@@ -91,7 +91,11 @@ Stored truth and `disguised_stats` SHALL be shown side by side; disguise SHALL b
 
 #### Scenario: Monster summary fields
 - **WHEN** a monster curated summary is rendered
-- **THEN** it includes species/variant/threat tier, approved-profile or interim numeric source, owning site or ambient placement, loot table, behaviour profile
+- **THEN** it includes species/variant/threat tier, approved-profile or interim numeric source, owning site or ambient placement, loot table, behaviour profile, and the shared resource, condition, and true-trait sections read through the authoritative status/character read model
+
+#### Scenario: A monster with sanctioned zero-maximum gauges renders its shared sections
+- **WHEN** a monster whose numeric source carries a zero MP/SP maximum (an approved-profile or tier-band zero) is rendered
+- **THEN** its resource, condition, and trait sections render from the stored state — the zero gauge shown as its stored value over a zero maximum — rather than degrading those sections to their unavailable form
 
 #### Scenario: Room summary fields
 - **WHEN** a room curated summary is rendered
@@ -172,6 +176,14 @@ Each curated summary section SHALL compute independently. A failed section SHALL
 #### Scenario: Corrupt section isolation
 - **WHEN** each summary section is independently made to fail, including a corrupt status-query source
 - **THEN** only that slot exposes its stable error and all unaffected sections remain readable
+
+#### Scenario: A sanctioned zero-maximum gauge is not a section failure
+- **WHEN** a monster summary's shared sections read a gauge whose maximum is a sanctioned zero
+- **THEN** no section slot carries an error and none reports `source_unavailable` for that reason
+
+#### Scenario: A negative-maximum gauge still fails its sections closed
+- **WHEN** a stored gauge's modifiers compute to a negative maximum
+- **THEN** each section routed through the status/character read model carries its stable error while unaffected sections remain readable
 
 #### Scenario: Lookup and length error matrix
 - **WHEN** requests target an absent object, an existing object of the wrong kind, a 2000-character recall query, or a 2001-character recall query

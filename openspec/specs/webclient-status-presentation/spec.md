@@ -5,7 +5,7 @@ Read-only compact character status derived from canonical resources, active cond
 ## Requirements
 
 ### Requirement: Compact status reports canonical true resources
-The available version-3 status panel SHALL contain exactly `schema_version: 3`, `available: true`, `actor`, `resources`, `conditions`, `disguise_active`, and `combat`. `resources` SHALL contain exactly `hp`, `mp`, and `sp`, each with non-negative JavaScript-safe integer `current` and positive safe integer `maximum`, with current not exceeding maximum. Resource values SHALL come directly from canonical traits and SHALL never call `get_display_value` or substitute `disguised_stats`.
+The available version-3 status panel SHALL contain exactly `schema_version: 3`, `available: true`, `actor`, `resources`, `conditions`, `disguise_active`, and `combat`. `resources` SHALL contain exactly `hp`, `mp`, `sp`, each with non-negative safe-integer `current` and non-negative safe-integer `maximum` not below current. Resource values SHALL come directly from canonical traits and SHALL never call `get_display_value` or substitute `disguised_stats`.
 
 #### Scenario: Active disguise does not alter resources
 - **WHEN** an actor has true HP 80/100, MP 40/60, SP 30/50 and display-only disguised values for any traits
@@ -14,6 +14,14 @@ The available version-3 status panel SHALL contain exactly `schema_version: 3`, 
 #### Scenario: Missing gauge fails closed
 - **WHEN** the active puppet lacks a valid required HP, MP, or SP gauge
 - **THEN** the status panel is unavailable at schema version 3 and does not report zero for the missing resource
+
+#### Scenario: A zero-maximum gauge is reported verbatim
+- **WHEN** the active puppet's canonical storage carries a required gauge whose computed maximum is zero with stored current zero, as sanctioned zero-MP/SP monster data produces
+- **THEN** the status panel stays available and reports that resource with current 0 and maximum 0, inventing nothing
+
+#### Scenario: A negative computed maximum fails closed
+- **WHEN** a required gauge's stored base/mod/mult compute to a negative maximum, or its stored current is nonzero while its maximum computes to zero
+- **THEN** the status panel is unavailable at schema version 3 rather than reporting the corrupt gauge
 
 #### Scenario: Status version cutover is exact
 - **WHEN** equivalent available and unavailable status payloads are checked at versions 2 and 3
