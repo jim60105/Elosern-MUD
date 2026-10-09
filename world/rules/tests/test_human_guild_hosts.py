@@ -7,6 +7,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from typeclasses.exits import Exit
@@ -91,6 +92,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         return hosts.sync_persistent_adventurers(people=self.people, profiles=self.profiles,
                                                qualifications=self.bindings)
 
+    @covers_requirement(
+        "human-guild-hosts::altoria-qualifications-select-one-persistent-adventurer-per-branch-and-target"
+    )
     def test_occupied_key_is_suffixed_once_and_reuse_preserves_all_live_state(self):
         create_object(NPC, key=self.person.name, location=self.room1)
         host, = self.sync()
@@ -109,6 +113,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         self.assertEqual(again.db.schedule_state, "busy")
         self.assertEqual(again.attributes.get(hosts.PERSON_ATTRIBUTE), self.person.key)
 
+    @covers_requirement(
+        "human-guild-hosts::normal-hosts-own-literal-bases-gear-and-usable-complete-human-skill-lineages"
+    )
     def test_normal_lineage_has_prerequisites_and_resolver_accepts_top_skill(self):
         host, = self.sync()
         self.assertTrue(can_use_skill(host, self.skill))
@@ -128,6 +135,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         self.assertEqual(host.db.equipment["armor"], "t_host_armor")
         self.assertEqual((host.db.age, host.db.apparent_age), (42, 39))
 
+    @covers_requirement(
+        "human-guild-hosts::altoria-qualifications-select-one-persistent-adventurer-per-branch-and-target"
+    )
     def test_qualification_selects_actual_person_when_hosts_colocate_and_fails_closed(self):
         for index in (1, 2):
             profile = replace(self.profile, key=f"t_other_profile_{index}")
@@ -156,6 +166,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
             hosts.qualification_for("t_other", "t_rank", people=self.people,
                                     qualifications=(replace(self.bindings[0], branch_key="t_other"),))
 
+    @covers_requirement(
+        "human-guild-hosts::normal-hosts-own-literal-bases-gear-and-usable-complete-human-skill-lineages"
+    )
     def test_invalid_age_gear_voice_or_duplicate_person_rejects_before_creation(self):
         before = NPC.objects.all_family().count()
         for bad in (True, -1, 10001):
@@ -180,6 +193,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
             self.sync()
         self.assertEqual((host.location, host.db.persona), before)
 
+    @covers_requirement(
+        "human-guild-hosts::hosts-live-in-connected-residences-and-traverse-authored-recurring-guild-visits"
+    )
     def test_connected_weekly_occurrences_traverse_real_exits_and_repeat(self):
         host, = self.sync()
         for start, end, destination in ((0, 10, self.frontage), (10, 40, self.guild),
@@ -190,6 +206,9 @@ class PersistentHumanGuildHostTests(EvenniaTest):
             self.assertEqual([event.kind for event in events], ["npc_departed", "npc_arrived"])
             self.assertEqual(host.db.schedule_state, "duty")
 
+    @covers_requirement(
+        "human-guild-hosts::hosts-live-in-connected-residences-and-traverse-authored-recurring-guild-visits"
+    )
     def test_locked_weekly_arrival_remains_absent_with_no_teleport(self):
         host, = self.sync()
         schedules.settle_npc_schedules(0, 10)
