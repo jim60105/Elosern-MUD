@@ -1,7 +1,7 @@
 # Remaining First-Batch Monster Resource Skills
 
 **Date:** 2026-10-10
-**Status:** Proposed, pending user approval. No implementation or balance verification is claimed.
+**Status:** Approved by the user on 2026-10-10 for the whole five-change batch; the approval record is §12. Approval covers the literals and prose below, not implementation status: only `sway-whistle-sparrow-resource-skill` is delivered first, and the remaining four species stay unimplemented until their own changes land.
 **Scope:** Five existing species and their ten existing non-crocodile variants. The approved 2026-10-09 shared-mechanism and crocodile sections remain unchanged.
 
 ## 1. Authority and approval boundary
@@ -195,3 +195,28 @@ Per change run focused affected Evennia labels using the approved test environme
 ## 11. Exact approval list
 
 Approve the shared prose-only environmental choice in §2; the declarations, targeting/audience/hit semantics, cost order and kit order in §3; and every ability key/label, element, coefficient, MP/SP price, buff key/duration/polarity/modifier, complete literal row, existing behavior-profile binding and quoted prose/author-note replacement in §§4–8. Approval of this batch amends the cited main-spec sentences so each cumulative “Approved delivered resource rows are literal” table becomes the pool approval record; the historical physical-axis table is not an MP/SP record. Existing physical axes and grades are retained, not newly calibrated. No separate MP scaling, resource reaction, recovery share or environment bonus is requested.
+
+## 12. 核准紀錄（2026-10-10）
+
+本節於使用者核准後追加，不修改上文任何已核准範圍與文字；上文各節的 “proposed / pending user
+approval” 敘述自本節起由下方紀錄取代，但文字本身不對應改寫（沿用
+`2026-10-05-monster-data-model-design.md`「平衡核准落地」的追加慣例）。
+
+使用者於 2026-10-10 在工作對話中，核准本文件 §11 所列的完整內容，範圍為下列五個變更，依 §9 的
+序列依序落地：
+
+1. `sway-whistle-sparrow-resource-skill`（§4，穗鳴雀）
+2. `tide-lamp-crab-resource-skill`（§5，潮燈蟹）
+3. `ridge-burrow-hare-resource-skill`（§6，築埂兔）
+4. `rock-echo-goat-resource-skill`（§7，岩響山羊）
+5. `fog-mane-lynx-resource-skill`（§8，霧鬃山貓）
+
+核准項目逐項對應 §11：§2 的共用「僅以文字描述環境條件」決策；§3 的宣告形狀、目標／受眾／
+命中相依語意、付費順序與套組順序；以及 §4–§8 各物種的技能鍵／標籤、元素、係數、MP/SP 價格、
+buff 鍵／持續時間／極性／修正值、完整數值列、既有行為設定檔綁定，與所有引號內的公布文字及
+作者註記替換。
+
+落地狀態（本節不宣告尚未落地的部分）：本批次的第一個落地變更為
+`sway-whistle-sparrow-resource-skill`；其餘四個物種的數值列與技能雖已核准，仍維持既有的零 MP/SP
+池與敘事邊界，須由各自的變更落地後才具可執行形式。核准不改變既有狩獵委託的物種／變體選擇器、
+個體危險評級，也不使任何未交付物種取得可執行能力。
