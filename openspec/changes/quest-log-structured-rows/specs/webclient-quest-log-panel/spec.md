@@ -58,7 +58,7 @@ The presentation registry SHALL register a `quest_log` panel at schema version 2
 
 #### Scenario: The reward object's exact shape
 - **WHEN** a row's `reward` is present
-- **THEN** it contains exactly `copper` and `merit` (non-negative safe integers) and `items`, a list of at most eight entries in the issuance's declared order, each containing exactly `item_key`, `display_name`, and a positive safe-integer `quantity`
+- **THEN** it contains exactly `copper` and `merit` (non-negative safe integers) and `items`, a list of at most one entry in the issuance's declared order, each containing exactly `item_key`, `display_name`, and a positive safe-integer `quantity`
 
 #### Scenario: Nullable lines and the always-enabled track descriptor
 - **WHEN** a row's `objective_note`, `deadline_line`, `rationale`, `flavor`, `reward`, and `track` are serialized
