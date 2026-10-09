@@ -201,7 +201,6 @@ def sync_persistent_adventurers(
                     if outcome.outcome == "rejected":
                         raise GuildHostIntegrityError(f"person {key!r} equipment rejected: {outcome.reason}")
                 set_npc_schedule(host, _bound_schedule(person, rooms))
-                host.db.schedule_state = "duty"
                 if live_key_taken_by_other(host):
                     host.key = f"{person.name}-{host.pk}"
                 host.save()
