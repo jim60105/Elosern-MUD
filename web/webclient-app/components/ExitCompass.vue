@@ -707,7 +707,9 @@ const deadR = DEAD_ZONE * PAD_R;
 </template>
 
 <style scoped>
-/* Geometry and colours follow the redesign prototype
+/* The shake rides the command-panel motion token (about 250 ms) and its
+   travel scales with `--motion-travel`, so `reduced` keeps no movement.
+   Geometry and colours follow the redesign prototype
    (docs/design/scene-overview-redesign/ExitCompassPrototype.vue). The pad's
    inner ground and the portal violet have no design token; they are kept as
    component-local custom properties so they live in one place. */
@@ -756,18 +758,18 @@ const deadR = DEAD_ZONE * PAD_R;
 }
 
 .exit-compass__svg--shake {
-  animation: exit-compass-shake 260ms var(--ease-standard);
+  animation: exit-compass-shake var(--motion-panel) var(--ease-standard);
 }
 
 @keyframes exit-compass-shake {
   20% {
-    transform: translateX(-3px);
+    transform: translateX(calc(-3px * var(--motion-travel)));
   }
   45% {
-    transform: translateX(3px);
+    transform: translateX(calc(3px * var(--motion-travel)));
   }
   70% {
-    transform: translateX(-2px);
+    transform: translateX(calc(-2px * var(--motion-travel)));
   }
 }
 
@@ -829,7 +831,7 @@ const deadR = DEAD_ZONE * PAD_R;
 
 .exit-compass__pip {
   fill: var(--gold-500);
-  transition: r 100ms;
+  transition: r var(--motion-fast);
 }
 .exit-compass__pip--on {
   fill: var(--gold-300);
@@ -885,8 +887,8 @@ const deadR = DEAD_ZONE * PAD_R;
   stroke: var(--compass-rim);
   stroke-width: 1.8;
   transition:
-    cx 90ms var(--ease-standard),
-    cy 90ms var(--ease-standard);
+    cx var(--motion-fast) var(--ease-standard),
+    cy var(--motion-fast) var(--ease-standard);
 }
 .exit-compass__knob--lit {
   stroke: var(--gold-300);
