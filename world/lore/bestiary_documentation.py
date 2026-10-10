@@ -17,6 +17,7 @@ relationship check.
 """
 
 import yaml
+import re
 from dataclasses import dataclass
 
 from world.lore.monster_species import published_species_view, published_variant_view
@@ -45,6 +46,10 @@ BLOCK_REQUIRED_KEYS = (
     "public-fields",
     "status",
 )
+#: The three faces every editorial entry has to record, plus its disposition.
+LEDGER_FACES = ("ecology narrative", "ability limits", "historic vs current")
+LEDGER_ROW = re.compile(r"^\|\s*`(?P<key>[a-z0-9_]+)`\s*\|(?P<cells>.+?)\|\s*$")
+LEDGER_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 @dataclass(frozen=True)
@@ -64,6 +69,69 @@ class BestiaryDocument:
 
     current: tuple[BestiarySection, ...]
     historical: tuple[BestiarySection, ...]
+
+
+@dataclass(frozen=True)
+class EditorialEntry:
+    """One indexed editorial review of a current species section."""
+
+    species_key: str
+    reviewed: str
+    faces: tuple[str, ...]
+    disposition: str
+
+
+def parse_editorial_ledger(text: str) -> tuple[EditorialEntry, ...]:
+    """Parse the ledger's indexed rows: ``| `key` | date | face | face | face | disposition |``."""
+    entries: list[EditorialEntry] = []
+    for line in text.splitlines():
+        match = LEDGER_ROW.match(line.strip())
+        if match is None:
+            continue
+        cells = [cell.strip() for cell in match.group("cells").split("|")]
+        entries.append(
+            EditorialEntry(
+                species_key=match.group("key"),
+                reviewed=cells[0] if cells else "",
+                faces=tuple(cells[1:-1]),
+                disposition=cells[-1] if len(cells) > 1 else "",
+            )
+        )
+    return tuple(entries)
+
+
+def check_editorial_ledger(species_rows, entries: tuple[EditorialEntry, ...]) -> tuple[str, ...]:
+    """Return one problem per broken ledger relationship (empty when valid).
+
+    The record proves coverage - every current species was reviewed on a stated
+    date with a disposition for each face - and never judges the prose itself
+    nor claims the review is still fresh.
+    """
+    problems: list[str] = []
+    seen: set[str] = set()
+    for entry in entries:
+        if entry.species_key in seen:
+            problems.append(f"{entry.species_key}: reviewed more than once")
+            continue
+        seen.add(entry.species_key)
+        if entry.species_key not in species_rows:
+            problems.append(f"{entry.species_key}: ledger entry for an unshipped species")
+        if LEDGER_DATE.match(entry.reviewed) is None:
+            problems.append(
+                f"{entry.species_key}: review date {entry.reviewed!r} is not YYYY-MM-DD"
+            )
+        if len(entry.faces) != len(LEDGER_FACES):
+            problems.append(
+                f"{entry.species_key}: records {len(entry.faces)} reviewed faces, "
+                f"expected {len(LEDGER_FACES)}"
+            )
+        elif not all(entry.faces):
+            problems.append(f"{entry.species_key}: a reviewed face carries no disposition")
+        if not entry.disposition:
+            problems.append(f"{entry.species_key}: carries no overall disposition")
+    for key in sorted(set(species_rows) - seen):
+        problems.append(f"{key}: no editorial review entry")
+    return tuple(problems)
 
 
 def _split_sections(lines: list[str], *, is_current: bool) -> list[BestiarySection]:

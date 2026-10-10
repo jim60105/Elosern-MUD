@@ -27,6 +27,8 @@ from world.lore.bestiary_documentation import (
     DELIVERED,
     NARRATIVE,
     check_bestiary_documentation,
+    check_editorial_ledger,
+    parse_editorial_ledger,
     parse_bestiary_document,
 )
 from world.lore.monster_species import (
@@ -36,6 +38,12 @@ from world.lore.monster_species import (
 from world.tests.synthetic_data import make_monster_species, make_monster_variant
 
 BESTIARY = pathlib.Path(__file__).resolve().parents[3] / "docs" / "lore" / "bestiary.md"
+LEDGER = (
+    pathlib.Path(__file__).resolve().parents[3]
+    / "docs"
+    / "development"
+    / "bestiary-editorial-review.md"
+)
 REQUIREMENT = (
     "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
 )
@@ -314,3 +322,54 @@ class BestiaryRelationshipFaultTests(unittest.TestCase):
         empty_body = self.valid.replace("合成敘述段落。", "")
         problems = self._problems(empty_body)
         self.assertIn("t_doc_species: current section carries no prose body", problems)
+
+
+class EditorialLedgerTests(unittest.TestCase):
+    """Requirement: indexed review coverage, never prose judgement."""
+
+    def _entries(self, *rows: str):
+        return parse_editorial_ledger("\n".join(rows))
+
+    @covers_requirement(REQUIREMENT)
+    def test_every_shipped_species_has_one_dated_review_entry(self):
+        entries = parse_editorial_ledger(LEDGER.read_text(encoding="utf-8"))
+        self.assertEqual(
+            {entry.species_key for entry in entries}, set(MONSTER_SPECIES_REGISTRY)
+        )
+        self.assertEqual(
+            check_editorial_ledger(MONSTER_SPECIES_REGISTRY, entries), ()
+        )
+
+    @covers_requirement(REQUIREMENT)
+    def test_ledger_relationship_faults_are_named(self):
+        rows = {"t_doc_species": object()}
+        valid = "| `t_doc_species` | 2026-01-01 | ecology read | boundary read | status read | accepted |"
+        self.assertEqual(check_editorial_ledger(rows, self._entries(valid)), ())
+
+        problems = check_editorial_ledger(rows, self._entries(valid, valid))
+        self.assertIn("t_doc_species: reviewed more than once", problems)
+
+        orphan = "| `t_doc_retired` | 2026-01-01 | a | b | c | accepted |"
+        problems = check_editorial_ledger(rows, self._entries(valid, orphan))
+        self.assertIn("t_doc_retired: ledger entry for an unshipped species", problems)
+
+        undated = "| `t_doc_species` | yesterday | a | b | c | accepted |"
+        problems = check_editorial_ledger(rows, self._entries(undated))
+        self.assertIn(
+            "t_doc_species: review date 'yesterday' is not YYYY-MM-DD", problems
+        )
+
+        short = "| `t_doc_species` | 2026-01-01 | a | b | accepted |"
+        problems = check_editorial_ledger(rows, self._entries(short))
+        self.assertIn("t_doc_species: records 2 reviewed faces, expected 3", problems)
+
+        blank_face = "| `t_doc_species` | 2026-01-01 | a |  | c | accepted |"
+        problems = check_editorial_ledger(rows, self._entries(blank_face))
+        self.assertIn("t_doc_species: a reviewed face carries no disposition", problems)
+
+        silent = "| `t_doc_species` | 2026-01-01 | a | b | c |  |"
+        problems = check_editorial_ledger(rows, self._entries(silent))
+        self.assertIn("t_doc_species: carries no overall disposition", problems)
+
+        problems = check_editorial_ledger(rows, ())
+        self.assertIn("t_doc_species: no editorial review entry", problems)

@@ -126,6 +126,29 @@ reload. Refresh tests age an actual mount before reapplication; comparing two
 fresh mounts cannot detect a stale refresh lifetime. New species reuse these
 shared mechanisms instead of cloning exhaustive per-species vectors.
 
+### Documenting a species
+
+A current bestiary section carries a bounded `bestiary` index next to its prose:
+the species key, its parent species key, its default variant, every variant it
+owns with its kit-backed executable status, and the public registry fields the
+section documents. Author the prose freely - rewording it never fails a check -
+but keep the index truthful: a key, parent, ownership, field or status edit is
+what the structural relationship check
+(`world/lore/bestiary_documentation.py`, driven from
+`world/lore/tests/test_bestiary_documentation.py`) verifies, and it rejects
+missing, duplicated, orphaned, mis-parented, field-incomplete, private-field and
+status-mismatched entries by naming the key and the relationship. Historical
+appendices belong behind the document's historical boundary marker and never
+count as current coverage.
+
+Whether the prose is *any good* is not something a test can assert. Each current
+species therefore needs one dated entry in the indexed editorial ledger
+(`docs/development/bestiary-editorial-review.md`) recording what was reviewed -
+its ecology narrative, its ability limits and the historic/current separation -
+and the disposition. Add or update that entry in the same change that rewrites a
+species' current section; the ledger's structural check proves coverage, never
+freshness or semantic accuracy.
+
 ## 參考文件
 
 [世界觀總覽](/lore/overview) 說明大陸地理、種族、政治、經濟與信仰。[魔法技能體系](/lore/magic-system) 說明元素作用、神性資格與尚未解答的魔法謎團。涉及具體聚落的創作，請另對照 [聚落地點指南](/lore/settlement-locations)。

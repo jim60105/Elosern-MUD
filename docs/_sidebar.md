@@ -55,6 +55,7 @@
   - [新增物品指南](/development/adding-items)
   - [新增角色模板指南](/development/adding-player-presets)
   - [新增 NPC 指南](/development/adding-npcs)
+  - [魔物圖鑑編輯審查紀錄](/development/bestiary-editorial-review)
   - [設定與環境變數](/development/settings-and-environment)
   - [官方美術部署](/development/official-artwork-deployment)
   - [開發資料庫重置手冊](/development/database-reset)
