@@ -107,6 +107,7 @@
         "world.rules.tests.test_friendly_fire",
         "world.rules.tests.test_crocodile_resource_skill",
         "world.rules.tests.test_sway_whistle_sparrow_resource_skill",
+        "world.rules.tests.test_tide_lamp_crab_resource_skill",
         "world.rules.tests.test_gauge_transfer",
         "world.rules.tests.test_gm",
         "world.rules.tests.test_church",
