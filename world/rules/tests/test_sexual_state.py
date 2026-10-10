@@ -101,10 +101,12 @@ class SexualStateTests(EvenniaTestCase):
 
     def test_reconstructing_handler_preserves_live_persistent_state(self):
         entity = create_object(PlayerCharacter, key="persistent state")
-        entity.sexual.pleasure.base = 60
+        band = PLEASURE_CONFIG.bands[3]
+        entity.sexual.pleasure.base = band.floor
         entity.sexual.record_climax()
         rebuilt = SexualState(entity)
-        self.assertEqual(rebuilt.arousal.level, "高度")
+        self.assertEqual(rebuilt.pleasure.value, band.floor)
+        self.assertEqual(rebuilt.arousal.level, band.level)
         self.assertEqual(rebuilt.climax_today, 1)
 
 
@@ -238,27 +240,35 @@ class SexualStateMutatorTests(EvenniaTestCase):
         self.assertTrue(state.virgin)
 
 
-# The documented pleasure→arousal band table (design D-1). The test pins the
-# documented values literally so a balance edit cannot drift unnoticed.
-DOCUMENTED_BANDS = (
-    (0, 14, "平靜", 0),
-    (15, 34, "微興奮", 1),
-    (35, 59, "中等", 2),
-    (60, 84, "高度", 3),
-    (85, 100, "極限", 4),
-)
-
-
 class PleasureBandTableTests(unittest.TestCase):
-    """Every pleasure value in 0..100 maps to its documented arousal level."""
+    """The shipped band table is well formed and its lookups agree with it.
 
-    def test_every_value_maps_to_its_documented_band(self):
-        for floor, ceiling, level, ordinal in DOCUMENTED_BANDS:
-            for value in range(floor, ceiling + 1):
-                with self.subTest(value=value, level=level):
-                    self.assertEqual(PLEASURE_CONFIG.ordinal_for(value), ordinal)
-                    self.assertEqual(PLEASURE_CONFIG.floor_for(value), floor)
-                    self.assertEqual(PLEASURE_CONFIG.floor_for_level(level), floor)
+    The band boundaries are authored rulebook data (``sexual_pleasure.yaml``):
+    asserting a copied boundary table here would make every tuning edit an
+    expected-data edit. Detected defects: a band whose own floor/ceiling does
+    not resolve back to it (an ordinal or floor lookup off-by-one), and a band
+    table that stops covering ``0..100`` contiguously in vocabulary order.
+    """
+
+    def test_bands_cover_zero_to_100_contiguously_in_vocabulary_order(self):
+        bands = PLEASURE_CONFIG.bands
+        self.assertEqual([band.level for band in bands], list(AROUSAL_LEVELS))
+        self.assertEqual(bands[0].floor, 0)
+        self.assertEqual(bands[-1].ceiling, 100)
+        for lower, upper in zip(bands, bands[1:]):
+            with self.subTest(lower=lower.level, upper=upper.level):
+                self.assertEqual(lower.ceiling + 1, upper.floor)
+
+    def test_lookup_agrees_with_the_declared_bands(self):
+        for ordinal, band in enumerate(PLEASURE_CONFIG.bands):
+            with self.subTest(level=band.level):
+                self.assertEqual(PLEASURE_CONFIG.ordinal_for(band.floor), ordinal)
+                self.assertEqual(PLEASURE_CONFIG.ordinal_for(band.ceiling), ordinal)
+                self.assertEqual(PLEASURE_CONFIG.floor_for(band.floor), band.floor)
+                self.assertEqual(PLEASURE_CONFIG.floor_for(band.ceiling), band.floor)
+                self.assertEqual(
+                    PLEASURE_CONFIG.floor_for_level(band.level), band.floor
+                )
 
 
 class PleasureConfigValidationTests(unittest.TestCase):
@@ -300,9 +310,24 @@ class PleasureConfigValidationTests(unittest.TestCase):
         )
         return path
 
-    def test_canonical_table_loads_and_matches_the_singleton(self):
-        config = load_pleasure_config(path=self._write(self._valid()))
-        self.assertEqual(config, PLEASURE_CONFIG)
+    def test_a_declared_table_loads_with_its_own_values(self):
+        # The expected bands come from the same test-owned declaration that is
+        # handed to the loader, never from the shipped singleton: this detects
+        # a loader that drops, reorders or swaps a band's level/floor/ceiling
+        # or a multiplier, without pinning the shipped tuning.
+        data = self._valid()
+        config = load_pleasure_config(path=self._write(data))
+        self.assertEqual(
+            [(band.level, band.floor, band.ceiling) for band in config.bands],
+            [
+                (entry["level"], entry["floor"], entry["ceiling"])
+                for entry in data["pleasure_bands"]
+            ],
+        )
+        self.assertEqual(
+            config.sensitivity_multipliers, data["sensitivity_multipliers"]
+        )
+        self.assertEqual(config.shame_multipliers, data["shame_multipliers"])
 
     def test_band_gap_raises_at_load(self):
         data = self._valid()
@@ -368,10 +393,14 @@ class PleasureConfigValidationTests(unittest.TestCase):
 class PleasureConstructionTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::pleasure-is-constructed-from-an-imported-baseline-s-arousal-level-at-that-level-s-band-floor")
     def test_imported_arousal_level_resolves_to_its_band_floor(self):
+        # Detected defect: construction ignores the imported arousal level and
+        # starts at the wrong band floor (e.g. 0 or another band's floor).
+        level = AROUSAL_LEVELS[1]
+        band = PLEASURE_CONFIG.bands[1]
         entity = create_object(PlayerCharacter, key="imported arousal")
-        entity.db.sexual = {"arousal": "微興奮", "virgin": True, "sensitivity": {}}
-        self.assertEqual(entity.sexual.pleasure.value, 15)
-        self.assertEqual(entity.sexual.arousal.level, "微興奮")
+        entity.db.sexual = {"arousal": level, "virgin": True, "sensitivity": {}}
+        self.assertEqual(entity.sexual.pleasure.value, band.floor)
+        self.assertEqual(entity.sexual.arousal.level, level)
 
     @covers_requirement("sexual-state-handler::pleasure-is-constructed-from-an-imported-baseline-s-arousal-level-at-that-level-s-band-floor")
     def test_omitted_arousal_defaults_to_the_floor_levels_pleasure_floor(self):
@@ -404,22 +433,32 @@ class PleasureBoundsTests(EvenniaTestCase):
 
 class DerivedArousalTests(EvenniaTestCase):
     @covers_requirement("sexual-state-handler::arousal-is-a-derived-read-only-view-over-pleasure-comparable-exactly-as-before")
-    def test_mid_band_pleasure_reads_the_covering_level(self):
-        entity = create_object(PlayerCharacter, key="mid band")
-        entity.sexual.pleasure.base = 72
-        self.assertEqual(entity.sexual.arousal.value, 3)
-        self.assertEqual(entity.sexual.arousal.level, "高度")
+    def test_every_band_floor_reads_its_covering_level(self):
+        # Detected defect: the derived view resolves a pleasure value to the
+        # wrong band (an off-by-one in the band lookup). Expected levels are
+        # read from the declaration's own bands, never from a copied boundary.
+        for ordinal, band in enumerate(PLEASURE_CONFIG.bands):
+            with self.subTest(level=band.level):
+                entity = create_object(PlayerCharacter, key=f"band {ordinal}")
+                entity.sexual.pleasure.base = band.floor
+                self.assertEqual(entity.sexual.arousal.level, band.level)
+                self.assertEqual(entity.sexual.arousal.value, ordinal)
         self.assertEqual(entity.sexual.arousal.levels, AROUSAL_LEVELS)
 
     @covers_requirement("sexual-state-handler::arousal-is-a-derived-read-only-view-over-pleasure-comparable-exactly-as-before")
     def test_comparisons_against_the_vocabulary_work_exactly_as_before(self):
+        # Detected defect: the derived view loses its ordered comparison
+        # surface (equality/ordering against the vocabulary or a raw ordinal).
+        top_ordinal = len(PLEASURE_CONFIG.bands) - 1
+        top = PLEASURE_CONFIG.bands[top_ordinal]
+        below = PLEASURE_CONFIG.bands[top_ordinal - 1]
         entity = create_object(PlayerCharacter, key="compare")
-        entity.sexual.pleasure.base = 90
-        self.assertTrue(entity.sexual.arousal >= "高度")
-        self.assertTrue(entity.sexual.arousal == "極限")
-        self.assertTrue(entity.sexual.arousal > "中等")
-        self.assertFalse(entity.sexual.arousal < "極限")
-        self.assertTrue(entity.sexual.arousal <= 4)
+        entity.sexual.pleasure.base = top.ceiling
+        self.assertTrue(entity.sexual.arousal == top.level)
+        self.assertTrue(entity.sexual.arousal >= top.level)
+        self.assertTrue(entity.sexual.arousal > below.level)
+        self.assertFalse(entity.sexual.arousal < top.level)
+        self.assertTrue(entity.sexual.arousal <= top_ordinal)
 
     @covers_requirement("sexual-state-handler::arousal-is-a-derived-read-only-view-over-pleasure-comparable-exactly-as-before")
     def test_direct_assignment_to_arousal_raises(self):
