@@ -2,6 +2,8 @@
 
 This is the exhaustive current-requirement disposition for the selected families, based on the main specs at `afa974d4`. Canonical current IDs come from `uv run --locked python -m tools.spec_traceability list --json-output ...`, not manual normalization. Delta files are authoritative full replacements. Legacy scenario **headings** remain under MODIFIED because strict validation requires them; their bodies cease asserting shipped identities. A REMOVED heading retires its ID. New IDs must be generated from the future effective specs during apply.
 
+Every MODIFIED block preserves all original scenario headings and unrelated assertions with zero coverage loss. In particular, the large `sample-city-altoria` xyzgrid block keeps every topology, permanent-interior and doorway scenario; only selected merchandise-membership bodies change. The 164 discovered planning annotation sites are Python decorators, not a count-based completion bound for JS or metadata.
+
 ## 1+5 Monster
 
 ### `monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill`

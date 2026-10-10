@@ -50,6 +50,10 @@ Every shipped host dialogue SHALL retain its declared service interactions, boun
 - **WHEN** the authored dialogue corpus is reviewed
 - **THEN** every live host/table is covered, including newly added sources; keyword actions and service behavior remain verified
 
+#### Scenario: Editorial evidence has complete source coverage
+- **WHEN** the characterization review ledger is checked against actual live sources
+- **THEN** each source has one dated review/disposition entry, missing or orphan entries fail, and the check makes no claim to prove prose quality or judgment freshness
+
 #### Scenario: Rewording
 - **WHEN** a valid greeting, response or misunderstanding line is reworded
 - **THEN** behavior and coverage tests pass without updating expected prose; no command/mechanic/UI term or shared placeholder is accepted

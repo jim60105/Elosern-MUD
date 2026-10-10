@@ -2,6 +2,8 @@
 
 All pending changes remain untouched. Approval must acknowledge the following consequences, not silently authorize their repair.
 
+All other non-archived `openspec/changes/*` directories are read-only for this proposal and its implementation tasks. “Later owner action” below records a separately authorized future decision; none is a task to edit those proposals in this change.
+
 ## D1: Twelve MODIFIED targets become nonexistent
 
 Each row below occurs in **each** of `ridge-burrow-hare-resource-skill`, `rock-echo-goat-resource-skill` and `fog-mane-lynx-resource-skill`. Thus four broken blocks per proposal, twelve total. REMOVED plus ADDED is deliberate; no compatibility heading is retained.
@@ -14,6 +16,8 @@ Each row below occurs in **each** of `ridge-burrow-hare-resource-skill`, `rock-e
 | `specs/monster-resource-abilities/spec.md` | Crocodile ecology documents implemented limits | Bestiary documentation covers keyed public content relationships | Update keyed documentation links/status and editorial evidence, not a fixed still-deferred species list or verbatim sentence requirement |
 
 All four target names are removed by this proposal. If these old deltas are applied after the generalization, target lookup is structurally invalid. Independently, their numeric approval tables and named completed/deferred lists are semantically incompatible with the new contract. The current strict failures are deferred and must not be repaired by this proposal.
+
+Owner refresh must copy the complete then-current replacement blocks, including every required scenario heading and its body, rather than merely substitute the four target names. Re-evaluate all blocks the owner touches against apply-time specs; this precaution does not identify additional broken MODIFIED targets beyond the twelve listed above.
 
 ## Eighteen old-shaped ADDED blocks need later redesign
 

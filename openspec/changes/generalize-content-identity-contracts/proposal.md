@@ -23,9 +23,11 @@ None. Existing owners retain their contracts.
 
 `monster-species-registry`, `monster-resource-abilities`, `monster-action-policy`, `monster-individual-construction`, `npc-profile-registry`, `npc-identity-titles`, `sample-city-altoria`, `altoria-hospitality`, `altoria-learning-and-exchange`, `altoria-crown-and-watch`, `altoria-sanctum`, `ciaran-village-commons`, `ciaran-village-crafts`, `ciaran-village-commerce`, `guild-registration`, `title-system`, `quest-reward-settlement`, `equipment-effects`, `commerce-assortments`, `shop-economy`, `lore-registries`, `place-attendant-hosts`, `lore-item-catalog`, `human-guild-hosts` and `webclient-contextual-hud`. The exhaustive requirement-level disposition is in `scope-inventory.md`.
 
+`military-equipment`, `guild-exam-restrictions` and `guild-rank-exams` are retained dependencies, not modified capabilities. The named military exception creates no delta for them.
+
 ## Impact
 
-One planning-only change on `master`; implementation needs the serial packages in `design.md`. No code, existing proposal, main spec, archive or compatibility/save migration is changed by this proposal. Places/settlements, clergy titles, skill names, sexual-act catalogs and balance values are excluded.
+One planning-only change on `master`; implementation needs the serial packages in `design.md`. No code, existing proposal, main spec, archive or compatibility/save migration is changed by this proposal. Every other non-archived `openspec/changes/*` directory is read-only both now and for this proposal's implementation tasks. Places/settlements, clergy titles, skill names, sexual-act catalogs and balance values are excluded.
 
 ## Approval decisions
 
