@@ -21,11 +21,13 @@
  * retired tab root (webclient-retire-exploration-submenus).
  *
  * The AVG scene overview (webclient-scene-overview-component, AVG stage
- * design §7): `overviewMenu` flattens the exits, the people, the objects,
- * and a footer (查看房間 ‧ 等待／休息 ‧ 建議) into ONE reading-order menu
- * with a `sections` index and `geometry: "sections"` for the router, and
+ * design §7): `overviewMenu` flattens the people, the objects, and a footer
+ * (查看房間 ‧ 等待／休息 ‧ 建議) into ONE reading-order menu with a
+ * `sections` index and `geometry: "sections"` for the router, and
  * `verbMenuFor` is a person chip's verb popover (the target's affordances
  * plus 查看). `overviewMenu` is the exploration root the resolver serves.
+ * The exits are not part of it: the exit compass (exploration-exit-compass)
+ * reads them through `exitTargets`, outside the router's root frame.
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -195,7 +197,8 @@
   }
 
   // -------------------------------------------------------------------------
-  // Exit (move) rows — the scene overview's 出口 chips.
+  // Exit (move) rows — the exit compass's targets and the dialogue screen's
+  // exit rows (the retired 出口 chips' builder, unchanged).
   // -------------------------------------------------------------------------
 
   function moveItems(panel, currentNode) {
@@ -235,6 +238,15 @@
       items.push(item);
     });
     return items;
+  }
+
+  // The exit compass's rows (exploration-exit-compass design D2): exactly
+  // the `moveItems` rows — keys, payloads, and disabled reasons unchanged —
+  // for the committed current node. They live outside the router's root
+  // frame, so the compass and the dialogue exits list read them here.
+  function exitTargets(panel, options) {
+    options = options || {};
+    return moveItems(panel, options.currentNode || null);
   }
 
   // -------------------------------------------------------------------------
@@ -580,15 +592,14 @@
   // Scene overview (webclient-scene-overview-component design D1).
   // -------------------------------------------------------------------------
 
-  // One flat menu in reading order — 出口, 人物, 物件, then the label-less
-  // footer — with `sections: [{key, label, count}]` naming the non-empty
+  // One flat menu in reading order — 人物, 物件, then the label-less footer
+  // (the exits left for the exit compass, exploration-exit-compass) — with `sections: [{key, label, count}]` naming the non-empty
   // rows. Item shapes reuse the existing builders so payloads stay
   // byte-identical. `geometry: "sections"` tells the router how the arrow
   // keys cross rows; the menu carries no `grid` flag, so focus projects as a
   // list (the focus index is the reading-order index).
   function overviewMenu(panel, options) {
     options = options || {};
-    var currentNode = options.currentNode || null;
     var suggestions = options.suggestions || null;
     var sections = [];
     var items = [];
@@ -600,11 +611,6 @@
       sections.push({ key: key, label: label, count: rows.length });
       Array.prototype.push.apply(items, rows);
     }
-
-    // 出口: the exit chip builder's rows verbatim. It carries no back row and
-    // no empty placeholder, so a room with no exits omits the section instead
-    // of rendering a dead row.
-    addSection("exits", "出口", moveItems(panel, currentNode));
 
     // 人物: every interact target opens its verb popover (always enabled:
     // the popover has at least 查看), then a look chip for each present
@@ -727,6 +733,7 @@
      buildMenus: buildMenus,
      navigationItems: navigationItems,
      moveItems: moveItems,
+     exitTargets: exitTargets,
      lookItems: lookItems,
      waitItems: waitItems,
      targetMenuFor: targetMenuFor,

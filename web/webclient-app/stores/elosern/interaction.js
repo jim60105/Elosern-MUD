@@ -190,10 +190,51 @@ export function applyInteraction(ctx) {
     return ctx.router.focusItemByKey(key);
   };
 
+  // The submission gate the router applies behind `focusConfirm` (the
+  // frozen router's own `confirm` checks): a mutation in flight or a declared
+  // presentation revision not yet committed refuses every new submission.
+  ctx.explorationSubmitLocked = function explorationSubmitLocked() {
+    return ctx.router.isMutationInFlight() || ctx.router.isAwaitingRevision();
+  };
+
+  // The exit compass's activation (exploration-exit-compass design D2): the
+  // compass lives outside the router's root frame, so it runs the same gate
+  // `focusConfirm` runs — exploration form, in-flight and awaiting-revision
+  // lock, the row's server-authored `enabled` flag — over the exit row
+  // re-resolved from the committed panels at THIS moment (a stale or
+  // duplicate activation cannot submit), and hands the row to the one
+  // exploration submit handler, so the payload, the command echo, and the
+  // connection lock inside `dispatchAction` are exactly the old exit chip's.
+  ctx.activateExit = function activateExit(exitRef) {
+    const rs = ctx.reducer.getState();
+    if (!ctx.dockOnExplorationForm(rs)) {
+      return { sent: false, reason: "mode" };
+    }
+    if (ctx.explorationSubmitLocked()) {
+      return { sent: false, reason: "locked" };
+    }
+    const ref = String(exitRef);
+    const item = ctx.frameResolver
+      .explorationExits()
+      .rows.find((row) => row.key === "exit-" + ref || (row.payload && String(row.payload.exit_ref) === ref));
+    if (!item) {
+      return { sent: false, reason: "missing" };
+    }
+    if (!item.enabled) {
+      return { sent: false, reason: "disabled", item };
+    }
+    const before = ctx.lastSubmittedRequestId;
+    ctx.handleExplorationItem(item);
+    if (ctx.lastSubmittedRequestId === before) {
+      return { sent: false, reason: "refused" };
+    }
+    return { sent: true, requestId: ctx.lastSubmittedRequestId };
+  };
+
   // Both navigation bars use the committed root's intents. Reference entries
   // live only in the top bar, so activating one must not focus a hidden row.
   ctx.tabToRootAndConfirm = function tabToRootAndConfirm(itemKey, source) {
-    if (ctx.router.isMutationInFlight() || ctx.router.isAwaitingRevision()) return;
+    if (ctx.explorationSubmitLocked()) return;
     while (ctx.router.depth() > 1) {
       if (!ctx.router.popMenu()) return;
     }

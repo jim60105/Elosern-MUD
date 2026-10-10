@@ -8,6 +8,10 @@
 // webclient-scene-overview-swap: the dock's root frame is the scene overview,
 // so its chips in reading order are the root frame's rendered rows, and a
 // person chip's verb popover is the root's one child frame.
+//
+// exploration-exit-compass: the exits left the root frame for the exit
+// compass, so the digits address the people, the objects, and the footer
+// only; no digit ever moves.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -45,9 +49,10 @@ function sixSkillCategory() {
   ];
 }
 
-// The nine-chip overview: three exits, two person chips, one object chip, and
-// the three footer chips (查看房間 ‧ 等待／休息 ‧ 建議), in reading order.
-const NINE_CHIP_OVERRIDES = {
+// The six-chip overview: two person chips, one object chip, and the three
+// footer chips (查看房間 ‧ 等待／休息 ‧ 建議), in reading order. The three
+// exits are the compass's and take no slot.
+const SIX_CHIP_OVERRIDES = {
   move: [
     { exit_ref: "east", label: "東", destination: "room:43", enabled: true, disabled_reason: null },
     {
@@ -78,10 +83,7 @@ const NINE_CHIP_OVERRIDES = {
   ],
 };
 
-const NINE_CHIP_KEYS = [
-  "exit-east",
-  "exit-north",
-  "exit-west",
+const SIX_CHIP_KEYS = [
   "target-7",
   "target-8",
   "object-3",
@@ -90,9 +92,7 @@ const NINE_CHIP_KEYS = [
   "suggestions",
 ];
 
-const SIX_CHIP_KEYS = [
-  "exit-east",
-  "exit-north",
+const FOUR_CHIP_KEYS = [
   "target-7",
   "object-3",
   "look-room",
@@ -110,8 +110,8 @@ describe("dock digit row picks (1–9)", () => {
   }
 
   // The exploration root: the scene overview, whose chips are the root
-  // frame's rendered rows — exit-east (enabled), exit-north (disabled),
-  // target-7, object-3, look-room, wait, suggestions.
+  // frame's rendered rows — target-7, object-3, look-room, wait,
+  // suggestions (the exits are the compass's).
   function openOverview(explorationOverrides = undefined, contextActions = undefined) {
     const panels = {
       exploration: fx.explorationPanel(explorationOverrides),
@@ -146,25 +146,28 @@ describe("dock digit row picks (1–9)", () => {
     store.setSender(sender);
   });
 
-  it("digit 1 picks the first chip and submits it exactly as Enter would", () => {
-    openSession();
-    openOverview();
-    expect(store.focusPress("1")).toBe(true);
-    expect(store.view.focus.key).toBe("exit-east");
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.move",
-      payload: { exit_ref: "east" },
-    });
-  });
-
-  it("digit 2 moves focus onto a disabled chip, shows its explanation, and submits nothing", () => {
+  it("digit 2 picks the object chip and submits it exactly as Enter would", () => {
     openSession();
     openOverview();
     expect(store.focusPress("2")).toBe(true);
-    expect(store.view.focus.key).toBe("exit-north");
-    expect(store.view.focus.enabled).toBe(false);
-    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.focus.key).toBe("object-3");
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.look",
+      payload: { target_id: 3 },
+    });
+  });
+
+  it("no digit addresses an exit: the root frame carries none", () => {
+    openSession();
+    openOverview(SIX_CHIP_OVERRIDES, fx.explorationActions());
+    const keys = store.router.currentMenu().items.map((i) => i.key);
+    expect(keys.some((key) => key.startsWith("exit-"))).toBe(false);
+    for (const digit of ["1", "2", "3", "4", "5", "6"]) {
+      store.focusPress(digit);
+      store.focusEscape();
+    }
+    expect(sender.sent.actions.some((action) => action.action_id === "explore.move")).toBe(false);
   });
 
   it("a digit beyond the frame's row count is unclaimed and submits nothing", () => {
@@ -191,27 +194,27 @@ describe("dock digit row picks (1–9)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the overview's chips follow reading order: digit 3 opens the person's verb popover", () => {
+  it("the overview's chips follow reading order: digit 1 opens the person's verb popover", () => {
     openSession();
     openOverview();
-    // The overview renders exits, then people, then objects, then the
-    // footer, so slot 3 is the person chip.
-    expect(store.router.currentMenu().items[2].key).toBe("target-7");
-    expect(store.focusPress("3")).toBe(true);
+    // The overview renders people, then objects, then the footer, so slot 1
+    // is the person chip.
+    expect(store.router.currentMenu().items[0].key).toBe("target-7");
+    expect(store.focusPress("1")).toBe(true);
     expect(store.view.dockSource).toBe("exploration.target");
     expect(store.view.dockDepth).toBe(2);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("digits 5–9 pick the overview's later chips in reading order", () => {
+  it("digits 2–6 pick the overview's later chips in reading order", () => {
     openSession();
     // The default envelope is `generating`, so the footer carries the 建議
-    // chip and the overview holds exactly nine chips.
-    openOverview(NINE_CHIP_OVERRIDES, fx.explorationActions());
-    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(NINE_CHIP_KEYS);
+    // chip and the overview holds exactly six chips.
+    openOverview(SIX_CHIP_OVERRIDES, fx.explorationActions());
+    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(SIX_CHIP_KEYS);
 
-    // 5 -> the second person chip: its verb popover opens, nothing submits.
-    expect(store.focusPress("5")).toBe(true);
+    // 2 -> the second person chip: its verb popover opens, nothing submits.
+    expect(store.focusPress("2")).toBe(true);
     expect(store.view.dockSource).toBe("exploration.target");
     expect(store.view.dockDepth).toBe(2);
     // The popover is scoped to the chip's own target.
@@ -220,16 +223,16 @@ describe("dock digit row picks (1–9)", () => {
     expect(store.focusEscape()).toBe(true);
     expect(store.view.dockDepth).toBe(1);
 
-    // 9 -> the ninth chip is the footer's 建議 chip: it pushes the suggestions
-    // frame through the ordinary confirmation path.
-    expect(store.focusPress("9")).toBe(true);
+    // 6 -> the sixth chip is the footer's 建議 chip: it pushes the
+    // suggestions frame through the ordinary confirmation path.
+    expect(store.focusPress("6")).toBe(true);
     expect(store.view.dockSource).toBe("exploration.suggestions");
     expect(store.view.dockDepth).toBe(2);
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.focusEscape()).toBe(true);
 
-    // 6 -> the object chip submits its explore.look once.
-    expect(store.focusPress("6")).toBe(true);
+    // 3 -> the object chip submits its explore.look once.
+    expect(store.focusPress("3")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
       action_id: "explore.look",
@@ -237,16 +240,17 @@ describe("dock digit row picks (1–9)", () => {
     });
   });
 
-  it("digit 9 on a six-chip overview is unclaimed", () => {
+  it("digits 5 and 9 on a four-chip overview are unclaimed", () => {
     openSession();
     openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
-    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(SIX_CHIP_KEYS);
-    // No ninth chip: the press is unclaimed and nothing submits.
+    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(FOUR_CHIP_KEYS);
+    // No fifth or ninth chip: the press is unclaimed and nothing submits.
+    expect(store.focusPress("5")).toBe(false);
     expect(store.focusPress("9")).toBe(false);
     expect(store.view.dockDepth).toBe(1);
     expect(sender.sent.actions).toHaveLength(0);
-    // The sixth chip is real: 等待／休息 pushes the waiting frame.
-    expect(store.focusPress("6")).toBe(true);
+    // The fourth chip is real: 等待／休息 pushes the waiting frame.
+    expect(store.focusPress("4")).toBe(true);
     expect(store.view.dockSource).toBe("exploration.wait");
     expect(sender.sent.actions).toHaveLength(0);
   });
@@ -337,7 +341,7 @@ describe("dock digit row picks (1–9)", () => {
   it("held digit repeats are suppressed like held Enter, even after the lock releases", () => {
     openSession();
     openOverview();
-    expect(store.focusPress("1")).toBe(true);
+    expect(store.focusPress("2")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
     // Release the mutation lock exactly like a committed result does
     // (result declares the revision, the update reaches it). A held-key
@@ -356,11 +360,11 @@ describe("dock digit row picks (1–9)", () => {
       {},
     );
     expect(store.view.dispatch.inFlight).toBe(null);
-    expect(store.focusPress("1", true)).toBe(true);
+    expect(store.focusPress("2", true)).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
     // The digit binding itself still works for a fresh press after the
     // suppression (the row re-submits once the lock is clear).
-    expect(store.focusPress("1", false)).toBe(true);
+    expect(store.focusPress("2", false)).toBe(true);
     expect(sender.sent.actions).toHaveLength(2);
   });
 });

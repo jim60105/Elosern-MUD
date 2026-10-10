@@ -199,8 +199,9 @@ describe("window.Elosern bridge", () => {
     openActiveSession(store);
 
     // Initial focus is the scene overview's first chip
-    // (webclient-scene-overview-swap: the exploration root is the overview).
-    expect(store.view.focus.key).toBe("exit-east");
+    // (webclient-scene-overview-swap: the exploration root is the overview;
+    // its exits are the exit compass's, exploration-exit-compass).
+    expect(store.view.focus.key).toBe("target-7");
 
     // An unclaimed key (a plain letter) is not swallowed by the bridge.
     const unclaimed = press("l");
@@ -213,23 +214,16 @@ describe("window.Elosern bridge", () => {
     const slash = press("/");
     expect(slash.defaultPrevented).toBe(true);
 
-    // A consumed key (ArrowRight) steps the overview's reading order: exits,
-    // then people, then objects, then the footer.
+    // A consumed key (ArrowRight) steps the overview's reading order:
+    // people, then objects, then the footer.
     const right = press("ArrowRight");
     expect(right.defaultPrevented).toBe(true);
-    expect(store.view.focus.key).toBe("exit-north");
-    expect(store.view.focus.enabled).toBe(false);
-
-    // A second ArrowRight reaches the person chip; a plain letter is left
-    // unclaimed.
-    press("ArrowRight");
-    expect(store.view.focus.key).toBe("target-7");
+    expect(store.view.focus.key).toBe("object-3");
     const unclaimed2 = press("m");
     expect(unclaimed2.defaultPrevented).toBe(false);
 
-    // The footer's 等待／休息 chip is the reading order's sixth entry: the
+    // The footer's 等待／休息 chip is the reading order's fourth entry: the
     // reference entries live in the top navigation, so the overview walks on.
-    press("ArrowRight"); // object-3
     press("ArrowRight"); // look-room
     press("ArrowRight"); // wait
     expect(store.view.focus.key).toBe("wait");
@@ -243,13 +237,13 @@ describe("window.Elosern bridge", () => {
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.focus.key).toBe("wait");
 
-    // Positional picks reach past four (the help reference advertises 1–9):
-    // `5` picks the overview's fifth entry and is claimed; a digit past the
-    // entry count stays unclaimed.
+    // Positional picks (the help reference advertises 1–9): `3` picks the
+    // overview's third entry and is claimed; a digit past the entry count
+    // stays unclaimed.
     const nine = press("9");
     expect(nine.defaultPrevented).toBe(false);
-    const five = press("5");
-    expect(five.defaultPrevented).toBe(true);
+    const three = press("3");
+    expect(three.defaultPrevented).toBe(true);
     expect(store.view.focus.key).toBe("look-room");
   });
 

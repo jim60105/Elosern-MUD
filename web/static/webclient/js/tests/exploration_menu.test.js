@@ -621,17 +621,16 @@ function overviewPanel() {
   });
 }
 
-test("the overview lists exits, people, objects, and the footer in reading order", () => {
+test("the overview lists people, objects, and the footer in reading order, and no exit", () => {
   const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
   assert.equal(menu.geometry, "sections");
   assert.equal(menu.title, "場景");
   assert.equal(menu.grid, undefined, "a sections menu carries no grid flag");
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["exit-e1", "exit-e2", "target-5", "entity-8", "object-6", "object-7", "look-room", "wait"]
+    ["target-5", "entity-8", "object-6", "object-7", "look-room", "wait"]
   );
   assert.deepEqual(menu.sections, [
-    { key: "exits", label: "出口", count: 2 },
     { key: "people", label: "人物", count: 2 },
     { key: "objects", label: "物件", count: 2 },
     { key: "footer", label: null, count: 2 },
@@ -652,7 +651,7 @@ test("the overview omits empty people and objects sections", () => {
   const menu = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
   assert.deepEqual(
     menu.sections.map((section) => section.key),
-    ["exits", "footer"]
+    ["footer"]
   );
   panel.move = [];
   const noExits = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
@@ -660,9 +659,9 @@ test("the overview omits empty people and objects sections", () => {
   assert.ok(!noExits.items.some((item) => item.key === "move-empty"));
 });
 
-test("a disabled exit chip keeps its reason and the plain exit label", () => {
-  const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
-  const locked = menu.items.find((item) => item.key === "exit-e2");
+test("a disabled exit target keeps its reason and the plain exit label", () => {
+  const rows = ExplorationMenu.exitTargets(overviewPanel(), { currentNode: "room:3" });
+  const locked = rows.find((item) => item.key === "exit-e2");
   assert.equal(locked.enabled, false);
   assert.equal(locked.actionId, null);
   assert.equal(locked.payload, null);
@@ -671,14 +670,16 @@ test("a disabled exit chip keeps its reason and the plain exit label", () => {
   assert.deepEqual(locked.disabledReason, { code: "locked", message: "門鎖著。" });
 });
 
-test("overview exit chips carry the move payload with current_node", () => {
-  const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
-  const north = menu.items.find((item) => item.key === "exit-e1");
+test("exit targets are exactly the move rows and carry the payload with current_node", () => {
+  const rows = ExplorationMenu.exitTargets(overviewPanel(), { currentNode: "room:3" });
+  assert.deepEqual(rows, ExplorationMenu.moveItems(overviewPanel(), "room:3"));
+  assert.deepEqual(rows.map((item) => item.key), ["exit-e1", "exit-e2"]);
+  const north = rows.find((item) => item.key === "exit-e1");
   assert.equal(north.actionId, "explore.move");
   assert.deepEqual(north.payload, { exit_ref: "e1", current_node: "room:3" });
   assert.equal(north.direction, "north");
   assert.equal(north.destination, "room:1");
-  const unsynced = ExplorationMenu.overviewMenu(overviewPanel(), {}).items[0];
+  const unsynced = ExplorationMenu.exitTargets(overviewPanel(), {})[0];
   assert.equal(unsynced.enabled, false);
   assert.equal(unsynced.label, "北");
   assert.equal(unsynced.actionId, null, "an exit without the local-map current_node never submits");

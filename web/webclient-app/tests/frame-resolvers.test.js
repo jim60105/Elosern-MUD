@@ -59,8 +59,8 @@ describe("frame resolver — committed-state following and purity", () => {
   it("re-resolving after a newer committed snapshot names the newer exits with no stale row", () => {
     const state = committedState();
     const resolver = resolverFor(state);
-    const before = resolver.resolve({ source: "exploration.root" });
-    expect(before.items.map((i) => i.label)).toContain("西風酒館");
+    const before = resolver.explorationExits().rows;
+    expect(before.map((i) => i.label)).toContain("西風酒館");
 
     // A newer committed snapshot replaces the exploration panel atomically.
     state.panels.exploration = explorationPanel({
@@ -76,8 +76,8 @@ describe("frame resolver — committed-state following and purity", () => {
     });
     state.revision = 2;
 
-    const after = resolver.resolve({ source: "exploration.root" });
-    const labels = after.items.map((i) => i.label);
+    const after = resolver.explorationExits().rows;
+    const labels = after.map((i) => i.label);
     expect(labels).toContain("歸旅客棧");
     expect(labels).not.toContain("西風酒館");
     expect(labels).not.toContain("北岸大道");
@@ -105,10 +105,10 @@ describe("frame resolver — committed-state following and purity", () => {
 
   it("a resolver throwing mid-build degrades to the marker without an exception", () => {
     const state = committedState();
-    // A committed panel whose exit list read raises: the registry's exception
-    // guard converts the throw to the shared marker (available panel, so no
-    // authored reason).
-    Object.defineProperty(state.panels.exploration, "move", {
+    // A committed panel whose interact list read raises: the registry's
+    // exception guard converts the throw to the shared marker (available
+    // panel, so no authored reason).
+    Object.defineProperty(state.panels.exploration, "interact", {
       configurable: true,
       get() {
         throw new Error("boom");
@@ -122,9 +122,27 @@ describe("frame resolver — committed-state following and purity", () => {
     });
     // The guard converts every call over the poisoned panel; deleting the
     // poison restores resolution (the marker is not sticky).
-    delete state.panels.exploration.move;
-    state.panels.exploration.move = [];
+    delete state.panels.exploration.interact;
+    state.panels.exploration.interact = [];
     expect(resolver.resolve({ source: "exploration.root" }).unresolvable).toBeUndefined();
+  });
+
+  it("a throwing exit build degrades to no exits without an exception", () => {
+    const state = committedState();
+    Object.defineProperty(state.panels.exploration, "move", {
+      configurable: true,
+      get() {
+        throw new Error("boom");
+      },
+    });
+    const resolver = resolverFor(state);
+    expect(resolver.explorationExits()).toEqual({ rows: [], currentNode: null });
+  });
+
+  it("an unavailable exploration panel has no compass rows", () => {
+    const state = committedState();
+    state.panels.exploration = { schema_version: 3, available: false, reason: { code: "x", message: "暫時無法使用。" } };
+    expect(resolverFor(state).explorationExits()).toEqual({ rows: [], currentNode: null });
   });
 
   it("a resolver throwing while the exploration panel carries an unavailable reason reports it", () => {
@@ -168,12 +186,19 @@ describe("frame resolver — the finite exploration table", () => {
     );
     expect(overview.geometry).toBe("sections");
     expect(overview.sections.map((section) => section.key)).toEqual([
-      "exits",
       "people",
       "objects",
       "footer",
     ]);
-    expect(overview.sections.map((section) => section.count)).toEqual([2, 1, 1, 3]);
+    expect(overview.sections.map((section) => section.count)).toEqual([1, 1, 3]);
+    // The exits are the exit compass's, outside the root: the builder's rows
+    // for the same current node.
+    expect(resolver.explorationExits()).toEqual({
+      rows: ExplorationMenu.exitTargets(state.panels.exploration, {
+        currentNode: state.panels.local_map.current_node,
+      }),
+      currentNode: state.panels.local_map.current_node,
+    });
     // The target frame resolves through the same target seam the push sites
     // use: it is the verb popover (`verbMenuFor`), not the affordance grid
     // (`targetMenuFor`).
@@ -239,12 +264,13 @@ describe("frame resolver — the finite exploration table", () => {
 });
 
 describe("frame resolver — verbatim domain rows, reproduced navigation rows", () => {
-  it("a two-exit room's overview exit chips are exactly the two server exit rows", () => {
+  it("a two-exit room's compass rows are exactly the two server exit rows, and the root has none", () => {
     const state = committedState();
     const resolver = resolverFor(state);
     const menu = resolver.resolve({ source: "exploration.root" });
     const panel = state.panels.exploration;
-    const chips = menu.items.filter((item) => item.key.startsWith("exit-"));
+    expect(menu.items.some((item) => item.key.startsWith("exit-"))).toBe(false);
+    const chips = resolver.explorationExits().rows;
     expect(chips).toHaveLength(panel.move.length);
     panel.move.forEach((exitRow, index) => {
       const row = chips[index];
@@ -299,8 +325,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
       ],
     });
     const resolver = resolverFor(state);
-    const menu = resolver.resolve({ source: "exploration.root" });
-    const enabledChip = menu.items.find((item) => item.key === "exit-east");
+    const enabledChip = resolver.explorationExits().rows.find((item) => item.key === "exit-east");
     expect(enabledChip.enabled).toBe(true);
     expect(enabledChip.actionId).toBe("explore.move");
     expect(enabledChip.payload).toEqual({ exit_ref: "east", current_node: "room:42" });
@@ -337,7 +362,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     }
     // Server-authored disabled reason survives verbatim on the locked exit.
     const locked = panel.move.find((m) => m.disabled_reason);
-    const lockedChip = overview.items.find((i) => i.key === `exit-${locked.exit_ref}`);
+    const lockedChip = resolver.explorationExits().rows.find((i) => i.key === `exit-${locked.exit_ref}`);
     expect(lockedChip.disabledReason).toEqual(locked.disabled_reason);
   });
 
@@ -378,14 +403,14 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     const resolver = resolverFor(committedState());
     const root = resolver.resolve({ source: "exploration.root" });
     const keys = root.items.map((i) => i.key);
-    // The reading order: exits, people, objects, then the label-less footer.
+    // The reading order: people, objects, then the label-less footer; the
+    // exits are the exit compass's (exploration-exit-compass).
     expect(root.sections.map((section) => section.key)).toEqual([
-      "exits",
       "people",
       "objects",
       "footer",
     ]);
-    expect(keys).toContain("exit-east");
+    expect(keys).not.toContain("exit-east");
     expect(keys).toContain("target-7");
     expect(keys).toContain("object-3");
     expect(keys).toContain("look-room");

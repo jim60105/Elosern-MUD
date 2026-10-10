@@ -71,7 +71,8 @@ export const CONTROLS_REFERENCE = [
         id: "digits",
         keys: ["1", "…", "9"],
         label: "依位置執行",
-        detail: "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。",
+        detail:
+          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；探索時依序對應人物、物件與底列的項目，出口改由出口羅盤操作；超出項目數的數字不作用。",
       },
       {
         id: "confirm",

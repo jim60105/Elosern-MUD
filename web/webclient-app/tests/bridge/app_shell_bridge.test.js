@@ -155,21 +155,22 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     const sender = fx.createFakeSender();
     store.setSender(sender);
 
-    // The overview's first chip is an enabled exit, so a real row exists at
-    // slot 1 without opening any child frame.
-    expect(store.view.focus.key).toBe("exit-east");
+    // The overview's second chip is the object's look chip, so a real row
+    // exists at slot 2 without opening any child frame (the exits are the
+    // exit compass's and take no slot).
+    expect(store.view.focus.key).toBe("target-7");
 
-    // `1` is consumed by the store's row pick -> the bridge claims it:
+    // `2` is consumed by the store's row pick -> the bridge claims it:
     // preventDefault fires and the row submits through the store.
-    const claimed = new KeyboardEvent("keydown", { key: "1", bubbles: true, cancelable: true });
+    const claimed = new KeyboardEvent("keydown", { key: "2", bubbles: true, cancelable: true });
     document.dispatchEvent(claimed);
     await wrapper.vm.$nextTick();
     expect(claimed.defaultPrevented).toBe(true);
-    expect(sender.sent.actions.map((a) => a.action_id)).toContain("explore.move");
+    expect(sender.sent.actions.map((a) => a.action_id)).toContain("explore.look");
 
     // A digit with no such row is unclaimed: the bridge does not prevent the
     // default, so the key falls through to the text / command-history path.
-    // The overview renders seven chips, so 7 and beyond have no row.
+    // The overview renders five chips, so 7 and beyond have no row.
     for (const key of ["7", "8", "9", "0"]) {
       const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
       document.dispatchEvent(event);
