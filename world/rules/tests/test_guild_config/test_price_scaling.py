@@ -23,10 +23,16 @@ class PriceScaleSectionTests(unittest.TestCase):
     """``price_scales`` section and per-shop scale validation (design §4)."""
 
     def test_shipped_section_is_par(self):
-        self.assertEqual(
-            _shipped_scales(),
-            {"capital_altoria": 100, "village_ciaran": 100},
-        )
+        # The shipped scale factors are authored data: the section is accepted
+        # by its own validator and stays inside the documented bounds.
+        scales = _shipped_scales()
+        self.assertTrue(scales)
+        self.assertEqual(validate_price_scales(scales), scales)
+        for settlement, scale in scales.items():
+            with self.subTest(settlement=settlement):
+                self.assertIs(type(scale), int)
+                self.assertGreaterEqual(scale, 1)
+                self.assertLessEqual(scale, 1000)
 
     def test_price_scales_must_be_a_mapping(self):
         with self.assertRaises(GuildConfigError):

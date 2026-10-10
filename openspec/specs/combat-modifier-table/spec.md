@@ -119,7 +119,7 @@ the same rules SHALL evaluate against its real values with no code change to `co
 #### Scenario: Sexual-field rules fire once entity.sexual is a real object (self-arming)
 - **WHEN** `evaluate_combat_modifiers(entity)` is called on an entity whose `entity.sexual` exposes
   `arousal` at or above the `高度` threshold
-- **THEN** the returned bundle includes `high_arousal_agility_accuracy_penalty`'s adjustment
+- **THEN** the returned bundle includes `t_high_arousal_agility_accuracy_penalty`'s adjustment
   (`agility: "-20%"`, `accuracy: -15`)
 
 #### Scenario: The tolerated None is change 3's current placeholder
@@ -127,6 +127,10 @@ the same rules SHALL evaluate against its real values with no code change to `co
   implementation
 - **THEN** `entity.sexual` is `None` as change 3's current placeholder value, and the inert
   degradation applies to it
+
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
 
 ### Requirement: Every rule ID in combat_modifiers.yaml has exactly one corresponding unit test
 For every `Rule.id` present in `world/rules/rulebook/combat_modifiers.yaml`, `world/rules/tests/
@@ -209,7 +213,7 @@ and SHALL add the target's flat `defense` bundle value to the target's effective
 the defense term is subtracted.
 
 #### Scenario: A physical attacker with an atk_phys bonus deals more damage
-- **WHEN** an entity owning `retainer_martial_training` (bundle `atk_phys: 5`) lands a physical
+- **WHEN** an entity owning `t_retainer_martial_training` (bundle `atk_phys: 5`) lands a physical
   attack whose magnitude would otherwise be `round(effective_atk * multiplier) - defense`
 - **THEN** the staged damage amount equals `round((effective_atk + 5) * multiplier) - defense`,
   floored at the configured damage floor
@@ -220,7 +224,7 @@ the defense term is subtracted.
   `atk_phys` bundle value added
 
 #### Scenario: A defender with a defense bonus takes less damage
-- **WHEN** an entity owning `guardian_instinct` (bundle `defense: 5`) is the target of a physical
+- **WHEN** an entity owning `t_guardian_instinct` (bundle `defense: 5`) is the target of a physical
   or magic attack
 - **THEN** the staged damage amount equals `round(attack * multiplier) - (effective_defense + 5)`,
   floored at the configured damage floor
@@ -239,6 +243,10 @@ the defense term is subtracted.
 - **WHEN** an entity with no matching rows is involved in damage resolution
 - **THEN** it receives unchanged damage math
 
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+
 ### Requirement: Percentage mp_cost and sp_cost bundle values adjust resource checks and deductions
 The action resolver's resource check (step 2) and resource deduction (step 6) SHALL apply the
 actor's `mp_cost` and `sp_cost` percentage bundle values to the skill's declared MP and SP costs,
@@ -247,7 +255,7 @@ never negative: `max(0, floor(amount * (1 + pct/100)))` for a signed, possibly f
 percentage.
 
 #### Scenario: A cost reduction enables a cast the declared cost would reject
-- **WHEN** an entity owning `precise_mana_control` (bundle `mp_cost: "-10%"`) has MP exactly equal
+- **WHEN** an entity owning `t_precise_mana_control` (bundle `mp_cost: "-10%"`) has MP exactly equal
   to `floor(declared_cost * 0.9)` but below the declared cost
 - **THEN** the action resolves successfully and deducts exactly `floor(declared_cost * 0.9)` MP,
   and the event log reports that adjusted amount
@@ -272,6 +280,10 @@ percentage.
 - **WHEN** a resource key has no matching `X_cost` bundle entry
 - **THEN** it uses the declared cost unchanged
 
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+
 ### Requirement: Damage-estimation surfaces mirror the live adjusted damage math
 The overwhelm expected-damage estimator (`_expected_damage_per_attack`) and the monster
 highest-expected-damage skill-choice metric (`_choose_skill.expected_damage`) SHALL compute their
@@ -280,13 +292,13 @@ entity's `atk_phys` bundle value is added to the physical attack term and its `d
 value to the defense term, exactly as in live damage.
 
 #### Scenario: Overwhelm expected damage includes the bundle adjustments
-- **WHEN** `_expected_damage_per_attack` is called on an attacker owning `retainer_martial_training`
-  against a defender owning `guardian_instinct`
+- **WHEN** `_expected_damage_per_attack` is called on an attacker owning `t_retainer_martial_training`
+  against a defender owning `t_guardian_instinct`
 - **THEN** the estimate uses `effective_atk + 5` for the attack term and `effective_defense + 5`
   for the defense term
 
 #### Scenario: Monster skill choice ranks physical attacks with their atk_phys bonus
-- **WHEN** a monster owning (or granted) `retainer_martial_training` chooses between a physical and
+- **WHEN** a monster owning (or granted) `t_retainer_martial_training` chooses between a physical and
   a magic candidate skill
 - **THEN** the physical candidate's expected damage includes the flat `atk_phys` bundle value
 
@@ -299,6 +311,10 @@ value to the defense term, exactly as in live damage.
 - **WHEN** the overwhelm power-ratio heuristic (`effective_power`) ranks entities
 - **THEN** it keeps ranking by raw effective stats
 
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+
 ### Requirement: Preview, preflight, and resolve agree on adjusted resource costs
 `action_preview.py`'s skill-wide failure check SHALL apply the same `apply_cost_modifier`
 computation as the resolver's step 2 and step 6, using the no-create bundle from
@@ -307,7 +323,7 @@ preflight or resolve for the same resource state, and a skill the preview report
 `INSUFFICIENT_RESOURCE` is rejected identically by preflight.
 
 #### Scenario: Preview enables exactly the casts preflight allows under a reduction
-- **WHEN** an entity owning `extreme_endurance` (bundle `sp_cost: "-10%"`) has SP at or above the
+- **WHEN** an entity owning `t_extreme_endurance` (bundle `sp_cost: "-10%"`) has SP at or above the
   adjusted cost of a skill it owns
 - **THEN** `preview_skill` reports the skill enabled, `ActionResolver.preflight` succeeds, and
   `ActionResolver.resolve` deducts the adjusted amount
@@ -316,6 +332,10 @@ preflight or resolve for the same resource state, and a skill the preview report
 - **WHEN** the same entity has SP below the adjusted cost
 - **THEN** `preview_skill`, `preflight`, and `resolve` all report `INSUFFICIENT_RESOURCE` for the
   same resource key, and no state is written
+
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
 
 ### Requirement: dual_wield_style grants a combat adjustment while owned
 `combat_modifiers.yaml` SHALL contain a `skill_owned` row for `dual_wield_style` producing a nonzero
@@ -375,58 +395,43 @@ persistent state.
 - **THEN** the read is unchanged from before this capability's amendment
 
 ### Requirement: high_exposure_defense_penalty prices raised exposure as a combat cost
-`world/rules/rulebook/combat_modifiers.yaml` SHALL declare a `high_exposure_defense_penalty` row
-whose condition is `{field: exposure, gte: 高}` and whose adjustment is `{defense: -15}` — a flat
-integer — evaluated by the same `evaluate_condition()` function as every other row in the table
-with no special-casing by condition origin.
+The authored high_exposure_defense_penalty row SHALL match exposure at or above 高, the second-highest vocabulary level, and grant a negative flat integer defense adjustment through the common condition engine. Below 高 it SHALL be absent. Its status display SHALL retain a Traditional Chinese label and warning severity. Exact negative magnitude SHALL be tunable data; percentage defense SHALL remain invalid for its flat-integer consumer.
+
+#### Scenario: Synthetic negative adjustment reaches real damage
+- **WHEN** a fixed synthetic exposure row gives defense -15 and a synthetic passive gives defense +5
+- **THEN** the merged flat defense is -10, both physical and magic damage observe it, and changing exposure below 高 removes only the exposure contribution
+
+#### Scenario: Production status projection has a distinct boundary
+- **WHEN** the actual exposure row matches an entity above 高
+- **THEN** the status read model carries the current authored flat negative adjustment and warning label; neither appears below 高, without a duplicated literal adjustment table
 
 #### Scenario: An entity at or above 高 exposure takes the defense penalty
-- **WHEN** `evaluate_combat_modifiers(entity)` is called on an entity whose `entity.sexual.exposure`
-  is at or above `高`
-- **THEN** the returned bundle includes `defense: -15`
+- **WHEN** actual exposure reaches 高 or above
+- **THEN** the authored negative flat defense row matches through the common engine
 
 #### Scenario: The penalty applies correctly through real damage resolution, not only the raw bundle
-- **WHEN** an entity whose `exposure` is at or above `高` is the target of a physical or magic attack,
-  resolved through `world/rules/combat.py::_adjusted_defense`
-- **THEN** the staged damage amount reflects the target's effective defense reduced by exactly `15`
-  (i.e. `_adjusted_defense` returns `effective_value("defense") - 15`), with no exception raised —
-  proving the adjustment's shape is one `_adjusted_defense`'s numeric-addition consumer can actually
-  apply, not merely one `evaluate_combat_modifiers()` can report in isolation
+- **WHEN** a fixed synthetic exposure row grants defense -15 during real physical and magic damage resolution
+- **THEN** independently known damage outcomes reflect defense reduced by 15 rather than merely echoing the raw bundle
 
 #### Scenario: An entity below 高 exposure is unaffected
-- **WHEN** `evaluate_combat_modifiers(entity)` is called on an entity whose `entity.sexual.exposure`
-  is below `高` (`極低` or `低`)
-- **THEN** the returned bundle contains no adjustment attributable to
-  `high_exposure_defense_penalty`
+- **WHEN** actual exposure is below 高
+- **THEN** no adjustment attributable to the exposure row appears
 
 #### Scenario: The row merges with buff-origin and skill-owned rows identically
-- **WHEN** an entity simultaneously has `exposure` at or above `高`, has the `poisoned` buff active,
-  and owns `defense_instinct`
-- **THEN** the returned bundle includes `agility: "-10%"` (from `poisoned`) and `defense: -10`
-  (`defense_instinct`'s `+5` and `high_exposure_defense_penalty`'s `-15` summed by
-  `_merge_adjustments`'s numeric-addition path — both being flat integers is what makes this
-  genuine merge possible; see design.md D-2), with no row excluded or handled differently because of
-  its condition origin
+- **WHEN** fixed synthetic buff, passive and exposure rows contribute agility -10%, defense +5 and defense -15
+- **THEN** agility stays -10% and defense merges to -10 without condition-origin special casing
 
 #### Scenario: The matched condition is player-visible through the status read model
-- **WHEN** `build_status_read_model(entity)` is called on an entity whose `exposure` is at or above
-  `高`
-- **THEN** the read model's conditions include the `high_exposure_defense_penalty` code carrying
-  `{"defense": -15}` as its modifiers with its `status_display.yaml` Traditional Chinese label and
-  warning severity, and the entry is absent when `exposure` is below `高` — the row surfaces through
-  the same `webclient-status-presentation` matched-condition surface as every other
-  `combat_modifiers.yaml` rule
+- **WHEN** the authored exposure row matches
+- **THEN** the status condition carries its current authored modifier, Traditional Chinese label and warning severity, absent below 高
 
 #### Scenario: The defense adjustment is a merge-safe flat integer
-- **WHEN** the row's adjustment shape is chosen
-- **THEN** it is a flat integer, matching every other `defense`-bundle row in this table —
-  `defense` has no percentage-aware consumer anywhere in this codebase, and only a flat
-  integer is safe to merge and to consume in damage resolution
+- **WHEN** the authored adjustment is validated
+- **THEN** negative flat integer shape is required and percentage defense is rejected
 
 #### Scenario: The threshold position mirrors the arousal penalty's
-- **WHEN** the row's threshold is placed on `EXPOSURE_LEVELS`
-- **THEN** it is the second-highest of the five levels, mirroring
-  `high_arousal_agility_accuracy_penalty`'s threshold position on `AROUSAL_LEVELS`
+- **WHEN** exposure and arousal penalty thresholds are located in their vocabularies
+- **THEN** both remain second-highest, without fixing the adjustment magnitudes
 
 ### Requirement: Worn equipment merges into the merged bundle of both evaluation paths
 
@@ -467,6 +472,10 @@ preview, cost, and resist consumers share one effective bundle.
 - **WHEN** the accessor or either evaluation path runs
 - **THEN** none of them writes any entity state
 
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+
 ### Requirement: Adjusted agility never resolves negative
 
 Every consumer path that derives a modifier-adjusted effective agility for
@@ -505,14 +514,14 @@ level view with `gte`/`lte`/equality comparison parity across both paths.
 
 #### Scenario: Revealing habit earns the exposure defense penalty with little written
 
-- **WHEN** an actor with stored exposure 中等 wearing 修女聖袍 (bias +1,
+- **WHEN** an actor with stored exposure 中等 wearing t_修女聖袍 (bias +1,
   effective 高) is evaluated for combat modifiers
 - **THEN** the shipped 露出 ≥ 高 defense adjustment is present in the merged
   bundle
 
 #### Scenario: Penalty round-trips with the equipment
 
-- **WHEN** the actor unequips 修女聖袍 mid-itinerary and modifiers are
+- **WHEN** the actor unequips t_修女聖袍 mid-itinerary and modifiers are
   re-evaluated
 - **THEN** the exposure defense adjustment is gone in both paths and the
   stored trait never moved
@@ -540,6 +549,10 @@ level view with `gte`/`lte`/equality comparison parity across both paths.
 - **THEN** it remains handler-free and write-free, reading stored sexual levels
   through one neutral shared reader that imports no rules modules
 
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+
 ### Requirement: Equipment-worn conditions match a shared worn-item fact
 
 The rulebook condition vocabulary SHALL include `equipment_worn:
@@ -551,9 +564,9 @@ resist scoring, and presentation all match identically.
 
 #### Scenario: Sister's grace fires while the habit is worn
 
-- **WHEN** an actor wearing 修女聖袍 with arousal 中等 is evaluated for
+- **WHEN** an actor wearing t_修女聖袍 with arousal 中等 is evaluated for
   combat modifiers
-- **THEN** the merged bundle includes `sister_vestment_grace`'s defense +4
+- **THEN** the merged bundle includes `t_sister_vestment_grace`'s defense +4
 
 #### Scenario: Same rule silent without the item or the arousal
 
@@ -573,7 +586,7 @@ resist scoring, and presentation all match identically.
 
 #### Scenario: Multi-accessory devotion stack merges as declared
 
-- **WHEN** an actor simultaneously wears 聖女聖袍, 光輝聖徽, and 朝聖者銅符
+- **WHEN** an actor simultaneously wears t_聖女聖袍, t_光輝聖徽, and t_朝聖者銅符
   (within the shipped accessory slot budget) with arousal 高度
 - **THEN** the merged bundle carries the combined defense +8 and the
   emblem's heal_gain +10%, and the display layer lists all three matched
@@ -587,7 +600,7 @@ resist scoring, and presentation all match identically.
 
 #### Scenario: The worn-item read is pure and fail-safe
 - **WHEN** the worn-item-keys fact is read from stored equipment
-- **THEN** the read is pure — malformed storage yields an empty set, no writes, and
+- **THEN** the read is pure ;  malformed storage yields an empty set, no writes, and
   no handler materialization
 
 #### Scenario: A missing fact fails the condition closed
@@ -597,3 +610,8 @@ resist scoring, and presentation all match identically.
 #### Scenario: equipment_worn composes with existing conditions
 - **WHEN** an `equipment_worn` condition is authored alongside other conditions
 - **THEN** it AND-composes with all existing conditions
+
+#### Scenario: Numerical mechanism examples are synthetic
+- **WHEN** the numerical examples above are exercised
+- **THEN** file-local fixed synthetic rows grant those values with independently known results; shipped-content checks retain real reference/predicate/shape/polarity validation without fixing the production adjustment amounts
+

@@ -25,15 +25,19 @@ The qualification registry SHALL map guild_branch_altoria E/D/C/B to Hok B, A to
 - **THEN** one host is created with its own primary-key suffix and stable person provenance, and later sync/exams reuse its key/dbref without renaming
 
 ### Requirement: Normal hosts own literal bases gear and usable complete human skill lineages
-Hosts SHALL use approved section 3/4.3 normal bases and canonical ages, actual rank-matched military gear and full learned utility/sword prerequisite ownership and proficiency. Hok SHALL retain coastal literal inputs without reapplying subrace modifiers, normal physical reference 25/20/29, age 45 and nearshore/escort/hunt identity. Cassandra SHALL retain 40/40 and Augustine 68/52. Cards/dialogue SHALL match implemented capabilities with no fire-sword/far-ocean claims or OOC speech.
+Hosts SHALL use their complete authored normal bases and canonical ages, actual rank-matched military gear and full learned utility/sword prerequisite ownership and proficiency. Hok SHALL retain coastal literal inputs without reapplying subrace modifiers and his nearshore/escort/hunt identity. Cassandra and Augustine SHALL retain their authored normal configurations. Cards/dialogue SHALL reflect implemented capabilities without fire-sword/far-ocean claims or OOC speech. Tests SHALL validate references and real construction/restoration without duplicated base-stat or age tables.
+
+#### Scenario: Persistent normal configuration
+- **WHEN** a host enters and exits an examination
+- **THEN** the existing host row and normal bases, owned lineage, gear and identity survive restoration; normal values are compared to the pre-exam snapshot rather than historical numerical pins
 
 #### Scenario: Usable top lineage
 - **WHEN** a normal synthetic qualified adventurer requests its top sword skill
-- **THEN** required lower ownership/proficiency is present and resolver accepts it
+- **THEN** required lower ownership/proficiency is present and the resolver accepts execution
 
 #### Scenario: Invalid age or unsupported item
 - **WHEN** authored profile ages are boolean/out-of-range or gear is unregistered
-- **THEN** preflight rejects before creation
+- **THEN** preflight rejects before creation, preserving the existing 0..10000 age bound
 
 ### Requirement: Hosts live in connected residences and traverse authored recurring guild visits
 Each host SHALL have a real connected residence and resolved routine route using ordinary place/movement systems. Hok SHALL have morning/evening daily guild visits; Cassandra and Augustine SHALL each have one fixed interval per seven-day cycle. Exact offsets SHALL live in NPC schedule data. Maps SHALL own residence materialization and real Exits SHALL govern travel.

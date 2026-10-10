@@ -20,6 +20,7 @@ from world.ai.director_templates import QUEST_TEMPLATE_POOL
 from world.lore.dialogue.shape import DialogueDefinition, KeywordResponse
 from world.lore.npc_card import NpcCard, NpcCardIdentity
 from world.lore.npc_profiles.inventory import NpcSource
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
 from world.lore.npc_profiles.shape import NpcProfile, NpcVoiceLines
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY, StartingCompanion
 from world.lore.settlements.places import PLACE_REGISTRY
@@ -163,20 +164,20 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
         normal_hosts = sync_persistent_adventurers()
         rows = tuple(ADVENTURER_REGISTRY.values())
         self.assertEqual(len(normal_hosts), 3)
-        expected = (
-            ("altoria_hok", 45, 45, (145, 110, 110, 14, 14, 13, 25), (25, 20, 29)),
-            ("altoria_cassandra", 40, 40, (170, 120, 120, 17, 17, 16, 30), None),
-            ("altoria_augustine", 68, 52, (200, 120, 120, 20, 20, 19, 35), None),
-        )
         snapshots = []
-        for person, host, (key, age, apparent, bases, physical) in zip(rows, normal_hosts, expected, strict=True):
+        for person, host in zip(rows, normal_hosts, strict=True):
             route = resolve_residence_route(person.home_key, "altoria_guild_hall")
-            self.assertEqual(person.key, key)
             self.assertEqual(host.location, route["home"])
-            self.assertEqual((host.db.age, host.db.apparent_age), (age, apparent))
+            # Construction stores the person's own declared bases and the
+            # profile's declared ages, never a duplicated expected table.
+            profile = NPC_PROFILE_REGISTRY[person.profile_key]
+            self.assertEqual(
+                (host.db.age, host.db.apparent_age),
+                (profile.age, profile.apparent_age),
+            )
             actual_bases = tuple(getattr(host.traits, stat).base for stat in
                                  ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"))
-            self.assertEqual(actual_bases, bases)
+            self.assertEqual(actual_bases, person.bases)
             for stat in ("hp", "mp", "sp"):
                 gauge = getattr(host.traits, stat)
                 self.assertEqual(gauge.current, gauge.max)
@@ -184,10 +185,16 @@ class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
             self.assertEqual(host.db.equipment["armor"], person.equipment[1])
             for skill_key in (*host.db.skills["active"], *host.db.skills["passive"]):
                 self.assertTrue(can_use_skill(host, SKILL_REGISTRY[skill_key]), skill_key)
+            # The declared military pair folds into the live values through the
+            # separate domain bonuses; nothing is baked into the stored bases.
+            stored = actual_bases[3:6]
             values = (_adjusted_attack(host, "atk_phys"), adjusted_agility(host), _adjusted_defense(host))
-            if physical is not None:
-                self.assertEqual(values, physical)
-            snapshots.append({"person": key, "host": host.pk, "home": host.location.pk,
+            for field, adjusted, base in zip(
+                ("atk_phys", "agility", "defense"), values, stored
+            ):
+                self.assertGreaterEqual(adjusted, base, f"{person.key} {field}")
+            self.assertNotEqual(values, stored, person.key)
+            snapshots.append({"person": person.key, "host": host.pk, "home": host.location.pk,
                               "bases": actual_bases, "physical": values})
         for target, person in (("E", normal_hosts[0]), ("D", normal_hosts[0]),
                                ("C", normal_hosts[0]), ("B", normal_hosts[0]),

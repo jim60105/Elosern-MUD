@@ -207,6 +207,8 @@ MUD_TEST_SETTINGS=1 uv run --locked evennia test --settings test_settings.py --k
 uv run --locked python -m tools.spec_traceability check
 ```
 
+測試裡的數值角色分成三類，寫新斷言時照這個分界選：**通用完整性**驗證 schema、身份與參照、槽位、稀有度預算與價格帶歸屬，這一類在合法調價或調量級之後仍須維持綠燈，因此不比對具體數值；**共用合成機制**用受控的 file-local 合成宣告與固定輸入驗證算式結果，期望值不得呼叫受測的同一支計算函式取得，也不得把公式抄進測試 helper；**代表性整合冒煙**讀取現行宣告當輸入，觀察另一個消費端的結果（建構後的持久化基底、商店 offer、結算後的錢包與庫存）。價格、庫存、調整與效果量級都住在 rulebook，測試只驗證關係與接線；一筆合法調價不該需要修改任何期望值。
+
 ---
 
 ## 4. 常見錯誤
@@ -259,6 +261,7 @@ policy. A/S have no reducing ceilings and retain their domain effects.
 | 摘要塞了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |
 | 為新物品發明新的 kind／icon／rarity 值卻只改 registry | 構造被封閉列舉拒絕；擴充視覺詞彙見 §5 |
 | 為了讓某個測試通過而捏造 registry 資料 | 世界資料是產品決定；測試該用受控 registry 分層（規則層、adapter 層、Storybook），瀏覽器端只測真實資料 |
+| 把價格、庫存或效果量級抄進測試當期望值 | 每次合法調價都得回頭改測試；改成讀取宣告並只驗證關係與接線（見 Step 6） |
 
 ---
 
