@@ -66,6 +66,8 @@ from ._support import (
     _T_SENTENCE,
     _instance_bound_payload,
     SceneBuilderTestBase,
+    SYNTH_OCCUPANT_NAME,
+    SYNTH_OCCUPANT_TITLE,
 )
 
 class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
@@ -86,27 +88,30 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
         # identity may carry surrounding whitespace; the spawner and the
         # persisted display_name both take the normalized form.
         npc = self._spawned_npc(
-            self._characterized(display_name="  黑鬍  ", title=" 林間盜匪首領 ")
+            self._characterized(
+                display_name=f"  {SYNTH_OCCUPANT_NAME}  ",
+                title=f" {SYNTH_OCCUPANT_TITLE} ",
+            )
         )
-        self.assertEqual(npc.key, "黑鬍")
-        self.assertEqual(npc.db.display_name, "黑鬍")
-        self.assertEqual(npc.npc_title, "林間盜匪首領")
+        self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
+        self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
+        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
 
     @covers_requirement("npc-identity-titles::blueprint-scene-occupants-spawn-under-the-authored-name-with-the-authored-title")
     def test_full_characterization_is_materialized_fully(self):
         npc = self._spawned_npc(
             self._characterized(
-                display_name="黑鬍",
-                title="林間盜匪首領",
+                display_name=SYNTH_OCCUPANT_NAME,
+                title=SYNTH_OCCUPANT_TITLE,
                 age=68,
                 apparent_age=68,
                 portrait={"stable_key": "forest_bandit_chief"},
             )
         )
         # The authored name IS the key; the title lands as the validated form.
-        self.assertEqual(npc.key, "黑鬍")
-        self.assertEqual(npc.db.display_name, "黑鬍")
-        self.assertEqual(npc.npc_title, "林間盜匪首領")
+        self.assertEqual(npc.key, SYNTH_OCCUPANT_NAME)
+        self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
+        self.assertEqual(npc.npc_title, SYNTH_OCCUPANT_TITLE)
         self.assertEqual(npc.db.age, 68)
         self.assertEqual(npc.db.apparent_age, 68)
         self.assertEqual(
@@ -281,9 +286,11 @@ class SceneBuilderCharacterizationTests(SceneBuilderTestBase):
     @covers_requirement("spawn-named-portraits::the-scenebuilder-applies-blueprint-characterization-to-named-occupants")
     def test_name_only_occupant_is_named_but_portrait_less(self):
         npc = self._spawned_npc(
-            self._characterized(display_name="黑鬍", title="林間盜匪首領")
+            self._characterized(
+                display_name=SYNTH_OCCUPANT_NAME, title=SYNTH_OCCUPANT_TITLE
+            )
         )
-        self.assertEqual(npc.db.display_name, "黑鬍")
+        self.assertEqual(npc.db.display_name, SYNTH_OCCUPANT_NAME)
         self.assertIsNone(npc.db.age)
         self.assertIsNone(npc.db.apparent_age)
         self.assertIsNone(npc.db.portrait_policy)
