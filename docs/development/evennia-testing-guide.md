@@ -1111,6 +1111,18 @@ uv run --locked python -m tools.test_data_lint check
 JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 `contract`／`debt`
 帳本放行既有例外。`debt` 帳本只減不增：遷移時在讓檔案變乾淨的同一個 commit 移除條目。
 
+### 同一變更的需求退役與重新掛載
+
+移除需求時，其識別碼在同一次實作內退役並重新掛載；標註角色與目標的完整規則見
+`docs/development/spec-test-traceability.md` 的「同一變更內的需求退役與重新掛載」一節。
+
+資料契約測試（`Data-contract test:`）的理由字串存在三處且必須一致：檔案第一行、
+`tools/test_data_lint_seed.json` 的 `contract` 理由，以及由前者重新產生的
+`tools/test_data_freeze.json`。變更理由時一律**先改 seed、再重新產生帳本**，否則
+`seed-mismatch`／`untagged-contract` 會直接失敗；切勿只手改其中一份。請以
+`uv run --locked python -m tools.test_data_lint check` 驗證，且不得為此新增 `debt`、`deny`
+或任何允許清單條目。
+
 ### Synthetic test-data kit 使用指引
 
 `world/tests/synthetic_data/`（import 路徑 `world.tests.synthetic_data`）是全庫共用的替身世界：每個 catalog 都是**真實
