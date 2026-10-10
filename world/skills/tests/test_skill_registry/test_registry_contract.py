@@ -534,129 +534,160 @@ class SkillRegistryTests(unittest.TestCase):
                 self.assertEqual(skill.cost, {})
                 self.assertEqual(tuple(skill.effects), effects)
 
+
+class AuthoredMonsterKitContractTests(unittest.TestCase):
+    """Requirement: shipped monster kits are typed, validated authored data.
+
+    Every kit skill is derived from the variant registries themselves, so a
+    new or edited kit skill is covered automatically and no per-species
+    approved key tuple, effect list or magnitude is copied here. Identity
+    eligibility, hit dependencies and audiences are read from the authored
+    declarations through the same shared helpers the engine uses.
+    """
+
+    @staticmethod
+    def _declared_kit_references():
+        """``(variant, slot, skill)`` for every shipped kit reference."""
+        from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
+
+        references = []
+        for variant in MONSTER_VARIANT_REGISTRY.values():
+            for slot, keys in (
+                ("active", variant.active_skill_keys),
+                ("passive", variant.passive_skill_keys),
+            ):
+                for key in keys:
+                    references.append((variant, slot, SKILL_REGISTRY[key]))
+        return references
+
+    def test_the_shipped_declarations_are_non_empty(self):
+        self.assertTrue(self._declared_kit_references())
+
     @covers_requirement(
-        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
-        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
-        "monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill",
-        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "monster-resource-abilities::monster-ability-identity-and-composition-are-authored-registry-data",
         "test-data-independence::production-content-checks-validate-references-without-numerical-approval-mirrors",
     )
-    def test_tide_devouring_bite_data_contract(self):
-        from world.skills.effects import EffectAudience
-        from world.skills.cost_tiers import spell_tier_for
-        from world.skills.cost_tiers import is_freeform_eligible
+    def test_every_declared_kit_skill_resolves_with_matching_kind_cost_and_effects(self):
+        from world.skills.effects.combat import GaugeTransferEffect
+        from world.skills.cost_tiers import is_freeform_eligible, spell_tier_for
 
-        skill = SKILL_REGISTRY["tide_devouring_bite"]
-        self.assertEqual(skill.label, "吞潮咬擊")
-        self.assertIs(skill.kind, SkillKind.ACTIVE)
-        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        # Detect lost payment channels without approving authored magnitudes.
-        self.assertEqual(set(skill.cost), {"mp", "sp"})
-        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
-        self.assertTrue(skill.usable_out_of_combat)
-        self.assertEqual(skill.element.key, "water")
-        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
-        self.assertEqual(skill.group, "water")
-        self.assertEqual(skill.prerequisites, ())
-        self.assertEqual(
-            skill.eligibility.allowed_actor_kinds, ("monster",)
-        )
-        self.assertEqual(
-            skill.eligibility.allowed_species, ("tide_devouring_crocodile",)
-        )
-        self.assertEqual(len(skill.effects), 2)
-        self.assertEqual(skill.effects[0], "damage:water:physical")
-        from world.skills.effects import GaugeTransferEffect
-        drain = skill.parsed_effects[1]
-        self.assertIsInstance(drain, GaugeTransferEffect)
-        self.assertEqual((drain.gauge, drain.direction, drain.magnitude_mode), ("mp", "drain", "fixed"))
-        self.assertGreater(drain.magnitude, 0)
-        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
-        self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
-        self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
-        self.assertGreater(skill.effect_policies[1].transfer.caster_recovery_share, 0)
-        self.assertLessEqual(skill.effect_policies[1].transfer.caster_recovery_share, 1)
-        self.assertEqual(spell_tier_for(skill), "學徒")
-        self.assertFalse(is_freeform_eligible(skill))
+        references = self._declared_kit_references()
+        self.assertTrue(references)
+        for variant, slot, skill in references:
+            with self.subTest(variant=variant.key, slot=slot, skill=skill.key):
+                self.assertIs(
+                    skill.kind,
+                    SkillKind.ACTIVE if slot == "active" else SkillKind.PASSIVE,
+                )
+                # Target shape: a declared active kit is chosen for a target,
+                # and every declared constraint is one the resolver supports.
+                self.assertIsNot(skill.target_spec, TargetSpec.NONE)
+                self.assertIn(
+                    skill.faction_constraint,
+                    (FactionConstraint.ANY, FactionConstraint.SELF_ONLY),
+                )
+                # Payment channels: only the two payable resources, positive
+                # integer magnitudes, never an inferred zero or a float.
+                self.assertTrue(skill.cost)
+                self.assertLessEqual(set(skill.cost), {"mp", "sp"})
+                for resource, amount in skill.cost.items():
+                    self.assertIs(type(amount), int, resource)
+                    self.assertGreater(amount, 0, resource)
+                # Every declared effect string resolves to a typed effect in
+                # the shared effect model, and the policy tuple stays
+                # positionally parallel with the declarations.
+                self.assertTrue(skill.effects)
+                self.assertEqual(len(skill.parsed_effects), len(skill.effects))
+                self.assertEqual(len(skill.effect_policies), len(skill.effects))
+                for effect_id, parsed in zip(skill.effects, skill.parsed_effects):
+                    self.assertIsNotNone(parsed, effect_id)
+                    self.assertTrue(
+                        type(parsed).__module__.startswith("world.skills.effects"),
+                        f"{effect_id} resolved to {type(parsed).__module__}",
+                    )
+                    if effect_id.partition(":")[0] == "gauge_transfer":
+                        self.assertIsInstance(parsed, GaugeTransferEffect, effect_id)
+                        self.assertIn(parsed.direction, ("drain", "restore"), effect_id)
+                # The shared cost-tier and freeform-shape gates apply to the
+                # authored skill without any species-specific branch.
+                self.assertTrue(spell_tier_for(skill))
+                self.assertFalse(is_freeform_eligible(skill))
+                # Prerequisite closure mirrors the construction validator: a
+                # declared active kit is satisfied by the variant's own
+                # active-or-passive keys, with no fabricated prerequisite.
+                if slot == "active":
+                    declared = (
+                        *variant.active_skill_keys,
+                        *variant.passive_skill_keys,
+                    )
+                    for prerequisite in skill.prerequisites:
+                        self.assertIn(prerequisite.skill_key, declared, skill.key)
 
     @covers_requirement(
         "skill-identity-eligibility::stored-identity-determines-actor-qualification",
+        "monster-resource-abilities::monster-ability-identity-and-composition-are-authored-registry-data",
+    )
+    def test_every_declared_kit_skill_qualifies_its_declaring_identity_only(self):
+        from world.skills.eligibility import record_identity_eligible
+
+        references = self._declared_kit_references()
+        self.assertTrue(references)
+        declaring_species = {
+            variant.species_key for variant, _slot, _skill in references
+        }
+        for variant, slot, skill in references:
+            with self.subTest(variant=variant.key, slot=slot, skill=skill.key):
+                eligibility = skill.eligibility
+                self.assertIsNotNone(eligibility.allowed_actor_kinds)
+                self.assertNotIn("player", eligibility.allowed_actor_kinds)
+                self.assertIn("monster", eligibility.allowed_actor_kinds)
+                # Species/variant names stay data: every named species must be
+                # one that actually declares a monster kit, and the declaring
+                # species is eligible for the skill it declares.
+                self.assertIsNotNone(eligibility.allowed_species)
+                self.assertLessEqual(
+                    set(eligibility.allowed_species), declaring_species
+                )
+                self.assertIn(variant.species_key, eligibility.allowed_species)
+                self.assertTrue(
+                    record_identity_eligible(
+                        eligibility,
+                        "monster",
+                        species_key=variant.species_key,
+                        variant_key=variant.key,
+                    )
+                )
+                # Excluded from character catalogs: neither character kind
+                # qualifies for a monster-kit skill.
+                for actor_kind in ("player", "npc"):
+                    self.assertFalse(
+                        record_identity_eligible(eligibility, actor_kind), actor_kind
+                    )
+
+    @covers_requirement(
         "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
-        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
-        "monster-resource-abilities::穗鳴雀-owns-its-approved-contact-resource-ability",
-    )
-    def test_grain_shaking_peck_data_contract(self):
-        from world.skills.effects import EffectAudience
-        from world.skills.cost_tiers import spell_tier_for
-        from world.skills.cost_tiers import is_freeform_eligible
-
-        skill = SKILL_REGISTRY["grain_shaking_peck"]
-        self.assertEqual(skill.label, "震穗啄擊")
-        self.assertIs(skill.kind, SkillKind.ACTIVE)
-        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(set(skill.cost), {"mp", "sp"})
-        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
-        # Both monster abilities declare True: the shared policy makes every
-        # damage-carrying ability selectable outside combat (settled
-        # 2026-10-10), and eligibility alone keeps it out of player use.
-        self.assertTrue(skill.usable_out_of_combat)
-        self.assertEqual(skill.element.key, "wind")
-        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
-        self.assertEqual(skill.group, "wind")
-        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-        self.assertEqual(skill.prerequisites, ())
-        self.assertEqual(skill.cast_conditions, ())
-        self.assertEqual(skill.eligibility.allowed_actor_kinds, ("monster",))
-        self.assertEqual(
-            skill.eligibility.allowed_species, ("sway_whistle_sparrow",)
-        )
-        self.assertEqual(len(skill.effects), 2)
-        self.assertEqual(skill.effects[0], "damage:wind:physical")
-        self.assertEqual(skill.effects[1], "buff_apply:grain_rattle")
-        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
-        self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
-        self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
-        self.assertIsNone(skill.effect_policies[1].transfer)
-        self.assertEqual(spell_tier_for(skill), "學徒")
-        self.assertFalse(is_freeform_eligible(skill))
-
-    @covers_requirement(
-        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
         "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints",
-        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
-        "monster-resource-abilities::潮燈蟹-owns-its-approved-contact-resource-ability",
+        "monster-resource-abilities::monster-ability-identity-and-composition-are-authored-registry-data",
     )
-    def test_lamp_carapace_claw_data_contract(self):
+    def test_every_declared_kit_skill_declares_resolvable_hits_and_audiences(self):
         from world.skills.effects import EffectAudience
-        from world.skills.cost_tiers import spell_tier_for
-        from world.skills.cost_tiers import is_freeform_eligible
 
-        skill = SKILL_REGISTRY["lamp_carapace_claw"]
-        self.assertEqual(skill.label, "燈甲螯擊")
-        self.assertIs(skill.kind, SkillKind.ACTIVE)
-        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(set(skill.cost), {"mp", "sp"})
-        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
-        # Every damage-carrying monster ability declares True under the one
-        # written policy (settled 2026-10-10); eligibility alone keeps it out
-        # of player catalogs and lineage.
-        self.assertTrue(skill.usable_out_of_combat)
-        self.assertEqual(skill.element.key, "light")
-        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
-        self.assertEqual(skill.group, "light")
-        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
-        self.assertEqual(skill.prerequisites, ())
-        self.assertEqual(skill.cast_conditions, ())
-        self.assertEqual(skill.eligibility.allowed_actor_kinds, ("monster",))
-        self.assertEqual(skill.eligibility.allowed_species, ("tide_lamp_crab",))
-        self.assertEqual(len(skill.effects), 2)
-        self.assertEqual(skill.effects[0], "damage:light:physical")
-        self.assertEqual(skill.effects[1], "self_buff_apply:lamp_carapace_guard")
-        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
-        # The self guard declares no hit dependency on the enemy strike: the
-        # audience intersection would otherwise exclude the caster on a miss.
-        self.assertIs(skill.effect_policies[1].audience, EffectAudience.SELF)
-        self.assertIsNone(skill.effect_policies[1].requires_hit_from)
-        self.assertIsNone(skill.effect_policies[1].transfer)
-        self.assertEqual(spell_tier_for(skill), "學徒")
-        self.assertFalse(is_freeform_eligible(skill))
+        references = self._declared_kit_references()
+        self.assertTrue(references)
+        for variant, slot, skill in references:
+            with self.subTest(variant=variant.key, slot=slot, skill=skill.key):
+                for index, policy in enumerate(skill.effect_policies):
+                    self.assertLess(index, len(skill.effects), skill.key)
+                    self.assertIsInstance(policy.audience, EffectAudience)
+                    if policy.requires_hit_from is None:
+                        continue
+                    # A hit-qualified rider names an *earlier* damage
+                    # occurrence of the same skill, once.
+                    self.assertIn(policy.requires_hit_from, range(index))
+                    self.assertTrue(
+                        skill.effects[policy.requires_hit_from].startswith("damage:"),
+                        skill.key,
+                    )
+                    if policy.transfer is not None:
+                        self.assertGreater(policy.transfer.caster_recovery_share, 0)
+                        self.assertLessEqual(policy.transfer.caster_recovery_share, 1)

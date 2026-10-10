@@ -434,6 +434,140 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
                     pass
             self.assertEqual(info.call_count, 0)
 
+    @covers_requirement(
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "monster-individual-construction::the-construction-entry-point-validates-the-declared-kit-and-behavior-binding",
+    )
+    def test_invalid_kit_references_create_nothing(self):
+        from world.skills.registry import SkillEligibility, SkillKind, SkillPrerequisite, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        valid = make_skill(
+            "t_fault_valid", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        passive_only = make_skill("t_fault_passive", kind=SkillKind.PASSIVE)
+        active_only = make_skill(
+            "t_fault_active_2", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        foreign = make_skill(
+            "t_fault_foreign",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            eligibility=SkillEligibility(
+                allowed_actor_kinds=("monster",),
+                allowed_species=(OTHER_SPECIES,),
+            ),
+        )
+        chained = make_skill(
+            "t_fault_chained",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            prerequisites=(SkillPrerequisite("t_fault_absent", 1),),
+        )
+        effect_carrier = make_skill(
+            "t_fault_effect",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            effects=["damage:fire:physical"],
+        )
+        library = {
+            skill.key: skill
+            for skill in (
+                valid,
+                passive_only,
+                active_only,
+                foreign,
+                chained,
+                effect_carrier,
+            )
+        }
+        base = {ORDINARY: ORDINARY_ROW, STRONGER: STRONGER_ROW, ORPHAN: ORPHAN_ROW}
+
+        cases = {
+            "identity-ineligible active skill": ("active_skill_keys", (foreign.key,)),
+            "unusable active prerequisite": ("active_skill_keys", (chained.key,)),
+            "duplicate active key": (
+                "active_skill_keys",
+                (valid.key, valid.key),
+            ),
+            "active slot declaring a PASSIVE": (
+                "active_skill_keys",
+                (passive_only.key,),
+            ),
+            "passive slot declaring an ACTIVE": (
+                "passive_skill_keys",
+                (active_only.key,),
+            ),
+            "duplicate passive key": (
+                "passive_skill_keys",
+                (passive_only.key, passive_only.key),
+            ),
+        }
+        with patch.dict("world.skills.registry.SKILL_REGISTRY", library):
+            for label, (field, keys) in cases.items():
+                with self.subTest(case=label):
+                    before = _object_count()
+                    broken = replace(ORDINARY_ROW, **{field: keys})
+                    mapping = dict(base, **{ORDINARY: broken})
+                    with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping):
+                        with self.assertRaises(MonsterConstructionError):
+                            construct_species_individual(SPECIES, ORDINARY)
+                    self.assertEqual(_object_count(), before, label)
+
+            # An unavailable effect is a prefix the resolver has no handler
+            # for, even though the effect string itself parses.
+            with self.subTest(case="unavailable effect handler"):
+                before = _object_count()
+                kitted = replace(
+                    ORDINARY_ROW, active_skill_keys=(effect_carrier.key,)
+                )
+                mapping = dict(base, **{ORDINARY: kitted})
+                with (
+                    patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping),
+                    patch.dict(
+                        "world.rules.action.contracts._EFFECT_HANDLERS", {}, clear=True
+                    ),
+                ):
+                    with self.assertRaises(MonsterConstructionError):
+                        construct_species_individual(SPECIES, ORDINARY)
+                self.assertEqual(_object_count(), before)
+
+    @covers_requirement(
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_a_declared_kit_is_constructed_verbatim_without_invented_progression(self):
+        from world.skills.registry import SkillKind, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        first = make_skill(
+            "t_ordered_first", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        second = make_skill(
+            "t_ordered_second", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {first.key: first, second.key: second},
+        ):
+            kitted = replace(
+                ORDINARY_ROW,
+                active_skill_keys=(second.key, first.key),
+                behaviour_profile_key="ambush_predator",
+            )
+            mapping = {
+                ORDINARY: kitted,
+                STRONGER: STRONGER_ROW,
+                ORPHAN: ORPHAN_ROW,
+            }
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping):
+                with self.captureOnCommitCallbacks(execute=True):
+                    individual = construct_species_individual(SPECIES, ORDINARY)
+        # The declared order is the stored order, no prerequisite or passive is
+        # fabricated beside it, and the prerequisite-free kit builds nothing else.
+        self.assertEqual(individual.db.skills["active"], [second.key, first.key])
+        self.assertEqual(individual.db.skills["passive"], [])
+        self.assertEqual(individual.db.behaviour_tree, "ambush_predator")
+
 
 if __name__ == "__main__":
     unittest.main()
