@@ -587,7 +587,10 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
         self.assertEqual(skill.cost, {"mp": 10, "sp": 2})
-        self.assertFalse(skill.usable_out_of_combat)
+        # Both monster abilities declare True: the shared policy makes every
+        # damage-carrying ability selectable outside combat (settled
+        # 2026-10-10), and eligibility alone keeps it out of player use.
+        self.assertTrue(skill.usable_out_of_combat)
         self.assertEqual(skill.element.key, "wind")
         self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
         self.assertEqual(skill.group, "wind")
