@@ -5,6 +5,7 @@ import unittest
 from dataclasses import replace
 from tools.spec_traceability import covers_requirement
 from unittest.mock import patch
+from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
@@ -22,6 +23,7 @@ from world.rules.action import (
 from world.rules.action_preview import preview_skill
 from world.rules.buffs import grant_conferred_growth_rate
 from world.rules.combat import Battlefield, BattlefieldActionContext, run_round
+from world.rules.clock import get_world_clock
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
@@ -213,11 +215,31 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
 
     @covers_requirement("skill-lineage::each-actor-skill-target-accrues-once-per-world-clock-tick")
     def test_rolled_back_commit_releases_claims_so_retry_accrues(self):
+        registry = live_skill_registry()
+        paid_skill = replace(registry[_MAGIC_CASTER], cost={"mp": 10})
+        cost_scope = patch.dict(registry, {_MAGIC_CASTER: paid_skill})
+        cost_scope.start()
+        self.addCleanup(cost_scope.stop)
         monster = self._monsters(1)[0]
         context = self._field([monster])
         request = self._request(_MAGIC_CASTER, [monster], context)
         before = dict(self.actor.db.skill_proficiency)
+        before_mp = self.actor.traits.mp.current
+        before_hp = monster.traits.hp.current
+        clock = get_world_clock()
+        before_tick = clock.tick
+        fault_observations = []
         real = dict(_EVENT_EFFECT_PLANNERS)
+
+        def fail_after_claim():
+            # Observe the acquired claim and completed writes at the fault.
+            fault_observations.append((
+                dict(self.actor.db.skill_proficiency),
+                progression.practice_claims_for(self.actor, _MAGIC_CASTER),
+                self.actor.traits.mp.current,
+                monster.traits.hp.current,
+            ))
+            raise RuntimeError("injected after practice claim")
 
         def poison(_request, _log):
             # Runs after the staged practice batch; its failure forces the
@@ -227,7 +249,7 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
                     self.actor,
                     "poisoned commit",
                     frozenset({"progression"}),
-                    lambda: (_ for _ in ()).throw(RuntimeError("injected")),
+                    fail_after_claim,
                 )
             ]
 
@@ -239,7 +261,25 @@ class PracticePipelineIntegrationTests(EvenniaTestCase):
             _EVENT_EFFECT_PLANNERS.clear()
             _EVENT_EFFECT_PLANNERS.update(real)
         self.assertNotEqual(first.outcome, "success")
+        self.assertIsNone(first.event_log)
+        self.assertIsNone(first.time_cost_seconds)
+        self.assertEqual(first.notifications, ())
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(len(fault_observations), 1)
+        written_practice, claims, paid_mp, damaged_hp = fault_observations[0]
+        self.assertNotEqual(written_practice, before)
+        self.assertTrue(claims)
+        self.assertLess(paid_mp, before_mp)
+        self.assertLess(damaged_hp, before_hp)
         self.assertEqual(dict(self.actor.db.skill_proficiency), before)
+        self.assertEqual(self.actor.traits.mp.current, before_mp)
+        self.assertEqual(monster.traits.hp.current, before_hp)
+        reloaded_actor = ObjectDB.objects.get(pk=self.actor.pk)
+        reloaded_monster = ObjectDB.objects.get(pk=monster.pk)
+        self.assertEqual(dict(reloaded_actor.db.skill_proficiency), before)
+        self.assertEqual(reloaded_actor.traits.mp.current, before_mp)
+        self.assertEqual(reloaded_monster.traits.hp.current, before_hp)
         self.assertEqual(
             progression.practice_claims_for(self.actor, _MAGIC_CASTER), set()
         )

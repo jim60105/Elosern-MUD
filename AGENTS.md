@@ -223,6 +223,25 @@ mechanics rather than echo fixture or registry content; data-echo tests are
 replaced, not multiplied (the aggregate coverage gate stays a floor, not a
 target).
 
+Keep each assertion's role and detectable defect explicit. Generic production
+integrity checks retain identity, references, recipient/hit topology, schema
+bounds and intentional quality relationships. Mutable balance magnitudes belong
+to the authored declarations, with no second approval table.
+
+Shared synthetic mechanism tests use fixed inputs and independently known
+outcomes. A target with MP 3, requested drain 10 and full recovery share leaves
+the target at 0 and a caster starting at MP 20 with cost 10 at 13. That assertion
+detects recovery credited on requested loss. Never obtain expected arithmetic
+by calling the calculator under test or copying its formula into a helper.
+
+Representative production smoke executes a distinct consumer boundary through
+real construction, selection, payment, resolution and committed reload. Reading
+the declared profile and observing stored literal bases detects wrong source
+selection or baked multipliers; it does not establish calculation correctness.
+Keep untouched recipient controls and fault injection after relevant writes or
+practice claims. Classification tags and requirement decorators carry claims,
+so maintain their matching ledger/seed reasons and meaningful assertions.
+
 ## OpenSpec workflow
 
 Feature work is specification-driven. Use the matching repository skill under

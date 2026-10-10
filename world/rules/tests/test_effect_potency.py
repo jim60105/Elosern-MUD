@@ -276,6 +276,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
                 key="bad_self_dep",
                 label="Self Dep",
                 description="desc",
+                cost={},
+                usable_out_of_combat=False,
+                element="fire",
                 kind=SkillKind.ACTIVE,
                 target_spec=TargetSpec.SINGLE,
                 effects=["damage:fire:magic"],
@@ -289,6 +292,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
                 key="bad_fwd_dep",
                 label="Fwd Dep",
                 description="desc",
+                cost={},
+                usable_out_of_combat=False,
+                element="fire",
                 kind=SkillKind.ACTIVE,
                 target_spec=TargetSpec.SINGLE,
                 effects=["damage:fire:magic", "damage:fire:magic"],
@@ -305,6 +311,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
                 key="bad_oor_dep",
                 label="OOR Dep",
                 description="desc",
+                cost={},
+                usable_out_of_combat=False,
+                element="fire",
                 kind=SkillKind.ACTIVE,
                 target_spec=TargetSpec.SINGLE,
                 effects=["damage:fire:magic", "buff_apply:focus"],
@@ -321,6 +330,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
                 key="bad_nondmg_dep",
                 label="Non Damage Dep",
                 description="desc",
+                cost={},
+                usable_out_of_combat=False,
+                element="fire",
                 kind=SkillKind.ACTIVE,
                 target_spec=TargetSpec.SINGLE,
                 effects=["buff_apply:focus", "gauge_transfer:mp:drain:fixed:5"],
@@ -336,6 +348,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
             key="valid_dep",
             label="Valid Dep",
             description="desc",
+            cost={},
+            usable_out_of_combat=False,
+            element="fire",
             kind=SkillKind.ACTIVE,
             target_spec=TargetSpec.SINGLE,
             effects=["damage:fire:magic", "gauge_transfer:mp:drain:fixed:5"],
@@ -352,6 +367,9 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
             key="repeated_dep",
             label="Repeated Dep",
             description="desc",
+            cost={},
+            usable_out_of_combat=False,
+            element="fire",
             kind=SkillKind.ACTIVE,
             target_spec=TargetSpec.SINGLE,
             effects=[
@@ -371,6 +389,12 @@ class EffectPolicyAuthoringTests(unittest.TestCase):
 
 class DirectHandlerPotencyTests(unittest.TestCase):
     """Formula and direct-handler behavior with effect potency."""
+
+    def setUp(self):
+        super().setUp()
+        heal = patch.dict(COMBAT_YAML["heal"], {"multiplier": 1.0, "floor": 1})
+        heal.start()
+        self.addCleanup(heal.stop)
 
     @covers_requirement(
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
@@ -487,19 +511,13 @@ class DirectHandlerPotencyTests(unittest.TestCase):
 
     def test_heal_magnitude_inserts_coefficient_before_rounding_and_gain(self):
         actor = FakeEntity("actor", magic_power=35)
-        mult = float(COMBAT_YAML["heal"]["multiplier"])
-        floor = int(COMBAT_YAML["heal"]["floor"])
-
-        # Baseline potency 1.0: max(round(35 * mult * 1.0), floor)
-        self.assertEqual(_heal_magnitude(actor, 1.0), max(round(35 * mult), floor))
-        # Potency 2.0: max(round(35 * mult * 2.0), floor)
-        self.assertEqual(_heal_magnitude(actor, 2.0), max(round(35 * mult * 2.0), floor))
+        self.assertEqual(_heal_magnitude(actor, 1.0), 35)
+        self.assertEqual(_heal_magnitude(actor, 2.0), 70)
 
     def test_heal_magnitude_sub_one_potency_respects_floor(self):
         actor = FakeEntity("actor", magic_power=1)
-        floor = int(COMBAT_YAML["heal"]["floor"])
         # magic 1 * mult 1.0 * coef 0.01 = 0.01 -> round is 0 -> clamped to floor (1)
-        self.assertEqual(_heal_magnitude(actor, 0.01), floor)
+        self.assertEqual(_heal_magnitude(actor, 0.01), 1)
 
     def test_heal_magnitude_discriminates_formula_ordering_with_heal_gain(self):
         # magic 33, mult 1.0, potency 2.0, heal_gain "+15%".
@@ -529,9 +547,9 @@ class DirectHandlerPotencyTests(unittest.TestCase):
 
         amt_empty = int(pending_empty.description.rsplit("|", 1)[1])
         amt_forged = int(pending_forged.description.rsplit("|", 1)[1])
-        expected = _heal_magnitude(actor, 1.0)
-        self.assertEqual(amt_empty, expected)
-        self.assertEqual(amt_forged, expected)
+        # Detect forged binding changing the fixed synthetic heal outcome.
+        self.assertEqual(amt_empty, 30)
+        self.assertEqual(amt_forged, 30)
 
     def test_heal_and_self_heal_clamp_at_hp_gap_and_never_revive(self):
         actor = FakeEntity("actor", hp=0, max_hp=100, magic_power=40)
@@ -567,6 +585,9 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
 
     def setUp(self):
         super().setUp()
+        heal = patch.dict(COMBAT_YAML["heal"], {"multiplier": 1.0, "floor": 1})
+        heal.start()
+        self.addCleanup(heal.stop)
         self.caster = create_object(PlayerCharacter, key="caster")
         self.target = create_object(PlayerCharacter, key="target")
         self.ally = create_object(PlayerCharacter, key="ally")
@@ -729,11 +750,10 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         heal_entries = [e for e in res.event_log.entries if e.kind == "heal"]
         self.assertEqual(len(heal_entries), 1)
-        expected_heal = _heal_magnitude(self.caster, 2.0)
-        # Expected heal should be applied, clamped to gap 60:
-        applied = min(60, expected_heal)
-        self.assertEqual(heal_entries[0].data["amount"], applied)
-        self.assertEqual(self.ally.traits.hp.current, 40 + applied)
+        # Fixed synthetic magic 30 and potency 2 heal the entire 60 HP gap.
+        # A wrong potency or recipient cannot pass through a shared calculator.
+        self.assertEqual(heal_entries[0].data["amount"], 60)
+        self.assertEqual(self.ally.traits.hp.current, 100)
 
     def test_healing_composes_potency_equipment_gain_and_freeform_scale(self):
         # Caster magic_power = 33, ally hp gap = 100.

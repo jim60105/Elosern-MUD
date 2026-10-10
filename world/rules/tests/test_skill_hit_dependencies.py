@@ -16,7 +16,14 @@ from world.rules.action import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.tests.combat_fixtures import FakeEntity, grant_lineage
-from world.tests.synthetic_data import make_skill
+from world.tests.synthetic_data import (
+    make_skill,
+    make_monster_species,
+    make_monster_variant,
+    synthetic_registries,
+)
+from world.lore.monster_species import MonsterCombatProfile
+from world.rules.monster_individual import construct_species_individual
 from world.skills.effects import (
     DamageEffect,
     DamagePolicy,
@@ -27,6 +34,7 @@ from world.skills.effects import (
 from world.skills.registry import (
     SkillCategory,
     SkillDef,
+    SkillEligibility,
     SkillKind,
     TargetSpec,
 )
@@ -390,8 +398,8 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
         "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
     )
-    def test_critical_defeat_crossing_and_second_species_reuse(self):
-        """Scenario: Critical hit does not multiply drain; defeat crossing transfers before settlement; second species reuse."""
+    def test_critical_defeat_crossing(self):
+        """Critical hit does not multiply drain; defeat crossing still transfers."""
         skill = self._make_skill(
             "synth_second_species_skill",
             effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:10"],
@@ -436,13 +444,83 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertEqual(self.target_a.traits.mp.current, 10)
         self.assertEqual(self.actor.traits.mp.current, 20)
 
-        # Second species execution: executed without species-specific branch
-        second_actor = create_object(PlayerCharacter, key="second_species_actor")
-        second_actor.race = "human"
-        second_actor.apply_race_baseline()
-        second_actor.traits.hp.current = 50
-        second_actor.traits.mp.current = 20
-        second_actor.traits.sp.current = 20
-        self.assertEqual(second_actor.traits.mp.current, 20)
-        self.assertEqual(second_actor.traits.sp.current, 20)
-        self.assertFalse(hasattr(ActionResolver, "resolve_tide_devouring_crocodile"))
+    @covers_requirement(
+        "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
+        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "test-data-independence::shared-synthetic-mechanism-coverage-owns-independently-known-outcomes",
+    )
+    def test_two_species_execute_shared_drain_with_isolated_hit_state(self):
+        """Detect species-specific execution and hit evidence leaking by DB identity."""
+        species_keys = ("t_drain_species_a", "t_drain_species_b")
+        skill = make_skill(
+            "t_shared_species_drain",
+            target_spec=TargetSpec.AREA,
+            cost={"mp": 10, "sp": 5},
+            eligibility=SkillEligibility(
+                allowed_actor_kinds=("monster",), allowed_species=species_keys,
+            ),
+            effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:10"],
+            effect_policies=(
+                EffectPolicy(audience=EffectAudience.ENEMIES),
+                EffectPolicy(
+                    audience=EffectAudience.ENEMIES,
+                    requires_hit_from=0,
+                    transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+                ),
+            ),
+        )
+        species = {}
+        variants = {}
+        for index, species_key in enumerate(species_keys):
+            variant_key = f"t_drain_variant_{index}"
+            species[species_key] = make_monster_species(
+                species_key, default_variant_key=variant_key,
+            )
+            variants[variant_key] = make_monster_variant(
+                variant_key,
+                species_key=species_key,
+                combat_profile=MonsterCombatProfile(
+                    hp=100, mp=100, sp=100, atk_phys=10,
+                    agility=20, defense=0, magic_power=0,
+                ),
+                active_skill_keys=(skill.key,),
+            )
+        with synthetic_registries(
+            "monster_species", "monster_variants", "monster_tiers",
+            extra={"monster_species": species, "monster_variants": variants},
+        ), patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+            actors = [
+                construct_species_individual(key, species[key].default_variant_key)
+                for key in species_keys
+            ]
+            self.assertNotEqual(actors[0].pk, actors[1].pk)
+            self.assertNotEqual(self.target_a.pk, self.target_b.pk)
+            for index, actor in enumerate(actors):
+                actor.traits.mp.current = 20
+                actor.traits.sp.current = 20
+                self.target_a.traits.mp.current = 3
+                self.target_b.traits.mp.current = 3
+                context = BattlefieldActionContext(Battlefield(
+                    roster={
+                        str(actor.key): actor,
+                        "hit_target_a": self.target_a,
+                        "hit_target_b": self.target_b,
+                    },
+                    teams={
+                        "actors": {str(actor.key)},
+                        "foes": {"hit_target_a", "hit_target_b"},
+                    },
+                ))
+                # Swap hit/miss in the next invocation, so stale evidence fails.
+                rolls = [80, 1] if index == 0 else [1, 80]
+                with patch("world.rules.combat.damage.roll_d100", side_effect=rolls):
+                    result = ActionResolver.resolve(ActionRequest(
+                        actor, skill.key, [self.target_a, self.target_b], context,
+                    ))
+                self.assertEqual(result.outcome, "success")
+                self.assertEqual(actor.traits.mp.current, 13)
+                self.assertEqual(actor.traits.sp.current, 15)
+                self.assertEqual(
+                    (self.target_a.traits.mp.current, self.target_b.traits.mp.current),
+                    (0, 3) if index == 0 else (3, 0),
+                )
