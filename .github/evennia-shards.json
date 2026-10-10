@@ -141,6 +141,7 @@
         "world.rules.tests.test_monster_behaviour_policy",
         "world.rules.tests.test_monster_behaviour_profile",
         "world.rules.tests.test_monster_behaviour_selection",
+        "world.rules.tests.test_monster_composition_coverage",
         "world.rules.tests.test_monster_flee_decision",
         "world.rules.tests.test_monster_individual",
         "world.rules.tests.test_monster_scale",

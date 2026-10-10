@@ -1,8 +1,11 @@
-"""Data-contract test: crab resource skill production combat smoke contract
+"""Data-contract test: crab representative-composition production smoke over the generic self-guard/lifetime contracts
 
-One real session proves hit-independent self-guard routing, nominal payment,
-aged ally-attempt refresh and durable depletion. Shared synthetic tests own
-formula, rejection, hit-evidence and rollback vectors.
+The stable-key-ordered representative of the hit-independent self-guard
+composition shape is constructed for real and observed through one committed
+session: a missing strike that still mounts the guard on the caster, ally and
+target controls, aged refresh, ordinary fallback on its exhausted MP axis, the
+inclusive flee edge, a late-target rejection and a committed reload. Shared
+synthetic suites own the hit/miss/rejection, formula and rollback vectors.
 """
 
 from unittest.mock import patch
@@ -14,7 +17,8 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
-from world.rules.action import ActionRequest, ActionResolver
+from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
+from world.rules.action import ActionRequest, ActionResolver, RejectReason
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield, BattlefieldActionContext
@@ -22,11 +26,30 @@ from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
 from world.rules.combat_session.records import read_session
+from world.rules.disengage import FLEE_SKILL_KEY
+from world.rules.monster_behaviour import resolve_behaviour_profile
 from world.rules.monster_individual import construct_species_individual
 from world.skills.registry import SKILL_REGISTRY
 
-SKILL_KEY = "lamp_carapace_claw"
-BUFF_KEY = "lamp_carapace_guard"
+# The representative the composition-coverage check derives for this group.
+REPRESENTATIVE_VARIANT = "reef_warden"
+REPRESENTATIVE_ROW = MONSTER_VARIANT_REGISTRY[REPRESENTATIVE_VARIANT]
+SKILL_KEY = REPRESENTATIVE_ROW.active_skill_keys[0]
+BEHAVIOUR_KEY = REPRESENTATIVE_ROW.behaviour_profile_key
+
+_MOUNTED_PREFIXES = ("buff_apply:", "self_buff_apply:")
+
+
+def _mounted_buff_key(skill) -> str:
+    """The timed effect key one representative kit actually mounts."""
+    for effect in skill.effects:
+        for prefix in _MOUNTED_PREFIXES:
+            if effect.startswith(prefix):
+                return effect[len(prefix):]
+    raise AssertionError("the representative kit mounts no timed effect")
+
+
+BUFF_KEY = _mounted_buff_key(SKILL_REGISTRY[SKILL_KEY])
 
 
 def _buff_instances(entity):
@@ -45,14 +68,17 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         return player
 
     @covers_requirement(
-        "monster-action-policy::潮燈蟹-contact-kit-uses-existing-first-owned-policy-and-fallback",
+        "monster-action-policy::authored-monster-kits-use-shared-policy-selection-and-fallback",
         "monster-individual-construction::constructed-kits-and-depleted-resources-survive-reload-without-registry-resets",
-        "monster-resource-abilities::潮燈蟹-timed-modifier-follows-its-authored-recipient-and-lifetime",
+        "monster-resource-abilities::timed-monster-effects-follow-declared-recipients-and-lifetime",
+        "monster-resource-abilities::delivered-monster-compositions-retain-representative-consumer-evidence",
         "test-data-independence::representative-production-smoke-proves-real-consumer-integration-proportionally",
     )
     def test_production_self_guard_miss_ally_refresh_payment_and_reload(self):
         """Detect hit-gated guard, role swap, stale refresh or lost durable source."""
-        crab = construct_species_individual("tide_lamp_crab", "shore_walker")
+        crab = construct_species_individual(
+            REPRESENTATIVE_ROW.species_key, REPRESENTATIVE_VARIANT
+        )
         room = create_object(Room, key="t_guard_smoke_room")
         player = self._opponent(room, "t_guard_smoke_target")
         ally = self._opponent(room, "t_guard_smoke_ally")
@@ -114,14 +140,17 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         depleted_sp = crab.traits.sp.current
         crab.traits.mp.current = 0
         reloaded = Monster.objects.get(pk=crab.pk)
-        self.assertEqual(reloaded.species_key, "tide_lamp_crab")
-        self.assertEqual(reloaded.variant_key, "shore_walker")
+        self.assertEqual(reloaded.species_key, crab.species_key)
+        self.assertEqual(reloaded.variant_key, crab.variant_key)
         self.assertEqual(reloaded.traits.mp.current, 0)
         self.assertEqual(reloaded.traits.sp.current, depleted_sp)
         self.assertEqual(reloaded.db.skills["active"], [SKILL_KEY])
-        self.assertEqual(reloaded.db.behaviour_tree, "instinctive")
+        self.assertEqual(reloaded.db.behaviour_tree, BEHAVIOUR_KEY)
         self.assertIn(BUFF_KEY, entity_active_buffs(reloaded))
         self.assertEqual(_buff_instances(reloaded)[0].remaining_seconds, duration)
+
+        # MP-axis exhaustion: the ordinary attack takes over through the same
+        # selection boundary, so the paid axis stays real evidence.
         fallback = _enemy_policy(reloaded, field, record)
         self.assertEqual(fallback.skill_key, "basic_attack")
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
@@ -131,3 +160,26 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         clock.advance(duration, AdvanceSource.COMMAND, (reloaded,))
         self.assertNotIn(BUFF_KEY, entity_active_buffs(reloaded))
         self.assertEqual(evaluate_combat_modifiers(reloaded).get("defense", 0), baseline_defense)
+
+        # Inclusive flee edge on this representative's own declared threshold,
+        # then a target that dies between selection and resolution.
+        reloaded.traits.mp.current = reloaded.traits.mp.max
+        threshold = resolve_behaviour_profile(reloaded).flee_hp_fraction
+        self.assertIsNotNone(threshold)
+        edge = int(reloaded.traits.hp.max * threshold)
+        reloaded.traits.hp.current = edge
+        self.assertEqual(_enemy_policy(reloaded, field, record).skill_key, FLEE_SKILL_KEY)
+        reloaded.traits.hp.current = edge + 1
+        strike = _enemy_policy(reloaded, field, record)
+        self.assertEqual(strike.skill_key, SKILL_KEY)
+
+        paid_before = (reloaded.traits.mp.current, reloaded.traits.sp.current)
+        practice_before = dict(reloaded.db.skill_proficiency or {})
+        player.traits.hp.current = 0
+        late = ActionResolver.resolve(strike)
+        self.assertEqual(late.outcome, "rejected")
+        self.assertEqual(late.reason, RejectReason.TARGET_DEAD)
+        self.assertEqual(
+            (reloaded.traits.mp.current, reloaded.traits.sp.current), paid_before
+        )
+        self.assertEqual(dict(reloaded.db.skill_proficiency or {}), practice_before)

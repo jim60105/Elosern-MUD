@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 from copy import deepcopy
+from numbers import Real
 import os
 from pathlib import Path
 import subprocess
@@ -10,6 +11,8 @@ import sys
 import tempfile
 import unittest
 from unittest.mock import patch
+
+import yaml
 
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_behaviour import (
@@ -42,6 +45,12 @@ _T_STRIKE = synth_damage_skill(
 )
 _SCOPE_EXTRA = {"skills": {_T_STRIKE.key: _T_STRIKE}}
 
+# The authored rulebook read by a second, independent path: the loader under
+# test parses YAML into ``MONSTER_BEHAVIOUR_YAML``, and this test re-reads the
+# same file so a drifted loader and a drifted declaration both show up without
+# any shipped value being mirrored as a literal here.
+RULEBOOK_PATH = Path(__file__).parents[1] / "rulebook" / "monster_behaviour.yaml"
+
 
 def _apex_tier() -> str:
     """The shipped tier whose DEFAULT archetype declares no flee threshold."""
@@ -60,21 +69,38 @@ class MonsterFleeProfileTests(unittest.TestCase):
 
     @covers_requirement(
         "monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold",
-        "monster-action-policy::authored-crocodile-behavior-uses-the-existing-first-owned-strategy",
+        "monster-action-policy::authored-monster-kits-use-shared-policy-selection-and-fallback",
     )
     def test_shipped_thresholds_and_tier_defaults_are_valid(self):
+        """Every declared threshold reaches its profile, and every tier default resolves.
+
+        Detect a loader that dropped, defaulted or re-scaled an authored
+        scalar: the expectation is re-parsed from the rulebook file rather
+        than mirrored as a literal table, so the test cannot drift into an
+        approval copy of the shipped balance values.
+        """
+        raw = yaml.safe_load(RULEBOOK_PATH.read_text(encoding="utf-8"))
+        declared = {
+            key: values["flee_hp_fraction"]
+            for key, values in raw["archetypes"].items()
+        }
+        self.assertTrue(declared)
+        for key, fraction in declared.items():
+            with self.subTest(archetype=key):
+                if fraction is None:
+                    continue
+                self.assertIsInstance(fraction, Real)
+                self.assertNotIsInstance(fraction, bool)
+                self.assertGreaterEqual(fraction, 0)
+                self.assertLessEqual(fraction, 1)
         self.assertEqual(
             {
                 key: profile.flee_hp_fraction
                 for key, profile in BEHAVIOUR_PROFILES.items()
             },
             {
-                "instinctive": 0.35,
-                "pack_hunter": 0.20,
-                "brute": 0.10,
-                "tactical_caster": 0.25,
-                "apex_predator": None,
-                "ambush_predator": 0.20,
+                key: None if fraction is None else float(fraction)
+                for key, fraction in declared.items()
             },
         )
         for tier, key in MONSTER_BEHAVIOUR_YAML[
