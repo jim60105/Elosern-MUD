@@ -88,9 +88,14 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
 
     @covers_requirement(
         "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected",
+        "monster-action-policy::潮燈蟹-contact-kit-uses-existing-first-owned-policy-and-fallback",
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
         "monster-individual-construction::constructed-kits-and-depleted-resources-survive-reload-without-registry-resets",
         "monster-individual-construction::the-construction-entry-point-validates-the-declared-kit-and-behavior-binding",
+        "monster-individual-construction::潮燈蟹-construction-persists-both-approved-contact-kits",
+        "monster-resource-abilities::潮燈蟹-owns-its-approved-contact-resource-ability",
+        "monster-resource-abilities::潮燈蟹-timed-modifier-follows-its-authored-recipient-and-lifetime",
+        "monster-resource-abilities::潮燈蟹-payment-and-atomicity-retain-the-shared-transaction",
         "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals",
         "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
         "monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold",

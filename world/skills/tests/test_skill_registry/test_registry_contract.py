@@ -617,6 +617,7 @@ class SkillRegistryTests(unittest.TestCase):
         "skill-identity-eligibility::stored-identity-determines-actor-qualification",
         "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints",
         "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "monster-resource-abilities::潮燈蟹-owns-its-approved-contact-resource-ability",
     )
     def test_lamp_carapace_claw_data_contract(self):
         from world.skills.effects import EffectAudience

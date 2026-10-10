@@ -342,6 +342,7 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
         "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently",
         "monster-resource-abilities::crocodile-ecology-documents-implemented-limits",
         "monster-resource-abilities::穗鳴雀-public-ecology-reflects-the-completed-contact-kit",
+        "monster-resource-abilities::潮燈蟹-public-ecology-reflects-the-completed-contact-kit",
     )
     def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
         for key in APPROVED_SPECIES:
