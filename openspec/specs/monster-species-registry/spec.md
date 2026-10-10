@@ -93,7 +93,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 #### Scenario: Flavour never becomes a number
 - **WHEN** a variant whose narrative mentions magical or elemental behaviour is inspected
 - **THEN** its magic power, MP and SP equal explicit approved literals, never values inferred from narrative; all twelve shipped variants retain zero magic power within their zero tier magic bands
-- **AND** only the approved crocodile resource exceptions permit nonzero pools, bank_lurker MP/SP 30/40 and bay_warden 50/60; the other ten variants retain zero MP/SP
+- **AND** approved resource exceptions are bank_lurker MP/SP 30/40, bay_warden 50/60; grain_pecker MP/SP 20/8; flock_leader MP/SP 30/12; variants not yet approved in this sequence retain their existing zero pools
 
 #### Scenario: Balance approval populates the same slot
 - **WHEN** a balance-approved complete profile and grade are authored for one variant
@@ -109,7 +109,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 
 #### Scenario: MP and SP pools are gated by approval, not inference
 - **WHEN** MP or SP literals are authored for a variant
-- **THEN** MP and SP carry no tier band and require explicit approval; the two approved crocodile pools are accepted verbatim and every other unapproved nonzero pool is rejected
+- **THEN** MP and SP carry no tier band and require explicit approval; the crocodile pools and explicitly approved complete profiles in “Approved delivered resource rows are literal” are accepted verbatim after approval; every unapproved nonzero pool is rejected
 
 #### Scenario: Only explicit user balance approval populates a slot
 - **WHEN** a profile or grade slot is populated
@@ -136,17 +136,14 @@ value, and a `magic_power` outside the variant's tier magic band.
 - **AND** consumers SHALL NOT read the registry slot as if it carried that fallback
 
 ### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
-The registries SHALL NOT register, reference, or imply a skill key, behaviour profile, or combat trait
-for the five deferred abilities (wind grain-shaking, lamp-mimicking glow, earth burrow-packing,
-fog-channeling, rock-sonance). Crocodile contact MP drain SHALL be executable solely through its
-authored shared-engine skill and validated kit, with no prose-derived effects.
+The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are tide_lamp_crab, ridge_burrow_hare, rock_echo_goat, fog_mane_lynx. Crocodile contact MP drain and completed species kits remain authored configuration.
 
 #### Scenario: No behaviour seam is faked
-- **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the five deferred abilities
+- **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the still-deferred species listed above
 - **THEN** it carries none, and the ability prose remains in the published description fields only
 
 #### Scenario: Narrative does not unlock a behaviour
-- **WHEN** the existing behaviour-selection path resolves a variant whose narrative describes one of the five still-deferred special abilities
+- **WHEN** the existing behaviour-selection path resolves a variant whose narrative describes a still-deferred special ability
 - **THEN** the resolved behaviour is exactly the existing damage-oriented decision path with no new effect, and the proposal records the mechanics prerequisite rather than an implementation
 
 #### Scenario: Crocodile behavior comes from validated configuration
@@ -155,15 +152,19 @@ authored shared-engine skill and validated kit, with no prose-derived effects.
 
 #### Scenario: Ability text is published narrative only
 
-- **WHEN** ability text is authored for one of the five deferred abilities
+- **WHEN** ability text is authored for one of the still-deferred species listed above
 - **THEN** it SHALL be permitted only as published narrative prose, including its approved limits
 
 #### Scenario: Executable abilities are an external prerequisite
 
-- **WHEN** an executable form of one of these deferred abilities is wanted
+- **WHEN** an executable form of a still-deferred ability is wanted
 - **THEN** it is a named external prerequisite owned by the skill/behaviour-mechanics work; a
   registry field, a stored trait, or a placeholder value SHALL NOT stand in for it
 - **AND** no consumer SHALL be permitted to interpret narrative text as an available effect
+
+#### Scenario: sway_whistle_sparrow completes its executable boundary
+- **WHEN** this species' two approved kits are constructed
+- **THEN** `grain_shaking_peck` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
 
 ### Requirement: Published projections expose only marked public fields
 The species and variant registries SHALL expose published views built from explicitly marked public
@@ -235,9 +236,8 @@ runtime store idempotently.
 
 ### Requirement: The approved first-batch profiles and grades are user-approved literals
 The twelve shipped variants SHALL carry the exact complete approved profiles in the table stated in
-the scenario below, except for the explicitly approved crocodile resource values and bite kit.
-Magic power SHALL remain zero for all twelve; other ten variants retain zero MP/SP and unchanged
-content. Newly constructed instances SHALL use these rows without live migration.
+the scenario below, except for the explicitly approved resource pools and kits recorded below.
+Magic power SHALL remain zero for all twelve; only listed delivered species change MP/SP and ability content. Newly constructed instances SHALL use these rows without live migration.
 
 #### Scenario: New instance
 - **WHEN** a registered variant constructs a new monster
@@ -276,9 +276,9 @@ The approval fence SHALL cover exactly these twelve variants. Each approved seve
 #### Scenario: Zero pools and retained identities survive the batch
 
 - **WHEN** the approved batch is applied to the existing registry
-- **THEN** magic power remains zero for all twelve; MP/SP remain zero for the ten non-crocodile variants
-- **AND** species keys, variant keys, names and grades are retained; only crocodile ecology and behavior receive the approved bite integration
-- **AND** only tide_devouring_bite is added for the two crocodile variants
+- **THEN** magic power remains zero for all twelve; resource pools equal the explicit approved exceptions below and all not-yet-delivered variants retain zero MP/SP
+- **AND** species keys, variant keys, names and grades are retained; only explicitly approved delivered species receive their authored ecology and kit integration
+- **AND** tide_devouring_bite remains unchanged for the two crocodile variants; approved completed kits are grain_shaking_peck
 
 #### Scenario: The approved literals retire attrition without changing character
 
@@ -290,7 +290,17 @@ The approval fence SHALL cover exactly these twelve variants. Each approved seve
 #### Scenario: Crocodile resource values replace only their previous zero pools
 - **WHEN** the full approved profiles are compared with the registry
 - **THEN** bank_lurker has HP/MP/SP/attack/agility/defense/magic of 140/30/40/22/12/14/0 and grade D; bay_warden has 210/50/60/28/12/15/0 and grade C
-- **AND** no other numeric axis, grade or non-crocodile profile changes and no measured balance claim is implied
+- **AND** no crocodile numeric axis, cost, effect, kit, binding or grade changes; the other explicitly approved MP/SP exceptions below supersede prior zero pools without any measured balance claim
+
+#### Scenario: Approved delivered resource rows are literal
+- **WHEN** all delivered first-batch rows after this change are compared against their approval record
+- **THEN** they carry the following complete profiles in HP/MP/SP/atk_phys/agility/defense/magic_power order, preserving their original grades
+
+| Variant | Complete profile | Grade |
+|---|---|---|
+| `grain_pecker` | 30/20/8/4/7/3/0 | F |
+| `flock_leader` | 55/30/12/8/10/4/0 | E |
+- **AND** every remaining non-crocodile variant retains its earlier complete profile and zero MP/SP until its own approval and cutover
 
 ### Requirement: Every shipped combat profile and danger grade lies inside its declared tier band
 Validation SHALL independently check HP, attack, agility, defense and magic against their own tier

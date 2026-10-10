@@ -9,6 +9,10 @@
       "reason": "crocodile resource skill production combat smoke contract"
     },
     {
+      "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
+      "reason": "sparrow resource skill production combat smoke contract"
+    },
+    {
       "path": "tests/test_command_docs.py",
       "reason": "player command docs parity contract"
     },

@@ -464,3 +464,11 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（remaining-monster-resource-skills §4，穗鳴雀震穗啄擊）：命中後
+# 短暫分心的 mount，accuracy −3 資料在 combat_modifiers.yaml 的
+# grain_rattle_accuracy 列（earth_dust_veil 的 accuracy 先例）。
+- key: grain_rattle
+  duration: 10
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}

@@ -543,7 +543,7 @@ class SkillRegistryTests(unittest.TestCase):
     def test_tide_devouring_bite_data_contract(self):
         from world.skills.effects import EffectAudience
         from world.skills.cost_tiers import spell_tier_for
-        from world.rules.freeform_casting import freeform_scale_for
+        from world.skills.cost_tiers import is_freeform_eligible
 
         skill = SKILL_REGISTRY["tide_devouring_bite"]
         self.assertEqual(skill.label, "吞潮咬擊")
@@ -570,4 +570,45 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
         self.assertEqual(skill.effect_policies[1].transfer.caster_recovery_share, 1.0)
         self.assertEqual(spell_tier_for(skill), "學徒")
-        self.assertIsNone(freeform_scale_for(skill))
+        self.assertFalse(is_freeform_eligible(skill))
+
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
+        "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_grain_shaking_peck_data_contract(self):
+        from world.skills.effects import EffectAudience
+        from world.skills.cost_tiers import spell_tier_for
+        from world.skills.cost_tiers import is_freeform_eligible
+
+        skill = SKILL_REGISTRY["grain_shaking_peck"]
+        self.assertEqual(skill.label, "震穗啄擊")
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertEqual(skill.cost, {"mp": 10, "sp": 2})
+        # Both monster abilities declare True: the shared policy makes every
+        # damage-carrying ability selectable outside combat (settled
+        # 2026-10-10), and eligibility alone keeps it out of player use.
+        self.assertTrue(skill.usable_out_of_combat)
+        self.assertEqual(skill.element.key, "wind")
+        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
+        self.assertEqual(skill.group, "wind")
+        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+        self.assertEqual(skill.prerequisites, ())
+        self.assertEqual(skill.cast_conditions, ())
+        self.assertEqual(skill.eligibility.allowed_actor_kinds, ("monster",))
+        self.assertEqual(
+            skill.eligibility.allowed_species, ("sway_whistle_sparrow",)
+        )
+        self.assertEqual(len(skill.effects), 2)
+        self.assertEqual(skill.effects[0], "damage:wind:physical")
+        self.assertEqual(skill.effects[1], "buff_apply:grain_rattle")
+        self.assertEqual(skill.effect_policies[0].coefficient, 0.8)
+        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
+        self.assertEqual(skill.effect_policies[1].coefficient, 1.0)
+        self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
+        self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
+        self.assertIsNone(skill.effect_policies[1].transfer)
+        self.assertEqual(spell_tier_for(skill), "學徒")
+        self.assertFalse(is_freeform_eligible(skill))
