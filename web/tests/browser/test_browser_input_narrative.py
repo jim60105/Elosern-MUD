@@ -538,6 +538,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function(
             """() => { const p = document.querySelector('[data-testid="message-page"]');
               return p && p.getAttribute('data-page') === '1'
+                && p.textContent.startsWith('第1句：')
                 && parseInt(p.getAttribute('data-pages') || '0', 10) >= 2; }""",
             timeout=30000,
         )

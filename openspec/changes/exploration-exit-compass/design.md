@@ -14,7 +14,7 @@ Observed today:
 ## Goals / Non-Goals
 
 **Goals:**
-- Exits are chosen on a compass by bearing; the payload and the server's gate are untouched.
+- Exits are chosen on a compass by bearing; the payload and the server's admission gate are untouched. The explicitly authorized acceptance repair corrects only traversal success detection for reused wilderness rooms.
 - The model is pure and exhaustively unit-tested; the component is thin.
 - The client is fully working after this change alone.
 
@@ -112,8 +112,15 @@ Live wilderness hover aimed without moving, and a discrete pointer click moved
 from `wild:elosern:60:97` to `wild:elosern:61:97`. Holding south produced an
 arrival, then the server returned `move_failed` / `移動失敗。` despite a changed
 committed wilderness node; the compass stopped and displayed that rejection.
-The server adapter's room-object-identity success check is outside this
-frontend-only change. The deterministic browser walk journey separately verifies
-three committed arrivals, the exact per-arrival payloads, and the dead-end stop
-using its explicitly scripted action-result/update responder; it is not evidence
-of uninterrupted traversal through the real wilderness server.
+The user subsequently authorized correcting that success check: unchanged room
+identity is a failure only if the canonical location node is also unchanged.
+Traversal, charging, and discovery still use the shared Exit path. The
+deterministic browser walk journey separately verifies three committed arrivals,
+the exact per-arrival payloads, and the dead-end stop using its explicitly
+scripted action-result/update responder.
+
+The reduced-to-full reader gate initially failed. Temporary typewriter tracing
+showed the gate accepted the old startup response (106 units, instant), then
+switched motion before the newly appended response (205 units) rendered. The
+gate now waits for the new text as well as page geometry; all original assertions
+remain intact. No MessageWindow or useTypewriter production change is needed.

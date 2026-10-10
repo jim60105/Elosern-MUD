@@ -57,7 +57,7 @@ from world.rules.tests._combat_session_helpers import (
     open_synthetic_scope,
     synth_innate_overlay,
 )
-from unittest.mock import patch
+from unittest.mock import PropertyMock, patch
 from world.ai.npc_dialogue import register_npc_dialogue
 import unittest
 from ._support import (
@@ -144,6 +144,31 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         visited = {visit.node_id for visit in parse_knowledge(self.player)}
         self.assertIn(f"room:{int(self.destination.pk)}", visited)
 
+
+    @covers_requirement("webclient-exploration-menu::explore-move-traverses-a-re-resolved-exit-through-the-shared-movement-path")
+    def test_coordinate_change_in_a_reused_wilderness_room_reports_success(self):
+        room = create_object(TerrainRoom, key="測試荒野房間")
+        self.player.location = room
+        self.exit_obj.location = room
+        self.exit_obj.destination = room
+        coordinates = [1, 1]
+
+        def traverse(actor, destination):
+            self.assertIs(actor.location, destination)
+            coordinates[1] += 1
+
+        with patch.object(
+            TerrainRoom, "coordinates", new_callable=PropertyMock,
+            side_effect=lambda: tuple(coordinates),
+        ), patch.object(self.exit_obj, "at_traverse", traverse):
+            source = _current_node(self.player)
+            result = self._move(
+                {"exit_ref": str(int(self.exit_obj.id)), "current_node": source}
+            )
+            self.assertEqual(result["outcome"], "success")
+            self.assertEqual(result["code"], "moved")
+            self.assertNotEqual(_current_node(self.player), source)
+            self.assertIs(self.player.location, room)
 
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-reports-failure-truthfully-on-every-client-path")
     def test_failed_charge_reports_move_failed_with_player_still_at_source(self):
