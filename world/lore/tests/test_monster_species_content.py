@@ -1,14 +1,9 @@
-"""Data-contract test: approved first-batch bestiary narrative, balance-profile and danger-grade contract
+"""Data-contract test: shipped bestiary identity, narrative, profile integrity and construction wiring
 
-The shipped species/variant registries are authored content: this is the one
-place allowed to name it. It pins the six approved species and their twelve
-approved named variant directions (content-approved 2026-10-05), the approved
-zh-TW narrative landed in the published fields, the user-approved complete
-combat profile and guild danger grade of every shipped variant together with
-its membership in the tier band that variant declares (balance-approved
-2026-10-08), the values and numeric source a constructed individual stores, the
-shared stable-key contract, and the negative guarantee that the registries name
-no skill key, behaviour profile, or combat trait.
+The six species and twelve variant identities retain their published narrative
+and taxonomy. Current complete profiles and grades satisfy authoring bounds;
+construction and reload observe the selected profile without numerical
+approval copies. Delivered kits and deferred kits remain distinct.
 """
 
 import ast
@@ -39,7 +34,6 @@ from world.rules.monster_behaviour import BEHAVIOUR_PROFILES, MONSTER_BEHAVIOUR_
 from world.rules.monster_individual import construct_species_individual
 from world.rules.traits import (
     NUMERIC_SOURCE_APPROVED_PROFILE,
-    initial_trait_config_for_variant,
 )
 from world.skills.registry import SKILL_REGISTRY
 
@@ -84,139 +78,7 @@ APPROVED_VARIANTS = {
     "bay_warden": ("tide_devouring_crocodile", "守灣型", "mid", False),
 }
 
-# The user's balance approval (2026-10-08, `human-monster-balance-data`):
-# variant key -> the approved complete combat profile and guild danger grade.
-# These are the approved literals verbatim; the registry must reproduce them
-# field for field, and a value that differs is a content defect, not a
-# re-tuning decision. MP and SP are authored zeros for every variant whose
-# ability mechanic has not landed, and the approved delivered pools where it
-# has (crocodile 30/40 and 50/60, sparrow 20/8 and 30/12, crab 20/9 and 30/15);
-# magic_power is zero everywhere and every tier's magic band is (0, 0).
-APPROVED_BALANCE = {
-    "grain_pecker": {
-        "hp": 30,
-        "mp": 20,
-        "sp": 8,
-        "atk_phys": 4,
-        "agility": 7,
-        "defense": 3,
-        "magic_power": 0,
-        "danger_grade": "F",
-    },
-    "flock_leader": {
-        "hp": 55,
-        "mp": 30,
-        "sp": 12,
-        "atk_phys": 8,
-        "agility": 10,
-        "defense": 4,
-        "magic_power": 0,
-        "danger_grade": "E",
-    },
-    "shore_walker": {
-        "hp": 30,
-        "mp": 20,
-        "sp": 9,
-        "atk_phys": 5,
-        "agility": 4,
-        "defense": 5,
-        "magic_power": 0,
-        "danger_grade": "F",
-    },
-    "reef_warden": {
-        "hp": 60,
-        "mp": 30,
-        "sp": 15,
-        "atk_phys": 12,
-        "agility": 4,
-        "defense": 7,
-        "magic_power": 0,
-        "danger_grade": "E",
-    },
-    "burrow_maker": {
-        "hp": 30,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 4,
-        "agility": 8,
-        "defense": 3,
-        "magic_power": 0,
-        "danger_grade": "F",
-    },
-    "nest_guard": {
-        "hp": 55,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 11,
-        "agility": 6,
-        "defense": 6,
-        "magic_power": 0,
-        "danger_grade": "E",
-    },
-    "cliff_stepper": {
-        "hp": 130,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 20,
-        "agility": 16,
-        "defense": 12,
-        "magic_power": 0,
-        "danger_grade": "D",
-    },
-    "pass_warden": {
-        "hp": 170,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 26,
-        "agility": 14,
-        "defense": 14,
-        "magic_power": 0,
-        "danger_grade": "C",
-    },
-    "wood_stalker": {
-        "hp": 115,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 20,
-        "agility": 20,
-        "defense": 10,
-        "magic_power": 0,
-        "danger_grade": "D",
-    },
-    "trail_hunter": {
-        "hp": 165,
-        "mp": 0,
-        "sp": 0,
-        "atk_phys": 25,
-        "agility": 22,
-        "defense": 12,
-        "magic_power": 0,
-        "danger_grade": "C",
-    },
-    "bank_lurker": {
-        "hp": 140,
-        "mp": 30,
-        "sp": 40,
-        "atk_phys": 22,
-        "agility": 12,
-        "defense": 14,
-        "magic_power": 0,
-        "danger_grade": "D",
-    },
-    "bay_warden": {
-        "hp": 210,
-        "mp": 50,
-        "sp": 60,
-        "atk_phys": 28,
-        "agility": 12,
-        "defense": 15,
-        "magic_power": 0,
-        "danger_grade": "C",
-    },
-}
-
-# The seven numeric fields a profile carries, read from the record itself, so
-# the approval table can never drift away from the profile it pins.
+# The complete profile shape is stable; its authored magnitudes are mutable.
 PROFILE_FIELDS = tuple(field.name for field in dataclasses.fields(MonsterCombatProfile))
 
 # One approved ability-limit clause per species: the narrative carries each
@@ -438,7 +300,7 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
 
 
 class BalanceSlotContentTests(unittest.TestCase):
-    """The approved literals, and only them, in the shipped balance slots."""
+    """Detect missing, partial or malformed current authored balance slots."""
 
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
@@ -446,34 +308,23 @@ class BalanceSlotContentTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals"
     )
-    def test_every_shipped_variant_carries_its_approved_literal_profile_and_grade(self):
-        for key, approved in APPROVED_BALANCE.items():
+    def test_every_shipped_variant_carries_a_complete_profile_and_registered_grade(self):
+        self.assertEqual(
+            set(PROFILE_FIELDS),
+            {"hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power"},
+        )
+        for key in APPROVED_VARIANTS:
             with self.subTest(variant=key):
-                self.assertEqual(
-                    set(approved), set(PROFILE_FIELDS) | {"danger_grade"}
-                )
                 variant = MONSTER_VARIANT_REGISTRY[key]
                 profile = variant.combat_profile
                 self.assertIsInstance(profile, MonsterCombatProfile)
                 for name in PROFILE_FIELDS:
-                    self.assertEqual(
-                        getattr(profile, name), approved[name], name
-                    )
-                self.assertEqual(variant.danger_grade, approved["danger_grade"])
+                    value = getattr(profile, name)
+                    self.assertIs(type(value), int, name)
+                    self.assertGreaterEqual(value, 0, name)
+                self.assertGreater(profile.hp, 0)
+                self.assertIn(variant.danger_grade, GUILD_RANK_REGISTRY)
 
-    @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
-    )
-    @covers_requirement(
-        "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals"
-    )
-    def test_no_variant_outside_the_approved_batch_carries_a_profile_or_grade(self):
-        unapproved = set(MONSTER_VARIANT_REGISTRY) - set(APPROVED_BALANCE)
-        for key in sorted(unapproved):
-            with self.subTest(variant=key):
-                variant = MONSTER_VARIANT_REGISTRY[key]
-                self.assertIsNone(variant.combat_profile)
-                self.assertIsNone(variant.danger_grade)
 
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
@@ -522,37 +373,23 @@ class BalanceSlotContentTests(unittest.TestCase):
 
 
 class ApprovedProfileConstructionTests(EvenniaTestCase):
-    """The approved literals reach every constructed individual, unchanged.
-
-    ``construct_species_individual`` is the one construction entry point every
-    owner (wilderness ambient, site, quest provisioning) calls, and it stores
-    the configuration and records the numeric source this class pins. No caller
-    changed in this change: the values below are the proof that none had to.
-    """
+    """Observe current profile selection across construction and persistence."""
 
     @covers_requirement(
         "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
     )
     @covers_requirement(
-        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers"
-    )
-    def test_the_construction_entry_point_returns_the_approved_values_and_source(self):
-        for key, approved in APPROVED_BALANCE.items():
-            with self.subTest(variant=key):
-                variant = MONSTER_VARIANT_REGISTRY[key]
-                config, source = initial_trait_config_for_variant(variant)
-                self.assertEqual(source, NUMERIC_SOURCE_APPROVED_PROFILE)
-                for name in PROFILE_FIELDS:
-                    self.assertEqual(config[name]["base"], approved[name], name)
-                self.assertEqual(config["guild_merit"]["base"], 0)
-
-    @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-individual-construction::individual-numerics-come-only-from-approved-sources-with-no-scaling-and-no-baked-multipliers",
+        "monster-individual-construction::穗鳴雀-construction-persists-both-approved-contact-kits",
+        "monster-individual-construction::潮燈蟹-construction-persists-both-approved-contact-kits",
     )
     def test_every_shipped_variant_constructs_an_individual_with_those_values(self):
-        for key, approved in APPROVED_BALANCE.items():
+        from typeclasses.monsters import Monster
+
+        for key in APPROVED_VARIANTS:
             with self.subTest(variant=key):
                 variant = MONSTER_VARIANT_REGISTRY[key]
+                profile = variant.combat_profile
                 with (
                     patch("world.rules.monster_individual.log_info") as info,
                     self.captureOnCommitCallbacks(execute=True),
@@ -565,12 +402,25 @@ class ApprovedProfileConstructionTests(EvenniaTestCase):
                     info.call_args.kwargs["context"]["numeric_source"],
                     NUMERIC_SOURCE_APPROVED_PROFILE,
                 )
-                for name in PROFILE_FIELDS:
-                    stored = getattr(individual.traits, name)
-                    self.assertEqual(stored.base, approved[name], name)
-                self.assertEqual(
-                    individual.danger_grade, approved["danger_grade"]
-                )
+                # Detect wrong variant selection and multipliers baked into bases.
+                for actual in (individual, Monster.objects.get(pk=individual.pk)):
+                    self.assertEqual(actual.species_key, variant.species_key)
+                    self.assertEqual(actual.variant_key, key)
+                    for name in PROFILE_FIELDS:
+                        stored = getattr(actual.traits, name)
+                        self.assertEqual(stored.base, getattr(profile, name), name)
+                    self.assertEqual(actual.danger_grade, variant.danger_grade)
+                    if variant.active_skill_keys:
+                        self.assertEqual(
+                            actual.db.skills["active"], list(variant.active_skill_keys),
+                        )
+                        self.assertEqual(
+                            actual.db.skills["passive"], list(variant.passive_skill_keys),
+                        )
+                        self.assertEqual(actual.db.behaviour_tree, variant.behaviour_profile_key)
+                    else:
+                        # Deferred kits must stay absent, not acquire a new mount.
+                        self.assertIsNone(actual.db.skills)
 
 
 class SharedStableKeyContractTests(unittest.TestCase):
@@ -639,6 +489,9 @@ class AbilitySeamNegativeTests(unittest.TestCase):
                         self.assertEqual(narrative & faces, set())
                         self.assertEqual(row.active_skill_keys, (skill_key,))
                         self.assertEqual(row.behaviour_profile_key, profile_key)
+                        self.assertEqual(row.passive_skill_keys, ())
+                        self.assertIn(skill_key, SKILL_REGISTRY)
+                        self.assertIn(profile_key, BEHAVIOUR_PROFILES)
                     else:
                         strings: set[str] = set()
                         _string_values(row, set(), strings)

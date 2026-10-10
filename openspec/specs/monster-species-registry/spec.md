@@ -80,60 +80,59 @@ different species, or names a variant whose `ordinary_variant` is false.
   explicit authored field
 
 ### Requirement: Numeric combat profiles and danger grades are balance-gated slots, never invented values
-`MonsterVariant.combat_profile` SHALL be either `None` or a frozen record that carries a complete
-value set (HP, MP, SP, physical combat power, agility, defense, `magic_power`) as literal authored
-values, and `MonsterVariant.danger_grade` SHALL be either `None` or an authored guild danger grade.
-Registry construction SHALL reject a partially populated profile, a non-integer value, a negative
-value, and a `magic_power` outside the variant's tier magic band.
+`MonsterVariant.combat_profile` SHALL be either None or a frozen complete authored record of HP/MP/SP/atk_phys/agility/defense/magic_power. `danger_grade` SHALL be None or a valid authored guild grade. Authoring SHALL provide explicit values; narrative, display names and other variants SHALL NOT infer them. Tests SHALL validate schema and established independent tier/grade constraints without reproducing a literal approval table or forbidding an otherwise valid author edit.
+
+#### Scenario: Incomplete or invalid profile
+- **WHEN** a profile omits a field, supplies None in a populated record, a non-integer or negative value, or magic outside its declared tier band
+- **THEN** registry validation raises the named error before publication
+
+#### Scenario: None retains optional-source semantics outside the required profiled set
+- **WHEN** a variant outside the twelve required first-batch profiles has no authored profile or grade
+- **THEN** consumers treat None as absence; only individual construction may use and report its existing tier fallback, and no registry consumer substitutes inferred numbers
+
+#### Scenario: Authored pools remain independent
+- **WHEN** an author adjusts explicit MP/SP pools
+- **THEN** no MP/SP tier band or narrative-derived pool is introduced, and physical/magic tier validation remains unchanged
 
 #### Scenario: A partial numeric profile is rejected
-- **WHEN** a variant profile omits any one of the seven numeric fields or sets one to `None`
-- **THEN** registry construction raises the named species-registry error and the variant is not published
+- **WHEN** one of seven fields is absent or None inside a populated profile
+- **THEN** named registry validation rejects before publication
 
 #### Scenario: Flavour never becomes a number
-- **WHEN** a variant whose narrative mentions magical or elemental behaviour is inspected
-- **THEN** its magic power, MP and SP equal explicit approved literals, never values inferred from narrative; all twelve shipped variants retain zero magic power within their zero tier magic bands
-- **AND** approved resource exceptions are bank_lurker MP/SP 30/40, bay_warden 50/60; grain_pecker MP/SP 20/8; flock_leader MP/SP 30/12; shore_walker MP/SP 20/9; reef_warden MP/SP 30/15; variants not yet approved in this sequence retain their existing zero pools
+- **WHEN** narrative mentions magical/elemental behavior
+- **THEN** magic/MP/SP remain explicit declarations rather than inferred values, with existing zero magic bands enforced
 
 #### Scenario: Balance approval populates the same slot
-- **WHEN** a balance-approved complete profile and grade are authored for one variant
-- **THEN** the record validates with no schema change, and the previously empty slot is now the single source of truth that consumers read
+- **WHEN** an author supplies a valid complete profile and grade
+- **THEN** the same record shape validates and becomes the single source consumers read
 
 #### Scenario: An unapproved slot still means "no approved profile"
-- **WHEN** a variant whose approval has not been granted is read
-- **THEN** its profile is `None` and its grade is `None`, and no consumer treats that as a zero or as an approved number
+- **WHEN** an optional future variant outside the required twelve lacks a profile or grade
+- **THEN** None means absence, never zero, without requiring a duplicate approval record
 
 #### Scenario: An approved value is never re-derived at the registry
-- **WHEN** a registry edit changes an approved literal to a value computed from another field, from a display name, or from the tier band
-- **THEN** the shipped-content contract fails, because the approved literals are pinned and tier-band membership alone does not prove a value was approved
+- **WHEN** a consumer reads an explicit authored profile
+- **THEN** it never derives replacement values from names, other fields or tier ranges; otherwise valid author edits remain permitted
 
 #### Scenario: MP and SP pools are gated by approval, not inference
-- **WHEN** MP or SP literals are authored for a variant
-- **THEN** MP and SP carry no tier band and require explicit approval; the crocodile pools and explicitly approved complete profiles in “Approved delivered resource rows are literal” are accepted verbatim after approval; every unapproved nonzero pool is rejected
+- **WHEN** an author declares MP/SP pools
+- **THEN** they are explicit valid integer data with no invented tier band or narrative inference; no historical approval table pins their magnitudes
 
 #### Scenario: Only explicit user balance approval populates a slot
-- **WHEN** a profile or grade slot is populated
-- **THEN** only an explicit user balance approval may populate it: the authored values SHALL be the
-  approved values verbatim, and a registry edit SHALL NOT re-derive, re-tune, re-round, or
-  interpolate them, nor infer any value from a display name, a description, a threat tier, or
-  another variant
+- **WHEN** a profile or grade is populated
+- **THEN** an explicit author declaration is required, not inferred/interpolated consumer data; valid author retuning does not require changing a duplicate test approval
 
 #### Scenario: Granted approval ships both profile and grade
-- **WHEN** approval is granted for a variant
-- **THEN** that variant SHALL ship the approved complete profile and the approved guild danger grade
+- **WHEN** a required first-batch profile is published
+- **THEN** both its complete authored record and valid guild danger grade are present
 
 #### Scenario: A None slot means no approved profile exists
-- **WHEN** a slot is `None` on some future variant
-- **THEN** a consumer SHALL treat it as "no approved per-variant profile exists": never as a zero,
-  never as a per-species number invented from flavour, and never as tier-band truth about the
-  variant itself
+- **WHEN** an optional future variant has a None slot
+- **THEN** no consumer treats absence as zero, invented flavor data or a populated tier-band profile
 
 #### Scenario: The interim fallback is owned by individual construction
-- **WHEN** a profile is `None` and a numeric value is needed
-- **THEN** the single sanctioned numeric fallback is the named interim rule owned by individual
-  construction, the existing threat-tier band construction at the variant's declared tier,
-  recorded with its numeric source
-- **AND** consumers SHALL NOT read the registry slot as if it carried that fallback
+- **WHEN** such an absent profile needs numeric construction
+- **THEN** only the existing named individual-construction tier fallback provides and records the source; the registry slot itself stays absent
 
 ### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
 The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are ridge_burrow_hare, rock_echo_goat, fog_mane_lynx. Crocodile contact MP drain and completed species kits remain authored configuration.
@@ -239,74 +238,52 @@ runtime store idempotently.
 - **AND** synchronization SHALL NOT create, modify, or delete any monster, room, quest, or art record
 
 ### Requirement: The approved first-batch profiles and grades are user-approved literals
-The twelve shipped variants SHALL carry the exact complete approved profiles in the table stated in
-the scenario below, except for the explicitly approved resource pools and kits recorded below.
-Magic power SHALL remain zero for all twelve; only listed delivered species change MP/SP and ability content. Newly constructed instances SHALL use these rows without live migration.
+All twelve currently shipped first-batch variants SHALL retain complete authored profiles and valid authored grades, with no None slots. Values SHALL be adjustable data, without a duplicate approval table. Completeness, identity/default membership, independent tier-axis/grade-range checks and explicit MP/SP pools SHALL remain. Six delivered ability kits remain delivered; undelivered hare/goat/lynx ability kits remain deferred independently of their already-shipped profiles.
+
+#### Scenario: Benign authoring change
+- **WHEN** a delivered or already-profiled first-batch variant's HP, physical axis or MP/SP changes within the established schema and tier constraints
+- **THEN** content tests pass without editing expected numerical tables and a newly constructed individual uses the declaration without coefficients baked into storage
+
+#### Scenario: Existing bounds remain authoritative
+- **WHEN** a profile is partial, mistyped, negative, or outside an established tier axis or grade range
+- **THEN** existing validation rejects it by variant and field, including nonzero magic under a zero magic band
+
+#### Scenario: Live state is preserved
+- **WHEN** the registry changes after an individual exists
+- **THEN** reload preserves that individual's identity, owned kit and current stored traits/resources without migration or refill
 
 #### Scenario: New instance
 - **WHEN** a registered variant constructs a new monster
-- **THEN** its literal profile is authoritative without skill/gear coefficients baked in
-
-The approval fence SHALL cover exactly these twelve variants. Each approved seven-value profile and danger grade SHALL equal the approval record, with no None slots. A different literal SHALL be a content defect rather than an implicit retuning decision.
+- **THEN** its current authored profile is authoritative without skill/gear multipliers baked into storage
 
 #### Scenario: Every shipped batch variant carries its approved values
-- **WHEN** the shipped registry is compared field by field against the twelve-variant approval record
-- **THEN** all seven profile values and grades equal the approved literals and no approved slot is None
+- **WHEN** all twelve first-batch profiles and grades are inspected
+- **THEN** all seven fields and a valid grade are present with no None slots; authored values, not an approval mirror, govern
 
 #### Scenario: Approval does not extend to unapproved content
-- **WHEN** a variant outside the approved twelve carries a profile or grade without separate approval
-- **THEN** the approved-content contract reports it rather than extending this approval
+- **WHEN** an undelivered ability kit or profile outside the required first-batch set is inspected
+- **THEN** no inference from this batch grants that kit; any explicitly authored optional profile follows the same schema without a historical numerical approval fence
 
 #### Scenario: The approved profile table is pinned verbatim
-
-- **WHEN** the shipped registry is authored against the approval record
-- **THEN** the twelve variants carry exactly the following approved literals:
-
-| Variant key | Display name | Grade | Previous HP | Approved HP | Approved attack | Approved agility | Approved defense |
-|---|---|---|---:|---:|---:|---:|---:|
-| `grain_pecker` | 穗鳴雀・啄穗型 | F | 55 | 30 | 4 | 7 | 3 |
-| `flock_leader` | 穗鳴雀・領群型 | E | 80 | 55 | 8 | 10 | 4 |
-| `shore_walker` | 潮燈蟹・灘行型 | F | 70 | 30 | 5 | 4 | 5 |
-| `reef_warden` | 潮燈蟹・守礁型 | E | 110 | 60 | 12 | 4 | 7 |
-| `burrow_maker` | 築埂兔・掘巢型 | F | 60 | 30 | 4 | 8 | 3 |
-| `nest_guard` | 築埂兔・護巢型 | E | 95 | 55 | 11 | 6 | 6 |
-| `cliff_stepper` | 岩響山羊・踏崖型 | D | 240 | 130 | 20 | 16 | 12 |
-| `pass_warden` | 岩響山羊・守隘型 | C | 330 | 170 | 26 | 14 | 14 |
-| `wood_stalker` | 霧鬃山貓・林伏型 | D | 220 | 115 | 20 | 20 | 10 |
-| `trail_hunter` | 霧鬃山貓・獵道型 | C | 280 | 165 | 25 | 22 | 12 |
-| `bank_lurker` | 吞潮鱷・潛岸型 | D | 340 | 140 | 22 | 12 | 14 |
-| `bay_warden` | 吞潮鱷・守灣型 | C | 400 | 210 | 28 | 12 | 15 |
+- **WHEN** authored first-batch profiles are checked
+- **THEN** the historical numerical approval table is removed, not moved; completeness and current declared bounds remain independently checked for all twelve
 
 #### Scenario: Zero pools and retained identities survive the batch
-
-- **WHEN** the approved batch is applied to the existing registry
-- **THEN** magic power remains zero for all twelve; resource pools equal the explicit approved exceptions below and all not-yet-delivered variants retain zero MP/SP
-- **AND** species keys, variant keys, names and grades are retained; only explicitly approved delivered species receive their authored ecology and kit integration
-- **AND** tide_devouring_bite remains unchanged for the two crocodile variants; approved completed kits are grain_shaking_peck, lamp_carapace_claw
+- **WHEN** current first-batch declarations are validated
+- **THEN** zero remains a valid explicitly authored pool rather than inferred absence; magic remains zero under existing tier magic bands, and all species/variant identities and authored grade validity remain
+- **AND** only the six delivered kits are present; tide_devouring_bite, grain_shaking_peck and lamp_carapace_claw retain their existing ownership and effect intent
 
 #### Scenario: The approved literals retire attrition without changing character
-
-- **WHEN** the approved literals are reviewed against the previous values
-- **THEN** lower HP and selected defense reductions remove extended attrition
-- **AND** stronger forms retain danger through increased offense or agility
-- **AND** independent axes preserve the cat's mobility, crocodile's endurance, and crab's defensive character
+- **WHEN** valid authored profiles are revised
+- **THEN** the existing cat mobility, crocodile endurance and crab defensive content intent stays reflected in independent axes and ecology; no old-versus-new numerical table or new universal encounter band is imposed
 
 #### Scenario: Crocodile resource values replace only their previous zero pools
-- **WHEN** the full approved profiles are compared with the registry
-- **THEN** bank_lurker has HP/MP/SP/attack/agility/defense/magic of 140/30/40/22/12/14/0 and grade D; bay_warden has 210/50/60/28/12/15/0 and grade C
-- **AND** no crocodile numeric axis, cost, effect, kit, binding or grade changes; the other explicitly approved MP/SP exceptions below supersede prior zero pools without any measured balance claim
+- **WHEN** crocodile profiles are authored or consumed
+- **THEN** explicit MP/SP pools and complete profile/grade are retained without a 140/30/40 or 210/50/60 approval mirror; kit/binding/effect mechanics remain unchanged
 
 #### Scenario: Approved delivered resource rows are literal
-- **WHEN** all delivered first-batch rows after this change are compared against their approval record
-- **THEN** they carry the following complete profiles in HP/MP/SP/atk_phys/agility/defense/magic_power order, preserving their original grades
-
-| Variant | Complete profile | Grade |
-|---|---|---|
-| `grain_pecker` | 30/20/8/4/7/3/0 | F |
-| `flock_leader` | 55/30/12/8/10/4/0 | E |
-| `shore_walker` | 30/20/9/5/4/5/0 | F |
-| `reef_warden` | 60/30/15/12/4/7/0 | E |
-- **AND** every remaining non-crocodile variant retains its earlier complete profile and zero MP/SP until its own approval and cutover
+- **WHEN** both delivered variants per crocodile, sparrow and crab species are constructed
+- **THEN** their current complete authored profile/grade and defined owned kit are used; the other six required profiles remain complete while their ability kits remain deferred
 
 ### Requirement: Every shipped combat profile and danger grade lies inside its declared tier band
 Validation SHALL independently check HP, attack, agility, defense and magic against their own tier

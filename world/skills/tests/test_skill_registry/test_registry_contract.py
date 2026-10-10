@@ -539,6 +539,7 @@ class SkillRegistryTests(unittest.TestCase):
         "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
         "monster-resource-abilities::crocodile-bite-is-one-authored-shared-engine-physical-resource-skill",
         "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "test-data-independence::production-content-checks-validate-references-without-numerical-approval-mirrors",
     )
     def test_tide_devouring_bite_data_contract(self):
         from world.skills.effects import EffectAudience
@@ -549,7 +550,9 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(skill.label, "吞潮咬擊")
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(skill.cost, {"mp": 10, "sp": 5})
+        # Detect lost payment channels without approving authored magnitudes.
+        self.assertEqual(set(skill.cost), {"mp", "sp"})
+        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
         self.assertTrue(skill.usable_out_of_combat)
         self.assertEqual(skill.element.key, "water")
         self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
@@ -563,12 +566,16 @@ class SkillRegistryTests(unittest.TestCase):
         )
         self.assertEqual(len(skill.effects), 2)
         self.assertEqual(skill.effects[0], "damage:water:physical")
-        self.assertEqual(skill.effects[1], "gauge_transfer:mp:drain:fixed:10")
-        self.assertEqual(skill.effect_policies[0].coefficient, 1.0)
+        from world.skills.effects import GaugeTransferEffect
+        drain = skill.parsed_effects[1]
+        self.assertIsInstance(drain, GaugeTransferEffect)
+        self.assertEqual((drain.gauge, drain.direction, drain.magnitude_mode), ("mp", "drain", "fixed"))
+        self.assertGreater(drain.magnitude, 0)
         self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
         self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
         self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
-        self.assertEqual(skill.effect_policies[1].transfer.caster_recovery_share, 1.0)
+        self.assertGreater(skill.effect_policies[1].transfer.caster_recovery_share, 0)
+        self.assertLessEqual(skill.effect_policies[1].transfer.caster_recovery_share, 1)
         self.assertEqual(spell_tier_for(skill), "學徒")
         self.assertFalse(is_freeform_eligible(skill))
 
@@ -576,6 +583,7 @@ class SkillRegistryTests(unittest.TestCase):
         "skill-identity-eligibility::stored-identity-determines-actor-qualification",
         "skill-effect-model::effect-hit-dependencies-reference-earlier-damage-occurrences",
         "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "monster-resource-abilities::穗鳴雀-owns-its-approved-contact-resource-ability",
     )
     def test_grain_shaking_peck_data_contract(self):
         from world.skills.effects import EffectAudience
@@ -586,7 +594,8 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(skill.label, "震穗啄擊")
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(skill.cost, {"mp": 10, "sp": 2})
+        self.assertEqual(set(skill.cost), {"mp", "sp"})
+        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
         # Both monster abilities declare True: the shared policy makes every
         # damage-carrying ability selectable outside combat (settled
         # 2026-10-10), and eligibility alone keeps it out of player use.
@@ -604,9 +613,7 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(len(skill.effects), 2)
         self.assertEqual(skill.effects[0], "damage:wind:physical")
         self.assertEqual(skill.effects[1], "buff_apply:grain_rattle")
-        self.assertEqual(skill.effect_policies[0].coefficient, 0.8)
         self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
-        self.assertEqual(skill.effect_policies[1].coefficient, 1.0)
         self.assertIs(skill.effect_policies[1].audience, EffectAudience.ENEMIES)
         self.assertEqual(skill.effect_policies[1].requires_hit_from, 0)
         self.assertIsNone(skill.effect_policies[1].transfer)
@@ -628,7 +635,8 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(skill.label, "燈甲螯擊")
         self.assertIs(skill.kind, SkillKind.ACTIVE)
         self.assertIs(skill.target_spec, TargetSpec.SINGLE)
-        self.assertEqual(skill.cost, {"mp": 10, "sp": 3})
+        self.assertEqual(set(skill.cost), {"mp", "sp"})
+        self.assertTrue(all(type(value) is int and value > 0 for value in skill.cost.values()))
         # Every damage-carrying monster ability declares True under the one
         # written policy (settled 2026-10-10); eligibility alone keeps it out
         # of player catalogs and lineage.
@@ -644,9 +652,7 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertEqual(len(skill.effects), 2)
         self.assertEqual(skill.effects[0], "damage:light:physical")
         self.assertEqual(skill.effects[1], "self_buff_apply:lamp_carapace_guard")
-        self.assertEqual(skill.effect_policies[0].coefficient, 1.0)
         self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
-        self.assertEqual(skill.effect_policies[1].coefficient, 1.0)
         # The self guard declares no hit dependency on the enemy strike: the
         # audience intersection would otherwise exclude the caster on a miss.
         self.assertIs(skill.effect_policies[1].audience, EffectAudience.SELF)
