@@ -8,7 +8,7 @@ and the CI + documentation wiring that keeps behavior tests resolvable without
 a database or shipped-content coupling.
 ## Requirements
 ### Requirement: Data-contract tests are explicitly classified
-Every test file intentionally exercising shipped content SHALL retain the exact `Data-contract test:` first-docstring-line tag (or leading JS/TS comment) and matching contract ledger reason. The classification SHALL permit generic schema/reference/content-quality checks and minimal real consumer smoke. It SHALL NOT authorize duplicated mutable balance tables, literal production magnitude pins, mock forwarding echoes or expected values obtained by calling the same production calculation. Fixed synthetic mechanism fixtures MAY use independently known literal results.
+A test file intentionally exercising shipped content SHALL retain the exact `Data-contract test:` first-docstring-line tag (or leading JS/TS comment) and its matching ledger reason. The classification SHALL permit generic schema/reference/content-quality checks and minimal real consumer smoke, and SHALL NOT authorize duplicated balance tables, literal magnitude pins, mock echoes or expected values from the same production calculation. Fixed synthetic fixtures MAY use known literal results.
 
 #### Scenario: Tag and ledger agree
 - **WHEN** the gate reads a contract entry

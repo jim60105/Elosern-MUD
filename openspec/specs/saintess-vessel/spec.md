@@ -117,7 +117,7 @@ For an entity owning `saintess_vessel`, the world-clock settlement SHALL guarant
 - **THEN** she never falls below the authored 微興奮 floor and moves by at most ±1 per advance
 
 ### Requirement: Each named public blessing ceremony reads the holder's excitement tier exactly once
-The vessel SHALL retain exactly its two ceremonial modifier roles, a blessing arousal scale gated on vessel ownership and a separate positive defense grace gated on vessel ownership, active light_blessing and arousal at least 中等. Magnitudes and authored durations SHALL be mutable rulebook data. Cast-time recovery grace SHALL combine the maximum of the priestly and vessel scale, with one arousal read, and snapshot that result on the mounted recovery buff. The blessing SHALL NOT gain a recovery profile; the vessel SHALL add no other combat adjustments.
+The vessel SHALL retain exactly its two ceremonial modifier roles, a blessing arousal scale gated on vessel ownership and a separate positive defense grace gated on vessel ownership, active light_blessing and arousal at least 中等. Cast-time recovery grace SHALL combine the maximum of the priestly and vessel scale, with one arousal read, and snapshot that result on the mounted recovery buff. The blessing SHALL NOT gain a recovery profile; the vessel SHALL add no other combat adjustments.
 
 #### Scenario: Shared synthetic snapshot mechanism
 - **WHEN** a fixed synthetic fixture gives priestly and vessel scales 0.1 and arousal ordinal 2

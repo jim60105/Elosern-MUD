@@ -9,8 +9,6 @@ Every one of these eight acts SHALL declare `resistible=True`,
 `actor_counters=("hostile_act_count",)`, and
 `participant_counters=("hostile_act_count",)`.
 
-Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
-
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 4`
 - **THEN** `combat_tease_whisper` is absent from the returned set

@@ -22,8 +22,6 @@ Every one of these eleven acts SHALL declare
 `target_spec=TargetSpec.SELF`, `target_part=None`, `participant_counters=()`, and
 `resistible=False`.
 
-Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
-
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `masturbation_count == 9`
 - **THEN** `solo_deep_touch` is absent from the returned set

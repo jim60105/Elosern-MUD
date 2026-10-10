@@ -17,8 +17,6 @@ through their `pair_events` tables, selected from the participants' `sex` fields
 the unlock gate enumerated for its tier group in the scenarios below. Every one of these sixteen
 acts SHALL declare `resistible=True`.
 
-Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
-
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `duo_act_count == 4`
 - **THEN** `partner_kiss` is absent from the returned set
@@ -105,7 +103,7 @@ by this change SHALL declare `sexual_events=()`, with the two intercourse acts d
   recipient, and no other act added by this change ever names that event
 
 ### Requirement: The four Tier 3 acts trade off at baseline sensitivity
-The four existing Tier 3 acts SHALL retain the established baseline trade-offs while base pleasure and actor-side ratios remain authored data. At equal ordinary sensitivity, no shame and two participants, anal intercourse SHALL give the target more pleasure than mutual masturbation while mutual masturbation gives the actor more. Deep vaginal intercourse SHALL exceed ordinary vaginal intercourse for both participants and retain the larger actor-side gap. Divergent learned body-part sensitivity SHALL remain capable of changing these comparisons.
+The four existing Tier 3 acts SHALL retain the established baseline trade-offs while base pleasure and actor-side ratios remain authored data. At equal ordinary sensitivity, no shame and two participants, anal intercourse SHALL give the target more pleasure than mutual masturbation while mutual masturbation gives the actor more. Deep vaginal intercourse SHALL exceed ordinary vaginal intercourse for both participants and retain the larger actor-side gap.
 
 #### Scenario: partner_anal_sex grants the target strictly more than partner_mutual_masturbation does at baseline
 - **WHEN** the four acts resolve in separately reset controlled participant states
