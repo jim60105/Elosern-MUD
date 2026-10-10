@@ -25,8 +25,9 @@ Metadata read points: `tools/test_data_freeze.json` (ledger: `contract` reasons,
    boundary and may not be mocked. The role is recorded per site in `cutover-matrix.md`.
 5. **A `Data-contract test:` line and its ledger reason are one string in three places.** Changing
    the reason means editing the file's first docstring line AND `tools/test_data_lint_seed.json`, then
-   regenerating `tools/test_data_freeze.json`; editing one file alone fails `seed-mismatch` /
-   `untagged-contract`.
+   regenerating the ledger with `uv run --locked python -m tools.test_data_lint seed` (preview with
+   `--dry-run`) and gating on `tools.test_data_lint check`; editing one file alone fails
+   `seed-mismatch` / `untagged-contract`.
 6. **Shrink-only ledgers.** `debt` and `seedDebtPaths` entries are removed in the commit that makes
    the file clean; this change must not add a `debt`, `deny` or new-allowlist entry. A file may
    legitimately move from `debt` to `contract` (as `world/rules/tests/test_buffs.py` already did),
@@ -104,10 +105,11 @@ Metadata read points: `tools/test_data_freeze.json` (ledger: `contract` reasons,
 
 | Path | Ledger | Seed | Disposition |
 | --- | --- | --- | --- |
-| `world/rules/tests/test_buffs.py` | `contract: buff rulebook content contract` (94th entry) | absent from `contract`, present in `seedDebtPaths` | Pre-existing, legal: `check_ledger` reports `new-debt` only when a contract path is outside the seeded classification *and* outside `seedDebtPaths`. This change touches neither file; the entry is recorded so no package mistakes the 94-vs-93 difference for drift and regenerates the ledger wholesale. |
+| `world/rules/tests/test_buffs.py` | `contract: buff rulebook content contract` (the entry that makes the ledger carry one more contract than the seed) | absent from `contract`, present in `seedDebtPaths` | Pre-existing, legal: `check_ledger` reports `new-debt` only when a contract path is outside the seeded classification *and* outside `seedDebtPaths`. This change touches neither file; the entry is recorded so no package mistakes the 94-vs-93 difference for drift and regenerates the ledger wholesale. |
 | `world/ai/tests/test_npc_dialogue_prompts.py` | `debt` | `seedDebtPaths` | Affected consumer; stays debt (WP5) -- see Table B. |
 | `world/imports/tests/test_skill_registry_self_arming.py`, `world/rules/tests/test_item_effects_rulebook.py`, `world/rules/tests/test_traits.py` | `debt` | `seedDebtPaths` | Unaffected by this cutover; leave untouched. |
 
 Counts observed at WP1: ledger `contract` 94, `debt` 14, `seedDebtPaths` 336; seed `contract` 93,
-`seedDebtPaths` 336. Reasons must be edited in `tools/test_data_lint_seed.json` and the ledger
-regenerated with `uv run --locked python -m tools.test_data_lint check` as the gate.
+`seedDebtPaths` 336. Reasons must be edited in `tools/test_data_lint_seed.json`; regenerate the ledger
+with `uv run --locked python -m tools.test_data_lint seed` (never hand-edit it) and gate with
+`uv run --locked python -m tools.test_data_lint check`.

@@ -74,12 +74,18 @@ examiner-facing rank, military gear or examiner statements.
 | A | `military_a_sword` | `military_a_armor` | `world/lore/items/vocab.py`, `world/lore/settlements/assortments.py`, `world/lore/guild_adventurers.py`, `world/rules/rulebook/equipment_effects.yaml`, `world/rules/rulebook/guild_exam_restrictions.yaml`, `world/rules/rulebook/commerce/altoria.yaml` |
 | S | `military_s_sword` | `military_s_armor` | `world/lore/items/vocab.py`, `world/lore/settlements/assortments.py`, `world/lore/guild_adventurers.py`, `world/rules/rulebook/equipment_effects.yaml`, `world/rules/rulebook/guild_exam_restrictions.yaml`, `world/rules/rulebook/commerce/altoria.yaml` |
 
-Tests that must keep naming them (each keeps its id and its reason):
+Tests that must keep naming them (each keeps its id and its named-pair assertion; a reason realignment
+is called out where one is due):
 
-- `world/lore/tests/test_items.py` -- item registry content contract (123-item roster is replaced by
-  per-item metadata validation in WP6, but the military keys stay valid registered items).
+- `world/lore/tests/test_items.py` -- the six E-S keys stay valid registered items with unchanged
+  metadata. WP6 replaces the 123-item expected-key roster with per-item metadata validation and
+  therefore realigns this file's ledger reason; that reason edit is recorded in `metadata-map.md`
+  Table B and does not relax the named-pair contract.
 - `world/rules/tests/test_equipment_effect_rulebook.py` -- the named military data-contract case
   (`military_s_sword` budget check at the `:994` region) stays a named test with unchanged arithmetic.
+  WP6 realigns this file's ledger reason once the Church subset lists become item-lore
+  `liturgical_role` discovery (`metadata-map.md` Table A); the military case and its arithmetic do not
+  move.
 - `world/lore/tests/test_assortments.py` -- `MILITARY_ADDED_KEYS` (`:65`) is the one piece of the
   historical capital union that survives: WP6 keeps it as a separate tagged military membership test
   with the examiner dependency in its rationale, and drops the historical whole-capital union around it.

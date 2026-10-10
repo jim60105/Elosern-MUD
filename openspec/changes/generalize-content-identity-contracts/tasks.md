@@ -1,6 +1,6 @@
 # Tasks
 
-Planning only: every box below is intentionally unchecked. These are os-apply tasks, not permission to implement now. Execute WP1 through WP7 serially; retain each package's tests, docs and assertion-backed annotations with its implementation. The implementation owner performs integrated verification after the packages land; do not run concurrent checks against half-finished work.
+Planning-authored: the boxes below are os-apply tasks, not permission to implement at planning time. Execute WP1 through WP7 serially and tick each package's boxes only once its own completion evidence is verified (WP1's four boxes are checked; WP2-WP7 remain unchecked). Retain each package's tests, docs and assertion-backed annotations with its implementation. The implementation owner performs integrated verification after the packages land; do not run concurrent checks against half-finished work.
 
 Every other non-archived `openspec/changes/*` directory is read-only. No checkbox authorizes editing a deferred monster proposal, an `exploration-*` proposal or any other existing change; later-owner refresh obligations are recorded decisions outside this implementation.
 

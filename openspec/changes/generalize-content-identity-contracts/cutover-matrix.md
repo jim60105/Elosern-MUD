@@ -13,6 +13,12 @@ Re-open rule: editing any delta requirement heading invalidates the rows it touc
 commands above and update this file in the same commit. This file pins ids, sites and roles only --
 never prose, prices or other content values (D2/D8: no second expected-content fixture).
 
+The effective tree is throwaway and lives outside the repository, so it is re-created on demand:
+copy `openspec/specs/` to `/tmp/gcic-effective-tree/openspec/specs/`, then for each of the 25 delta
+files replace the matching `### Requirement:` block with its MODIFIED block, delete its REMOVED
+blocks and append its ADDED blocks. The tool's exit status plus its empty `errors` list is the check
+that the merged tree has no duplicate or empty requirement id.
+
 ## Matrix A. Old heading -> effective heading (61 rows)
 
 `REMOVED` rows list the *candidate* general requirements the disposition names; the exact
