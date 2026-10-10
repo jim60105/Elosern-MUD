@@ -204,6 +204,14 @@ class BestiaryRelationshipFaultTests(unittest.TestCase):
         problems = self._problems(_section(self.row.key, block))
         self.assertIn("t_doc_ordinary: documented twice (also under t_doc_species)", problems)
 
+    def test_a_missing_block_key_is_named(self):
+        block = self._block()
+        block.pop("parent-species")
+        problems = self._problems(_section(self.row.key, block))
+        self.assertIn(
+            "t_doc_species: metadata block is missing ['parent-species']", problems
+        )
+
     def test_orphan_and_wrong_parent_are_named(self):
         problems = self._problems(_section("t_doc_unknown", self._block(species="t_doc_unknown")))
         self.assertIn("t_doc_unknown: documented species is not in the registry", problems)

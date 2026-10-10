@@ -129,9 +129,11 @@ shared mechanisms instead of cloning exhaustive per-species vectors.
 ### Documenting a species
 
 A current bestiary section carries a bounded `bestiary` index next to its prose:
-the species key, its parent species key, its default variant, every variant it
-owns with its kit-backed executable status, and the public registry fields the
-section documents. Author the prose freely - rewording it never fails a check -
+the species key, the parent species key (the species that owns the section's
+variants, stated rather than inferred from section order), its default variant,
+every variant it owns with its kit-backed executable status, and the public
+registry fields the section documents. Author the prose freely - rewording it
+never fails a check -
 but keep the index truthful: a key, parent, ownership, field or status edit is
 what the structural relationship check
 (`world/lore/bestiary_documentation.py`, driven from

@@ -30,6 +30,7 @@ from world.rules.combat_session.records import read_session
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_behaviour import resolve_behaviour_profile
 from world.rules.monster_individual import construct_species_individual
+from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
 
 # The representative the composition-coverage check derives for this group.
@@ -149,20 +150,16 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(reloaded.db.skills["active"], [SKILL_KEY])
         self.assertEqual(reloaded.db.behaviour_tree, BEHAVIOUR_KEY)
 
-        # Inclusive flee edge on this representative's own declared threshold,
-        # then a target that dies between selection and resolution.
+        # Late-target gate: the policy's own request, taken at full health so
+        # the kit is the selection, is resolved after its target died.
         reloaded.traits.sp.current = reloaded.traits.sp.max
-        threshold = resolve_behaviour_profile(reloaded).flee_hp_fraction
-        self.assertIsNotNone(threshold)
-        edge = int(reloaded.traits.hp.max * threshold)
-        reloaded.traits.hp.current = edge
-        self.assertEqual(_enemy_policy(reloaded, field, record).skill_key, FLEE_SKILL_KEY)
-        reloaded.traits.hp.current = edge + 1
+        reloaded.traits.mp.current = reloaded.traits.mp.max
+        reloaded.traits.hp.current = reloaded.traits.hp.max
         strike = _enemy_policy(reloaded, field, record)
         self.assertEqual(strike.skill_key, SKILL_KEY)
-
         paid_before = (reloaded.traits.mp.current, reloaded.traits.sp.current)
         practice_before = dict(reloaded.db.skill_proficiency or {})
+        player_hp = player.traits.hp.current
         player.traits.hp.current = 0
         late = ActionResolver.resolve(strike)
         self.assertEqual(late.outcome, "rejected")
@@ -171,3 +168,18 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             (reloaded.traits.mp.current, reloaded.traits.sp.current), paid_before
         )
         self.assertEqual(dict(reloaded.db.skill_proficiency or {}), practice_before)
+        # Restore the victim so the flee-boundary probe below still has a
+        # living enemy to select against.
+        player.traits.hp.current = player_hp
+
+        # Inclusive flee edge, located with the engine's own comparison.
+        maximum = reloaded.traits.hp.max
+        threshold = resolve_behaviour_profile(reloaded).flee_hp_fraction
+        self.assertIsNotNone(threshold)
+        edge = flee_edge(maximum, threshold)
+        self.assertGreater(edge, 0)
+        reloaded.traits.hp.current = edge
+        self.assertEqual(_enemy_policy(reloaded, field, record).skill_key, FLEE_SKILL_KEY)
+        if edge < maximum:
+            reloaded.traits.hp.current = edge + 1
+            self.assertEqual(_enemy_policy(reloaded, field, record).skill_key, SKILL_KEY)

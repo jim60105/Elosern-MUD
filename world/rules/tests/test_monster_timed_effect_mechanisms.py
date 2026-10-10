@@ -33,7 +33,7 @@ from world.rules.buffs import (
     has_positional_marker,
 )
 from world.rules.clock import AdvanceSource, WorldClock
-from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat import COMBAT_YAML, Battlefield, BattlefieldActionContext
 from world.rules.monster_individual import construct_species_individual
 from world.lore.monster_species import MonsterCombatProfile
 from world.skills.effects import EffectAudience, EffectPolicy
@@ -176,7 +176,11 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
 
         absorbed = self._resolve(skill, [self.enemy], roll=80)
         self.assertEqual(absorbed.outcome, "success")
-        self.assertLess(self.enemy.traits.hp.current, 100)
+        # The committed loss is the rulebook's damage floor: the defense
+        # swallowed the attack entirely, and the rider still landed.
+        self.assertEqual(
+            100 - self.enemy.traits.hp.current, int(COMBAT_YAML["damage"]["floor"])
+        )
         self.assertEqual(active_stack_count(self.enemy, RIDER_BUFF), 1)
         for entity in controls:
             self.assertNotIn(RIDER_BUFF, entity_active_buffs(entity))

@@ -111,6 +111,19 @@ def _module_tree(path: pathlib.Path) -> ast.Module:
     return ast.parse(path.read_text(encoding="utf-8"))
 
 
+def _decorator_name(node: ast.AST) -> str:
+    """The dotted name of one decorator expression."""
+    if isinstance(node, ast.Call):
+        node = node.func
+    parts: list[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
 def _declared_representatives() -> dict[str, pathlib.Path]:
     """Map every declared representative variant key to its test module.
 
@@ -271,6 +284,35 @@ class RepresentativeCoverageTests(unittest.TestCase):
                         "construct_species_individual must take the declared "
                         "representative, not a copied variant key",
                     )
+                # A declaration plus an empty or skipped test would satisfy
+                # every wiring rule above while contributing no evidence, so
+                # the module also has to carry a non-skipped test that
+                # actually resolves an action.
+                tests = [
+                    node
+                    for node in ast.walk(tree)
+                    if isinstance(node, ast.FunctionDef) and node.name.startswith("test_")
+                ]
+                self.assertTrue(tests, "the smoke carries no test")
+                resolving = [
+                    node
+                    for node in tests
+                    if not any(
+                        "skip" in _decorator_name(decorator)
+                        for decorator in node.decorator_list
+                    )
+                    and any(
+                        isinstance(inner, ast.Call)
+                        and isinstance(inner.func, ast.Attribute)
+                        and inner.func.attr in {"resolve", "revalidate_submission"}
+                        for inner in ast.walk(node)
+                    )
+                ]
+                self.assertTrue(
+                    resolving,
+                    "no non-skipped test resolves an action, so the declared "
+                    "representative has no committed evidence",
+                )
                 literals = {
                     node.value
                     for node in ast.walk(tree)

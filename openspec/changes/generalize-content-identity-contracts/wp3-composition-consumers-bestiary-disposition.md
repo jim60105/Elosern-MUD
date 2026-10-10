@@ -228,3 +228,27 @@ package and repairing it would edit a foreign file.
 - The editorial-ledger pattern introduced here is the precedent WP4's NPC ledger
   should follow (indexed by actual source identity, structurally checked,
   never a prose fixture).
+
+## WP3 post-implementation review, every finding and disposition
+
+One blocking whole-diff review ran over the five WP3 commits with the assignment,
+the requirement scenarios, the constraints and my reported evidence, and read the
+worktree files. Its findings and dispositions:
+
+| Id | Finding | Disposition |
+| --- | --- | --- |
+| B1 | The representative-evidence link was structural only: a module could declare a representative, satisfy every wiring rule and still carry an empty or skipped test, contributing no evidence. | **Adopted.** The AST pass now also requires a non-skipped `test_*` function whose body resolves an action (`resolve`/`revalidate_submission`), so a declaration without committed behaviour fails. |
+| B2 | The inclusive flee edge was located as `int(max_hp * threshold)`, a multiply-and-floor guess whose correctness against the engine's binary-float `stored / maximum <= threshold` comparison is an IEEE-rounding coincidence that a balance retune can break in either direction. | **Adopted.** The boundary is now located by `world/rules/tests/combat_fixtures.py::flee_edge`, which applies the engine's own comparison over candidate HP, and the smokes assert the outgoing side only while a striking band exists. The late-target gate was moved ahead of the flee probe and now restores the victim's HP so both probes select against a living enemy. Disposition wording updated: the boundary is *derived*, not floored arithmetic. |
+| N1 | The composition signature collapses the gauge axis (`gauge_transfer:mp:...` and `:sp:...` group identically), so a future SP-draining kit would inherit the MP group's evidence. | **Recorded as a deliberate limitation.** The requirement names effect kind, hit-dependency and audience only; adding element or gauge detail would split same-shape kits (the duplication the design forbids). `effect_family` is the documented one-line extension point if the design ever wants paid-axis diversity as a grouping axis. |
+| N2 | `parent-species` enforcement is degenerate (any non-self value is rejected) and the guide/advertised relationship implied possible nesting. | **Adopted as wording.** The registry has no nested species, so the field states the owning species explicitly rather than inferring it from section adjacency; the module comment and the author guide now say exactly that. |
+| N3 | The task-3.4 fault list includes a popped required block key, but no fault test asserted it. | **Adopted.** `test_a_missing_block_key_is_named` pops `parent-species` and asserts the named `metadata block is missing ['parent-species']` problem. |
+| N4 | The timed-effect rider test's docstring promised the committed loss is the damage floor while asserting only `assertLess`. | **Adopted.** It now asserts the exact committed delta read from the live rulebook (`int(COMBAT_YAML["damage"]["floor"])`), matching the 3.1 oracle. |
+| N5 | Watch-item: the retired `crocodile-ecology-documents-implemented-limits` scenario now survives only as the editorial ledger's unjudged prose cell, because the new carrier proves keyed relationships. | **Accepted as the requirement-faithful carrier** (the generic requirement is about keyed public-content relationships) and **recorded here for WP7**: if the zero-carrier audit counts scenario-level coverage, this row needs a note. |
+
+The reviewer confirmed no self-fulfilling oracle in the 3.1 additions, no shipped
+balance value mirrored as an expectation (the flee table is gone and the
+thresholds are read live), no species allowlist or shape-count pin in the
+grouping, correct shard/seed/ledger handling (including that manifest
+registration is not contract registration), and that the ledger is a genuine
+indexed record. Observed after folding in the findings: `65 tests OK` across the
+nine affected modules and `test-data-lint ... violations=0`.

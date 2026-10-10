@@ -38,6 +38,10 @@ REQUIRED_FIELDS_BY_FACE = (
     ("species", ("display_name_zh", "published_description_zh", "published_ecology_zh")),
     ("variant", ("display_name_zh", "description_zh")),
 )
+#: ``parent-species`` states the species that owns this section's variants: the
+#: registry has no nested species, so any value other than the section's own key
+#: is a wrong-owner fault. The field is authored rather than inferred from
+#: section adjacency, so a misplaced section is caught instead of assumed.
 BLOCK_REQUIRED_KEYS = (
     "species",
     "parent-species",
