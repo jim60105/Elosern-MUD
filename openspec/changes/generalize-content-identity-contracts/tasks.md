@@ -6,7 +6,7 @@ Every other non-archived `openspec/changes/*` directory is read-only. No checkbo
 
 ## 1. WP1: Approved contract and test-role cutover map
 
-- [ ] 1.1 Record explicit approval of D1-D3 from `pending-couplings.md` and confirm apply-time current monster specs have not been changed by a deferred proposal; completion evidence is the approval disposition and current exact target inventory, with no edits to any pending change.
+- [x] 1.1 Record explicit approval of D1-D3 from `pending-couplings.md` and confirm apply-time current monster specs have not been changed by a deferred proposal; completion evidence is the approval disposition and current exact target inventory, with no edits to any pending change.
 - [ ] 1.2 Generate canonical IDs from current/effective specs with `uv run --locked python -m tools.spec_traceability list`, expand `scope-inventory.md`'s 61-heading/164-site map to all affected Python/JS consumers, and assign each assertion its synthetic mechanism, registry contract or representative smoke role; completion is a complete old-heading-to-new-heading and test-to-contract matrix with no guessed IDs.
 - [ ] 1.3 Preserve all excluded place/settlement, clergy/guild/title-tab, skill/sexual/balance assertions and the named six E-S military pairs while preparing effective deltas; completion is an assertion disposition identifying every retained contract and no migration of excluded data ownership.
 - [ ] 1.4 Document the same-change retarget rules in traceability/test-data guidance and mark every affected freeze/seed reason for alignment; completion is a concrete metadata map, not a new allowlist or expected-content fixture.
