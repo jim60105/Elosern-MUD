@@ -50,17 +50,17 @@ rulebook table, the sole cap writer, and the turn-in matching rule.
 
 #### Scenario: A cap break does not lose the turn-in gain
 - **WHEN** a matching companion's record sits at value 99 with cap 99 at turn-in
-- **THEN** the cap rises to the entry's `new_cap` first and the +2 `quest_completion` gain then
-  applies, leaving the value at 101 with the raised cap
+- **THEN** the cap rises to the entry's `new_cap` first and the declared `quest_completion` gain then
+  applies, leaving value `min(new_cap, 99 + declared_gain)` with the raised cap
 
 #### Scenario: A recordless matching companion still gets its cap break
 - **WHEN** a matching in-party companion has no affinity record at turn-in
-- **THEN** the turn-in creates a fresh record raised to the entry's `new_cap` and applies the +2
+- **THEN** the turn-in creates a fresh record raised to the entry's `new_cap` and applies the declared quest-completion
   gain on top
 
 #### Scenario: A non-matching entry is a no-op
 - **WHEN** a turn-in completes a quest whose `cap_breaks` entry matches no in-party companion
-- **THEN** the reward and +2 gains commit normally and no cap changes anywhere
+- **THEN** the reward and the declared quest-completion gains commit normally and no cap changes anywhere
 
 #### Scenario: Re-completing a milestone is idempotent
 - **WHEN** a milestone quest is turned in again after its cap break already fired
@@ -76,7 +76,7 @@ rulebook table, the sole cap writer, and the turn-in matching rule.
 
 #### Scenario: The cap raise rides the reward transaction and precedes the gain
 - **WHEN** the turn-in raises a matching companion's cap
-- **THEN** `raise_affinity_cap` runs inside the same atomic transaction as the reward and the `quest_completion` affinity gain, and the cap raise is applied before the `quest_completion` gains so a record sitting at the old cap cannot clamp the +2 gain
+- **THEN** `raise_affinity_cap` runs inside the same atomic transaction as the reward and the `quest_completion` affinity gain, and the cap raise is applied before the `quest_completion` gains so a record sitting at the old cap cannot prematurely clamp the declared quest-completion gain
 
 #### Scenario: Entry identity validation details
 - **WHEN** a `cap_breaks` entry is loaded
@@ -91,3 +91,8 @@ rulebook table, the sole cap writer, and the turn-in matching rule.
   `role`, declares both `npc_key` and `role`, duplicates another entry's `quest_key` and selector,
   or declares `new_cap` at or below 99
 - **THEN** loading the rulebook fails closed with a named validation error
+
+#### Scenario: Independently known cap-order fixture
+- **WHEN** a synthetic quest rule grants 2 to value 99 and raises cap to 150
+- **THEN** the committed value is 101, whereas a failed reward commit restores both value 99 and cap 99; this does not pin the production quest gain
+

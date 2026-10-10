@@ -430,7 +430,7 @@ The catalogue SHALL carry the 16 Series A/B/D rows as new `SKILL_REGISTRY` entri
 
 #### Scenario: Series A clergy qualifier passives
 - **WHEN** the Series A rows are registered
-- **THEN** they are `pain_to_pleasure`, `priestly_grace`, `rapture_renewal` (first-time catalogue entry — the 「聖職敘階授予」 channel itself) and new `vow_of_service` (offering copper +25% and offering/climax merit +10%, ledger multipliers only, pure-positive)
+- **THEN** they are `pain_to_pleasure`, `priestly_grace`, `rapture_renewal` (first-time catalogue entry ;  the 「聖職敘階授予」 channel itself) and new `vow_of_service` (authored positive offering copper and offering/climax merit adjustments, ledger multipliers only, pure-positive)
 
 #### Scenario: Series B rite actives
 - **WHEN** the Series B rows are registered
@@ -442,10 +442,10 @@ The catalogue SHALL carry the 16 Series A/B/D rows as new `SKILL_REGISTRY` entri
 
 #### Scenario: Prices and prereqs follow the recorded finals
 - **WHEN** the catalogue rows are priced and chained
-- **THEN** price bands follow the tuned finals recorded in this change's tasks, and catalogue-internal prereq chains ride the Series D high rows only
+- **THEN** prices validate against the current authored bands without historical final-value tables, and catalogue-internal prereq chains ride the Series D high rows only
 
 #### Scenario: The combat rails are separate requirements
-- **WHEN** the two combat rite rails — the lamb-seal charge buff and the martyr-vow pool filter — are scheduled
+- **WHEN** the two combat rite rails ;  the lamb-seal charge buff and the martyr-vow pool filter ;  are scheduled
 - **THEN** they are separate requirements landed by the combat-ministry change; here the rows register with their declarations
 
 ### Requirement: The church redeem and merit commands are documented in the docs trio
@@ -541,7 +541,7 @@ No `world/ai/` module SHALL participate in the lamb-seal narrowing, the martyr-v
 - **THEN** it reports zero findings
 
 ### Requirement: Series C discipline passives ship pure-positive with no baseline downside
-The redemption catalogue SHALL gain five Series C rows as `SKILL_REGISTRY` PASSIVE skills — `poverty_vow`, `obedience`, `chastity_discipline`, `temple_endurance`, `public_devotion` — with the per-row effects pinned by the scenarios below. No Series C row SHALL carry any effect negative relative to baseline, and the loader's polarity gate SHALL reject any row that does.
+The redemption catalogue SHALL gain five Series C rows as `SKILL_REGISTRY` PASSIVE skills ;  `poverty_vow`, `obedience`, `chastity_discipline`, `temple_endurance`, `public_devotion` ;  with the per-row effects pinned by the scenarios below. No Series C row SHALL carry any effect negative relative to baseline, and the loader's polarity gate SHALL reject any row that does.
 
 #### Scenario: Every Series C passive is positive-only
 - **WHEN** the shipped rule rows of each Series C passive are enumerated through the loader's polarity reading
@@ -549,11 +549,11 @@ The redemption catalogue SHALL gain five Series C rows as `SKILL_REGISTRY` PASSI
 
 #### Scenario: Obedience doubles merit only under the status
 - **WHEN** a holder earns offering/climax merit while under a domination/submission status and while not under one
-- **THEN** the credit is exactly doubled in the first case and unchanged in the second
+- **THEN** the credit increases by its declared positive multiplier in the first case and unchanged in the second
 
 #### Scenario: Temple endurance mitigates, never adds a penalty
 - **WHEN** a holder at the high-arousal defense-penalty tier is compared against baseline and against a non-holder
-- **THEN** the holder's penalty magnitude is 25% smaller than baseline and the non-holder's penalty is byte-identical to the pre-change value
+- **THEN** the holder's penalty magnitude is smaller by its declared mitigation fraction than baseline and the non-holder's penalty is byte-identical to the pre-change value
 
 #### Scenario: Poverty vow and chastity discipline raise income
 - **WHEN** a holder earns offering copper or pray merit
@@ -565,14 +565,14 @@ The redemption catalogue SHALL gain five Series C rows as `SKILL_REGISTRY` PASSI
 
 #### Scenario: Temple endurance is sanctioned mitigation
 - **WHEN** `temple_endurance` is authored
-- **THEN** it mitigates the EXISTING high-arousal defense penalty by 25% — mitigation of an existing penalty is positive relative to baseline and therefore allowed
+- **THEN** it mitigates the EXISTING high-arousal defense penalty by its declared positive mitigation fraction ;  mitigation of an existing penalty is positive relative to baseline and therefore allowed
 
 #### Scenario: Public devotion rewards public acts
 - **WHEN** a holder performs acts in public venues
 - **THEN** `public_devotion` raises the merit earned from those acts
 
 ### Requirement: Series E utility rows feed the core loop
-The redemption catalogue SHALL gain the three Series E rows as cast-rail or ownership mechanics — `rite_martial_blessing`, `rite_shelter`, and `rite_morning_devotion` — whose handler and gating details are pinned by the scenarios below. None SHALL appear in any lineage tree; the redemption pipeline is the only acquisition path; prices land inside the tuned bands.
+The redemption catalogue SHALL gain the three Series E rows as cast-rail or ownership mechanics ;  `rite_martial_blessing`, `rite_shelter`, and `rite_morning_devotion` ;  whose handler and gating details are pinned by the scenarios below. None SHALL appear in any lineage tree; the redemption pipeline is the only acquisition path; prices land inside the tuned bands.
 
 #### Scenario: Morning devotion raises the prayer cap by exactly one
 - **WHEN** a redeemed holder prays once past her base daily cap
@@ -589,14 +589,14 @@ The redemption catalogue SHALL gain the three Series E rows as cast-rail or owne
 #### Scenario: Blessing and shelter resolve through the shared resolver face
 - **WHEN** a redeemed holder casts `rite_martial_blessing` before a fight and, inside a venue,
   `rite_shelter`
-- **THEN** both settle through `settle_out_of_combat_cast` — buff mounted with its cooldown stamp,
-  rest bonus applied with its day marker, one `rite_cast` event each — and a forced commit failure
+- **THEN** both settle through `settle_out_of_combat_cast` ;  buff mounted with its cooldown stamp,
+  rest bonus applied with its day marker, one `rite_cast` event each ;  and a forced commit failure
   restores ledger, buffs, traits, and tick byte-identically
 
 #### Scenario: Morning devotion is a passive grant, not a cast
 - **WHEN** a sister redeems `rite_morning_devotion` and then attempts to cast it
 - **THEN** the skill landed in `db.skills.passive`, the cast is the stable PASSIVE rejection, and
-  her pray daily cap is raised by one from the moment of redemption
+  her pray daily cap is raised by its authored positive increment from the moment of redemption
 
 #### Scenario: Shelter re-arms after the day boundary
 - **WHEN** a holder uses `rite_shelter`, the world clock crosses a day boundary, and she casts it
@@ -622,7 +622,7 @@ The redemption catalogue SHALL gain the three Series E rows as cast-rail or owne
 
 #### Scenario: Morning devotion is re-judged PASSIVE
 - **WHEN** `rite_morning_devotion` is classified
-- **THEN** it is re-judged `PASSIVE` (its effect is the pray daily cap +1, purely ownership-triggered — a cast could only burn time), granted to `db.skills.passive` by the ordinary redemption rail and still feeding the pray → merit → redeem loop
+- **THEN** it is re-judged `PASSIVE` (its effect is the authored positive pray daily cap increment, purely ownership-triggered ;  a cast could only burn time), granted to `db.skills.passive` by the ordinary redemption rail and still feeding the pray → merit → redeem loop
 
 ### Requirement: Series C/E rule rows load under the correspondence and polarity gates
 Each Series C/E mechanic SHALL be tunable by a `world/rules/rulebook/church.yaml` row (no hardcoded numbers in Python), each row exercising the existing one-row-one-test correspondence gate.
@@ -641,8 +641,9 @@ Each Series C/E mechanic SHALL be tunable by a `world/rules/rulebook/church.yaml
 
 #### Scenario: This change records its own finals
 - **WHEN** this change authors its numbers
-- **THEN** it decides and records its OWN eight price finals inside those bands and its own Series C/E numeric finals (scales, mitigation factor, buff magnitude, cooldown, cap increment) in the `REDEEM_CATALOG`/`church.yaml` authoring, and the correspondence tests assert those recorded finals
+- **THEN** it decides and records its OWN eight price finals inside those bands and its own Series C/E numeric finals (scales, mitigation factor, buff magnitude, cooldown, cap increment) in the `REDEEM_CATALOG`/`church.yaml` authoring, and correspondence tests validate row IDs, predicates, reference resolution and polarity; shared fixed synthetic tests validate calculations without final-value pins
 
 #### Scenario: Series C/E rows are prereq-free
 - **WHEN** the grown catalogue is enumerated
 - **THEN** the catalogue enumerates 24 rows total once these 8 land, with Series C/E prereq-free (catalogue-internal prereqs stay on the Series D high rows only)
+

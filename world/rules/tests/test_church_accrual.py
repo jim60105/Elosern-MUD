@@ -39,18 +39,24 @@ from world.rules.state_reactions import dispatch_phase_reaction  # noqa: F401  (
 
 _DAY_SECONDS = CLOCK_YAML["seconds_per_hour"] * CLOCK_YAML["hours_per_day"]
 
-#: The tuned acceptance curve finals (church.yaml ``acceptance`` rows) and the
-#: arousal band floors they map from (``sexual_pleasure.yaml``): ordinal ->
-#: (band floor pleasure, accept percent). The loader's monotonicity gate pins
-#: the shape; the matrix here proves the runtime decision consumes exactly
-#: (ordinal, roll).
-_CURVE = (
-    (0, 0, 50),
-    (1, 15, 65),
-    (2, 35, 80),
-    (3, 60, 90),
-    (4, 85, 100),
-)
+def _band_floor(ordinal: int) -> int:
+    """The arousal band floor of one ordinal (``sexual_pleasure.yaml``)."""
+    from world.rules.sexual_state import PLEASURE_CONFIG
+
+    return PLEASURE_CONFIG.bands[ordinal].floor
+
+
+def _acceptance_curve() -> tuple[tuple[int, int, int], ...]:
+    """The live acceptance curve: (ordinal, band floor, accept percent).
+
+    Both columns come from their owning declarations, so a valid retune of the
+    acceptance finals or of the arousal bands cannot break this matrix; it
+    proves the runtime decision consumes exactly (ordinal, roll).
+    """
+    return tuple(
+        (ordinal, _band_floor(ordinal), percent)
+        for ordinal, percent in get_church_rules().acceptance
+    )
 
 #: The shipped climax-while-enrolled accrual final (church.yaml
 #: ``accrual_climax_while_enrolled``; design §5.4 "small").
@@ -109,7 +115,7 @@ class ChurchAccrualBase(EvenniaTest):
         return church.offering_menu(self.char1)[0].key
 
     def _set_ordinal(self, entity, ordinal: int) -> None:
-        entity.sexual.pleasure.base = _CURVE[ordinal][1]
+        entity.sexual.pleasure.base = _band_floor(ordinal)
 
 
 class ChurchPrayTests(ChurchAccrualBase):
@@ -319,7 +325,7 @@ class ChurchOfferingAcceptanceTests(ChurchAccrualBase):
     )
     def test_acceptance_follows_the_curve_for_every_ordinal(self):
         row_key = self._first_row_key()
-        for ordinal, pleasure, percent in _CURVE:
+        for ordinal, _, percent in _acceptance_curve():
             with self.subTest(ordinal=ordinal, percent=percent):
                 self._set_ordinal(self.recipient, ordinal)
                 self.assertEqual(self.recipient.sexual.arousal.value, ordinal)
@@ -337,14 +343,16 @@ class ChurchOfferingAcceptanceTests(ChurchAccrualBase):
     )
     def test_ordinal_zero_accepts_exactly_inside_its_half_band(self):
         row_key = self._first_row_key()
+        percent = get_church_rules().acceptance[0][1]
+        self.assertLess(percent, 100)
         self._set_ordinal(self.recipient, 0)
-        for roll in (1, 25, 50):
+        for roll in (1, percent // 2, percent):
             with patch("world.rules.church.roll_d100", return_value=roll):
                 self.assertEqual(
                     church.offer_step(self.char1, self.recipient, row_key)["outcome"],
                     "accepted",
                 )
-        for roll in (51, 75, 100):
+        for roll in (percent + 1, percent + (100 - percent) // 2, 100):
             with patch("world.rules.church.roll_d100", return_value=roll):
                 self.assertEqual(
                     church.offer_step(self.char1, self.recipient, row_key)["outcome"],
@@ -381,9 +389,9 @@ class ChurchOfferingAcceptanceTests(ChurchAccrualBase):
             "resolve",
             return_value=ActionResult.success(None, 0),
         ):
-            for roll in (50, 65, 80, 90):
+            for roll in (percent for _, _, percent in _acceptance_curve()[:-1]):
                 accepted = []
-                for ordinal, pleasure, _ in _CURVE:
+                for ordinal, _, _ in _acceptance_curve():
                     self._set_ordinal(self.recipient, ordinal)
                     with patch("world.rules.church.roll_d100", return_value=roll):
                         result = church.offer_step(
