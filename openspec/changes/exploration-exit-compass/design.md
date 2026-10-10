@@ -70,3 +70,47 @@ Tokens from `styles/tokens.css`, sizes `calc(<n>px * var(--ui-scale))`, nothing 
 ## Open Questions
 
 None blocking. The exact location of the store's submission gate is resolved by reading `stores/elosern*.js` at the start of task 3.1.
+
+## Resume acceptance notes
+
+The successor apply preserves the previous implementation commits. The contract
+gate found four authored test fixtures that named shipped catalog content; those
+fixtures now use synthetic labels without changing their assertions.
+
+Task 6.2 adds complete MODIFIED requirement blocks across contextual HUD, frame
+resolution, options, browser verification, component showcase, desktop shell,
+and pointer activation. Every existing scenario name is retained. Remaining
+inventory matches concerning inventory sections, minimap legends, unrelated
+drawers, combat forms, and verb popovers retain their existing contracts. The
+suggestions footer remains in the overview; its delta clarifies the right-column
+placement rather than implementing the later room-actions change.
+
+Live acceptance uses the built client and agent-browser against isolated managed
+Evennia runtimes. Real grid, wilderness, interior, disabled-exit, and no-exit
+rooms were captured at exactly 1451×790 and 1920×1080. The disabled room uses an
+isolated builder exit lock and the account's quell mode, so its reason comes from
+the server rather than an injected client panel. A real conversation's dedicated
+exit list moved to the next grid room and restored compass focus.
+
+The Storybook comparison is `Design/SceneOverviewRedesign`, including its
+Wilderness reference. This change intentionally keeps the existing people,
+object, and footer chips in the right column; the prototype's presence rail,
+place-card actions, and relocated suggestions pill belong to the next two
+changes. The compass geometry and shared readout follow the reference. At the
+reference viewport the compass box is 184 px square inside a 198 px pane; at
+1920×1080 it is 253 px square inside a 272 px pane. There is no horizontal
+overflow or pane-host vertical overflow; crowded content scrolls only inside the
+right column. The `.elosern-root .action-dock__pane` override retains only
+horizontal clipping and scrollbar styling and introduces no competing geometry.
+1920×1080 is additional change-specific visual acceptance, not a replacement for
+the repository's standard larger automated acceptance viewport.
+
+Live wilderness hover aimed without moving, and a discrete pointer click moved
+from `wild:elosern:60:97` to `wild:elosern:61:97`. Holding south produced an
+arrival, then the server returned `move_failed` / `移動失敗。` despite a changed
+committed wilderness node; the compass stopped and displayed that rejection.
+The server adapter's room-object-identity success check is outside this
+frontend-only change. The deterministic browser walk journey separately verifies
+three committed arrivals, the exact per-arrival payloads, and the dead-end stop
+using its explicitly scripted action-result/update responder; it is not evidence
+of uninterrupted traversal through the real wilderness server.

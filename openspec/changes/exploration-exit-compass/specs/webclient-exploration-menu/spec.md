@@ -101,7 +101,7 @@ carry no exit item.
 
 
 #### Scenario: The 出口 row mirrors move rows in payload order
-- **WHEN** the exits are resolved (by the compass, which replaced the 出口 row) the committed exits
+- **WHEN** the compass resolves the committed exits, replacing the former 出口 row
 - **THEN** it carries one target per `move` row, and a disabled row stays a visible disabled target carrying its server-authored reason, never omitted
 - **AND** activating an enabled exit target submits the unchanged `explore.move` payload
 
