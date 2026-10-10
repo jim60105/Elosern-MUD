@@ -1124,6 +1124,10 @@ JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 
 完成後請以 `uv run --locked python -m tools.test_data_lint check` 驗證，且不得為此新增
 `debt`、`deny` 或任何允許清單條目。
 
+### NPC 人物設定與台詞的審查紀錄
+
+NPC 的人物設定、角色卡、語音與劇本台詞是作者文字，行為測試不得以「預期台詞」的 fixture 釘死它們。這批內容的審查證據是 `docs/development/npc-editorial-review.md` 這份以實際來源為索引、帶日期的帳本，由 `world/lore/tests/test_npc_editorial_review.py` 搭配純檢查器 `world/lore/npc_editorial_review.py` 驗證覆蓋。該檢查只證明每個實際來源都有一筆具名處置，不判斷文字品質，也不保證審查仍然新鮮。新增或改寫任何一個來源時，在同一次變更內更新帳本；只改散文敘述不會讓檢查失敗。
+
 ### Synthetic test-data kit 使用指引
 
 `world/tests/synthetic_data/`（import 路徑 `world.tests.synthetic_data`）是全庫共用的替身世界：每個 catalog 都是**真實
