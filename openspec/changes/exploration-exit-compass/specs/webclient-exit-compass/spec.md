@@ -262,7 +262,7 @@ The dialogue screen's `↦ 移動…` list SHALL keep presenting the room's exit
 - **THEN** the dialogue exits list shows it disabled with its server-authored reason
 
 ### Requirement: A press produces one discrete move or one walk, never both
-A discrete move SHALL be sent on pointer release, or on Enter keydown, only when the press was shorter than 400 ms, and a held press or key SHALL NOT also send a discrete move. Opening a card or drawer, a suppressed step, a result without a panel change, and Escape SHALL stop a walk.
+A discrete move SHALL be sent on pointer release, or on the release of Enter or Space, only when the press was shorter than 400 ms, and a held press or key SHALL NOT also send a discrete move. Opening a card or drawer, a suppressed step, a result without a panel change, and Escape SHALL stop a walk.
 
 #### Scenario: Release after a hold sends nothing
 - **WHEN** the player holds the pointer on an angled target for 600 ms and releases
