@@ -89,6 +89,10 @@ The registries SHALL permit executable first-batch abilities only through explic
 - **WHEN** this species' two approved kits are constructed
 - **THEN** `grain_shaking_peck` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
 
+#### Scenario: tide_lamp_crab completes its executable boundary
+- **WHEN** this species' two approved kits are constructed
+- **THEN** `lamp_carapace_claw` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
+
 #### Scenario: ridge_burrow_hare completes its executable boundary
 - **WHEN** this species' two approved kits are constructed
 - **THEN** `ridge_bracing_kick` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
