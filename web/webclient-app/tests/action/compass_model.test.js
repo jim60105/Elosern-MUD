@@ -59,7 +59,7 @@ describe("compass-model constants", () => {
 describe("resolveTargets angle sources", () => {
   it("a wilderness exit takes its map bearing, equal to the minimap's", () => {
     const model = mapModel("wilderness", [node(CURRENT, 0, 0, "current"), node("ne", 1, 1)]);
-    const targets = targetsFor([exitRow("a", "林間小徑", "ne")], model);
+    const targets = targetsFor([exitRow("a", "測試小徑", "ne")], model);
     expect(targets.angled).toHaveLength(1);
     const [target] = targets.angled;
     expect(target.source).toBe("map");

@@ -86,7 +86,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             _move_row("e%d" % index, label, "room:%d" % (100 + index))
             for index, label in enumerate(labels)
         ]
-        names = ["哨兵", "攤販", "吟遊詩人", "巡邏隊長", "乞丐", "藥師", "鐵匠學徒", "信差", "修女", "賞金獵人"]
+        names = ["測試人物 %d" % index for index in range(10)]
         people = [_interact_target(700 + index, name) for index, name in enumerate(names)]
         self._mount_overview(
             page,

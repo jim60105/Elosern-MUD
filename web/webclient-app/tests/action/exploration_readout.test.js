@@ -17,7 +17,7 @@ import {
 } from "../../components/exploration-readout.js";
 import { useReadoutState } from "../../composables/use-exit-compass.js";
 
-const angled = { kind: "angled", angle: 270, glyph: "←", label: "西部丘陵與谷地", enabled: true, reason: null };
+const angled = { kind: "angled", angle: 270, glyph: "←", label: "測試荒野區域", enabled: true, reason: null };
 const portal = { kind: "portal", slot: 0, glyph: "⇧", label: "塔樓三層", enabled: true, reason: null };
 const locked = { kind: "angled", angle: 0, glyph: "↑", label: "north", enabled: false, reason: "前方的吊橋已經收起。" };
 
@@ -25,7 +25,7 @@ describe("aimReadout", () => {
   it("an angled target leads with 前往 and its octant glyph and names the destination", () => {
     expect(aimReadout({ angle: 270, target: angled, zone: "pad" })).toEqual({
       lead: "前往 ←",
-      text: "西部丘陵與谷地",
+      text: "測試荒野區域",
       tone: "normal",
     });
   });
@@ -131,11 +131,11 @@ describe("the readout's flash timing", () => {
 
 describe("ExplorationReadout", () => {
   it("is a polite live region with a lead and a text", () => {
-    const w = mount(ExplorationReadout, { props: { lead: "前往 ←", text: "西部丘陵與谷地", tone: "normal" } });
+    const w = mount(ExplorationReadout, { props: { lead: "前往 ←", text: "測試荒野區域", tone: "normal" } });
     const root = w.get('[data-testid="exploration-readout"]');
     expect(root.attributes("aria-live")).toBe("polite");
     expect(w.get('[data-testid="exploration-readout-lead"]').text()).toBe("前往 ←");
-    expect(w.get('[data-testid="exploration-readout-text"]').text()).toBe("西部丘陵與谷地");
+    expect(w.get('[data-testid="exploration-readout-text"]').text()).toBe("測試荒野區域");
     expect(root.attributes("data-tone")).toBe("normal");
   });
 

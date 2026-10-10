@@ -29,7 +29,7 @@ from ._journey_support import (
     _wait_mode,
 )
 
-REGION = "西部丘陵與谷地"
+REGION = "測試荒野區域"
 DEAD_END = "這個方向沒有路了，停下腳步。"
 LOCKED_REASON = "前方的吊橋已經收起。"
 
