@@ -424,7 +424,7 @@ def _move_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
     except Exception as exc:
         log_error("exit_traverse_failed", context={"char": actor.pk, "exit": exit_obj.pk}, exc=exc)
         return _rejected("move_failed", "移動失敗。")
-    if actor.location is source_location and _current_node(actor) == current_node:
+    if actor.location is source_location and _current_node(actor) in (None, current_node):
         # ``at_traverse`` returns None on both branches (the movement cost and
         # knowledge hooks live in ``at_post_traverse``), so success is detected
         # by the actor actually relocating. Wilderness rooms may be reused:

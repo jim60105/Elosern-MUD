@@ -170,6 +170,25 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertNotEqual(_current_node(self.player), source)
             self.assertIs(self.player.location, room)
 
+    def test_unreadable_coordinates_in_a_reused_room_do_not_report_success(self):
+        room = create_object(TerrainRoom, key="測試荒野房間")
+        self.player.location = room
+        self.exit_obj.location = room
+        self.exit_obj.destination = room
+        with patch.object(
+            TerrainRoom, "coordinates", new_callable=PropertyMock,
+            side_effect=[(1, 1), None],
+        ), patch.object(self.exit_obj, "at_traverse", lambda actor, destination: None):
+            result = self._move(
+                {
+                    "exit_ref": str(int(self.exit_obj.id)),
+                    "current_node": encode_wild(WILDERNESS_NAME, 1, 1),
+                }
+            )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "move_failed")
+        self.assertIs(self.player.location, room)
+
     @covers_requirement("movement-settlement-atomicity::a-failed-movement-reports-failure-truthfully-on-every-client-path")
     def test_failed_charge_reports_move_failed_with_player_still_at_source(self):
         before = get_world_clock().tick
