@@ -150,7 +150,8 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(_object_count(), before)
 
     @covers_requirement(
-        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
+        "monster-individual-construction::shipped-variants-construct-their-declared-configuration-through-the-common-boundary",
     )
     def test_a_failed_application_leaves_no_individual_and_no_event(self):
         before = _object_count()
@@ -567,6 +568,65 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(individual.db.skills["active"], [second.key, first.key])
         self.assertEqual(individual.db.skills["passive"], [])
         self.assertEqual(individual.db.behaviour_tree, "ambush_predator")
+
+    @covers_requirement(
+        "monster-individual-construction::shipped-variants-construct-their-declared-configuration-through-the-common-boundary",
+    )
+    def test_committed_kit_binding_and_depleted_pools_survive_a_reload(self):
+        from world.skills.registry import SkillKind, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        skill = make_skill(
+            "t_reload_kit", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        kitted = replace(
+            STRONGER_ROW,
+            active_skill_keys=(skill.key,),
+            behaviour_profile_key="ambush_predator",
+        )
+        mapping = {ORDINARY: ORDINARY_ROW, STRONGER: kitted, ORPHAN: ORPHAN_ROW}
+        with (
+            patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}),
+            patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            individual = construct_species_individual(SPECIES, STRONGER)
+            individual.traits.mp.current = 2
+            individual.traits.sp.current = 0
+
+        bases = _stored_values(individual)
+        gauges = {key: getattr(individual.traits, key).current for key in ("hp", "mp", "sp")}
+        self.assertEqual(gauges["mp"], 2)
+        self.assertEqual(gauges["sp"], 0)
+
+        # A later registry edit is data the committed individual must not be
+        # migrated to: the reload reads its own stored identity, kit, binding
+        # and pools rather than re-deriving them from the edited declaration.
+        rebalanced = {
+            ORDINARY: ORDINARY_ROW,
+            STRONGER: replace(
+                STRONGER_ROW,
+                display_name_zh="合成敘述：重新平衡後的版本。",
+                active_skill_keys=(),
+                behaviour_profile_key=None,
+            ),
+            ORPHAN: ORPHAN_ROW,
+        }
+        with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", rebalanced):
+            reloaded = Monster.objects.get(pk=individual.pk)
+            self.assertEqual(reloaded.species_key, SPECIES)
+            self.assertEqual(reloaded.variant_key, STRONGER)
+            self.assertEqual(reloaded.db.skills["active"], [skill.key])
+            self.assertEqual(reloaded.db.skills["passive"], [])
+            self.assertEqual(reloaded.db.behaviour_tree, "ambush_predator")
+            self.assertEqual(_stored_values(reloaded), bases)
+            self.assertEqual(
+                {
+                    key: getattr(reloaded.traits, key).current
+                    for key in ("hp", "mp", "sp")
+                },
+                gauges,
+            )
 
 
 if __name__ == "__main__":
