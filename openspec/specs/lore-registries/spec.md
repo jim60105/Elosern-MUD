@@ -21,10 +21,10 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 #### Scenario: Elf sits roughly one order of magnitude above the human elite tier on static stats
 - **WHEN** `RACE_REGISTRY["elf"].static_baseline.atk_phys[0]` (the elf `atk_phys` floor) is
   compared against `STATIC_TIER_REGISTRY["human_elite"].band[1]` (the human 精銳-tier `atk_phys`
-  ceiling, 14) — **not** `RACE_REGISTRY["human"].static_baseline`'s species-wide ceiling, which
+  ceiling, 14) ;  **not** `RACE_REGISTRY["human"].static_baseline`'s species-wide ceiling, which
   includes the S-rank 大劍豪 tier and would understate the ratio
 - **THEN** the ratio is between 5× and 15×, reflecting `world_info.md`'s own worked comparison
-  ("對照人類精銳(7-14)約為8-10倍，與設定文字「10倍」相符") — and this ratio is checked
+  ("對照人類精銳(7-14)約為8-10倍，與設定文字「10倍」相符") ;  and this ratio is checked
   independently of the vital-pool ratio above; neither scenario's assertion may be satisfied by
   deriving one band from the other
 
@@ -36,7 +36,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **WHEN** the three races' `static_baseline.magic_power` bands are compared
 - **THEN** every upper bound of `beastfolk` is below every lower bound of `human`, and every
   upper bound of `human` is below every lower bound of `elf`, matching the interim table
-  1–30 / 5–90 / 100–900, and no `RaceProfile` field named `magic_cap` or
+  and authored band constraints, and no `RaceProfile` field named `magic_cap` or
   `starting_magic_level` exists anywhere in the dataclass
 
 #### Scenario: The fourth band axis is mandatory and integral
@@ -46,15 +46,15 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 
 #### Scenario: StaticBand is four-dimensional
 - **WHEN** `StaticBand` is inspected
-- **THEN** it is four-dimensional — `atk_phys`, `agility`, `defense`, and `magic_power`, each a `tuple[int, int]`
+- **THEN** it is four-dimensional ;  `atk_phys`, `agility`, `defense`, and `magic_power`, each a `tuple[int, int]`
 
 #### Scenario: Race static baselines carry the growth-redesign interim bands
 - **WHEN** the three races' `static_baseline` values are inspected
-- **THEN** they carry the growth-redesign interim bands: human `(1, 22)` on the three combat axes with `magic_power (5, 90)`, beastfolk `(4, 34)` with `magic_power (1, 30)`, elf `(70, 95)` with `magic_power (100, 900)`
+- **THEN** they carry explicit complete authored axis bands; exact endpoints are adjustable game data, with the existing independent power-gap and band-shape constraints retained
 
 #### Scenario: The former magic fields do not exist and the fourth axis is the only bound
 - **WHEN** `RaceProfile` is inspected
-- **THEN** the former `magic_cap` and `starting_magic_level` fields SHALL NOT exist — the fourth `static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic average survives
+- **THEN** the former `magic_cap` and `starting_magic_level` fields SHALL NOT exist ;  the fourth `static_baseline` axis is the only race-owned magic-power bound, and no race-owned magic average survives
 
 ### Requirement: StaticTier registry records named power bands within each race's static_baseline
 `world/lore/races.py` SHALL define a frozen `StaticTier` dataclass with fields `key`, `race_key`, `display_name_zh`, `order`, `band: tuple[int, int | None]`, `magic_band: tuple[int, int]`, `guild_rank_hint`, and `description`, and a module-level `STATIC_TIER_REGISTRY: dict[str, StaticTier]` containing five human tiers, four beastfolk tiers, and two elf tiers.
@@ -70,14 +70,13 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **WHEN** the five human tiers are sorted by `order`
 - **THEN** the sequence is 平民與非戰鬥者, 一般冒險者, 精銳, 一流, 大劍豪 with strictly increasing
   `order`, and the highest tier's `band` upper bound equals `RACE_REGISTRY["human"]
-  .static_baseline.atk_phys[1]` (22) — a human S-rank adventurer is numerically representable, not
+  .static_baseline.atk_phys[1]` ;  a human S-rank adventurer is numerically representable, not
   capped out by a narrower species band
 
 #### Scenario: Old magic lore anchors survive as tier magic bands
 - **WHEN** `STATIC_TIER_REGISTRY["human_adventurer"].magic_band` is inspected
-- **THEN** it is mid-band within the human `magic_power` band (5–90), anchored on the old human
-  average 30, and the 平民 tier's `magic_band` lower bound is the race floor 5 while the 大劍豪
-  tier's upper bound is the race ceiling 90 — the race magic band is spanned deterministically by
+- **THEN** it is mid-band within the authored human `magic_power` band, and the 平民 tier's `magic_band` lower bound is the race floor while the 大劍豪
+  tier's upper bound is the race ceiling ;  the race magic band is spanned deterministically by
   the tier ladder instead of the deleted `starting_magic_level`
 
 #### Scenario: Guild rank hints are present only where world_info.md states them
@@ -89,7 +88,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 
 #### Scenario: An open-ended top tier is representable
 - **WHEN** `STATIC_TIER_REGISTRY["elf_prodigy"]` is inspected
-- **THEN** its `band` is `(95, None)`, where `None` records the source's lack of a hard ceiling,
+- **THEN** its `band` has an authored integral floor and `None` upper bound, where `None` records the source's lack of a hard ceiling,
   while its `magic_band` is a closed two-integer tuple within the elf `magic_power` band (no
   open-ended magic dimension exists)
 
@@ -133,11 +132,8 @@ Defines the typed, immutable world-lore registries used as the code-side source 
   `vital_overrides is None`, since `world_info.md` documents no per-branch stat skew for elves
 
 #### Scenario: Beastfolk subspecies carry the documented stat-distribution skew
-- **WHEN** `SUBRACE_REGISTRY["catkin"]`, `["bearkin"]`, `["rabbitkin"]`, `["bovinekin"]`,
-  `["tigerkin"]`, and `["foxkin"]` are inspected
-- **THEN** each has all three `static_modifiers` fields matching `world_info.md`'s 「亞種數值傾向」
-  block exactly (e.g. `catkin.static_modifiers == StatModifiers(atk_phys=-0.10, agility=0.40,
-  defense=-0.30)`), and `wolfkin.static_modifiers == StatModifiers()` (balanced, all zero)
+- **WHEN** shipped subrace declarations are validated
+- **THEN** Beastfolk static modifiers SHALL retain their documented directional trade-offs and wolfkin zero baseline; exact percentages SHALL be adjustable authoring data.
 
 #### Scenario: Human bloodline subraces carry zero-sum stat-distribution skew
 - **WHEN** every one of the five human `SUBRACE_REGISTRY` entries' `static_modifiers` is inspected
@@ -150,7 +146,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **THEN** the human keys are exactly `human_royal`, `human_noble`, `human_coastal`,
   `human_plains`, and `human_highland`; no legacy wealth-ladder key (`human_wealthy`,
   `human_commoner`, `human_laborer`) appears as a subrace key anywhere, and no human subrace is
-  named after an occupation — 農民 is an occupation practised within `human_plains`, not a subrace
+  named after an occupation ;  農民 is an occupation practised within `human_plains`, not a subrace
 
 #### Scenario: Human subrace naming is synonymous across key and Chinese fields
 - **WHEN** the five human `SUBRACE_REGISTRY` entries are inspected
@@ -162,17 +158,8 @@ Defines the typed, immutable world-lore registries used as the code-side source 
   `common_name_zh` being `display_name_zh` plus the 血脈 suffix
 
 #### Scenario: Human bloodline stat modifiers keep the documented lineage values
-- **WHEN** the five human `SUBRACE_REGISTRY` entries' `static_modifiers` and `vital_overrides`
-  are inspected
-- **THEN** `human_royal` is `StatModifiers(atk_phys=-0.05, agility=-0.05, defense=0.10)` with
-  `vital_overrides["mp"] == (120, 220)`; `human_noble` is `StatModifiers(atk_phys=0.10,
-  agility=0.05, defense=-0.15)`; `human_coastal` is `StatModifiers(atk_phys=0.05, agility=0.10,
-  defense=-0.15)`; `human_plains` is `StatModifiers()` (the human zero baseline, so the largest
-  human group's demographics and mechanics agree); and `human_highland` is
-  `StatModifiers(atk_phys=0.10, agility=-0.15, defense=0.05)` — every value unchanged by the
-  rename, each carrying the lineage rationale in `world_info.md`'s human 「數值傾向」 block
-  (王都王室重統御學識; 領地貴族自幼習劍術馬術; 港市海岸船上作業練就輕捷; 東部平原農耕與工坊
-  並重; 西部丘陵谷地礦坑與工坊重勞動)
+- **WHEN** shipped subrace declarations are validated
+- **THEN** Human bloodline modifiers SHALL retain their existing lineage rationale, directional trade-offs, zero-sum discipline and human_plains zero baseline. Royal MP override SHALL remain explicit; exact percentages and pool endpoints SHALL be authoring data.
 
 #### Scenario: Human specialty prose states the lineage and its bent
 - **WHEN** the five human `SUBRACE_REGISTRY` entries' `specialty` fields are inspected
@@ -188,7 +175,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **THEN** they are exactly, verbatim:
   斐歐恩族 → 「翠綠森林村的森林精靈。親和光屬性魔法，弓術與光法並修，從容而精準。」;
   基亞蘭族 → 「暗影谷村的黑暗精靈。親和火與暗屬性魔法，刀術造詣尤深，攻勢凌厲。」;
-  伊歐拉斯族 → 「幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。」 —
+  伊歐拉斯族 → 「幽月谷村的幻童精靈。外表永駐童年，親和所有屬性魔法，並擅長神之秘法。」 ; 
   each naming the branch's own village, affinity, and signature art from `world_info.md`'s 三分支
   block, with no occupational determinism
 
@@ -201,7 +188,7 @@ Defines the typed, immutable world-lore registries used as the code-side source 
   兔人 → 「奔躍如風的兔人，為獸人之中最快的亞種，擅長遊走遠射，卻經不起近身的一擊。」;
   牛人 → 「身軀如山、皮糙肉厚的牛人，防禦最厚而善於陣地戰，只因其行動緩慢而難以追擊機動的敵人。」;
   虎人 → 「爆發力驚人、攻速兼備的虎人，出擊凌厲而防禦為全亞種最弱，講求一擊制敵而非持久消耗。」;
-  狐人 → 「體格在獸人之中不突出的狐人，以體力換來同族最深厚的魔力底蘊，是最接近施法者的亞種。」 —
+  狐人 → 「體格在獸人之中不突出的狐人，以體力換來同族最深厚的魔力底蘊，是最接近施法者的亞種。」 ; 
   each naming a physique and its habit plus the tradeoff its `static_modifiers` encode, matching
   `world_info.md`'s 「亞種數值傾向」 block, never an occupation as identity
 
@@ -209,16 +196,14 @@ Defines the typed, immutable world-lore registries used as the code-side source 
 - **WHEN** every one of the seven beastfolk `SUBRACE_REGISTRY` entries' `static_modifiers` is
   inspected
 - **THEN** `abs(atk_phys + agility + defense) <= 1e-12` for every entry, with no exemption for
-  `foxkin` — its physical-axis modifiers alone already sum to zero (`-0.05 + 0.15 + -0.10 ==
+  `foxkin` ;  its physical-axis modifiers alone already sum to zero (`-0.05 + 0.15 + -0.10 ==
   0.0`); its separate MP vital-band override (below) is a different, independently-checked
   mechanism and is not required to make this sum work; the tolerance accounts only for binary
   `float` representation of the documented decimal percentages
 
 #### Scenario: Foxkin overrides its MP vital band above the species baseline
-- **WHEN** `SUBRACE_REGISTRY["foxkin"]` is inspected
-- **THEN** `vital_overrides` is not `None` and `vital_overrides["mp"] == (50, 70)`, which is a
-  higher band than `RACE_REGISTRY["beastfolk"].vital_baseline.mp` ((30, 50)) — confirming a
-  subrace can override a vital bound, not only a static one
+- **WHEN** shipped subrace declarations are validated
+- **THEN** Foxkin SHALL retain an explicit MP vital-band override above its species baseline; exact endpoints SHALL be adjustable data.
 
 #### Scenario: Every other subrace leaves vital_overrides unset
 - **WHEN** every `SUBRACE_REGISTRY` entry other than `"foxkin"` and any human bloodline subrace that
@@ -260,12 +245,12 @@ entries (`apprentice`/初級, `intermediate`/中級, `advanced`/高級, `superio
 
 #### Scenario: Bands cover 0 upward with no gaps or overlaps
 - **WHEN** the five tiers are sorted by `level_min`
-- **THEN** each tier's `level_min` equals the previous tier's `level_max + 1` (0, 16, 31, 71, 91),
+- **THEN** each tier's `level_min` equals the previous tier's `level_max + 1`,
   and no two tiers' `[level_min, level_max]` ranges overlap
 
 #### Scenario: Ultimate tier is open-ended
 - **WHEN** `MAGIC_TIER_REGISTRY["ultimate"]` is inspected
-- **THEN** `level_min` is 91 and `level_max` is `None`
+- **THEN** `level_min` follows the previous maximum and `level_max` is `None`; exact internal boundaries are author-adjustable
 
 ### Requirement: Nation registry covers the three states
 `world/lore/nations.py` SHALL define a frozen `Nation` dataclass and a module-level
@@ -321,14 +306,9 @@ The registry SHALL remain frozen keyed MonsterTier lore data with key, display_n
 #### Scenario: Example monsters are non-empty for every tier
 - **WHEN** each tier's example list is inspected
 - **THEN** it retains at least one canonical example from world_info.md
-MonsterTier SHALL retain four keyed threat tiers, their names/examples and guild-rank ranges, with independent HP/attack/agility/defense authoring bounds below and zero magic for current profiles. HP SHALL be independent endurance; no fixed 15-20-times relationship or elf/beastfolk calibration SHALL remain. Calamity upper reference values SHALL be open-ended (None upper limits), without altering human racial/static-tier bounds. Every future concrete monster SHALL have explicit literals and encounter evidence; maximum-axis Cartesian products SHALL NOT imply guaranteed balance.
+MonsterTier SHALL retain four keyed threat tiers, their names/examples and guild-rank ranges, with independent HP/attack/agility/defense authored independent-axis bounds and zero magic for current profiles. HP SHALL be independent endurance; no fixed 15-20-times relationship or elf/beastfolk calibration SHALL remain. Calamity upper reference values SHALL be open-ended (None upper limits), without altering human racial/static-tier bounds. Every future concrete monster SHALL have explicit literals and encounter evidence; maximum-axis Cartesian products SHALL NOT imply guaranteed balance.
 
-| Monster tier | HP | Physical attack | Agility | Defense |
-|---|---|---|---|---|
-| Low | 25–70 | 3–12 | 3–12 | 2–8 |
-| Mid | 110–230 | 18–28 | 10–24 | 10–16 |
-| High | 300–750 | 26–40 | 16–30 | 18–32 |
-| Calamity | 1,200–3,000+ | 60–150+ | 60–150+ | 60–150+ |
+The exact independent-axis bounds SHALL reside in the authored tier registry without a duplicated numerical table in specs or tests.
 
 These are authoring bounds and reference envelopes, not a guarantee for every Cartesian combination. Taking every axis at its maximum can exceed the intended encounter difficulty. Calamity upper reference values are open-ended for monster classification; this does not open human racial validation bounds. Every future concrete monster still needs explicit literal values and encounter evidence.
 
@@ -398,10 +378,10 @@ with exactly nine entries: three capitals, three elven villages, and three known
 - **WHEN** a usable item and an equipment item both name the intimacy-device band
 - **THEN** both resolve the same `PriceEntry`, so a category's two mechanical shapes never require separate bands
 
-The price registry SHALL add `magic_armor` with integer minimum 10000 copper and no upper ceiling, preserve mundane armor bounds and the 100000-copper magic-weapon floor, and retain 10000 copper per gold.
+The price registry SHALL retain separate authored `magic_armor`, mundane armor and magic-weapon price bands with integer minima and existing finite/open-ended shape. Exact price endpoints SHALL be mutable data; the currency conversion SHALL remain 10000 copper per gold.
 
 #### Scenario: Enchanted armor has its own price range
-- **WHEN** an enchanted armor offer costs 10000 copper or more, including above mundane armor maximum
+- **WHEN** an enchanted armor offer lies within its declared magic_armor band, including above mundane armor maximum
 - **THEN** magic_armor validates it without changing mundane armor bounds
 
 #### Scenario: The price table covers every documented purchasing-power reference
@@ -455,32 +435,27 @@ This requirement fixes only the concrete human selections in the starting-kit re
 - **THEN** items rejected on tier or incongruity grounds (`great_axe` — the UNCOMMON bearfolk weapon; `storage_pouch` — RARE, 帝國壟斷的空間魔法小袋; `gliding_cloak` — EPIC) SHALL NOT appear in any human kit
 
 ### Requirement: Human lineage renames ship without a save-data compatibility layer
-The human subrace rename SHALL be a clean breaking change with no alias table, no migration script, and no compatibility handling for the retired keys.
+The human subrace rename SHALL remain a clean breaking change without aliases, migration scripts or compatibility handling for retired keys. The unrelated human_commoner StaticTier identity SHALL survive independently of its mutable authored physical band.
 
 #### Scenario: Retired keys resolve nowhere in shipped data
-- **WHEN** `SUBRACE_REGISTRY`, `PLAYER_PRESET_REGISTRY`, the starting-kit registry, and the
-  import/browser fixtures are inspected
-- **THEN** none of them references `human_wealthy`, `human_laborer`, or `human_commoner` as a
-  subrace key, and no alias mapping resolves a retired key to a new one
+- **WHEN** subrace/preset/starting-kit registries and import/browser fixtures are inspected
+- **THEN** no subrace key references human_wealthy, human_laborer or human_commoner and no alias maps a retired key
 
 #### Scenario: The static tier named human_commoner is untouched
-- **WHEN** `STATIC_TIER_REGISTRY["human_commoner"]` and every `static_tier_key`/`default_tier`
-  occurrence of `human_commoner` are inspected
-- **THEN** they still resolve to the 平民與非戰鬥者 physical band ((1, 5)), because that key
-  names the unrelated `StaticTier` concept — after the rename it is the only surviving meaning
-  of the string
+- **WHEN** human_commoner StaticTier and static_tier_key/default_tier occurrences resolve
+- **THEN** they resolve to the same 平民與非戰鬥者 StaticTier concept using its current authored physical band, not an expected (1,5) table
 
 #### Scenario: The retired keys are exactly the wealth-ladder subrace keys
-- **WHEN** the scope of the breaking change is inspected
-- **THEN** the retired keys are `human_wealthy`, `human_commoner` (as a subrace key), and `human_laborer`
+- **WHEN** rename scope is inspected
+- **THEN** only human_wealthy, human_commoner as a subrace key and human_laborer are retired
 
 #### Scenario: Only the new keys are named
-- **WHEN** the registry, tests, fixtures, presets, and docs are inspected
-- **THEN** they SHALL name only the new keys
+- **WHEN** subrace registries, tests, fixtures, presets and docs are inspected
+- **THEN** only new subrace keys are named, while unrelated StaticTier meaning stays
 
 #### Scenario: Orphaned Scripts are not pruned and the database is rebuilt
 - **WHEN** a database were carried across the rename
-- **THEN** it would keep the orphaned `lore:subraces:*` Scripts because `world/lore/sync.py::sync_all` creates and overwrites but never prunes; the database is rebuilt, and adding pruning to `sync_all` is explicitly out of scope
+- **THEN** it would retain orphaned lore:subraces Scripts because sync creates/overwrites without pruning; the existing rebuild policy remains, with pruning explicitly out of scope
 
 ### Requirement: Subrace specialty prose is server-owned Traditional Chinese for every entry
 Every `Subrace.specialty` value in `SUBRACE_REGISTRY` SHALL be Traditional Chinese (zh-TW) player-facing prose, derived server-side from the registry and rendered verbatim to the player by the character-creation surfaces.

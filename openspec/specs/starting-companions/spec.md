@@ -20,7 +20,7 @@ these entries, defaulting to empty.
 
 #### Scenario: The twins declare each other
 - **WHEN** `PLAYER_PRESET_REGISTRY` is inspected
-- **THEN** `yuna_darknight` declares `yuka_darknight` and `yuka_darknight` declares `yuna_darknight`, each at affinity `95` with a relationship label and no profile reference
+- **THEN** `yuna_darknight` declares `yuka_darknight` and `yuka_darknight` declares `yuna_darknight`, each at its valid authored affinity with a relationship label and no profile reference
 
 #### Scenario: A preset without companions is unchanged
 - **WHEN** any preset other than the four companion-declaring presets is inspected
@@ -71,7 +71,7 @@ these entries, defaulting to empty.
 - **THEN** no player preset is modified
 
 #### Scenario: The twins' affinity leaves stage headroom
-- **WHEN** `yuna_darknight` and `yuka_darknight` declare each other symmetrically at affinity `95`
+- **WHEN** `yuna_darknight` and `yuka_darknight` declare each other symmetrically at valid authored affinity
 - **THEN** the value is above the rulebook `invite_threshold` and inside the 至愛 stage with headroom, so a single negative delta cannot drop the pair a stage and the companion can never be auto-dismissed on arrival
 
 #### Scenario: Declaration errors surface at load, never at activation

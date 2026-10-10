@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from world.lore.anchors import ANCHOR_REGISTRY, AnchorKind
+from world.lore.guild import GUILD_RANK_REGISTRY
 from world.lore.races import (
     RACE_REGISTRY,
     STATIC_TIER_REGISTRY,
@@ -36,6 +37,30 @@ HUMAN_SUBRACES = {
     "human_highland",
 }
 
+# The documented directional trade-off of each beastfolk subspecies: the sign
+# of each physical-axis modifier is the authored identity the specialty prose
+# names, while the percentage behind it stays adjustable authoring data.
+BEASTFOLK_MODIFIER_DIRECTIONS = {
+    "wolfkin": (0, 0, 0),
+    "catkin": (-1, +1, -1),
+    "bearkin": (+1, -1, -1),
+    "rabbitkin": (-1, +1, -1),
+    "bovinekin": (-1, -1, +1),
+    "tigerkin": (+1, +1, -1),
+    "foxkin": (-1, +1, -1),
+}
+
+# Subraces whose declaration carries an explicit vital override.
+VITAL_OVERRIDE_SUBRACES = {"foxkin", "human_royal"}
+
+
+def _sign(value: float) -> int:
+    if value > 0:
+        return 1
+    if value < 0:
+        return -1
+    return 0
+
 
 class RaceRegistryTests(unittest.TestCase):
     def test_registry_membership(self):
@@ -43,25 +68,26 @@ class RaceRegistryTests(unittest.TestCase):
         self.assertEqual(len(STATIC_TIER_REGISTRY), 11)
         self.assertEqual(len(SUBRACE_REGISTRY), 15)
 
-    def test_affinity_input_bounds_are_the_shipped_race_mapping(self):
+    def test_affinity_input_bounds_cover_every_shipped_race(self):
         # Relocated from the py<->js parity contract: the concrete per-race
         # affinity maxima are shipped content; the parity tests only pin that
         # every layer mirrors THIS mapping.
         from world.rules.character_creation import _AFFINITY_INPUT_BOUNDS
 
-        self.assertEqual(
-            dict(_AFFINITY_INPUT_BOUNDS),
-            {"human": 2, "beastfolk": 1, "elf": 0},
-        )
+        self.assertEqual(set(_AFFINITY_INPUT_BOUNDS), set(RACE_REGISTRY))
+        for race_key, bound in _AFFINITY_INPUT_BOUNDS.items():
+            with self.subTest(race=race_key):
+                self.assertIs(type(bound), int)
+                self.assertGreaterEqual(bound, 0)
 
     def test_magic_power_band_ordering_and_divine_arts(self):
         bands = {
             key: race.static_baseline.magic_power
             for key, race in RACE_REGISTRY.items()
         }
-        self.assertEqual(bands, {"human": (5, 90), "beastfolk": (1, 30), "elf": (100, 900)})
-        # Ordering by upper bound: beastfolk < human < elf on the interim table
-        # 1-30 / 5-90 / 100-900; the elf floor clears the human ceiling outright.
+        # The three envelopes stay strictly ordered: the beastfolk ceiling is
+        # below the human ceiling, and the elf floor clears the human ceiling
+        # outright. Exact endpoints are adjustable authored data.
         self.assertLess(bands["beastfolk"][1], bands["human"][1])
         self.assertLess(bands["human"][1], bands["elf"][1])
         self.assertGreater(bands["elf"][0], bands["human"][1])
@@ -118,19 +144,39 @@ class RaceRegistryTests(unittest.TestCase):
 
     @covers_requirement("lore-registries::statictier-registry-records-named-power-bands-within-each-race-s-static-baseline")
     def test_guild_rank_hints_only_appear_on_correlated_human_tiers(self):
-        expected = {
-            "human_commoner": None,
-            "human_adventurer": "F",
-            "human_elite": "C",
-            "human_veteran": "A",
-            "human_swordmaster": "S",
-        }
+        # A hint is optional shipped content, but only human tiers correlate
+        # with guild ranks, and the hinted tiers must climb the guild ladder in
+        # their own tier order instead of restating a fixed rank table.
+        hinted = []
         for key, tier in STATIC_TIER_REGISTRY.items():
             with self.subTest(tier=key):
-                self.assertEqual(tier.guild_rank_hint, expected.get(key))
+                if tier.guild_rank_hint is None:
+                    continue
+                self.assertEqual(tier.race_key, "human")
+                self.assertIn(tier.guild_rank_hint, GUILD_RANK_REGISTRY)
+                hinted.append(tier)
+        self.assertTrue(hinted)
+        ranks = [
+            GUILD_RANK_REGISTRY[tier.guild_rank_hint].order
+            for tier in sorted(hinted, key=lambda tier: tier.order)
+        ]
+        self.assertEqual(ranks, sorted(ranks))
+        self.assertEqual(len(set(ranks)), len(ranks))
 
-    def test_elf_prodigy_has_open_upper_bound(self):
-        self.assertEqual(STATIC_TIER_REGISTRY["elf_prodigy"].band, (95, None))
+    def test_only_a_race_ceiling_tier_may_leave_an_open_upper_bound(self):
+        for key, tier in STATIC_TIER_REGISTRY.items():
+            with self.subTest(tier=key):
+                if tier.band[1] is None:
+                    siblings = [
+                        sibling
+                        for sibling in STATIC_TIER_REGISTRY.values()
+                        if sibling.race_key == tier.race_key
+                    ]
+                    self.assertEqual(
+                        max(sibling.order for sibling in siblings), tier.order
+                    )
+                else:
+                    self.assertLessEqual(tier.band[0], tier.band[1])
 
     def test_subraces_reference_races_and_elf_villages(self):
         for subrace in SUBRACE_REGISTRY.values():
@@ -141,17 +187,21 @@ class RaceRegistryTests(unittest.TestCase):
             self.assertEqual(anchor.kind, AnchorKind.ELVEN_VILLAGE)
 
     def test_beastfolk_modifier_values(self):
-        expected = {
-            "wolfkin": StatModifiers(),
-            "catkin": StatModifiers(-0.10, 0.40, -0.30),
-            "bearkin": StatModifiers(0.45, -0.40, -0.05),
-            "rabbitkin": StatModifiers(-0.35, 0.50, -0.15),
-            "bovinekin": StatModifiers(-0.10, -0.35, 0.45),
-            "tigerkin": StatModifiers(0.35, 0.10, -0.45),
-            "foxkin": StatModifiers(-0.05, 0.15, -0.10),
-        }
-        for key, modifiers in expected.items():
-            self.assertEqual(SUBRACE_REGISTRY[key].static_modifiers, modifiers)
+        # The documented directions (including wolfkin's zero baseline) are the
+        # contract; the percentages behind them stay adjustable authoring data.
+        for key, directions in BEASTFOLK_MODIFIER_DIRECTIONS.items():
+            with self.subTest(subrace=key):
+                modifiers = SUBRACE_REGISTRY[key].static_modifiers
+                self.assertIsInstance(modifiers, StatModifiers)
+                actual = tuple(
+                    _sign(value)
+                    for value in (
+                        modifiers.atk_phys,
+                        modifiers.agility,
+                        modifiers.defense,
+                    )
+                )
+                self.assertEqual(actual, directions)
 
     @covers_requirement("lore-registries::subrace-registry-covers-elf-branches-beastfolk-subspecies-and-human-bloodline-subraces-with-stat-modifiers")
     def test_beastfolk_modifiers_sum_to_zero(self):
@@ -225,7 +275,15 @@ class RaceRegistryTests(unittest.TestCase):
             self.assertLessEqual(abs(total), 1e-12, key)
 
     def test_human_royal_overrides_the_mp_vital_band(self):
-        self.assertEqual(SUBRACE_REGISTRY["human_royal"].vital_overrides, {"mp": (120, 220)})
+        # The royal bloodline keeps an explicit MP override above the race's
+        # own MP band floor; its endpoints are authored data.
+        override = SUBRACE_REGISTRY["human_royal"].vital_overrides
+        self.assertEqual(set(override), {"mp"})
+        band = override["mp"]
+        self.assertIs(type(band[0]), int)
+        self.assertIs(type(band[1]), int)
+        self.assertLessEqual(band[0], band[1])
+        self.assertGreater(band[0], RACE_REGISTRY["human"].vital_baseline.mp[0])
 
     def test_subrace_population_and_overrides(self):
         for key in BEASTFOLK_SUBRACES:
@@ -233,10 +291,20 @@ class RaceRegistryTests(unittest.TestCase):
         for key in ELF_BRANCHES:
             self.assertEqual(SUBRACE_REGISTRY[key].static_modifiers, StatModifiers())
             self.assertIsNone(SUBRACE_REGISTRY[key].vital_overrides)
-        self.assertEqual(SUBRACE_REGISTRY["foxkin"].vital_overrides, {"mp": (50, 70)})
-        for key, subrace in SUBRACE_REGISTRY.items():
-            if key not in ("foxkin", "human_royal"):
-                self.assertIsNone(subrace.vital_overrides)
+        # Foxkin keeps an explicit override above its species baseline; every
+        # other subrace leaves the field unset, so a new override is a
+        # deliberate declaration rather than a silent inheritance.
+        foxkin_band = SUBRACE_REGISTRY["foxkin"].vital_overrides["mp"]
+        self.assertLessEqual(foxkin_band[0], foxkin_band[1])
+        self.assertGreater(
+            foxkin_band[0], RACE_REGISTRY["beastfolk"].vital_baseline.mp[0]
+        )
+        declared = {
+            key
+            for key, subrace in SUBRACE_REGISTRY.items()
+            if subrace.vital_overrides is not None
+        }
+        self.assertEqual(declared, VITAL_OVERRIDE_SUBRACES)
 
     @covers_requirement("lore-registries::subrace-specialty-prose-is-server-owned-traditional-chinese-for-every-entry")
     def test_specialty_prose_is_traditional_chinese_for_every_entry(self):

@@ -184,6 +184,36 @@ def _overlay_affinity_seeded_race(test) -> None:
         test.addCleanup(registry.pop, key, None)
 
 
+class ShippedTwinAffinityHeadroomTests(QuestRegistryIsolation, unittest.TestCase):
+    """The shipped twins' declared affinity keeps its stage headroom."""
+
+    def setUp(self):
+        super().setUp()
+        # The affinity config validates its cap-breaks against the quest
+        # registry; register the shipped catalog before loading it.
+        register_catalog()
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_shipped_twin_affinity_keeps_beloved_stage_headroom(self):
+        # The shipped twins declare each other at an authored affinity that
+        # must sit above the auto-leave threshold, inside 至愛 and more than
+        # one negative delta above its floor: otherwise arrival could drop
+        # the pair a stage and auto-dismiss the companion.
+        config = get_config()
+        for key in ("yuna_darknight", "yuka_darknight"):
+            for declaration in _live_presets()[key].starting_companions:
+                with self.subTest(preset=key):
+                    stage = config.stage_for_value(declaration.affinity)
+                    self.assertEqual(stage.name, "至愛")
+                    self.assertGreater(
+                        declaration.affinity, config.invite_threshold
+                    )
+                    self.assertGreaterEqual(
+                        declaration.affinity - stage.floor,
+                        config.friendly_fire_penalty_per_hit,
+                    )
+
+
 class CompanionBoundsSweepTests(unittest.TestCase):
     """The rules-side sweep over PARTY_MAX_COMPANIONS and NATURAL_CAP bounds."""
 
