@@ -79,7 +79,9 @@ describe("the command region collapses in dialogue mode (store keys)", () => {
 
   it("keeps the exploration overview as the dock's only frame and shows it again on leaving", () => {
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.rootMenu.items.map((item) => item.key)).toContain("exit-east");
+    expect(store.view.rootMenu.items.map((item) => item.key)).toContain("target-7");
+    expect(store.view.rootMenu.items.map((item) => item.key)).not.toContain("exit-east");
+    expect(store.view.explorationExits.map((item) => item.key)).toContain("exit-east");
     store.receive(
       1,
       "ui_snapshot",
@@ -100,7 +102,6 @@ describe("the command region collapses in dialogue mode (store keys)", () => {
 
 describe("the collapsed dock keeps its ordinary form", () => {
   const ROOT_ITEMS = [
-    { key: "exit-east", label: "西風酒館", enabled: true },
     { key: "target-7", label: "店長", enabled: true },
     { key: "wait", label: "等待／休息", enabled: true },
   ];

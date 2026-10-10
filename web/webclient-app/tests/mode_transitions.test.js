@@ -184,7 +184,7 @@ describe("AppClient live mode changes", () => {
     expect(leaving[0].classes()).toContain("actor-enter-leave-active");
   });
 
-  it("leaving dialogue focuses the returning dock without scrolling any ancestor", async () => {
+  it("leaving dialogue focuses the returning dock's compass without scrolling any ancestor", async () => {
     // The command region starts its return beyond the stage's right edge, so
     // a plain focus() would scroll an ancestor towards it and drag the whole
     // stage sideways; the dock takes focus with `preventScroll`.
@@ -199,13 +199,17 @@ describe("AppClient live mode changes", () => {
       await nextTick();
       await nextTick();
       await nextTick();
+      // Re-entering exploration hands focus on to the exit compass inside
+      // the dock (exploration-exit-compass); every focus call on the way —
+      // the dock's rescue and the compass's — avoids scrolling.
       const dock = document.getElementById("action-dock");
-      expect(document.activeElement).toBe(dock);
-      const dockCalls = focus.mock.contexts
+      const compass = dock.querySelector('[data-testid="exit-compass"]');
+      expect(document.activeElement).toBe(compass);
+      const homeCalls = focus.mock.contexts
         .map((context, index) => [context, focus.mock.calls[index]])
-        .filter(([context]) => context === dock);
-      expect(dockCalls.length).toBeGreaterThan(0);
-      for (const [, args] of dockCalls) {
+        .filter(([context]) => context === dock || context === compass);
+      expect(homeCalls.length).toBeGreaterThan(0);
+      for (const [, args] of homeCalls) {
         expect(args[0]).toEqual({ preventScroll: true });
       }
     } finally {

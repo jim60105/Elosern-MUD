@@ -4,7 +4,7 @@
 // feedback it stops on, the shared readout's state, and the minimap's aimed
 // node. The compass itself (ExitCompass.vue) sends nothing; this composable
 // is the only place its `move` reaches the store.
-import { computed, getCurrentScope, onScopeDispose, ref, watch } from "vue";
+import { computed, getCurrentScope, nextTick, onScopeDispose, ref, watch } from "vue";
 import { resolveTargets } from "../components/compass-model.js";
 import {
   FLASH_MS,
@@ -139,6 +139,42 @@ export function useExitCompass(store, { panel, compassRef }) {
     const target = readout.aim.value?.target;
     return target && target.destinationOnMap ? target.destination : null;
   });
+
+  // Entering exploration focuses the compass (redesign §5.4). The shell
+  // hands focus over on a mode change into exploration; this covers the
+  // compass's first appearance in an exploration stretch (the session's first
+  // snapshot, whose mode never "changes"). Only focus that sits nowhere (the
+  // body, a removed element) or on the dock itself moves; later re-mounts in
+  // the same stretch (returning from the waiting frame) leave focus to the
+  // router's path.
+  let entered = false;
+  watch(
+    () => store.view.mode,
+    (mode) => {
+      if (mode !== "exploration") {
+        entered = false;
+      }
+    },
+  );
+  watch(
+    compassRef,
+    async (compass) => {
+      if (!compass || entered || store.view.mode !== "exploration") {
+        return;
+      }
+      entered = true;
+      await nextTick();
+      if (typeof document === "undefined") {
+        return;
+      }
+      const active = document.activeElement;
+      const dock = document.getElementById("action-dock");
+      if (!active || active === document.body || active === document.documentElement || !active.isConnected || active === dock) {
+        compass.focus();
+      }
+    },
+    { flush: "post" },
+  );
 
   return {
     compassTargets: targets,

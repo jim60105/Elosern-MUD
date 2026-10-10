@@ -14,7 +14,9 @@
 //
 // The chrome is, top to bottom: the optional guidance line, the breadcrumb,
 // the scrolling body, and the shortcut-legend strip. The legend is the
-// single element carrying the `action-dock-description` hook.
+// single element carrying the `action-dock-description` hook; the
+// exploration panel carries none (exploration-exit-compass: its keys live in
+// the help overlay, and the compass needs the height).
 //
 // While a combat round plays by itself and locks the commands (`playback`),
 // the body carries a waiting cue over its top edge: a label, the existing
@@ -138,9 +140,11 @@ function onPaneActivate(payload) {
          markup — `數字鍵 1–9 ‧ <kbd>Enter</kbd> 執行 ‧ <kbd>Esc</kbd> 返回`
          with styled `<kbd>` elements. It is the single visible legend and the
          only element carrying the `action-dock-description` hook; it renders
-         in exploration, dialogue, and combat mode (never in creation mode). -->
+         in dialogue and combat mode (never in creation mode, and never in
+         exploration, whose bindings the help overlay lists:
+         exploration-exit-compass). -->
     <p
-      v-if="mode !== 'creation'"
+      v-if="mode !== 'creation' && mode !== 'exploration'"
       class="action-dock__legend"
       data-testid="action-dock-description"
     >

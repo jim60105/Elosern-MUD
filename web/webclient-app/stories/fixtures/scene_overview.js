@@ -57,19 +57,18 @@ export function explorationPanelFixture({ exits = [], targets = [], entities = [
   };
 }
 
-// The destination names the exit chips read: the `nodes` of the committed
-// local-map model (`destinationLabel` reads only `id` and `label`).
+// A minimal local-map model carrying only destination names (`id` and
+// `label`, all `destinationLabel` reads), for the dialogue exits list.
 export function localMapFixture(nodes) {
   return { nodes: nodes.map(([id, label]) => ({ id, label })) };
 }
 
 // SceneOverview args: the overview menu exactly as the exploration root's
 // resolver will return it.
-export function overviewArgs(panel, { currentNode = "room:900", suggestions = null, localMap = null, focusedKey = null, active = true } = {}) {
+export function overviewArgs(panel, { currentNode = "room:900", suggestions = null, focusedKey = null, active = true } = {}) {
   return {
     menu: ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }),
     focusedKey,
-    localMap,
     active,
   };
 }

@@ -369,8 +369,33 @@ watch(
         restoreFocusHome();
       }
     }
+    if (nextMode === "exploration" && prevMode !== "exploration") {
+      focusExplorationEntry();
+    }
   },
 );
+
+// Entering exploration focuses the exit compass (exploration-exit-compass,
+// redesign §5.4): once the exploration pane has rendered, focus that sits on
+// the dock itself or fell out of the layout moves to the compass. Focus the
+// player put elsewhere (the command field, a drawer, an overlay) stays. Every
+// other return path keeps the dock as the focus home, so the router's arrow
+// keys keep walking the overview's chips after a popover or drawer closes.
+async function focusExplorationEntry() {
+  await nextTick();
+  if (props.mode !== "exploration") {
+    return;
+  }
+  const active = document.activeElement;
+  const dock = document.getElementById("action-dock");
+  if (!(focusIsLost(active) || active === dock)) {
+    return;
+  }
+  const compass = dock?.querySelector?.('[data-testid="exit-compass"]');
+  if (compass && typeof compass.focus === "function") {
+    compass.focus({ preventScroll: true });
+  }
+}
 
 // Pre-flush focus rescue for data-driven vitals island hide (design D3):
 // when the island hides outside combat (all vitals full and conditions cleared),

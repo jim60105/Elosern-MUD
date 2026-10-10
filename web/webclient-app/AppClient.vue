@@ -16,6 +16,8 @@ import DockVerbPopover from "./components/DockVerbPopover.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
 import SceneOverview from "./components/SceneOverview.vue";
+import ExitCompass from "./components/ExitCompass.vue";
+import ExplorationReadout from "./components/ExplorationReadout.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
 import CharacterStatusDrawer from "./components/CharacterStatusDrawer.vue";
 import HudDrawer from "./components/HudDrawer.vue";
@@ -89,6 +91,8 @@ const {
   npcPersonaEditor, npcPersonaSetField, npcPersonaSave, npcPersonaReload, npcPersonaDiscard,
   npcPersonaRetry, npcPersonaClose,
   onSkillUse, skillUseDockShown, skillUseLocked,
+  compassRef, compassTargets, compassArrivalKey, compassBusy, compassActive,
+  readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The dialogue host's standing portrait (webclient-dialogue-stage-actors
 // D2): the committed `art` panel's raw catalog entry named by the committed
@@ -390,6 +394,7 @@ function onFoeLineupGone() {
         <LocalMap
           v-if="store.view.localMapModel"
           :local-map="store.view.localMapModel"
+          :aimed-node="aimedNode"
           :motion-level="store.view.motionLevel"
           @move="onMapMove"
           @open-map="onMapExpand"
@@ -431,7 +436,13 @@ function onFoeLineupGone() {
           @back="onDockBack"
           @skip="store.skipBeats"
         >
-          <div class="dock-pane-host" :class="{ 'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' || skillUseDockShown }">
+          <div
+            class="dock-pane-host"
+            :class="{
+              'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' || skillUseDockShown,
+              'dock-pane-host--exploration': overviewShown && !waitOpen,
+            }"
+          >
             <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
               <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
                 <h3>等待直到黎明</h3>
@@ -450,19 +461,47 @@ function onFoeLineupGone() {
               </article>
               <button type="button" class="waiting-back" @keydown.enter.stop @keydown.space.stop @click="onDockBack">返回上一層</button>
             </section>
-            <!-- The exploration dock's root frame (webclient-scene-overview-
-                 swap D4): one scene overview — chip rows for exits, people,
-                 and objects, plus the footer. Under a target's verb popover
-                 it stays rendered as inert ancestor chrome. -->
-            <SceneOverview
+            <!-- The exploration dock's root pane (exploration-exit-compass
+                 design D5): the exit compass on the left, filling the panel
+                 height, and a right column holding the shared readout and
+                 the scene overview's 人物 / 物件 / footer chip rows (webclient-
+                 scene-overview-swap D4). Under a target's verb popover the
+                 pane stays rendered as inert ancestor chrome. -->
+            <div
               v-if="overviewShown"
-              :menu="overviewMenu"
-              :focused-key="overviewActive ? store.view.focus.key : overviewFocusKey"
-              :local-map="store.view.localMapModel"
-              :active="overviewActive"
-              @focus-change="onDockFocusChange"
-              @activate="onDockActivate"
-            />
+              class="exploration-root"
+              data-testid="exploration-root"
+            >
+              <div class="exploration-root__compass" :inert="!overviewActive || null">
+                <ExitCompass
+                  ref="compassRef"
+                  :targets="compassTargets"
+                  :busy="compassBusy"
+                  :arrival-key="compassArrivalKey"
+                  :active="compassActive"
+                  :motion-level="store.view.motionLevel"
+                  @aim="onCompassAim"
+                  @blocked="onCompassBlocked"
+                  @move="onCompassMove"
+                />
+              </div>
+              <div class="exploration-root__side">
+                <ExplorationReadout
+                  :lead="readoutContent.lead"
+                  :text="readoutContent.text"
+                  :tone="readoutContent.tone"
+                  :flash="readoutContent.flash"
+                  :motion-level="store.view.motionLevel"
+                />
+                <SceneOverview
+                  :menu="overviewMenu"
+                  :focused-key="overviewActive ? store.view.focus.key : overviewFocusKey"
+                  :active="overviewActive"
+                  @focus-change="onDockFocusChange"
+                  @activate="onDockActivate"
+                />
+              </div>
+            </div>
             <!-- The SkillBook casting flow (skillbook-authoritative-casting):
                  the book handed casting to the dock; its frames render here
                  with their own detail card. -->
@@ -805,5 +844,41 @@ function onFoeLineupGone() {
   flex: 1;
   min-height: 0;
   align-items: flex-start;
+}
+
+/* The exploration root pane (exploration-exit-compass design D5): the
+   compass fills the pane's height on the left; the right column stacks the
+   readout over the overview's chip rows and is the one region that scrolls,
+   so the pane (and the command panel's box) never grows. */
+.dock-pane-host.dock-pane-host--exploration {
+  align-items: stretch;
+  height: 100%;
+}
+.exploration-root {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: calc(10px * var(--ui-scale));
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+}
+.exploration-root__compass {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  min-height: 0;
+  max-width: calc(220px * var(--ui-scale));
+}
+.exploration-root__side {
+  display: flex;
+  flex-direction: column;
+  gap: calc(8px * var(--ui-scale));
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: thin;
 }
 </style>

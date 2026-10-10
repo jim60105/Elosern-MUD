@@ -2,18 +2,16 @@
 // SceneOverview (AVG stage design §7; OpenSpec change
 // webclient-scene-overview-component, design D4): the exploration root of
 // the command panel. It renders the one overview menu of
-// `ExplorationMenu.overviewMenu` as labelled chip rows — 出口, 人物, 物件 —
-// and a label-less footer (查看房間 ‧ 等待／休息 ‧ 建議), in the menu's
-// reading order. Chips wrap inside the panel; an absent section renders no
-// row and no label.
+// `ExplorationMenu.overviewMenu` as labelled chip rows — 人物, 物件 — and a
+// label-less footer (查看房間 ‧ 等待／休息 ‧ 建議), in the menu's reading
+// order. Chips wrap inside the panel; an absent section renders no row and
+// no label. The exits are not chips: the exit compass beside the overview
+// owns them (exploration-exit-compass).
 //
 // Every chip is a `DockMenuItem`, the dock's one shared row renderer, so the
 // `data-item-key` identity, the `<idPrefix>-<i>` row id, the focused fill,
 // and the focusable disabled state (its `（無法使用）` marker and its
-// `aria-describedby` reason) come from one definition. Exit chips carry the
-// direction glyph and, while enabled with a canonical direction and a known
-// destination, the destination's name (the exit outlet's headline rule).
-// The reason strip (`exploration-detail`) shows the focused chip's
+// `aria-describedby` reason) come from one definition. The reason strip (`exploration-detail`) shows the focused chip's
 // server-authored reason while that chip is disabled.
 //
 // The listbox is the surface's single tab stop while `active` (it carries
@@ -23,15 +21,13 @@
 // scrolls itself — the dock pane is the single scrolling region.
 import { computed, nextTick, ref, watch } from "vue";
 import DockMenuItem from "./DockMenuItem.vue";
-import { directionGlyph, disabledRowReason, exitLabel } from "./dock-exits.js";
+import { disabledRowReason } from "./dock-exits.js";
 import { dockItemKeys } from "./dock-items.js";
 
 const props = defineProps({
   // The resolved overview menu: `{items, sections, geometry, title}`.
   menu: { type: Object, required: true },
   focusedKey: { type: String, default: null },
-  // The committed `localMapModel`, for exit destination names.
-  localMap: { type: Object, default: null },
   idPrefix: { type: String, default: "exploration-row" },
   active: { type: Boolean, default: true },
 });
@@ -42,10 +38,6 @@ const listEl = ref(null);
 
 function reasonFor(item) {
   return disabledRowReason(item);
-}
-
-function chipLabel(item, isExit) {
-  return isExit ? exitLabel(item, props.localMap) : item.label;
 }
 
 const chips = computed(() => {
@@ -64,11 +56,10 @@ const rows = computed(() => {
   let start = 0;
   for (const section of sections) {
     const count = Math.max(0, section.count || 0);
-    const isExit = section.key === "exits";
     const slice = chips.value.slice(start, start + count).map((chip) => ({
       ...chip,
-      label: chipLabel(chip.item, isExit),
-      glyph: isExit ? directionGlyph(chip.item.direction) : null,
+      label: chip.item.label,
+      glyph: null,
       enabled: chip.item.enabled !== false,
       reason: reasonFor(chip.item),
     }));
