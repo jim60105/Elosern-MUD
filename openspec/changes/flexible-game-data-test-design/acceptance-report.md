@@ -113,7 +113,7 @@ are green in the focused runs recorded for packages A and C5.
 | `uv run --locked python -m tools.contract_gate` | passed: traceability, observability, test-data, shards and contracts (18 contract tests OK) |
 | `uv run --locked python -m tools.spec_traceability check` | 2077 requirements, 8470 associations, 2077 covered, 0 uncovered, 0 errors |
 | `uv run --locked python -m tools.test_data_lint check` | scanned 1244, flagged 96, quantity-pins 10, violations 0 (unchanged from the baseline) |
-| focused changed-suite runs | every module in the assertion-to-defect table above was run green in this change; the per-run counts are in the package commit messages and the three slice reports |
+| focused changed-suite runs | every module whose assertions were migrated in this change was run green; the per-run counts are in the package commit messages and the three slice reports. `world/maps/tests/test_city_movement_cost.py` appears in the mapping as an unchanged, already declaration-driven file and has no separately recorded focused run |
 | aggregate branch-coverage gate | CI-owned: the exact-root ≥80% gate combines the non-browser Evennia, managed-browser and top-level evidence files, and `tools.spec_traceability verify --evidence` is CI-only per AGENTS.md; no local substitute was fabricated |
 
 ## D.5 Reported, not waived
@@ -135,3 +135,25 @@ are green in the focused runs recorded for packages A and C5.
   expectations but is not in this change's inventory
   (`scope-inventory.md` / `test-migration.md`); it was left untouched and is
   reported here.
+- `tools/test_data_lint_seed.json` still lists flat module paths
+  (`test_defeat_aftermath_core.py`, `test_defeat_aftermath_violation.py`,
+  `test_sexual_act_effects.py`, `test_city_movement_cost.py`) from before those
+  suites became packages. The lint's stale-path check only covers
+  `debt_set | contract_paths`, so nothing fails; the entries are unvalidated
+  bookkeeping and pruning them is a separate seed-debt change, not this one.
+
+## D.6 Post-implementation critique and dispositions
+
+An independent critique ran over the finished change (all package commits plus
+the three parallel slices). It raised one blocking finding and four
+non-blocking observations; every one is dispositioned below, and every fix was
+re-verified with a focused run (`test_combat_modifiers` +
+`test_human_combat_calibration`, 99 tests OK).
+
+| Finding | Severity | Disposition |
+| --- | --- | --- |
+| `test_combat_modifiers.py` built percent expectations with `f"{value}%"` while production formats `f"{value:+g}%"`; an integral or positive tuned sum would have failed falsely | blocking | FIXED: all three expectations now use `f"{value:+g}%"`; the earlier partial critique's seven findings were checked again and remain fixed |
+| the martial-blessing test selected its church accrual row with an unanchored "first row with a magnitude", which dictionary order would decide once a second such row exists | non-blocking | FIXED without naming the shipped row id (the test-data lint rejects both the row id and a catalog symbol reference): the candidates are collected and their uniqueness is asserted, so a second magnitude-bearing row fails loudly |
+| the rewritten calibration probes no longer record the spec's "round medians" | non-blocking | FIXED: `_assert_probe_evidence` now records a round median and asserts only that it is inside the same 1..200 bound as the individual probes, never at a balance target |
+| this report overclaimed focused runs and did not mention the stale flat `seedDebtPaths` entries | non-blocking | FIXED here: the focused-run row names the exception (`test_city_movement_cost.py` is unchanged), and the stale seed entries are recorded in D.5 |
+| residual literal pins remain in `test_combat_session_recovery.py` and `test_defeat_aftermath_violation/test_archetype_and_rendering.py`, both outside this change's inventory | non-blocking | accepted, no change: they are pre-existing, disclosed in D.5, and are not regressions; they belong to whichever change next touches those capabilities |

@@ -586,7 +586,7 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "poisoned")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": f"{scaled}%"},
+            {"agility": f"{scaled:+g}%"},
         )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
@@ -604,7 +604,7 @@ class CombatModifierTests(EvenniaTestCase):
         self.assertEqual(
             evaluate_combat_modifiers(entity),
             {
-                "agility": f"{merged_agility}%",
+                "agility": f"{merged_agility:+g}%",
                 "accuracy": arousal.then["accuracy"],
                 "defense": rule.then["defense"],
             },
@@ -642,7 +642,7 @@ class CombatModifierTests(EvenniaTestCase):
             evaluate_combat_modifiers(entity),
             {
                 "actions_per_turn": fear_lock.then["actions_per_turn"],
-                "agility": f"{merged_agility}%",
+                "agility": f"{merged_agility:+g}%",
                 "accuracy": fear.then["accuracy"],
             },
         )
@@ -849,13 +849,17 @@ class CombatModifierTests(EvenniaTestCase):
         # row, not from the combat-modifier row's literal.
         from world.rules.church_rulebook import get_church_rules
 
-        # Resolved structurally: the shipped row id is catalog data this
-        # behavior test must not name.
-        row = next(
+        # The shipped row id is catalog data this behavior test must not name,
+        # so the row is selected structurally; the uniqueness assertion makes a
+        # second magnitude-bearing accrual row fail loudly instead of letting
+        # dictionary order decide the expectation.
+        candidates = [
             r
             for r in get_church_rules().accrual.values()
             if "magnitude" in r and r.get("skill_key")
-        )
+        ]
+        self.assertEqual(len(candidates), 1)
+        row = candidates[0]
         entity = self._entity()
         apply_buff(entity, "martial_blessing")
         self.assertEqual(
@@ -867,7 +871,13 @@ class CombatModifierTests(EvenniaTestCase):
         from world.rules.church_rulebook import get_church_rules
         entity = self._entity()
         apply_buff(entity, "martial_blessing")
-        martial_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "magnitude" in r and r.get("skill_key"))
+        candidates = [
+            r
+            for r in get_church_rules().accrual.values()
+            if "magnitude" in r and r.get("skill_key")
+        ]
+        self.assertEqual(len(candidates), 1)
+        martial_key = candidates[0]["skill_key"]
         mock_rules = type("MockChurchRules", (), {
             "accrual": {martial_key: {"stat": "defense", "magnitude": 15, "cooldown_seconds": 1800}},
             "passive_effects": get_church_rules().passive_effects,

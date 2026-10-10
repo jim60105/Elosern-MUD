@@ -346,6 +346,18 @@ class HumanCombatCalibrationTests(EvenniaTest):
                 or outcome.final_human_hps[0] < human.traits.hp.base,
                 "the real resolver must have changed a combatant's HP",
             )
+        # The recorded evidence includes a bounded round median: it must be a
+        # real executed run inside the same bound as the individual probes,
+        # never a balance target.
+        rounds = sorted(outcome.rounds for outcome in outcomes)
+        middle = len(rounds) // 2
+        median = (
+            rounds[middle]
+            if len(rounds) % 2
+            else (rounds[middle - 1] + rounds[middle]) / 2
+        )
+        self.assertGreaterEqual(median, 1, "the round median must be a real run")
+        self.assertLessEqual(median, 200, "the round median must stay bounded")
 
     @covers_requirement(
         "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
