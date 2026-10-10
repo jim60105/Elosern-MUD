@@ -85,6 +85,10 @@ The registries SHALL permit executable first-batch abilities only through explic
   registry field, a stored trait, or a placeholder value SHALL NOT stand in for it
 - **AND** no consumer SHALL be permitted to interpret narrative text as an available effect
 
+#### Scenario: sway_whistle_sparrow completes its executable boundary
+- **WHEN** this species' two approved kits are constructed
+- **THEN** `grain_shaking_peck` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
+
 #### Scenario: rock_echo_goat completes its executable boundary
 - **WHEN** this species' two approved kits are constructed
 - **THEN** `rock_echo_ram` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
