@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
+from ._journey_support import _combat_panel, _inject_snapshot, _wait_mode
 from .browser_helpers import (
     activate_overview_chip,
     focus_action_dock,
@@ -59,32 +60,32 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertIn("gradient", frame["feather"], "the band draws the seam feather")
             self.assertEqual(frame["edgeEvents"], "none", "the seam edge is pointer-inert")
             self.assertEqual(frame["featherEvents"], "none", "the seam feather is pointer-inert")
-            # The message controls and the shortcut legend share one strip:
-            # their vertical centres agree, and the pane ends above it.
-            strip = page.evaluate(
+            # The exploration command panel carries no key-hint legend
+            # (exploration-exit-compass): its bindings live in the help
+            # overlay, and the pane runs to the band's foot instead.
+            self.assertEqual(
+                page.locator('[data-testid="action-dock-description"]').count(),
+                0,
+                f"no legend in exploration {viewport}",
+            )
+            geometry = page.evaluate(
                 """() => {
-                  const mid = (s) => { const r = document.querySelector(s).getBoundingClientRect();
-                                       return (r.top + r.bottom) / 2; };
                   const pane = document.querySelector('.action-dock__pane').getBoundingClientRect();
-                  const legend = document.querySelector('.action-dock__legend').getBoundingClientRect();
-                  return { log: mid('[data-testid="message-log-open"]'),
-                           legend: mid('.action-dock__legend'),
-                           paneBottom: pane.bottom, legendTop: legend.top };
+                  const region = document.querySelector('[data-testid="anchor-band-command"]').getBoundingClientRect();
+                  const compass = document.querySelector('#action-dock [data-testid="exit-compass"]').getBoundingClientRect();
+                  return { paneBottom: pane.bottom, regionBottom: region.bottom,
+                           compassBottom: compass.bottom, compassTop: compass.top,
+                           paneTop: pane.top, compassWidth: compass.width, compassHeight: compass.height };
                 }"""
             )
-            self.assertLessEqual(abs(strip["log"] - strip["legend"]), 1.5, f"one baseline {viewport} {strip}")
-            self.assertLessEqual(strip["paneBottom"], strip["legendTop"] + 0.5, "rows end above the legend")
-            # The shortcut legend is the dock's own strip carrying the draft's
-            # markup (the single `action-dock-description` element), rendered
-            # below the scrolling body rather than in a tab bar
-            # (webclient-scene-overview-swap D3).
-            description = page.locator('[data-testid="action-dock-description"]').inner_text()
-            for keyword in ("數字鍵 1–9", "Enter 執行", "Esc 返回"):
-                self.assertIn(keyword, description)
-            # The exploration root is the scene overview: one frame of chips
-            # (exits, people, objects, and the footer) and NO combat list. The
-            # chip count varies with the room's exits and occupants, so only
-            # the floor is pinned.
+            self.assertLessEqual(geometry["paneBottom"], geometry["regionBottom"] + 0.5, f"{viewport} {geometry}")
+            self.assertGreaterEqual(geometry["compassTop"], geometry["paneTop"] - 0.5, f"{viewport} {geometry}")
+            self.assertLessEqual(geometry["compassBottom"], geometry["paneBottom"] + 0.5, f"{viewport} {geometry}")
+            self.assertAlmostEqual(geometry["compassWidth"], geometry["compassHeight"], delta=1)
+            # The exploration root is the exit compass beside the scene
+            # overview: one frame of chips (people, objects, and the footer)
+            # and NO combat list. The chip count varies with the room's
+            # occupants, so only the floor is pinned.
             self.assertEqual(
                 page.locator('#action-dock [data-pane-kind="commands"]').count(),
                 0,
@@ -96,7 +97,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 "the exploration root renders exactly one scene overview",
             )
             cells = page.locator("#action-dock [data-item-key]")
-            self.assertGreaterEqual(cells.count(), 3, "the overview renders its chips")
+            self.assertGreaterEqual(cells.count(), 2, "the overview renders its chips")
             # The focused chip carries the muted-gold fill (the `--focused`
             # class; webclient-desktop-shell: "The focused row or chip SHALL be
             # marked by a muted-gold fill plus a leading glyph") — the
@@ -157,13 +158,18 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
 
         The old visually-hidden ``action-dock-description`` duplicate was
         deleted: the dock's own legend strip IS the hook (webclient-scene-
-        overview-swap D3 re-homed it out of the tab bar, so it also shows in
-        combat). The legend names only implemented behaviour (1–9 pick rows,
+        overview-swap D3 re-homed it out of the tab bar). It shows in combat;
+        the exploration panel carries none (exploration-exit-compass). The legend names only implemented behaviour (1–9 pick rows,
         Enter activates, Esc pops one frame); the ``/`` focus binding stays
         implemented but the reference's legend does not advertise it, so
         neither does this one.
         """
         page = self.logged_in_page()
+        # The exploration panel shows no legend (exploration-exit-compass);
+        # combat keeps it.
+        self.assertEqual(page.locator(".action-dock__legend").count(), 0)
+        _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
+        _wait_mode(page, "combat")
         focus_action_dock(page)
         hint = page.locator(".action-dock__legend")
         # Exactly one legend element, and it carries the test hook.

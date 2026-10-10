@@ -24,6 +24,9 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    click_compass_exit,
+    compass_exit_point,
+    compass_target_refs,
     focus_action_dock,
     install_outbound_recorder,
     outbound_messages,
@@ -104,16 +107,13 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # Under the scene-overview dock (webclient-scene-overview-swap) the
-        # root frame renders the room's exits directly as chips keyed
-        # ``exit-<exit_ref>``. Clicking the first enabled exit dispatches
-        # ``explore.move`` exactly once — the identical router-submit path
-        # Enter takes on the same chip.
+        # The exploration root's exits are the exit compass's
+        # (exploration-exit-compass). Clicking the first enabled exit's pip
+        # dispatches ``explore.move`` exactly once — through the same store
+        # gate and submit handler Enter on the compass takes.
         move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
         self.assertTrue(move_rows, "expected at least one enabled move row")
-        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
-        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
-        self._click_row(page, exit_key)
+        click_compass_exit(page, move_rows[0]["exit_ref"])
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
             if sent_action_count(page, "explore.move") >= 1:
@@ -281,15 +281,14 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # The scene overview renders the room's exits directly as chips keyed
-        # ``exit-<exit_ref>``. Rapidly double-activating the first exit chip
-        # submits ``explore.move`` once; the immediate second activation is
-        # rejected (the in-flight lock, or the stale-row guard once the dock
-        # re-renders after the move), so exactly one action crosses the wire and
-        # no duplicated chips ever render.
-        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
-        self.assertTrue(move_rows, "expected at least one enabled move row")
-        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
+        # The scene overview's 查看房間 chip submits ``explore.look``.
+        # Rapidly double-activating it submits once; the immediate second
+        # activation is rejected (the in-flight lock, or the stale-row guard
+        # once the dock re-renders), so exactly one action crosses the wire
+        # and no duplicated chips ever render. (The exits are the exit
+        # compass's, whose rapid clicks queue one step by design.)
+        del panel
+        exit_key = "look-room"
         page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
         page.evaluate(
             """() => {
@@ -307,7 +306,7 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             }"""
         )
         page.wait_for_timeout(400)
-        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        self.assertEqual(sent_action_count(page, "explore.look"), 1)
         rows = self._rows(page)
         self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
         self.assertGreaterEqual(len(rows), 1)
@@ -320,20 +319,17 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # A genuine browser double-click on the first root exit chip (keyed
-        # ``exit-<exit_ref>``): the first click (detail 1)
-        # submits ``explore.move`` once; the second click of the gesture is
-        # suppressed by the in-flight lock (no second submit), so exactly one
-        # action crosses the wire.
-        move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
-        self.assertTrue(move_rows, "expected at least one enabled move row")
-        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
-        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
-        exit_row = page.locator(f'[data-item-key="{exit_key}"]')
-        self.assertEqual(exit_row.count(), 1)
-        exit_row.dblclick()
+        # A genuine browser double-click on the overview's 查看房間 chip: the
+        # first click (detail 1) submits ``explore.look`` once; the second
+        # click of the gesture is suppressed by the in-flight lock (no second
+        # submit), so exactly one action crosses the wire.
+        del panel
+        page.wait_for_selector('[data-item-key="look-room"]', timeout=15000)
+        look_row = page.locator('[data-item-key="look-room"]')
+        self.assertEqual(look_row.count(), 1)
+        look_row.dblclick()
         page.wait_for_timeout(400)
-        self.assertEqual(sent_action_count(page, "explore.move"), 1)
+        self.assertEqual(sent_action_count(page, "explore.look"), 1)
         rows = self._rows(page)
         self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
         self.assertGreaterEqual(len(rows), 1)
@@ -366,22 +362,22 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             },
         )
         before = sent_action_count(page)
-        # The overlay intercepts pointer events; a primary click dispatched on
-        # the first root exit chip (keyed ``exit-<exit_ref>``) must not submit
-        # anything while the offline overlay is up (the store is disconnected, so
-        # dispatchAction is rejected and no OOB action crosses the wire).
+        # The overlay intercepts pointer events; a primary press dispatched
+        # straight on the exit compass at the first exit's pip must not submit
+        # anything while the offline overlay is up (the store is disconnected,
+        # so dispatchAction is rejected and no OOB action crosses the wire).
         panel = self._exploration_panel(page)
         move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
         self.assertTrue(move_rows, "expected at least one enabled move row")
-        exit_key = "exit-" + str(move_rows[0]["exit_ref"])
-        self.assertEqual(page.locator(f'[data-item-key="{exit_key}"]').count(), 1)
+        x, y = compass_exit_point(page, move_rows[0]["exit_ref"])
         page.evaluate(
-            """() => {
-              const row = document.querySelector('[data-item-key="EXITKEY"]');
-              if (row) {
-                row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+            """([x, y]) => {
+              const pad = document.querySelector('#action-dock [data-testid="exit-compass-pad"]');
+              for (const type of ['pointermove', 'pointerdown', 'pointerup']) {
+                pad.dispatchEvent(new PointerEvent(type, {bubbles: true, button: 0, clientX: x, clientY: y}));
               }
-            }""".replace("EXITKEY", exit_key)
+            }""",
+            [x, y],
         )
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), before)
@@ -443,17 +439,21 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 install_outbound_recorder(page)
                 panel = self._wait_exploration_available(page)
-                # The scene overview reads the room in section order, so the
-                # root's first chip is an exit (keyed ``exit-<exit_ref>``).
-                self.assertTrue(
-                    self._rows(page)[0].startswith("exit-"),
-                    f"expected an exit chip first, got {self._rows(page)[0]!r}",
+                # The room's exits are the exit compass's targets, never
+                # overview chips (exploration-exit-compass), and a mouse click
+                # on the first enabled exit's pip moves exactly once.
+                self.assertEqual(
+                    sorted(compass_target_refs(page)),
+                    sorted(str(r["exit_ref"]) for r in (panel.get("move") or [])),
                 )
+                self.assertFalse(any(key.startswith("exit-") for key in self._rows(page)))
                 move_rows = [r for r in (panel.get("move") or []) if r.get("enabled")]
                 if move_rows:
-                    exit_key = "exit-" + str(move_rows[0]["exit_ref"])
-                    page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
-                    self.assertIn(exit_key, self._rows(page))
+                    click_compass_exit(page, move_rows[0]["exit_ref"])
+                    deadline = time.monotonic() + 20
+                    while time.monotonic() < deadline and sent_action_count(page, "explore.move") < 1:
+                        page.wait_for_timeout(250)
+                    self.assertEqual(sent_action_count(page, "explore.move"), 1)
                 page.close()
 
 

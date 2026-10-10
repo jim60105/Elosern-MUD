@@ -334,10 +334,11 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
     """Activate one scene-overview chip by its keyboard key.
 
     The exploration dock's root frame is the scene overview
-    (webclient-scene-overview-swap, design D6): exits, people, objects, and
-    the footer render as one frame of chips keyed ``exit-<exit_ref>``,
-    ``target-<identity>``, ``entity-<identity>``, ``object-<identity>``,
-    ``look-room``, ``wait``, and ``suggestions``. This helper focuses the
+    (webclient-scene-overview-swap, design D6): people, objects, and the
+    footer render as one frame of chips keyed ``target-<identity>``,
+    ``entity-<identity>``, ``object-<identity>``, ``look-room``, ``wait``, and
+    ``suggestions``; the exits are the exit compass's
+    (``activate_compass_exit``). This helper focuses the
     dock, moves the keyboard router's focus onto that chip, and confirms it
     with Enter — the same path a keyboard user takes, with no pointer click
     and no direct store call.
@@ -368,18 +369,89 @@ def overview_target_with_affordance(page: Page, action_id: str) -> dict:
     raise AssertionError("the fixture must offer a target with %r" % (action_id,))
 
 
-def activate_first_overview_exit(page: Page, timeout: int = 30000) -> None:
-    """Activate the scene overview's first exit chip.
+def compass_target_refs(page: Page) -> list:
+    """The exit refs the exit compass renders, pips then portal beads."""
+    return page.evaluate(
+        """() => Array.from(document.querySelectorAll(
+          '#action-dock [data-testid="exit-compass-pip"], '
+          + '#action-dock [data-testid="exit-compass-portal"]'))
+          .map((el) => el.getAttribute('data-exit-ref'))"""
+    )
 
-    The 出口 row leads the overview's reading order, so the root frame's first
-    chip is the room's first exit: normalizing the stack to the root and
-    pressing Enter submits ``explore.move`` for it — the dock path that
-    replaced the retired 移動 submenu (webclient-scene-overview-swap).
+
+def aim_compass_exit(page: Page, exit_ref, timeout: int = 30000) -> None:
+    """Aim the exit compass at ``exit_ref`` with the keyboard.
+
+    The exploration dock's exits live on the exit compass
+    (exploration-exit-compass), not in the router's root frame. This helper
+    normalizes the stack to the root, focuses the compass (its one tab stop),
+    and presses ``]`` until the compass's ``data-aim-ref`` names the exit — the
+    path a keyboard user takes to reach any exit, however crowded its sector.
     """
     focus_action_dock(page, timeout=timeout)
     page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
+    compass = page.locator('#action-dock [data-testid="exit-compass"]')
+    compass.wait_for(state="visible", timeout=timeout)
+    compass.focus()
+    wanted = str(exit_ref)
+    for _ in range(len(compass_target_refs(page)) + 1):
+        if compass.get_attribute("data-aim-ref") == wanted:
+            return
+        page.keyboard.press("]")
+    raise AssertionError(
+        "the exit compass never aimed exit %r (targets %r)" % (wanted, compass_target_refs(page))
+    )
+
+
+def activate_compass_exit(page: Page, exit_ref, timeout: int = 30000) -> None:
+    """Aim the exit compass at ``exit_ref`` and move once with Enter.
+
+    A short Enter press is one discrete move: it submits ``explore.move`` with
+    the exit row's unchanged payload through the store's exit gate.
+    """
+    aim_compass_exit(page, exit_ref, timeout=timeout)
     page.keyboard.press("Enter")
     page.wait_for_timeout(80)
+
+
+def compass_exit_point(page: Page, exit_ref, timeout: int = 30000) -> tuple:
+    """The viewport point at the centre of ``exit_ref``'s pip or portal bead."""
+    target = page.locator(
+        '#action-dock [data-testid="exit-compass"] [data-exit-ref="%s"]' % exit_ref
+    ).first
+    target.wait_for(state="visible", timeout=timeout)
+    box = target.bounding_box()
+    if not box:
+        raise AssertionError("the exit compass target %r has no box" % (exit_ref,))
+    return (box["x"] + box["width"] / 2, box["y"] + box["height"] / 2)
+
+
+def click_compass_exit(page: Page, exit_ref, timeout: int = 30000) -> None:
+    """Click the exit compass at ``exit_ref``'s pip (or portal bead).
+
+    A real mouse hover-aims the pad, and a press shorter than the hold
+    threshold moves once on release (exploration-exit-compass).
+    """
+    x, y = compass_exit_point(page, exit_ref, timeout=timeout)
+    page.mouse.move(x, y)
+    page.mouse.down()
+    page.mouse.up()
+    page.wait_for_timeout(80)
+
+
+def activate_first_compass_exit(page: Page, timeout: int = 30000) -> None:
+    """Move through the committed room's first exit on the exit compass.
+
+    The first exit is the first ``move`` row of the committed exploration
+    panel (payload order), the one the retired overview's first exit chip
+    carried; it is reached by the compass's keyboard cycle and moved through
+    with Enter (exploration-exit-compass).
+    """
+    panel = (store_state(page).get("panels") or {}).get("exploration") or {}
+    rows = panel.get("move") or []
+    if not rows:
+        raise AssertionError("the committed room offers no exit")
+    activate_compass_exit(page, rows[0]["exit_ref"], timeout=timeout)
 
 
 def open_command_line(page: Page, timeout: int = 30000) -> None:

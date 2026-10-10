@@ -218,6 +218,7 @@
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_collapses_the_band_and_stands_both_actors",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_choices_sit_over_the_stage_and_the_dock_collapses",
         "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_stage_journey_completes_by_keyboard",
+        "web.tests.browser.test_browser_exploration_dialogue.ExplorationBrowserTest.test_dialogue_exit_row_moves_with_the_committed_exit_payload",
         "web.tests.browser.test_harness.PortAllocationTests"
       ],
       "files_b": [
@@ -241,7 +242,9 @@
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_confirmed_action_disconnect_shows_no_uncertain_notice",
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_disconnect_after_submit_shows_uncertain_notice_no_retry",
         "web.tests.browser.test_browser_combat_rejection.CombatReconnectBrowserTest.test_reconnect_resumes_same_session_without_new_round",
-        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_preserves_the_saved_draft"
+        "web.tests.browser.test_browser_creation_reset_draft.ResetAndDraftJourneys.test_escape_preserves_the_saved_draft",
+        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_holding_a_direction_walks_until_a_dead_end",
+        "web.tests.browser.test_browser_exit_compass.ExitCompassBrowserTest.test_a_disabled_exit_reads_its_reason_from_the_readout"
       ]
     },
     {

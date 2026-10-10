@@ -22,7 +22,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    activate_first_overview_exit,
+    activate_first_compass_exit,
     activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
@@ -253,16 +253,15 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         """Walk through the dock from the plaza to the empty-ground room (the
         scripted transport-failure room, same journey as the surface file).
 
-        The flat Vue dock opens the Move submenu on the first Enter (the
-        exploration root's first item is "移動"), so the journey needs a second
-        Enter to select the focused destination row (前往測試空地, ``exit-44``)
-        and dispatch ``explore.move`` into the empty ground.
+        The room's first exit (前往測試空地, exit ``44``) is moved through on
+        the exit compass, which dispatches ``explore.move`` into the empty
+        ground.
         """
-        # The overview's first exit chip IS 前往測試空地: activating it
-        # dispatches explore.move straight from the root frame
-        # (webclient-scene-overview-swap), so the router stays at depth 1 and
-        # the suggestions section remains visible to the assertions.
-        activate_first_overview_exit(page)
+        # The compass's first exit IS 前往測試空地: moving through it
+        # dispatches explore.move without pushing a frame
+        # (exploration-exit-compass), so the router stays at depth 1 and the
+        # suggestions section remains visible to the assertions.
+        activate_first_compass_exit(page)
         self._wait_suggestions(page, "degraded")
 
     # -- journeys ------------------------------------------------------------
@@ -628,16 +627,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
 
         # Returning to the plaza through the dock regenerates: generating
-        # line, then ready. The flat Vue dock opens the Move submenu on the
-        # first Enter (the empty-ground root's first item is "移動"), so the
-        # journey needs a second Enter to select the focused "回到廣場" row and
-        # dispatch the return move. The generating line is transient (~1.5s),
-        # so the dispatch must happen while the Move submenu is open (before
-        # the menu re-homes to the plaza).
-        # The overview's first exit chip is 回到廣場: activating it dispatches
-        # the return move straight from the root frame, so the transient
-        # generating line stays visible to the assertion.
-        activate_first_overview_exit(page)
+        # line, then ready. The compass's first exit is 回到廣場: moving
+        # through it dispatches the return move without pushing a frame, so
+        # the transient generating line stays visible to the assertion.
+        activate_first_compass_exit(page)
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self._wait_suggestions(page, "ready")

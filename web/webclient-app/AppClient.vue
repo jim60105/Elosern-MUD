@@ -863,13 +863,16 @@ function onFoeLineupGone() {
   min-height: 0;
   height: 100%;
 }
+/* The compass column is as wide as the pane is tall: the pad is a square
+   sized to the band height minus the pane's padding (about 198 px at
+   1451x790). */
 .exploration-root__compass {
   display: flex;
   align-items: center;
   justify-content: center;
   height: 100%;
   min-height: 0;
-  max-width: calc(220px * var(--ui-scale));
+  aspect-ratio: 1 / 1;
 }
 .exploration-root__side {
   display: flex;

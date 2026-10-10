@@ -6,7 +6,9 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_compass_exit,
     activate_overview_chip,
+    compass_target_refs,
     fixture_home_node_id,
     focus_action_dock,
     install_outbound_recorder,
@@ -283,10 +285,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
+        # The exits are the exit compass's (exploration-exit-compass): the
+        # overview's chips start with the people.
         expected_root = [
-            "exit-" + str(row["exit_ref"]) for row in panel.get("move") or []
-        ]
-        expected_root += [
             "target-" + str(target["identity"]) for target in panel["interact"]
         ]
         expected_root += ["look-room", "wait"]
@@ -367,7 +368,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     )
     def test_keyboard_only_journey_walks_the_overview(self):
         """A pure arrows-and-Enter journey at 1451x790: the overview's chips
-        are reachable, an exit chip moves, a person chip opens the verb
+        are reachable, the exit compass moves, a person chip opens the verb
         popover (Escape returns with that chip focused), and a move from the
         minimap returns the dock to the new room's overview
         (webclient-scene-overview-swap, design D2/D6)."""
@@ -403,19 +404,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(page.locator('[data-testid="verb-popover"]').count(), 0)
 
-        # Arrows reach an exit chip — the 出口 row leads the reading order, so
-        # walking left from the restored person chip wraps onto an exit — and
-        # Enter submits explore.move for it.
-        for _ in range(12):
-            if str(store_state(page)["focus"]["key"]).startswith("exit-"):
-                break
-            _press(page, "ArrowLeft")
-        focused = store_state(page)["focus"]["key"]
-        self.assertTrue(
-            str(focused).startswith("exit-"),
-            "arrows must reach an exit chip (focus was %r)" % (focused,),
+        # The exits are on the exit compass beside the overview
+        # (exploration-exit-compass): every committed exit is a compass
+        # target, none is an overview chip, and the compass's keyboard cycle
+        # plus Enter submits explore.move for one.
+        self.assertEqual(
+            sorted(compass_target_refs(page)),
+            sorted(str(row["exit_ref"]) for row in exits),
         )
-        _press(page, "Enter")
+        self.assertEqual(
+            page.locator('#action-dock [data-testid="scene-overview"] [data-item-key^="exit-"]').count(),
+            0,
+        )
+        enabled_exit = next(row for row in exits if row.get("enabled"))
+        activate_compass_exit(page, enabled_exit["exit_ref"])
         self._wait_panel(
             page,
             "local_map",
@@ -445,7 +447,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # The minimap's own node control is the move path that bypasses the
         # dock entirely: a click on it submits the same explore.move the
-        # overview's exit chip would.
+        # exit compass would.
         node_id = page.evaluate(
             """() => {
               const lm = window.__elosernBridge.store.view.localMapModel;
