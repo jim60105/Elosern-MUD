@@ -230,6 +230,16 @@ APPROVED_ABILITY_LIMITS = {
     "tide_devouring_crocodile": "不能隔著整條河抽取魔力",
 }
 
+# Each delivered species whose contact kit has landed also publishes its
+# approved environment-independent contact clause, so the executable kit's
+# prose boundary is pinned beside the retained limit above.
+APPROVED_CONTACT_CLAUSES = {
+    "sway_whistle_sparrow": (
+        "近身時，牠會配合短促氣流啄擊，命中後使對手短暫分心；"
+        "此招不需要穀物，也不產生強風或擊退。"
+    ),
+}
+
 # No registry field may stand in for an ability seam.
 FORBIDDEN_SEAM_FIELDS = frozenset(
     {
@@ -327,6 +337,7 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently",
         "monster-resource-abilities::crocodile-ecology-documents-implemented-limits",
+        "monster-resource-abilities::穗鳴雀-public-ecology-reflects-the-completed-contact-kit",
     )
     def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
         for key in APPROVED_SPECIES:
@@ -340,10 +351,20 @@ class ApprovedBestiaryContentTests(unittest.TestCase):
                     species.published_ecology_zh,
                     "the approved ability boundary clause is missing",
                 )
+                contact_clause = APPROVED_CONTACT_CLAUSES.get(key)
+                if contact_clause is not None:
+                    self.assertIn(
+                        contact_clause,
+                        species.published_ecology_zh,
+                        "the approved contact clause is missing",
+                    )
                 self.assertNotEqual(
                     species.published_description_zh, species.published_ecology_zh
                 )
 
+    @covers_requirement(
+        "monster-resource-abilities::穗鳴雀-public-ecology-reflects-the-completed-contact-kit"
+    )
     def test_the_author_private_notes_keep_the_unknown_origin_boundary(self):
         for key in APPROVED_SPECIES:
             with self.subTest(species=key):

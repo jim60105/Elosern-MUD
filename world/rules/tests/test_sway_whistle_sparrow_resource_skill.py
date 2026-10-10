@@ -85,15 +85,20 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
 
     @covers_requirement(
         "monster-action-policy::skill-selection-differs-by-archetype-comparing-owned-skills-by-a-dice-free-expected",
+        "monster-action-policy::穗鳴雀-contact-kit-uses-existing-first-owned-policy-and-fallback",
         "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
         "monster-individual-construction::constructed-kits-and-depleted-resources-survive-reload-without-registry-resets",
         "monster-individual-construction::the-construction-entry-point-validates-the-declared-kit-and-behavior-binding",
+        "monster-individual-construction::穗鳴雀-construction-persists-both-approved-contact-kits",
         "monster-species-registry::the-approved-first-batch-profiles-and-grades-are-user-approved-literals",
         "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
         "monster-flee-policy::every-monster-behaviour-archetype-declares-a-validated-flee-threshold",
         "skill-identity-eligibility::stored-identity-determines-actor-qualification",
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
         "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
+        "monster-resource-abilities::穗鳴雀-owns-its-approved-contact-resource-ability",
+        "monster-resource-abilities::穗鳴雀-timed-modifier-follows-its-authored-recipient-and-lifetime",
+        "monster-resource-abilities::穗鳴雀-payment-and-atomicity-retain-the-shared-transaction",
     )
     def test_production_sparrow_variants_combat_buff_and_reload(self):
         # 1. Formally construct BOTH variants through the production entry point.
