@@ -1,0 +1,47 @@
+{
+  "baseline_groups": {
+    "openspec root metadata": {
+      "file_count": 1,
+      "sha256": "b815e082d44e63a46ba394fc72c4dbf85c191c3980434f44296ec66cdfc98a99"
+    },
+    "openspec/changes/archive/": {
+      "file_count": 4107,
+      "sha256": "94db57cc5d1df74d60a4303111b3fc1c5df6fe4dc1a176403c78dabeb018f048"
+    },
+    "openspec/changes/exploration-exit-compass/": {
+      "file_count": 6,
+      "sha256": "e1efacbc2e6a2463b17dea1274e6c4a4814de76afd3815fc76669a82479bc616"
+    },
+    "openspec/changes/exploration-presence-rail/": {
+      "file_count": 6,
+      "sha256": "cadd4d29a3e9729a76d9a7f9a384c8f3e8c6547850df35b75ed6be50ae4bb8ad"
+    },
+    "openspec/changes/exploration-room-actions/": {
+      "file_count": 7,
+      "sha256": "b42e39b3347e1e3a663ba9727302ef2097253c0d3a93fe2105c3638d6be177d9"
+    },
+    "openspec/changes/fog-mane-lynx-resource-skill/": {
+      "file_count": 8,
+      "sha256": "174c2cd7b8c958efd9415412ef81ccd0afaf6e436beada01a565624513882d7d"
+    },
+    "openspec/changes/ridge-burrow-hare-resource-skill/": {
+      "file_count": 8,
+      "sha256": "d61fcc7dc8da5dc6aafef34f5ebc78504b8c6c92414efef9fb98e9273f6e85a7"
+    },
+    "openspec/changes/rock-echo-goat-resource-skill/": {
+      "file_count": 8,
+      "sha256": "2167ac6523ad5c49d5b278f9d2f94123a72928f1c22d24d06a44d676902f1d7e"
+    },
+    "openspec/specs/": {
+      "file_count": 311,
+      "sha256": "4eb5bba331e2fcc819638ff896dd099f7be81bd31fe6382404dd2f9cc8efdc39"
+    }
+  },
+  "classified_test_files": 94,
+  "current_capabilities": 311,
+  "current_requirements": 2074,
+  "hash_algorithm": "sha256",
+  "head": "234dc1c4e57ab40a9e56703698df91327c10c49e",
+  "tree_hash_encoding": "sha256 of sorted path + TAB + file_sha256 + LF records; UTF-8",
+  "versioned_test_sources_screened": 1244
+}
