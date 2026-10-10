@@ -753,6 +753,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
     )
+    @covers_requirement(
+        "webclient-exit-compass::the-dialogue-screen-s-exits-list-stays-independent-of-the-exploration-root"
+    )
     def test_dialogue_exit_row_moves_with_the_committed_exit_payload(self):
         """exploration-exit-compass D9: the dialogue screen's `↦ 移動…` list
         reads the committed exit rows independently of the exploration router

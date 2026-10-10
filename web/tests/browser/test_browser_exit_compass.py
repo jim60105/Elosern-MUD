@@ -161,6 +161,11 @@ class ExitCompassBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
     )
+    @covers_requirement(
+        "webclient-exit-compass::continuous-movement-is-commit-driven",
+        "webclient-exit-compass::continuous-movement-stops-safely-with-a-reason",
+        "webclient-exit-compass::holding-a-pointer-press-on-an-angled-target-starts-a-walk",
+    )
     def test_holding_a_direction_walks_until_a_dead_end(self):
         """Holding ArrowUp on the compass walks north one committed room at a
         time — one move per arrival, never two in flight — and stops at the
@@ -213,6 +218,9 @@ class ExitCompassBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
+    )
+    @covers_requirement(
+        "webclient-exit-compass::the-compass-never-loosens-the-server-s-gate",
     )
     def test_a_disabled_exit_reads_its_reason_from_the_readout(self):
         """A disabled exit stays aimable: hovering or aiming it shows 無法通行

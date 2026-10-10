@@ -421,7 +421,12 @@ SHALL NEVER drop, clip, or reorder rows to fit a bound.
 - **THEN** the flattened row bounds apply to flattened totals, not to that count, which is separately bounded by the number of `SkillCategory` members plus exactly one — the extra slot carrying the presentation-only synthetic fallback group (category `"unknown"`) for keys absent from `SKILL_REGISTRY`, so an entity owning skills in every real category plus one unregistered key still renders
 
 ### Requirement: explore.move traverses a re-resolved Exit through the shared movement path
-The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref` (1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's current node ID equals `current_node` (the stale guard), re-resolve the Exit from the actor's location by the opaque `exit_ref`, re-check that the Exit's location and destination are valid and the `traverse` lock allows the actor, and invoke the Exit's own traversal method.
+
+The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref`
+(1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's
+current node, re-resolve the Exit by the opaque `exit_ref`, re-check its location, destination, and `traverse`
+lock, and invoke its own traversal method. Relocation SHALL be decided by the canonical node, never by the
+room object.
 
 #### Scenario: Keyboard movement charges the same 30 seconds as the command path
 - **WHEN** an actor submits `explore.move` with a valid `exit_ref` and matching `current_node` for a traversable exit
@@ -456,6 +461,11 @@ The production action registry SHALL register `explore.move`, whose payload SHAL
 #### Scenario: A successful move refreshes everything in one snapshot
 - **WHEN** an `explore.move` succeeds
 - **THEN** the adapter publishes a full snapshot at one newer revision so the location change, clock charge, map, header, and shop/quest state refresh together
+
+#### Scenario: Reused wilderness rooms report successful coordinate movement
+- **WHEN** traversal changes the actor's canonical wilderness coordinates while retaining the same room object
+- **THEN** the adapter reports `success` / `moved`, publishes the committed destination, and does not return `move_failed` solely because room identity is unchanged
+- **AND** a traversal whose canonical location node is unchanged still rejects `move_failed`, whatever the room object's identity
 
 ### Requirement: explore.look reuses the command appearance path
 The production action registry SHALL register `explore.look`, whose payload SHALL accept exactly one of `room` (the exact boolean true) or `target_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve `target_id` against the actor's current location's present contents when given, re-verify presence and ordinary display/access rules, and route the look through the same appearance path the `look` command uses.
@@ -721,27 +731,27 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 
 ### Requirement: The keyboard-first exploration dock roots at the scene overview and opens dialogue directly
 
-In exploration mode the exploration dock SHALL own the action-dock surface, and in dialogue mode it SHALL
-stay mounted, hidden with the collapsed command region (`webclient-contextual-hud`), with its router
-holding the same root; its root frame SHALL be one scene overview composed only from the validated
-`exploration` panel and the committed `context_actions` `suggestions` envelope, and the overview SHALL
-present the 出口, 人物, and 物件 rows and the footer in that reading order.
+The dock SHALL own the action-dock surface in exploration and stay mounted in dialogue, hidden with the
+collapsed command region (`webclient-contextual-hud`) under the same router root. Its root pane SHALL compose
+only the validated `exploration` panel, the committed `local_map` panel, and the committed `context_actions`
+`suggestions` envelope, presenting the exit compass (`webclient-exit-compass`) for movement beside a scene
+overview, with no 出口 row or root-frame exit item.
 
 #### Scenario: Move, Look, and dialogue complete without typed input
-- **WHEN** a player uses only arrows and Enter to activate an exit chip, then activates a scripted dialogue host's chip, chooses 交談, and then presses the digit of the first choice the dialogue surface offers
+- **WHEN** a player uses only the keyboard to aim an exit on the compass and press Enter, then activates a scripted dialogue host's chip, chooses 交談, and then presses the digit of the first choice the dialogue surface offers
 - **THEN** the browser submits exactly `explore.move`, then `explore.talk_open` with the host's identity, then `explore.talk_scripted` with the server-authored keyword ID, and the refreshed panels appear without a typed command
 
 #### Scenario: The overview shows exits, people, and objects in one frame
 - **WHEN** the committed exploration panel carries two exits, one dialogue host, and one object
-- **THEN** the dock's root frame renders the 出口 row with two exit chips, the 人物 row with the host's chip, the 物件 row with the object's chip, and the footer with 查看房間 and 等待／休息, all in one frame with no tab to switch
+- **THEN** the exits are the exit compass's two targets rather than an overview row: the dock's root pane renders the compass, and the overview beside it renders the 人物 row with the host's chip, the 物件 row with the object's chip, and the footer with 查看房間 and 等待／休息, all in one frame with no tab to switch and no 出口 row
 
 #### Scenario: An empty row is omitted
 - **WHEN** the committed exploration panel carries exits but no people and no objects
-- **THEN** the overview renders the 出口 row and the footer only, and no 人物 or 物件 label or empty row is present
+- **THEN** the overview renders the footer only, no 人物 or 物件 label or empty row is present, and the compass still renders
 
 #### Scenario: A disabled exit stays visible with its reason
-- **WHEN** the room has a locked exit and the player focuses its chip and presses Enter
-- **THEN** the chip is rendered disabled with its disabled marker, its server-authored reason is readable, and no `ui_action` is emitted
+- **WHEN** the room has a locked exit and the player aims it on the compass and presses Enter
+- **THEN** its target is rendered disabled, its server-authored reason is readable in the compass readout, and no `ui_action` is emitted
 
 #### Scenario: A person chip opens the verb popover in payload order
 - **WHEN** the player activates the chip of a target whose affordances are 交談, 交易, and 戰鬥 in that payload order
@@ -772,8 +782,8 @@ present the 出口, 人物, and 物件 rows and the footer in that reading order
 - **THEN** the commit that publishes the new room shows the new room's overview as the dock's only frame, and no chip, popover row, or waiting card from the previous room remains activatable
 
 #### Scenario: Arrow keys follow the chip rows
-- **WHEN** the overview has three exit chips and two person chips, focus is on the third exit chip, and the player presses ArrowRight, then ArrowUp
-- **THEN** ArrowRight moves focus to the first person chip, and ArrowUp moves focus to the first exit chip, because it keeps the chip's position within its row
+- **WHEN** the overview has three object chips and two person chips, focus is on the third object chip, and the player presses ArrowRight, then ArrowUp
+- **THEN** ArrowRight moves focus to the first footer chip, and ArrowUp moves focus to the object chip at the same position within its row, because arrow keys step through reading order and rows exactly as before the exit row left the overview
 
 #### Scenario: Escape closes the popover and restores the opener
 - **WHEN** a target's popover is open and the player presses Escape
@@ -804,9 +814,9 @@ present the 出口, 人物, and 物件 rows and the footer in that reading order
 - **THEN** the exploration dock synchronously unloads, unregisters its keyboard handlers, discards local selection and speech state, and only the combat dock owns action-dock focus
 
 #### Scenario: The 出口 row mirrors move rows in payload order
-- **WHEN** the overview renders the 出口 row
-- **THEN** it carries one chip per `move` row in payload order, and a disabled row stays visible as a disabled chip carrying its server-authored reason, never omitted
-- **AND** activating an enabled exit chip submits the unchanged `explore.move` payload
+- **WHEN** the compass resolves the committed exits, replacing the former 出口 row
+- **THEN** it carries one target per `move` row, and a disabled row stays a visible disabled target carrying its server-authored reason, never omitted
+- **AND** activating an enabled exit target submits the unchanged `explore.move` payload
 
 #### Scenario: The 人物 row pairs interact chips with look chips
 - **WHEN** the overview renders the 人物 row
@@ -832,11 +842,6 @@ present the 出口, 人物, and 物件 rows and the footer in that reading order
 #### Scenario: Chips wrap and the overview scrolls inside the command region
 - **WHEN** the overview's chips exceed the fixed command region's width or height
 - **THEN** chips wrap inside the region and an overview taller than the region scrolls inside it with the focused chip kept in view
-
-#### Scenario: Exit chips carry canonical glyphs and resolved destinations
-- **WHEN** an exit chip renders
-- **THEN** it carries the exit's direction glyph from the fixed table of canonical direction words and, while enabled, the destination's display name resolved from the committed `local_map` nodes
-- **AND** an exit label outside that table renders verbatim with no guessed direction, and a destination absent from the committed lattice falls back to the exit's own label
 
 #### Scenario: The verb popover is a child card over the inert overview
 - **WHEN** a target chip opens its verb popover
@@ -871,7 +876,7 @@ present the 出口, 人物, and 物件 rows and the footer in that reading order
 - **THEN** it ends with an enabled back row returning to its parent, so pointer and keyboard users backtrack through the identical router path, and Escape pops exactly one level and restores the parent frame's previously focused entry (the chip that opened the popover or the child frame)
 
 #### Scenario: A committed location change closes every child frame
-- **WHEN** the committed location changes — a move from an exit chip, the minimap, or a typed command
+- **WHEN** the committed location changes — a move from the exit compass, the minimap, or a typed command
 - **THEN** the dock returns to the overview: any open popover or child frame is closed in the same commit that publishes the new room, and no frame from the previous room remains activatable
 
 #### Scenario: A dialogue-mode commit collapses the dock's command region
@@ -899,6 +904,11 @@ present the 出口, 人物, and 物件 rows and the footer in that reading order
 #### Scenario: Service surfaces have no standalone Services root
 - **WHEN** the player reaches the guild or shop surfaces
 - **THEN** they are reached from the top navigation bar and from a target's `navigate` affordance instead of a standalone Services root, and the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged
+
+#### Scenario: Exit chips carry canonical glyphs and resolved destinations
+- **WHEN** the compass aims an exit
+- **THEN** the readout carries the exit's direction glyph from the fixed table of canonical direction words and, while enabled, the destination's display name resolved from the committed `local_map` nodes
+- **AND** an exit label outside that table is a portal that renders verbatim with no guessed direction, and a destination absent from the committed lattice falls back to the exit's own label
 
 ### Requirement: Portrait focus stays client-local against the art catalog seam
 Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that references entries in the server-authored art `portrait_catalog` when the art capability supplies one and `null` otherwise. The browser SHALL switch portrait focus only among verified catalog values emitted by the server, SHALL NOT construct portrait subject keys or URLs from entity data, and SHALL NOT send a focus mutation or input message.

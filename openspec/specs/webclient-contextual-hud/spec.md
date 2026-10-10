@@ -944,7 +944,7 @@ In combat mode the root SHALL render one vertical icon-and-label command list wi
 - **THEN** one root row renders and still requires its existing explicit confirmation
 
 ### Requirement: The dock's shortcut legend names only real keyboard behaviour and renders as one visible instance
-The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the scrolling region, in exploration and combat mode (never in creation mode, and never visibly in dialogue mode, where the strip is hidden with the collapsed command region). The legend SHALL render exactly once as visible content and SHALL be the only element carrying the legend's test hook; no root command list or pane SHALL carry a second copy.
+The action dock SHALL carry one shortcut-legend strip at the bottom of its content column, below the scrolling region, in combat mode (never in creation mode, and never visibly in dialogue mode, where the strip is hidden with the collapsed command region). The legend SHALL render exactly once as visible content and SHALL be the only element carrying the legend's test hook; no root command list or pane SHALL carry a second copy.
 
 #### Scenario: The legend matches the reference dock hint
 - **WHEN** the legend strip renders
@@ -956,29 +956,24 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 
 #### Scenario: Digits pick and confirm the frame's first nine entries
 - **WHEN** the dock owns keyboard focus (the key target is not editable) and the player presses `1`–`9`
-- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order — for the scene overview, its first nine chips in reading order: exits, then people, then objects, then the footer; a frame's `back` row takes the slot of its rendered position) and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
+- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order — for the scene overview, its first nine chips in reading order: people, then objects, then the footer; exits belong to the separate compass; a frame's `back` row takes the slot of its rendered position) and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
 
 #### Scenario: Digits outside the dock's claim fall through
 - **WHEN** dialogue mode holds — or a digit's entry does not exist (a frame with fewer rendered entries, dialogue mode, or the pre-session empty stack)
 - **THEN** in dialogue mode neither the dock's entries nor the keyboard router claims any digit: the digits `1`–`N` belong to the dialogue choice list while it holds focus, which handles them itself as "Dialogue choices appear centred over the stage after the line is fully read" defines; and an unclaimed digit falls through to the text / command-history path
 
 #### Scenario: The legend renders once
-- **WHEN** the dock renders in exploration or combat mode, at the overview, in a child frame, or at the combat root, and later the mode changes to dialogue
-- **THEN** exactly one element carries the shortcut-legend text and test hook, it is the dock's
-  legend strip, no root command list or pane renders a duplicate copy, and in dialogue mode the strip is hidden
-  with the command region and no other element shows a legend
+- **WHEN** the dock renders in combat mode and later changes to exploration or dialogue
+- **THEN** combat carries exactly one legend strip and no duplicate; exploration renders no legend element and dialogue keeps its strip hidden with the command region
 
 #### Scenario: The legend matches the reference wording and kbd structure
-- **WHEN** the dock renders its legend strip in exploration or combat mode
+- **WHEN** the dock renders its legend strip in combat mode
 - **THEN** the legend reads `數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回` with `Enter` and `Esc` rendered as
   styled `<kbd>` elements and no other key named
 
 #### Scenario: A digit picks its row
-- **WHEN** the scene overview holds three exit chips, two person chips, and one object chip, and the
-  player presses `5`, and later `6`, from a non-editable focus
-- **THEN** the `5` press focuses the second person chip and opens its popover exactly as `Enter`
-  would, once, and after Escape the `6` press focuses the object chip and submits its `explore.look`
-  once
+- **WHEN** the scene overview holds two person chips and one object chip beside a compass with three exit targets, and the player presses `2`, then after Escape presses `3`
+- **THEN** `2` opens the second person's popover once and `3` submits the object's `explore.look` once; compass targets occupy no digit slot
 
 #### Scenario: A digit beyond the frame's rows is unclaimed
 - **WHEN** the current dock frame has fewer rendered entries than the pressed digit and the command
@@ -1048,31 +1043,31 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 
 #### Scenario: The form set is fixed
 - **WHEN** the row region selects a form
-- **THEN** the forms are: exit, person, object, and footer chips for the scene overview; the verb popover's rows under a target head; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
+- **THEN** the forms are: person, object, and footer chips for the scene overview beside the exit compass; the verb popover's rows under a target head; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
 
 #### Scenario: Exploration frames never regress to grids or nav lists
 - **WHEN** any exploration frame renders
-- **THEN** it renders no exit-outlet grid and no navigation-row list: exits are chips of the scene overview, and a host's conversation topics are the dialogue surface's choices, never a dock frame
+- **THEN** it renders no exit-outlet grid and no navigation-row list: exits are targets of the separate compass, and a host's conversation topics are the dialogue surface's choices, never a dock frame
 
 #### Scenario: An enabled exit chip names direction by glyph and destination by text
-- **WHEN** an exit chip is enabled
-- **THEN** it renders the exit's direction as a leading glyph and its primary text is the destination's display name — never a repetition of the direction word or the exit's own label once a glyph already carries that meaning
+- **WHEN** the compass aims an enabled angled exit
+- **THEN** its pip marks the bearing and the shared readout names the committed destination with its octant glyph, without repeating a direction-word label
 
 #### Scenario: Direction glyphs come only from the canonical table
 - **WHEN** an exit label falls outside the fixed client-side table of canonical direction words
-- **THEN** the glyph is resolved from that table, and an out-of-table label renders verbatim as the chip's primary text (there being no glyph to carry it) rather than being mapped to a guessed direction
+- **THEN** no direction is guessed from the label: a usable map bearing supplies its octant glyph, otherwise it becomes a portal whose fallback text is the verbatim label
 
 #### Scenario: An unknown destination falls back without doubling labels
-- **WHEN** the destination's display name — resolved by matching the exit's server-authored destination node against the committed local-map nodes — finds that node absent from the committed lattice
-- **THEN** an enabled canonical-direction chip falls back to its own exit label as its primary text rather than rendering blank, and never renders both the destination name and the exit's own label at once
+- **WHEN** an enabled exit's destination is absent from the committed local map
+- **THEN** the readout uses the exit's own label once and invents no destination name
 
 #### Scenario: A disabled exit chip keeps its own label and marker
-- **WHEN** an exit chip is disabled
-- **THEN** it always renders its own exit label as its primary text, never the destination name, followed by the shared disabled marker
+- **WHEN** a compass target is disabled
+- **THEN** its hollow dashed marker remains visible and aimable, and the readout shows `無法通行` with the unchanged server-authored reason instead of promising a destination
 
 #### Scenario: Exit chip focus and disabled reasons stay honest
-- **WHEN** an exit chip is focused, or a disabled chip's explanation is sought
-- **THEN** the focused state is conveyed by the chip's background and border fill together with no additional focus-only glyph beside its persistent direction glyph; the disabled chip's server-authored explanation remains reachable by assistive technology directly from the chip and is shown in the overview's reason strip while the chip is focused; and the submitted move payload is unchanged
+- **WHEN** the compass aims an exit or explains a disabled target
+- **THEN** shape and fill mark its aim, the shared polite live readout exposes the unchanged disabled reason, a disabled target submits nothing, and an enabled activation keeps the move payload unchanged
 
 #### Scenario: Chips and rows render only backed fields
 - **WHEN** any chip or row renders
@@ -1091,28 +1086,28 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** it keeps the existing disabled contract: it remains focusable by arrow keys and by pointer, keeps its accessible disabled state and its server-authored explanation, and submits nothing
 
 #### Scenario: A move row names where it goes
-- **WHEN** the scene overview renders an enabled exit chip whose label is a canonical direction and whose destination node is present in the committed local map
-- **THEN** the chip renders that direction's glyph together with the destination node's display name as its primary text, with no separate rendering of the exit's own direction-word label, and activating it submits the unchanged move payload
+- **WHEN** the compass aims an enabled exit whose destination node is present in the committed local map
+- **THEN** the shared readout shows that node's display name with the target's angled or portal glyph, and activation submits the unchanged move payload
 
 #### Scenario: A non-canonical exit keeps its own name
-- **WHEN** an exit chip's label is a named door or a dynamic wilderness exit rather than a canonical direction
-- **THEN** the chip renders that label verbatim as its primary text and no direction is guessed for it
+- **WHEN** an exit has no usable map bearing and its label is outside the canonical direction table
+- **THEN** it becomes a portal, keeps its own label as the destination-name fallback, and no direction is guessed from that label
 
 #### Scenario: An unknown destination falls back to the exit's own label
-- **WHEN** an enabled canonical-direction exit chip's destination node is absent from the committed local map
-- **THEN** the chip renders its glyph together with the exit's own label as a fallback primary text, and no destination name is invented
+- **WHEN** an enabled canonical-direction target has no destination node in the committed local map
+- **THEN** the readout shows its octant glyph and its own label as the fallback text, without inventing a node name
 
 #### Scenario: A disabled exit never loses its disabled marker to a known destination
-- **WHEN** a canonical-direction exit chip is disabled and its destination node is present in the committed local map
-- **THEN** the chip renders its own exit label followed by the shared disabled marker as its primary text, not the destination's display name, and its server-authored explanation remains reachable by assistive technology from the chip itself
+- **WHEN** a disabled exit's destination node is present in the committed map
+- **THEN** its target remains visibly disabled and its readout shows the server reason in the warn tone, never replacing that explanation with the destination name
 
 #### Scenario: A focused move row is not double-marked
-- **WHEN** an exit chip carrying a direction glyph is focused
-- **THEN** the chip's background and border change together to mark focus, and no additional focus-only glyph renders alongside its existing direction glyph
+- **WHEN** a compass target is aimed
+- **THEN** its aim wedge, pip or bead treatment, and knob carry the aim, and no legacy chip-focus glyph is added beside its readout glyph
 
 #### Scenario: The move frame has no companion panel
-- **WHEN** the scene overview renders with any chip focused
-- **THEN** no detail aside or other side panel renders beside the overview, the overview occupies the pane's full available width, and no exit-outlet grid exists anywhere in the dock
+- **WHEN** the exploration root renders with any overview chip focused
+- **THEN** the compass occupies the left side and the shared readout and overview occupy the right column; no exit-outlet grid or detail aside renders
 
 #### Scenario: A row renders only backed fields
 - **WHEN** the scene overview renders a look-only chip for a present entity
@@ -2246,7 +2241,7 @@ The action dock SHALL fill the bottom band's command region — the right third 
 
 #### Scenario: Fixed chrome surrounds one scrolling region
 - **WHEN** the dock's content column lays out
-- **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
+- **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
 
 #### Scenario: Popovers and wide frames stay inside the region
 - **WHEN** a target's verb popover renders, or a frame's content does not fit the region's width
@@ -2254,7 +2249,7 @@ The action dock SHALL fill the bottom band's command region — the right third 
 
 #### Scenario: One dock element persists across every mode
 - **WHEN** the committed mode changes, including into or out of dialogue
-- **THEN** the panel is the same single `#action-dock` element in every mode, carrying its existing tab index, its `data-mode` attribute and its role as the documented focus home of every mode except dialogue, and it is not remounted
+- **THEN** the panel is the same single `#action-dock` element in every mode, carrying its existing tab index, its `data-mode` attribute and its role as the documented focus forwarding target, with the compass owning exploration-root focus and the active row container owning other dock frames, and it is not remounted
 
 #### Scenario: The presentation stays readable beyond colour
 - **WHEN** the command region and its band render
@@ -2271,7 +2266,7 @@ The action dock SHALL fill the bottom band's command region — the right third 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
 - **THEN** the row region scrolls internally, the dock's chrome (the combat root list, the breadcrumb,
-  and the legend strip) stays fixed, and no row or chip is rendered outside the command region
+  and the combat-only legend strip) stays fixed, and no row or chip is rendered outside the command region
 
 #### Scenario: One dock element persists across a mode change
 - **WHEN** the committed mode changes between exploration, dialogue, combat and creation
@@ -2435,7 +2430,7 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 
 #### Scenario: Mode boundaries move focus deliberately
 - **WHEN** the mode enters dialogue with focus held inside the command region, or leaves dialogue for exploration with focus held inside the message region, inside the `choices` anchor, or on the document body
-- **THEN** on entering, focus moves to the message window's page surface before the region is hidden; on leaving, focus moves to the action dock once the region is rendered again
+- **THEN** on entering, focus moves to the message window's page surface before the region is hidden; on leaving, focus moves to the exit compass once the region is rendered again
 
 #### Scenario: The router claims only the slash in dialogue
 - **WHEN** the mode is `dialogue`
@@ -2447,7 +2442,7 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 
 #### Scenario: Leaving dialogue restores the overview without a remount
 - **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
-- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the scene overview with no popover open, and focus is on the action dock
+- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the scene overview with no popover open, and focus is on the exit compass
 
 #### Scenario: Keys never drive the hidden dock
 - **WHEN** the mode is dialogue, focus is on the document body, and the player presses ArrowRight, Enter, and Escape
@@ -2529,7 +2524,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: Picks and exits dispatch their exact intents
 - **WHEN** the player activates a pick row, or an enabled exit row
-- **THEN** a pick dispatches `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` through the single dispatch entry, and an enabled exit row dispatches the same `explore.move` payload the overview's exit chip dispatches
+- **THEN** a pick dispatches `explore.talk_scripted` with `{npc_id: host.identity, keyword_id}` through the single dispatch entry, and an enabled exit row dispatches the unchanged `explore.move` payload of its committed move row
 
 #### Scenario: The free-form and exit rows dispatch nothing themselves
 - **WHEN** the player activates `⌨ 自由對話`, or `✕ 結束對話`
@@ -2537,7 +2532,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: The move row borrows the scene overview's exits
 - **WHEN** the player activates `↦ 移動…`
-- **THEN** it dispatches nothing and replaces the rows with the exit rows of the committed exploration scene overview, in its order, each carrying the exit's direction glyph and, while enabled, the destination's display name under the scene overview's exit-chip rules, ending with a back row; a disabled exit row stays focusable with its server-authored reason and dispatches nothing
+- **THEN** it dispatches nothing and replaces the choices with dedicated committed `moveItems` rows from the store view, independent of the router root, in payload order, carrying their direction glyphs, enabled destination names, disabled markers and unchanged server reasons, followed by a back row
 
 #### Scenario: The exit rows return to the choices
 - **WHEN** Escape or the back row is activated in the exit rows, or the committed room has no exits
@@ -2593,7 +2588,7 @@ While the committed mode is `dialogue` and the committed `dialogue` panel is ava
 
 #### Scenario: A move from the list leaves the conversation
 - **WHEN** the player activates `↦ 移動…` and then an enabled exit row
-- **THEN** exactly one `explore.move` request with the overview exit chip's payload is submitted, the movement settlement clears the session through the existing seam, and the committed mode returns to `exploration` with the dock at the new room's overview
+- **THEN** exactly one `explore.move` request with the committed move row's unchanged payload is submitted, the movement settlement clears the session through the existing seam, and the committed mode returns to `exploration` with the dock at the new room's overview
 
 #### Scenario: The list is one tab stop and keeps its keys
 - **WHEN** the list has focus and the player presses Tab, then Shift+Tab back, then ArrowDown twice and Enter

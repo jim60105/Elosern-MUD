@@ -1208,5 +1208,125 @@ class ModeTransitionsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class ExitCompassEvidenceTest(unittest.TestCase):
+    """exploration-exit-compass: the compass's pure model, its pad component,
+    the shared readout, the store's exit gate, and the dock's controls
+    reference are DOM-state and reducer contracts jsdom executes, so the
+    change's Vitest files are their evidence (the browser journeys cover the
+    live client's hold-to-walk, the readout, and the pad's geometry)."""
+
+    @covers_requirement(
+        "webclient-exit-compass::each-exploration-exit-resolves-to-exactly-one-angled-or-portal-target",
+        "webclient-exit-compass::portals-occupy-deterministic-slots-on-an-outer-track",
+        "webclient-exit-compass::an-aim-snaps-to-the-nearest-angled-exit-within-thirty-degrees",
+        "webclient-exit-compass::the-compass-degrades-honestly",
+    )
+    def test_exit_compass_model_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/action/compass_model.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "exit-compass model Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-exit-compass::the-compass-pad-answers-hover-and-click",
+        "webclient-exit-compass::holding-a-pointer-press-on-an-angled-target-starts-a-walk",
+        "webclient-exit-compass::the-compass-is-one-keyboard-composite",
+        "webclient-exit-compass::bracket-keys-cycle-every-target-and-holding-a-key-walks",
+        "webclient-exit-compass::continuous-movement-is-commit-driven",
+        "webclient-exit-compass::continuous-movement-stops-safely-with-a-reason",
+        "webclient-exit-compass::a-press-produces-one-discrete-move-or-one-walk-never-both",
+    )
+    def test_exit_compass_pad_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/action/exit_compass.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "exit-compass pad Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-exit-compass::the-compass-feeds-one-shared-readout-line",
+        "webclient-exit-compass::the-aimed-destination-lights-on-the-minimap-and-motion-respects-the-motion-level",
+    )
+    def test_exit_compass_readout_and_pane_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/action/exploration_readout.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_scene_overview.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "exit-compass readout/pane Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-exit-compass::the-compass-never-loosens-the-server-s-gate",
+        "webclient-exit-compass::the-dialogue-screen-s-exits-list-stays-independent-of-the-exploration-root",
+        "webclient-exit-compass::the-controls-reference-documents-the-compass-and-the-exploration-panel-shows-no-key-hints",
+    )
+    def test_exit_compass_gate_and_surfaces_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/store/exit_activation.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_dialogue_choices.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/overlays/help_overlay.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "exit-compass gate/surfaces Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

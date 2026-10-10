@@ -28,6 +28,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable",
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
         "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
+        "webclient-exit-compass::compass-behavior-is-verified-in-the-live-client-at-two-viewports",
     )
     def test_action_dock_renders_the_mockup_command_surface(self):
         for viewport in ((1451, 790), (2560, 1440)):
@@ -149,6 +150,9 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
  
     @covers_requirement(
         "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
+    )
+    @covers_requirement(
+        "webclient-exit-compass::the-controls-reference-documents-the-compass-and-the-exploration-panel-shows-no-key-hints"
     )
     def test_dock_shortcut_legend_renders_once_with_real_behaviour_wording(self):
         """The dock's shortcut legend renders as exactly one visible instance,

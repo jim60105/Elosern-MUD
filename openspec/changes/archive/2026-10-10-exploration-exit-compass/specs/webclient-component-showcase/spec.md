@@ -1,11 +1,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
-The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`,
-`ExitCompass`, `ExplorationReadout`, `SceneOverview`, and `DockVerbPopover`) SHALL present the `context_actions` v5 menus and the
-`exploration` panel's scene overview as a separate exit compass beside a finite set of people/object/footer rows or chips with a shared readout in exploration, and with the mode-appropriate guidance line elsewhere
-and focused/disabled states, and SHALL render the option and choice cards in the exact
-server-authored shape.
+
+The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`, `ExitCompass`,
+`ExplorationReadout`, `SceneOverview`, `DockVerbPopover`) SHALL present the `context_actions` v5 menus and, in
+exploration, the `exploration` panel's scene overview as an exit compass beside finite people/object/footer
+rows or chips sharing one readout, with the mode's guidance line, focused/disabled states, and the exact
+server-authored option and choice card shape.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell

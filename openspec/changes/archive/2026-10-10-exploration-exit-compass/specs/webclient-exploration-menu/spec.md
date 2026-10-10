@@ -1,7 +1,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: explore.move traverses a re-resolved Exit through the shared movement path
-The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref` (1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's current node ID equals `current_node` (the stale guard), re-resolve the Exit from the actor's location by the opaque `exit_ref`, re-check that the Exit's location and destination are valid and the `traverse` lock allows the actor, and invoke the Exit's own traversal method. After traversal, a changed canonical location node SHALL count as relocation even when a wilderness room object is reused; unchanged room identity and unchanged canonical node SHALL still reject.
+
+The production action registry SHALL register `explore.move`, whose payload SHALL accept exactly `exit_ref`
+(1..64 ASCII characters) and `current_node` (a canonical node ID). The adapter SHALL verify the actor's
+current node, re-resolve the Exit by the opaque `exit_ref`, re-check its location, destination, and `traverse`
+lock, and invoke its own traversal method. Relocation SHALL be decided by the canonical node, never by the
+room object.
 
 #### Scenario: Keyboard movement charges the same 30 seconds as the command path
 - **WHEN** an actor submits `explore.move` with a valid `exit_ref` and matching `current_node` for a traversable exit
@@ -40,16 +45,15 @@ The production action registry SHALL register `explore.move`, whose payload SHAL
 #### Scenario: Reused wilderness rooms report successful coordinate movement
 - **WHEN** traversal changes the actor's canonical wilderness coordinates while retaining the same room object
 - **THEN** the adapter reports `success` / `moved`, publishes the committed destination, and does not return `move_failed` solely because room identity is unchanged
+- **AND** a traversal whose canonical location node is unchanged still rejects `move_failed`, whatever the room object's identity
 
 ### Requirement: The keyboard-first exploration dock roots at the scene overview and opens dialogue directly
 
-In exploration mode the exploration dock SHALL own the action-dock surface, and in dialogue mode it SHALL
-stay mounted, hidden with the collapsed command region (`webclient-contextual-hud`), with its router
-holding the same root; its root pane SHALL be composed only from the validated `exploration` panel, the
-committed `local_map` panel, and the committed `context_actions` `suggestions` envelope, and SHALL present
-the exit compass (`webclient-exit-compass`) for movement beside a scene overview whose rows are 人物 and 物件
-and the footer, in that reading order. The overview SHALL carry no 出口 row, and the router's root frame SHALL
-carry no exit item.
+The dock SHALL own the action-dock surface in exploration and stay mounted in dialogue, hidden with the
+collapsed command region (`webclient-contextual-hud`) under the same router root. Its root pane SHALL compose
+only the validated `exploration` panel, the committed `local_map` panel, and the committed `context_actions`
+`suggestions` envelope, presenting the exit compass (`webclient-exit-compass`) for movement beside a scene
+overview, with no 出口 row or root-frame exit item.
 
 #### Scenario: Move, Look, and dialogue complete without typed input
 - **WHEN** a player uses only the keyboard to aim an exit on the compass and press Enter, then activates a scripted dialogue host's chip, chooses 交談, and then presses the digit of the first choice the dialogue surface offers
