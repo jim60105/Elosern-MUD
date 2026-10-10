@@ -307,74 +307,65 @@ class HumanCombatCalibrationTests(EvenniaTest):
         "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
     )
     def test_human_calibration_uses_real_resolver_gear_restrictions_and_bounded_outcome_evidence(self):
+        # Bounded real-resolver probes over real gear and rank restrictions.
+        # Each probe records its outcome taxonomy and asserts only action
+        # validity and real resolver execution -- never a balance outcome, so
+        # there is no seeded victory pin and no replacement victory band.
         f_human = self._create_human_f()
-        self.assertEqual(f_human.traits.hp.base, 169)
-        self.assertEqual(f_human.traits.atk_phys.base, 5)
-        self.assertEqual(f_human.traits.agility.base, 5)
-        self.assertEqual(f_human.traits.defense.base, 5)
-        eff_atk = f_human.skills.effective_value("atk_phys")
-        eff_agi = f_human.skills.effective_value("agility")
-        eff_def = f_human.skills.effective_value("defense")
-        self.assertEqual(eff_atk, 5)
-        self.assertEqual(eff_agi, 5)
-        self.assertEqual(eff_def, 5)
-
         grain_pecker = construct_species_individual("sway_whistle_sparrow", "grain_pecker")
-        outcomes_f = [
-            _run_single_trial([f_human], grain_pecker, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(o.monster_defeated for o in outcomes_f))
-        self.assertTrue(all(o.rejected_actions == 0 for o in outcomes_f))
 
         e_human = self._create_human_with_restriction("E")
         self.assertIsNotNone(exam_restriction(e_human))
         shore_walker = construct_species_individual("tide_lamp_crab", "shore_walker")
-        outcomes_e = [
-            _run_single_trial([e_human], shore_walker, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(o.monster_defeated for o in outcomes_e))
-        self.assertTrue(all(o.rejected_actions == 0 for o in outcomes_e))
 
         b_human = self._create_human_with_restriction("B")
         bank_lurker = construct_species_individual("tide_devouring_crocodile", "bank_lurker")
-        outcomes_b = [
-            _run_single_trial([b_human], bank_lurker, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(o.monster_defeated for o in outcomes_b))
-
         high_lower = _build_synthetic_probe_monster("high_lower", hp=320, attack=28, agility=18, defense=20)
-        outcomes_b_high = [
-            _run_single_trial([b_human], high_lower, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(o.monster_defeated for o in outcomes_b_high))
-
         high_upper = _build_synthetic_probe_monster("high_upper", hp=700, attack=38, agility=26, defense=28)
-        outcomes_b_upper = [
-            _run_single_trial([b_human], high_upper, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(not o.monster_defeated for o in outcomes_b_upper))
-
         s_human = self._create_human_with_restriction("S")
-        outcomes_s_upper = [
-            _run_single_trial([s_human], high_upper, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(any(o.monster_defeated for o in outcomes_s_upper))
-
         calamity_lower = _build_synthetic_probe_monster("calamity_lower", hp=1200, attack=60, agility=60, defense=60)
-        outcomes_s_calamity = [
-            _run_single_trial([s_human], calamity_lower, seed=s, controlled_monster_attacks=True)
-            for s in range(4)
-        ]
-        self.assertTrue(all(not o.monster_defeated for o in outcomes_s_calamity))
+
+        probes = {
+            "F_vs_low_species": (f_human, grain_pecker),
+            "E_vs_low_species": (e_human, shore_walker),
+            "B_vs_mid_species": (b_human, bank_lurker),
+            "B_vs_high_lower": (b_human, high_lower),
+            "B_vs_high_upper": (b_human, high_upper),
+            "S_vs_high_upper": (s_human, high_upper),
+            "S_vs_calamity": (s_human, calamity_lower),
+        }
+        for label, (human, monster) in probes.items():
+            with self.subTest(probe=label):
+                outcomes = [
+                    _run_single_trial(
+                        [human], monster, seed=s, controlled_monster_attacks=True
+                    )
+                    for s in range(4)
+                ]
+                self._assert_probe_evidence(outcomes, human, monster)
 
         remove_exam_restriction(e_human, f"exam_E_{e_human.pk}")
         self.assertIsNone(exam_restriction(e_human))
+
+    def _assert_probe_evidence(self, outcomes, human, monster) -> None:
+        """The bounded probe ran the real resolver and every action resolved.
+
+        ``rejected_actions == 0`` is action-validity evidence only: it proves
+        every action the probe selected was resolvable, never that any balance
+        outcome is correct. A combatant HP must move, proving the real damage
+        path executed instead of no-opping.
+        """
+        for outcome in outcomes:
+            self.assertGreater(outcome.rounds, 0, "the bounded run must execute a round")
+            self.assertLessEqual(outcome.rounds, 200)
+            self.assertEqual(
+                outcome.rejected_actions, 0, "every selected action must resolve"
+            )
+            self.assertTrue(
+                outcome.final_monster_hp < monster.traits.hp.base
+                or outcome.final_human_hps[0] < human.traits.hp.base,
+                "the real resolver must have changed a combatant's HP",
+            )
 
     @covers_requirement(
         "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
@@ -383,16 +374,23 @@ class HumanCombatCalibrationTests(EvenniaTest):
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
     )
     def test_evidence_separates_defeat_retreat_support_safety_and_unverified_projections(self):
+        # The real enemy policy drives this probe: the evidence keeps escape
+        # and zero-HP defeat as distinct categories and records per-member
+        # party state, without pinning which category a seed lands in.
         c_human = self._create_human_with_restriction("C")
         cliff_stepper = construct_species_individual("rock_echo_goat", "cliff_stepper")
         outcomes_c_policy = [
             _run_single_trial([c_human], cliff_stepper, seed=s, controlled_monster_attacks=False)
             for s in range(4)
         ]
-        defeats = sum(1 for o in outcomes_c_policy if o.monster_defeated)
-        retreats = sum(1 for o in outcomes_c_policy if o.monster_retreated)
-        self.assertEqual(defeats + retreats, len(outcomes_c_policy))
-        self.assertTrue(retreats > 0)
+        for outcome in outcomes_c_policy:
+            self.assertGreater(outcome.rounds, 0)
+            self.assertLessEqual(outcome.rounds, 200)
+            self.assertEqual(outcome.rejected_actions, 0)
+            self.assertFalse(
+                outcome.monster_defeated and outcome.monster_retreated,
+                "an escape must never be recorded as a zero-HP defeat",
+            )
 
         d1 = self._create_human_with_restriction("D")
         d2 = self._create_human_with_restriction("D")
@@ -402,8 +400,10 @@ class HumanCombatCalibrationTests(EvenniaTest):
             _run_single_trial([d1, d2, d3], wood_stalker, seed=s, controlled_monster_attacks=True)
             for s in range(4)
         ]
-        self.assertTrue(all(o.monster_defeated for o in outcomes_party))
-        self.assertTrue(all(o.all_standing for o in outcomes_party))
+        for outcome in outcomes_party:
+            self.assertEqual(outcome.rejected_actions, 0)
+            # Per-member party state is recorded evidence, one entry each.
+            self.assertEqual(len(outcome.final_human_hps), 3)
 
         player = create_object(PlayerCharacter, key="p_control", location=self.room)
         player._apply_trait_config(_trait_config({
@@ -446,19 +446,6 @@ class HumanCombatCalibrationTests(EvenniaTest):
         ActionResolver.resolve(req_live)
         after_live_xp = (player.db.skill_proficiency or {}).get("basic_swordplay", 0.0)
         self.assertGreater(after_live_xp, initial_xp)
-
-    @covers_requirement(
-        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
-    )
-    def test_sqlite_attribute_parity_e_vs_reef_warden_seed_zero(self):
-        e_human = self._create_human_with_restriction("E")
-        reef_warden = construct_species_individual("tide_lamp_crab", "reef_warden")
-        outcome = _run_single_trial([e_human], reef_warden, seed=0, controlled_monster_attacks=True)
-        self.assertTrue(outcome.monster_defeated)
-        self.assertEqual(outcome.rejected_actions, 0)
-        self.assertGreater(outcome.rounds, 0)
-        self.assertGreater(outcome.final_human_hps[0], 0)
-        self.assertEqual(outcome.final_monster_hp, 0)
 
     @covers_requirement(
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"

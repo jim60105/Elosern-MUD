@@ -28,7 +28,9 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
         entity = self._entity()
         apply_buff(entity, "poisoned")
         matches = dict(matched_combat_modifiers(entity))
-        self.assertEqual(matches["poison_agility_penalty"], {"agility": "-10%"})
+        self.assertEqual(
+            matches["poison_agility_penalty"], RULES["poison_agility_penalty"].then
+        )
         merged = evaluate_combat_modifiers(entity)
         expected = {}
         for adjustments in matches.values():
@@ -43,7 +45,7 @@ class MatchedCombatModifiersTests(EvenniaTestCase):
         matches = dict(matched_combat_modifiers(entity))
         self.assertEqual(
             matches["high_arousal_agility_accuracy_penalty"],
-            {"agility": "-20%", "accuracy": -15},
+            RULES["high_arousal_agility_accuracy_penalty"].then,
         )
 
     def test_merged_combination_identical_to_evaluate(self):

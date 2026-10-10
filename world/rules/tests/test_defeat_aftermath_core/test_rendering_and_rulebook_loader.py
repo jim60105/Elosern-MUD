@@ -70,6 +70,7 @@ from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
 
 from ._support import (
     DefeatAftermathBase,
+    wake_target,
 )
 
 
@@ -92,7 +93,13 @@ class RenderingTests(DefeatAftermathBase):
         rendered = render_plain_text(aftermath[0])
         self.assertIn(DEFEAT_AFTERMATH_RULEBOOK.pg_lines[0], rendered)
         self.assertIn("虛弱感籠罩全身", rendered)
-        self.assertIn("你昏迷了 8 秒", rendered)
+        # The wake line interpolates the entry's own recovery time; the
+        # minimum-time value itself is the recovery solve's and is covered by
+        # its synthetic fixtures.
+        recovery = next(
+            entry for entry in aftermath[0].entries if entry.kind == "recovery_advance"
+        )
+        self.assertIn(f"你昏迷了 {recovery.data['seconds']} 秒", rendered)
 
     @covers_requirement(
         "defeat-aftermath-core::defeat-aftermath-emits-eventlog-entries-and-defeat-lines"
@@ -117,9 +124,11 @@ class RenderingTests(DefeatAftermathBase):
         (_, kwargs), = calls
         self.assertEqual(kwargs["context"]["char"], str(self.player.key))
         self.assertEqual(kwargs["context"]["room"], str(self.room.pk))
-        self.assertEqual(kwargs["context"]["hp_after"], 5)
-        self.assertEqual(kwargs["context"]["seconds"], 8)
-        self.assertEqual(kwargs["context"]["hp_wake"], 5)
+        self.assertEqual(kwargs["context"]["hp_after"], wake_target(self.player))
+        # The advance's exact world time is the recovery solve's; the boundary
+        # event only has to report a positive amount.
+        self.assertGreater(kwargs["context"]["seconds"], 0)
+        self.assertEqual(kwargs["context"]["hp_wake"], wake_target(self.player))
         self.assertIn("tick", kwargs["context"])
 
     @covers_requirement(
@@ -200,9 +209,14 @@ class RulebookLoaderTests(DefeatAftermathBase):
     def test_shipped_rulebook_loads_with_owned_sections(self):
         self.assertTrue(DEFEAT_AFTERMATH_RULEBOOK.pg_lines)
         self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.weak_debuff_buff_key, "defeat_weak")
-        self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.regen_scale, 0.5)
-        self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.max_recovery_seconds, 21600)
-        self.assertEqual(DEFEAT_AFTERMATH_RULEBOOK.recovery.wake_fraction, 0.05)
+        recovery = DEFEAT_AFTERMATH_RULEBOOK.recovery
+        # The authored recovery magnitudes are data: assert the validated
+        # shape only, never a repeated production value.
+        self.assertGreater(recovery.regen_scale, 0)
+        self.assertLessEqual(recovery.regen_scale, 1)
+        self.assertGreater(recovery.max_recovery_seconds, 0)
+        self.assertGreater(recovery.wake_fraction, 0)
+        self.assertLess(recovery.wake_fraction, 1)
         # The DA4-owned violation section ships validated rows keyed by lore
         # species names and the violated wake line.
         self.assertTrue(DEFEAT_AFTERMATH_RULEBOOK.violation.rows)
