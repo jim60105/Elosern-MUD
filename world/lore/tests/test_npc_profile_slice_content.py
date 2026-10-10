@@ -33,9 +33,10 @@ from world.rules.npc_roster_validation import derive_shipped_sources
 # panel tokens are all ASCII, so any run of two or more Latin letters in an
 # authored greeting, keyword response or voice line names one of them.
 _ASCII_TOKEN_RE = re.compile(r"[A-Za-z]{2,}")
-_HOST = "npc-profile-registry"
-_CHARACTERIZATION = f"{_HOST}::every-registry-derived-host-has-complete-individual-characterization"
-_DIALOGUE = f"{_HOST}::authored-host-dialogue-preserves-service-semantics"
+# The two canonical requirement ids this file establishes are inlined as string
+# literals at every decorator below: tools.spec_traceability folds only literal
+# decorator arguments, so a module constant would silently record no
+# association and leave the retargeted claims invisible to the gate.
 
 
 def _hosted_places() -> list:
@@ -90,7 +91,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
 
     maxDiff = None
 
-    @covers_requirement(_CHARACTERIZATION)
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
     def test_every_registry_derived_host_has_complete_individual_characterization(self):
         hosts = _hosted_places()
         self.assertTrue(hosts, "the place registry declares no hosted place")
@@ -111,7 +114,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                 self.assertTrue(0 <= profile.age <= 10000)
                 self.assertTrue(0 <= profile.apparent_age <= 10000)
 
-    @covers_requirement(_CHARACTERIZATION)
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
     def test_every_scripted_host_uses_its_table_as_the_sole_greeting_source(self):
         for place in _hosted_places():
             with self.subTest(host=place.service_id):
@@ -126,7 +131,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                 )
                 self.assertIsNone(problem)
 
-    @covers_requirement(_CHARACTERIZATION)
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
     def test_every_dialogue_table_belongs_to_exactly_one_profiled_host(self):
         table_hosts: dict[str, list] = {key: [] for key in DIALOGUE_ROWS}
         for place in _hosted_places():
@@ -143,7 +150,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
                 )
                 self.assertIn(hosts[0].host_profile_key, NPC_PROFILE_REGISTRY)
 
-    @covers_requirement(_CHARACTERIZATION)
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
     def test_qualified_people_resolve_their_own_cards_and_offline_voices(self):
         people = tuple(ADVENTURER_REGISTRY.values())
         self.assertTrue(people, "the adventurer registry ships no person")
@@ -168,7 +177,9 @@ class NpcHostCharacterizationContractTests(unittest.TestCase):
         )
         validate_guild_npc_identities()
 
-    @covers_requirement(_CHARACTERIZATION)
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
     def test_every_other_source_kind_carries_its_characterization_input(self):
         sources = derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
         kinds = {kind for kind, _ in sources}
@@ -219,7 +230,9 @@ class AuthoredDialogueContractTests(unittest.TestCase):
 
     maxDiff = None
 
-    @covers_requirement(_DIALOGUE)
+    @covers_requirement(
+        "npc-profile-registry::authored-host-dialogue-preserves-service-semantics"
+    )
     def test_every_authored_table_keeps_its_service_semantics(self):
         tables = sorted(DIALOGUE_ROWS)
         self.assertTrue(tables, "the dialogue registry ships no table")
@@ -228,7 +241,9 @@ class AuthoredDialogueContractTests(unittest.TestCase):
                 problems = _table_problems(DIALOGUE_ROWS[table_key], f"table {table_key}")
                 self.assertEqual(problems, [])
 
-    @covers_requirement(_DIALOGUE)
+    @covers_requirement(
+        "npc-profile-registry::authored-host-dialogue-preserves-service-semantics"
+    )
     def test_two_hosts_may_share_the_same_keyword_vocabulary(self):
         # The requirement keeps uniqueness *within* one table and explicitly
         # allows two hosts to expose the same service labels: the per-table rule
@@ -251,7 +266,9 @@ class AuthoredDialogueContractTests(unittest.TestCase):
         self.assertEqual(_table_problems(first, "table t_first"), [])
         self.assertEqual(_table_problems(second, "table t_second"), [])
 
-    @covers_requirement(_DIALOGUE)
+    @covers_requirement(
+        "npc-profile-registry::authored-host-dialogue-preserves-service-semantics"
+    )
     def test_an_out_of_character_table_is_reported(self):
         # The structural check is not vacuous: a line smuggling a command or
         # interface token into prose is reported, and a table-local mute is
