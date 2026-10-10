@@ -1,18 +1,18 @@
 import { h, onBeforeUnmount, onMounted, ref } from "vue";
 import DialogueChoices from "../../components/DialogueChoices.vue";
 import { dialogueViewModel } from "../../stores/dialogue-view.js";
-import { overviewExits } from "../../composables/use-dialogue-choices.js";
+import ExplorationMenu from "../../lib/exploration_menu.js";
 import { DIALOGUE_PANEL_SAMPLE } from "../fixtures.js";
-import { explorationPanelFixture, localMapFixture, overviewArgs } from "../fixtures/scene_overview.js";
+import { explorationPanelFixture, localMapFixture } from "../fixtures/scene_overview.js";
 
 // DialogueChoices: the conversation's choice list, centred over the stage
 // once the session line is fully read (AVG stage design §8.2;
 // webclient-dialogue-choices-overlay). One menu composite and one tab stop:
 // ArrowUp / ArrowDown wrap, Home / End jump, Enter / Space activate, digits
-// 1–N pick directly, and `↦ 移動…` swaps in the committed overview's exits
-// (Escape or the back row returns). Every story binds the same derived
-// shapes the live wiring passes: the picks through `dialogueViewModel`, the
-// exits through the real `overviewMenu` sliced by its `exits` section.
+// 1–N pick directly, and `↦ 移動…` swaps in the committed exits (Escape or
+// the back row returns). Every story binds the same derived shapes the live
+// wiring passes: the picks through `dialogueViewModel`, the exits through the
+// real `exitTargets` rows (the exit compass's, exploration-exit-compass D9).
 
 const PICKS = dialogueViewModel(DIALOGUE_PANEL_SAMPLE).picks;
 
@@ -28,7 +28,7 @@ const LOCAL_MAP = localMapFixture([
   ["room:44", "北岸大道"],
   ["room:45", "霧骨渡口"],
 ]);
-const EXITS = overviewExits(overviewArgs(ROOM).menu);
+const EXITS = ExplorationMenu.exitTargets(ROOM, { currentNode: "room:900" });
 
 // The list sits in a box the size of the `choices` anchor's span at
 // 1451x790 (560px wide), over a dim stage-like ground, and takes focus on

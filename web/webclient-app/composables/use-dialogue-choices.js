@@ -4,23 +4,6 @@
 // passive; every dispatch goes through the store's single entry.
 import { computed, nextTick, ref, watch } from "vue";
 
-// The committed scene overview's exit items: the overview is the router's
-// root frame in dialogue (webclient-talk-open-dock D1), and its `sections`
-// geometry names how many leading items are exits, in reading order.
-export function overviewExits(menu) {
-  const items = Array.isArray(menu?.items) ? menu.items : [];
-  const sections = Array.isArray(menu?.sections) ? menu.sections : [];
-  let start = 0;
-  for (const section of sections) {
-    const count = Math.max(0, section.count || 0);
-    if (section.key === "exits") {
-      return items.slice(start, start + count);
-    }
-    start += count;
-  }
-  return [];
-}
-
 export function useDialogueChoices(store, shellRef, dialogueVM) {
   // The window's reader state (design D3), reported by `reading-change`.
   // True until the window says otherwise: a reconnect inside a conversation
@@ -41,10 +24,13 @@ export function useDialogueChoices(store, shellRef, dialogueVM) {
       store.view.dispatch.inFlight == null,
   );
 
-  const dialogueExits = computed(() => overviewExits(store.view.rootMenu));
+  // The committed exit rows (exploration-exit-compass design D9): the
+  // `moveItems` rows the exit compass also reads, sourced independently of
+  // the router's root frame (which carries no exit item).
+  const dialogueExits = computed(() => store.view.explorationExits || []);
 
   // `↦ 移動…` then an exit row: the same payload and echo descriptor the
-  // overview's exit chip submits (design D8).
+  // exit compass submits (design D8).
   function onDialogueMove(item) {
     if (!item || !item.actionId) {
       return;

@@ -10,7 +10,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
-import { overviewExits } from "../composables/use-dialogue-choices.js";
 
 const PANEL = {
   schema_version: 2,
@@ -315,22 +314,5 @@ describe("DialogueChoices", () => {
     expect(before).not.toHaveBeenCalled();
     expect(w.emitted("pick")).toBeUndefined();
     expect(w.emitted("leave")).toBeUndefined();
-  });
-});
-
-describe("overviewExits", () => {
-  it("slices the overview's items by its `exits` section, in reading order", () => {
-    const menu = {
-      items: [{ key: "a" }, { key: "b" }, { key: "p" }, { key: "f" }],
-      sections: [
-        { key: "exits", count: 2 },
-        { key: "people", count: 1 },
-        { key: "footer", count: 1 },
-      ],
-    };
-    expect(overviewExits(menu).map((item) => item.key)).toEqual(["a", "b"]);
-    expect(overviewExits({ items: menu.items, sections: [{ key: "people", count: 1 }, { key: "exits", count: 2 }] }).map((i) => i.key)).toEqual(["b", "p"]);
-    expect(overviewExits(null)).toEqual([]);
-    expect(overviewExits({ items: menu.items, sections: [] })).toEqual([]);
   });
 });
