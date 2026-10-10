@@ -54,7 +54,7 @@ sensitivity_multiplier * shame_multiplier * participant_multiplier)`.
 #### Scenario: A neutral participant at 普通 sensitivity and 無 shame receives exactly the ratio-scaled base
 - **WHEN** `compute_pleasure_gain(participant, part, base_pleasure=10, ratio=1.0, participant_count=1)`
   is called on a participant whose sensitivity for `part` is `普通` and whose `shame` is `無`
-- **THEN** it returns `10` (both multipliers are `1.0` at their floor, per the shipped
+- **THEN** it returns `10` (both multipliers are `1.0` at their floor, per the fixed synthetic
   `sexual_pleasure.yaml`)
 
 #### Scenario: Higher sensitivity increases the gain
@@ -69,6 +69,10 @@ sensitivity_multiplier * shame_multiplier * participant_multiplier)`.
 #### Scenario: The multipliers read from their declared tables
 - **WHEN** the sensitivity, shame, and participant multipliers are resolved
 - **THEN** the sensitivity and shame multipliers are read from `PLEASURE_CONFIG.sensitivity_multipliers`/`.shame_multipliers` (unchanged, `pleasure-gauge`-owned) keyed by `participant.sexual.sensitivity[part].level` and `participant.sexual.shame.level`, and the participant multiplier is read from this change's own `sexual_act_effects.yaml` participant-count table
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
 
 ### Requirement: sexual_act_effects.yaml declares the participant-count table and the climax extension threshold, validated at load
 `world/rules/rulebook/sexual_act_effects.yaml` SHALL declare exactly `participant_multipliers`

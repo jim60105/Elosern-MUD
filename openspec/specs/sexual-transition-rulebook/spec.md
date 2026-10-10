@@ -165,10 +165,10 @@ change 7's sanctioned mutator for this field — and SHALL NOT read or write
   `entity.sexual.record_climax()`
 
 ### Requirement: The one rule targeting a vital gauge outside SexualState writes through change 3's entity.traits surface, never through SexualState
-`sp_cost_on_climax` SHALL apply its cost by mutating `entity.traits.sp.current` directly — the
-public writable property of change 3's `GaugeTrait` (`.value` is its read-only alias) — and SHALL
+`sp_cost_on_climax` SHALL apply its cost by mutating `entity.traits.sp.current` directly ;  the
+public writable property of change 3's `GaugeTrait` (`.value` is its read-only alias) ;  and SHALL
 NOT reach through `entity.sexual` to do so. The delta
-SHALL resolve to a negative integer in the source's documented `20`–`30` range, applied as a
+SHALL resolve to a negative integer in the authored range, applied as a
 subtraction.
 
 #### Scenario: A climax event costs stamina in the documented range
@@ -186,6 +186,10 @@ subtraction.
   delta magnitude
 - **THEN** `entity.traits.sp.value` stops at its own configured floor (change 3's `TraitHandler`
   bound), rather than this rule producing a negative stamina value
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
 
 ### Requirement: virgin and experience_types rules are irreversible and append-only end-to-end through apply_event()
 Firing `virginity_once`'s triggering event SHALL flip `entity.sexual.virgin` to `False` permanently;
@@ -266,7 +270,7 @@ event-triggered transition table.
 
 
 ### Requirement: pleasure-targeting rules write through the bounded_counter kind, and report their arousal-level crossing under the field name arousal
-Every rule targeting `pleasure` SHALL apply its `delta` or `set` effect by mutating `entity.sexual.pleasure`'s bounded counter value, following the same `delta`/`set` resolution rules as `bounded_counter`'s `ordered_level` sibling. A `pleasure`-targeting rule's reported changed-field SHALL be `"arousal"`, computed by comparing the derived arousal ordinal before and after the mutation — not `"pleasure"`, and not by comparing raw pleasure numbers.
+Every rule targeting `pleasure` SHALL apply its `delta` or `set` effect by mutating `entity.sexual.pleasure`'s bounded counter value, following the same `delta`/`set` resolution rules as `bounded_counter`'s `ordered_level` sibling. A `pleasure`-targeting rule's reported changed-field SHALL be `"arousal"`, computed by comparing the derived arousal ordinal before and after the mutation ;  not `"pleasure"`, and not by comparing raw pleasure numbers.
 
 #### Scenario: A pleasure delta that crosses an arousal band reports as an arousal change
 - **WHEN** `apply_event(entity, "stimulus_applied")` fires `arousal_up_on_stimulus`
@@ -306,6 +310,10 @@ Every rule targeting `pleasure` SHALL apply its `delta` or `set` effect by mutat
 #### Scenario: A within-band pleasure change reports no change
 - **WHEN** a pleasure change remains within one arousal band
 - **THEN** it reports no change at all
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
 
 ### Requirement: Transition rulebook rejects unbacked condition vocabulary
 

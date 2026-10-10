@@ -202,6 +202,10 @@ level-string field, unchanged by this capability) and initialize the `pleasure` 
 - **THEN** both paths already default `arousal` to `AROUSAL_LEVELS[0]`, so `pleasure`
   initializes at that floor (`0`)
 
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
+
 ### Requirement: pleasure is bounded 0 to 100 and every mutation clamps at those bounds
 `SexualState.pleasure` SHALL be a counter trait bounded `min=0, max=100`. No mutation path — decay,
 a rule's `delta` or `set` effect, or any future direct write — SHALL be able to move it outside that
@@ -239,11 +243,15 @@ succeeding or no-op'ing.
 - **THEN** it raises `AttributeError`, rather than silently succeeding or leaving `pleasure`
   unaffected
 
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
+
 ### Requirement: decay_tick decays pleasure by crossing exactly one band per configured interval
 `decay_tick()`'s handling of the `pleasure` field (renamed from `arousal` in `DECAY_CONFIG`) SHALL,
 once its configured interval has accumulated, move `pleasure` to one point below its current band's
 floor (clamped at `0`), guaranteeing the derived `arousal` level steps down by exactly one level
-regardless of where within the current band `pleasure` started — preserving decay's "at most one
+regardless of where within the current band `pleasure` started ;  preserving decay's "at most one
 level of decay per configured field" behaviour as an observable arousal-level effect.
 
 #### Scenario: Decay from the middle of a band crosses to the band below
@@ -262,6 +270,10 @@ level of decay per configured field" behaviour as an observable arousal-level ef
   accumulated time) on an entity whose `pleasure` is `85` (`極限` band)
 - **THEN** `entity.sexual.arousal.level` becomes `"高度"`, not `"中等"` or lower, even though `85`
   crossing to `84` numerically also crosses into a band whose own floor is far below `85`
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
 
 ### Requirement: SexualState exposes eleven independent, unbounded, lifetime behaviour counters, each with exactly one sanctioned mutator
 `SexualState` SHALL expose exactly the eleven counter fields named in the mapping scenario below,
@@ -498,7 +510,7 @@ effective ordinal with unchanged row/payload schemas.
 #### Scenario: Declaration-only vocabulary modules are exempted per-module
 
 - **WHEN** the structural allowlist enumerates modules that name `exposure` only as
-  preset-declaration vocabulary — authored baseline card keywords and the validator's level
+  preset-declaration vocabulary ;  authored baseline card keywords and the validator's level
   table in `world/lore/player_presets.py`
 - **THEN** they are enumerated in the same structural allowlist as declaration-only exemptions:
   they construct baseline records and SHALL NOT read `entity.sexual`, stored `sexual_traits`
@@ -508,3 +520,8 @@ effective ordinal with unchanged row/payload schemas.
 
 - **WHEN** a live-state read is added to an exempt declaration-only module
 - **THEN** it SHALL still be classified as a consumer
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
+

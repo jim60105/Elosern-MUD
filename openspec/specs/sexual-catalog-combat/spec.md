@@ -24,6 +24,8 @@ Every one of these eight acts SHALL declare `resistible=True`,
 `actor_counters=("hostile_act_count",)`, and
 `participant_counters=("hostile_act_count",)`.
 
+Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
+
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 4`
 - **THEN** `combat_tease_whisper` is absent from the returned set
@@ -52,43 +54,41 @@ Every one of these eight acts SHALL declare `resistible=True`,
 
 #### Scenario: The two Tier 1 acts share the hostile_act_count 5 gate
 - **WHEN** the Tier 1 acts `combat_tease_whisper` and `combat_tease_touch` are read from `COMBAT_ACTS`
-- **THEN** each declares `unlock={"hostile_act_count": 5}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"hostile_act_count": <declared positive threshold>}`
 
 #### Scenario: The three Tier 2 acts share the hostile_act_count 20 gate
 - **WHEN** the Tier 2 acts `combat_charm`, `combat_bind_caress`, and `combat_forced_pleasure` are read from `COMBAT_ACTS`
-- **THEN** each declares `unlock={"hostile_act_count": 20}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"hostile_act_count": <declared positive threshold>}`
 
 #### Scenario: The two Tier 3 acts share the hostile_act_count 40 + climax_count 30 gate
 - **WHEN** the Tier 3 acts `combat_forced_climax` and `combat_relentless_torment` are read from `COMBAT_ACTS`
-- **THEN** each declares the compound gate `unlock={"hostile_act_count": 40, "climax_count": 30}`
+- **THEN** each declares the compound counter-key topology as synthetic `unlock={"hostile_act_count": <declared positive threshold>, "climax_count": <declared positive threshold>}`
 
 #### Scenario: The single Tier 5 act carries the hostile_act_count 80 + climax_extension_count 30 gate
 - **WHEN** the Tier 5 act `combat_climax_domination` is read from `COMBAT_ACTS`
-- **THEN** it declares the compound gate `unlock={"hostile_act_count": 80, "climax_extension_count": 30}`
+- **THEN** it declares the compound counter-key topology as synthetic `unlock={"hostile_act_count": <declared positive threshold>, "climax_extension_count": <declared positive threshold>}`
 
 #### Scenario: Counters credit both bodies of a hostile act
 - **WHEN** the counter declarations of the eight acts are examined
 - **THEN** `hostile_act_count` records participation from either side, because a hostile sexual act happens between two bodies
 
+#### Scenario: Declared thresholds are mutable and boundary examples are synthetic
+- **WHEN** exact numerical boundary cases above are exercised
+- **THEN** local fixed synthetic declarations use those boundary values; shipped acts retain the stated counter-key topology, membership and resistance policy with authored positive thresholds, and tests do not pin their literal unlock counts
+
 ### Requirement: combat_forced_climax, combat_relentless_torment, and combat_climax_domination reliably clear the climax extension threshold
-`combat_forced_climax`, `combat_relentless_torment`, and `combat_climax_domination` SHALL each
-declare `base_pleasure=30`.
+The three extension-oriented acts SHALL retain their existing guarantee of meeting the configured extension threshold at the established ordinary-sensitivity, strong-shame, two-participant control condition. Base pleasure and shared multipliers SHALL be author-adjustable; tests SHALL preserve the threshold relationship without pinning base pleasure 30 or gain 21. Formula correctness SHALL be covered separately by fixed synthetic mechanism fixtures.
 
 #### Scenario: Worst-case target-side gain still clears the extension threshold
-- **WHEN** `compute_pleasure_gain` is evaluated for a target at `普通` sensitivity (multiplier `1.0`),
-  `強烈` shame (multiplier `0.65`), and `participant_count == 2` for `combat_forced_climax`
-- **THEN** the resulting gain is greater than or equal to `climax_extension_threshold` (`20`)
+- **WHEN** a declared extension act resolves for a target already in 進行中 under that control condition
+- **THEN** an extension is staged and consumed at settlement; changing balance data so that this established guarantee fails remains a meaningful content-quality failure
 
 ### Requirement: combat_forced_climax and combat_relentless_torment differ by actor_pleasure_ratio, not by dominance-freedom tuning
-`combat_forced_climax` SHALL declare `actor_pleasure_ratio=0.4` and `target_part="私處"`.
-`combat_relentless_torment` SHALL declare `actor_pleasure_ratio=0.6` and `target_part="臀部"`, with
-`base_pleasure=30` matching `combat_forced_climax` exactly.
+The two acts SHALL retain their existing distinct actor-side ratios, equal base pleasure, and respective target parts 私處 and 臀部. The relentless actor-side ratio SHALL exceed the forced ratio; exact magnitudes SHALL be authored data. Neither SHALL add dominance-freedom tuning.
 
 #### Scenario: combat_relentless_torment always costs the actor more than combat_forced_climax at equal target-side gain
-- **WHEN** `compute_pleasure_gain` is evaluated for the actor for both acts at identical sensitivity,
-  shame, and participant count
-- **THEN** `combat_relentless_torment`'s actor-side gain exceeds `combat_forced_climax`'s actor-side
-  gain
+- **WHEN** the two acts execute against controlled participants with equal part sensitivity and unchanged target state
+- **THEN** the relentless actor receives greater pleasure while the target-side base remains equal; no fixed ratio or resulting gain table is required
 
 ### Requirement: combat_climax_domination is the sole AREA act in this catalog line
 `combat_climax_domination` SHALL declare `target_spec=TargetSpec.AREA` and

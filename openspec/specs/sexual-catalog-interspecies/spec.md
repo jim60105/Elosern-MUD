@@ -18,6 +18,8 @@ targets a single `Monster`, declares no `target_part` (異種 is a parless line)
 `interspecies_mating`, `interspecies_domination`, and `interspecies_resonance`, each gated by the
 unlock thresholds below.
 
+Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
+
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 9`
 - **THEN** `interspecies_touch` is absent from the returned set
@@ -55,10 +57,10 @@ unlock thresholds below.
 #### Scenario: The unlock mappings are tiered by counter thresholds
 - **WHEN** the seven acts' `unlock` mappings are inspected
 - **THEN** `interspecies_touch` and `interspecies_caress` each declare
-  `unlock={"hostile_act_count": 10}`; `interspecies_entangle` and `interspecies_receive` each
-  declare `unlock={"hostile_act_count": 30}`; `interspecies_mating` declares the compound gate
-  `unlock={"hostile_act_count": 30, "climax_count": 20}`; and `interspecies_domination` and
-  `interspecies_resonance` each declare `unlock={"interspecies_act_count": 20}`
+  `unlock={"hostile_act_count": <declared positive threshold>}`; `interspecies_entangle` and `interspecies_receive` each
+  declare `unlock={"hostile_act_count": <declared positive threshold>}`; `interspecies_mating` declares the compound gate
+  `unlock={"hostile_act_count": <declared positive threshold>, "climax_count": <declared positive threshold>}`; and `interspecies_domination` and
+  `interspecies_resonance` each declare `unlock={"interspecies_act_count": <declared positive threshold>}`
 
 #### Scenario: The counter records participation from either side
 - **WHEN** an interspecies act happens between two bodies of different species
@@ -73,7 +75,11 @@ unlock thresholds below.
 - **WHEN** an act resolves, including a same-species cast (a target that is not a `Monster`)
 - **THEN** mirroring applies whenever the act resolves; a same-species cast keeps the shipped
   actor-credit behavior and credits the participant only if the shipped handler's own rules already
-  do — this delta adds no species condition to the counter handler
+  do ;  this delta adds no species condition to the counter handler
+
+#### Scenario: Declared thresholds are mutable and boundary examples are synthetic
+- **WHEN** exact numerical boundary cases above are exercised
+- **THEN** local fixed synthetic declarations use those boundary values; shipped acts retain the stated counter-key topology, membership and resistance policy with authored positive thresholds, and tests do not pin their literal unlock counts
 
 ### Requirement: Every act declares target_part=None, never a BODY_PARTS member
 Every one of the seven acts added by this change SHALL declare `target_part=None`.
@@ -93,20 +99,16 @@ act added by this change SHALL declare `sexual_events=()`.
   act added by this change ever names that event
 
 ### Requirement: interspecies_receive declares the highest actor_pleasure_ratio among this change's seven acts
-`interspecies_receive` SHALL declare `actor_pleasure_ratio=0.9`, strictly greater than every other
-act this change adds.
+`interspecies_receive` SHALL retain the greatest actor-side ratio among the seven existing acts, with the exact ratio authored as adjustable data.
 
 #### Scenario: interspecies_receive's ratio exceeds every sibling act's ratio
-- **WHEN** the `actor_pleasure_ratio` of all seven acts this change adds is compared
-- **THEN** `interspecies_receive`'s value (`0.9`) is strictly greater than each of the other six
+- **WHEN** shipped declarations are validated
+- **THEN** the receive ratio exceeds each sibling's ratio without an expected literal ratio table
 
 ### Requirement: interspecies_mating grants the actor strictly more pleasure than interspecies_receive despite the lower ratio
-`interspecies_mating` SHALL declare `base_pleasure=26`. Combined with `interspecies_receive`'s
-`base_pleasure=18, actor_pleasure_ratio=0.9`, this SHALL hold even at the worst-case multiplier
-combination (`普通` sensitivity, `強烈` shame, `participant_count == 2`).
+`interspecies_mating` SHALL retain its established greater actor pleasure than `interspecies_receive` despite its smaller ratio, including the existing ordinary-sensitivity, strong-shame, two-participant control condition. Exact base pleasure and ratio magnitudes SHALL remain authored data.
 
 #### Scenario: Worst-case actor-side gain still orders interspecies_mating above interspecies_receive
-- **WHEN** `compute_pleasure_gain` is evaluated for the same actor at `普通` sensitivity (multiplier
-  `1.0`), `強烈` shame (multiplier `0.65`), and `participant_count == 2` for both
-  `interspecies_mating` and `interspecies_receive`
-- **THEN** `interspecies_mating`'s resulting gain is strictly greater than `interspecies_receive`'s
+- **WHEN** both acts resolve from separately reset controlled participant states
+- **THEN** observed actor pleasure increase is greater for mating, without pinning 13/12 gains or computing the expected result with the same production gain function
+
