@@ -1,5 +1,6 @@
-"""Data-contract test: skill registry content contract
-Slice of ``test_skill_registry``: SkillRegistryTests.
+"""Data-contract test: skill registry typed kit/reference contract
+Slice of ``test_skill_registry``: SkillRegistryTests and the authored monster
+kit reference/eligibility checks derived from the variant registries.
 """
 from tools.spec_traceability import covers_requirement
 import ast

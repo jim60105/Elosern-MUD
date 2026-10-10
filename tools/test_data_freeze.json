@@ -82,7 +82,7 @@
     },
     {
       "path": "world/lore/tests/test_monster_species_content.py",
-      "reason": "shipped bestiary identity, narrative, profile integrity and construction wiring"
+      "reason": "registry-derived monster identity, profile/kit coverage and bestiary relationship contract"
     },
     {
       "path": "world/lore/tests/test_names.py",
@@ -370,7 +370,7 @@
     },
     {
       "path": "world/skills/tests/test_skill_registry/test_registry_contract.py",
-      "reason": "skill registry content contract"
+      "reason": "skill registry typed kit/reference contract"
     },
     {
       "path": "world/skills/tests/test_spell_catalogs.py",

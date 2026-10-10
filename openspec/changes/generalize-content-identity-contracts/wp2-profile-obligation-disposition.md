@@ -138,3 +138,29 @@ comparison helpers stay in place, with a comment naming the keyed bestiary relat
 what replaces them. That package's task removes the prose fixtures and adds the checker; WP2 only
 rebased their iteration onto the live registries and re-attached their annotations, so no coverage
 window is opened by this package.
+
+## 6. Ledger/metadata edit path, and a conflict between two recorded rules
+
+The two carried reasons this package changed
+(`world/lore/tests/test_monster_species_content.py`,
+`world/skills/tests/test_skill_registry/test_registry_contract.py`) were changed in all three places
+at once: the file's first docstring line, `tools/test_data_lint_seed.json`, and
+`tools/test_data_freeze.json`. `uv run --locked python -m tools.test_data_lint check` reports
+`violations=0` with a two-line ledger diff.
+
+The ledger was **not** regenerated with `tools.test_data_lint seed`, and the reason is itself a
+conflict between two recorded rules:
+
+* `metadata-map.md` rule 5 (as amended in `00015605`) says to regenerate the ledger with that command
+  and not to hand-edit it.
+* `metadata-map.md` rule 6, and its Table C entry for `world/rules/tests/test_buffs.py`, forbid the
+  move that regeneration performs: the tool rebuilds `contract` from the seed, which is missing that
+  one pre-existing contract entry, so regenerating moves it from `contract` to `debt` — "never the
+  reverse by reason of this cutover" — and rewrites the whole 470-entry ledger (356 insertions / 38
+  deletions in the working tree, reordered).
+
+The regenerating path therefore cannot be taken without breaking rule 6 and reopening the
+asymmetry WP1 recorded for exactly this reason. The surgical three-place edit satisfies the gate,
+keeps the diff to the two reasons, and leaves the ledger/seed asymmetry exactly as WP1 recorded it.
+This is called out for WP7, which owns the integrated gate, in case the project prefers to resolve
+the rule conflict the other way at that point.

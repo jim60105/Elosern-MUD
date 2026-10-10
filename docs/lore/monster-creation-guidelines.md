@@ -104,18 +104,19 @@
 
 ## 魔物資源技能與套組配置（2026-10-09 起陸續落地）
 
-首批十二個核准變體皆有完整戰鬥設定與有效公會評級。吞潮鱷、穗鳴雀、潮燈蟹各有兩個變體實作專屬資源技能套組；資源池與戰鬥數值以現行宣告為準，不另維護核准數值表。
+每個變體都以列上的 `profile_required` 自行宣告是否必須具備完整戰鬥設定與有效公會評級。宣告為必要者若缺少完整檔案或評級，註冊表載入即失敗；未宣告必要者可以留空，個體建構時沿用該變體所屬威脅層級的既有帶狀預設值。吞潮鱷、穗鳴雀、潮燈蟹各有兩個變體實作專屬資源技能套組；資源池與戰鬥數值一律以現行宣告為準，不另維護核准數值表，也不從名稱、敘述或其他變體推導數字。
 
-1. **套組配置**：變體可選擇性宣告有序主動技能（`active_skill_keys`）、被動技能（`passive_skill_keys`）與行為設定檔鍵（`behaviour_profile_key`）。吞潮鱷配置 `tide_devouring_bite`（吞潮咬擊），穗鳴雀配置 `grain_shaking_peck`（震穗啄擊），潮燈蟹配置 `lamp_carapace_claw`（燈甲螯擊），皆於固有普通攻擊（`basic_attack`）與逃跑（`flee`）之前選用。
-2. **其餘六變體的套組維持暫緩**：其餘六個已核准變體保留完整宣告，資源池不得從敘述推導。三項暫緩特殊能力（壓實土埂、聚集霧氣、敲岩脈動）維持敘事邊界與純物理普通攻擊，不建立造假技能或捏造前置。
+1. **套組配置**：變體可選擇性宣告有序主動技能（`active_skill_keys`）、被動技能（`passive_skill_keys`）與行為設定檔鍵（`behaviour_profile_key`）。吞潮鱷配置 `tide_devouring_bite`（吞潮咬擊），穗鳴雀配置 `grain_shaking_peck`（震穗啄擊），潮燈蟹配置 `lamp_carapace_claw`（燈甲螯擊），皆於固有普通攻擊（`basic_attack`）與逃跑（`flee`）之前選用。可執行能力的所有權完全來自列本身宣告的資料，沒有物種白名單；未宣告套組的列不會因為敘述提到某項能力而取得技能、資源或效果。
+2. **其餘六變體未宣告套組**：其餘六個變體保留完整戰鬥設定宣告，但不宣告任何技能或行為設定檔，資源池不得從敘述推導。三項尚未實作的敘事能力（壓實土埂、聚集霧氣、敲岩脈動）維持敘事邊界與純物理普通攻擊，不建立造假技能或捏造前置。
 3. **無啟動重置或線上遷移**：個體建構時將持久化身分、套組與當前資源，重載維持已消耗之 MP/SP 與行為綁定；註冊表更新不重置線上個體。
 
 ### Test authoring boundaries
 
-Check every shipped variant's complete current profile, tier/grade bounds,
-owned kit and behavior references. Keep deferred kits absent independently
-of their authored resource pools. A valid profile or cost edit must not require
-a duplicate expected-value table.
+Check every shipped variant's declared profile obligation, complete current
+profile, tier/grade bounds, owned kit and behavior references. Keep rows that
+declare no profile or no kit absent independently of their authored resource
+pools. A valid profile, kit or cost edit must not require a duplicate
+expected-value table, and no per-species key tuple belongs in a test.
 
 Shared synthetic suites establish hit qualification, actual-loss transfer,
 payment ordering and post-write/post-claim rollback with fixed outcomes.
