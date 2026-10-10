@@ -3,7 +3,7 @@
 // blocked mappings, the flash timing, and the `off` motion level.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { effectScope } from "vue";
+import { effectScope, reactive, ref } from "vue";
 import ExplorationReadout from "../../components/ExplorationReadout.vue";
 import {
   DEAD_END_TEXT,
@@ -15,7 +15,7 @@ import {
   presentCount,
   readoutContent,
 } from "../../components/exploration-readout.js";
-import { useReadoutState } from "../../composables/use-exit-compass.js";
+import { useExitCompass, useReadoutState } from "../../composables/use-exit-compass.js";
 
 const angled = { kind: "angled", angle: 270, glyph: "←", label: "測試荒野區域", enabled: true, reason: null };
 const portal = { kind: "portal", slot: 0, glyph: "⇧", label: "塔樓三層", enabled: true, reason: null };
@@ -126,6 +126,32 @@ describe("the readout's flash timing", () => {
     expect(state.content.value.text).toBe("second");
     vi.advanceTimersByTime(600);
     expect(state.content.value.flash).toBe(false);
+  });
+});
+
+describe("the compass arrival signal", () => {
+  it("observes a wilderness coordinate arrival when the room identity is reused", () => {
+    const scope = effectScope();
+    try {
+      const store = reactive({
+        view: { explorationCurrentNode: "wild:test:0:0" },
+      });
+      const panel = reactive({ look: { room: { identity: 42 } } });
+      const wiring = scope.run(() =>
+        useExitCompass(store, { panel: () => panel, compassRef: ref(null) }),
+      );
+      const first = wiring.compassArrivalKey.value;
+      store.view.explorationCurrentNode = "wild:test:0:1";
+      expect(wiring.compassArrivalKey.value).not.toBe(first);
+      const arrived = wiring.compassArrivalKey.value;
+      // A non-movement panel replacement must not schedule another step.
+      panel.look.room = { identity: 42 };
+      expect(wiring.compassArrivalKey.value).toBe(arrived);
+      panel.look.room = { identity: 43 };
+      expect(wiring.compassArrivalKey.value).not.toBe(arrived);
+    } finally {
+      scope.stop();
+    }
   });
 });
 

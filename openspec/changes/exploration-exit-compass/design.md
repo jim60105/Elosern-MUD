@@ -76,6 +76,9 @@ None blocking. The exact location of the store's submission gate is resolved by 
 The successor apply preserves the previous implementation commits. The contract
 gate found four authored test fixtures that named shipped catalog content; those
 fixtures now use synthetic labels without changing their assertions.
+The compass arrival key includes both committed room identity and current node,
+because wilderness coordinates can change while the server reuses a room object.
+An unchanged-node panel replacement does not count as another arrival.
 
 Task 6.2 adds complete MODIFIED requirement blocks across contextual HUD, frame
 resolution, options, browser verification, component showcase, desktop shell,

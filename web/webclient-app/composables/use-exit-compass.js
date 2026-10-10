@@ -64,11 +64,13 @@ export function useExitCompass(store, { panel, compassRef }) {
     }),
   );
 
-  // The arrival signal: the committed room identity, which changes exactly on
-  // movement (the same key the dock's room-change reset uses).
+  // Wilderness rooms can be reused across coordinates. Include the committed
+  // node so every logical arrival is observed even when the room id survives.
   const compassArrivalKey = computed(() => {
     const identity = explorationPanel.value?.look?.room?.identity;
-    return identity === undefined ? null : identity;
+    return identity === undefined
+      ? null
+      : `${identity}:${store.view.explorationCurrentNode ?? ""}`;
   });
 
   const compassBusy = computed(() => !!store.view.submitLocked);

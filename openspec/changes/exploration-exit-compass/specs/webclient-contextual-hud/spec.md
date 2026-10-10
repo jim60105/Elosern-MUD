@@ -57,24 +57,24 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** it renders no exit-outlet grid and no navigation-row list: exits are targets of the separate compass, and a host's conversation topics are the dialogue surface's choices, never a dock frame
 
 #### Scenario: An enabled exit chip names direction by glyph and destination by text
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** the compass aims an enabled angled exit
+- **THEN** its pip marks the bearing and the shared readout names the committed destination with its octant glyph, without repeating a direction-word label
 
 #### Scenario: Direction glyphs come only from the canonical table
 - **WHEN** an exit label falls outside the fixed client-side table of canonical direction words
-- **THEN** the glyph is resolved from that table, and an out-of-table label renders verbatim as the chip's primary text (there being no glyph to carry it) rather than being mapped to a guessed direction
+- **THEN** no direction is guessed from the label: a usable map bearing supplies its octant glyph, otherwise it becomes a portal whose fallback text is the verbatim label
 
 #### Scenario: An unknown destination falls back without doubling labels
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** an enabled exit's destination is absent from the committed local map
+- **THEN** the readout uses the exit's own label once and invents no destination name
 
 #### Scenario: A disabled exit chip keeps its own label and marker
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** a compass target is disabled
+- **THEN** its hollow dashed marker remains visible and aimable, and the readout shows `無法通行` with the unchanged server-authored reason instead of promising a destination
 
 #### Scenario: Exit chip focus and disabled reasons stay honest
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** the compass aims an exit or explains a disabled target
+- **THEN** shape and fill mark its aim, the shared polite live readout exposes the unchanged disabled reason, a disabled target submits nothing, and an enabled activation keeps the move payload unchanged
 
 #### Scenario: Chips and rows render only backed fields
 - **WHEN** any chip or row renders
@@ -93,24 +93,24 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** it keeps the existing disabled contract: it remains focusable by arrow keys and by pointer, keeps its accessible disabled state and its server-authored explanation, and submits nothing
 
 #### Scenario: A move row names where it goes
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** the compass aims an enabled exit whose destination node is present in the committed local map
+- **THEN** the shared readout shows that node's display name with the target's angled or portal glyph, and activation submits the unchanged move payload
 
 #### Scenario: A non-canonical exit keeps its own name
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** an exit has no usable map bearing and its label is outside the canonical direction table
+- **THEN** it becomes a portal, keeps its own label as the destination-name fallback, and no direction is guessed from that label
 
 #### Scenario: An unknown destination falls back to the exit's own label
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** an enabled canonical-direction target has no destination node in the committed local map
+- **THEN** the readout shows its octant glyph and its own label as the fallback text, without inventing a node name
 
 #### Scenario: A disabled exit never loses its disabled marker to a known destination
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** a disabled exit's destination node is present in the committed map
+- **THEN** its target remains visibly disabled and its readout shows the server reason in the warn tone, never replacing that explanation with the destination name
 
 #### Scenario: A focused move row is not double-marked
-- **WHEN** the compass resolves or aims the committed exit described by this scenario
-- **THEN** the compass target and shared readout follow `webclient-exit-compass`: map bearing precedes canonical direction fallback, other exits become portals, enabled destinations use committed node names with exit-label fallback, disabled targets stay aimable and expose the unchanged server reason without submitting, and activation uses the unchanged move payload
+- **WHEN** a compass target is aimed
+- **THEN** its aim wedge, pip or bead treatment, and knob carry the aim, and no legacy chip-focus glyph is added beside its readout glyph
 
 #### Scenario: The move frame has no companion panel
 - **WHEN** the exploration root renders with any overview chip focused
