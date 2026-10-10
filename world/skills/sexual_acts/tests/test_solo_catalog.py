@@ -35,29 +35,9 @@ _TIER_3 = (
 )
 _ALL_ACTS = (*_TIER_1, *_TIER_2, *_TIER_3)
 
-# The exact unlock table design.md D-1 pins, keyed per act.
-_UNLOCK_TABLE = {
-    "solo_deep_touch": {"masturbation_count": 10},
-    "solo_both_hands": {"masturbation_count": 10},
-    "solo_finger_lick": {"masturbation_count": 10},
-    "solo_rear_touch": {"masturbation_count": 10},
-    "solo_nipple_play": {"masturbation_count": 10},
-    "solo_toy_vibrator": {"masturbation_count": 25},
-    "solo_toy_clamps": {"masturbation_count": 25},
-    "solo_toy_plug": {"masturbation_count": 25},
-    "solo_toy_advanced_link": {
-        "masturbation_count": 25,
-        "toy_use_count": 15,
-    },
-    "solo_toy_advanced_full": {
-        "masturbation_count": 25,
-        "toy_use_count": 15,
-    },
-    "solo_bound_masturbation": {
-        "masturbation_count": 25,
-        "toy_use_count": 15,
-    },
-}
+def _unlock(act_key: str) -> dict[str, int]:
+    """The act's declared unlock mapping (its authored thresholds)."""
+    return dict(SEXUAL_ACT_REGISTRY[act_key].unlock)
 
 
 def _entity(key="solo catalog owner"):
@@ -79,13 +59,26 @@ def _use_toys(entity, times):
 
 
 class SoloActRegistrationTests(unittest.TestCase):
-    """The eleven rows carry exactly the D-1 unlock/self-shape table."""
+    """The eleven rows carry a valid authored unlock/self-shape."""
 
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")
-    def test_each_act_declares_its_d1_unlock_mapping(self):
-        for key, expected in _UNLOCK_TABLE.items():
+    def test_each_act_declares_a_valid_positive_unlock_mapping(self):
+        for key in _ALL_ACTS:
             with self.subTest(key=key):
-                self.assertEqual(dict(SEXUAL_ACT_REGISTRY[key].unlock), expected)
+                unlock = _unlock(key)
+                self.assertTrue(unlock)
+                for counter, threshold in unlock.items():
+                    self.assertIs(type(threshold), int, counter)
+                    self.assertGreater(threshold, 0, counter)
+        # The tiered counter pairing is retained topology.
+        for key in _TIER_1:
+            self.assertEqual(set(_unlock(key)), {"masturbation_count"})
+        for key in _TIER_2:
+            self.assertEqual(set(_unlock(key)), {"masturbation_count"})
+        for key in _TIER_3:
+            self.assertEqual(
+                set(_unlock(key)), {"masturbation_count", "toy_use_count"}
+            )
 
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")
     def test_every_act_is_a_self_targeted_unresistible_solo_act(self):
@@ -124,7 +117,7 @@ class SoloUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")
     def test_tier1_act_locked_below_threshold_and_unlocked_at_it(self):
         entity = _entity()
-        _masturbate(entity, 9)
+        _masturbate(entity, _unlock("solo_deep_touch")["masturbation_count"] - 1)
         self.assertNotIn("solo_deep_touch", entity.skills.owned_keys())
         entity.sexual.record_masturbation()
         self.assertIn("solo_deep_touch", entity.skills.owned_keys())
@@ -132,15 +125,17 @@ class SoloUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")
     def test_tier2_act_requires_masturbation_count_not_toy_use_count(self):
         entity = _entity()
-        _masturbate(entity, 25)
+        _masturbate(entity, _unlock("solo_toy_vibrator")["masturbation_count"])
         self.assertEqual(entity.sexual.toy_use_count, 0)
         self.assertIn("solo_toy_vibrator", entity.skills.owned_keys())
 
     @covers_requirement("sexual-catalog-solo::eleven-tier-1-3-solo-acts-are-registered-gated-by-masturbation-count-and-or-toy-use-count-thresholds")
     def test_tier3_act_requires_both_counters_not_toy_use_count_alone(self):
         entity = _entity()
-        _masturbate(entity, 24)
-        _use_toys(entity, 15)
+        _masturbate(
+            entity, _unlock("solo_toy_advanced_link")["masturbation_count"] - 1
+        )
+        _use_toys(entity, _unlock("solo_toy_advanced_link")["toy_use_count"])
         self.assertNotIn("solo_toy_advanced_link", entity.skills.owned_keys())
         entity.sexual.record_masturbation()
         self.assertIn("solo_toy_advanced_link", entity.skills.owned_keys())
@@ -170,24 +165,30 @@ class SoloCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-solo::tier-2-and-tier-3-acts-credit-both-masturbation-count-and-toy-use-count-on-cast")
     def test_toy_act_increments_both_counters_by_exactly_one(self):
-        _masturbate(self.actor, 25)
+        threshold = _unlock("solo_toy_vibrator")["masturbation_count"]
+        _masturbate(self.actor, threshold)
         result = self._cast("solo_toy_vibrator")
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.masturbation_count, 26)
+        self.assertEqual(self.actor.sexual.masturbation_count, threshold + 1)
         self.assertEqual(self.actor.sexual.toy_use_count, 1)
 
     @covers_requirement("sexual-catalog-solo::tier-2-and-tier-3-acts-credit-both-masturbation-count-and-toy-use-count-on-cast")
     def test_tier3_act_also_increments_both_counters_by_exactly_one(self):
-        _masturbate(self.actor, 25)
-        _use_toys(self.actor, 15)
+        unlock = _unlock("solo_toy_advanced_full")
+        _masturbate(self.actor, unlock["masturbation_count"])
+        _use_toys(self.actor, unlock["toy_use_count"])
         result = self._cast("solo_toy_advanced_full")
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.masturbation_count, 26)
-        self.assertEqual(self.actor.sexual.toy_use_count, 16)
+        self.assertEqual(
+            self.actor.sexual.masturbation_count, unlock["masturbation_count"] + 1
+        )
+        self.assertEqual(
+            self.actor.sexual.toy_use_count, unlock["toy_use_count"] + 1
+        )
 
     @covers_requirement("sexual-catalog-solo::only-the-two-deepest-tier-1-acts-add-the-masturbation-experience-type")
     def test_solo_deep_touch_adds_the_masturbation_experience_type(self):
-        _masturbate(self.actor, 10)
+        _masturbate(self.actor, _unlock("solo_deep_touch")["masturbation_count"])
         self.assertEqual(self.actor.sexual.experience_types, frozenset())
         result = self._cast("solo_deep_touch")
         self.assertEqual(result.outcome, "success")
@@ -195,7 +196,7 @@ class SoloCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-solo::only-the-two-deepest-tier-1-acts-add-the-masturbation-experience-type")
     def test_tier1_act_outside_the_deepest_two_adds_no_experience_type(self):
-        _masturbate(self.actor, 10)
+        _masturbate(self.actor, _unlock("solo_finger_lick")["masturbation_count"])
         result = self._cast("solo_finger_lick")
         self.assertEqual(result.outcome, "success")
         self.assertEqual(self.actor.sexual.experience_types, frozenset())

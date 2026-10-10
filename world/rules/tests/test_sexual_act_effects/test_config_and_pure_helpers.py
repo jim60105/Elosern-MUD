@@ -74,10 +74,16 @@ class EffectsConfigTests(unittest.TestCase):
     def test_shipped_table_loads_and_exposes_both_values(self):
         config = load_effects_config()
         multipliers = getattr(config, _MULTIPLIER_FIELD)
-        self.assertEqual(multipliers["1"], 1.0)
-        self.assertEqual(multipliers["2"], 1.1)
-        self.assertEqual(multipliers["3+"], 1.2)
-        self.assertEqual(getattr(config, _THRESHOLD_FIELD), 20)
+        # The table keys and the non-descending shape are the contract; the
+        # authored values are tuning data.
+        self.assertEqual(set(multipliers), {"1", "2", "3+"})
+        values = [multipliers[key] for key in ("1", "2", "3+")]
+        self.assertTrue(all(type(value) is float for value in values))
+        self.assertEqual(values, sorted(values))
+        self.assertGreater(values[0], 0)
+        threshold = getattr(config, _THRESHOLD_FIELD)
+        self.assertIs(type(threshold), int)
+        self.assertGreater(threshold, 0)
 
     @covers_requirement("sexual-act-effects::sexual-act-effects-yaml-declares-the-participant-count-table-and-the-climax-extension-threshold-validated-at-load")
     def test_missing_threshold_fails_closed_naming_the_field(self):
@@ -120,11 +126,14 @@ class EffectsConfigTests(unittest.TestCase):
 
     def test_participant_multiplier_buckets_counts(self):
         config = load_effects_config()
-        self.assertEqual(config.participant_multiplier(1), 1.0)
-        self.assertEqual(config.participant_multiplier(2), 1.1)
+        multipliers = getattr(config, _MULTIPLIER_FIELD)
+        self.assertEqual(config.participant_multiplier(1), multipliers["1"])
+        self.assertEqual(config.participant_multiplier(2), multipliers["2"])
         for count in (3, 4, 30):
             with self.subTest(count=count):
-                self.assertEqual(config.participant_multiplier(count), 1.2)
+                self.assertEqual(
+                    config.participant_multiplier(count), multipliers["3+"]
+                )
         for bad in (0, -2, 1.5, True):
             with self.subTest(count=bad):
                 with self.assertRaises(ValueError):

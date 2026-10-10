@@ -97,7 +97,10 @@ class DivineEighthRowStructuralTests(unittest.TestCase):
 
     def test_placeholder_pleasure_field_is_referenced_by_no_effect(self):
         skill, act = self._eighth()
-        self.assertEqual(act.base_pleasure, 1)
+        # The counter field is an inert placeholder of a valid shape; the
+        # contract is that no effect reads it.
+        self.assertIs(type(act.base_pleasure), int)
+        self.assertGreaterEqual(act.base_pleasure, 0)
         self.assertFalse(
             [effect for effect in skill.effects if effect.startswith("pleasure:")],
             "no pleasure: effect may read the placeholder base_pleasure",

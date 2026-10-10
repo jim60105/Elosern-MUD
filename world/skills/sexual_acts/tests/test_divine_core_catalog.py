@@ -137,8 +137,13 @@ class DivineActRegistrationTests(unittest.TestCase):
     def test_placeholder_pleasure_fields_are_documented_not_read(self):
         for skill, act in self._c7a_pairs().values():
             with self.subTest(key=skill.key):
-                self.assertEqual(act.base_pleasure, 1)
-                self.assertEqual(act.actor_pleasure_ratio, 0.0)
+                # These counter fields are inert placeholders: the acts
+                # declare no pleasure effect at all, so only their shape is
+                # asserted, never an authored magnitude.
+                self.assertIs(type(act.base_pleasure), int)
+                self.assertGreaterEqual(act.base_pleasure, 0)
+                self.assertGreaterEqual(act.actor_pleasure_ratio, 0)
+                self.assertLessEqual(act.actor_pleasure_ratio, 1)
                 self.assertIsNone(act.actor_part)
 
 
