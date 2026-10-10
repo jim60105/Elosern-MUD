@@ -507,7 +507,10 @@ class WorldClockAtomicityTests(EvenniaTest):
     @covers_requirement("settlement-stage-order::buff-ticks-sexual-decay-and-practice-settlement-are-skipped-for-combat-sourced-advances")
     def test_booking_survives_combat_and_settles_on_next_skip_advance(self):
         from world.rules.clock import get_world_clock
-        from world.rules.progression import practice_xp_amount
+        from world.rules.progression import (
+            PRACTICE_XP_PER_STUDY_HOUR,
+            practice_xp_amount,
+        )
         from world.skills.registry import SKILL_REGISTRY
 
         self.player.db.skill_proficiency = {"fire_arrow": 20.0}
@@ -523,7 +526,7 @@ class WorldClockAtomicityTests(EvenniaTest):
         per_use = practice_xp_amount(self.player, SKILL_REGISTRY["fire_arrow"])
         self.assertAlmostEqual(
             self.player.db.skill_proficiency["fire_arrow"],
-            20.0 + 2 * 10.0 * per_use,
+            20.0 + 2 * PRACTICE_XP_PER_STUDY_HOUR * per_use,
         )
 
     @covers_requirement("settlement-stage-order::gauge-and-buff-elapsed-time-is-deterministic")
@@ -594,9 +597,13 @@ class WorldClockAtomicityTests(EvenniaTest):
         )
         self.player.db.skills = {"active": ["fire_arrow"], "passive": []}
         # One XP short of the first proficiency level: the base human race's
-        # learning multiplier is 1.0, so eight booked hours at 10.0 XP/hour
-        # cross the level-1 threshold and trigger the grant.
-        self.player.db.skill_proficiency = {"fire_arrow": 49.0}
+        # learning multiplier is 1.0, so eight booked hours at the declared
+        # per-hour rate cross the level-1 threshold and trigger the grant.
+        from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
+
+        self.player.db.skill_proficiency = {
+            "fire_arrow": SKILL_PROFICIENCY_XP_PER_LEVEL - 1.0
+        }
         self.player.db.practice_booking = "fire_arrow"
         clock = get_world_clock()
 
@@ -627,7 +634,10 @@ class WorldClockAtomicityTests(EvenniaTest):
             self.player.db.skills, {"active": ["fire_arrow"], "passive": []}
         )
         self.assertNotIn(granted.key, self.player.skills.owned_keys())
-        self.assertEqual(self.player.db.skill_proficiency["fire_arrow"], 49.0)
+        self.assertEqual(
+            self.player.db.skill_proficiency["fire_arrow"],
+            SKILL_PROFICIENCY_XP_PER_LEVEL - 1.0,
+        )
         self.assertEqual(self.player.db.practice_booking, "fire_arrow")
 
     @covers_requirement("time-skip-commands::rest-duration-parses-an-explicit-duration-and-advances-the-clock-by-that-much-capped-at-the-configured-maximum")

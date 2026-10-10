@@ -275,4 +275,6 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         self.assertEqual(self.player.traits.hp.current, 2)
         self.assertAlmostEqual(self.player.traits.hp.regen_remainder, 0.08, places=6)
         self.assertEqual(error.call_count, 1)
-        self.assertEqual(error.call_args.kwargs["context"]["target"], 5)
+        self.assertEqual(
+            error.call_args.kwargs["context"]["target"], self._wake_target()
+        )

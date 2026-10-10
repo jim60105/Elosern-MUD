@@ -3,7 +3,6 @@
 Real-runtime calibration, bounded resolver probes, and persistent host evidence.
 """
 
-import math
 import random
 import unittest
 from dataclasses import dataclass
@@ -18,16 +17,12 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
-from world.lore.items import ITEM_REGISTRY
-from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
-    ActionResult,
     _stored_trait_value,
 )
 from world.rules.character_creation import (
-    CharacterCreationRequest,
     resolve_starting_profile,
     _resolve_values,
 )
@@ -49,16 +44,12 @@ from world.rules.guild_exam_restrictions import (
     preflight_exam_restriction,
     remove_exam_restriction,
 )
-from world.rules.guild_exams import (
-    restore_exam_host,
-    start_guild_exam,
-)
 from world.rules.human_guild_hosts import sync_persistent_adventurers
 from world.rules.traits import _trait_config
 from world.rules.monster_individual import construct_species_individual
 from world.rules.progression import apply_lineage_auto_seed
 from world.rules.progression import can_use_skill
-from world.skills.registry import SKILL_REGISTRY, SkillKind
+from world.skills.registry import SKILL_REGISTRY
 from world.skills.restrictions import exam_restriction
 
 
@@ -74,17 +65,6 @@ class TrialOutcome:
     rejected_actions: int
     final_human_hps: tuple[int, ...]
     final_monster_hp: int
-
-
-def _median(values: list[int | float]) -> float:
-    if not values:
-        return 0.0
-    s = sorted(values)
-    n = len(s)
-    mid = n // 2
-    if n % 2 == 1:
-        return float(s[mid])
-    return (s[mid - 1] + s[mid]) / 2.0
 
 
 def _build_synthetic_probe_monster(name: str, hp: int, attack: int, agility: int, defense: int) -> Monster:

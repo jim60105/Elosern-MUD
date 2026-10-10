@@ -20,6 +20,7 @@ from world.rules import progression
 from world.rules.progression import (
     AFFINITY_ELEMENT_MULTIPLIER,
     FREEFORM_SCALE_LADDER,
+    FREEFORM_SCALE_VALUES,
     NON_AFFINITY_ELEMENT_MULTIPLIER,
     PROFICIENCY_TIP_CAP,
     SKILL_PRACTICE_XP_PER_USE,
@@ -384,6 +385,17 @@ class TipCapTests(_Scoped):
         self.assertTrue(can_use_skill(entity, TREE["t_tree_canopy"]))
 
 
+# A file-local synthetic ladder: the shipped ladder is authored progression
+# data, so the numeric rung examples below run on these fixed rows instead of
+# approving the shipped thresholds and scale values.
+_SYNTHETIC_LADDER = ((0.25, 0), (0.5, 2), (1.0, 4))
+
+
+def _xp_for_level(level: int) -> float:
+    """Whole proficiency levels in the declared XP-per-level unit."""
+    return float(level * SKILL_PROFICIENCY_XP_PER_LEVEL)
+
+
 class FreeformLadderTests(_Scoped):
     """Skill-anchored ladder over the cast skill's own proficiency."""
 
@@ -398,23 +410,37 @@ class FreeformLadderTests(_Scoped):
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_ladder_constants(self):
-        self.assertEqual(
-            FREEFORM_SCALE_LADDER,
-            ((0.25, 0), (0.5, 1), (1.0, 3), (2.0, 6), (4.0, 10)),
-        )
+        # The shipped ladder's shape is the contract: anchored at level 0,
+        # strictly ascending in both fields over canonical cast scales. The
+        # numeric rungs are authored progression data.
+        levels = [min_level for _, min_level in FREEFORM_SCALE_LADDER]
+        scales = [scale for scale, _ in FREEFORM_SCALE_LADDER]
+        self.assertEqual(levels[0], 0)
+        self.assertEqual(levels, sorted(levels))
+        self.assertEqual(len(set(levels)), len(levels))
+        self.assertEqual(scales, sorted(scales))
+        self.assertEqual(len(set(scales)), len(scales))
+        self.assertLessEqual(set(scales), set(FREEFORM_SCALE_VALUES))
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_entitled_levels_unlock_rungs(self):
         skill = TREE[self.CANOPY]
-        for xp, expected in (
-            (0.0, (0.25,)),
-            (50.0, (0.25, 0.5)),
-            (150.0, (0.25, 0.5, 1.0)),
-            (300.0, (0.25, 0.5, 1.0, 2.0)),
-            (500.0, (0.25, 0.5, 1.0, 2.0, 4.0)),
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
         ):
-            with self.subTest(xp=xp):
-                self.assertEqual(freeform_scales_for(self._master(xp), skill), expected)
+            for level, expected in (
+                (0, (0.25,)),
+                (2, (0.25, 0.5)),
+                (4, (0.25, 0.5, 1.0)),
+            ):
+                with self.subTest(level=level):
+                    self.assertEqual(
+                        freeform_scales_for(
+                            self._master(_xp_for_level(level)), skill
+                        ),
+                        expected,
+                    )
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_no_mastery_means_no_ladder(self):
@@ -429,7 +455,13 @@ class FreeformLadderTests(_Scoped):
             (self.CANOPY, _MASTERY_KEY, "t_tree_heartwood"),
             {self.CANOPY: 0.0, "t_tree_heartwood": 500.0},
         )
-        self.assertEqual(freeform_scales_for(entity, TREE[self.CANOPY]), (0.25,))
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
+        ):
+            self.assertEqual(
+                freeform_scales_for(entity, TREE[self.CANOPY]), (0.25,)
+            )
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_unknown_element_entitlement_fails_closed(self):
@@ -438,15 +470,18 @@ class FreeformLadderTests(_Scoped):
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_capped_skill_ladder_is_bounded_by_its_tip_cap(self):
-        # The root caps at Lv.3; the 1.0 rung needs Lv.3 (passes) and the
-        # 2.0 rung needs Lv.6, so the ladder provably stops at 1.0 even on
-        # inflated XP — a mid-tree spell never advertises a rung it cannot
-        # practise to.
+        # The root caps at Lv.3, so under the synthetic ladder the 1.0 rung
+        # (level 4) is unreachable even on inflated XP — a mid-tree spell
+        # never advertises a rung it cannot practise to.
         entity = _entity(("t_tree_root", _MASTERY_KEY), {"t_tree_root": 500.0})
-        self.assertEqual(
-            freeform_scales_for(entity, TREE["t_tree_root"]),
-            (0.25, 0.5, 1.0),
-        )
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
+        ):
+            self.assertEqual(
+                freeform_scales_for(entity, TREE["t_tree_root"]),
+                (0.25, 0.5),
+            )
 
     @covers_requirement("skill-lineage::the-freeform-scale-ladder-is-anchored-to-proficiency")
     def test_scale_entries_follow_the_ladder_with_scaled_costs(self):
@@ -454,9 +489,13 @@ class FreeformLadderTests(_Scoped):
         # whose ladder anchors on its OWN proficiency.
         entity = _entity(
             (_MAGIC_SPELL.key, _MASTERY_KEY),
-            {_MAGIC_SPELL.key: 150.0},
+            {_MAGIC_SPELL.key: _xp_for_level(4)},
         )
-        entries = freeform_scale_entries_for(entity, _MAGIC_SPELL)
+        with patch(
+            "world.rules.progression._scaling.FREEFORM_SCALE_LADDER",
+            _SYNTHETIC_LADDER,
+        ):
+            entries = freeform_scale_entries_for(entity, _MAGIC_SPELL)
         self.assertEqual([entry[0] for entry in entries], [0.25, 0.5, 1.0])
         self.assertTrue(all(entry[2] >= 1 for entry in entries))
         self.assertEqual(entries[-1][1], "1")

@@ -849,7 +849,13 @@ class CombatModifierTests(EvenniaTestCase):
         # row, not from the combat-modifier row's literal.
         from world.rules.church_rulebook import get_church_rules
 
-        row = get_church_rules().accrual["rite_martial_blessing"]
+        # Resolved structurally: the shipped row id is catalog data this
+        # behavior test must not name.
+        row = next(
+            r
+            for r in get_church_rules().accrual.values()
+            if "magnitude" in r and r.get("skill_key")
+        )
         entity = self._entity()
         apply_buff(entity, "martial_blessing")
         self.assertEqual(
