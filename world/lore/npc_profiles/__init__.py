@@ -74,17 +74,33 @@ def assemble_profile_registry(
     return registry
 
 
+#: The owned slices, in the fixed order above. This declaration is the single
+#: source of truth: the registry is assembled from it, and the NPC source
+#: inventory's owning-slice labels resolve through
+#: :data:`PROFILE_KEY_SLICES` rather than through a second hand-kept list.
+PROFILE_SLICES: tuple[tuple[str, tuple[NpcProfile, ...]], ...] = (
+    ("altoria_lower", ALTORIA_LOWER_ROWS),
+    ("altoria_trade", ALTORIA_TRADE_ROWS),
+    ("altoria_guild", ALTORIA_GUILD_ROWS),
+    ("altoria_upper", ALTORIA_UPPER_ROWS),
+    ("ciaran_homes_a", CIARAN_HOMES_A_ROWS),
+    ("ciaran_homes_b", CIARAN_HOMES_B_ROWS),
+)
+
+#: The slice labels the assembly declares, in order.
+PROFILE_SLICE_LABELS: tuple[str, ...] = tuple(
+    label for label, _ in PROFILE_SLICES
+)
+
 NPC_PROFILE_REGISTRY: MappingProxyType[str, NpcProfile] = MappingProxyType(
-    assemble_profile_registry(
-        (
-            ("altoria_lower", ALTORIA_LOWER_ROWS),
-            ("altoria_trade", ALTORIA_TRADE_ROWS),
-            ("altoria_guild", ALTORIA_GUILD_ROWS),
-            ("altoria_upper", ALTORIA_UPPER_ROWS),
-            ("ciaran_homes_a", CIARAN_HOMES_A_ROWS),
-            ("ciaran_homes_b", CIARAN_HOMES_B_ROWS),
-        )
-    )
+    assemble_profile_registry(PROFILE_SLICES)
+)
+
+#: Which slice declares each profile key. ``NPC_PROFILE_REGISTRY`` and this
+#: mapping are both derived from ``PROFILE_SLICES``, so a profile cannot be
+#: registered without a declared owner.
+PROFILE_KEY_SLICES: MappingProxyType[str, str] = MappingProxyType(
+    {row.key: label for label, rows in PROFILE_SLICES for row in rows}
 )
 
 __all__ = [
@@ -95,4 +111,7 @@ __all__ = [
     "CIARAN_HOMES_A_ROWS",
     "CIARAN_HOMES_B_ROWS",
     "NPC_PROFILE_REGISTRY",
+    "PROFILE_KEY_SLICES",
+    "PROFILE_SLICES",
+    "PROFILE_SLICE_LABELS",
 ]

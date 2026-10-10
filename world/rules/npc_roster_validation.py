@@ -32,21 +32,20 @@ class NpcRosterError(Exception):
         )
 
 
-def derive_shipped_sources(
+def _resolve_shipped_inputs(
     *,
-    places: Mapping[str, PlaceDefinition] | None = None,
-    dialogue_rows: Mapping[str, Any] | None = None,
-    player_presets: Mapping[str, PlayerPreset] | None = None,
-    quest_templates: Iterable[Any] | None = None,
-    examples_dir: Path | None = None,
-    adventurers: Mapping | None = None,
-) -> frozenset[tuple[str, str]]:
-    """Derive the complete set of shipped NPC source (kind, key) pairs.
+    places: Mapping[str, PlaceDefinition] | None,
+    dialogue_rows: Mapping[str, Any] | None,
+    player_presets: Mapping[str, PlayerPreset] | None,
+    quest_templates: Iterable[Any] | None,
+    examples_dir: Path | None,
+    adventurers: Mapping | None,
+) -> tuple[Any, Any, Any, tuple, Path, Any]:
+    """Resolve the live registries a shipped-source derivation reads.
 
-    Returns a frozenset of ``(kind, key)`` tuples corresponding to the sources
-    defined across the places registry, dialogue tables, persistent guild
-    adventurers, starting companion declarations, quest template occupants, and
-    shipped import examples.
+    ``quest_templates`` has no default: only the composition root knows the
+    offline template pool, so a caller that omits it gets a ``ValueError``
+    rather than a silently empty source set.
     """
     if places is None:
         from world.lore.settlements.places import PLACE_REGISTRY
@@ -72,6 +71,35 @@ def derive_shipped_sources(
         import world.imports.examples as _examples_pkg
 
         examples_dir = Path(_examples_pkg.__file__).resolve().parent
+    return places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers
+
+
+def derive_shipped_sources(
+    *,
+    places: Mapping[str, PlaceDefinition] | None = None,
+    dialogue_rows: Mapping[str, Any] | None = None,
+    player_presets: Mapping[str, PlayerPreset] | None = None,
+    quest_templates: Iterable[Any] | None = None,
+    examples_dir: Path | None = None,
+    adventurers: Mapping | None = None,
+) -> frozenset[tuple[str, str]]:
+    """Derive the complete set of shipped NPC source (kind, key) pairs.
+
+    Returns a frozenset of ``(kind, key)`` tuples corresponding to the sources
+    defined across the places registry, dialogue tables, persistent guild
+    adventurers, starting companion declarations, quest template occupants, and
+    shipped import examples.
+    """
+    places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers = (
+        _resolve_shipped_inputs(
+            places=places,
+            dialogue_rows=dialogue_rows,
+            player_presets=player_presets,
+            quest_templates=quest_templates,
+            examples_dir=examples_dir,
+            adventurers=adventurers,
+        )
+    )
 
     sources: set[tuple[str, str]] = set()
 
@@ -102,6 +130,67 @@ def derive_shipped_sources(
     return frozenset(sources)
 
 
+def derive_shipped_source_owners(
+    *,
+    places: Mapping[str, PlaceDefinition] | None = None,
+    dialogue_rows: Mapping[str, Any] | None = None,
+    player_presets: Mapping[str, PlayerPreset] | None = None,
+    quest_templates: Iterable[Any] | None = None,
+    examples_dir: Path | None = None,
+    adventurers: Mapping | None = None,
+    profile_key_slices: Mapping[str, str] | None = None,
+) -> dict[tuple[str, str], str]:
+    """The owning content-slice label every profile-backed source resolves to.
+
+    Only the three profile-backed kinds carry a derivable owner: a host's and a
+    person's owner is the profile slice that declares its profile, and a
+    dialogue table's owner is the owner of its single hosting place. The three
+    kinds that author no profile (``starting_companion``,
+    ``quest_template_occupant``, ``import_example``) are absent here; those rows
+    are only required to name a non-empty owning slice.
+
+    The mapping is derived from the live slice declaration
+    (``npc_profiles.PROFILE_KEY_SLICES``), so a new hosted place, table or
+    person is owned without editing an owner list. A source whose profile no
+    registered slice declares -- a synthetic profile registry -- is omitted
+    rather than guessed.
+    """
+    places, dialogue_rows, player_presets, quest_templates, examples_dir, adventurers = (
+        _resolve_shipped_inputs(
+            places=places,
+            dialogue_rows=dialogue_rows,
+            player_presets=player_presets,
+            quest_templates=quest_templates,
+            examples_dir=examples_dir,
+            adventurers=adventurers,
+        )
+    )
+    if profile_key_slices is None:
+        from world.lore.npc_profiles import PROFILE_KEY_SLICES
+
+        profile_key_slices = PROFILE_KEY_SLICES
+
+    owners: dict[tuple[str, str], str] = {}
+    table_owners: dict[str, str] = {}
+    for place in places.values():
+        if place.service_id is None:
+            continue
+        owner = profile_key_slices.get(place.host_profile_key)
+        if owner is None:
+            continue
+        owners[("place_host", place.service_id)] = owner
+        for kwarg, value in place.authored_kwargs:
+            if kwarg == "dialogue_key":
+                table_owners.setdefault(value, owner)
+    for table_key, owner in table_owners.items():
+        owners[("dialogue_table", table_key)] = owner
+    for person_key, person in adventurers.items():
+        owner = profile_key_slices.get(person.profile_key)
+        if owner is not None:
+            owners[("persistent_adventurer", person_key)] = owner
+    return owners
+
+
 def validate_npc_roster(
     *,
     places: Mapping[str, PlaceDefinition] | None = None,
@@ -112,21 +201,28 @@ def validate_npc_roster(
     profile_registry: Mapping[str, NpcProfile] | None = None,
     inventory: Iterable[NpcSource] | None = None,
     adventurers: Mapping | None = None,
+    owners: Mapping[tuple[str, str], str] | None = None,
 ) -> None:
     """Validate the complete shipped NPC roster and raise NpcRosterError on failure.
 
     All checks are performed and all violations are collected together:
     1. Bidirectional inventory equality between derived sources and inventory rows.
-    2. Place hosts resolve to profiles with valid compact cards.
+    2. Every source names a non-empty owning content slice, and every
+       profile-backed source's owner is the slice that declares its profile
+       (``owners`` overrides the derived resolution for a synthetic universe).
     3. Persistent adventurers resolve to distinct profiles with valid compact cards,
        bounded age pairs and both offline voice lines.
-    4. Dialogue tables are answered by exactly one hosted place; scripted hosts author
-       a misunderstanding reply and no profile greeting.
-    5. Starting companion partner presets provide speech_style, greeting, and a valid
+    4. Place hosts resolve to profiles with valid compact cards, bounded age pairs,
+       exactly one inventory assignment, and (as scripted hosts) a valid
+       misunderstanding reply and no profile greeting.
+    5. Dialogue tables are answered by exactly one hosted place.
+    6. Starting companion partner presets provide speech_style, greeting, and a valid
        derived card with maximum-length synthetic owner.
-    6. Quest template occupants carry personas with valid compact cards and pass characterization.
-    7. Shipped import examples validate cleanly as NPC character records.
-    8. Every profile in profile_registry is referenced by a hosted place or persistent adventurer.
+    7. Quest template occupants carry personas with valid compact cards and pass
+       characterization.
+    8. Shipped import examples validate cleanly as NPC character records.
+    9. Every profile in profile_registry is referenced by a hosted place or persistent
+       adventurer.
     """
     if places is None:
         from world.lore.settlements.places import PLACE_REGISTRY
@@ -201,6 +297,35 @@ def validate_npc_roster(
             f"source kind={kind!r} key={key!r} is present in inventory but missing from registries"
         )
 
+    # Owning content slice, resolved from the live slice declaration rather
+    # than from an owner list: every row names one, and every profile-backed
+    # source's row names the slice that declares its profile.
+    if owners is None:
+        owners = derive_shipped_source_owners(
+            places=places,
+            dialogue_rows=dialogue_rows,
+            player_presets=player_presets,
+            quest_templates=quest_templates,
+            examples_dir=examples_dir,
+            adventurers=adventurers,
+        )
+    row_by_source = {(row.kind, row.key): row for row in inventory}
+    for kind, key in sorted(actual_sources):
+        row = row_by_source.get((kind, key))
+        if row is None:
+            continue  # already reported as missing from the inventory
+        if not isinstance(row.owner, str) or not row.owner.strip():
+            violations.append(
+                f"source kind={kind!r} key={key!r} carries no owning content slice"
+            )
+            continue
+        expected_owner = owners.get((kind, key))
+        if expected_owner is not None and row.owner != expected_owner:
+            violations.append(
+                f"source kind={kind!r} key={key!r} names owning slice {row.owner!r} "
+                f"instead of the resolved owner {expected_owner!r}"
+            )
+
     # Persistent people have distinct profiles and both offline reply paths.
     person_profiles: set[str] = set()
     other_profiles = {
@@ -241,7 +366,8 @@ def validate_npc_roster(
             except (NpcCardError, ValueError) as err:
                 violations.append(f"{label} invalid {field}: {err}")
 
-    # 2. Place hosts: must resolve to a valid profile with a valid compact card
+    # 4. Place hosts: valid profile, valid compact card, bounded age pair, one
+    #    inventory assignment.
     for place in places.values():
         if place.service_id is None:
             continue
@@ -264,8 +390,24 @@ def validate_npc_roster(
             violations.append(
                 f"source kind='place_host' key={place.service_id!r} profile {profile_key!r} has invalid card: {err}"
             )
+        for field in ("age", "apparent_age"):
+            value = getattr(profile, field)
+            if type(value) is not int or not 0 <= value <= 10000:
+                violations.append(
+                    f"source kind='place_host' key={place.service_id!r} "
+                    f"profile {profile_key!r} has invalid {field}"
+                )
+        assignments = [
+            row for row in inventory
+            if row.kind == "place_host" and row.key == place.service_id
+        ]
+        if len(assignments) != 1:
+            violations.append(
+                f"source kind='place_host' key={place.service_id!r} "
+                "has missing or stale inventory assignment"
+            )
 
-    # 4. Dialogue tables & scripted hosts
+    # 5. Dialogue tables & scripted hosts
     # Map dialogue keys to hosted places
     table_hosts: dict[str, list[PlaceDefinition]] = {tk: [] for tk in dialogue_rows}
     scripted_hosts: list[PlaceDefinition] = []
@@ -311,13 +453,21 @@ def validate_npc_roster(
                 f"source kind='place_host' key={host.service_id!r} profile {profile_key!r} "
                 "missing misunderstood reply"
             )
+        else:
+            try:
+                normalize_offline_greeting(profile.voice.misunderstood)
+            except (NpcCardError, ValueError) as err:
+                violations.append(
+                    f"source kind='place_host' key={host.service_id!r} "
+                    f"profile {profile_key!r} invalid misunderstood reply: {err}"
+                )
         if profile.voice.greeting is not None:
             violations.append(
                 f"source kind='place_host' key={host.service_id!r} profile {profile_key!r} "
                 "authors a greeting; table greeting is the single source for hosts"
             )
 
-    # 5. Starting companions: partner preset resolution, speech_style/greeting, derived card
+    # 6. Starting companions: partner preset resolution, speech_style/greeting, derived card
     for preset_key, preset in player_presets.items():
         for companion in preset.starting_companions:
             source_key = f"{preset_key}:{companion.preset_key}"
@@ -355,7 +505,7 @@ def validate_npc_roster(
                     f"partner preset {companion.preset_key!r} derived card violates contract: {err}"
                 )
 
-    # 6. Quest template occupants
+    # 7. Quest template occupants
     for template in quest_templates:
         try:
             payload = template.to_payload()
@@ -410,7 +560,7 @@ def validate_npc_roster(
                                 f"characterization error: {cerr}"
                             )
 
-    # 7. Shipped import examples
+    # 8. Shipped import examples
     for json_path in sorted(examples_dir.glob("*.json")):
         source_key = json_path.stem
         try:
@@ -442,7 +592,7 @@ def validate_npc_roster(
                 f"source kind='import_example' key={source_key!r} validation failed: {rejections}"
             )
 
-    # 8. Orphan profiles
+    # 9. Orphan profiles
     orphan_keys = sorted(set(profile_registry) - referenced_profiles)
     for prof_key in orphan_keys:
         violations.append(
