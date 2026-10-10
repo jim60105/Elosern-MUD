@@ -1,9 +1,10 @@
-"""Data-contract test: shipped NPC persona roster validation contract
+"""Data-contract test: registry-derived NPC roster completeness and fault-diagnostic contract
 
 Validates that the complete shipped NPC roster satisfies all completeness,
-card-validity, voice-coverage, dialogue-mapping, and inventory invariants, and
-verifies through synthetic registries that every violation class is detected
-and reported with its source and profile/preset identity.
+owner-resolution, card-validity, age-bounds, voice-coverage, dialogue-mapping
+and inventory invariants, and verifies through synthetic registries that every
+violation class is detected in isolation and reported with its source kind,
+source key and profile/preset identity before world synchronization.
 """
 
 from __future__ import annotations
@@ -143,6 +144,28 @@ class ShippedNpcRosterContractTests(unittest.TestCase):
         derived = derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
         inv_pairs = {(r.kind, r.key) for r in NPC_SOURCE_INVENTORY}
         self.assertEqual(derived, frozenset(inv_pairs))
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_shipped_row_naming_the_wrong_owner_is_reported(self):
+        # The default owner channel resolves each source's slice from the live
+        # slice declaration: a row naming another slice fails, naming both.
+        from world.lore.npc_profiles.inventory import NPC_SOURCE_INVENTORY
+
+        broken = tuple(
+            replace(row, owner="t_wrong_slice")
+            if (row.kind, row.key) == ("dialogue_table", "altoria_eatery")
+            else row
+            for row in NPC_SOURCE_INVENTORY
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(quest_templates=QUEST_TEMPLATE_POOL, inventory=broken)
+        msg = str(caught.exception)
+        self.assertIn("dialogue_table", msg)
+        self.assertIn("altoria_eatery", msg)
+        self.assertIn("t_wrong_slice", msg)
+        self.assertIn("altoria_lower", msg)
 
 
 class ShippedPersistentAdventurerSmokeTests(EvenniaTest):
@@ -370,8 +393,38 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         )
         return profile
 
+    def _add_new_owner_host_and_table(self, owner: str = "test_slice_2") -> None:
+        """Add a second hosted place, its table, its profile and its own owner.
+
+        Nothing about this source is district-specific: it is a plain place
+        declaration plus an inventory row under a new slice label, which is
+        exactly what the completeness contract must pick up on its own.
+        """
+        base_place = self.synth["places"]["t_shop"]
+        self.synth["places"]["t_shop_2"] = replace(
+            base_place,
+            key="t_shop_2",
+            service_id="t_shop_2_service",
+            host_profile_key="t_host_prof_2",
+            authored_kwargs=(
+                ("shop_key", "t_shop_2"),
+                ("dialogue_key", "t_dialogue_2"),
+            ),
+        )
+        self.synth["profile_registry"]["t_host_prof_2"] = replace(
+            self.synth["profile_registry"]["t_host_prof"], key="t_host_prof_2"
+        )
+        self.synth["dialogue_rows"]["t_dialogue_2"] = DialogueDefinition(
+            greeting="「第二家店的問候語。」",
+            responses=(KeywordResponse("買賣", "「要買什麼請看架上。」"),),
+        )
+        self.synth["inventory"] += (
+            NpcSource("place_host", "t_shop_2_service", owner),
+            NpcSource("dialogue_table", "t_dialogue_2", owner),
+        )
+
     @covers_requirement("npc-profile-registry::the-shipped-npc-source-inventory-enumerates-every-source-with-an-owner")
-    @covers_requirement("npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue")
+    @covers_requirement("npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization")
     def test_persistent_person_passes_with_no_scripted_home_table(self):
         self._add_persistent_person()
         validate_npc_roster(**self.synth)
@@ -445,7 +498,7 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         self.assertIn("missing from registries", msg)
 
     @covers_requirement(
-        "npc-profile-registry::guild-branch-master-and-rank-examiners-carry-individual-authored-profiles-and-rewritten-dialogue"
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
     )
     def test_qualified_person_missing_profile_is_reported(self):
         self._add_persistent_person()
@@ -455,6 +508,146 @@ class SyntheticNpcRosterValidationTests(unittest.TestCase):
         msg = str(caught.exception)
         self.assertIn("persistent_adventurer", msg)
         self.assertIn("unregistered_person", msg)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_new_owner_host_and_table_are_covered_automatically(self):
+        # Completion criterion for the derived completeness contract: a valid
+        # new owner's host and table pass with no district-specific test.
+        self._add_new_owner_host_and_table()
+        validate_npc_roster(
+            **self.synth,
+            owners={
+                ("place_host", "t_shop_service"): "test_slice",
+                ("dialogue_table", "t_dialogue"): "test_slice",
+                ("place_host", "t_shop_2_service"): "test_slice_2",
+                ("dialogue_table", "t_dialogue_2"): "test_slice_2",
+            },
+        )
+        derived = derive_shipped_sources(
+            **{key: value for key, value in self.synth.items()
+               if key not in {"profile_registry", "inventory"}}
+        )
+        self.assertIn(("place_host", "t_shop_2_service"), derived)
+        self.assertIn(("dialogue_table", "t_dialogue_2"), derived)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_row_naming_the_wrong_owner_is_reported(self):
+        self._add_new_owner_host_and_table()
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(
+                **self.synth,
+                owners={("place_host", "t_shop_2_service"): "t_other_slice"},
+            )
+        msg = str(caught.exception)
+        self.assertIn("place_host", msg)
+        self.assertIn("t_shop_2_service", msg)
+        self.assertIn("test_slice_2", msg)
+        self.assertIn("t_other_slice", msg)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_row_without_an_owning_slice_is_reported(self):
+        self.synth["inventory"] = tuple(
+            replace(row, owner="   ")
+            if (row.kind, row.key) == ("place_host", "t_shop_service")
+            else row
+            for row in self.synth["inventory"]
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        msg = str(caught.exception)
+        self.assertIn("place_host", msg)
+        self.assertIn("t_shop_service", msg)
+        self.assertIn("carries no owning content slice", msg)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_place_host_without_an_inventory_assignment_is_reported(self):
+        # The inventory row IS the host's owner relationship: dropping it fails
+        # both directions, naming the source.
+        self.synth["inventory"] = tuple(
+            row
+            for row in self.synth["inventory"]
+            if (row.kind, row.key) != ("place_host", "t_shop_service")
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        msg = str(caught.exception)
+        self.assertIn("place_host", msg)
+        self.assertIn("t_shop_service", msg)
+        self.assertIn("missing from inventory", msg)
+        self.assertIn("missing or stale inventory assignment", msg)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_place_host_with_an_invalid_age_is_reported(self):
+        # ``NpcProfile`` already refuses a malformed age at construction, so the
+        # invalid value is injected past the dataclass exactly as the persistent
+        # person case does: the roster gate must still catch it.
+        for field, value in (("age", True), ("age", -1), ("apparent_age", 10001)):
+            with self.subTest(field=field, value=value):
+                profile = self.synth["profile_registry"]["t_host_prof"]
+                self.synth["profile_registry"]["t_host_prof"] = SimpleNamespace(
+                    **{**vars(profile), field: value}
+                )
+                with self.assertRaises(NpcRosterError) as caught:
+                    validate_npc_roster(**self.synth)
+                msg = str(caught.exception)
+                self.assertIn("place_host", msg)
+                self.assertIn("t_shop_service", msg)
+                self.assertIn("t_host_prof", msg)
+                self.assertIn(f"invalid {field}", msg)
+                self.synth["profile_registry"]["t_host_prof"] = profile
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_place_host_misunderstanding_reply_violating_the_contract_is_reported(self):
+        # ``NpcVoiceLines`` already bounds an authored line, so the offending
+        # reply is injected past the dataclass: the roster gate must still catch
+        # a profile mapping whose reply violates the offline-greeting contract.
+        from world.lore.npc_card import OFFLINE_GREETING_LIMIT
+
+        profile = self.synth["profile_registry"]["t_host_prof"]
+        self.synth["profile_registry"]["t_host_prof"] = SimpleNamespace(
+            **{
+                **vars(profile),
+                "voice": SimpleNamespace(
+                    greeting=None,
+                    misunderstood="「" + "長" * OFFLINE_GREETING_LIMIT + "」",
+                ),
+            }
+        )
+        with self.assertRaises(NpcRosterError) as caught:
+            validate_npc_roster(**self.synth)
+        msg = str(caught.exception)
+        self.assertIn("place_host", msg)
+        self.assertIn("t_shop_service", msg)
+        self.assertIn("invalid misunderstood reply", msg)
+
+    @covers_requirement(
+        "npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization"
+    )
+    def test_a_changed_personnel_declaration_passes(self):
+        # A valid personnel edit -- new ages, with the inventory declaration
+        # moved with it -- is accepted without touching a spec or this contract.
+        profile = self._add_persistent_person()
+        changed = replace(profile, age=63, apparent_age=57)
+        self.synth["profile_registry"][changed.key] = changed
+        self.synth["inventory"] = tuple(
+            replace(row, age=changed.age, apparent_age=changed.apparent_age)
+            if row.kind == "persistent_adventurer"
+            else row
+            for row in self.synth["inventory"]
+        )
+        validate_npc_roster(**self.synth)
 
     @covers_requirement(
         "npc-profile-registry::the-shipped-npc-roster-is-validated-as-complete-before-the-game-starts"

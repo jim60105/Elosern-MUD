@@ -102,11 +102,11 @@
     },
     {
       "path": "world/lore/tests/test_npc_profile_inventory.py",
-      "reason": "shipped NPC source inventory data contract"
+      "reason": "shipped NPC source inventory equality contract"
     },
     {
       "path": "world/lore/tests/test_npc_profile_slice_content.py",
-      "reason": "per-slice authored NPC profiles and rewritten dialogue content contract"
+      "reason": "registry-derived NPC host characterization and authored dialogue coverage contract"
     },
     {
       "path": "world/lore/tests/test_npc_tiers.py",
@@ -270,7 +270,7 @@
     },
     {
       "path": "world/rules/tests/test_guild_config/test_service_host_roster.py",
-      "reason": "guild/shop config validation contract"
+      "reason": "place-derived service host roster and current place-declaration contract"
     },
     {
       "path": "world/rules/tests/test_church_hosts.py",
@@ -286,7 +286,7 @@
     },
     {
       "path": "world/rules/tests/test_npc_roster_validation.py",
-      "reason": "shipped NPC persona roster validation contract"
+      "reason": "registry-derived NPC roster completeness and fault-diagnostic contract"
     },
     {
       "path": "world/rules/tests/test_npc_schedules.py",
