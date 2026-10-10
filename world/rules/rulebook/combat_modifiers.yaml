@@ -223,3 +223,8 @@
 - id: grain_rattle_accuracy
   when: {buff_active: grain_rattle}
   then: {accuracy: -3}
+# 魔物資源技能（remaining-monster-resource-skills §5）：燈甲螯擊的自身護甲，
+# buff 列為 mount，+2 資料在此（martial_blessing 的 defense 先例）。
+- id: lamp_carapace_guard_defense
+  when: {buff_active: lamp_carapace_guard}
+  then: {defense: 2}

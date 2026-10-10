@@ -28,11 +28,11 @@ Two boundaries are pinned here and must not be blurred:
   requirement R4).** A delivered species carries its authored kit and
   behaviour binding here; a species still awaiting mechanics registers no
   skill key, behaviour profile, or combat trait, and no placeholder field
-  stands in for one. Delivered: the crocodile (``tide_devouring_bite``) and
-  the sparrow (``grain_shaking_peck``); the crab, hare, goat and lynx
-  abilities remain deferred to the skill/behaviour-mechanics work. The
-  approved prose (including its stated limits) lives in the published
-  narrative fields only.
+  stands in for one. Delivered: the crocodile (``tide_devouring_bite``), the
+  sparrow (``grain_shaking_peck``) and the crab (``lamp_carapace_claw``); the
+  hare, goat and lynx abilities remain deferred to the
+  skill/behaviour-mechanics work. The approved prose (including its stated
+  limits) lives in the published narrative fields only.
 
 Key grammar (requirement R1) is the shared stable-key contract, whose predicate
 lives in ``world/art/subjects.py``. ``world/lore/`` may not import that module —
@@ -528,11 +528,12 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "沿岸居民知道牠們會聚集在魔法燈附近，漁人偶爾將牠們當成潮池的位置標記。"
         "大量聚集時，不熟悉港口的小船可能誤判岸邊訊號；靠近礁洞的人也可能受到螯足攻擊。"
         "牠們只能重現已有光源的節奏，不能製造幻覺或偽裝物體。"
-        "發光不等於治療能力，也不表示牠們掌握光屬性治療術。",
+        "牠會在螯擊時收緊甲殼，短暫提高自身防禦；這項動作不依賴光源，"
+        "發光斑紋與螯擊皆無治療效果，也不屬於光屬性治療術。",
         ("southeast_coast", "southwest_coast"),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；發光斑紋的成因在設定中保持未記載。",
-        "（作者私有：作者解釋）低階物種的第二個方向：以既有光源為條件的辨識干擾，"
-        "刻意排除幻覺與治療語意。",
+        "（作者私有：作者解釋）低階物種的第二個方向：追光生態保留既有光源條件；"
+        "戰鬥採螯擊與甲殼防護，排除幻覺與治療。",
         "（作者私有：尚未證實的猜想）漁村傳說牠們是某位失蹤燈匠的遺留造物，僅見於口述。",
         "shore_walker",
         True,
@@ -649,9 +650,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=30, mp=0, sp=0, atk_phys=5, agility=4, defense=5, magic_power=0
+            hp=30, mp=20, sp=9, atk_phys=5, agility=4, defense=5, magic_power=0
         ),
         "F",
+        active_skill_keys=("lamp_carapace_claw",),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "reef_warden",
@@ -661,9 +664,11 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=60, mp=0, sp=0, atk_phys=12, agility=4, defense=7, magic_power=0
+            hp=60, mp=30, sp=15, atk_phys=12, agility=4, defense=7, magic_power=0
         ),
         "E",
+        active_skill_keys=("lamp_carapace_claw",),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "burrow_maker",

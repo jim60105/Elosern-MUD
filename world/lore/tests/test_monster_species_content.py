@@ -90,8 +90,8 @@ APPROVED_VARIANTS = {
 # field for field, and a value that differs is a content defect, not a
 # re-tuning decision. MP and SP are authored zeros for every variant whose
 # ability mechanic has not landed, and the approved delivered pools where it
-# has (crocodile 30/40 and 50/60, sparrow 20/8 and 30/12); magic_power is zero
-# everywhere and every tier's magic band is (0, 0).
+# has (crocodile 30/40 and 50/60, sparrow 20/8 and 30/12, crab 20/9 and 30/15);
+# magic_power is zero everywhere and every tier's magic band is (0, 0).
 APPROVED_BALANCE = {
     "grain_pecker": {
         "hp": 30,
@@ -115,8 +115,8 @@ APPROVED_BALANCE = {
     },
     "shore_walker": {
         "hp": 30,
-        "mp": 0,
-        "sp": 0,
+        "mp": 20,
+        "sp": 9,
         "atk_phys": 5,
         "agility": 4,
         "defense": 5,
@@ -125,8 +125,8 @@ APPROVED_BALANCE = {
     },
     "reef_warden": {
         "hp": 60,
-        "mp": 0,
-        "sp": 0,
+        "mp": 30,
+        "sp": 15,
         "atk_phys": 12,
         "agility": 4,
         "defense": 7,
@@ -237,6 +237,10 @@ APPROVED_CONTACT_CLAUSES = {
     "sway_whistle_sparrow": (
         "近身時，牠會配合短促氣流啄擊，命中後使對手短暫分心；"
         "此招不需要穀物，也不產生強風或擊退。"
+    ),
+    "tide_lamp_crab": (
+        "牠會在螯擊時收緊甲殼，短暫提高自身防禦；這項動作不依賴光源，"
+        "發光斑紋與螯擊皆無治療效果，也不屬於光屬性治療術。"
     ),
 }
 
@@ -619,6 +623,8 @@ class AbilitySeamNegativeTests(unittest.TestCase):
             "bay_warden": ("tide_devouring_bite", "ambush_predator"),
             "grain_pecker": ("grain_shaking_peck", "instinctive"),
             "flock_leader": ("grain_shaking_peck", "instinctive"),
+            "shore_walker": ("lamp_carapace_claw", "instinctive"),
+            "reef_warden": ("lamp_carapace_claw", "instinctive"),
         }
         for source, registry in (
             ("species", MONSTER_SPECIES_REGISTRY),

@@ -612,3 +612,44 @@ class SkillRegistryTests(unittest.TestCase):
         self.assertIsNone(skill.effect_policies[1].transfer)
         self.assertEqual(spell_tier_for(skill), "學徒")
         self.assertFalse(is_freeform_eligible(skill))
+
+    @covers_requirement(
+        "skill-identity-eligibility::stored-identity-determines-actor-qualification",
+        "skill-effect-model::effect-audiences-select-recipients-without-changing-skill-faction-constraints",
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_lamp_carapace_claw_data_contract(self):
+        from world.skills.effects import EffectAudience
+        from world.skills.cost_tiers import spell_tier_for
+        from world.skills.cost_tiers import is_freeform_eligible
+
+        skill = SKILL_REGISTRY["lamp_carapace_claw"]
+        self.assertEqual(skill.label, "燈甲螯擊")
+        self.assertIs(skill.kind, SkillKind.ACTIVE)
+        self.assertIs(skill.target_spec, TargetSpec.SINGLE)
+        self.assertEqual(skill.cost, {"mp": 10, "sp": 3})
+        # Every damage-carrying monster ability declares True under the one
+        # written policy (settled 2026-10-10); eligibility alone keeps it out
+        # of player catalogs and lineage.
+        self.assertTrue(skill.usable_out_of_combat)
+        self.assertEqual(skill.element.key, "light")
+        self.assertIs(skill.category, SkillCategory.ELEMENTAL_MAGIC)
+        self.assertEqual(skill.group, "light")
+        self.assertIs(skill.faction_constraint, FactionConstraint.ANY)
+        self.assertEqual(skill.prerequisites, ())
+        self.assertEqual(skill.cast_conditions, ())
+        self.assertEqual(skill.eligibility.allowed_actor_kinds, ("monster",))
+        self.assertEqual(skill.eligibility.allowed_species, ("tide_lamp_crab",))
+        self.assertEqual(len(skill.effects), 2)
+        self.assertEqual(skill.effects[0], "damage:light:physical")
+        self.assertEqual(skill.effects[1], "self_buff_apply:lamp_carapace_guard")
+        self.assertEqual(skill.effect_policies[0].coefficient, 1.0)
+        self.assertIs(skill.effect_policies[0].audience, EffectAudience.ENEMIES)
+        self.assertEqual(skill.effect_policies[1].coefficient, 1.0)
+        # The self guard declares no hit dependency on the enemy strike: the
+        # audience intersection would otherwise exclude the caster on a miss.
+        self.assertIs(skill.effect_policies[1].audience, EffectAudience.SELF)
+        self.assertIsNone(skill.effect_policies[1].requires_hit_from)
+        self.assertIsNone(skill.effect_policies[1].transfer)
+        self.assertEqual(spell_tier_for(skill), "學徒")
+        self.assertFalse(is_freeform_eligible(skill))
