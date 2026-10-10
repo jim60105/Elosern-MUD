@@ -75,13 +75,13 @@ Numerical boundary examples below SHALL use scoped synthetic declarations. Shipp
 ### Requirement: interspecies_receive declares the highest actor_pleasure_ratio among this change's seven acts
 `interspecies_receive` SHALL retain the greatest actor-side ratio among the seven existing acts, with the exact ratio authored as adjustable data.
 
-#### Scenario: Ratio relationship
+#### Scenario: interspecies_receive's ratio exceeds every sibling act's ratio
 - **WHEN** shipped declarations are validated
 - **THEN** the receive ratio exceeds each sibling's ratio without an expected literal ratio table
 
 ### Requirement: interspecies_mating grants the actor strictly more pleasure than interspecies_receive despite the lower ratio
 `interspecies_mating` SHALL retain its established greater actor pleasure than `interspecies_receive` despite its smaller ratio, including the existing ordinary-sensitivity, strong-shame, two-participant control condition. Exact base pleasure and ratio magnitudes SHALL remain authored data.
 
-#### Scenario: Real execution compares distinct outcomes
+#### Scenario: Worst-case actor-side gain still orders interspecies_mating above interspecies_receive
 - **WHEN** both acts resolve from separately reset controlled participant states
 - **THEN** observed actor pleasure increase is greater for mating, without pinning 13/12 gains or computing the expected result with the same production gain function

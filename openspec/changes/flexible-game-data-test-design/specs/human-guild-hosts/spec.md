@@ -8,3 +8,11 @@ Hosts SHALL use their complete authored normal bases and canonical ages, actual 
 #### Scenario: Persistent normal configuration
 - **WHEN** a host enters and exits an examination
 - **THEN** the existing host row and normal bases, owned lineage, gear and identity survive restoration; normal values are compared to the pre-exam snapshot rather than historical numerical pins
+
+#### Scenario: Usable top lineage
+- **WHEN** a normal synthetic qualified adventurer requests its top sword skill
+- **THEN** required lower ownership/proficiency is present and the resolver accepts execution
+
+#### Scenario: Invalid age or unsupported item
+- **WHEN** authored profile ages are boolean/out-of-range or gear is unregistered
+- **THEN** preflight rejects before creation, preserving the existing 0..10000 age bound

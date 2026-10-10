@@ -51,6 +51,150 @@ nodes (PASSIVE skills are never consumed by edges and never accrue).
 - **WHEN** a valid positive edge threshold changes
 - **THEN** topology/reference checks remain green; fixed synthetic trees independently prove multi-parent qualification, reverse-edge caps and exact boundary behavior
 
+### Requirement: can_use_skill is the single shared use-eligibility predicate
+`can_use_skill(entity, skill)` SHALL be a pure query returning False unless the key is owned, identity/restrictions pass and every prerequisite key is owned at or above its declared minimum proficiency. The shared predicate SHALL gate ACTIVE spells and weapon skills alike.
+
+#### Scenario: A mid-tree spell is gated by its own edge
+- **WHEN** a fixed synthetic tree gives t_storm a t_wave prerequisite at level 3 and the owner has t_wave level 2
+- **THEN** eligibility is False regardless of t_storm's own proficiency
+
+#### Scenario: The exact threshold passes
+- **WHEN** the synthetic owner's t_wave reaches 3
+- **THEN** eligibility is True, without pinning any shipped edge
+
+#### Scenario: The gate is school-agnostic
+- **WHEN** an owned ACTIVE weapon skill has an unmet prerequisite
+- **THEN** it uses the same False eligibility path as spells
+
+#### Scenario: A root skill with no prereqs is usable on ownership
+- **WHEN** an identity-eligible owner requests a synthetic root without prerequisites
+- **THEN** eligibility is True regardless of proficiency
+
+#### Scenario: Every consumer reads the single gate
+- **WHEN** resolver step-1/preflight/resolve, action preview, submission revalidation, both skill menus or default attack policy needs eligibility
+- **THEN** each consumes the same shared predicate rather than ownership-plus-MP-only logic
+
+#### Scenario: An unmet chain is rejected as an unknown skill
+- **WHEN** resolver step-1 sees an owned skill with an unmet chain
+- **THEN** it rejects with UNKNOWN_SKILL and names the first unmet edge in declared order
+
+#### Scenario: No mastery-tier override returns
+- **WHEN** 主宰-tier entry is evaluated
+- **THEN** all declared prerequisites use AND semantics with no mastery-tier override
+
+#### Scenario: cost_tiers stays cosmetic
+- **WHEN** a skill declares cost_tiers
+- **THEN** it remains a display-only data label
+
+### Requirement: Practice saturates at the derived tip cap
+For skill S, cap(S) SHALL be the maximum minimum proficiency of all edges consuming S, or the authored progression tip cap when no edge consumes S. Once proficiency reaches that cap, further practice SHALL NOT accrue. Synthetic numeric fixtures SHALL NOT approve shipped edge/tip values.
+
+#### Scenario: A fully consumed node stops at its edge
+- **WHEN** a synthetic root is consumed by an edge requiring level 3 and continues practice at level 3
+- **THEN** its stored XP stops increasing at level 3
+
+#### Scenario: The canopy node caps at the yaml default
+- **WHEN** a synthetic canopy with no consumers has a fixed synthetic tip cap 10
+- **THEN** accrual saturates at 10; production canopy cap follows its current declaration
+
+#### Scenario: A saturation ceiling still unlocks its child
+- **WHEN** a synthetic parent caps at 5 because its child requires 5 and practice reaches 5
+- **THEN** the child passes eligibility
+
+#### Scenario: One shared award primitive clamps every writer
+- **WHEN** saturation is enforced
+- **THEN** one shared sole proficiency award primitive clamps storage at cap(S)
+
+#### Scenario: Both accrual entry points route through the primitive
+- **WHEN** per-use grants or booked-practice settlement award XP
+- **THEN** both use that shared primitive and cannot diverge at cap boundaries
+
+#### Scenario: The cap never starves a consuming edge
+- **WHEN** a consumed skill's cap is derived
+- **THEN** it is not below any consuming threshold, so saturation cannot block a child
+
+### Requirement: The freeform scale ladder is anchored to proficiency
+Allowed freeform scales SHALL derive from the authored progression ladder over the skill's OWN proficiency, gated by its element-mastery key. Rungs above the skill's derived cap SHALL never unlock. Numeric ladder examples SHALL use fixed synthetic rows rather than approve production thresholds or scale values.
+
+#### Scenario: A mastery holder at level 0 sees only the small rungs
+- **WHEN** a fixed synthetic ladder allows 0.25 unconditionally, 0.5 at 1, 1.0 at 3, 2.0 at 6 and 4.0 at 10, and an entitled synthetic skill owner is at level 0
+- **THEN** allowed scales are (0.25,)
+
+#### Scenario: Canopy proficiency unlocks the 4.0 rung
+- **WHEN** that synthetic skill reaches level 10 under synthetic tip cap 10
+- **THEN** 4.0 appears
+
+#### Scenario: A capped mid-tree skill stops below the canopy rungs
+- **WHEN** a synthetic mid-tree skill with cap 5 is practiced past its cap under the same fixture
+- **THEN** its maximum scale is 1.0, with the level-6 and level-10 rungs absent
+
+#### Scenario: No mastery still means no ladder
+- **WHEN** an actor lacks the required element-mastery key
+- **THEN** the scale set is empty regardless of proficiency
+
+#### Scenario: Tip caps prune unreachable rungs
+- **WHEN** a rung threshold exceeds the derived tip cap
+- **THEN** it never unlocks
+
+#### Scenario: The ladder is fully deterministic
+- **WHEN** scales are derived
+- **THEN** registry and proficiency state alone determine them, with no hidden information
+
+#### Scenario: All surfaces share one derivation
+- **WHEN** the resolver gate, preview and combat panel require allowed scales
+- **THEN** they consume the same skill-anchored derivation
+
+### Requirement: Import and scene-build auto-seed prerequisite proficiency exactly
+Within the all-or-nothing import transaction, missing prerequisite proficiency SHALL seed exactly to its declared requirement, never above, and ownership SHALL extend to transitive closure. Explicit proficiency SHALL always win, even below eligibility. Scene spawn and preset activation SHALL share the same closure/seed mechanisms.
+
+#### Scenario: A deep imported skill arrives usable
+- **WHEN** a fixed synthetic import owns t_storm requiring t_wave level 3 with no explicit t_wave proficiency
+- **THEN** the loaded owner has the closed chain, t_wave exactly level 3 and passing eligibility
+
+#### Scenario: Explicit proficiency beats auto-seed
+- **WHEN** that synthetic record explicitly gives t_wave XP 120, level 2
+- **THEN** level 2 remains and the unmet edge is not overwritten
+
+#### Scenario: Auto-seed never overshoots
+- **WHEN** a fixed synthetic edge requires level 5
+- **THEN** seeded XP is exactly 250 under the existing 50-XP-per-level mechanism
+
+#### Scenario: Malformed imports still reject all-or-nothing
+- **WHEN** another invalid field accompanies auto-seeding
+- **THEN** the whole record rejects and nothing persists, including seeded values
+
+#### Scenario: An unregistered proficiency key rejects the record
+- **WHEN** a record includes not_a_skill with XP 50
+- **THEN** validation names the key and persists nothing
+
+#### Scenario: Preset activation shares the same helpers
+- **WHEN** preset activation seeds an edge
+- **THEN** it produces the same result as import for identical skill inputs via the same two helpers
+
+#### Scenario: Normalization precedes semantic validation
+- **WHEN** an import is processed
+- **THEN** auto-seed normalization precedes semantic validation and schema range checks still reject malformed records wholesale
+
+#### Scenario: Explicit proficiency always wins
+- **WHEN** an import has an explicit proficiency entry
+- **THEN** it wins even if its edge remains unmet
+
+#### Scenario: Explicit keys resolve in the registry against the raw record
+- **WHEN** explicit proficiency keys are validated
+- **THEN** validation reads the raw record before normalization, naming and rejecting unknown keys rather than dropping/persisting them
+
+#### Scenario: The NPC spawn path shares the helper
+- **WHEN** scene-builder NPC spawn seeds lineage proficiency
+- **THEN** it uses the character-loader's shared helper
+
+#### Scenario: Preset activation composes the helpers directly
+- **WHEN** preset activation seeds proficiency
+- **THEN** it composes ownership closure and proficiency seed directly over declared keys, not the import-record wrapper
+
+#### Scenario: Exactly three production callers
+- **WHEN** production closure/seed callers are counted
+- **THEN** there are exactly three, with no reimplemented closure/seed algorithm
+
 
 ### Requirement: The wind lineage ships as the authored two-root branching tree with a two-parent canopy
 `SKILL_REGISTRY` SHALL carry prerequisite edges forming the authored wind tree of the node-data authority (`docs/lore/skill-trees/wind.md`): TWO roots ;  `gale_step` (mobility) and `wind_blade` (destruction) ;  each with no prerequisites. The structure is a two-root DAG whose strict topological canopy is `sky_apotheosis`; `wind_mastery` and `flight` SHALL NOT be tree nodes (PASSIVE skills are never consumed by edges and never accrue).
@@ -184,7 +328,7 @@ element-mastery passive SHALL NOT be a tree node.
   branch-terminal leaves
 - **THEN** `spark_shock` is consumed by exactly two edges (chain_lightning at its declared edge threshold and paralyzing_bolt
   at its declared edge threshold) and `thunder_combo` by exactly two (thunder_gods_haste at its declared edge threshold and thunder_shatter_strike at
-  5), `thunder_shatter_strike` and `thunder_prison` consume exactly one edge each and are consumed
+  its declared positive edge threshold), `thunder_shatter_strike` and `thunder_prison` consume exactly one edge each and are consumed
   by none, and no cross-route edge exists between the initiative line and the overload line outside
   the canopy's two authored parent edges
 

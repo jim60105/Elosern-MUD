@@ -9,7 +9,7 @@ The six existing E-S military sword/armor pairs SHALL remain registered for shar
 - **WHEN** a player and NPC equip the same pair through normal equipment APIs
 - **THEN** both receive the declared effects through shared consumers, with independently tested synthetic equipment arithmetic and no holder-specific path
 
-#### Scenario: Invalid reference or budget
+#### Scenario: Authoring fails closed
 - **WHEN** an equipment row names a missing identity, buff, price band or violates the established rarity budget
 - **THEN** normal validation rejects it before use
 
@@ -19,3 +19,7 @@ Weapons SHALL remain in common_arms and armor in common_outfits through ordinary
 #### Scenario: Finite purchase and restock
 - **WHEN** stock is exhausted and a configured restock boundary passes
 - **THEN** purchases reject while empty and restock adds at most the declared quantity up to the declared maximum; fixed synthetic fixtures independently verify arithmetic, wallet/inventory/stock atomicity and resale
+
+#### Scenario: Rollback
+- **WHEN** a purchase persistence step fails after a relevant write
+- **THEN** wallet, inventory mirrors and stock equal their prior snapshots after reload

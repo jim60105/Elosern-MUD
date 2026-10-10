@@ -9,9 +9,13 @@ Every test file intentionally exercising shipped content SHALL retain the exact 
 - **WHEN** the gate reads a contract entry
 - **THEN** tag and reason agreement remains mandatory and an absent/empty/divergent tag fails with the existing untagged-contract violation
 
-#### Scenario: Classification remains discoverable
+#### Scenario: Classification is discoverable by humans
 - **WHEN** contributors search Data-contract test tags
 - **THEN** every intentionally shipped-content test has its matching ledger reason and behavior-only tests are absent
+
+#### Scenario: Untagged files are never data-contract tests
+- **WHEN** a file lacks its tag or ledger registration
+- **THEN** no tool or document treats it as a data-contract test
 
 #### Scenario: Mutable data cannot be approved by duplication
 - **WHEN** an author changes a valid balance magnitude within existing explicit invariants

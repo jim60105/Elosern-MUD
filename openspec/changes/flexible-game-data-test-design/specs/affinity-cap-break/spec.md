@@ -13,12 +13,12 @@
 
 #### Scenario: A cap break does not lose the turn-in gain
 - **WHEN** a matching companion's record sits at value 99 with cap 99 at turn-in
-- **THEN** the cap rises to the entry's `new_cap` first and the the declared quest-completion `quest_completion` gain then
-  applies, leaving the value at 101 with the raised cap
+- **THEN** the cap rises to the entry's `new_cap` first and the declared `quest_completion` gain then
+  applies, leaving value `min(new_cap, 99 + declared_gain)` with the raised cap
 
 #### Scenario: A recordless matching companion still gets its cap break
 - **WHEN** a matching in-party companion has no affinity record at turn-in
-- **THEN** the turn-in creates a fresh record raised to the entry's `new_cap` and applies the the declared quest-completion
+- **THEN** the turn-in creates a fresh record raised to the entry's `new_cap` and applies the declared quest-completion
   gain on top
 
 #### Scenario: A non-matching entry is a no-op
@@ -39,7 +39,7 @@
 
 #### Scenario: The cap raise rides the reward transaction and precedes the gain
 - **WHEN** the turn-in raises a matching companion's cap
-- **THEN** `raise_affinity_cap` runs inside the same atomic transaction as the reward and the `quest_completion` affinity gain, and the cap raise is applied before the `quest_completion` gains so a record sitting at the old cap cannot clamp the the declared quest-completion gain
+- **THEN** `raise_affinity_cap` runs inside the same atomic transaction as the reward and the `quest_completion` affinity gain, and the cap raise is applied before the `quest_completion` gains so a record sitting at the old cap cannot prematurely clamp the declared quest-completion gain
 
 #### Scenario: Entry identity validation details
 - **WHEN** a `cap_breaks` entry is loaded

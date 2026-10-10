@@ -48,8 +48,7 @@ wall-clock input.
 
 #### Scenario: Presence outside the hunting band follows the density formula
 - **WHEN** presence is decided for a coordinate outside the hunting band
-- **THEN** it uses `(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the named densities
-  (6 / 3 / 3 / 3 / 7 / 8 / 8 in registry order)
+- **THEN** it uses `(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the current valid authored regional density, without a duplicate density vector
 
 #### Scenario: Name selection is formula-derived on every branch
 - **WHEN** the returned monster name is selected, on any branch including the hunting band

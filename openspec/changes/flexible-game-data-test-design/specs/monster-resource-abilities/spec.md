@@ -49,15 +49,19 @@ The bite SHALL drain up to its declared amount of current target MP once if its 
 ### Requirement: Affordability precedes effects and recovery precedes costs
 The caster SHALL already afford both adjusted declared costs before any roll/effect. Damage, target drain and capped caster recovery SHALL precede MP/SP payment in the shared transaction. Canonical reactions SHALL remain in force and overflow SHALL be discarded. Tests SHALL cover this order once with fixed synthetic fixtures.
 
-#### Scenario: Recovery clamps before payment
+#### Scenario: Full cap loses nominal cost
 - **WHEN** a synthetic caster starts at maximum MP 30, removes 10 target MP with full recovery share, and pays cost 10 MP plus 5 SP
 - **THEN** caster MP ends at 20 and SP decreases by 5; a caster starting at 20 MP also ends at 20
+
+#### Scenario: Room under the cap follows current order
+- **WHEN** the same fixed synthetic caster starts at MP 20 under cap 30 and removes 10 target MP
+- **THEN** recovery reaches 30 before MP payment 10 leaves 20, without credit exceeding actual removal
 
 #### Scenario: Drain cannot finance an action
 - **WHEN** either resource is below its adjusted declared cost despite plentiful target MP
 - **THEN** resolution rejects before dice, effects or practice
 
-#### Scenario: Canonical modifiers remain
+#### Scenario: Canonical modifiers still apply
 - **WHEN** existing resource modifiers or MP reactions participate
 - **THEN** shared APIs apply them without reordering existing skills or storing discarded recovery
 

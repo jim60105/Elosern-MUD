@@ -319,3 +319,26 @@ The price registry SHALL retain separate authored `magic_armor`, mundane armor a
 #### Scenario: The intimacy-device band is shared by both codex shapes
 - **WHEN** `PRICE_TABLE` is inspected for intimacy-device pricing
 - **THEN** it includes the intimacy-device band shared by the codex's wearable and usable 性玩具 entries
+
+### Requirement: Human lineage renames ship without a save-data compatibility layer
+The human subrace rename SHALL remain a clean breaking change without aliases, migration scripts or compatibility handling for retired keys. The unrelated human_commoner StaticTier identity SHALL survive independently of its mutable authored physical band.
+
+#### Scenario: Retired keys resolve nowhere in shipped data
+- **WHEN** subrace/preset/starting-kit registries and import/browser fixtures are inspected
+- **THEN** no subrace key references human_wealthy, human_laborer or human_commoner and no alias maps a retired key
+
+#### Scenario: The static tier named human_commoner is untouched
+- **WHEN** human_commoner StaticTier and static_tier_key/default_tier occurrences resolve
+- **THEN** they resolve to the same 平民與非戰鬥者 StaticTier concept using its current authored physical band, not an expected (1,5) table
+
+#### Scenario: The retired keys are exactly the wealth-ladder subrace keys
+- **WHEN** rename scope is inspected
+- **THEN** only human_wealthy, human_commoner as a subrace key and human_laborer are retired
+
+#### Scenario: Only the new keys are named
+- **WHEN** subrace registries, tests, fixtures, presets and docs are inspected
+- **THEN** only new subrace keys are named, while unrelated StaticTier meaning stays
+
+#### Scenario: Orphaned Scripts are not pruned and the database is rebuilt
+- **WHEN** a database were carried across the rename
+- **THEN** it would retain orphaned lore:subraces Scripts because sync creates/overwrites without pruning; the existing rebuild policy remains, with pruning explicitly out of scope

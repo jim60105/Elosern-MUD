@@ -45,3 +45,10 @@ Numerical boundary examples below SHALL use scoped synthetic declarations. Shipp
 - **WHEN** exact numerical boundary cases above are exercised
 - **THEN** local fixed synthetic declarations use those boundary values; shipped acts retain the stated counter-key topology, membership and resistance policy with authored positive thresholds, and tests do not pin their literal unlock counts
 
+### Requirement: Tier 2 and Tier 3 acts credit both masturbation_count and toy_use_count on cast
+Each of solo_toy_vibrator, solo_toy_clamps, solo_toy_plug, solo_toy_advanced_link, solo_toy_advanced_full and solo_bound_masturbation SHALL retain actor counters masturbation_count and toy_use_count. Real integration actors SHALL satisfy current declared eligibility, not historical unlock counts.
+
+#### Scenario: Casting a toy act increments both counters by exactly one
+- **WHEN** an eligible actor casts solo_toy_vibrator on itself and both counters are snapshotted before the cast
+- **THEN** masturbation_count and toy_use_count each increase by exactly 1, regardless of valid authored threshold changes
+

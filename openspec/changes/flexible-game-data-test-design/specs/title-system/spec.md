@@ -18,8 +18,8 @@ The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 cate
 - **THEN** no system gates anything on a clergy title key or display
 
 #### Scenario: Threshold finals are recorded by the tuning task
-- **WHEN** this change's tuning task decides the five threshold finals
-- **THEN** they are recorded in BOTH the registry rows and this requirement's scenarios before archive, and the shipped rows and the recorded finals agree
+- **WHEN** an author adjusts valid strictly ascending ladder thresholds
+- **THEN** the registry alone records the values; generic ordering/reference checks and independent synthetic boundary tests pass without a duplicate scenario or expected-value table
 
 #### Scenario: Ladder grants ride the existing machinery verbatim
 - **WHEN** a clergy ladder title is earned

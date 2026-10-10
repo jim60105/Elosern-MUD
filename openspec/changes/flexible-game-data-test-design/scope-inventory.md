@@ -388,9 +388,11 @@ This is not a ban on numbers. Intentional invariants include integer copper conv
 - MODIFIED: MagicTier bands are contiguous and non-overlapping
 - MODIFIED: MonsterTier registry has physical stat and HP bands derived from guild rank
 - MODIFIED: Currency is an integer count of 銅 with no floats in the money path
+- MODIFIED: Human lineage renames ship without a save-data compatibility layer
 ### `masterwork-price-band`
 
 - MODIFIED: A masterwork price band spans everyday and scarce prices for the same object
+- MODIFIED: A keepsake-band item can never be offered for sale
 ### `military-equipment`
 
 - MODIFIED: Six military pairs use shared registered effects and approved integer prices
@@ -450,9 +452,13 @@ This is not a ban on numbers. Intentional invariants include integer copper conv
 ### `sexual-catalog-shame`
 
 - MODIFIED: Nine Tier 1-4 shame acts are registered, gated by exposure_act_count and/or watched_count thresholds
+- MODIFIED: shame_public_masturbation credits three counters and emits five events
+- MODIFIED: shame_public_performance credits both watched_count and exposure_act_count on the actor and emits the four public events
+- MODIFIED: shame_provocative_gaze credits hostile_act_count on both participants
 ### `sexual-catalog-solo`
 
 - MODIFIED: Eleven Tier 1-3 solo acts are registered, gated by masturbation_count and/or toy_use_count thresholds
+- MODIFIED: Tier 2 and Tier 3 acts credit both masturbation_count and toy_use_count on cast
 ### `sexual-state-handler`
 
 - MODIFIED: pleasure is constructed from an imported baseline's arousal level at that level's band floor
@@ -469,6 +475,10 @@ This is not a ban on numbers. Intentional invariants include integer copper conv
 - MODIFIED: The wind lineage ships as the authored two-root branching tree with a two-parent canopy
 - MODIFIED: The ice lineage ships as the authored two-root branching tree with a two-parent canopy
 - MODIFIED: The lightning lineage ships as the authored two-root branching tree with a two-parent canopy
+- MODIFIED: can_use_skill is the single shared use-eligibility predicate
+- MODIFIED: Practice saturates at the derived tip cap
+- MODIFIED: The freeform scale ladder is anchored to proficiency
+- MODIFIED: Import and scene-build auto-seed prerequisite proficiency exactly
 ### `skill-registry`
 
 - MODIFIED: dual_wield_style is a PASSIVE stance, not a castable ACTIVE skill

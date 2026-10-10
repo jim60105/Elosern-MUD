@@ -57,6 +57,17 @@ Numerical boundary examples below SHALL use scoped synthetic declarations. Shipp
 ### Requirement: The four Tier 3 acts trade off at baseline sensitivity
 The four existing Tier 3 acts SHALL retain the established baseline trade-offs while base pleasure and actor-side ratios remain authored data. At equal ordinary sensitivity, no shame and two participants, anal intercourse SHALL give the target more pleasure than mutual masturbation while mutual masturbation gives the actor more. Deep vaginal intercourse SHALL exceed ordinary vaginal intercourse for both participants and retain the larger actor-side gap. Divergent learned body-part sensitivity SHALL remain capable of changing these comparisons.
 
-#### Scenario: Real casting preserves the trade-off
+#### Scenario: partner_anal_sex grants the target strictly more than partner_mutual_masturbation does at baseline
 - **WHEN** the four acts resolve in separately reset controlled participant states
 - **THEN** observed actor and target pleasure deltas satisfy those relationships without numerical gain pins or expected values derived from the same production calculation
+#### Scenario: partner_mutual_masturbation grants the actor strictly more than partner_anal_sex does at baseline
+- **WHEN** separately reset ordinary-sensitivity/no-shame participants execute both acts with equal two-participant and resistance-control conditions
+- **THEN** observed actor pleasure gain is greater for mutual masturbation
+
+#### Scenario: 深度交合 escalates the stakes over 交合 on both sides
+- **WHEN** separately reset baseline participants execute ordinary and deep intercourse
+- **THEN** deep target gain exceeds ordinary target gain and the actor-side gap exceeds the target-side gap
+
+#### Scenario: Baseline trade-offs do not claim per-character dominance
+- **WHEN** the baseline comparison is interpreted
+- **THEN** it is not universal dominance: per-body-part sensitivity can diverge with play history

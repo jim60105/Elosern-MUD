@@ -67,7 +67,7 @@ The redemption catalogue SHALL gain five Series C rows as `SKILL_REGISTRY` PASSI
 ### Requirement: Series E utility rows feed the core loop
 The redemption catalogue SHALL gain the three Series E rows as cast-rail or ownership mechanics ;  `rite_martial_blessing`, `rite_shelter`, and `rite_morning_devotion` ;  whose handler and gating details are pinned by the scenarios below. None SHALL appear in any lineage tree; the redemption pipeline is the only acquisition path; prices land inside the tuned bands.
 
-#### Scenario: Morning devotion raises the prayer cap by its authored increment
+#### Scenario: Morning devotion raises the prayer cap by exactly one
 - **WHEN** a redeemed holder prays once past her base daily cap
 - **THEN** the prayer succeeds, and without the skill the same prayer hit the cap's stable rejection
 

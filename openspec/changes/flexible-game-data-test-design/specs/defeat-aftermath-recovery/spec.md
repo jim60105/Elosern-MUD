@@ -11,7 +11,7 @@ scaled_rate × elapsed)`) first reaches or exceeds the wake target
 `t` with source `defeat_aftermath`, then clamp the player's HP to exactly
 the target.
 
-#### Scenario: Defeat wakes at exactly the declared fraction after the computed advance
+#### Scenario: Defeat wakes at exactly 5% after the computed advance
 - **WHEN** a defeat settles with the player at HP 1, regen rate and remainder fixed by fixture, and the rulebook scale in force
 - **THEN** the clock advances by the computed minimum `t` with source `defeat_aftermath` and the player's HP equals exactly `ceil(max_hp × declared_wake_fraction)`
 

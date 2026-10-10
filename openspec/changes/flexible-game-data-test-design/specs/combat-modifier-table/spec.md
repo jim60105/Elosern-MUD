@@ -332,3 +332,31 @@ The authored high_exposure_defense_penalty row SHALL match exposure at or above 
 #### Scenario: Production status projection has a distinct boundary
 - **WHEN** the actual exposure row matches an entity above 高
 - **THEN** the status read model carries the current authored flat negative adjustment and warning label; neither appears below 高, without a duplicated literal adjustment table
+
+#### Scenario: An entity at or above 高 exposure takes the defense penalty
+- **WHEN** actual exposure reaches 高 or above
+- **THEN** the authored negative flat defense row matches through the common engine
+
+#### Scenario: The penalty applies correctly through real damage resolution, not only the raw bundle
+- **WHEN** a fixed synthetic exposure row grants defense -15 during real physical and magic damage resolution
+- **THEN** independently known damage outcomes reflect defense reduced by 15 rather than merely echoing the raw bundle
+
+#### Scenario: An entity below 高 exposure is unaffected
+- **WHEN** actual exposure is below 高
+- **THEN** no adjustment attributable to the exposure row appears
+
+#### Scenario: The row merges with buff-origin and skill-owned rows identically
+- **WHEN** fixed synthetic buff, passive and exposure rows contribute agility -10%, defense +5 and defense -15
+- **THEN** agility stays -10% and defense merges to -10 without condition-origin special casing
+
+#### Scenario: The matched condition is player-visible through the status read model
+- **WHEN** the authored exposure row matches
+- **THEN** the status condition carries its current authored modifier, Traditional Chinese label and warning severity, absent below 高
+
+#### Scenario: The defense adjustment is a merge-safe flat integer
+- **WHEN** the authored adjustment is validated
+- **THEN** negative flat integer shape is required and percentage defense is rejected
+
+#### Scenario: The threshold position mirrors the arousal penalty's
+- **WHEN** exposure and arousal penalty thresholds are located in their vocabularies
+- **THEN** both remain second-highest, without fixing the adjustment magnitudes

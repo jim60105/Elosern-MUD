@@ -65,13 +65,13 @@ Numerical boundary examples below SHALL use scoped synthetic declarations. Shipp
 ### Requirement: combat_forced_climax, combat_relentless_torment, and combat_climax_domination reliably clear the climax extension threshold
 The three extension-oriented acts SHALL retain their existing guarantee of meeting the configured extension threshold at the established ordinary-sensitivity, strong-shame, two-participant control condition. Base pleasure and shared multipliers SHALL be author-adjustable; tests SHALL preserve the threshold relationship without pinning base pleasure 30 or gain 21. Formula correctness SHALL be covered separately by fixed synthetic mechanism fixtures.
 
-#### Scenario: Observable extension
+#### Scenario: Worst-case target-side gain still clears the extension threshold
 - **WHEN** a declared extension act resolves for a target already in 進行中 under that control condition
 - **THEN** an extension is staged and consumed at settlement; changing balance data so that this established guarantee fails remains a meaningful content-quality failure
 
 ### Requirement: combat_forced_climax and combat_relentless_torment differ by actor_pleasure_ratio, not by dominance-freedom tuning
 The two acts SHALL retain their existing distinct actor-side ratios, equal base pleasure, and respective target parts 私處 and 臀部. The relentless actor-side ratio SHALL exceed the forced ratio; exact magnitudes SHALL be authored data. Neither SHALL add dominance-freedom tuning.
 
-#### Scenario: Distinct participant outcomes
+#### Scenario: combat_relentless_torment always costs the actor more than combat_forced_climax at equal target-side gain
 - **WHEN** the two acts execute against controlled participants with equal part sensitivity and unchanged target state
 - **THEN** the relentless actor receives greater pleasure while the target-side base remains equal; no fixed ratio or resulting gain table is required
