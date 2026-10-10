@@ -28,9 +28,6 @@ from world.skills.registry import (
 )
 
 
-# Retained for callers importing _CATALOG_EFFECTS; elemental catalogs have migrated to behavior specs.
-_CATALOG_EFFECTS: dict[str, tuple[str, ...]] = {}
-
 class ElementalSpellsBuilderTests(unittest.TestCase):
     def test_elemental_spells_builder_rejects_unknown_element(self):
         from world.skills.registry import _elemental_spells

@@ -419,10 +419,11 @@ class ChurchOfferingAcceptanceTests(ChurchAccrualBase):
         self.assertNotIn("affinity", offer_region)
         row_key = self._first_row_key()
         self._set_ordinal(self.recipient, 1)
-        with patch("world.rules.church.roll_d100", return_value=65):
+        percent = _acceptance_curve()[1][2]
+        with patch("world.rules.church.roll_d100", return_value=percent):
             result = church.offer_step(self.char1, self.recipient, row_key)
         self.assertEqual(result["outcome"], "accepted")
-        self.assertEqual(result["accept_percent"], 65)
+        self.assertEqual(result["accept_percent"], percent)
 
 
 class ChurchOfferingSettlementTests(ChurchAccrualBase):

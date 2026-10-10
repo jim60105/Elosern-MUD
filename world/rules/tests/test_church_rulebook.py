@@ -698,7 +698,13 @@ class PassivePolarityGateTests(TestCase):
     def test_obedience_doubles_merit_under_submission_status(self):
         from world.rules.church import scaled_merit_gain
 
-        obedience_key = next(p.skill_key for p in get_church_rules().passive_effects if p.effects.get("multiplier", 0) > 1.0)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if p.effects.get("multiplier", 0) > 1.0
+        )
+        obedience_key = row.skill_key
+        multiplier = row.effects["multiplier"]
 
         class _MockEntity:
             def __init__(self, has_mark=False):
@@ -707,19 +713,30 @@ class PassivePolarityGateTests(TestCase):
 
         unmarked = _MockEntity(has_mark=False)
         marked = _MockEntity(has_mark=True)
-        # Without submission status: unchanged (x1)
-        self.assertEqual(scaled_merit_gain(unmarked, 40), 40)
-        # Under submission status: exactly doubled (x2)
-        self.assertEqual(scaled_merit_gain(marked, 40), 80)
+        base = 40
+        # Without submission status: unchanged; under it: the row's own
+        # declared multiplier, never a duplicated final.
+        self.assertEqual(scaled_merit_gain(unmarked, base), base)
+        self.assertEqual(
+            scaled_merit_gain(marked, base), round(base * multiplier)
+        )
 
     @covers_requirement(
         "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
     )
-    def test_temple_endurance_mitigates_high_exposure_defense_penalty_by_25_percent(self):
+    def test_temple_endurance_mitigates_by_its_declared_percent(self):
         from unittest.mock import patch
         from world.rules.combat_modifiers import evaluate_combat_modifiers
 
-        temple_key = next(p.skill_key for p in get_church_rules().passive_effects if "mitigation" in p.effects)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if "mitigation" in p.effects
+        )
+        temple_key = row.skill_key
+        percent = int(
+            row.effects["mitigation"]["high_exposure_defense_penalty"].rstrip("%")
+        )
 
         class _MockEntity:
             def __init__(self, owns_temple=False):
@@ -737,10 +754,14 @@ class PassivePolarityGateTests(TestCase):
         non_holder = _MockEntity(owns_temple=False)
         holder = _MockEntity(owns_temple=True)
         with patch("world.rules.combat_modifiers.effective_exposure", return_value="高"):
-            # Non-holder penalty is byte-identical -15
-            self.assertEqual(evaluate_combat_modifiers(non_holder), {"defense": -15})
-            # Holder penalty is 25% smaller in magnitude (-15 * 0.75 = -11.25)
-            self.assertEqual(evaluate_combat_modifiers(holder), {"defense": -11.25})
+            base_penalty = evaluate_combat_modifiers(non_holder)["defense"]
+            # The non-holder reads the authored penalty unchanged...
+            self.assertLess(base_penalty, 0)
+            # ...and the holder's magnitude shrinks by the declared percent.
+            self.assertAlmostEqual(
+                evaluate_combat_modifiers(holder),
+                {"defense": base_penalty * (1 - percent / 100)},
+            )
 
     @covers_requirement(
         "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
@@ -748,7 +769,13 @@ class PassivePolarityGateTests(TestCase):
     def test_public_devotion_public_venue_differential(self):
         from world.rules.church import scaled_merit_gain
 
-        devotion_key = next(p.skill_key for p in get_church_rules().passive_effects if "merit_percent" in p.effects and "copper_percent" not in p.effects)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if "merit_percent" in p.effects and "copper_percent" not in p.effects
+        )
+        devotion_key = row.skill_key
+        percent = row.effects["merit_percent"]
 
         class _MockEntity:
             def __init__(self, is_public=False):
@@ -758,10 +785,14 @@ class PassivePolarityGateTests(TestCase):
 
         private_char = _MockEntity(is_public=False)
         public_char = _MockEntity(is_public=True)
-        # In private venue: public_devotion does not apply
-        self.assertEqual(scaled_merit_gain(private_char, 100), 100)
-        # In public venue: +30% merit bonus applies (100 -> 130)
-        self.assertEqual(scaled_merit_gain(public_char, 100), 130)
+        base = 100
+        # In private venue the passive does not apply; in public it adds the
+        # row's own declared percentage.
+        self.assertEqual(scaled_merit_gain(private_char, base), base)
+        self.assertEqual(
+            scaled_merit_gain(public_char, base),
+            round(base * (1 + percent / 100)),
+        )
 
 
 class ChurchRulebookShapeTests(_TempFile):

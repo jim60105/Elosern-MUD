@@ -732,6 +732,31 @@ class StartingCompanionDeclarationTests(unittest.TestCase):
             self.assertGreater(declaration.affinity, 0)
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_the_twins_declared_affinity_keeps_its_stage_headroom(self):
+        # The affinity rulebook validates its cap-breaks against the quest
+        # registry, so register the shipped catalog before loading it.
+        from world.quests.catalog import register_catalog
+        from world.rules.affinity_config import get_config
+
+        register_catalog()
+        config = get_config()
+        for key in ("yuna_darknight", "yuka_darknight"):
+            for declaration in PLAYER_PRESET_REGISTRY[key].starting_companions:
+                with self.subTest(preset=key):
+                    # Above the auto-leave threshold, inside 至愛 and more than
+                    # one negative delta above its floor: a single penalty can
+                    # never drop the pair a stage or auto-dismiss the arrival.
+                    stage = config.stage_for_value(declaration.affinity)
+                    self.assertEqual(stage.name, "至愛")
+                    self.assertGreater(
+                        declaration.affinity, config.invite_threshold
+                    )
+                    self.assertGreaterEqual(
+                        declaration.affinity - stage.floor,
+                        config.friendly_fire_penalty_per_hit,
+                    )
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_every_other_preset_declares_no_companions(self):
         for key, preset in PLAYER_PRESET_REGISTRY.items():
             if key in (

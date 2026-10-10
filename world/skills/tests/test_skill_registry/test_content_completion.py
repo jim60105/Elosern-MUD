@@ -25,7 +25,7 @@ from world.skills.registry import (
     validate_prerequisite_graph,
 )
 from world.rules.progression import proficiency_cap
-from ..test_spell_catalogs import _CATALOG_EFFECTS
+
 
 class SkillContentCompletionTests(unittest.TestCase):
     @covers_requirement("skill-registry::guardian-instinct-and-blade-art-mastery-display-text-reflects-character-sheet-flavor")

@@ -56,18 +56,18 @@ def _trickle_draw(entity, resulting_tick: int) -> int:
 
 def _first_down_draw_tick(entity, from_tick: int) -> int:
     """Return the first tick after ``from_tick`` whose draw is minus."""
-    tick = from_tick
-    while _trickle_draw(entity, tick) != 0:
-        tick += 1
-    return tick
+    for tick in range(from_tick, from_tick + 10_000):
+        if _trickle_draw(entity, tick) == 0:
+            return tick
+    raise AssertionError("no minus draw inside the search window")
 
 
 def _first_up_draw_tick(entity, from_tick: int) -> int:
     """Return the first tick after ``from_tick`` whose draw is plus."""
-    tick = from_tick
-    while _trickle_draw(entity, tick) != 1:
-        tick += 1
-    return tick
+    for tick in range(from_tick, from_tick + 10_000):
+        if _trickle_draw(entity, tick) == 1:
+            return tick
+    raise AssertionError("no plus draw inside the search window")
 
 
 def _holder(key: str = "saintess holder"):

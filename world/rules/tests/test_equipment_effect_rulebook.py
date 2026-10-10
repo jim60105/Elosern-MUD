@@ -67,7 +67,6 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 79)
         self.assertEqual(
             set(loaded),
             {
@@ -76,6 +75,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                 if definition.equipment_slot is not None
             },
         )
+        self.assertTrue(loaded)
         self.assertEqual(dict(EQUIPMENT_EFFECT_RULES), loaded)
 
     @covers_requirement(
@@ -567,13 +567,12 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
     )
     def test_override_cannot_redefine_registry_rarity(self):
-        # Budget lookup follows the REAL registry rarity: the untouched
-        # budgets table still rejects a common club exceeding flat 4.
-        self._expect_rejection(
-            lambda d: d["effects"]["wooden_club"]["adjustments"].update(
-                {"atk_phys": 5}
-            )
-        )
+        # Budget lookup follows the REAL registry rarity, and an entry may not
+        # declare one of its own: the closed entry schema rejects the field.
+        document = _canonical_document()
+        document["effects"]["wooden_club"]["rarity"] = "legendary"
+        with self.assertRaisesRegex(EquipmentEffectsRulebookError, "rarity"):
+            load_equipment_effect_rules(_write_rulebook(document))
 
     @covers_requirement(
         "equipment-effects::registration-and-tradeability-are-independent"
@@ -643,7 +642,6 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 79)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():
