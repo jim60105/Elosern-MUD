@@ -141,10 +141,36 @@ completed in bounded batches. One dialogue batch timed out at the login
 selector; its dedicated exit-move method subsequently passed in isolation.
 These are recorded execution outcomes, not an attribution to pre-existing bugs.
 
-Final exercised gates: Vitest 166 files / 2099 tests; static exploration-menu
+Final exercised gates: Vitest 166 files / 2100 tests; static exploration-menu
 Node tests 34; movement adapter tests 22; frozen-contract tests 9; contract gate
 (2061 requirements covered, zero lint violations, 18 contract tests);
 component/story coverage (70 required components and GM coverage); production
 build; and strict OpenSpec validation. The build retains its existing unresolved
 runtime-art URL and large-chunk warnings. No full managed-browser or full
 Evennia suite was run.
+
+## Post-implementation rubber-duck
+
+The required independent post-implementation review found no blocking issues.
+Its three non-blocking findings and two suggestions were disposed as follows:
+
+- Adopted retained-aim refresh after a halt: `halt()` now re-snaps the aim against
+  current committed targets before showing the rejection. A regression replaces
+  targets without changing room identity and proves the retained aim now carries
+  the current disabled reason. All 2100 Vitest tests pass.
+- Deferred exception-vocabulary hardening for a raising wilderness coordinate
+  property. Normal valid/unchanged/missing-node traversal is covered; an
+  infrastructure exception remains logged and rejected by the existing
+  dispatcher. Broader exceptional-coordinate semantics are outside the narrowly
+  authorized success-classification repair.
+- Deferred new-capability evidence-ID remapping to archive sync, exactly as
+  tasks.md's workflow follow-up already requires. Those requirement IDs are not
+  yet in main specs; this apply does not archive or sync them. Current evidence
+  annotations retain the valid main-spec IDs and pass the traceability gate.
+- Rejected the suggested index fallback for people without identity. The
+  validated committed entity contract requires identity; inventing identities
+  for malformed payloads would weaken honest degradation.
+- No change for the exit-label performance suggestion: resolution is already
+  computed and cached, as the reviewer itself confirmed.
+
+The reviewer completed synchronously and left no child processes running.

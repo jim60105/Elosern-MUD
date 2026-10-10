@@ -329,6 +329,7 @@ function halt(message = null) {
   awaitingArrival = false;
   clearTimeout(noChangeTimer);
   stopWalking();
+  setAim(resnapAim(props.targets, aim.value));
   if (message) {
     blocked("rejected", null, message);
   }

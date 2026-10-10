@@ -423,6 +423,20 @@ describe("ExitCompass stop reasons", () => {
     expect(moves()).toEqual(["n1"]);
   });
 
+  it("halt refreshes the retained aim from the current committed targets", async () => {
+    await startWalkingNorth();
+    await wrapper.setProps({ targets: LOCKED_NORTH });
+    wrapper.vm.halt("此出口目前無法通行。");
+    await nextTick();
+    expect(lastAim().target).toMatchObject({
+      exitRef: "n4",
+      enabled: false,
+      reason: "前方的吊橋已經收起。",
+    });
+    expect(moves()).toEqual(["n1"]);
+    expect(root().attributes("data-walking")).toBe("false");
+  });
+
   it("leaving exploration stops the walk without another move", async () => {
     await startWalkingNorth();
     await arrive(NORTH_ROOM_2, 2, { active: false });
