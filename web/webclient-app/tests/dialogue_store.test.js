@@ -89,12 +89,11 @@ describe("dialogue frame vocabulary", () => {
     expect(menu.dialogueForm).toBeUndefined();
     const keys = (menu.items || []).map((i) => i.key);
     expect(menu.sections.map((section) => section.key)).toEqual([
-      "exits",
       "people",
       "objects",
       "footer",
     ]);
-    expect(keys).toContain("exit-east");
+    expect(keys).not.toContain("exit-east");
     expect(keys).toContain("wait");
     expect(keys).not.toContain("move");
     expect(keys).not.toContain("dlg-options");
@@ -149,7 +148,10 @@ describe("dialogue store mode lifecycle", () => {
     // The root frame is the ORDINARY exploration root: no dialogue form,
     // no 對話選項 tab, the ordinary overview chips still activatable.
     expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
-    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("exit-east");
+    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("target-7");
+    // The exits stay reachable outside the root (the compass and the
+    // dialogue exits list read them).
+    expect(store.view.explorationExits.map((i) => i.key)).toContain("exit-east");
     expect(store.view.rootMenu.items.map((i) => i.key)).not.toContain("move");
   });
 
@@ -418,7 +420,7 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.focusEscape()).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.focus.key).toBe("exit-east");
+    expect(store.view.focus.key).toBe("target-7");
   });
 
   it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {

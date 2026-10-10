@@ -40,6 +40,11 @@ export function applyView(ctx) {
     return typeof key === "string" && Object.hasOwn(combat.skillByKey, key) ? combat.skillByKey[key] : null;
   }
 
+  function explorationExitsView() {
+    const { rows, currentNode } = ctx.frameResolver.explorationExits();
+    return { explorationExits: rows, explorationCurrentNode: currentNode };
+  }
+
   ctx.buildView = function buildView(prev, rs) {
     const panels = rs.panels || {};
     const panel = panels.context_actions || null;
@@ -248,6 +253,13 @@ export function applyView(ctx) {
             reason: panels.local_map.reason,
           }
         : null,
+      // The exit compass's rows and the current node they were built with
+      // (exploration-exit-compass D2/D9), independent of the router's root
+      // frame; the dialogue screen's exit list reads the same rows.
+      ...explorationExitsView(),
+      // The submission gate the compass waits on: a mutation in flight or a
+      // declared presentation revision not yet committed.
+      submitLocked: ctx.router.isMutationInFlight() || ctx.router.isAwaitingRevision(),
       // The keyboard router's current combat menu frame (root/skills/scale/
       // target) so the visible dock follows keyboard navigation (Option B).
       combatMenu: mounted ? ctx.router.currentMenu() : null,

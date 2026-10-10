@@ -6,7 +6,9 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    activate_first_overview_exit,
+    activate_first_compass_exit,
+    click_compass_exit,
+    compass_target_refs,
     fixture_home_node_id,
     install_outbound_recorder,
     outbound_messages,
@@ -75,28 +77,31 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         time_before = store_state(page)["serverTime"]
 
         # The exploration root is the scene overview (webclient-scene-overview-
-        # swap), so its first chip is the room's first exit.
+        # swap) beside the exit compass, which carries the room's exits
+        # (exploration-exit-compass).
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.depth()"),
             1,
             "the exploration root is the scene overview",
         )
-        # remove-redundant-dock-menu-layout: the overview is the direct-child
-        # rule's one exception for row regions — it renders as a single
-        # component that is the pane host's only child, with no anonymous
-        # layout wrapper and no detail aside.
+        # remove-redundant-dock-menu-layout: the exploration root pane is the
+        # direct-child rule's one exception for row regions — it renders as a
+        # single element that is the pane host's only child (the compass plus
+        # the readout-and-overview column, exploration-exit-compass D5), with
+        # no anonymous layout wrapper and no detail aside.
         self.assertEqual(page.locator(".dock-menu-layout").count(), 0)
         self.assertEqual(
             page.evaluate(
                 "() => { const host = document.querySelector('.dock-pane-host');"
                 " if (!host) return false;"
                 " const kids = Array.from(host.children);"
-                " return kids.length === 1 && kids[0].classList.contains('scene-overview'); }"
+                " return kids.length === 1 && kids[0].getAttribute('data-testid') === 'exploration-root'"
+                " && !!kids[0].querySelector('[data-testid=\"scene-overview\"]'); }"
             ),
             True,
-            "the scene overview renders as the pane host's only child",
+            "the exploration root pane renders as the pane host's only child",
         )
-        _press(page, "Enter")  # the first exit chip
+        activate_first_compass_exit(page)  # the compass's first exit
         try:
             self._wait_panel(
                 page,
@@ -122,7 +127,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             # the move as stale (no state change). The client re-synchronizes
             # and asks the user to re-operate; the test emulates that retry
             # by re-selecting the same exit.
-            activate_first_overview_exit(page)
+            activate_first_compass_exit(page)
             self._wait_panel(
                 page,
                 "local_map",
@@ -180,9 +185,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-frame-resolution::activation-payloads-read-committed-state-at-dispatch-time")
     def test_open_overview_follows_a_committed_move(self):
         """The shipped dock path (the user-visible bug, design doc §2): the
-        scene overview renders the committed panel's exits, so a committed move
-        must make the RENDERED chips list the NEW room's exits, and activating
-        a rendered chip must submit the new `exit_ref`/`current_node`. Against
+        exit compass renders the committed panel's exits, so a committed move
+        must make the RENDERED compass targets the NEW room's exits, and
+        activating a rendered target must submit the new
+        `exit_ref`/`current_node` (exploration-exit-compass). Against
         the copy-based router this fails red: the rendered pane keeps the
         previous room's rows and payloads, so the second activation is answered
         `stale` and the player sees nothing."""
@@ -204,20 +210,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         def rendered_exit_rows():
-            # The REAL pane: the dock row region's rendered rows, in DOM
-            # order — not a store copy.
-            return page.evaluate(
-                "() => Array.from("
-                "document.querySelectorAll('#action-dock [data-item-key]'))"
-                ".map((el) => el.getAttribute('data-item-key'))"
-                ".filter((key) => key.startsWith('exit-'))"
-            )
+            # The REAL pane: the exit compass's rendered targets — not a
+            # store copy.
+            return sorted(compass_target_refs(page))
 
         panel_before = store_state(page)["panels"]["exploration"]
         self.assertEqual(
             rendered_exit_rows(),
-            ["exit-" + row["exit_ref"] for row in panel_before["move"]],
-            "the freshly rendered overview must match the committed room",
+            sorted(str(row["exit_ref"]) for row in panel_before["move"]),
+            "the freshly rendered compass must match the committed room",
         )
 
         # A real admitted move commits a newer snapshot for the whole room.
@@ -232,15 +233,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         after_rows = rendered_exit_rows()
         self.assertEqual(
             after_rows,
-            ["exit-" + row["exit_ref"] for row in panel_after["move"]],
-            "the overview still renders the superseded room's exits",
+            sorted(str(row["exit_ref"]) for row in panel_after["move"]),
+            "the compass still renders the superseded room's exits",
         )
 
-        # Activating a rendered chip through the pointer path submits the NEW
-        # state's payload.
+        # Activating a rendered target through the pointer path submits the
+        # NEW state's payload.
         moves_before = sent_action_count(page, "explore.move")
-        first_key = after_rows[0]
-        page.locator(f"#action-dock [data-item-key=\"{first_key}\"]").click()
+        target_row = next(row for row in panel_after["move"] if row.get("enabled"))
+        click_compass_exit(page, target_row["exit_ref"])
         page.wait_for_function(
             f"() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
             " && m[1][0] && m[1][0].action_id === 'explore.move').length"
@@ -260,7 +261,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(
             (envelopes[-1].get("payload") or {}).get("exit_ref"),
-            panel_after["move"][0]["exit_ref"],
+            target_row["exit_ref"],
             "the activation submitted the superseded room's exit_ref",
         )
 
@@ -271,7 +272,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def test_frame_resolver_follows_committed_state_across_a_real_move(self):
         """The frame resolver registry derives menus at access time (design
         doc D1): the scene overview resolved before a real move names the old
-        room; re-resolving after the committed snapshot names the new room's
+        room; re-resolving after the committed snapshot names the new room.
+        The exits live outside the root frame (exploration-exit-compass): the
+        resolver-derived exit rows the view publishes name the new room's
         exits with the new current_node and no stale row."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -283,8 +286,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "() => window.__elosernBridge.resolveFrame({ source: 'exploration.root' })"
             )
 
-        before = resolve_overview_menu()
-        self.assertFalse(before.get("unresolvable", False), f"the overview did not resolve: {before}")
+        def exit_rows():
+            return {"items": store_state(page)["explorationExits"]}
+
+        overview_before = resolve_overview_menu()
+        self.assertFalse(
+            overview_before.get("unresolvable", False), f"the overview did not resolve: {overview_before}"
+        )
+        self.assertFalse(any(item["key"].startswith("exit-") for item in overview_before["items"]))
+        before = exit_rows()
         panel_before = store_state(page)["panels"]["exploration"]
         before_keys = [item["key"] for item in before["items"] if item["key"].startswith("exit-")]
         self.assertEqual(
@@ -307,8 +317,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         node_after = store_state(page)["panels"]["local_map"]["current_node"]
         self.assertNotEqual(node_after, node_before)
 
-        after = resolve_overview_menu()
-        self.assertFalse(after.get("unresolvable", False), f"the overview did not re-resolve: {after}")
+        overview_after = resolve_overview_menu()
+        self.assertFalse(
+            overview_after.get("unresolvable", False), f"the overview did not re-resolve: {overview_after}"
+        )
+        after = exit_rows()
         panel_after = store_state(page)["panels"]["exploration"]
         after_keys = [item["key"] for item in after["items"] if item["key"].startswith("exit-")]
         self.assertEqual(

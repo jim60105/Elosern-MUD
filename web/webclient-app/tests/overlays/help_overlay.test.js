@@ -46,6 +46,19 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(wrapper.text()).not.toContain("1-4");
   });
 
+  it("lists the exit compass's aim, cycle, move, hold, and escape bindings", () => {
+    wrapper = mount(HelpOverlay);
+    const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());
+    expect(keys("compass-aim")).toEqual(["↑", "↓", "←", "→"]);
+    expect(rowText("compass-aim")).toContain("瞄準");
+    expect(keys("compass-cycle")).toEqual(["[", "]"]);
+    expect(keys("compass-move")).toEqual(["Enter", "Space"]);
+    expect(rowText("compass-hold")).toContain("按住");
+    expect(rowText("compass-escape")).toContain("清除羅盤的瞄準");
+    // The digits now address the overview's people, objects, and footer.
+    expect(rowText("digits")).toContain("出口改由出口羅盤操作");
+  });
+
   it("reads in Traditional Chinese apart from literal key names and command syntax", () => {
     wrapper = mount(HelpOverlay);
     const prose = wrapper

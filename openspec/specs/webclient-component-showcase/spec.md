@@ -94,11 +94,12 @@ non-local network requests blocked.
 - **THEN** it renders from local assets without failure
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
-The action-dock components (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`,
-`SceneOverview`, and `DockVerbPopover`) SHALL present the `context_actions` v5 menus and the
-`exploration` panel's scene overview as a finite set of framed rows or chips with a guidance line
-and focused/disabled states, and SHALL render the option and choice cards in the exact
-server-authored shape.
+
+The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`, `ExitCompass`,
+`ExplorationReadout`, `SceneOverview`, `DockVerbPopover`) SHALL present the `context_actions` v5 menus and, in
+exploration, the `exploration` panel's scene overview as an exit compass beside finite people/object/footer
+rows or chips sharing one readout, with the mode's guidance line, focused/disabled states, and the exact
+server-authored option and choice card shape.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell
@@ -109,12 +110,12 @@ server-authored shape.
 - **THEN** each option and choice card is the exact server-authored shape and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
 
 #### Scenario: The scene overview renders only its non-empty rows
-- **WHEN** the scene overview renders a menu whose sections are exits, objects, and the footer, with no people section
-- **THEN** the 出口 and 物件 rows and the footer render in that order, no 人物 row or label is present, and each chip carries its row key and row id in reading order
+- **WHEN** the scene overview renders objects and the footer, with no people section, beside a compass with exits
+- **THEN** only the 物件 row and footer render in that order, with no 人物 or 出口 row or label, and each chip carries its row key and row id
 
 #### Scenario: A disabled exit chip explains itself without submitting
-- **WHEN** the scene overview renders a disabled exit chip and the pointer clicks it
-- **THEN** the chip becomes the focused chip, its label carries the disabled marker, the reason strip shows the server-authored reason, and no activation intent is emitted
+- **WHEN** a disabled compass target is aimed or clicked
+- **THEN** the shared readout shows its unchanged server reason and no move intent is emitted
 
 #### Scenario: The verb popover closes on an outside press
 - **WHEN** the verb popover is open inside its host and the pointer presses inside the host but outside the popover card
@@ -138,9 +139,8 @@ server-authored shape.
   horizontally
 
 #### Scenario: An exit chip follows the move row form's rules
-- **WHEN** the scene overview renders an exit chip
-- **THEN** it carries the exit's direction glyph and, while enabled, the destination's display
-  name, under the same glyph, destination, and disabled-label rules as the move row form
+- **WHEN** the compass resolves and aims a committed move row
+- **THEN** its target and readout obey `webclient-exit-compass`, including bearing, direction and portal resolution, destination fallback, and disabled reason presentation
 
 #### Scenario: The verb popover names its target and its rows
 - **WHEN** the verb popover renders for a target

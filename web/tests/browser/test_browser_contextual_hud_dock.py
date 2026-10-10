@@ -7,6 +7,8 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     activate_overview_chip,
+    aim_compass_exit,
+    compass_target_refs,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
@@ -434,34 +436,22 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         _wait_mode(page, "exploration")
 
         # The exploration root is the scene overview: its rendered chips in
-        # reading order are [exit-ex-a, exit-ex-b, exit-ex-c, target-11,
-        # look-room, wait] (the suggestions envelope is unavailable).
+        # reading order are [target-11, look-room, wait] (the suggestions
+        # envelope is unavailable). The three exits are the exit compass's
+        # (exploration-exit-compass) and take no digit slot.
         self.assertEqual(_dock_depth(page), 1, "the overview is the root frame")
         self.assertEqual(
             page.evaluate(
                 "() => Array.from(document.querySelectorAll("
                 "'#action-dock .scene-chip')).map((el) => el.getAttribute('data-item-key'))"
             ),
-            ["exit-ex-a", "exit-ex-b", "exit-ex-c", "target-11", "look-room", "wait"],
+            ["target-11", "look-room", "wait"],
             "the overview's rendered chips are the digit slots",
         )
+        self.assertEqual(sorted(compass_target_refs(page)), ["ex-a", "ex-b", "ex-c"])
 
-        # `2` picks the second chip (a disabled one): the focus moves onto it
-        # and nothing submits — a stable state with no server commit to race.
-        _press(page, "2")
-        self.assertEqual(
-            store_state(page)["focus"]["key"],
-            "exit-ex-b",
-            "digit 2 moved the focus onto the second chip",
-        )
-        self.assertEqual(
-            sent_action_count(page),
-            0,
-            "a disabled picked chip shows its explanation and submits nothing",
-        )
-
-        # `9` is beyond the six rendered chips: unclaimed, the overview stays
-        # current, nothing submits.
+        # `9` is beyond the three rendered chips: unclaimed, the overview
+        # stays current, nothing submits.
         _press(page, "9")
         self.assertEqual(
             _dock_depth(page),
@@ -470,23 +460,21 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), 0, "the unclaimed digit submits nothing")
 
-        # The frame stayed current: `1` picks the first rendered chip and
-        # submits its move exactly as Enter would — the proof is the
-        # OUTBOUND envelope (the fabricated exit_ref is the server's
-        # problem, not the client's; the commit's authoritative panel
-        # replace is intentionally not asserted, so the assertion cannot
-        # race it).
-        _press(page, "1")
-        moves = [
+        # `2` picks the second rendered chip (查看房間) and submits its look
+        # exactly as Enter would — the proof is the OUTBOUND envelope, so the
+        # assertion cannot race the commit. No digit ever moves.
+        _press(page, "2")
+        looks = [
             args[0]
             for cmdname, args, _kwargs in outbound_messages(page)
-            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.look"
         ]
         self.assertEqual(
-            [m.get("payload", {}).get("exit_ref") for m in moves],
-            ["ex-a"],
-            "digit 1 submitted exactly the first row's move, once",
+            [m.get("payload") for m in looks],
+            [{"room": True}],
+            "digit 2 submitted exactly the second chip's look, once",
         )
+        self.assertEqual(sent_action_count(page, "explore.move"), 0, "no digit moves")
 
         # A digit with no such row is unclaimed: the bridge does not prevent
         # its default (dispatchEvent returns false only when a listener
@@ -506,9 +494,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def test_dock_panes_render_per_kind_vocabulary(self):
         """Dock panes render a per-kind vocabulary from backed fields only.
 
-        The exploration root's exit vocabulary is the scene overview's chips
-        (webclient-retire-exploration-submenus deleted the move frame's outlet
-        pane), so the exit chip is the form under test here.
+        The exploration root's exit vocabulary is the exit compass and its
+        readout (exploration-exit-compass replaced the overview's exit chips,
+        which had replaced the move frame's outlet pane), so the compass's
+        targets and the readout's lead and text are the form under test.
         """
         page = self.logged_in_page()
         exploration = _exploration_panel(
@@ -532,8 +521,9 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # The exploration root renders the scene overview, and no exit-outlet
-        # grid exists anywhere in the dock.
+        # The exploration root renders the exit compass beside the scene
+        # overview, and no exit-outlet grid or exit chip exists anywhere in
+        # the dock (exploration-exit-compass).
         self.assertEqual(_dock_depth(page), 1)
         self.assertEqual(page.locator('[data-testid="scene-overview"]').count(), 1)
         # A NEGATIVE assertion (the retired outlet grid must not exist). It is
@@ -543,99 +533,38 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(
             page.evaluate(
                 "() => document.querySelectorAll("
-                "'#action-dock .dock-menu__outlet').length"
+                "'#action-dock .dock-menu__outlet, #action-dock [data-item-key^=\"exit-\"]').length"
             ),
             0,
-            "no exit-outlet grid exists anywhere in the dock",
+            "no exit-outlet grid or exit chip exists anywhere in the dock",
         )
-        chips = page.locator("#action-dock .scene-chip")
-        self.assertEqual(chips.count(), 5, "three exit chips plus the footer's two")
+        self.assertEqual(sorted(compass_target_refs(page)), ["1", "2", "3"])
 
-        # Row 1: the canonical "南" (south) direction resolves to a glyph, and
-        # the destination's display name is the chip's primary text — the exit's
-        # own direction-word label never renders beside it.
-        first = chips.nth(0)
-        self.assertIn("↓", first.inner_text(), "the canonical direction renders its glyph")
-        self.assertEqual(
-            first.locator(".dock-menu-item__label").inner_text(),
-            "南大道",
-            "the destination's display name is the chip's primary text",
-        )
-        self.assertEqual(
-            first.locator(".dock-menu-item__glyph").count(),
-            1,
-            "the chip carries exactly one direction glyph element",
-        )
-        # The focused chip carries the shared focus caret (::before) while an
-        # unfocused one does not: the direction glyph is a separate, persistent
-        # element, so focus never double-marks the chip.
-        self.assertEqual(
-            first.evaluate("el => getComputedStyle(el, '::before').content"),
-            '"▶"',
-            "the focused chip carries the shared focus caret",
-        )
-        self.assertEqual(
-            chips.nth(1).evaluate("el => getComputedStyle(el, '::before').content"),
-            "none",
-            "an unfocused chip carries no caret",
+        readout = lambda: (  # noqa: E731
+            page.locator('[data-testid="exploration-readout-lead"]').inner_text().strip(),
+            page.locator('[data-testid="exploration-readout-text"]').inner_text().strip(),
         )
 
-        # Row 2: a non-canonical door "南門" renders verbatim (no guessed
-        # direction), and its destination node is absent from the committed
-        # lattice (no name).
-        second = chips.nth(1)
-        self.assertEqual(
-            second.locator(".dock-menu-item__glyph").count(),
-            0,
-            "a non-canonical exit label carries no direction glyph",
-        )
-        second_text = second.inner_text()
-        self.assertIn("南門", second_text)
-        self.assertNotIn("grid:capital_altoria:9:9", second_text)
+        # Exit 1 leads to a committed map node one step north: the map
+        # bearing (not its 南 label) places it, and the readout names the
+        # destination's display name, never the node id.
+        aim_compass_exit(page, "1")
+        self.assertEqual(readout(), ("前往 ↑", "南大道"))
 
-        # Row 3: a disabled exit chip keeps its own label plus the shared
-        # marker, and its server-authored reason stays reachable from the chip
-        # itself and from the overview's reason strip while it is focused.
-        third = chips.nth(2)
-        third_text = third.inner_text()
-        self.assertIn("北", third_text)
-        self.assertIn("（無法使用）", third_text)
-        reason_id = third.get_attribute("aria-describedby")
-        self.assertTrue(reason_id, "the disabled chip carries its reason association")
-        reason_text = page.evaluate(
-            "(id) => { const el = document.getElementById(id);"
-            " return el ? el.textContent : null; }",
-            reason_id,
-        )
-        self.assertEqual(
-            reason_text,
-            "出口被阻擋。",
-            "the server-authored reason stays reachable from the chip",
-        )
-        self.assertTrue(
-            page.evaluate(
-                "() => window.__elosernBridge.store.focusItemByKey('exit-3')"
-            )
-        )
-        page.wait_for_timeout(80)
-        self.assertEqual(
-            page.locator('[data-testid="exploration-detail"]').inner_text(),
-            "出口被阻擋。",
-            "the overview's reason strip shows the focused chip's explanation",
-        )
+        # Exit 2 is a non-canonical label whose destination is absent from
+        # the committed lattice: a portal that renders its own label verbatim
+        # with no guessed direction.
+        aim_compass_exit(page, "2")
+        self.assertEqual(readout(), ("通道 ✦", "南門"))
+        self.assertNotIn("grid:capital_altoria:9:9", page.locator('[data-testid="exploration-readout"]').inner_text())
 
-        # Chips render only backed fields: no statistics line and no portrait
-        # slot (the exploration payload carries neither; the retired nav pane's
-        # sub-line went with the pane, webclient-talk-open-dock).
+        # Exit 3 is disabled: its target stays aimable, drawn hollow, and the
+        # readout shows the server-authored reason verbatim.
+        aim_compass_exit(page, "3")
+        self.assertEqual(readout(), ("無法通行", "出口被阻擋。"))
         self.assertEqual(
-            first.locator("img").count(),
-            0,
-            "the chip renders no portrait the payload does not carry",
-        )
-        self.assertEqual(
-            first.locator(".dock-menu-item__label").count(),
-            1,
-            "the chip carries exactly one backed label element",
+            page.locator('#action-dock [data-testid="exit-compass"] [data-exit-ref="3"]').get_attribute("data-enabled"),
+            "false",
         )
 
     @covers_requirement(

@@ -7,7 +7,7 @@ import json
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    activate_first_overview_exit,
+    activate_first_compass_exit,
     activate_overview_chip,
     focus_action_dock,
     fixture_home_node_id,
@@ -151,7 +151,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Move away from the goblin, then wait until dawn succeeds.
-        activate_first_overview_exit(page)  # the overview's first exit chip
+        activate_first_compass_exit(page)  # the compass's first exit
         self._wait_panel(
             page,
             "local_map",

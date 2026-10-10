@@ -13,6 +13,7 @@ from .browser_helpers import (
     wait_for_store_state,
 )
 from ._journey_support import (
+    _interact_target,
     _exploration_panel,
     _move_row,
     _exploration_context_actions_panel,
@@ -69,10 +70,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def test_overview_chips_wrap_inside_the_pane_at_a_narrow_viewport(self):
         """The scene overview's chips wrap by width inside the command region.
 
-        At the minimum supported viewport a room with many exits renders its
-        chips as wrapping rows inside the scrolling pane: no chip overflows the
-        pane horizontally, the reading order is unchanged, and the last chip is
-        reachable by scrolling (the dock pane is the single scrolling region).
+        At the minimum supported viewport a crowded room renders its chips as
+        wrapping rows in the right column beside the exit compass
+        (exploration-exit-compass D5): no chip overflows the column
+        horizontally, the reading order is unchanged, the last chip is
+        reachable by scrolling (the column is the pane's single scrolling
+        region), and the twelve exits stay on the compass.
         """
         page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
@@ -83,32 +86,39 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             _move_row("e%d" % index, label, "room:%d" % (100 + index))
             for index, label in enumerate(labels)
         ]
+        names = ["測試人物 %d" % index for index in range(10)]
+        people = [_interact_target(700 + index, name) for index, name in enumerate(names)]
         self._mount_overview(
             page,
-            _exploration_panel([], move_rows=exits),
+            _exploration_panel(people, move_rows=exits),
             {"status": "unavailable"},
         )
 
-        pane = page.locator("#action-dock .action-dock__pane")
+        column = page.locator("#action-dock .exploration-root__side")
         chips = page.locator("#action-dock .scene-chip")
-        # Twelve exit chips plus the footer's 查看房間 and 等待／休息 chips.
-        self.assertEqual(chips.count(), 14, "the overview renders one chip per entry")
-        pane_box = pane.bounding_box()
-        self.assertIsNotNone(pane_box, "the dock pane must be visible at 1451x790")
+        # Ten person chips plus the footer's 查看房間 and 等待／休息 chips.
+        self.assertEqual(chips.count(), 12, "the overview renders one chip per entry")
+        pane_box = column.bounding_box()
+        self.assertIsNotNone(pane_box, "the overview column must be visible at 1451x790")
+        self.assertEqual(
+            page.locator('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').count(),
+            len(exits),
+            "every exit is a compass target",
+        )
 
-        # The reading order is unchanged: the exits lead, the footer closes.
+        # The reading order is unchanged: the people lead, the footer closes.
         keys = page.evaluate(
             "() => Array.from(document.querySelectorAll('#action-dock .scene-chip'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
         self.assertEqual(
             keys,
-            ["exit-" + row["exit_ref"] for row in exits] + ["look-room", "wait"],
+            ["target-%d" % (700 + index) for index in range(len(names))] + ["look-room", "wait"],
             "the overview's chips keep their reading order",
         )
 
-        # No chip overflows the pane horizontally, and the chips wrap into more
-        # than one row (the fixed 2-column grid is gone with the outlet).
+        # No chip overflows the column horizontally, and the chips wrap into
+        # more than one row.
         tops = set()
         for index in range(chips.count()):
             box = chips.nth(index).bounding_box()
@@ -116,10 +126,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self.assertLessEqual(
                 box["x"] + box["width"],
                 pane_box["x"] + pane_box["width"] + 1,
-                "chip %d overflows the pane horizontally" % index,
+                "chip %d overflows the column horizontally" % index,
             )
             self.assertGreaterEqual(
-                box["x"], pane_box["x"] - 1, "chip %d starts left of the pane" % index
+                box["x"], pane_box["x"] - 1, "chip %d starts left of the column" % index
             )
             tops.add(round(box["y"]))
         self.assertGreater(
@@ -127,11 +137,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         # The last chip is reachable by scrolling: focusing it (the real
-        # keyboard path) scrolls it into the pane's visible box. The chip the
-        # assertion below measures is the last one in DOM order — the footer's
-        # 等待 — so the keyboard path must focus that same chip; focusing an
-        # already-visible exit chip scrolls nothing and leaves the footer
-        # below the pane's visible box.
+        # keyboard path) scrolls it into the column's visible box.
         last_key = keys[-1]
         self.assertTrue(
             page.evaluate(
@@ -145,12 +151,21 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertGreaterEqual(
             last_box["y"],
             pane_box["y"] - 1,
-            "the focused last chip must be scrolled into the pane",
+            "the focused last chip must be scrolled into the column",
         )
         self.assertLessEqual(
             last_box["y"] + last_box["height"],
             pane_box["y"] + pane_box["height"] + 1,
-            "the focused last chip must be scrolled into the pane",
+            "the focused last chip must be scrolled into the column",
+        )
+        # The pane itself never scrolls: the column does.
+        self.assertEqual(
+            page.evaluate(
+                "() => { const p = document.querySelector('#action-dock .action-dock__pane');"
+                " return p.scrollHeight - p.clientHeight; }"
+            ),
+            0,
+            "the dock pane must not scroll; the overview column does",
         )
         self.assertEqual(
             sent_action_count(page), 0, "focusing a chip submits nothing"

@@ -3,6 +3,7 @@
 // AppClient template consumes, so the SFC itself stays a thin, passive
 // renderer. Group call order preserves the original watcher registration
 // order (shell focus -> resync episode -> rest/wait teardown -> mode -> dock).
+import { ref } from "vue";
 import { useDispatchIntent, useIntentHandlers } from "./intents.js";
 import { usePanelView } from "./panel-view.js";
 import { useResync } from "./use-resync.js";
@@ -13,6 +14,7 @@ import { useRestWait } from "./use-rest-wait.js";
 import { useOverlays } from "./use-overlays.js";
 import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
+import { useExitCompass } from "./use-exit-compass.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
@@ -30,6 +32,8 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
   useBackdropBridge(sceneBackdropRef);
   const restWait = useRestWait(store, { dispatchIntent });
   const scene = useScene(store, { panel, panelAvailable, dispatchIntent });
+  // The exit compass's template ref (bound by AppClient's `ref="compassRef"`).
+  const compassRef = ref(null);
   return {
     dispatchIntent,
     panel,
@@ -52,5 +56,9 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     ...useNpcPersonaEditor(store, { shellRef }),
     // The SkillBook 施放 hand-over to the dock (skillbook-authoritative-casting).
     ...useSkillUse(store),
+    // The exploration root pane's exit compass and shared readout
+    // (exploration-exit-compass).
+    compassRef,
+    ...useExitCompass(store, { panel, compassRef }),
   };
 }

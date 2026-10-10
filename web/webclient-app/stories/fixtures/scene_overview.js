@@ -6,6 +6,8 @@
 // model over a synthesized `exploration` panel. Every value is a fixed
 // literal: no live server, LLM, or image data.
 import ExplorationMenu from "../../lib/exploration_menu.js";
+import { resolveTargets } from "../../components/compass-model.js";
+import { localMapModelFor } from "./local_map.js";
 
 const DIRECTION_LABELS = ["北", "東", "南", "西", "東北", "西北", "東南", "西南", "上", "下"];
 
@@ -55,19 +57,18 @@ export function explorationPanelFixture({ exits = [], targets = [], entities = [
   };
 }
 
-// The destination names the exit chips read: the `nodes` of the committed
-// local-map model (`destinationLabel` reads only `id` and `label`).
+// A minimal local-map model carrying only destination names (`id` and
+// `label`, all `destinationLabel` reads), for the dialogue exits list.
 export function localMapFixture(nodes) {
   return { nodes: nodes.map(([id, label]) => ({ id, label })) };
 }
 
 // SceneOverview args: the overview menu exactly as the exploration root's
 // resolver will return it.
-export function overviewArgs(panel, { currentNode = "room:900", suggestions = null, localMap = null, focusedKey = null, active = true } = {}) {
+export function overviewArgs(panel, { currentNode = "room:900", suggestions = null, focusedKey = null, active = true } = {}) {
   return {
     menu: ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }),
     focusedKey,
-    localMap,
     active,
   };
 }
@@ -77,6 +78,25 @@ export function verbArgs(panel, identity, { focusedKey = null } = {}) {
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:900" });
   const target = ExplorationMenu.targetById(model, identity);
   return { menu: ExplorationMenu.verbMenuFor(model, target), focusedKey };
+}
+
+// ExitCompass args (exploration-exit-compass): the compass targets exactly as
+// the pane derives them — the exploration resolver's exit rows
+// (`ExplorationMenu.exitTargets`) resolved against the store-shaped
+// `localMapModel` of a committed `local_map` panel. `localMap` null means no
+// local map is committed (the rows then carry no current node).
+export function compassArgs(panel, localMap, { arrivalKey = 1, busy = false, motionLevel = "full" } = {}) {
+  const currentNode = localMap ? localMap.current_node : null;
+  const model = localMap ? localMapModelFor(localMap) : null;
+  const rows = ExplorationMenu.exitTargets(panel, { currentNode });
+  return {
+    targets: resolveTargets(rows, model, { currentNode }),
+    arrivalKey,
+    busy,
+    active: true,
+    motionLevel,
+    localMapModel: model,
+  };
 }
 
 // Synthesized affordance rows.

@@ -6,7 +6,8 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
-    activate_first_overview_exit,
+    activate_first_compass_exit,
+    compass_target_refs,
     activate_overview_chip,
     fixture_home_node_id,
     install_outbound_recorder,
@@ -155,7 +156,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "Escape must leave the character panel",
         )
 
-        activate_first_overview_exit(page)  # the overview's first exit chip
+        activate_first_compass_exit(page)  # the compass's first exit
         self._wait_panel(
             page,
             "local_map",
@@ -201,7 +202,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @staticmethod
-    def _fabricated_exploration_panel(*, move=(), interact=()) -> dict:
+    def _fabricated_exploration_panel(*, move=(), interact=(), objects=()) -> dict:
         """A schema-valid available exploration panel carrying exactly the
         named rows — the fabricated room a real commit would produce."""
         return {
@@ -212,7 +213,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "look": {
                 "room": {"identity": 94001, "display_name": "巡邏室", "room": True},
                 "entities": [],
-                "objects": [],
+                "objects": list(objects),
             },
             "interact": list(interact),
             "character": {"available": True},
@@ -229,6 +230,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "enabled": True,
             "disabled_reason": None,
         }
+
+    @staticmethod
+    def _object(identity: int, name: str) -> dict:
+        return {"identity": identity, "display_name": name}
 
     @staticmethod
     def _target(identity: int, name: str) -> dict:
@@ -263,21 +268,23 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
         """Focus tracks the item KEY (webclient-declarative-frame-stack):
-        at the scene overview, a commit that REORDERS the exits keeps the focus
-        on the same key at its new index, and a commit that drops the focused
-        exit lands focus on a surviving row — never on the frozen copy's old
-        row. Activation then submits the NEW committed payload."""
+        at the scene overview, a commit that REORDERS the objects keeps the
+        focus on the same key at its new index, and a commit that drops the
+        focused object lands focus on a surviving row — never on the frozen
+        copy's old row. Activation then submits the NEW committed payload.
+        (The exits are the exit compass's since exploration-exit-compass, so
+        the object chips carry the reorderable rows.)"""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
         accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            move=[self._move_row("ex-a", "北門"), self._move_row("ex-b", "南門"),
-                  self._move_row("ex-c", "東門")])})
+            objects=[self._object(9101, "木箱"), self._object(9102, "石碑"),
+                     self._object(9103, "水井")])})
         self.assertTrue(accepted["accepted"], accepted)
 
         # The exploration root is the scene overview, so the fabricated room's
-        # exit chips are the root frame's rendered rows.
+        # object chips are the root frame's rendered rows.
         self.assertEqual(self._depth(page), 1)
         self.assertEqual(
             page.evaluate(
@@ -286,18 +293,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "exploration.root",
         )
         self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('exit-ex-b')")
+            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('object-9102')")
         )
-        self.assertEqual(store_state(page)["focus"]["key"], "exit-ex-b")
+        self.assertEqual(store_state(page)["focus"]["key"], "object-9102")
 
         # Reordered + extended commit: the same key survives at a new index.
         accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            move=[self._move_row("ex-c", "東門"), self._move_row("ex-b", "南門"),
-                  self._move_row("ex-a", "北門"), self._move_row("ex-d", "西門")])})
+            objects=[self._object(9103, "水井"), self._object(9102, "石碑"),
+                     self._object(9101, "木箱"), self._object(9104, "篝火")])})
         self.assertTrue(accepted["accepted"], accepted)
         self.assertEqual(
             store_state(page)["focus"]["key"],
-            "exit-ex-b",
+            "object-9102",
             "the same-key focus did not survive the re-resolution",
         )
 
@@ -305,12 +312,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # nearest-row rule itself is pinned at store level; here it must land
         # somewhere real, never on the vanished key).
         accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            move=[self._move_row("ex-c", "東門"), self._move_row("ex-d", "西門")])})
+            objects=[self._object(9103, "水井"), self._object(9104, "篝火")])})
         self.assertTrue(accepted["accepted"], accepted)
         focused = store_state(page)["focus"]["key"]
         self.assertIn(
             focused,
-            ("exit-ex-c", "exit-ex-d"),
+            ("object-9103", "object-9104"),
             "the lost-key fallback did not land on a surviving row",
         )
         self.assertEqual(self._depth(page), 1, "the overview did not stay current")
@@ -319,24 +326,24 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(
             page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
         )
-        # The proof is the OUTBOUND envelope only: the fabricated exit_ref
+        # The proof is the OUTBOUND envelope only: the fabricated identity
         # cannot be accepted by the server (its own result/lock behaviour is
         # covered elsewhere), so the recorder — written synchronously at
         # dispatch — is the assertion source, not the in-flight gate.
         page.wait_for_function(
             "() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
-            " && m[1][0] && m[1][0].action_id === 'explore.move').length === 1",
+            " && m[1][0] && m[1][0].action_id === 'explore.look').length === 1",
             timeout=10000,
         )
-        moves = [
+        looks = [
             args[0]
             for cmdname, args, _kw in outbound_messages(page)
-            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.move"
+            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.look"
         ]
-        self.assertEqual(len(moves), 1, "the activation dispatched exactly one move")
+        self.assertEqual(len(looks), 1, "the activation dispatched exactly one look")
         self.assertEqual(
-            (moves[0].get("payload") or {}).get("exit_ref"),
-            focused[len("exit-"):],
+            str((looks[0].get("payload") or {}).get("target_id")),
+            focused[len("object-"):],
             "the activation submitted a payload from a superseded row",
         )
 
@@ -458,14 +465,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIsNone(store_state(page)["degradedRoot"])
         root_keys = self._pane_keys(page)
         # The recovered root is the scene overview (webclient-scene-overview-
-        # swap): the fabricated room's exit chip, the room-look chip, the
-        # footer's 等待／休息, and the 建議 entry — the retired move/look/
-        # interact dock entries are gone, and the character, quests, and
-        # inventory entries belong to the top navigation.
+        # swap): the room-look chip, the footer's 等待／休息, and the 建議
+        # entry — the retired move/look/interact dock entries are gone, and
+        # the character, quests, and inventory entries belong to the top
+        # navigation. The fabricated room's exit is back on the exit compass
+        # (exploration-exit-compass).
         self.assertTrue(
-            {"exit-ex-a", "look-room", "wait", "suggestions"} <= set(root_keys),
+            {"look-room", "wait", "suggestions"} <= set(root_keys),
             f"the recovered root lost its entries: {root_keys}",
         )
+        self.assertEqual(compass_target_refs(page), ["ex-a"])
 
     @covers_requirement("webclient-frame-resolution::suggestions-frames-are-status-driven-generating-never-pops-unavailable-exits-to-the-root")
     def test_suggestions_frame_is_status_driven(self):

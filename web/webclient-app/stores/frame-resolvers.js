@@ -13,8 +13,9 @@
 //
 // The exploration root is the scene overview (webclient-scene-overview-swap,
 // AVG stage design §7): `exploration.root` resolves
-// `ExplorationMenu.overviewMenu` — one reading-order menu of exits, people,
-// objects, and a footer, with the router's `sections` geometry — and
+// `ExplorationMenu.overviewMenu` — one reading-order menu of people,
+// objects, and a footer, with the router's `sections` geometry; the exits
+// are the exit compass's, read through `explorationExits` — and
 // `exploration.target` resolves `ExplorationMenu.verbMenuFor`, the target's
 // verb popover. `exploration.navigation` is the top navigation bar's own
 // entry set (the character status, quest, and inventory surfaces, which no
@@ -158,15 +159,31 @@ export function createFrameResolver(deps) {
   };
 
   // The scene overview (webclient-scene-overview-swap D1): the exploration
-  // root frame. One reading-order menu of the committed panel's exits,
-  // people, objects, and footer, carrying the router's `sections` geometry.
-  // The same `currentNode` fallback the tab root used feeds the exit
-  // payloads, so they stay byte-identical.
+  // root frame. One reading-order menu of the committed panel's people,
+  // objects, and footer, carrying the router's `sections` geometry.
   const explorationOverviewSource = () => {
     const gate = requireExplorationPanel();
     if (!gate.ok) return gate.reason;
     const { panel, currentNode, suggestions } = explorationModel();
     return isolate(ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }));
+  };
+
+  // The exit compass's rows (exploration-exit-compass design D2/D9): the
+  // committed exits, outside the router's root frame, with the SAME
+  // `currentNode` the root used, so every `explore.move` payload stays
+  // byte-identical. The dialogue screen's `↦ 移動…` list reads them too.
+  // An unavailable or absent exploration panel has no exits, and a throwing
+  // build degrades the same way (the registry's exception guard, design D-C):
+  // no exception reaches the view build.
+  const explorationExits = () => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok) return { rows: [], currentNode: null };
+      const { panel, currentNode } = explorationModel();
+      return { rows: isolate(ExplorationMenu.exitTargets(panel, { currentNode })), currentNode };
+    } catch (err) {
+      return { rows: [], currentNode: null };
+    }
   };
 
   // The top navigation bar's exploration entries (webclient-scene-overview-
@@ -478,6 +495,7 @@ export function createFrameResolver(deps) {
 
   return {
     resolve,
+    explorationExits,
     // The combat model accessor (the declared selection-state home): the
     // store's client-local combat interactions (focus-skill recording, AREA
     // toggle, scale/shorthand choice, submit payload building) act on this

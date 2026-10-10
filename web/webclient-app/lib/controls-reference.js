@@ -8,8 +8,8 @@
 // path, and states it).
 //
 // Every row names a binding the code implements (AppShell `/` and ⌨,
-// CommandLine, the dock's keyboard router and digit picks, MessageWindow,
-// FullLogOverlay, DialogueChoices). `keys` are literal key names shown as key
+// CommandLine, the exit compass, the dock's keyboard router and digit picks,
+// MessageWindow, FullLogOverlay, DialogueChoices). `keys` are literal key names shown as key
 // caps; `id` is the stable hook for the row.
 export const CONTROLS_REFERENCE = [
   {
@@ -57,6 +57,46 @@ export const CONTROLS_REFERENCE = [
     ],
   },
   {
+    // The exit compass (exploration-exit-compass): one tab stop in the
+    // exploration command panel, focused on entering exploration.
+    id: "compass",
+    title: "出口羅盤",
+    entries: [
+      {
+        id: "compass-aim",
+        keys: ["↑", "↓", "←", "→"],
+        label: "瞄準方向",
+        detail:
+          "羅盤有焦點時按方向鍵瞄準，同時按住兩個方向鍵即為斜向；只會瞄準、不會移動。滑鼠移到羅盤上也會瞄準，訊息列會說明瞄準的出口。",
+      },
+      {
+        id: "compass-cycle",
+        keys: ["[", "]"],
+        label: "逐一切換出口",
+        detail: "依角度由北順時針切換每個出口，接著是外圈的通道，再回到第一個，擠在同一方向的出口也能選到。",
+      },
+      {
+        id: "compass-move",
+        keys: ["Enter", "Space"],
+        label: "前往瞄準的出口",
+        detail: "短按一次就移動一步；點擊羅盤也一樣。無法通行的出口不會移動，訊息列顯示原因。",
+      },
+      {
+        id: "compass-hold",
+        keys: ["Enter"],
+        label: "按住連續前進",
+        detail:
+          "按住方向鍵、Enter 或滑鼠鍵約 0.4 秒，就會朝瞄準的方向一路前進，每到一處都重新對準；放開、移開滑鼠或沒有路時停下。通道不會連續穿越。",
+      },
+      {
+        id: "compass-escape",
+        keys: ["Esc"],
+        label: "取消瞄準",
+        detail: "清除羅盤的瞄準並停下腳步；沒有瞄準時，Esc 照常返回指令面板的上一層。",
+      },
+    ],
+  },
+  {
     id: "dock",
     title: "指令面板",
     entries: [
@@ -71,7 +111,8 @@ export const CONTROLS_REFERENCE = [
         id: "digits",
         keys: ["1", "…", "9"],
         label: "依位置執行",
-        detail: "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。",
+        detail:
+          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；探索時依序對應人物、物件與底列的項目，出口改由出口羅盤操作；超出項目數的數字不作用。",
       },
       {
         id: "confirm",

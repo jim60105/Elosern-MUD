@@ -291,17 +291,18 @@ describe("store dispatch + focus", () => {
         {},
       );
       const view = store.view;
-      expect(view.focus.key).toBe("exit-east");
-      expect(view.focus.label).toBe("西風酒館");
+      // The exits are the exit compass's (exploration-exit-compass), so the
+      // overview opens on its first person chip.
+      expect(view.focus.key).toBe("target-7");
+      expect(view.focus.label).toBe("店長");
       expect(view.focus.enabled).toBe(true);
+      expect(store.router.rootMenu().items.some((item) => item.key.startsWith("exit-"))).toBe(false);
       // The overview navigates as rows of chips in reading order
       // (webclient-scene-overview-swap): ArrowRight steps to the next chip.
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("exit-north");
-      expect(store.view.focus.enabled).toBe(false);
+      expect(store.view.focus.key).toBe("object-3");
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("target-7");
-      expect(store.view.focus.label).toBe("店長");
+      expect(store.view.focus.key).toBe("look-room");
     });
 
     it("navigates the combat root grid with preserved action keys", () => {
@@ -359,9 +360,9 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("exit-east");
+      expect(store.view.focus.key).toBe("target-7");
       store.focusPress("ArrowRight");
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("object-3");
 
       // An identical update must not reset the focus position.
       store.receive(
@@ -370,7 +371,7 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 3, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("object-3");
 
       // Declarative frame semantics (webclient-declarative-frame-stack): a
       // changed panel RE-RESOLVES the open frame — the focus key survives
@@ -393,7 +394,7 @@ describe("store dispatch + focus", () => {
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("exit-north");
+      expect(store.view.focus.key).toBe("object-3");
      });
 
     it("routes a confirmed action item through the single dispatch entry", () => {
@@ -405,9 +406,8 @@ describe("store dispatch + focus", () => {
         {},
       );
       // Navigate the overview to the footer's 等待／休息 chip: the reading
-      // order is exit-east, exit-north, target-7, object-3, look-room, wait,
-      // suggestions.
-      for (let i = 0; i < 5; i += 1) {
+      // order is target-7, object-3, look-room, wait, suggestions.
+      for (let i = 0; i < 3; i += 1) {
         store.focusPress("ArrowRight");
       }
       expect(store.view.focus.key).toBe("wait");
@@ -439,16 +439,13 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      // The overview's second chip is the disabled exit: it stays focusable
-      // for its explanation and never dispatches.
-      expect(store.focusItemByKey("exit-north")).toBe(true);
-      expect(store.view.focus.key).toBe("exit-north");
-      expect(store.view.focus.enabled).toBe(false);
-      expect(store.focusConfirm("keyboard")).toBe(false);
+      // The disabled exit is the compass's: its gated activation submits
+      // nothing.
+      expect(store.activateExit("north")).toMatchObject({ sent: false, reason: "disabled" });
       expect(sender.sent.actions.length).toBe(0);
 
       // Pointer activation shares the same gates (mutation-lock + enabled).
-      expect(store.focusItemByKey("exit-east")).toBe(true);
+      expect(store.focusItemByKey("object-3")).toBe(true);
        store.dispatchAction("explore.wait", { daypart: "dusk" });
        expect(store.focusConfirm("pointer")).toBe(false);
        expect(store.view.dispatch.inFlight).not.toEqual(null);

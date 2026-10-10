@@ -14,7 +14,7 @@ Observed today:
 ## Goals / Non-Goals
 
 **Goals:**
-- Exits are chosen on a compass by bearing; the payload and the server's gate are untouched.
+- Exits are chosen on a compass by bearing; the payload and the server's admission gate are untouched. The explicitly authorized acceptance repair corrects only traversal success detection for reused wilderness rooms.
 - The model is pure and exhaustively unit-tested; the component is thin.
 - The client is fully working after this change alone.
 
@@ -54,7 +54,7 @@ The compass fills the panel height on the left (pad about 198 px at 1451×790 wi
 
 ### D10. Press, key, and stop rules
 
-A discrete move is sent on pointer release (or on keydown for Enter) only when the press was shorter than `HOLD_MS`; a held press or key never also produces a discrete move, so release after a walk sends nothing. Additional stop reasons: the gate suppressed the step (in-flight or awaiting revision at the arrival commit: wait for the next commit, stop after a bounded wait), a move result arrives with no panel change (stop with the result message), Escape (clears the aim and stops), and any drawer or card opening. The compass element stops propagation of the arrow, Enter, Space, `[`, and `]` keys; digits, Escape-with-no-aim, and `/` still bubble to the router. A Vitest check asserts the consumed keys never reach the document-level keyboard bridge.
+A discrete move is sent on pointer release (or on the release of Enter or Space) only when the press was shorter than `HOLD_MS`; the length of a key press is only known at its release, so a key behaves exactly like the pointer and a walk begins with its own first step; a held press or key never also produces a discrete move, so release after a walk sends nothing. Additional stop reasons: the gate suppressed the step (in-flight or awaiting revision at the arrival commit: wait for the next commit, stop after a bounded wait), a move result arrives with no panel change (stop with the result message), Escape (clears the aim and stops), and any drawer or card opening. The compass element stops propagation of the arrow, Enter, Space, `[`, and `]` keys; digits, Escape-with-no-aim, and `/` still bubble to the router. A Vitest check asserts the consumed keys never reach the document-level keyboard bridge.
 
 ### D7. Styling
 
@@ -70,3 +70,107 @@ Tokens from `styles/tokens.css`, sizes `calc(<n>px * var(--ui-scale))`, nothing 
 ## Open Questions
 
 None blocking. The exact location of the store's submission gate is resolved by reading `stores/elosern*.js` at the start of task 3.1.
+
+## Resume acceptance notes
+
+The successor apply preserves the previous implementation commits. The contract
+gate found four authored test fixtures that named shipped catalog content; those
+fixtures now use synthetic labels without changing their assertions.
+The compass arrival key includes both committed room identity and current node,
+because wilderness coordinates can change while the server reuses a room object.
+An unchanged-node panel replacement does not count as another arrival.
+
+Task 6.2 adds complete MODIFIED requirement blocks across contextual HUD, frame
+resolution, options, browser verification, component showcase, desktop shell,
+and pointer activation. Every existing scenario name is retained. Remaining
+inventory matches concerning inventory sections, minimap legends, unrelated
+drawers, combat forms, and verb popovers retain their existing contracts. The
+suggestions footer remains in the overview; its delta clarifies the right-column
+placement rather than implementing the later room-actions change.
+
+Live acceptance uses the built client and agent-browser against isolated managed
+Evennia runtimes. Real grid, wilderness, interior, disabled-exit, and no-exit
+rooms were captured at exactly 1451×790 and 1920×1080. The disabled room uses an
+isolated builder exit lock and the account's quell mode, so its reason comes from
+the server rather than an injected client panel. A real conversation's dedicated
+exit list moved to the next grid room and restored compass focus.
+
+The Storybook comparison is `Design/SceneOverviewRedesign`, including its
+Wilderness reference. This change intentionally keeps the existing people,
+object, and footer chips in the right column; the prototype's presence rail,
+place-card actions, and relocated suggestions pill belong to the next two
+changes. The compass geometry and shared readout follow the reference. At the
+reference viewport the compass box is 184 px square inside a 198 px pane; at
+1920×1080 it is 253 px square inside a 272 px pane. There is no horizontal
+overflow or pane-host vertical overflow; crowded content scrolls only inside the
+right column. The `.elosern-root .action-dock__pane` override retains only
+horizontal clipping and scrollbar styling and introduces no competing geometry.
+1920×1080 is additional change-specific visual acceptance, not a replacement for
+the repository's standard larger automated acceptance viewport.
+
+Live wilderness hover aimed without moving, and a discrete pointer click moved
+from `wild:elosern:60:97` to `wild:elosern:61:97`. Holding south produced an
+arrival, then the server returned `move_failed` / `移動失敗。` despite a changed
+committed wilderness node; the compass stopped and displayed that rejection.
+The user subsequently authorized correcting that success check: unchanged room
+identity is a failure only if the canonical location node is also unchanged.
+Traversal, charging, and discovery still use the shared Exit path. The
+deterministic browser walk journey separately verifies three committed arrivals,
+the exact per-arrival payloads, and the dead-end stop using its explicitly
+scripted action-result/update responder.
+
+The reduced-to-full reader gate initially failed. Temporary typewriter tracing
+showed the gate accepted the old startup response (106 units, instant), then
+switched motion before the newly appended response (205 units) rendered. The
+gate now waits for the new text as well as page geometry; all original assertions
+remain intact. No MessageWindow or useTypewriter production change is needed.
+
+After the server repair, a fresh agent-browser session traversed the real
+wilderness from `wild:elosern:61:97` through `61:96`, `61:95`, `61:94`, `61:93`,
+and `61:92` while ArrowDown was held. Release stopped walking; after another
+400 ms the node remained `61:92` and the readout still showed the aimed
+destination, not `move_failed`. Screenshots are
+`/tmp/compass-repaired-live-walk-1451.png` and
+`/tmp/compass-repaired-live-walk-1920.png`.
+
+Successor acceptance exercised 93 browser methods across all touched classes
+and the requested local-map class, in short batches. The reader class's 23
+methods passed with the original reduced-to-full assertion unchanged. Initial
+large or overlapping batches timed out; every affected method subsequently
+completed in bounded batches. One dialogue batch timed out at the login
+selector; its dedicated exit-move method subsequently passed in isolation.
+These are recorded execution outcomes, not an attribution to pre-existing bugs.
+
+Final exercised gates: Vitest 166 files / 2100 tests; static exploration-menu
+Node tests 34; movement adapter tests 22; frozen-contract tests 9; contract gate
+(2061 requirements covered, zero lint violations, 18 contract tests);
+component/story coverage (70 required components and GM coverage); production
+build; and strict OpenSpec validation. The build retains its existing unresolved
+runtime-art URL and large-chunk warnings. No full managed-browser or full
+Evennia suite was run.
+
+## Post-implementation rubber-duck
+
+The required independent post-implementation review found no blocking issues.
+Its three non-blocking findings and two suggestions were disposed as follows:
+
+- Adopted retained-aim refresh after a halt: `halt()` now re-snaps the aim against
+  current committed targets before showing the rejection. A regression replaces
+  targets without changing room identity and proves the retained aim now carries
+  the current disabled reason. All 2100 Vitest tests pass.
+- Deferred exception-vocabulary hardening for a raising wilderness coordinate
+  property. Normal valid/unchanged/missing-node traversal is covered; an
+  infrastructure exception remains logged and rejected by the existing
+  dispatcher. Broader exceptional-coordinate semantics are outside the narrowly
+  authorized success-classification repair.
+- Deferred new-capability evidence-ID remapping to archive sync, exactly as
+  tasks.md's workflow follow-up already requires. Those requirement IDs are not
+  yet in main specs; this apply does not archive or sync them. Current evidence
+  annotations retain the valid main-spec IDs and pass the traceability gate.
+- Rejected the suggested index fallback for people without identity. The
+  validated committed entity contract requires identity; inventing identities
+  for malformed payloads would weaken honest degradation.
+- No change for the exit-label performance suggestion: resolution is already
+  computed and cached, as the reviewer itself confirmed.
+
+The reviewer completed synchronously and left no child processes running.

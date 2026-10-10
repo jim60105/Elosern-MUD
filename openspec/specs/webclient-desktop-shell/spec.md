@@ -92,7 +92,7 @@ region collapses.
 
 #### Scenario: The action dock fills the command region with its mode's root and one legend
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region with one shortcut-legend strip, its exploration root renders as the scene overview and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
+- **THEN** it renders as one panel filling the band's command region with a shortcut-legend strip only outside exploration and creation, its exploration root renders as the exit compass beside the shared readout and people/object/footer scene overview and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame except a target's verb popover, which states its target in its own heading
 
 #### Scenario: A tall frame grows the band without touching the narrative
 - **WHEN** the dock carries a taller frame (a crowded scene overview, a target's verb popover, or the waiting frame) at 1451x790 or 2560x1440
@@ -100,7 +100,7 @@ region collapses.
 
 #### Scenario: Pane content scrolls inside the band
 - **WHEN** the active frame's rows exceed the command region's height
-- **THEN** the rows scroll within the pane host, the dock's chrome (the breadcrumb and the legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
+- **THEN** the rows scroll within the pane host, the dock's chrome (the breadcrumb and the mode-appropriate legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
 - **WHEN** the committed mode is dialogue at 1451x790
@@ -148,11 +148,11 @@ region collapses.
 
 #### Scenario: The dock renders its mode's root form
 - **WHEN** the action dock renders its root in exploration or combat
-- **THEN** its exploration root renders as the scene overview with chip rows for exits, people, and objects, and a footer, its combat root renders as a vertical list of icon-and-label command rows with the focused entry marked by a muted-gold fill, and its remaining region renders the current frame's rows or chips
+- **THEN** its exploration root renders as the scene overview with the exit compass on the left and the shared readout, people and object chip rows, and footer in the right column, its combat root renders as a vertical list of icon-and-label command rows with the focused entry marked by a muted-gold fill, and its remaining region renders the current frame's rows or chips
 
 #### Scenario: The dock carries the defined shortcut legend
 - **WHEN** the action dock renders
-- **THEN** it carries the shortcut legend the contextual-HUD legend requirement defines
+- **THEN** it carries the shortcut legend only in the modes the contextual-HUD legend requirement defines; exploration renders no permanent key-hint element
 
 #### Scenario: Rows mark focus, absence of focus, and disablement distinctly
 - **WHEN** the dock renders rows or chips
@@ -245,7 +245,7 @@ The client state store SHALL validate protocol, transport generation, epoch, rev
 After initial synchronization and after every completed or rejected action whose declared
 presentation revision has been accepted, the current mode's focus home SHALL own focus. Key events
 SHALL be dispatched through the public keyboard bridge (the `window.Elosern.KeyboardRouter` handle
-contract), claimed exactly when the router consumed them, rather than bound directly to the
+contract), claimed exactly when the router or focused compass consumed them, rather than bound directly to the
 document.
 
 #### Scenario: Keyboard navigation and backtracking are deterministic
@@ -286,13 +286,8 @@ document.
 - **THEN** the overview's footer carries the `suggestions` chip and activating it pushes the suggestions frame without dispatching a `ui_action`
 
 #### Scenario: Exploration root exposes the G2 hierarchical keys
-- **WHEN** the client is in exploration mode on a scene overview whose first two chips are an exit
-  and an interact target, and the player presses ArrowRight
-- **THEN** the keyboard router's focus key is the bare overview key `target-<identity>`, not the
-  legacy B2 `action-guild`-style `action-<id>`/`action-<surface>` key, and Enter on it pushes the
-  target's verb popover (the dock depth becomes 2) without dispatching a `ui_action`; focus then
-  lands on the popover's first row; for an exploration panel with no exits, people, or objects the
-  overview's first chip is `look-room`
+- **WHEN** the overview beside the compass focuses an interact target
+- **THEN** its bare key is `target-<identity>` and Enter opens its verb popover without submitting; when no people or objects exist the first overview chip is `look-room`; exits are not router items
 
 #### Scenario: The dock root omits the navigation-carried entries
 - **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces
@@ -311,7 +306,7 @@ document.
 
 #### Scenario: The mode's focus home reclaims focus after synchronization and actions
 - **WHEN** the shell reaches initial synchronization, or an action completes or is rejected with its declared presentation revision accepted
-- **THEN** the current mode's focus home owns focus: the action dock, or in dialogue mode the message window's focus target, as `webclient-contextual-hud` "The command region collapses in dialogue mode and the message window spans the band" defines
+- **THEN** the current mode's focus home owns focus: the exit compass at the exploration root, the active dock row container in other dock frames, or in dialogue mode the message window's focus target, as `webclient-contextual-hud` "The command region collapses in dialogue mode and the message window spans the band" defines
 
 #### Scenario: Slash expands the line and focuses the field without typing itself
 - **WHEN** `/` opens the command line from the focus home
@@ -335,7 +330,7 @@ document.
 
 #### Scenario: The exploration root carries the bare overview keys
 - **WHEN** the shell is in exploration mode
-- **THEN** the keyboard root is the scene overview frame, whose items carry the bare keys `exit-<exit_ref>` for exits, `target-<identity>` for interact targets, `entity-<identity>` and `object-<identity>` for look-only people and objects, and `look-room`, `wait`, and - whenever the committed `suggestions` envelope is not `unavailable` - `suggestions` for the footer, in the overview's reading order and navigated by its row-of-chips geometry
+- **THEN** the keyboard root is the scene overview frame, whose items carry the bare keys `target-<identity>` for interact targets, `entity-<identity>` and `object-<identity>` for look-only people and objects, and `look-room`, `wait`, and - whenever the committed `suggestions` envelope is not `unavailable` - `suggestions` for the footer, in people/object/footer reading order and navigated by its row-of-chips geometry; exits are independent compass targets with no router key
 
 #### Scenario: The exploration root omits the navigation-carried entries
 - **WHEN** the exploration keyboard root renders
@@ -572,7 +567,7 @@ new line, and SHALL be styled distinctly from server output (`.inp`) wherever th
 
 ### Requirement: The action dock's row region and detail panes are direct children of its pane host
 The action dock's pane host SHALL lay out the active frame's focusable row region and any displayed
-detail pane as direct children of that host, side by side when a detail pane is displayed. The
+detail pane as direct children of that host, side by side when a detail pane is displayed. The exploration root is the explicit exception, composing a compass beside a right column containing the readout and overview. The
 action dock's pane host SHALL be the only host of the dock's row region: no reference drawer body
 renders it.
 
@@ -595,10 +590,8 @@ renders it.
   outside the action dock's pane host
 
 #### Scenario: The scene overview is the host's only child
-- **WHEN** the dock is at the exploration root, and then a target's verb popover opens over it
-- **THEN** the scene overview component is the pane host's only child, fills its width, and renders
-  no detail pane, and the popover's card renders in the dock's overlay layer while the pane host's
-  children stay unchanged
+- **WHEN** the exploration root renders and a verb popover opens over it
+- **THEN** the pane host carries the compass and its right column, whose readout and overview remain mounted and inert beneath the popover; the popover stays in the overlay layer and no detail pane renders
 
 #### Scenario: The dock menu adds no anonymous layout container
 - **WHEN** the dock menu component renders under the pane host
@@ -609,8 +602,8 @@ renders it.
 - **THEN** it is a sibling of the row region under the same host, and the row region gains no wrapper for either case
 
 #### Scenario: The scene overview is the one exception to the direct-child rule for row regions
-- **WHEN** the dock renders the scene overview
-- **THEN** it renders as a single component that is a direct child of the pane host and that holds its labelled chip rows and its reason strip, displays no detail pane, and fills the host's full width
+- **WHEN** the exploration root renders
+- **THEN** the compass is beside a right column holding the readout and labelled overview chip rows and reason strip; only this column scrolls, no detail pane renders, and the root fills the unchanged pane host
 
 #### Scenario: A verb popover renders outside the pane host
 - **WHEN** a target's verb popover is open over the pane region

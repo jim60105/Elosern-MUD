@@ -12,11 +12,11 @@ capability pins the dock's read-side render contract.
 
 ### Requirement: The exploration dock renders the suggestions section from the validated v5 panel
 
-In exploration mode the action-dock surface SHALL render the `suggestions` content derived from the
-`context_actions` panel the store already validated (mirror-accepted at commit time) as its own dock
-pane, reached from the scene overview's footer chip, labelled `建議 (N)` with N the number of cards the
-pane will list when N is positive and `建議` otherwise. The pane SHALL be a menu frame of the keyboard
-router like every other dock frame, with its four status renders defined by the scenarios below.
+In exploration mode the action-dock surface SHALL render the `suggestions` content derived from the validated
+`context_actions` panel as its own dock pane, reached from the scene overview's footer chip in the right
+column beside the exit compass, labelled `建議 (N)` with N the card count when N is positive and `建議` otherwise.
+The pane SHALL be a menu frame of the keyboard router like every other dock frame, with its four status
+renders defined by the scenarios below.
 
 #### Scenario: The pane follows the four statuses
 - **WHEN** a puppeted WebClient in exploration mode presents `suggestions` with status

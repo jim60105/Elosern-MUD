@@ -289,7 +289,7 @@ describe("declarative frame stack (store contract)", () => {
       // The panel returns: the same root frame re-resolves and recovers.
       store.receive(1, "ui_update", [explorationCommit(4)], {});
       expect(store.view.degradedRoot).toBeNull();
-      expect(store.view.focus.key).toBe("exit-east");
+      expect(store.view.focus.key).toBe("target-7");
     });
   });
 
@@ -412,7 +412,7 @@ describe("declarative frame stack (store contract)", () => {
         source: "exploration.root",
         params: {},
       });
-      expect(store.view.focus.key).toBe("exit-east");
+      expect(store.view.focus.key).toBe("target-7");
     });
 
     // The named teardown triggers beyond the mode switch. The no-puppet case
@@ -471,7 +471,7 @@ describe("declarative frame stack (store contract)", () => {
         source: "exploration.root",
         params: {},
       });
-      expect(store.view.focus.key).toBe("exit-east");
+      expect(store.view.focus.key).toBe("target-7");
     });
 
     it("a transport loss at depth 2 yields exactly one root frame", () => {
@@ -499,7 +499,7 @@ describe("declarative frame stack (store contract)", () => {
       store.receive(1, "ui_update", [roomChange(3, 99)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
-      expect(store.view.focus.key).toBe("exit-east");
+      expect(store.view.focus.key).toBe("target-7");
 
       // The waiting frame.
       expect(store.focusItemByKey("wait")).toBe(true);

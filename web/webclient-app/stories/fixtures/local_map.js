@@ -540,3 +540,37 @@ export const LOCAL_MAP_ORDINARY_SAMPLE = {
     "已經探索過的相鄰位置",
   ],
 };
+
+// exploration-exit-compass: a synthesized `local_map` v1 panel around one
+// current node, for the exit-compass stories. `neighbours` are
+// `[id, label, x, y]` tuples; every value is a fixed literal.
+export function localMapAround({ layer, current, neighbours = [] }) {
+  const [currentId, currentLabel, cx, cy] = current;
+  const node = ([id, label, x, y], isCurrent) => ({
+    id,
+    label,
+    x,
+    y,
+    visibility: isCurrent ? "current" : "visible_unvisited",
+    current: isCurrent,
+    anchor: isCurrent,
+    landmark: false,
+    action: null,
+  });
+  return {
+    schema_version: 1,
+    available: true,
+    layer,
+    current_node: currentId,
+    title: currentLabel,
+    nodes: [node([currentId, currentLabel, cx, cy], true), ...neighbours.map((n) => node(n, false))],
+    edges: neighbours.map(([id, label]) => ({
+      source: currentId,
+      destination: id,
+      label,
+      known: true,
+      traversable: true,
+    })),
+    legend: [],
+  };
+}

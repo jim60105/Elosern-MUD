@@ -211,6 +211,8 @@ export const useElosernStore = defineStore("elosern", () => {
     focusEscape: ctx.focusEscape,
     focusItemByKey: ctx.focusItemByKey,
     tabToRootAndConfirm: ctx.tabToRootAndConfirm,
+    // The exit compass's gated activation (exploration-exit-compass D2).
+    activateExit: ctx.activateExit,
     chooseScale: ctx.chooseScale,
     // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,

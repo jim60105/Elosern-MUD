@@ -173,12 +173,15 @@ describe("the dialogue choice list over the stage", () => {
     expect(wrapper.get('[data-testid="anchor-command-line"]').attributes("data-expanded")).toBe("true");
   });
 
-  it("`↦ 移動…` then an exit dispatches the overview exit chip's payload", async () => {
+  it("`↦ 移動…` then an exit dispatches the committed exit row's payload", async () => {
     await openDialogue();
     await list().get('[data-testid="dialogue-move"]').trigger("click");
     const exitRows = list().findAll('[data-testid="dialogue-exit-row"]');
-    const overviewExit = store.view.rootMenu.items.find((item) => item.actionId === "explore.move" && item.enabled !== false);
-    expect(exitRows.length).toBeGreaterThan(0);
+    // exploration-exit-compass D9: the list reads the committed exit rows
+    // (the compass's), not the router root, which carries no exit item.
+    expect(store.view.rootMenu.items.some((item) => item.actionId === "explore.move")).toBe(false);
+    const overviewExit = store.view.explorationExits.find((item) => item.actionId === "explore.move" && item.enabled !== false);
+    expect(exitRows.length).toBe(store.view.explorationExits.length);
     const enabledRow = exitRows.find((row) => row.attributes("aria-disabled") !== "true");
     await enabledRow.trigger("click");
     expect(sender.sent.actions).toHaveLength(1);

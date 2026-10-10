@@ -140,7 +140,7 @@ describe("ActionDock (B2 action-dock family)", () => {
     // below the scrolling body (the draft's `.dock .hint`), the ONLY element
     // carrying the `action-dock-description` hook. The hidden duplicate is
     // gone, and no tab bar carries a second copy.
-    const w = mountDock({ rootItems: ROOT_ITEMS });
+    const w = mountDock({ mode: "combat", rootItems: ROOT_ITEMS });
     const legends = w.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);
     const legend = legends[0];
@@ -163,12 +163,17 @@ describe("ActionDock (B2 action-dock family)", () => {
     expect(w.get('[data-testid="action-dock-guidance"]').text()).toBe("戰鬥動作");
   });
 
-  it("renders one legend in exploration, dialogue, and combat, and none in creation", () => {
-    for (const mode of ["exploration", "dialogue", "combat"]) {
+  it("renders one legend in dialogue and combat, and none in exploration or creation", () => {
+    for (const mode of ["dialogue", "combat"]) {
       const w = mountDock({ mode, rootItems: COMBAT_ROOT_ITEMS });
       expect(w.findAll('[data-testid="action-dock-description"]'), mode).toHaveLength(1);
       w.unmount();
     }
+    // exploration-exit-compass: the exploration panel shows no key hints;
+    // its bindings live in the help overlay.
+    const exploration = mountDock({ mode: "exploration", rootItems: COMBAT_ROOT_ITEMS });
+    expect(exploration.findAll('[data-testid="action-dock-description"]')).toHaveLength(0);
+    exploration.unmount();
     const creation = mountDock({ mode: "creation", rootItems: [] });
     expect(creation.findAll('[data-testid="action-dock-description"]')).toHaveLength(0);
   });

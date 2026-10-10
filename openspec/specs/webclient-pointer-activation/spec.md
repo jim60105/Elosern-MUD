@@ -5,7 +5,12 @@ The dock-wide contract that every action-dock surface renders exactly the keyboa
 ## Requirements
 
 ### Requirement: Every action-dock surface renders exactly the keyboard router's current menu frame
-Each dock that owns the action dock — exploration, character, creation, and combat — SHALL render its rows from the keyboard router's current menu frame, so the rows visible on screen are always exactly the items the router will navigate, explain, and submit. A dock SHALL re-render its rows whenever the router pushes, replaces, or pops a frame, and SHALL NOT leave a pushed frame without a rendered representation.
+
+Each dock that owns the action dock — exploration, character, creation, and combat — SHALL render its rows
+from the keyboard router's current menu frame, so the rows on screen are exactly the items the router will
+navigate, explain, and submit. The exploration compass is independent of router rows and submits committed
+move rows through the same store gate. A dock SHALL re-render its rows whenever the router pushes, replaces,
+or pops a frame.
 
 #### Scenario: Combat submenus become visible instead of blind
 - **WHEN** the player opens Skills, a target list, a shorthand choice, or the Forfeit confirmation in combat mode
@@ -32,7 +37,7 @@ Each dock that owns the action dock — exploration, character, creation, and co
 - **THEN** it captures its own input, the router's frame is unchanged beneath it, and closing it restores the rendered rows for that frame
 
 #### Scenario: The overview beneath a popover is inert
-- **WHEN** a target's verb popover is open and the player clicks an exit chip of the overview visible beneath it
+- **WHEN** a target's verb popover is open and the player presses the compass or an overview chip visible beneath it
 - **THEN** the popover closes exactly as its back row would, no `ui_action` is emitted, and the overview becomes the current frame with the target's chip focused
 
 #### Scenario: Re-render is synchronous with the router event
@@ -64,7 +69,12 @@ Each dock that owns the action dock — exploration, character, creation, and co
 - **THEN** it is derived from the router's frame stack and its depth, and the dock renders no navigation affordance whose state is held outside that stack
 
 ### Requirement: Pointer activation traverses the identical path as keyboard confirmation
-Activating an action-dock row with the pointer SHALL move the router's focus to that row and then perform the same confirmation the keyboard performs, so both input methods share one gate. A pointer activation on an enabled row SHALL emit exactly one `ui_action` message, with the same action ID and payload the keyboard would emit. A pointer activation on a disabled row SHALL surface that row's explanation and SHALL NOT submit.
+
+Pointer activation of an action-dock row SHALL focus that row and perform the same confirmation the keyboard
+performs, so both share one gate. Compass pointer and keyboard activation SHALL submit the same committed move
+row through that gate without focusing a hidden router item. A pointer activation on an enabled row SHALL emit
+exactly one `ui_action` with the keyboard's action ID and payload; on a disabled row it SHALL surface that
+row's explanation and SHALL NOT submit.
 
 #### Scenario: Clicking a row submits exactly what Enter submits
 - **WHEN** the player clicks an enabled exploration, service, creation, or combat row
@@ -95,7 +105,12 @@ Activating an action-dock row with the pointer SHALL move the router's focus to 
 - **THEN** it is delivered by exactly one delegated listener installed on the stable action-dock element, surviving every dock re-render without per-row binding
 
 ### Requirement: The action dock is a single composite widget that cannot double-activate
-The rendered rows SHALL form one composite widget: the row container SHALL carry the listbox role, be the surface's single tab stop, and name the focused row through an active-descendant association, and each row SHALL carry the option role with its selected state. Rows SHALL NOT be individually reachable by sequential keyboard navigation. Pressing the pointer on a row SHALL NOT move DOM focus off that container.
+
+The rendered rows SHALL form one composite widget: the row container SHALL carry the listbox role, be the row
+region's single tab stop, and name the focused row through an active-descendant association, with each row
+carrying the option role and its selected state. The exploration compass SHALL be a separate single tab stop
+with `role="application"`; no exit is an overview row. A pointer press on a row SHALL NOT move DOM focus off
+that container.
 
 #### Scenario: Enter on a focused row emits one action, not two
 - **WHEN** the player moves focus to an enabled row with the arrow keys and presses Enter
@@ -131,7 +146,7 @@ The rendered rows SHALL form one composite widget: the row container SHALL carry
 
 #### Scenario: The action-dock element forwards focus
 - **WHEN** an active row container is mounted
-- **THEN** the action-dock element remains the surface's documented focus target and forwards focus to the active row container, so existing focus-restoration callers need no change
+- **THEN** the action-dock element remains the surface's documented focus target and forwards exploration-root focus to the compass and other frame focus to the active row container, so existing focus-restoration callers need no change
 
 #### Scenario: Only live primary pointer activations are admitted
 - **WHEN** a pointer activation arrives

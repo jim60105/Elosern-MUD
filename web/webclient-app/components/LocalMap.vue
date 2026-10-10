@@ -29,6 +29,9 @@ const props = defineProps({
   localMap: { type: Object, required: true },
   // The effective motion level, for the minimap pan (MapLattice).
   motionLevel: { type: String, default: "full" },
+  // The node of the exit the exit compass aims (exploration-exit-compass
+  // design D6): presentation only, null when nothing is aimed.
+  aimedNode: { type: String, default: null },
 });
 
 const emit = defineEmits(["move", "open-map"]);
@@ -204,6 +207,7 @@ function onIslandClick(event) {
         :marker-names="true"
         :pan-on-move="true"
         :motion-level="motionLevel"
+        :aimed-node="aimedNode"
         @move="(p) => emit('move', p)"
       />
 

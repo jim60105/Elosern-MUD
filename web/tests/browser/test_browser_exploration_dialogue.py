@@ -9,7 +9,7 @@ from tools.spec_traceability import covers_requirement
 from web.browser_support.browser_fixtures_data import SHIPPED_DIALOGUE_KEY
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
-    activate_first_overview_exit,
+    activate_first_compass_exit,
     activate_overview_chip,
     fixture_home_node_id,
     focus_action_dock,
@@ -579,9 +579,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(
             page.locator('[data-testid="dialogue-exit"]').count(), 0
         )
-        # The ordinary dock rows work again (movement parity after the
-        # session): the overview's first exit chip submits its move.
-        activate_first_overview_exit(page)  # the overview's first exit -> explore.move
+        # The ordinary dock works again (movement parity after the session):
+        # the exit compass's first exit submits its move.
+        activate_first_compass_exit(page)  # the compass's first exit -> explore.move
         self.assertEqual(sent_action_count(page, "explore.move"), 1)
         self._wait_panel(
             page,
@@ -604,7 +604,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         (never while a page types or is unread) with focus on it; `1` sends a
         pick; the reply is read; ⌨ 自由對話 borrows the command line and a line
         is sent; ↦ 移動… swaps in the exits and Escape returns; ✕ 結束對話 ends
-        the conversation; an exit chip then moves. Throughout the
+        the conversation; the exit compass then moves. Throughout the
         conversation the command region is collapsed, both stage actors
         stand, and focus is never on the document body.
         """
@@ -731,8 +731,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "leaving the conversation returns focus to the dock",
         )
 
-        # An exit chip moves from the restored overview.
-        activate_first_overview_exit(page)
+        # The exit compass moves from the restored exploration pane.
+        activate_first_compass_exit(page)
         wait_for_store_state(page, lambda s: sent_action_count(page, "explore.move") == 1)
         sent = [
             args[0].get("action_id") if args and isinstance(args[0], dict) else None
@@ -748,6 +748,62 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "explore.dialogue_leave",
                 "explore.move",
             ],
+        )
+
+    @covers_requirement(
+        "webclient-contextual-hud::dialogue-choices-appear-centred-over-the-stage-after-the-line-is-fully-read"
+    )
+    @covers_requirement(
+        "webclient-exit-compass::the-dialogue-screen-s-exits-list-stays-independent-of-the-exploration-root"
+    )
+    def test_dialogue_exit_row_moves_with_the_committed_exit_payload(self):
+        """exploration-exit-compass D9: the dialogue screen's `↦ 移動…` list
+        reads the committed exit rows independently of the exploration router
+        root (which carries no exit item), so it lists every exit, and an
+        enabled exit row submits exactly the exit row's `explore.move`
+        payload."""
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        panel = self._live_exploration_panel(page)
+        host = panel["interact"][0]
+        activate_overview_chip(page, "target-%s" % host["identity"])
+        _press(page, "Enter")  # 交談 -> explore.talk_open
+        self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+        wait_for_store_state(
+            page,
+            lambda s: _connected_active(s)
+            and s.get("mode") == "dialogue"
+            and s.get("dispatch", {}).get("inFlight") is None,
+        )
+        open_dialogue_choices(page)
+        self.assertFalse(
+            any(item["key"].startswith("exit-") for item in store_state(page)["rootMenu"]["items"]),
+            "the exploration root carries no exit item",
+        )
+        # ↦ 移動… sits just above ✕ 結束對話.
+        _press(page, "End")
+        _press(page, "ArrowUp")
+        _press(page, "Enter")
+        page.wait_for_selector('[data-testid="dialogue-choices"][data-view="exits"]')
+        state = store_state(page)
+        rows = state["explorationExits"]
+        moves = (state["panels"]["exploration"] or {}).get("move") or []
+        self.assertEqual(page.locator('[data-testid="dialogue-exit-row"]').count(), len(moves))
+        index = next(i for i, row in enumerate(rows) if row.get("enabled"))
+        for _ in range(index):
+            _press(page, "ArrowDown")
+        _press(page, "Enter")
+        wait_for_store_state(page, lambda s: sent_action_count(page, "explore.move") == 1)
+        envelope = [
+            args[0]
+            for cmd, args, _kw in outbound_messages(page)
+            if cmd == "ui_action" and args and args[0].get("action_id") == "explore.move"
+        ][0]
+        self.assertEqual(envelope["payload"], rows[index]["payload"])
+        self.assertEqual(
+            envelope["payload"],
+            {"exit_ref": moves[index]["exit_ref"], "current_node": state["panels"]["local_map"]["current_node"]},
         )
 
     @covers_requirement(

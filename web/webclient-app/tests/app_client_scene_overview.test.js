@@ -68,22 +68,31 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     document.body.innerHTML = "";
   });
 
-  it("renders the overview at the exploration root with no tab bar", async () => {
+  it("renders the compass and the overview at the exploration root with no tab bar", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
     expect(store.view.dockSource).toBe("exploration.root");
+    // The root pane (exploration-exit-compass D5): the compass on the left,
+    // then a right column with the readout over the overview's chip rows.
+    const root = wrapper.get('#action-dock [data-testid="exploration-root"]');
+    const [left, right] = root.element.children;
+    expect(left.querySelector('[data-testid="exit-compass"]')).not.toBeNull();
+    expect(Array.from(right.children).map((el) => el.getAttribute("data-testid"))).toEqual([
+      "exploration-readout",
+      "scene-overview",
+    ]);
     const overview = wrapper.get('[data-testid="scene-overview"]');
-    // One frame: the 出口 / 人物 / 物件 rows and the label-less footer.
+    // One frame: the 人物 / 物件 rows and the label-less footer; no 出口 row.
     expect(overview.findAll("[data-section]").map((row) => row.attributes("data-section"))).toEqual([
-      "exits",
       "people",
       "objects",
       "footer",
     ]);
-    expect(chip("exit-east").exists()).toBe(true);
+    expect(chip("exit-east").exists()).toBe(false);
+    expect(wrapper.findAll('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').map((el) => el.attributes("data-exit-ref")).sort()).toEqual(["east", "north"]);
     expect(chip("target-7").exists()).toBe(true);
     expect(chip("object-3").exists()).toBe(true);
     expect(chip("look-room").exists()).toBe(true);
@@ -95,8 +104,69 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     for (const gone of ["move", "look", "interact", "character"]) {
       expect(wrapper.find(`#action-dock [data-item-key="${gone}"]`).exists()).toBe(false);
     }
-    // The legend renders exactly once, as the dock's own strip.
-    expect(wrapper.findAll('[data-testid="action-dock-description"]')).toHaveLength(1);
+    // The exploration panel shows no key-hint legend.
+    expect(wrapper.find('[data-testid="action-dock-description"]').exists()).toBe(false);
+    // The readout idles with the exit and presence counts.
+    expect(wrapper.get('[data-testid="exploration-readout-text"]').text()).toBe(
+      `出口 ${fx.explorationPanel().move.length} · 在場 1`,
+    );
+  });
+
+  it("entering exploration focuses the compass", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    commitPanels();
+    await wrapper.vm.$nextTick();
+    await wrapper.vm.$nextTick();
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="exit-compass"]').element);
+  });
+
+  it("a compass move submits the exit row's payload, and a disabled exit explains itself in the readout", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    commitPanels();
+    await wrapper.vm.$nextTick();
+    const sender = fx.createFakeSender();
+    store.setSender(sender);
+    const compass = wrapper.get('[data-testid="exit-compass"]');
+    // Cycle to the locked exit: Enter sends nothing and the readout shows
+    // the server-authored reason.
+    for (let i = 0; i < 4 && compass.attributes("data-aim-ref") !== "north"; i += 1) {
+      await compass.trigger("keydown", { key: "]" });
+    }
+    expect(compass.attributes("data-aim-ref")).toBe("north");
+    expect(wrapper.get('[data-testid="exploration-readout-lead"]').text()).toBe("無法通行");
+    expect(wrapper.get('[data-testid="exploration-readout-text"]').text()).toBe("門被鎖住了");
+    await compass.trigger("keydown", { key: "Enter" });
+    await compass.trigger("keyup", { key: "Enter" });
+    expect(sender.sent.actions).toHaveLength(0);
+    // Cycle to the open exit and move once.
+    while (compass.attributes("data-aim-ref") !== "east") {
+      await compass.trigger("keydown", { key: "]" });
+    }
+    await compass.trigger("keydown", { key: "Enter" });
+    await compass.trigger("keyup", { key: "Enter" });
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.move",
+      payload: { exit_ref: "east", current_node: "room:42" },
+    });
+  });
+
+  it("aiming lights the destination on the minimap", async () => {
+    mountAppClient();
+    await wrapper.vm.$nextTick();
+    commitPanels();
+    await wrapper.vm.$nextTick();
+    const compass = wrapper.get('[data-testid="exit-compass"]');
+    while (compass.attributes("data-aim-ref") !== "east") {
+      await compass.trigger("keydown", { key: "]" });
+    }
+    const destination = fx.explorationPanel().move.find((row) => row.exit_ref === "east").destination;
+    const aimed = () => wrapper.findAll(".local-map .local-map__node--aimed").map((n) => n.attributes("data-node-id"));
+    expect(aimed()).toEqual([destination]);
+    await compass.trigger("keydown", { key: "Escape" });
+    expect(aimed()).toEqual([]);
   });
 
   it("opens the verb popover from a person chip, inerts the overview, and 查看 submits one explore.look", async () => {

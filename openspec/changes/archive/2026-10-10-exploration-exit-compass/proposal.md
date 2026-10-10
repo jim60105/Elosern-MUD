@@ -31,7 +31,18 @@ New `web/webclient-app/components/compass-model.js`, `ExitCompass.vue`, `Explora
 
 ## Non-goals
 
-No server or protocol change, no new action identifier, no touch or controller input, no minimap click-to-travel, no change to the verb popover, the 人物 / 物件 / footer rows, the place card, or combat.
+No protocol change, no new action identifier, no touch or controller input, no minimap click-to-travel, no change to the verb popover, the 人物 / 物件 / footer rows, the place card, or combat.
+
+### Authorized acceptance repair
+
+During successor acceptance the user explicitly authorized the minimal server
+repair needed for wilderness movement: a canonical coordinate-node change must
+count as successful traversal even when the server reuses the same room object.
+The user also authorized investigating the reduced-to-full reader regression.
+Tracing showed its browser gate sampled the previous startup response, not a
+restart of the same response; the repair therefore waits for the newly appended
+text while preserving every motion and page-advance assertion. No production
+reader behavior or unrelated server behavior is changed.
 
 ## Batch:
 

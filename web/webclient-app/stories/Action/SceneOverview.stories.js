@@ -4,14 +4,15 @@ import {
   AFFORDANCES,
   DIRECTION_LABELS,
   explorationPanelFixture,
-  localMapFixture,
   overviewArgs,
 } from "../fixtures/scene_overview.js";
 
-// SceneOverview: the exploration root of the command panel (AVG stage
-// design §7). Chip rows 出口 / 人物 / 物件 and a label-less footer (查看房間 ‧
-// 等待／休息 ‧ 建議), built by the real `overviewMenu` through the shared
-// derived-shape helper. Props: menu, focusedKey, localMap, idPrefix, active.
+// SceneOverview: the chip rows of the exploration root pane (AVG stage
+// design §7), in the right column beside the exit compass
+// (exploration-exit-compass). Chip rows 人物 / 物件 and a label-less footer
+// (查看房間 ‧ 等待／休息 ‧ 建議), built by the real `overviewMenu` through the
+// shared derived-shape helper; exits are the compass's, never chips. Props:
+// menu, focusedKey, idPrefix, active.
 // Events: focus-change (every click), activate ({key, item}, enabled chips
 // only). Each story renders inside a box the size of the command panel at
 // 1451x790 (484×220) that scrolls like the dock pane.
@@ -58,12 +59,6 @@ const FULL_ROOM = explorationPanelFixture({
   objects: [{ identity: 31, name: "任務板" }, { identity: 32, name: "壁爐" }],
 });
 
-const FULL_MAP = localMapFixture([
-  ["room:901", "北岸大道"],
-  ["room:902", "公會櫃檯"],
-  ["room:903", "黑麥酒館"],
-]);
-
 const READY_SUGGESTIONS = {
   status: "ready",
   cards: [
@@ -72,35 +67,24 @@ const READY_SUGGESTIONS = {
   ],
 };
 
-// Every row present: exits (one locked), people (two hosts and a look-only
-// traveller), objects, and the footer with 建議 (2).
+// Every row present: people (two hosts and a look-only traveller), objects,
+// and the footer with 建議 (2). The room's three exits are the compass's.
 export const FullRoom = {
   render,
   args: overviewArgs(FULL_ROOM, {
-    localMap: FULL_MAP,
     suggestions: READY_SUGGESTIONS,
-    focusedKey: "exit-exit-0",
+    focusedKey: "target-11",
   }),
 };
 
-// Nobody and nothing here: only the 出口 row and the footer render.
+// Nobody and nothing here: only the footer renders.
 export const EmptyRows = {
   render,
-  args: overviewArgs(
-    explorationPanelFixture({ exits: [{ label: "南", destination: "room:904" }] }),
-    { localMap: localMapFixture([["room:904", "南門廣場"]]) },
-  ),
+  args: overviewArgs(explorationPanelFixture({ exits: [{ label: "南", destination: "room:904" }] })),
 };
 
-// The focused chip is a locked exit: it keeps its own label with the
-// （無法使用） marker, and the reason strip shows the server's reason.
-export const DisabledExit = {
-  render,
-  args: overviewArgs(FULL_ROOM, { localMap: FULL_MAP, focusedKey: "exit-exit-2" }),
-};
-
-// A crowded crossroads: 12 exits and 10 people wrap inside the panel's
-// width with no horizontal scroll (a taller room scrolls the panel).
+// A crowded crossroads: 10 people wrap inside the panel's width with no
+// horizontal scroll (a taller room scrolls the panel).
 export const Overflowing = {
   render,
   args: overviewArgs(
@@ -117,7 +101,6 @@ export const Overflowing = {
       })),
     }),
     {
-      localMap: localMapFixture(DIRECTION_LABELS.map((label, i) => [`room:${910 + i}`, `${label}側街道`])),
       suggestions: { status: "generating" },
       focusedKey: "target-45",
     },

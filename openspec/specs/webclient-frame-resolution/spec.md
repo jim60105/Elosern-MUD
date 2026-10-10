@@ -2,6 +2,7 @@
 
 ## Purpose
 Defines the store-owned frame resolver registry mapping frame descriptors to menus derived from committed presentation state at access time, with resolvers forbidden from reading cached or component state. Covers the finite exploration/combat/creation descriptor tables, verbatim dynamic rows against client-owned navigation rows, the shared degradation marker for unresolvable descriptors, router frames storing descriptors with focus tracked across re-resolution, stack pop and root-reason rules, status-driven suggestions frames, single-decision-point teardown, and committed-state activation payloads.
+
 ## Requirements
 
 ### Requirement: Frame descriptors resolve to committed-state menus at access time
@@ -54,7 +55,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 
 #### Scenario: A retired exploration source degrades instead of resolving
 
-- **WHEN** `exploration.move`, `exploration.look`, or `exploration.interact` is resolved (their frames were retired with the exploration tab root, whose root frame is now the scene overview)
+- **WHEN** `exploration.move`, `exploration.look`, or `exploration.interact` is resolved (their frames were retired with the exploration tab root, whose root frame is now the people/object/footer scene overview beside the separate compass)
 - **THEN** each returns the shared unresolvable marker and produces no menu, so a stray push of one pops instead of resurrecting a pane
 
 #### Scenario: A withdrawn suggestions envelope degrades like a lost identity
@@ -75,7 +76,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 #### Scenario: The exploration table is exactly five sources
 
 - **WHEN** the exploration-family source table is declared
-- **THEN** its sources (panel `exploration`; `exploration.root` additionally reads `local_map.current_node`; `exploration.suggestions` reads `context_actions.suggestions`) are exactly `exploration.root` `{}`, `exploration.wait` `{}`, `exploration.target` `{identity}`, `exploration.keywords` `{identity}`, `exploration.suggestions` `{}`
+- **THEN** its sources (panel `exploration`; `exploration.root` reads the committed overview without exit rows; the independent compass and dialogue exit-row source read `local_map.current_node`; `exploration.suggestions` reads `context_actions.suggestions`) are exactly `exploration.root` `{}`, `exploration.wait` `{}`, `exploration.target` `{identity}`, `exploration.keywords` `{identity}`, `exploration.suggestions` `{}`
 
 ### Requirement: Dynamic rows and payloads are verbatim from the panel while client-owned navigation rows are reproduced
 
