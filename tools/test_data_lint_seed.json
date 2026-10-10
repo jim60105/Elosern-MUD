@@ -85,8 +85,12 @@
       "reason": "monster tier data contract"
     },
     {
+      "path": "world/lore/tests/test_bestiary_documentation.py",
+      "reason": "keyed bestiary documentation relationship contract"
+    },
+    {
       "path": "world/lore/tests/test_monster_species_content.py",
-      "reason": "registry-derived monster identity, profile/kit coverage and bestiary relationship contract"
+      "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
     },
     {
       "path": "world/lore/tests/test_names.py",

@@ -1,4 +1,4 @@
-"""Data-contract test: registry-derived monster identity, profile/kit coverage and bestiary relationship contract
+"""Data-contract test: registry-derived monster identity, profile/kit coverage and public narrative contract
 
 Identity, ownership, default membership and the authored profile obligation are
 read from the live registries themselves, so adding, renaming or retiring a row
@@ -6,13 +6,14 @@ needs no edit here and no roster is pinned. The shipped profiles and grades are
 band-checked independently of the registry's own validator, construction and
 reload observe the selected declaration without numerical approval copies, and
 whether a row delivers a kit is its own declared data rather than a species
-allowlist.
+allowlist. The published narrative is checked for presence and public/private
+separation only; the keyed bestiary documentation relationship lives in
+``test_bestiary_documentation.py`` and never compares a prose sentence.
 """
 
 import ast
 import dataclasses
 import pathlib
-import re
 import unittest
 from unittest.mock import patch
 
@@ -42,18 +43,7 @@ from world.rules.traits import (
 from world.skills.registry import SKILL_REGISTRY
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-BESTIARY = REPO_ROOT / "docs" / "lore" / "bestiary.md"
 BEHAVIOUR_SELECTION_MODULE = REPO_ROOT / "world" / "rules" / "monster_behaviour.py"
-
-
-def _normalised(text: str) -> str:
-    """The text with whitespace and markdown emphasis removed."""
-    return re.sub(r"[\s`*]+", "", text)
-
-
-def _sentences(text: str) -> list[str]:
-    """The full-stop separated sentences of one shipped display string."""
-    return [piece for piece in text.split("。") if piece.strip()]
 
 
 def _tier_band_bases(tier_key: str) -> dict[str, int]:
@@ -76,34 +66,6 @@ def _tier_band_bases(tier_key: str) -> dict[str, int]:
 
 # The complete profile shape is stable; its authored magnitudes are mutable.
 PROFILE_FIELDS = tuple(field.name for field in dataclasses.fields(MonsterCombatProfile))
-
-# One authored ability-limit clause per species, so the narrative carries each
-# special ability's own boundary text and nothing executable. Kept until the
-# keyed bestiary relationship checker replaces this prose comparison: the
-# checker, not this map, is what the post-cutover contract requires, so no new
-# clause belongs here.
-APPROVED_ABILITY_LIMITS = {
-    "sway_whistle_sparrow": "無法掀翻糧車",
-    "tide_lamp_crab": "不能製造幻覺或偽裝物體",
-    "ridge_burrow_hare": "無法鑽穿岩盤",
-    "rock_echo_goat": "脈動無法粉碎完整岩盤",
-    "fog_mane_lynx": "不能完全隱形",
-    "tide_devouring_crocodile": "不能隔著整條河抽取魔力",
-}
-
-# Each delivered species whose contact kit has landed also publishes its
-# approved environment-independent contact clause, so the executable kit's
-# prose boundary is pinned beside the retained limit above.
-APPROVED_CONTACT_CLAUSES = {
-    "sway_whistle_sparrow": (
-        "近身時，牠會配合短促氣流啄擊，命中後使對手短暫分心；"
-        "此招不需要穀物，也不產生強風或擊退。"
-    ),
-    "tide_lamp_crab": (
-        "牠會在螯擊時收緊甲殼，短暫提高自身防禦；這項動作不依賴光源，"
-        "發光斑紋與螯擊皆無治療效果，也不屬於光屬性治療術。"
-    ),
-}
 
 # No registry field may stand in for an ability seam.
 FORBIDDEN_SEAM_FIELDS = frozenset(
@@ -210,29 +172,24 @@ class ShippedRegistryIdentityTests(unittest.TestCase):
 
 
 class ShippedNarrativeTests(unittest.TestCase):
-    """The authored narrative fields, compared against the current bestiary."""
+    """The authored narrative fields: present, bounded and public-private split."""
 
     @covers_requirement(
         "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
-    def test_the_published_narrative_is_the_approved_zh_tw_prose(self):
+    def test_every_shipped_species_publishes_distinct_nonempty_prose(self):
+        """Detect a missing, empty or duplicated published narrative field.
+
+        Presence and separation only: which sentences the publication carries
+        is authored prose, and the keyed relationship between the publication
+        and the registries is checked by the documentation contract, never by
+        comparing sentences.
+        """
         for key, species in MONSTER_SPECIES_REGISTRY.items():
             with self.subTest(species=key):
                 self.assertTrue(species.published_description_zh)
                 self.assertTrue(species.published_appearance_zh)
                 self.assertTrue(species.published_ecology_zh)
-                self.assertIn(
-                    APPROVED_ABILITY_LIMITS[key],
-                    species.published_ecology_zh,
-                    "the approved ability boundary clause is missing",
-                )
-                contact_clause = APPROVED_CONTACT_CLAUSES.get(key)
-                if contact_clause is not None:
-                    self.assertIn(
-                        contact_clause,
-                        species.published_ecology_zh,
-                        "the approved contact clause is missing",
-                    )
                 self.assertNotEqual(
                     species.published_description_zh, species.published_ecology_zh
                 )
@@ -260,38 +217,11 @@ class ShippedNarrativeTests(unittest.TestCase):
     @covers_requirement(
         "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
-    def test_every_published_string_is_verbatim_approved_prose_in_order(self):
-        """Each published sentence is the approved bestiary text, in its order."""
-        haystack = _normalised(BESTIARY.read_text(encoding="utf-8"))
-        self.assertTrue(haystack)
-
-        def assert_sentences_are_approved(source: str, field: str, value: str) -> None:
-            sentences = [_normalised(piece) for piece in _sentences(value)]
-            self.assertTrue(sentences, f"{source}.{field} carries no prose")
-            cursor = 0
-            for sentence in sentences:
-                index = haystack.find(sentence, cursor)
-                self.assertGreaterEqual(
-                    index,
-                    cursor,
-                    f"{source}.{field} sentence {sentence!r} is not approved "
-                    "bestiary prose in its published order",
-                )
-                cursor = index + len(sentence)
-
-        for key, species in MONSTER_SPECIES_REGISTRY.items():
-            with self.subTest(species=key):
-                for field in (
-                    "published_description_zh",
-                    "published_appearance_zh",
-                    "published_ecology_zh",
-                ):
-                    assert_sentences_are_approved(key, field, getattr(species, field))
+    def test_every_shipped_variant_publishes_a_nonempty_description(self):
         for key, variant in MONSTER_VARIANT_REGISTRY.items():
             with self.subTest(variant=key):
-                assert_sentences_are_approved(
-                    key, "description_zh", variant.description_zh
-                )
+                self.assertTrue(variant.description_zh)
+                self.assertTrue(variant.display_name_zh)
 
 
 class BalanceSlotContentTests(unittest.TestCase):
