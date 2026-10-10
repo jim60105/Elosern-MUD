@@ -124,3 +124,27 @@ showed the gate accepted the old startup response (106 units, instant), then
 switched motion before the newly appended response (205 units) rendered. The
 gate now waits for the new text as well as page geometry; all original assertions
 remain intact. No MessageWindow or useTypewriter production change is needed.
+
+After the server repair, a fresh agent-browser session traversed the real
+wilderness from `wild:elosern:61:97` through `61:96`, `61:95`, `61:94`, `61:93`,
+and `61:92` while ArrowDown was held. Release stopped walking; after another
+400 ms the node remained `61:92` and the readout still showed the aimed
+destination, not `move_failed`. Screenshots are
+`/tmp/compass-repaired-live-walk-1451.png` and
+`/tmp/compass-repaired-live-walk-1920.png`.
+
+Successor acceptance exercised 93 browser methods across all touched classes
+and the requested local-map class, in short batches. The reader class's 23
+methods passed with the original reduced-to-full assertion unchanged. Initial
+large or overlapping batches timed out; every affected method subsequently
+completed in bounded batches. One dialogue batch timed out at the login
+selector; its dedicated exit-move method subsequently passed in isolation.
+These are recorded execution outcomes, not an attribution to pre-existing bugs.
+
+Final exercised gates: Vitest 166 files / 2099 tests; static exploration-menu
+Node tests 34; movement adapter tests 22; frozen-contract tests 9; contract gate
+(2061 requirements covered, zero lint violations, 18 contract tests);
+component/story coverage (70 required components and GM coverage); production
+build; and strict OpenSpec validation. The build retains its existing unresolved
+runtime-art URL and large-chunk warnings. No full managed-browser or full
+Evennia suite was run.

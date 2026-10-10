@@ -24,7 +24,7 @@
 
 ## 5. Test migration
 
-- [ ] 5.1 Update the browser tests and helpers under `web/tests/browser/` that activate an exit chip (`browser_helpers.py` "activate the scene overview's first exit chip", `test_browser_exploration_nav.py`, `test_browser_exploration_frame.py`, `test_browser_exploration_tiles.py`, `test_browser_exploration_state.py`, `test_browser_exploration_dialogue.py`, `test_browser_pointer.py`, `test_browser_local_map_interaction.py`, `test_browser_contextual_hud_dock.py`, plus any other hit of `grep -l "exit-" web/tests/browser`) to move through the compass (keyboard aim and Enter, or a click at the pip). Register any new or renamed method in `.github/browser-shards.json`, and run each touched class with the browser unittest driver documented in the repository AGENTS.md.
+- [x] 5.1 Update the browser tests and helpers under `web/tests/browser/` that activate an exit chip (`browser_helpers.py` "activate the scene overview's first exit chip", `test_browser_exploration_nav.py`, `test_browser_exploration_frame.py`, `test_browser_exploration_tiles.py`, `test_browser_exploration_state.py`, `test_browser_exploration_dialogue.py`, `test_browser_pointer.py`, `test_browser_local_map_interaction.py`, `test_browser_contextual_hud_dock.py`, plus any other hit of `grep -l "exit-" web/tests/browser`) to move through the compass (keyboard aim and Enter, or a click at the pip). Register any new or renamed method in `.github/browser-shards.json`, and run each touched class with the browser unittest driver documented in the repository AGENTS.md.
 - [x] 5.2 Add a browser journey that holds a direction in a wilderness room, observes at least two arrivals and a stop with the dead-end readout, and a journey where a disabled exit's reason is read from the readout.
 
 ## 6. Specs and docs
@@ -34,8 +34,8 @@
 
 ## 7. Integration acceptance
 
-- [ ] 7.1 Run `pnpm test`, `node scripts/component-coverage.mjs`, the touched browser classes, the contract gate (`tools.contract_gate`), the frozen-contract test (`tests.test_webclient_frozen_contract`), and `openspec validate exploration-exit-compass --strict`.
-- [ ] 7.2 Build the client (`pnpm run build`) and with `agent-browser` capture the live exploration screen at 1451×790 and 1920×1080 for a wilderness room, a town grid room, an interior room with portals, a room with a disabled exit, and a room with no exits; hover, click, and hold-to-walk in the wilderness; confirm the pad fits the band, the panel does not scroll beyond the right column, and compare with `Design/SceneOverviewRedesign` in Storybook. Fix deviations or record intentional ones in this change's design.md.
+- [x] 7.1 Run `pnpm test`, `node scripts/component-coverage.mjs`, the touched browser classes, the contract gate (`tools.contract_gate`), the frozen-contract test (`tests.test_webclient_frozen_contract`), and `openspec validate exploration-exit-compass --strict`.
+- [x] 7.2 Build the client (`pnpm run build`) and with `agent-browser` capture the live exploration screen at 1451×790 and 1920×1080 for a wilderness room, a town grid room, an interior room with portals, a room with a disabled exit, and a room with no exits; hover, click, and hold-to-walk in the wilderness; confirm the pad fits the band, the panel does not scroll beyond the right column, and compare with `Design/SceneOverviewRedesign` in Storybook. Fix deviations or record intentional ones in this change's design.md.
 
 ## Workflow follow-up
 
