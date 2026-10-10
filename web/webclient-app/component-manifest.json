@@ -26,6 +26,7 @@
     "Action/ChoiceCardRow",
     "Action/DockBreadcrumb",
     "Action/SceneOverview",
+    "Action/ExitCompass",
     "Action/DockVerbPopover",
     "Action/SkillDetailPane",
     "Action/SkillUseDock",

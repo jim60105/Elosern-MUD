@@ -475,3 +475,29 @@ describe("ExitCompass stop reasons", () => {
     expect(moves()).toEqual(["n1", "n2"]);
   });
 });
+
+describe("ExitCompass stories bind the derived shapes", async () => {
+  const stories = await import("../../stories/Action/ExitCompass.stories.js");
+
+  it("each static story resolves the documented targets", () => {
+    const angles = (args) => args.targets.angled.map((t) => Math.round(t.angle));
+    expect(angles(stories.Wilderness8Way.args)).toEqual([0, 45, 90, 135, 180, 225, 270, 315]);
+    expect(angles(stories.GridIrregular.args)).toEqual([37, 143, 323]);
+    expect(stories.InteriorPortals.args.targets.angled).toHaveLength(0);
+    expect(stories.InteriorPortals.args.targets.portals.map((p) => p.slot)).toEqual([60, 180, 300]);
+    const stairs = stories.Stairs.args.targets.portals;
+    expect(stairs.find((p) => p.vertical === "up").slot).toBe(0);
+    expect(stairs.find((p) => p.vertical === "down").slot).toBe(180);
+    expect(stories.DisabledExit.args.targets.angled.find((t) => !t.enabled).reason).toBe("前方的吊橋已經收起。");
+    expect(new Set(stories.TenPortals.args.targets.portals.map((p) => p.slot)).size).toBe(10);
+  });
+
+  it("every story mounts", () => {
+    for (const name of ["Wilderness8Way", "GridIrregular", "InteriorPortals", "Stairs", "DisabledExit", "TenPortals", "Walking"]) {
+      const story = stories[name];
+      const w = mount(story.render(story.args), { attachTo: document.body });
+      expect(w.find('[data-testid="exit-compass"]').exists(), name).toBe(true);
+      w.unmount();
+    }
+  });
+});
