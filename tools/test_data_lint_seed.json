@@ -101,6 +101,10 @@
       "reason": "nation data contract"
     },
     {
+      "path": "world/lore/tests/test_npc_editorial_review.py",
+      "reason": "registry-indexed NPC characterization editorial review contract"
+    },
+    {
       "path": "world/lore/tests/test_npc_profile_inventory.py",
       "reason": "shipped NPC source inventory equality contract"
     },
