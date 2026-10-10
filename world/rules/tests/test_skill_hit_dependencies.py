@@ -14,7 +14,7 @@ from world.rules.action import (
     PendingEffect,
     RejectReason,
 )
-from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat import COMBAT_YAML, Battlefield, BattlefieldActionContext
 from world.rules.tests.combat_fixtures import FakeEntity, grant_lineage
 from world.tests.synthetic_data import (
     make_skill,
@@ -165,6 +165,51 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.assertFalse(any(e.kind == "gauge_transfer" for e in res_miss.event_log.entries))
 
     @covers_requirement(
+        "monster-resource-abilities::hit-qualified-transfers-credit-actual-removal-once"
+    )
+    def test_absorbed_hit_credits_the_rider_independently_of_hp_loss(self):
+        """Scenario: Hit evidence and defeat; an absorbed hit still qualifies.
+
+        The victim's defense drives the pre-floor damage below zero, so the
+        committed HP loss is the rulebook's unscaled damage floor while the hit
+        is still true, and the rider transfers its full fixed amount exactly
+        once. The case cannot drift into the miss vector: a miss transfers
+        nothing at all.
+        """
+        skill = self._make_skill(
+            "absorbed_hit_rider",
+            effects=["damage:fire:physical", "gauge_transfer:mp:drain:fixed:5"],
+            policies=(
+                EffectPolicy(audience=EffectAudience.ENEMIES),
+                EffectPolicy(
+                    audience=EffectAudience.ENEMIES,
+                    requires_hit_from=0,
+                    transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+                ),
+            ),
+            target_spec=TargetSpec.SINGLE,
+        )
+        skill = replace(skill, cost={"mp": 0, "sp": 0})
+        req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
+        self.target_a.traits.defense.base = 500
+        self.target_a.traits.mp.current = 50
+        self.actor.traits.mp.current = 0
+        self.actor.traits.mp.base = 100
+        hp_before = self.target_a.traits.hp.current
+        with patch("world.rules.combat.damage.roll_d100", return_value=80):
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res = ActionResolver.resolve(req)
+        self.assertEqual(res.outcome, "success")
+        # The minimum hit, not a miss: the floor is read from the live combat
+        # rulebook rather than pinned as a literal.
+        floor = int(COMBAT_YAML["damage"]["floor"])
+        self.assertEqual(hp_before - self.target_a.traits.hp.current, floor)
+        drains = [e for e in res.event_log.entries if e.kind == "gauge_transfer"]
+        self.assertEqual(len(drains), 1)
+        self.assertEqual(self.target_a.traits.mp.current, 45)
+        self.assertEqual(self.actor.traits.mp.current, 5)
+
+    @covers_requirement(
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits"
     )
     def test_multi_strike_all_hit_miss_vectors_any_hit_once_per_target(self):
@@ -295,11 +340,17 @@ class SkillHitDependenciesTests(EvenniaTestCase):
 
     @covers_requirement(
         "skill-effect-model::dependent-effects-retain-normal-settlement-and-rollback",
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
-        "monster-resource-abilities::affordability-precedes-effects-and-recovery-precedes-costs",
+        "monster-resource-abilities::hit-qualified-transfers-credit-actual-removal-once",
+        "monster-resource-abilities::monster-effects-and-payments-share-the-ordinary-atomic-action",
     )
     def test_synthetic_transfer_partial_zero_mp_and_caster_cap(self):
-        """Scenario: Target partial/zero MP and caster full/partial cap."""
+        """Scenario: Actual-removal oracle, transfer limits and unaffordable requests.
+
+        Detect credit on the requested rather than the actually removed amount,
+        payment ordered before the effect, an undeclared side effect of the
+        transfer, or any write at all on a request the affordability gate
+        rejects.
+        """
         skill = self._make_skill(
             "synth_bite_mechanics",
             effects=["damage:water:physical", "gauge_transfer:mp:drain:fixed:10"],
@@ -315,6 +366,25 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         )
         skill = replace(skill, cost={"mp": 10, "sp": 5})
         req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
+        # An untouched control shares the room with the exchange; every case
+        # below proves it is never a recipient of the effect or of the payment.
+        control = create_object(PlayerCharacter, key="hit_control")
+        control.race = "human"
+        control.apply_race_baseline()
+        control.traits.hp.current = 100
+        control.traits.mp.current = 100
+        control_before = (control.traits.hp.current, control.traits.mp.current)
+        # Permanent stats are not a transfer surface: the drain moves a
+        # consumable pool and never rewrites the actor's or the victim's bases.
+        permanent_before = {
+            entity.pk: (
+                entity.traits.atk_phys.base,
+                entity.traits.agility.base,
+                entity.traits.defense.base,
+                entity.traits.magic_power.base,
+            )
+            for entity in (self.actor, self.target_a)
+        }
 
         # 1. Target with 3 MP: removal is at most 3, actor recovers at most 3
         self.target_a.traits.mp.current = 3
@@ -323,6 +393,7 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         self.actor.traits.sp.base = 100
         self.actor.traits.mp.base = 100
         self.target_a.traits.mp.base = 100
+        actor_hp_before = self.actor.traits.hp.current
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
                 res = ActionResolver.resolve(req)
@@ -331,6 +402,12 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # Actor recovers 3 -> 23, pays 10 -> ends at 13 MP, SP: 20 -> 15
         self.assertEqual(self.actor.traits.mp.current, 13)
         self.assertEqual(self.actor.traits.sp.current, 15)
+        # The transfer is MP-only: no undeclared HP healing reaches the actor,
+        # and the control is untouched by both the exchange and the payment.
+        self.assertEqual(self.actor.traits.hp.current, actor_hp_before)
+        self.assertEqual(
+            (control.traits.hp.current, control.traits.mp.current), control_before
+        )
 
         # 2. Target with 0 MP: deals damage, 0 drain, actor recovers 0, pays costs
         self.target_a.traits.mp.current = 0
@@ -384,19 +461,59 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         # 6. Insufficient MP or SP: rejected before rolls or effects
         self.actor.traits.mp.current = 9
         self.actor.traits.sp.current = 20
-        with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-            res_fail_mp = ActionResolver.resolve(req)
+        self.target_a.traits.mp.current = 20
+        with patch("world.rules.combat.damage.roll_d100") as roll_mp:
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res_fail_mp = ActionResolver.resolve(req)
         self.assertEqual(res_fail_mp.outcome, "rejected")
+        self.assertEqual(res_fail_mp.reason, RejectReason.INSUFFICIENT_RESOURCE)
+        self.assertEqual(roll_mp.call_count, 0)
 
         self.actor.traits.mp.current = 20
         self.actor.traits.sp.current = 4
-        with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
-            res_fail_sp = ActionResolver.resolve(req)
+        rejected_before = (
+            self.actor.traits.mp.current,
+            self.actor.traits.sp.current,
+            self.target_a.traits.mp.current,
+            self.target_a.traits.hp.current,
+            dict(self.actor.db.skill_proficiency or {}),
+            dict(self.target_a.db.skill_proficiency or {}),
+        )
+        with patch("world.rules.combat.damage.roll_d100") as roll_sp:
+            with patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}):
+                res_fail_sp = ActionResolver.resolve(req)
         self.assertEqual(res_fail_sp.outcome, "rejected")
+        self.assertEqual(res_fail_sp.reason, RejectReason.INSUFFICIENT_RESOURCE)
+        self.assertEqual(roll_sp.call_count, 0)
+        # A rejected request writes nothing: no gauge, no damage and no
+        # practice claim on either side of the exchange.
+        self.assertEqual(
+            (
+                self.actor.traits.mp.current,
+                self.actor.traits.sp.current,
+                self.target_a.traits.mp.current,
+                self.target_a.traits.hp.current,
+                dict(self.actor.db.skill_proficiency or {}),
+                dict(self.target_a.db.skill_proficiency or {}),
+            ),
+            rejected_before,
+        )
+        self.assertEqual(
+            {
+                entity.pk: (
+                    entity.traits.atk_phys.base,
+                    entity.traits.agility.base,
+                    entity.traits.defense.base,
+                    entity.traits.magic_power.base,
+                )
+                for entity in (self.actor, self.target_a)
+            },
+            permanent_before,
+        )
 
     @covers_requirement(
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "monster-resource-abilities::hit-qualified-transfers-credit-actual-removal-once",
     )
     def test_critical_defeat_crossing(self):
         """Critical hit does not multiply drain; defeat crossing still transfers."""
@@ -446,7 +563,8 @@ class SkillHitDependenciesTests(EvenniaTestCase):
 
     @covers_requirement(
         "skill-effect-model::dependent-recipients-intersect-ordinary-audiences-with-source-hits",
-        "monster-resource-abilities::successful-bite-drains-mp-and-recovers-only-actual-removal",
+        "monster-resource-abilities::hit-qualified-transfers-credit-actual-removal-once",
+        "monster-resource-abilities::delivered-monster-compositions-retain-representative-consumer-evidence",
         "test-data-independence::shared-synthetic-mechanism-coverage-owns-independently-known-outcomes",
     )
     def test_two_species_execute_shared_drain_with_isolated_hit_state(self):

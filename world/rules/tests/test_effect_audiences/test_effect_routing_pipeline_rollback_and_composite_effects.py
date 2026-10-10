@@ -251,8 +251,7 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
 
     @covers_requirement(
         "skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior",
-        "monster-resource-abilities::穗鳴雀-payment-and-atomicity-retain-the-shared-transaction",
-        "monster-resource-abilities::潮燈蟹-payment-and-atomicity-retain-the-shared-transaction",
+        "monster-resource-abilities::monster-effects-and-payments-share-the-ordinary-atomic-action",
     )
     def test_composite_effects_are_actual_state_changes_with_atomic_rollback(self):
         """Scenario: Composite effects are actual state changes."""
@@ -313,6 +312,11 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
                 self.companion.traits.hp.current,
                 self.target.traits.hp.current,
             ))
+            # A real practice claim lands before the failure: the rollback must
+            # take back the claim and its progression state, not just gauges.
+            claim = dict(self.caster.db.skill_proficiency or {})
+            claim[composite_skill.key] = claim.get(composite_skill.key, 0) + 7
+            self.caster.db.skill_proficiency = claim
             raise RuntimeError("injected after composite writes")
 
         def late_fault(_request, _log):
@@ -342,3 +346,28 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
                     actual.db.buffs,
                     actual.db.skill_proficiency,
                 ), before[entity.pk])
+
+        # The failed attempt left no stale claim, so re-issuing the identical
+        # request succeeds and lands one authored settlement.
+        self.companion.traits.hp.current = 50
+        companion_before_retry = self.companion.traits.hp.current
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=60),
+            patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={}),
+        ):
+            retried = ActionResolver.resolve(req)
+        self.assertEqual(retried.outcome, "success")
+        self.assertEqual(
+            self.caster.traits.mp.current, before[self.caster.pk][1] - 25
+        )
+        self.assertGreater(
+            self.companion.traits.hp.current, companion_before_retry
+        )
+        self.assertLess(self.target.traits.hp.current, before[self.target.pk][0])
+        self.assertIn(debuff, entity_active_buffs(self.target))
+        # The rolled-back claim is gone and the retry's own award is the day's
+        # single claim, so the failed attempt cannot double-count practice.
+        self.assertEqual(
+            self.caster.db.skill_proficiency[composite_skill.key],
+            before[self.caster.pk][3].get(composite_skill.key, 0),
+        )
