@@ -129,7 +129,7 @@ ordered skill via `EffectPolicy(requires_hit_from=<index>)`.
    - 第二項效果 `gauge_transfer:mp:drain:fixed:10`，其 `EffectPolicy` 宣告 `requires_hit_from=0` 與 `transfer=GaugeTransferPolicy(caster_recovery_share=1.0)`。
 4. **命中相依減益（Hit-Dependent Debuff）**：`grain_shaking_peck` 為既有詞彙的複合消費端——`damage:wind:physical`（係數 0.8）後接 `buff_apply:grain_rattle`，後者的 `EffectPolicy` 宣告 `requires_hit_from=0`。buff mount 列於 `buffs.yaml`（10 秒、`stacking: refresh`、`polarity: debuff`、空 `modifiers`），實際 `accuracy: -3` 在 `combat_modifiers.yaml` 的 `buff_active` 列；兩者都必須同時在 `status_display.yaml` 取得顯示列，否則 `world/rules/status_display.py` 於載入時即失敗。完全被吸收（殘餘傷害 0）的命中仍算命中，減益照常施加一次；未命中則不施加。
 5. **自身防護（Self Guard）**：`lamp_carapace_claw` 同為既有詞彙的複合消費端——`damage:light:physical`（係數 1.0）後接 `self_buff_apply:lamp_carapace_guard`，其 `EffectPolicy(coefficient=1.0, audience=EffectAudience.SELF)` **不宣告** `requires_hit_from`。SELF 受眾在 `world/rules/action/routing.py` 直接綁定施法者，因此未命中的已結算施放仍取得護甲；若在此宣告 `requires_hit_from=0`，共享的受眾／命中交集會把施法者排除，護甲永不生效。buff mount 列於 `buffs.yaml`（20 秒、`stacking: refresh`、`polarity: buff`、空 `modifiers`），實際 `defense: 2` 在 `combat_modifiers.yaml` 的 `buff_active` 列；兩者同樣必須在 `status_display.yaml` 取得顯示列。SELF 受眾讓複合式在敵人受眾為空時仍有接收者：選中友方時照常付費但不造成傷害，未指定目標仍由 `SINGLE` 目標閘門拒絕。
-6. **結算順序（Payment and Recovery Order）**：
+6. **結算順序（Payment and Recovery Order）**：本項描述帶 `gauge_transfer` 效果的吸取型技能（目前僅吞潮鱷）；純傷害或傷害加自身 buff 的複合式只依一般「傷害 → 扣除 MP 與 SP 成本」順序結算。
    - 於擲骰前檢驗可負擔性（affordability），吸取無法提前資助未達標的施法。
    - 動作管線結算時：傷害結算 → 目標魔力扣減 → 施法者魔力恢復（受施法者上限限制並捨棄溢出） → 扣除 MP 與 SP 成本。
    - 舉例（`bank_lurker`，上限 30 MP）：

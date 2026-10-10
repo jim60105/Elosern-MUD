@@ -11,6 +11,11 @@ exhaustion axes falling back to a resolved ``basic_attack``, pre-dice identity
 and affordability rejection, the no-target and positional-contact rejections,
 the inclusive 0.35 flee threshold, a depleted-gauge reload and a construction
 rollback. No live generative or image service is called anywhere here.
+
+Buff lifetimes are settled through the explicit ``tick_buffs`` game-second path
+(the same isolation the crocodile/sparrow smokes use) rather than a full world
+clock advance, so the clock's own recovery order is exercised elsewhere and the
+nominal resource deltas asserted here stay exact.
 """
 
 from unittest.mock import patch
@@ -203,6 +208,8 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         #    enemy component delivers nothing to it while the self guard still
         #    mounts and both resources are still paid: the SELF audience keeps
         #    the resolved attempt alive after the ENEMIES audience routes empty.
+        #    The guard is first aged six seconds so the post-cast lifetime is
+        #    evidence of a real mount on this attempt, not of the earlier cast.
         ally = self._opponent(room, "crab_ally")
         ally.traits.hp.base = 100
         ally.traits.hp.current = 100
@@ -216,6 +223,8 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         ally_context = BattlefieldActionContext(ally_battlefield)
         shore.traits.mp.current = shore.traits.mp.base
         shore.traits.sp.current = shore.traits.sp.base
+        tick_buffs(shore, 6)
+        self.assertEqual(_buff_instances(shore, BUFF_KEY)[0].remaining_seconds, 14)
         with patch("world.rules.combat.damage.roll_d100", return_value=80):
             ally_result = ActionResolver.resolve(
                 ActionRequest(shore, SKILL_KEY, [ally], ally_context)
@@ -223,6 +232,7 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         self.assertEqual(ally_result.outcome, "success")
         self.assertEqual(ally.traits.hp.current, 100)
         self.assertEqual(ally.traits.mp.current, 100)
+        self.assertEqual(_buff_instances(shore, BUFF_KEY)[0].remaining_seconds, 20)
         self.assertEqual(evaluate_combat_modifiers(shore)["defense"], 2)
         self.assertEqual(shore.traits.mp.current, 10)
         self.assertEqual(shore.traits.sp.current, 6)
@@ -232,6 +242,11 @@ class TideLampCrabResourceSkillSmokeTests(EvenniaTestCase):
         #    raises, so this proves the transactional restore, not staging
         #    purity. Every touched surface and the practice claim set return to
         #    their pre-action values and an immediate retry lands the same delta.
+        #    The claim equality is deliberately narrow: this injection point
+        #    fails before the award takes a claim (same-tick dedupe means one is
+        #    already held), so it proves the failed attempt left the set
+        #    untouched; the release path itself is covered by
+        #    world/rules/tests/test_skill_lineage.py.
         shore.traits.mp.current = shore.traits.mp.base
         shore.traits.sp.current = shore.traits.sp.base
         before = (
