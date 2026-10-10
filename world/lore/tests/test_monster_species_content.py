@@ -384,8 +384,8 @@ class BalanceSlotContentTests(unittest.TestCase):
         )
 
 
-class ApprovedProfileConstructionTests(EvenniaTestCase):
-    """Observe current profile selection across construction and persistence."""
+class ShippedProfileConstructionTests(EvenniaTestCase):
+    """Observe the declared profile selection across construction and persistence."""
 
     @covers_requirement(
         "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
@@ -430,18 +430,23 @@ class ApprovedProfileConstructionTests(EvenniaTestCase):
                         *variant.active_skill_keys,
                         *variant.passive_skill_keys,
                     )
-                    if declared_kit or variant.behaviour_profile_key is not None:
+                    # The two declarations are independent: a row may deliver a
+                    # kit without a behaviour binding, or bind a behaviour
+                    # without owning a skill, and neither may fabricate the
+                    # other. A row that declares neither keeps the innate
+                    # actions, with nothing mounted in either place.
+                    if declared_kit:
                         self.assertEqual(
                             actual.db.skills["active"], list(variant.active_skill_keys),
                         )
                         self.assertEqual(
                             actual.db.skills["passive"], list(variant.passive_skill_keys),
                         )
+                    else:
+                        self.assertIsNone(actual.db.skills)
+                    if variant.behaviour_profile_key is not None:
                         self.assertEqual(actual.db.behaviour_tree, variant.behaviour_profile_key)
                     else:
-                        # No delivered kit keeps the innate actions: nothing is
-                        # mounted and no placeholder stands in for one.
-                        self.assertIsNone(actual.db.skills)
                         self.assertIsNone(actual.db.behaviour_tree)
 
 
@@ -473,7 +478,7 @@ class AbilitySeamNegativeTests(unittest.TestCase):
     Delivery is read from each row's own declared kit, so an added or retired
     kit needs no edit here. The runtime half of the same contract - a kit-less
     row mounting no skills and no behaviour binding - is observed in
-    ``ApprovedProfileConstructionTests``.
+    ``ShippedProfileConstructionTests``.
     """
 
     def _forbidden_faces(self) -> set[str]:

@@ -164,3 +164,21 @@ asymmetry WP1 recorded for exactly this reason. The surgical three-place edit sa
 keeps the diff to the two reasons, and leaves the ledger/seed asymmetry exactly as WP1 recorded it.
 This is called out for WP7, which owns the integrated gate, in case the project prefers to resolve
 the rule conflict the other way at that point.
+
+## 7. WP2 post-implementation review, every finding and disposition
+
+One blocking whole-diff review ran over the four WP2 commits with the effective-id catalogue,
+WP1's planning artifacts and the focused suite results. It found no false annotation claim that
+leaves a requirement unestablished, and confirmed that every assertion deleted with the three
+species skill tests has another carrier. Its findings and dispositions:
+
+| Id | Finding | Disposition |
+| --- | --- | --- |
+| B1 | The all-kit loop enumerated both slots but asserted active-only shape (non-empty cost, truthy cost tier, non-`NONE` target) for every reference, so a future authored passive kit skill would fail a valid content edit. | **Adopted.** Target shape, payment channels and cost tier are now asserted only for the active slot; faction constraint, typed parsed effects, policy parallelism, the freeform-shape gate and prerequisite closure stay unconditional. No passive-only pin was added in its place. |
+| B2 | `allowed_species` was only checked as a subset, so widening a kit skill across two kit-declaring species passed silently, and the deleted exact equality had no other carrier. | **Adopted.** The test now derives, per skill, the set of species whose variants declare it and asserts equality against `allowed_species`; the derivation is registry data, not a roster, so no per-species tuple returns. |
+| N1 | The new fault matrix lacked unknown-skill-key and unknown-behaviour-profile cases; those lived only in the older, unprobed test. | **Adopted.** Both are now entries in the matrix and get the same "no object created" probe. |
+| N2 | The retained bestiary prose tests index `APPROVED_ABILITY_LIMITS` / `APPROVED_CONTACT_CLAUSES` by live registry key, so adding a species raises `KeyError` inside the test. | **Accepted as the documented interim state.** Those constants and their comparison helpers are the bestiary package's removal target (task 3.4); until then a species add fails loudly rather than silently skipping the narrative check. It is recorded here so the deferred `KeyError`-as-signal semantics are not mistaken for drift. |
+| N3 | `monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships` has no test carrier after WP2. | **Accepted deferral.** Its direct coverage is the keyed bestiary checker (task 3.4). WP7's zero-carrier acceptance must fail if that carrier does not land. |
+| N4 | The audience annotation on the kit test rested on an `isinstance` check that the definition class already enforces. | **Adopted.** The audience half now also asserts that a declared audience never turns the skill into an enemy- or ally-restricted one, and that a hit-qualified rider is never routed to the ally or caster pools. The id stays on the test. |
+| N5 | The construction test's single branch would crash (`db.skills` is `None`) on a row that binds a behaviour profile without declaring a kit. | **Adopted.** The kit assertions and the binding assertions are now gated on their own declarations. |
+| N6 | The class name still read `ApprovedProfileConstructionTests` after the approved-literal basis was removed. | **Adopted.** Renamed to `ShippedProfileConstructionTests`; the cross-reference in the seam tests was updated with it. |

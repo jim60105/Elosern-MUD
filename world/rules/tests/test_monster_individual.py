@@ -485,30 +485,28 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         base = {ORDINARY: ORDINARY_ROW, STRONGER: STRONGER_ROW, ORPHAN: ORPHAN_ROW}
 
         cases = {
-            "identity-ineligible active skill": ("active_skill_keys", (foreign.key,)),
-            "unusable active prerequisite": ("active_skill_keys", (chained.key,)),
-            "duplicate active key": (
-                "active_skill_keys",
-                (valid.key, valid.key),
-            ),
-            "active slot declaring a PASSIVE": (
-                "active_skill_keys",
-                (passive_only.key,),
-            ),
-            "passive slot declaring an ACTIVE": (
-                "passive_skill_keys",
-                (active_only.key,),
-            ),
-            "duplicate passive key": (
-                "passive_skill_keys",
-                (passive_only.key, passive_only.key),
-            ),
+            "unknown active skill key": {"active_skill_keys": ("t_fault_absent",)},
+            "unknown behaviour profile": {
+                "behaviour_profile_key": "t_fault_absent_profile"
+            },
+            "identity-ineligible active skill": {"active_skill_keys": (foreign.key,)},
+            "unusable active prerequisite": {"active_skill_keys": (chained.key,)},
+            "duplicate active key": {"active_skill_keys": (valid.key, valid.key)},
+            "active slot declaring a PASSIVE": {
+                "active_skill_keys": (passive_only.key,)
+            },
+            "passive slot declaring an ACTIVE": {
+                "passive_skill_keys": (active_only.key,)
+            },
+            "duplicate passive key": {
+                "passive_skill_keys": (passive_only.key, passive_only.key)
+            },
         }
         with patch.dict("world.skills.registry.SKILL_REGISTRY", library):
-            for label, (field, keys) in cases.items():
+            for label, overrides in cases.items():
                 with self.subTest(case=label):
                     before = _object_count()
-                    broken = replace(ORDINARY_ROW, **{field: keys})
+                    broken = replace(ORDINARY_ROW, **overrides)
                     mapping = dict(base, **{ORDINARY: broken})
                     with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping):
                         with self.assertRaises(MonsterConstructionError):

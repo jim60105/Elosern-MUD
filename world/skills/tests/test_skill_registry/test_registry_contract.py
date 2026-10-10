@@ -580,20 +580,25 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
                     skill.kind,
                     SkillKind.ACTIVE if slot == "active" else SkillKind.PASSIVE,
                 )
-                # Target shape: a declared active kit is chosen for a target,
-                # and every declared constraint is one the resolver supports.
-                self.assertIsNot(skill.target_spec, TargetSpec.NONE)
+                # Every declared constraint is one the resolver supports,
+                # whichever slot declares it.
                 self.assertIn(
                     skill.faction_constraint,
                     (FactionConstraint.ANY, FactionConstraint.SELF_ONLY),
                 )
-                # Payment channels: only the two payable resources, positive
-                # integer magnitudes, never an inferred zero or a float.
-                self.assertTrue(skill.cost)
-                self.assertLessEqual(set(skill.cost), {"mp", "sp"})
-                for resource, amount in skill.cost.items():
-                    self.assertIs(type(amount), int, resource)
-                    self.assertGreater(amount, 0, resource)
+                # Active-slot shape: a declared active kit is selected for a
+                # target and paid for in the two payable resources, with
+                # positive integer magnitudes and a resolvable cost tier. The
+                # passive slot carries no cast and no cost, so none of this is
+                # asserted for it.
+                if slot == "active":
+                    self.assertIsNot(skill.target_spec, TargetSpec.NONE)
+                    self.assertTrue(skill.cost)
+                    self.assertLessEqual(set(skill.cost), {"mp", "sp"})
+                    for resource, amount in skill.cost.items():
+                        self.assertIs(type(amount), int, resource)
+                        self.assertGreater(amount, 0, resource)
+                    self.assertTrue(spell_tier_for(skill))
                 # Every declared effect string resolves to a typed effect in
                 # the shared effect model, and the policy tuple stays
                 # positionally parallel with the declarations.
@@ -609,9 +614,9 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
                     if effect_id.partition(":")[0] == "gauge_transfer":
                         self.assertIsInstance(parsed, GaugeTransferEffect, effect_id)
                         self.assertIn(parsed.direction, ("drain", "restore"), effect_id)
-                # The shared cost-tier and freeform-shape gates apply to the
-                # authored skill without any species-specific branch.
-                self.assertTrue(spell_tier_for(skill))
+                # The shared freeform-shape gate applies to the authored skill
+                # without any species-specific branch: no kit skill is a
+                # freeform-scalable elemental spell.
                 self.assertFalse(is_freeform_eligible(skill))
                 # Prerequisite closure mirrors the construction validator: a
                 # declared active kit is satisfied by the variant's own
@@ -633,21 +638,24 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
 
         references = self._declared_kit_references()
         self.assertTrue(references)
-        declaring_species = {
-            variant.species_key for variant, _slot, _skill in references
-        }
+        # Derived, never a roster: the species a kit skill may be used by are
+        # exactly the species whose variants declare it, so widening one skill
+        # across species means declaring it in that species' kit too.
+        declarers: dict[str, set[str]] = {}
+        for variant, _slot, skill in references:
+            declarers.setdefault(skill.key, set()).add(variant.species_key)
         for variant, slot, skill in references:
             with self.subTest(variant=variant.key, slot=slot, skill=skill.key):
                 eligibility = skill.eligibility
                 self.assertIsNotNone(eligibility.allowed_actor_kinds)
                 self.assertNotIn("player", eligibility.allowed_actor_kinds)
                 self.assertIn("monster", eligibility.allowed_actor_kinds)
-                # Species/variant names stay data: every named species must be
-                # one that actually declares a monster kit, and the declaring
-                # species is eligible for the skill it declares.
+                # Species/variant names stay data: the named species are
+                # exactly the declarers of this skill, so an incompatible
+                # species never qualifies.
                 self.assertIsNotNone(eligibility.allowed_species)
-                self.assertLessEqual(
-                    set(eligibility.allowed_species), declaring_species
+                self.assertEqual(
+                    set(eligibility.allowed_species), declarers[skill.key]
                 )
                 self.assertIn(variant.species_key, eligibility.allowed_species)
                 self.assertTrue(
@@ -680,13 +688,27 @@ class AuthoredMonsterKitContractTests(unittest.TestCase):
                 for index, policy in enumerate(skill.effect_policies):
                     self.assertLess(index, len(skill.effects), skill.key)
                     self.assertIsInstance(policy.audience, EffectAudience)
+                    # The audience selects recipients without widening what the
+                    # skill may target: a declared audience never turns the
+                    # skill into an enemy- or ally-restricted one.
+                    self.assertIn(
+                        skill.faction_constraint,
+                        (FactionConstraint.ANY, FactionConstraint.SELF_ONLY),
+                        skill.key,
+                    )
                     if policy.requires_hit_from is None:
                         continue
                     # A hit-qualified rider names an *earlier* damage
-                    # occurrence of the same skill, once.
+                    # occurrence of the same skill, once, and routes to the
+                    # enemy pool that occurrence was rolled against.
                     self.assertIn(policy.requires_hit_from, range(index))
                     self.assertTrue(
                         skill.effects[policy.requires_hit_from].startswith("damage:"),
+                        skill.key,
+                    )
+                    self.assertNotIn(
+                        policy.audience,
+                        (EffectAudience.ALLIES, EffectAudience.SELF),
                         skill.key,
                     )
                     if policy.transfer is not None:
