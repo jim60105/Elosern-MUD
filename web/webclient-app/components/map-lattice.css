@@ -161,6 +161,20 @@
   pointer-events: none;
 }
 
+/* The exit compass's aimed destination (exploration-exit-compass D6): a
+   gold ring around the node and a brighter label, so the minimap confirms
+   the aim. */
+.local-map__aim-ring {
+  fill: rgba(228, 200, 142, 0.12);
+  stroke: var(--gold-400);
+  stroke-width: 1.6;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+.local-map__node--aimed .local-map__node-label {
+  fill: var(--gold-300);
+}
+
 /* Edge direction markers (map-02 D3b): a non-interactive decoration layer
    in the gutter. The diamond reuses the remembered-node fill so the off-
    canvas place reads with the same state identity; the landmark ring and

@@ -106,6 +106,9 @@ const props = defineProps({
   // phase, so the final state is on screen in the commit's frame (a CSS
   // phase would outlive the commit by a double frame even at 0s).
   motionLevel: { type: String, default: "full" },
+  // The node the exit compass aims (exploration-exit-compass design D6): it
+  // gains a highlight class and a decorative ring; null draws nothing.
+  aimedNode: { type: String, default: null },
 });
 
 const emit = defineEmits(["select", "hover", "leave", "move"]);
@@ -472,7 +475,7 @@ defineExpose({
       v-for="node in drawnNodes"
       :key="node.id"
       class="local-map__node"
-      :class="`local-map__node--${node.visibility}`"
+      :class="[`local-map__node--${node.visibility}`, { 'local-map__node--aimed': aimedNode !== null && String(node.id) === String(aimedNode) }]"
       :data-testid="`local-map__node--${node.id}`"
       :data-node="node.id"
       :data-node-id="node.id"
@@ -501,6 +504,16 @@ defineExpose({
         v-if="overlayChrome && node.visibility === 'current'"
         class="local-map__current-ring"
         data-testid="local-map__current-ring"
+        :r="MARKER_CURRENT_RING_R * markerScale"
+        aria-hidden="true"
+      />
+      <!-- The compass aim ring (exploration-exit-compass D6): decoration
+           only, outside the `local-map__marker` class the geometry audit
+           pairs, so it never reads as a second location. -->
+      <circle
+        v-if="aimedNode !== null && String(node.id) === String(aimedNode)"
+        class="local-map__aim-ring"
+        data-testid="local-map__aim-ring"
         :r="MARKER_CURRENT_RING_R * markerScale"
         aria-hidden="true"
       />
