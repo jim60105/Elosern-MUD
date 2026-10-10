@@ -22,15 +22,11 @@ from world.skills.registry import (
     FactionConstraint,
     SKILL_REGISTRY,
     SkillKind,
-    SkillPrerequisite,
     TargetSpec,
     declared_prerequisites,
     prerequisite_consumers,
 )
 
-
-# Retained for callers importing _CATALOG_EFFECTS; elemental catalogs have migrated to behavior specs.
-_CATALOG_EFFECTS: dict[str, tuple[str, ...]] = {}
 
 class ElementalSpellsBuilderTests(unittest.TestCase):
     def test_elemental_spells_builder_rejects_unknown_element(self):
@@ -106,59 +102,60 @@ class ClosedVocabularyParseTests(unittest.TestCase):
 class LightningLineageTreeCatalogTests(unittest.TestCase):
     """The shipped branching lightning lineage tree with a two-parent canopy is catalog data.
 
-    The edge table itself is the shipped content the requirement names, so it
-    lives in this registered data-contract file.
+    The edge topology is the shipped content the requirement names, so it
+    lives in this registered data-contract file; each edge threshold is
+    authored tuning data, so only its positive-integer shape is asserted.
     """
 
     @covers_requirement(
         "skill-lineage::the-lightning-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
     )
     def test_lightning_tree_edges_are_as_designed(self):
-        expected = {
-            "lightning_flicker": (SkillPrerequisite("static_ward", 3),),
-            "thunder_combo": (SkillPrerequisite("lightning_flicker", 3),),
-            "thunder_gods_haste": (SkillPrerequisite("thunder_combo", 5),),
-            "thunder_shatter_strike": (SkillPrerequisite("thunder_combo", 5),),
-            "judgement_thunder": (SkillPrerequisite("thunder_gods_haste", 8),),
-            "chain_lightning": (SkillPrerequisite("spark_shock", 3),),
-            "paralyzing_bolt": (SkillPrerequisite("spark_shock", 3),),
-            "lightning_strike": (SkillPrerequisite("chain_lightning", 3),),
-            "thunder_prison": (SkillPrerequisite("paralyzing_bolt", 3),),
-            "heavens_thunder": (SkillPrerequisite("lightning_strike", 5),),
-            "divine_lightning_slaughter": (SkillPrerequisite("heavens_thunder", 8),),
+        expected_edges = {
+            "lightning_flicker": ("static_ward",),
+            "thunder_combo": ("lightning_flicker",),
+            "thunder_gods_haste": ("thunder_combo",),
+            "thunder_shatter_strike": ("thunder_combo",),
+            "judgement_thunder": ("thunder_gods_haste",),
+            "chain_lightning": ("spark_shock",),
+            "paralyzing_bolt": ("spark_shock",),
+            "lightning_strike": ("chain_lightning",),
+            "thunder_prison": ("paralyzing_bolt",),
+            "heavens_thunder": ("lightning_strike",),
+            "divine_lightning_slaughter": ("heavens_thunder",),
             "thunder_apotheosis": (
-                SkillPrerequisite("judgement_thunder", 10),
-                SkillPrerequisite("divine_lightning_slaughter", 10),
+                "judgement_thunder",
+                "divine_lightning_slaughter",
             ),
         }
-        for key, expected_prereqs in expected.items():
+        for key, parent_keys in expected_edges.items():
             with self.subTest(spell=key):
+                declared = declared_prerequisites(key)
                 self.assertEqual(
-                    declared_prerequisites(key),
-                    expected_prereqs,
+                    tuple(prereq.skill_key for prereq in declared),
+                    parent_keys,
                 )
-        self.assertEqual(declared_prerequisites("static_ward"), ())
-        self.assertEqual(declared_prerequisites("spark_shock"), ())
+                for prereq in declared:
+                    self.assertIs(type(prereq.min_proficiency), int)
+                    self.assertGreaterEqual(prereq.min_proficiency, 1)
+        for root in ("static_ward", "spark_shock"):
+            self.assertEqual(declared_prerequisites(root), ())
         # Topological canopy: thunder_apotheosis is consumed by nothing.
         self.assertEqual(prerequisite_consumers("thunder_apotheosis"), ())
-        # Both Lv.10 parents are consumed only by thunder_apotheosis at threshold 10.
+        # Both canopy parents are consumed only by the canopy edge.
+        for parent in ("judgement_thunder", "divine_lightning_slaughter"):
+            self.assertEqual(
+                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
+                ("thunder_apotheosis",),
+            )
+        # Branch points feed exactly their authored children.
         self.assertEqual(
-            prerequisite_consumers("judgement_thunder"),
-            (("thunder_apotheosis", 10),),
+            {consumer for consumer, _ in prerequisite_consumers("spark_shock")},
+            {"chain_lightning", "paralyzing_bolt"},
         )
         self.assertEqual(
-            prerequisite_consumers("divine_lightning_slaughter"),
-            (("thunder_apotheosis", 10),),
-        )
-        # Branch points: spark_shock feeds exactly two children at threshold 3.
-        self.assertEqual(
-            set(prerequisite_consumers("spark_shock")),
-            {("chain_lightning", 3), ("paralyzing_bolt", 3)},
-        )
-        # thunder_combo feeds exactly two children at threshold 5.
-        self.assertEqual(
-            set(prerequisite_consumers("thunder_combo")),
-            {("thunder_gods_haste", 5), ("thunder_shatter_strike", 5)},
+            {consumer for consumer, _ in prerequisite_consumers("thunder_combo")},
+            {"thunder_gods_haste", "thunder_shatter_strike"},
         )
         # Terminal leaves have empty consumers.
         self.assertEqual(prerequisite_consumers("thunder_shatter_strike"), ())
@@ -172,58 +169,56 @@ class LightningLineageTreeCatalogTests(unittest.TestCase):
 class IceLineageTreeCatalogTests(unittest.TestCase):
     """The shipped branching ice lineage tree with a two-parent canopy is catalog data.
 
-    The edge table itself is the shipped content the requirement names, so it
-    lives in this registered data-contract file.
+    The edge topology is the shipped content the requirement names, so it
+    lives in this registered data-contract file; each edge threshold is
+    authored tuning data, so only its positive-integer shape is asserted.
     """
 
     @covers_requirement(
         "skill-lineage::the-ice-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
     )
     def test_ice_tree_edges_are_as_designed(self):
-        expected = {
-            "ice_wall": (SkillPrerequisite("frost_breath", 3),),
-            "frost_mire": (SkillPrerequisite("ice_wall", 3),),
-            "permafrost_domain": (SkillPrerequisite("ice_wall", 3),),
-            "absolute_tundra": (SkillPrerequisite("permafrost_domain", 8),),
-            "eternal_ice_field": (SkillPrerequisite("absolute_tundra", 8),),
-            "frost_arrow_rain": (SkillPrerequisite("ice_shard", 3),),
-            "ice_prison": (SkillPrerequisite("frost_arrow_rain", 3),),
-            "blizzard": (SkillPrerequisite("ice_prison", 5),),
-            "crystal_shatter": (SkillPrerequisite("ice_prison", 5),),
-            "absolute_zero": (SkillPrerequisite("blizzard", 8),),
-            "eternal_frost_apotheosis": (
-                SkillPrerequisite("eternal_ice_field", 10),
-                SkillPrerequisite("absolute_zero", 10),
-            ),
+        expected_edges = {
+            "ice_wall": ("frost_breath",),
+            "frost_mire": ("ice_wall",),
+            "permafrost_domain": ("ice_wall",),
+            "absolute_tundra": ("permafrost_domain",),
+            "eternal_ice_field": ("absolute_tundra",),
+            "frost_arrow_rain": ("ice_shard",),
+            "ice_prison": ("frost_arrow_rain",),
+            "blizzard": ("ice_prison",),
+            "crystal_shatter": ("ice_prison",),
+            "absolute_zero": ("blizzard",),
+            "eternal_frost_apotheosis": ("eternal_ice_field", "absolute_zero"),
         }
-        for key, expected_prereqs in expected.items():
+        for key, parent_keys in expected_edges.items():
             with self.subTest(spell=key):
+                declared = declared_prerequisites(key)
                 self.assertEqual(
-                    declared_prerequisites(key),
-                    expected_prereqs,
+                    tuple(prereq.skill_key for prereq in declared),
+                    parent_keys,
                 )
+                for prereq in declared:
+                    self.assertIs(type(prereq.min_proficiency), int)
+                    self.assertGreaterEqual(prereq.min_proficiency, 1)
         self.assertEqual(declared_prerequisites("frost_breath"), ())
         self.assertEqual(declared_prerequisites("ice_shard"), ())
         # Topological canopy: eternal_frost_apotheosis is consumed by nothing.
         self.assertEqual(prerequisite_consumers("eternal_frost_apotheosis"), ())
-        # Both Lv.10 parents are consumed only by eternal_frost_apotheosis at threshold 10.
+        # Both canopy parents are consumed only by the canopy edge.
+        for parent in ("eternal_ice_field", "absolute_zero"):
+            self.assertEqual(
+                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
+                ("eternal_frost_apotheosis",),
+            )
+        # Branch points feed exactly their two authored children.
         self.assertEqual(
-            prerequisite_consumers("eternal_ice_field"),
-            (("eternal_frost_apotheosis", 10),),
+            {consumer for consumer, _ in prerequisite_consumers("ice_wall")},
+            {"frost_mire", "permafrost_domain"},
         )
         self.assertEqual(
-            prerequisite_consumers("absolute_zero"),
-            (("eternal_frost_apotheosis", 10),),
-        )
-        # Branch points: ice_wall feeds exactly two children at threshold 3.
-        self.assertEqual(
-            set(prerequisite_consumers("ice_wall")),
-            {("frost_mire", 3), ("permafrost_domain", 3)},
-        )
-        # ice_prison feeds exactly two children at threshold 5.
-        self.assertEqual(
-            set(prerequisite_consumers("ice_prison")),
-            {("blizzard", 5), ("crystal_shatter", 5)},
+            {consumer for consumer, _ in prerequisite_consumers("ice_prison")},
+            {"blizzard", "crystal_shatter"},
         )
         # Terminal leaves have empty consumers.
         self.assertEqual(prerequisite_consumers("frost_mire"), ())
@@ -243,41 +238,46 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
     """The shipped branching fire lineage tree with a two-parent canopy is catalog data.
 
     Relocated from the migrated (now synthetic) rules lineage suite: the
-    edge table itself is the shipped content the requirement names, so it
-    lives in this registered data-contract file.
+    edge topology is the shipped content the requirement names, so it lives in
+    this registered data-contract file; each edge threshold is authored
+    tuning data, so only its positive-integer shape is asserted.
     """
 
     @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
     def test_fire_tree_edges_are_as_designed(self):
-        expected = {
-            "fire_ball": (SkillPrerequisite("fire_arrow", 3),),
-            "scorching_wave": (SkillPrerequisite("fire_ball", 3),),
-            "firestorm": (SkillPrerequisite("scorching_wave", 3),),
-            "flame_shroud": (SkillPrerequisite("scorching_wave", 3),),
-            "scorching_armor": (SkillPrerequisite("scorching_wave", 3),),
-            "lava_burst": (SkillPrerequisite("firestorm", 5),),
-            "hellfire": (SkillPrerequisite("firestorm", 5),),
-            "dragon_flame": (SkillPrerequisite("lava_burst", 8),),
-            "final_blaze": (SkillPrerequisite("hellfire", 5),),
-            "sacrificial_flame": (SkillPrerequisite("dragon_flame", 8),),
-            "crimson_apotheosis": (
-                SkillPrerequisite("sacrificial_flame", 10),
-                SkillPrerequisite("final_blaze", 10),
-            ),
+        expected_edges = {
+            "fire_ball": ("fire_arrow",),
+            "scorching_wave": ("fire_ball",),
+            "firestorm": ("scorching_wave",),
+            "flame_shroud": ("scorching_wave",),
+            "scorching_armor": ("scorching_wave",),
+            "lava_burst": ("firestorm",),
+            "hellfire": ("firestorm",),
+            "dragon_flame": ("lava_burst",),
+            "final_blaze": ("hellfire",),
+            "sacrificial_flame": ("dragon_flame",),
+            "crimson_apotheosis": ("sacrificial_flame", "final_blaze"),
         }
-        for key, expected_prereqs in expected.items():
+        for key, parent_keys in expected_edges.items():
             with self.subTest(key=key):
+                declared = declared_prerequisites(key)
                 self.assertEqual(
-                    declared_prerequisites(key),
-                    expected_prereqs,
+                    tuple(prereq.skill_key for prereq in declared),
+                    parent_keys,
                 )
+                for prereq in declared:
+                    self.assertIs(type(prereq.min_proficiency), int)
+                    self.assertGreaterEqual(prereq.min_proficiency, 1)
         self.assertEqual(declared_prerequisites("fire_arrow"), ())
         # Topological canopy: crimson_apotheosis is the strict last node.
         self.assertEqual(prerequisite_consumers("crimson_apotheosis"), ())
         # sacrificial_flame is consumed only by crimson_apotheosis.
         self.assertEqual(
-            prerequisite_consumers("sacrificial_flame"),
-            (("crimson_apotheosis", 10),),
+            tuple(
+                consumer
+                for consumer, _ in prerequisite_consumers("sacrificial_flame")
+            ),
+            ("crimson_apotheosis",),
         )
 
     @covers_requirement("skill-lineage::the-fire-lineage-ships-as-the-authored-branching-tree-with-a-two-parent-canopy")
@@ -292,53 +292,52 @@ class FireLineageTreeCatalogTests(unittest.TestCase):
 class WindLineageTreeCatalogTests(unittest.TestCase):
     """The shipped branching wind lineage tree with a two-parent canopy is catalog data.
 
-    The edge table itself is the shipped content the requirement names, so it
-    lives in this registered data-contract file.
+    The edge topology is the shipped content the requirement names, so it
+    lives in this registered data-contract file; each edge threshold is
+    authored tuning data, so only its positive-integer shape is asserted.
     """
 
     @covers_requirement(
         "skill-lineage::the-wind-lineage-ships-as-the-authored-two-root-branching-tree-with-a-two-parent-canopy"
     )
     def test_wind_tree_edges_are_as_designed(self):
-        expected = {
-            "gale_chain_step": (SkillPrerequisite("gale_step", 3),),
-            "afterimage_step": (SkillPrerequisite("gale_chain_step", 3),),
-            "haste_domain": (SkillPrerequisite("afterimage_step", 5),),
-            "tornado_blade": (SkillPrerequisite("wind_blade", 3),),
-            "storm_domain": (SkillPrerequisite("tornado_blade", 3),),
-            "gale_dance_strike": (SkillPrerequisite("tornado_blade", 3),),
-            "heavens_wrath_storm": (SkillPrerequisite("storm_domain", 5),),
-            "sky_rending_slash": (SkillPrerequisite("gale_dance_strike", 8),),
-            "sky_tempest": (SkillPrerequisite("heavens_wrath_storm", 8),),
-            "vacuum_severance": (SkillPrerequisite("sky_rending_slash", 8),),
-            "sky_apotheosis": (
-                SkillPrerequisite("sky_tempest", 10),
-                SkillPrerequisite("vacuum_severance", 10),
-            ),
+        expected_edges = {
+            "gale_chain_step": ("gale_step",),
+            "afterimage_step": ("gale_chain_step",),
+            "haste_domain": ("afterimage_step",),
+            "tornado_blade": ("wind_blade",),
+            "storm_domain": ("tornado_blade",),
+            "gale_dance_strike": ("tornado_blade",),
+            "heavens_wrath_storm": ("storm_domain",),
+            "sky_rending_slash": ("gale_dance_strike",),
+            "sky_tempest": ("heavens_wrath_storm",),
+            "vacuum_severance": ("sky_rending_slash",),
+            "sky_apotheosis": ("sky_tempest", "vacuum_severance"),
         }
-        for key, expected_prereqs in expected.items():
+        for key, parent_keys in expected_edges.items():
             with self.subTest(key=key):
+                declared = declared_prerequisites(key)
                 self.assertEqual(
-                    declared_prerequisites(key),
-                    expected_prereqs,
+                    tuple(prereq.skill_key for prereq in declared),
+                    parent_keys,
                 )
+                for prereq in declared:
+                    self.assertIs(type(prereq.min_proficiency), int)
+                    self.assertGreaterEqual(prereq.min_proficiency, 1)
         self.assertEqual(declared_prerequisites("gale_step"), ())
         self.assertEqual(declared_prerequisites("wind_blade"), ())
         # Topological canopy: sky_apotheosis is consumed by nothing.
         self.assertEqual(prerequisite_consumers("sky_apotheosis"), ())
-        # Both Lv.8 parents are consumed only by sky_apotheosis at threshold 10.
+        # Both canopy parents are consumed only by the canopy edge.
+        for parent in ("sky_tempest", "vacuum_severance"):
+            self.assertEqual(
+                tuple(consumer for consumer, _ in prerequisite_consumers(parent)),
+                ("sky_apotheosis",),
+            )
+        # Branch point: tornado_blade feeds exactly its two authored children.
         self.assertEqual(
-            prerequisite_consumers("sky_tempest"),
-            (("sky_apotheosis", 10),),
-        )
-        self.assertEqual(
-            prerequisite_consumers("vacuum_severance"),
-            (("sky_apotheosis", 10),),
-        )
-        # Branch point: tornado_blade feeds exactly two children at threshold 3.
-        self.assertEqual(
-            set(prerequisite_consumers("tornado_blade")),
-            {("storm_domain", 3), ("gale_dance_strike", 3)},
+            {consumer for consumer, _ in prerequisite_consumers("tornado_blade")},
+            {"storm_domain", "gale_dance_strike"},
         )
         # Mobility leaf: haste_domain is consumed by nothing.
         self.assertEqual(prerequisite_consumers("haste_domain"), ())

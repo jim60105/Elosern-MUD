@@ -29,7 +29,9 @@ from world.rules.clock import AdvanceSource, WorldClock, _settle_gauge_regen
 from world.rules.clock import _settle_buffs_and_decay
 from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.mp_flow import apply_mp_change
+from world.rules.rulebook.schema import Rule
 from world.rules.targeting import RoomActionContext
+from world.tests.synthetic_data import make_buff
 from world.skills.effects import (
     DamageEffect,
     DamagePolicy,
@@ -411,8 +413,21 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
     @covers_requirement(
         "combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no"
     )
-    def test_mana_reflux_share_bonus_folds_additively(self):
-        """Caster with active mana_reflux gains +10% recovery share folded additively."""
+    def test_synthetic_share_bonus_folds_additively(self):
+        """Detect bonus replacement or requested-loss credit with fixed inputs."""
+        buff = make_buff("t_share_bonus", duration=60)
+        buff_scope = patch.dict(BUFF_DEFINITIONS, {buff.key: buff})
+        buff_scope.start()
+        self.addCleanup(buff_scope.stop)
+        rules = patch("world.rules.combat_modifiers._RULES", [
+            Rule(
+                id="t_share_bonus",
+                when={"buff_active": buff.key},
+                then={"recovery_share_bonus": 0.1},
+            ),
+        ])
+        rules.start()
+        self.addCleanup(rules.stop)
         self.target.traits.mp.current = 50
         self.actor.traits.mp.current = 20
 
@@ -430,8 +445,8 @@ class GaugeTransferDrainAndShareTests(GaugeTransferTestBase):
         self.assertEqual(result1.outcome, "success")
         self.assertEqual(int(self.actor.traits.mp.current), 25)
 
-        # Apply mana_reflux buff to caster (+10% recovery_share_bonus)
-        apply_buff(self.actor, "mana_reflux")
+        # Activate the fixed synthetic bonus through the real buff writer.
+        apply_buff(self.actor, buff.key)
         self.target.traits.mp.current = 50
         self.actor.traits.mp.current = 20
 

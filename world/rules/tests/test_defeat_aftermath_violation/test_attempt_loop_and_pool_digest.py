@@ -41,6 +41,8 @@ from ._support import (
     _aftermath_entries,
     _aftermath_logs,
     _kinds,
+    recovery_seconds,
+    wake_target,
 )
 
 
@@ -65,11 +67,11 @@ class AttemptLoopTests(ViolationBase):
         for entity in (self.player, self.monster):
             self.assertEqual(entity.sexual.hostile_act_count, 2)
             self.assertEqual(entity.sexual.interspecies_act_count, 2)
-        # Combat 6s + two 120s attempts + the 8s recovery solve (the empty
-        # attempt scope never regenerates the victim, so the solve still runs
-        # from HP 1 to the 5% target).
-        self.assertEqual(self.clock.tick, 6 + 2 * 120 + 8)
-        self.assertEqual(self.player.traits.hp.current, 5)
+        # Combat 6s + two 120s attempts + the recovery solve's own published
+        # seconds (the empty attempt scope never regenerates the victim, so the
+        # solve still runs from HP 1 to the wake target).
+        self.assertEqual(self.clock.tick, 6 + 2 * 120 + recovery_seconds(result))
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         # The wake prose switched to the violated variant; the core's
         # defeat_settle data fields survive the rewrite.
         settle = next(entry for entry in entries if entry.kind == "defeat_settle")
@@ -106,8 +108,9 @@ class AttemptLoopTests(ViolationBase):
         # Zero landed attempts: the PG wake template stays.
         settle = next(entry for entry in entries if entry.kind == "defeat_settle")
         self.assertEqual(settle.data["wake"], DEFEAT_AFTERMATH_RULEBOOK.pg_lines[0])
-        # The resisted attempt still spends its declared duration.
-        self.assertEqual(self.clock.tick, 6 + 120 + 8)
+        # The resisted attempt still spends its declared duration, plus the
+        # recovery solve's own published seconds.
+        self.assertEqual(self.clock.tick, 6 + 120 + recovery_seconds(result))
 
     @covers_requirement(
         "defeat-aftermath-violation-sequence::each-attempt-rolls-the-shipped-resist-contest-with-the-victim-defending",
@@ -355,4 +358,4 @@ class FlagOffTests(ViolationBase):
             if entry.kind == "defeat_settle"
         )
         self.assertEqual(settle.data["wake"], DEFEAT_AFTERMATH_RULEBOOK.pg_lines[0])
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))

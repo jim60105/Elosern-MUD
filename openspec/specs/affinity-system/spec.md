@@ -67,12 +67,12 @@ whose floor is at or below the value; values at or above 100 SHALL map to the to
 - **THEN** the displayed stage is 絕對羈絆 and no numeric value or cap is rendered anywhere
 
 #### Scenario: A deviant ladder fails closed at load before any write
-- **WHEN** the ladder deviates from the canonical floor sequence — a wrong stage count, non-increasing floors, or a floor outside the canonical set 0/10/30/50/70/90/100
+- **WHEN** the ladder deviates from the canonical floor sequence ;  a wrong stage count, non-increasing floors, or a floor outside the canonical set 0/10/30/50/70/90/100
 - **THEN** loading rejects it with a named validation error before any write
 
 #### Scenario: The same YAML carries the tuning values
 - **WHEN** `rulebook/affinity.yaml` is read for its non-ladder settings
-- **THEN** it carries the offline party-invite threshold (70), the daily interaction cap (5), and the quest-completion gain (2)
+- **THEN** it carries the offline party-invite threshold (70, preserving the canonical 羈絆 entitlement), the authored positive daily interaction cap, and the authored positive quest-completion gain
 
 #### Scenario: Player-facing glyphs are Traditional Chinese
 - **WHEN** any player-facing affinity glyph is rendered
@@ -87,7 +87,7 @@ source SHALL be a member of the closed set (`talk`, `trade`, `guild`, `ai_dialog
 writer, `seed_affinity(npc, player, value)`.
 
 #### Scenario: Capped sources exhaust the daily budget
-- **WHEN** capped-source gains total 5 in one world day and a sixth capped gain is attempted
+- **WHEN** a fixed synthetic rulebook cap of 5 has been exhausted in one world day and a sixth capped gain is attempted
 - **THEN** the sixth gain is rejected with a capped outcome, no budget is consumed, and the value
   stays unchanged
 
@@ -161,7 +161,7 @@ writer, `seed_affinity(npc, player, value)`.
 
 #### Scenario: The shared daily budget covers the four capped interaction sources
 - **WHEN** positive deltas arrive from the capped sources
-- **THEN** they draw from the remaining daily budget — a `cap` of 5 shared across `talk`, `trade`, `guild`, and `ai_dialogue` — while `quest_completion` deltas bypass the cap
+- **THEN** they draw from the remaining daily budget ;  the authored daily cap shared across `talk`, `trade`, `guild`, and `ai_dialogue` ;  while `quest_completion` deltas bypass the cap
 
 #### Scenario: A positive delta clamps to the record cap
 - **WHEN** a positive delta would push the value above the record's `cap`
@@ -183,6 +183,10 @@ writer, `seed_affinity(npc, player, value)`.
 - **WHEN** a seed transaction commits durably
 - **THEN** exactly one `affinity_seed` boundary info event is emitted at the outermost durable commit
 - **AND** the seed consumed no daily budget, resolved no source, and ran no auto-leave recheck, because a seed establishes a starting relationship that no interaction produced
+
+#### Scenario: Production daily cap remains author-adjustable
+- **WHEN** a valid daily budget or quest gain is edited
+- **THEN** schema and integration checks consume the new declaration unchanged; fixed synthetic budgeting/rollback tests remain independent
 
 ### Requirement: Deterministic gains apply at talk, trade, and guild success paths
 A known-keyword talk answer SHALL grant +1 affinity (`talk` source) with the host NPC, a

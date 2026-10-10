@@ -78,7 +78,7 @@
     },
     {
       "path": "world/lore/tests/test_monster_species_content.py",
-      "reason": "approved first-batch bestiary narrative, balance-profile and danger-grade contract"
+      "reason": "shipped bestiary identity, narrative, profile integrity and construction wiring"
     },
     {
       "path": "world/lore/tests/test_names.py",

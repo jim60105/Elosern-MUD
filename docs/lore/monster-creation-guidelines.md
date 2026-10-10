@@ -104,11 +104,26 @@
 
 ## 魔物資源技能與套組配置（2026-10-09 起陸續落地）
 
-首批十二個核准變體中，吞潮鱷兩變體（`bank_lurker` 與 `bay_warden`）依使用者核准落地實作資源池（MP/SP 30/40 與 50/60）與專屬技能套組；穗鳴雀兩變體（`grain_pecker` 與 `flock_leader`）於 2026-10-10 的後續落地實作資源池（MP/SP 20/8 與 30/12）與專屬技能套組；潮燈蟹兩變體（`shore_walker` 與 `reef_warden`）以同批次核准落地資源池（MP/SP 20/9 與 30/15）與專屬技能套組：
+首批十二個核准變體皆有完整戰鬥設定與有效公會評級。吞潮鱷、穗鳴雀、潮燈蟹各有兩個變體實作專屬資源技能套組；資源池與戰鬥數值以現行宣告為準，不另維護核准數值表。
 
 1. **套組配置**：變體可選擇性宣告有序主動技能（`active_skill_keys`）、被動技能（`passive_skill_keys`）與行為設定檔鍵（`behaviour_profile_key`）。吞潮鱷配置 `tide_devouring_bite`（吞潮咬擊），穗鳴雀配置 `grain_shaking_peck`（震穗啄擊），潮燈蟹配置 `lamp_carapace_claw`（燈甲螯擊），皆於固有普通攻擊（`basic_attack`）與逃跑（`flee`）之前選用。
-2. **其餘六變體不變**：其餘六個已核准變體維持零 MP、零 SP 與零魔力數值，且三項暫緩特殊能力（壓實土埂、聚集霧氣、敲岩脈動）維持敘事邊界與純物理普通攻擊，不建立造假技能或捏造前置。
+2. **其餘六變體的套組維持暫緩**：其餘六個已核准變體保留完整宣告，資源池不得從敘述推導。三項暫緩特殊能力（壓實土埂、聚集霧氣、敲岩脈動）維持敘事邊界與純物理普通攻擊，不建立造假技能或捏造前置。
 3. **無啟動重置或線上遷移**：個體建構時將持久化身分、套組與當前資源，重載維持已消耗之 MP/SP 與行為綁定；註冊表更新不重置線上個體。
+
+### Test authoring boundaries
+
+Check every shipped variant's complete current profile, tier/grade bounds,
+owned kit and behavior references. Keep deferred kits absent independently
+of their authored resource pools. A valid profile or cost edit must not require
+a duplicate expected-value table.
+
+Shared synthetic suites establish hit qualification, actual-loss transfer,
+payment ordering and post-write/post-claim rollback with fixed outcomes.
+Representative production drain, enemy hit-rider and hit-independent self-guard
+compositions observe real session selection, recipient controls and committed
+reload. Refresh tests age an actual mount before reapplication; comparing two
+fresh mounts cannot detect a stale refresh lifetime. New species reuse these
+shared mechanisms instead of cloning exhaustive per-species vectors.
 
 ## 參考文件
 

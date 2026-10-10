@@ -1,19 +1,26 @@
 """Data-contract test: shipped usable-item regression contract
 
-Pins the current observable behaviour of the four shipped usable items
-(added-declarative-item-effects task 1.1): restored magnitudes 40/120/40,
-the ``hp_full``/``mp_full``/``no_debuffs`` rejection codes, one-unit
-consumption counts, the rendered event wording, and the six-second
-out-of-combat clock advance. This file names shipped catalog rows on
-purpose — it is the frozen contract the declarative-effect rewrite must
-reproduce byte-for-byte (design Risks: a migrated item silently changing
-magnitude or reason code)."""
+Exercises the observable behaviour of the four shipped usable items
+(added-declarative-item-effects task 1.1): the declaration-to-settlement
+wiring of each declared restore, the ``hp_full``/``mp_full``/``no_debuffs``
+rejection codes, one-unit consumption counts, the rendered event wording and
+the declared out-of-combat clock advance. This file names shipped catalog
+rows on purpose — it is the integration contract that detects a migrated item
+silently changing its reason code or ignoring its own declaration. The
+restored magnitudes themselves are authored data read from the declaration,
+never a duplicated expected table."""
 
 import unittest
 
 from evennia.utils.test_resources import EvenniaTest
 from world.rules.buffs import apply_buff, entity_active_buffs
 from world.rules.clock import WorldClock
+from world.rules.item_effects import (
+    ITEM_EFFECT_PROFILES,
+    ITEM_USE_SECONDS,
+    GaugeAdjustEffect,
+    ItemStat,
+)
 from world.rules.items import (
     ItemUseRequest,
     resolve_item_use,
@@ -25,6 +32,14 @@ _HEALING_KEY = "healing_potion"
 _GREATER_KEY = "greater_healing_potion"
 _MANA_KEY = "mana_potion"
 _HOLY_WATER_KEY = "baptismal_holy_water"
+
+
+def _declared_amount(item_key: str, stat: ItemStat) -> int:
+    """The item's own authored gauge adjustment for one stat."""
+    for effect in ITEM_EFFECT_PROFILES[item_key].effects:
+        if isinstance(effect, GaugeAdjustEffect) and effect.stat is stat:
+            return effect.amount
+    raise AssertionError(f"{item_key} declares no {stat.value} adjustment")
 
 
 class ShippedItemUseRegressionTests(EvenniaTest):
@@ -56,37 +71,40 @@ class ShippedItemUseRegressionTests(EvenniaTest):
         self.assertEqual(entry.text_template, text)
 
     def test_healing_potion_restores_forty_and_consumes_one_of_two(self):
+        declared = _declared_amount(_HEALING_KEY, ItemStat.HP)
         before, _ = self._set_gauge("hp", 60)
         self.actor.db.inventory = [_HEALING_KEY, _HEALING_KEY]
         result = self._use(_HEALING_KEY)
         self._assert_single_entry(
-            result, "你使用了「治療藥水」，恢復了 40 點生命值。"
+            result, f"你使用了「治療藥水」，恢復了 {declared} 點生命值。"
         )
-        self.assertEqual(int(self.actor.traits.hp.current), before + 40)
+        self.assertEqual(int(self.actor.traits.hp.current), before + declared)
         self.assertEqual(list_items(self.actor), [_HEALING_KEY])
 
     def test_greater_healing_potion_restores_one_hundred_twenty(self):
-        # The human baseline caps HP below the 200-point gap the 120 restore
-        # needs to stay unclamped, so the fixture lifts the base first.
-        self.actor.traits.hp.base = 300
-        before, _ = self._set_gauge("hp", 200)
+        declared = _declared_amount(_GREATER_KEY, ItemStat.HP)
+        # The human baseline would clamp the restore, so the fixture lifts the
+        # base above the declared amount before emptying the gauge.
+        self.actor.traits.hp.base = declared * 3
+        before, _ = self._set_gauge("hp", declared * 2)
         self.actor.db.inventory = [_GREATER_KEY]
         result = self._use(_GREATER_KEY)
         self._assert_single_entry(
-            result, "你使用了「強效治療藥水」，恢復了 120 點生命值。"
+            result, f"你使用了「強效治療藥水」，恢復了 {declared} 點生命值。"
         )
-        self.assertEqual(int(self.actor.traits.hp.current), before + 120)
+        self.assertEqual(int(self.actor.traits.hp.current), before + declared)
         self.assertEqual(list_items(self.actor), [])
 
     def test_mana_potion_restores_forty_mp_only(self):
+        declared = _declared_amount(_MANA_KEY, ItemStat.MP)
         hp_before = int(self.actor.traits.hp.current)
         mp_before, _ = self._set_gauge("mp", 60)
         self.actor.db.inventory = [_MANA_KEY]
         result = self._use(_MANA_KEY)
         self._assert_single_entry(
-            result, "你使用了「魔力藥水」，恢復了 40 點魔力值。"
+            result, f"你使用了「魔力藥水」，恢復了 {declared} 點魔力值。"
         )
-        self.assertEqual(int(self.actor.traits.mp.current), mp_before + 40)
+        self.assertEqual(int(self.actor.traits.mp.current), mp_before + declared)
         self.assertEqual(int(self.actor.traits.hp.current), hp_before)
         self.assertEqual(list_items(self.actor), [])
 
@@ -129,7 +147,7 @@ class ShippedItemUseRegressionTests(EvenniaTest):
         clock = WorldClock()
         settlement = use_item(self.actor, _HEALING_KEY, clock=clock)
         self.assertEqual(settlement.result.outcome, "success")
-        self.assertEqual(clock.tick, 6)
+        self.assertEqual(clock.tick, ITEM_USE_SECONDS)
         self.assertEqual(list_items(self.actor), [])
 
 

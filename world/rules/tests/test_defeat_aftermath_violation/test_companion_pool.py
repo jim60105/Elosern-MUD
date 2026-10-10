@@ -41,6 +41,8 @@ from ._support import (
     _aftermath_entries,
     _aftermath_logs,
     _kinds,
+    recovery_seconds,
+    wake_target,
 )
 
 
@@ -82,9 +84,10 @@ class CompanionPoolTests(ViolationBase):
         settle = next(entry for entry in entries if entry.kind == "defeat_settle")
         self.assertEqual(settle.data["wake"], DEFEAT_AFTERMATH_RULEBOOK.pg_lines[0])
         # Two executed attempts spend their declared durations; the recovery
-        # solve then walks HP 1 to the 5% wake target (no round seconds).
-        self.assertEqual(self.clock.tick, 2 * 120 + 8)
-        self.assertEqual(self.player.traits.hp.current, 5)
+        # solve then walks HP 1 to the wake target, publishing its own seconds
+        # (no round seconds).
+        self.assertEqual(self.clock.tick, 2 * 120 + recovery_seconds(result))
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
 
     def test_fled_companion_is_excluded_before_the_draw(self):
         fled_companion = self._companion("zulu companion")

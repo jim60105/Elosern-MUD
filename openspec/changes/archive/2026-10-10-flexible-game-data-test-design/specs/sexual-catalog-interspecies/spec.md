@@ -8,8 +8,6 @@
 `interspecies_mating`, `interspecies_domination`, and `interspecies_resonance`, each gated by the
 unlock thresholds below.
 
-Numerical boundary examples below SHALL use scoped synthetic declarations. Shipped acts retain the named roster, counter-key topology and intent, but their positive thresholds SHALL be author-adjustable.
-
 #### Scenario: A Tier 1 act is locked below its threshold and unlocked at it
 - **WHEN** `SkillHandler.owned_keys()` is read for an entity with `hostile_act_count == 9`
 - **THEN** `interspecies_touch` is absent from the returned set

@@ -8,6 +8,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 import world.rules.defeat_aftermath as defeat_aftermath_module
 import world.rules.defeat_aftermath.violation as defeat_aftermath_violation_module
+from world.rules.defeat_aftermath.rulebook import DEFEAT_AFTERMATH_RULEBOOK
 from world.rules import combat_session as combat_session_module
 from world.rules import clock as clock_module
 from world.rules import guild_config as guild_config_module
@@ -168,6 +169,13 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
             for entry in log.entries
         ]
 
+    def _wake_target(self) -> int:
+        """The authored wake target: the fraction of the gauge maximum."""
+        return math.ceil(
+            float(self.player.traits.hp.max)
+            * DEFEAT_AFTERMATH_RULEBOOK.recovery.wake_fraction
+        )
+
     @covers_requirement(
         "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
     )
@@ -178,42 +186,52 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
             calls,
             [
                 (6, AdvanceSource.COMBAT),
-                (8, AdvanceSource.DEFEAT_AFTERMATH),
+                (calls[1][0], AdvanceSource.DEFEAT_AFTERMATH),
             ],
         )
-        self.assertEqual(self.clock.tick, before + 14)
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(
+            self.clock.tick, before + sum(seconds for seconds, _ in calls)
+        )
+        # The wake value is the authored fraction of the gauge maximum, never
+        # a duplicated percentage.
+        expected_wake = math.ceil(
+            float(self.player.traits.hp.max)
+            * DEFEAT_AFTERMATH_RULEBOOK.recovery.wake_fraction
+        )
+        self.assertEqual(self.player.traits.hp.current, expected_wake)
         recovery = [
             entry for entry in self._aftermath_entries(result)
             if entry.kind == "recovery_advance"
         ]
         self.assertEqual(len(recovery), 1)
-        self.assertEqual(recovery[0].data, {"seconds": 8, "hp_wake": 5})
+        self.assertEqual(recovery[0].data["hp_wake"], expected_wake)
+        self.assertEqual(recovery[0].data["seconds"], calls[1][0])
 
     @covers_requirement(
         "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
     )
     def test_coarse_rate_overshoot_clamps_to_the_target(self):
         # Virtual scaled rate 0.65/s: t = ceil(4 / 0.65) = 7; the real 1.3/s
-        # advance lands floor(1 + 9.1) = 10, and the clamp pins HP to 5.
+        # advance overshoots, and the clamp pins HP to the wake target.
         self.player.traits.hp.rate = 1.3
         result, calls = self._spied_defeat()
-        self.assertEqual(calls[1], (7, AdvanceSource.DEFEAT_AFTERMATH))
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertIs(calls[1][1], AdvanceSource.DEFEAT_AFTERMATH)
+        self.assertGreater(calls[1][0], 0)
+        self.assertEqual(self.player.traits.hp.current, self._wake_target())
 
     @covers_requirement(
         "defeat-aftermath-recovery::defeat-recovery-advances-the-clock-to-the-5-wake-target"
     )
     def test_already_at_target_settles_inertly(self):
-        # max 20 -> target ceil(1) = 1 == the floored HP: no advance, no
-        # clamp, no recovery entry (delta requirement 1, inert scenario).
+        # The ceiling of the authored fraction of max 20 equals the floored
+        # HP: no advance, no clamp, no recovery entry (inert scenario).
         self.player.traits.hp.base = 20
         self.player.traits.hp.current = 20
         before = self.clock.tick
         result, calls = self._spied_defeat()
         self.assertEqual(calls, [(6, AdvanceSource.COMBAT)])
         self.assertEqual(self.clock.tick, before + 6)
-        self.assertEqual(self.player.traits.hp.current, 1)
+        self.assertEqual(self.player.traits.hp.current, self._wake_target())
         self.assertNotIn(
             "recovery_advance",
             [entry.kind for entry in self._aftermath_entries(result)],
@@ -232,7 +250,7 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         self.assertEqual(self.player.traits.hp.current, 1)
         self.assertEqual(error.call_count, 1)
         context = error.call_args.kwargs["context"]
-        self.assertEqual(context["target"], 5)
+        self.assertEqual(context["target"], self._wake_target())
         self.assertTrue(context["capped"])
         self.assertIn("tick", context)
         self.assertIn("char", context)
@@ -257,4 +275,6 @@ class RecoveryAdvanceTests(DefeatAftermathBase):
         self.assertEqual(self.player.traits.hp.current, 2)
         self.assertAlmostEqual(self.player.traits.hp.regen_remainder, 0.08, places=6)
         self.assertEqual(error.call_count, 1)
-        self.assertEqual(error.call_args.kwargs["context"]["target"], 5)
+        self.assertEqual(
+            error.call_args.kwargs["context"]["target"], self._wake_target()
+        )

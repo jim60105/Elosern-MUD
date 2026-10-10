@@ -79,6 +79,8 @@ from ._support import (
     _T_SHOP,
     _attack,
     _isolate_synthetic_catalog,
+    recovery_seconds,
+    wake_target,
 )
 
 
@@ -228,17 +230,22 @@ class RollbackTests(
         self.assertEqual([dict(e) for e in (self.player.db.quest_log or [])], quest_log_before)
         self.assertIsNotNone(self.player.db.active_combat)
         self.assertEqual(self.clock.tick, 6)
+        tick_after_failure = self.clock.tick
         # Retry settles fully, exactly once.
         with self.captureOnCommitCallbacks(execute=True):
             result = forfeit(self.player)
         self.assertEqual(result["outcome"], "defeat")
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         self.assertIn("defeat_weak", entity_active_buffs(self.player))
         self.assertFalse(ObjectDB.objects.filter(id=saved_pk).exists())
         self.assertFalse(self._registered(self.monster))
         self.assertIsNone(self.player.db.active_combat)
-        # Combat 6s + recovery 8s (scale 0.5 over the 1.0/s stored rate).
-        self.assertEqual(self.clock.tick, 20)
+        # The retry's combat round plus the recovery solve's own published
+        # seconds (scale 0.5 over the 1.0/s stored rate); the minimum-time
+        # value is the solve's and is covered by its synthetic fixtures.
+        self.assertEqual(
+            self.clock.tick, tick_after_failure + 6 + recovery_seconds(result)
+        )
 
     @covers_requirement(
         "defeat-aftermath-recovery::the-recovery-phase-commits-with-the-settlement"
@@ -301,6 +308,7 @@ class RollbackTests(
         self.assertEqual(merchant.merchant_stock[_T_POTION], _T_POTION_STOCK_BEFORE)
         self.assertEqual(merchant.last_restock_day, 0)
         self.assertEqual(self.monster.db.population_key, saved_marker)
+        tick_before_retry = self.clock.tick
         # Retry: the wake state and the advance are reproduced. The restock
         # boundary is day-granular: the reverted last_restock_day=0 with the
         # retry window still ending on day 1 after 06:00 legitimately catches
@@ -308,8 +316,14 @@ class RollbackTests(
         with self.captureOnCommitCallbacks(execute=True):
             result = forfeit(self.player)
         self.assertEqual(result["outcome"], "defeat")
-        self.assertEqual(self.player.traits.hp.current, 5)
-        self.assertEqual(self.clock.tick, 108010)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
+        # The retry reproduced the wake state and its advance: the clock moved
+        # on by the retry's combat round plus the recovery solve's own published
+        # seconds, past the day-1 restock boundary, catching exactly one
+        # restock.
+        self.assertEqual(
+            self.clock.tick, tick_before_retry + 6 + recovery_seconds(result)
+        )
         self.assertEqual(merchant.last_restock_day, 1)
         self.assertEqual(merchant.merchant_stock[_T_POTION], _T_POTION_RESTOCKED)
 

@@ -71,6 +71,7 @@ from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
 from ._support import (
     DefeatAftermathBase,
     WildernessDefeatMixin,
+    wake_target,
 )
 
 
@@ -196,7 +197,7 @@ class RecoveryFallbackDepartureTests(WildernessDefeatMixin, DefeatAftermathBase)
             self.captureOnCommitCallbacks(execute=True),
         ):
             restore_active_session(self.player)
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         self.assertIn("defeat_weak", entity_active_buffs(self.player))
         self.assertFalse(ObjectDB.objects.filter(id=saved_pk).exists())
         self.assertFalse(self._registered(self.monster))

@@ -134,13 +134,14 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
     )
     def test_clergy_ladder_titles_content_contract(self):
         expected = [
-            ("c_believer", "虔信者", 3),
-            ("c_sister", "修女", 6),
-            ("c_priest", "神官", 10),
-            ("c_bishop", "主教", 15),
-            ("c_cardinal", "樞機", 20),
+            ("c_believer", "虔信者"),
+            ("c_sister", "修女"),
+            ("c_priest", "神官"),
+            ("c_bishop", "主教"),
+            ("c_cardinal", "樞機"),
         ]
-        for key, display, threshold in expected:
+        thresholds = []
+        for key, display in expected:
             with self.subTest(key=key):
                 row = FIXED_TITLE_REGISTRY[key]
                 self.assertEqual(row.key, key)
@@ -150,9 +151,14 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
                     row.predicate.family,
                     TitlePredicateFamily.CHURCH_SKILLS_REDEEMED,
                 )
-                self.assertEqual(row.predicate.threshold, threshold)
                 self.assertTrue(row.flavor_zh.strip())
                 self.assertTrue(row.hint_zh.strip())
+                thresholds.append(row.predicate.threshold)
+        # The rung thresholds are strictly ascending authored tuning values:
+        # their finals stay registry data, so only the ordering is asserted.
+        self.assertTrue(all(isinstance(value, int) for value in thresholds))
+        self.assertEqual(thresholds, sorted(thresholds))
+        self.assertEqual(len(set(thresholds)), len(thresholds))
 
     @covers_requirement(
         "title-system::the-clergy-title-ladder-unlocks-by-redeemed-count-and-never-displays-聖女"

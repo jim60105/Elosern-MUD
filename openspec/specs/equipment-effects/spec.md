@@ -114,7 +114,7 @@ The equipment-effect capability SHALL expose one predicate returning the union o
 The capability SHALL provide one server-side formatter converting a registered item's rulebook entry into one deterministic 正體中文 summary: segments joined by 「｜」 in field-vocabulary declaration order, signed integers, percent fields as `±N%`, gauge fields as `<gauge>上限 ±N`, immunity keys rendered by their registered display names, and zero-valued fields omitted. Every number SHALL come from the rulebook; the formatter SHALL NOT recompute effective values.
 
 #### Scenario: Heavy armor describes its trade-off verbatim
-- **WHEN** the formatter renders 騎士全套板甲's entry (atk −2, defense +8, agility −10%, hp cap +15)
+- **WHEN** the formatter renders a synthetic armor entry (atk −2, defense +8, agility −10%, hp cap +15)
 - **THEN** the output is exactly 「攻擊 −2｜防禦 +8｜敏捷 −10%｜生命上限 +15」
 
 #### Scenario: Immunity-only item
@@ -209,7 +209,7 @@ bounds.
 
 #### Scenario: Vestments lift a nun's exposure two bands
 
-- **WHEN** an actor with stored exposure 中等 wears 聖女聖袍 (bias +2)
+- **WHEN** an actor with stored exposure 中等 wears a synthetic equipment declaration with bias +2
 - **THEN** effective exposure is 極高 and the stored trait is untouched
 
 #### Scenario: Bias clamps at both vocabulary ends

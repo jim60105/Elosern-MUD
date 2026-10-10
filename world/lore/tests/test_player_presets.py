@@ -2,7 +2,7 @@
 Tests for immutable registration presets."""
 
 import unittest
-from dataclasses import replace
+from dataclasses import fields, replace
 
 from tools.spec_traceability import covers_requirement
 
@@ -704,22 +704,57 @@ class PlayerPresetTests(unittest.TestCase):
 
 class StartingCompanionDeclarationTests(unittest.TestCase):
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
-    def test_the_twins_declare_each_other_symmetrically_at_95(self):
+    def test_the_twins_declare_each_other_symmetrically(self):
         yuna = PLAYER_PRESET_REGISTRY["yuna_darknight"]
         yuka = PLAYER_PRESET_REGISTRY["yuka_darknight"]
         self.assertEqual(
-            yuna.starting_companions,
-            (StartingCompanion("yuka_darknight", 95, "雙胞胎妹妹"),),
+            [(d.preset_key, d.relationship) for d in yuna.starting_companions],
+            [("yuka_darknight", "雙胞胎妹妹")],
         )
         self.assertEqual(
-            yuka.starting_companions,
-            (StartingCompanion("yuna_darknight", 95, "雙胞胎姊姊"),),
+            [(d.preset_key, d.relationship) for d in yuka.starting_companions],
+            [("yuna_darknight", "雙胞胎姊姊")],
+        )
+        # The declaration carries no profile reference: the partner preset is
+        # the companion's only authored characterization source.
+        self.assertEqual(
+            {field.name for field in fields(StartingCompanion)},
+            {"preset_key", "affinity", "relationship"},
         )
         for declaration in (*yuna.starting_companions, *yuka.starting_companions):
             partner = PLAYER_PRESET_REGISTRY[declaration.preset_key]
             # The partner's own card answers every mechanical question.
             self.assertIsInstance(partner, PlayerPreset)
             self.assertTrue(declaration.relationship)
+            # The authored value is a plain positive level: the rules-side
+            # sweep validates its 1..NATURAL_CAP bound and the stage headroom.
+            self.assertIs(type(declaration.affinity), int)
+            self.assertGreater(declaration.affinity, 0)
+
+    @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
+    def test_the_twins_declared_affinity_keeps_its_stage_headroom(self):
+        # The affinity rulebook validates its cap-breaks against the quest
+        # registry, so register the shipped catalog before loading it.
+        from world.quests.catalog import register_catalog
+        from world.rules.affinity_config import get_config
+
+        register_catalog()
+        config = get_config()
+        for key in ("yuna_darknight", "yuka_darknight"):
+            for declaration in PLAYER_PRESET_REGISTRY[key].starting_companions:
+                with self.subTest(preset=key):
+                    # Above the auto-leave threshold, inside 至愛 and more than
+                    # one negative delta above its floor: a single penalty can
+                    # never drop the pair a stage or auto-dismiss the arrival.
+                    stage = config.stage_for_value(declaration.affinity)
+                    self.assertEqual(stage.name, "至愛")
+                    self.assertGreater(
+                        declaration.affinity, config.invite_threshold
+                    )
+                    self.assertGreaterEqual(
+                        declaration.affinity - stage.floor,
+                        config.friendly_fire_penalty_per_hit,
+                    )
 
     @covers_requirement("starting-companions::a-preset-declares-its-starting-companions-by-partner-preset-key")
     def test_every_other_preset_declares_no_companions(self):

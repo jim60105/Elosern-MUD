@@ -91,7 +91,7 @@ Delivery SHALL validate both variants generically and retain a representative fo
 
 
 ### Requirement: 穗鳴雀 owns its approved contact resource ability
-Both `sway_whistle_sparrow` variants SHALL own `grain_shaking_peck` (震穗啄擊) as a prerequisite-free, selectable outside combat (`usable_out_of_combat=True`), with damage resolution requiring the existing battlefield gate single-target physical ability with `wind` elemental-magic taxonomy and monster/species eligibility. Its sole damage strike SHALL use its authored coefficient and nominal payment the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
+Both `sway_whistle_sparrow` variants SHALL own `grain_shaking_peck` (震穗啄擊) as a prerequisite-free single-target physical ability selectable outside combat (`usable_out_of_combat=True`) with `wind` elemental-magic taxonomy and monster/species eligibility, whose damage resolution requires the existing battlefield gate. Its sole strike SHALL use its authored coefficient and the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
 
 #### Scenario: Exact ordered composition
 - **WHEN** the approved ability is read
@@ -147,7 +147,7 @@ Affordability SHALL precede dice/effects, with normal modifiers and effects-befo
 
 
 ### Requirement: 潮燈蟹 owns its approved contact resource ability
-Both `tide_lamp_crab` variants SHALL own `lamp_carapace_claw` (燈甲螯擊) as a prerequisite-free, selectable outside combat (`usable_out_of_combat=True`), with damage resolution requiring the existing battlefield gate single-target physical ability with `light` elemental-magic taxonomy and monster/species eligibility. Its sole damage strike SHALL use its authored coefficient and nominal payment the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
+Both `tide_lamp_crab` variants SHALL own `lamp_carapace_claw` (燈甲螯擊) as a prerequisite-free single-target physical ability selectable outside combat (`usable_out_of_combat=True`) with `light` elemental-magic taxonomy and monster/species eligibility, whose damage resolution requires the existing battlefield gate. Its sole strike SHALL use its authored coefficient and the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
 
 #### Scenario: Exact ordered composition
 - **WHEN** the approved ability is read

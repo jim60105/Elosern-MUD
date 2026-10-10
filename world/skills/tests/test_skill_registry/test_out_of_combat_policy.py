@@ -25,7 +25,6 @@ from world.skills.registry import (
     validate_prerequisite_graph,
 )
 from world.rules.progression import proficiency_cap
-from ..test_spell_catalogs import _CATALOG_EFFECTS
 
 from ._support import (
     USABLE_OUT_OF_COMBAT_FALSE_KEYS,

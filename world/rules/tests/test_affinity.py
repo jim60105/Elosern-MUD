@@ -27,7 +27,7 @@ from world.rules.affinity import (
     seed_affinity,
     raise_affinity_cap,
 )
-from world.rules.affinity_config import get_config, load_config
+from world.rules.affinity_config import get_config
 from world.rules.party import is_companion, join_party
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
@@ -94,7 +94,8 @@ class AffinityWriterTests(EvenniaTestCase):
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_capped_sources_exhaust_the_daily_budget(self):
-        for _ in range(5):
+        cap = get_config().daily_interaction_cap
+        for _ in range(cap):
             outcome = apply_affinity_change(
                 self.npc, self.player, AffinitySource.TALK, 1
             )
@@ -105,28 +106,32 @@ class AffinityWriterTests(EvenniaTestCase):
         self.assertFalse(blocked.applied)
         self.assertTrue(blocked.budget_capped)
         self.assertEqual(blocked.delta_used, 0)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 5)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap)
         record = self.npc.relations._load(self.player)
-        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_gain, cap)
 
     def test_partial_delta_applies_only_the_remaining_budget(self):
-        for _ in range(3):
+        cap = get_config().daily_interaction_cap
+        for _ in range(cap - 1):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         outcome = apply_affinity_change(
-            self.npc, self.player, AffinitySource.TRADE, 4
+            self.npc, self.player, AffinitySource.TRADE, cap
         )
-        self.assertEqual(outcome.delta_used, 2)
+        # A delta larger than the single remaining budget point applies only it.
+        self.assertEqual(outcome.delta_used, 1)
         self.assertTrue(outcome.applied)
         self.assertTrue(outcome.budget_capped)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 5)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap)
         record = self.npc.relations._load(self.player)
-        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_gain, cap)
 
     def test_zero_applied_at_cap_consumes_no_budget(self):
         apply_affinity_change(
-            self.npc, self.player, AffinitySource.QUEST_COMPLETION, 99
+            self.npc, self.player, AffinitySource.QUEST_COMPLETION, NATURAL_CAP
         )
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 99)
+        self.assertEqual(
+            self.npc.relations.affinity_for(self.player), NATURAL_CAP
+        )
         outcome = apply_affinity_change(
             self.npc, self.player, AffinitySource.TALK, 1
         )
@@ -137,8 +142,9 @@ class AffinityWriterTests(EvenniaTestCase):
         self.assertEqual(record.daily_gain, 0)
 
     def test_budget_resets_on_a_new_world_day(self):
+        cap = get_config().daily_interaction_cap
         self._day_clock(0)
-        for _ in range(5):
+        for _ in range(cap):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         blocked = apply_affinity_change(
             self.npc, self.player, AffinitySource.TALK, 1
@@ -149,23 +155,26 @@ class AffinityWriterTests(EvenniaTestCase):
             self.npc, self.player, AffinitySource.TALK, 1
         )
         self.assertTrue(outcome.applied)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 6)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap + 1)
 
     def test_quest_completion_bypasses_the_daily_cap(self):
+        cap = get_config().daily_interaction_cap
+        gain = get_config().quest_completion_gain
         self._day_clock(0)
-        for _ in range(5):
+        for _ in range(cap):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         outcome = apply_affinity_change(
-            self.npc, self.player, AffinitySource.QUEST_COMPLETION, 2
+            self.npc, self.player, AffinitySource.QUEST_COMPLETION, gain
         )
         self.assertTrue(outcome.applied)
         self.assertFalse(outcome.budget_capped)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 7)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap + gain)
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget", "affinity-system::the-party-auto-leave-recheck-hook-runs-after-negative-affinity-deltas")
     def test_negative_delta_never_resets_or_restores_budget(self):
+        cap = get_config().daily_interaction_cap
         self._day_clock(0)
-        for _ in range(5):
+        for _ in range(cap):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         with patch(
             "world.rules.affinity.run_auto_leave_recheck"
@@ -175,14 +184,16 @@ class AffinityWriterTests(EvenniaTestCase):
             )
         self.assertEqual(outcome.delta_used, -2)
         recheck.assert_called_once_with(self.npc, self.player)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 3)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap - 2)
         record = self.npc.relations._load(self.player)
-        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_gain, cap)
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_friendly_fire_source_applies_without_budget_interaction(self):
+        cap = get_config().daily_interaction_cap
+        penalty = get_config().friendly_fire_penalty_per_hit
         self._day_clock(0)
-        for _ in range(5):
+        for _ in range(cap):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         with patch(
             "world.rules.affinity.run_auto_leave_recheck"
@@ -191,21 +202,23 @@ class AffinityWriterTests(EvenniaTestCase):
                 self.npc,
                 self.player,
                 AffinitySource.FRIENDLY_FIRE,
-                -1,
+                -penalty,
             )
-        self.assertEqual(outcome.delta_used, -1)
+        self.assertEqual(outcome.delta_used, -penalty)
         self.assertTrue(outcome.applied)
         self.assertFalse(outcome.budget_capped)
         self.assertFalse(outcome.source_rejected)
         recheck.assert_called_once_with(self.npc, self.player)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 4)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap - penalty)
         record = self.npc.relations._load(self.player)
-        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_gain, cap)
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_sexual_forced_source_applies_without_budget_interaction(self):
+        cap = get_config().daily_interaction_cap
+        penalty = get_config().sexual_forced_penalty
         self._day_clock(0)
-        for _ in range(5):
+        for _ in range(cap):
             apply_affinity_change(self.npc, self.player, AffinitySource.TALK, 1)
         with patch(
             "world.rules.affinity.run_auto_leave_recheck"
@@ -214,16 +227,16 @@ class AffinityWriterTests(EvenniaTestCase):
                 self.npc,
                 self.player,
                 AffinitySource.SEXUAL_FORCED,
-                -3,
+                -penalty,
             )
-        self.assertEqual(outcome.delta_used, -3)
+        self.assertEqual(outcome.delta_used, -penalty)
         self.assertTrue(outcome.applied)
         self.assertFalse(outcome.budget_capped)
         self.assertFalse(outcome.source_rejected)
         recheck.assert_called_once_with(self.npc, self.player)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 2)
+        self.assertEqual(self.npc.relations.affinity_for(self.player), cap - penalty)
         record = self.npc.relations._load(self.player)
-        self.assertEqual(record.daily_gain, 5)
+        self.assertEqual(record.daily_gain, cap)
 
     def test_negative_delta_floors_at_zero(self):
         apply_affinity_change(
@@ -280,11 +293,6 @@ class AffinityWriterTests(EvenniaTestCase):
     def test_capped_hint_is_fixed_and_non_numeric(self):
         for digit in "0123456789":
             self.assertNotIn(digit, AFFINITY_DAILY_CAP_HINT)
-
-    def test_daily_cap_constant_matches_yaml(self):
-        self.assertEqual(
-            load_config().daily_interaction_cap, 5
-        )
 
 
 class CapBreakWriterTests(EvenniaTestCase):
@@ -449,8 +457,10 @@ class SeedAffinityWriterTests(EvenniaTestCase):
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_seed_leaves_the_full_daily_budget_for_interactions(self):
-        seed_affinity(self.npc, self.player, 40)
-        for _ in range(5):
+        cap = get_config().daily_interaction_cap
+        seed_value = 40
+        seed_affinity(self.npc, self.player, seed_value)
+        for _ in range(cap):
             outcome = apply_affinity_change(
                 self.npc, self.player, AffinitySource.TALK, 1
             )
@@ -460,7 +470,9 @@ class SeedAffinityWriterTests(EvenniaTestCase):
         )
         self.assertFalse(blocked.applied)
         self.assertTrue(blocked.budget_capped)
-        self.assertEqual(self.npc.relations.affinity_for(self.player), 45)
+        self.assertEqual(
+            self.npc.relations.affinity_for(self.player), seed_value + cap
+        )
 
     @covers_requirement("affinity-system::apply-affinity-change-is-the-sole-affinity-writer-with-a-source-capped-daily-budget")
     def test_seed_below_threshold_keeps_a_bound_companion(self):

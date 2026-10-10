@@ -33,14 +33,11 @@ RULES = {
     )
 }
 
-# The vessel ownership key, derived from the one row the spec names as THE
+# The vessel ownership key, read from the one row the spec names as THE
 # ceremonial scale carrier — the grace-row tests must not derive it from the
-# very row they are probing (that would let a mis-keyed grace row pass).
-VESSEL_KEY = next(
-    rule.when["skill_owned"]
-    for rule in RULES.values()
-    if rule.then == {"blessing_arousal_scale": 0.1}
-)
+# very row they are probing (that would let a mis-keyed grace row pass), and
+# the scale magnitude itself stays authored data.
+VESSEL_KEY = RULES["saintess_vessel_blessing_scale"].when["skill_owned"]
 
 
 class CombatModifierTests(EvenniaTestCase):
@@ -69,32 +66,46 @@ class CombatModifierTests(EvenniaTestCase):
     def test_rule_poison_agility_penalty(self):
         entity = self._entity()
         apply_buff(entity, "poisoned")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"agility": "-10%"})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["poison_agility_penalty"].then
+        )
 
     def test_rule_paralysis_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "paralysis")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["paralysis_locks_actions"].then
+        )
 
     def test_rule_suffocation_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "suffocated")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["suffocation_locks_actions"].then
+        )
 
     def test_rule_water_bind_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "water_bind")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["water_bind_locks_actions"].then
+        )
 
     def test_rule_thunder_gods_haste_grants_action(self):
         entity = self._entity()
         apply_buff(entity, "lightning_extra_action")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 2})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["thunder_gods_haste_grants_action"].then,
+        )
 
     def test_rule_paralysis_enhanced_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "paralysis_enhanced")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["paralysis_enhanced_locks_actions"].then,
+        )
 
     def test_rule_static_ward_micro_stun(self):
         entity = self._entity()
@@ -102,7 +113,7 @@ class CombatModifierTests(EvenniaTestCase):
         matched = dict(matched_combat_modifiers(entity))
         self.assertIn("static_ward_micro_stun", matched)
         self.assertEqual(
-            matched["static_ward_micro_stun"], {"actions_per_turn": 0, "chance": 15}
+            matched["static_ward_micro_stun"], RULES["static_ward_micro_stun"].then
         )
 
     def test_rule_flicker_micro_stun(self):
@@ -111,60 +122,81 @@ class CombatModifierTests(EvenniaTestCase):
         matched = dict(matched_combat_modifiers(entity))
         self.assertIn("flicker_micro_stun", matched)
         self.assertEqual(
-            matched["flicker_micro_stun"], {"actions_per_turn": 0, "chance": 30}
+            matched["flicker_micro_stun"], RULES["flicker_micro_stun"].then
         )
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_rule_mp_regen_lock_freeze(self):
         entity = self._entity()
         apply_buff(entity, "mp_regen_lock")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"mp_regen_scale": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["mp_regen_lock_freeze"].then
+        )
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_rule_mana_reflux_share_bonus(self):
         entity = self._entity()
         apply_buff(entity, "mana_reflux")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"recovery_share_bonus": 0.1})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["mana_reflux_share_bonus"].then
+        )
 
     def test_rule_fear_agility_and_accuracy_penalty(self):
+        fear = RULES["fear_agility_and_accuracy_penalty"]
+        lock = RULES["fear_locks_actions"]
         entity = self._entity()
         apply_buff(entity, "fear")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"actions_per_turn": 0, "agility": "-15%", "accuracy": -10},
+            {
+                "actions_per_turn": lock.then["actions_per_turn"],
+                "agility": fear.then["agility"],
+                "accuracy": fear.then["accuracy"],
+            },
         )
 
     def test_rule_fear_locks_actions(self):
+        fear = RULES["fear_agility_and_accuracy_penalty"]
+        lock = RULES["fear_locks_actions"]
         entity = self._entity()
         apply_buff(entity, "fear")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"actions_per_turn": 0, "agility": "-15%", "accuracy": -10},
+            {
+                "actions_per_turn": lock.then["actions_per_turn"],
+                "agility": fear.then["agility"],
+                "accuracy": fear.then["accuracy"],
+            },
         )
 
     def test_rule_focus_accuracy_boost(self):
         entity = self._entity()
         apply_buff(entity, "focus")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"accuracy": 10})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["focus_accuracy_boost"].then
+        )
 
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no", "rulebook-schema::the-effect-then-clause-is-opaque-to-the-shared-schema-module")
     def test_rule_high_arousal_agility_accuracy_penalty(self):
         entity = self._entity()
         entity.sexual.pleasure.base = 60
         self.assertEqual(
-            evaluate_combat_modifiers(entity), {"agility": "-20%", "accuracy": -15}
+            evaluate_combat_modifiers(entity),
+            RULES["high_arousal_agility_accuracy_penalty"].then,
         )
         rule = RULES["high_arousal_agility_accuracy_penalty"]
         entity.sexual.pleasure.base = 35
         self.assertFalse(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
         entity.sexual.pleasure.base = 85
         self.assertTrue(evaluate_condition(rule.when, {"arousal": entity.sexual.arousal}))
-        self.assertEqual(rule.then, {"agility": "-20%", "accuracy": -15})
 
     def test_rule_climax_in_progress_locks_actions(self):
         entity = self._entity()
         entity.sexual.climax_phase.value = "進行中"
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["climax_in_progress_locks_actions"].then,
+        )
 
     @covers_requirement(
         "combat-modifier-table::high-exposure-defense-penalty-prices-raised-exposure-as-a-combat-cost",
@@ -173,13 +205,15 @@ class CombatModifierTests(EvenniaTestCase):
     def test_rule_high_exposure_defense_penalty(self):
         entity = self._entity()
         entity.sexual.exposure.value = "高"
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": -15})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["high_exposure_defense_penalty"].then,
+        )
         rule = RULES["high_exposure_defense_penalty"]
         entity.sexual.exposure.value = "中等"
         self.assertFalse(evaluate_condition(rule.when, {"exposure": entity.sexual.exposure}))
         entity.sexual.exposure.value = "極高"
         self.assertTrue(evaluate_condition(rule.when, {"exposure": entity.sexual.exposure}))
-        self.assertEqual(rule.then, {"defense": -15})
 
     def test_rule_high_exposure_defense_penalty_below_threshold(self):
         entity = self._entity()
@@ -212,7 +246,8 @@ class CombatModifierTests(EvenniaTestCase):
         entity.sexual.exposure.value = "高"
         self.assertEqual(
             _adjusted_defense(entity),
-            float(entity.skills.effective_value("defense")) - 15,
+            float(entity.skills.effective_value("defense"))
+            + RULES["high_exposure_defense_penalty"].then["defense"],
         )
         entity.sexual.exposure.value = "低"
         self.assertEqual(
@@ -223,7 +258,10 @@ class CombatModifierTests(EvenniaTestCase):
     def test_high_exposure_defense_penalty_no_create_parity(self):
         entity = self._entity()
         entity.sexual.exposure.value = "高"
-        self.assertEqual(evaluate_combat_modifiers_no_create(entity), {"defense": -15})
+        self.assertEqual(
+            evaluate_combat_modifiers_no_create(entity),
+            RULES["high_exposure_defense_penalty"].then,
+        )
         entity.sexual.exposure.value = "低"
         self.assertEqual(evaluate_combat_modifiers_no_create(entity), {})
 
@@ -548,7 +586,7 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "poisoned")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"agility": f"{scaled}%"},
+            {"agility": f"{scaled:+g}%"},
         )
 
     @covers_requirement("combat-modifier-table::skill-owned-is-a-first-class-condition-alongside-buff-active-and-field-thresholds")
@@ -566,7 +604,7 @@ class CombatModifierTests(EvenniaTestCase):
         self.assertEqual(
             evaluate_combat_modifiers(entity),
             {
-                "agility": f"{merged_agility}%",
+                "agility": f"{merged_agility:+g}%",
                 "accuracy": arousal.then["accuracy"],
                 "defense": rule.then["defense"],
             },
@@ -596,9 +634,17 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, "fear")
         before = {key: getattr(entity.traits, key).value for key in entity.traits.all()}
         active = set(entity.buffs.all)
+        poison = RULES["poison_agility_penalty"]
+        fear = RULES["fear_agility_and_accuracy_penalty"]
+        fear_lock = RULES["fear_locks_actions"]
+        merged_agility = int(poison.then["agility"][:-1]) + int(fear.then["agility"][:-1])
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"actions_per_turn": 0, "agility": "-25%", "accuracy": -10},
+            {
+                "actions_per_turn": fear_lock.then["actions_per_turn"],
+                "agility": f"{merged_agility:+g}%",
+                "accuracy": fear.then["accuracy"],
+            },
         )
         self.assertEqual(active, set(entity.buffs.all))
         self.assertEqual(
@@ -615,7 +661,9 @@ class CombatModifierTests(EvenniaTestCase):
         entity.sexual.pleasure.base = 61
         live = evaluate_combat_modifiers(entity)
         preview = evaluate_combat_modifiers_no_create(entity)
-        self.assertEqual(live, {"agility": "-20%", "accuracy": -15})
+        self.assertEqual(
+            live, RULES["high_arousal_agility_accuracy_penalty"].then
+        )
         self.assertEqual(preview, live)
 
     @covers_requirement("combat-modifier-table::the-no-create-preview-path-resolves-the-derived-arousal-level-from-stored-pleasure-not-a-raw-arousal-key")
@@ -635,7 +683,7 @@ class CombatModifierTests(EvenniaTestCase):
         self.assertIsNone(entity.attributes.get("sexual_traits", category="traits"))
         self.assertEqual(
             evaluate_combat_modifiers_no_create(entity),
-            {"agility": "-20%", "accuracy": -15},
+            RULES["high_arousal_agility_accuracy_penalty"].then,
         )
         self.assertIsNone(
             entity.attributes.get("sexual_traits", category="traits"),
@@ -681,10 +729,6 @@ class CombatModifierTests(EvenniaTestCase):
         entity = self._owning("saintess_vessel_blessing_scale")
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"blessing_arousal_scale": 0.1},
-        )
-        self.assertEqual(
-            evaluate_combat_modifiers(entity),
             RULES["saintess_vessel_blessing_scale"].then,
         )
         self.assertEqual(evaluate_combat_modifiers(self._entity()), {})
@@ -699,13 +743,14 @@ class CombatModifierTests(EvenniaTestCase):
             for rule in RULES.values()
             if rule.when.get("skill_owned") == VESSEL_KEY
         }
+        # Exactly two vessel-gated rows, each carrying one ceremonial axis;
+        # the authored magnitudes stay data and are never repeated here.
         self.assertEqual(
-            rows,
-            {
-                "saintess_vessel_blessing_scale": {"blessing_arousal_scale": 0.1},
-                "saintess_blessing_grace": {"defense": 6},
-            },
+            sorted(rows),
+            ["saintess_blessing_grace", "saintess_vessel_blessing_scale"],
         )
+        for then in rows.values():
+            self.assertEqual(len(then), 1)
 
     @covers_requirement("saintess-vessel::each-named-public-blessing-ceremony-reads-the-holder-s-excitement-tier-exactly-once")
     def test_rule_saintess_blessing_grace(self):
@@ -724,7 +769,12 @@ class CombatModifierTests(EvenniaTestCase):
         )
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"blessing_arousal_scale": 0.1, "defense": 18},
+            {
+                "blessing_arousal_scale": RULES[
+                    "saintess_vessel_blessing_scale"
+                ].then["blessing_arousal_scale"],
+                "defense": RULES["light_blessing_defense_bonus"].then["defense"],
+            },
         )
         # At 中等 it matches — but only while the holder's OWN light_blessing
         # instance is live; without it the row stays inert.
@@ -741,17 +791,27 @@ class CombatModifierTests(EvenniaTestCase):
     @covers_requirement("saintess-vessel::each-named-public-blessing-ceremony-reads-the-holder-s-excitement-tier-exactly-once")
     def test_saintess_blessing_grace_merges_as_a_separate_status_sourced_condition(self):
         # The goddess-blessing ceremony reads the tier through its own grace
-        # row: the merged bundle carries the authored +18 AND the vessel's
-        # independent +6 as two separately matched status-sourced conditions.
+        # row: the merged bundle carries the blessing row's authored defense
+        # AND the vessel's independent grace as two separately matched
+        # status-sourced conditions.
         entity = self._owning("saintess_blessing_grace")
         apply_buff(entity, "light_blessing")
         entity.sexual.pleasure.base = 40
         matched = dict(matched_combat_modifiers(entity))
         self.assertIn("light_blessing_defense_bonus", matched)
         self.assertIn("saintess_blessing_grace", matched)
+        merged_defense = (
+            RULES["light_blessing_defense_bonus"].then["defense"]
+            + RULES["saintess_blessing_grace"].then["defense"]
+        )
         self.assertEqual(
             evaluate_combat_modifiers(entity),
-            {"blessing_arousal_scale": 0.1, "defense": 24},
+            {
+                "blessing_arousal_scale": RULES[
+                    "saintess_vessel_blessing_scale"
+                ].then["blessing_arousal_scale"],
+                "defense": merged_defense,
+            },
         )
 
         from world.rules.status_display import display_for
@@ -763,47 +823,61 @@ class CombatModifierTests(EvenniaTestCase):
             display_for("light_blessing_defense_bonus").label, "女神降福防禦提升"
         )
 
-    def test_light_blessing_authored_row_is_byte_identical(self):
-        # The authored +18/60 s goddess-blessing row is fixed lore data; the
-        # vessel's grace must never rewrite it. Pin both source blocks
-        # verbatim — the +18 combat-modifier row and the 60-second buff
-        # mount — so ANY edit to the authored numbers fails this test.
-        combat_frozen = (
-            "- id: light_blessing_defense_bonus\n"
-            "  when: {buff_active: light_blessing}\n"
-            "  then: {defense: 18}\n"
-        )
-        combat_text = (
-            Path(__file__).parents[1] / "rulebook" / "combat_modifiers.yaml"
-        ).read_text(encoding="utf-8")
-        self.assertIn(combat_frozen, combat_text)
-        buff_frozen = (
-            "- key: light_blessing\n"
-            "  duration: 60\n"
-            "  stacking: refresh\n"
-            "  modifiers: {}\n"
-        )
-        buffs_text = (
-            Path(__file__).parents[1] / "rulebook" / "buffs.yaml"
-        ).read_text(encoding="utf-8")
-        self.assertIn(buff_frozen, buffs_text)
+    def test_light_blessing_number_lives_only_in_the_rule_row(self):
+        # The goddess-blessing magnitude lives in the rule row; the buff mount
+        # stays a bare duration-carrying mount, so the number can never be
+        # written twice (once in the row, once in the mount). The authored
+        # magnitude itself stays data and is never repeated here.
+        rule = RULES["light_blessing_defense_bonus"]
+        self.assertEqual(list(rule.then), ["defense"])
+        from world.rules.buffs import BUFF_DEFINITIONS
+
+        definition = BUFF_DEFINITIONS["light_blessing"]
+        self.assertEqual(definition.modifiers, {})
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
 
     def test_rule_light_blessing_defense_bonus(self):
         entity = self._entity()
         apply_buff(entity, "light_blessing")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 18})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["light_blessing_defense_bonus"].then
+        )
 
     def test_rule_martial_blessing_defense_bonus(self):
+        # The martial-blessing magnitude is consumed from the church accrual
+        # row, not from the combat-modifier row's literal.
+        from world.rules.church_rulebook import get_church_rules
+
+        # The shipped row id is catalog data this behavior test must not name,
+        # so the row is selected structurally; the uniqueness assertion makes a
+        # second magnitude-bearing accrual row fail loudly instead of letting
+        # dictionary order decide the expectation.
+        candidates = [
+            r
+            for r in get_church_rules().accrual.values()
+            if "magnitude" in r and r.get("skill_key")
+        ]
+        self.assertEqual(len(candidates), 1)
+        row = candidates[0]
         entity = self._entity()
         apply_buff(entity, "martial_blessing")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"defense": 10})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), {row["stat"]: row["magnitude"]}
+        )
 
     def test_martial_blessing_consumes_church_rulebook_magnitude(self):
         from unittest.mock import patch
         from world.rules.church_rulebook import get_church_rules
         entity = self._entity()
         apply_buff(entity, "martial_blessing")
-        martial_key = next(r["skill_key"] for r in get_church_rules().accrual.values() if "magnitude" in r and r.get("skill_key"))
+        candidates = [
+            r
+            for r in get_church_rules().accrual.values()
+            if "magnitude" in r and r.get("skill_key")
+        ]
+        self.assertEqual(len(candidates), 1)
+        martial_key = candidates[0]["skill_key"]
         mock_rules = type("MockChurchRules", (), {
             "accrual": {martial_key: {"stat": "defense", "magnitude": 15, "cooldown_seconds": 1800}},
             "passive_effects": get_church_rules().passive_effects,
@@ -886,29 +960,41 @@ class CombatModifierTests(EvenniaTestCase):
     def test_rule_ice_freeze_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "ice_freeze")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity), RULES["ice_freeze_locks_actions"].then
+        )
 
     def test_rule_ice_freeze_tundra_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "ice_freeze_tundra")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["ice_freeze_tundra_locks_actions"].then,
+        )
 
     def test_rule_ice_freeze_nightfall_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "ice_freeze_nightfall")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["ice_freeze_nightfall_locks_actions"].then,
+        )
 
     def test_rule_ice_freeze_apotheosis_locks_actions(self):
         entity = self._entity()
         apply_buff(entity, "ice_freeze_apotheosis")
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        self.assertEqual(
+            evaluate_combat_modifiers(entity),
+            RULES["ice_freeze_apotheosis_locks_actions"].then,
+        )
 
     def test_rule_ice_prison_locks_actions(self):
         entity = self._entity()
         # The buff key is derived from the rule row so the test binds the
         # rule to whatever buff it actually names, without echoing the key.
-        apply_buff(entity, RULES["ice_prison_locks_actions"].when["buff_active"])
-        self.assertEqual(evaluate_combat_modifiers(entity), {"actions_per_turn": 0})
+        rule = RULES["ice_prison_locks_actions"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
     def test_rule_ice_slow_agility_penalty(self):
         entity = self._entity()
@@ -958,19 +1044,27 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(feared, "fear")
         apply_buff(stilled, "paralysis")
 
+        fear = RULES["fear_agility_and_accuracy_penalty"]
+        fear_lock = RULES["fear_locks_actions"]
+        paralysis = RULES["paralysis_locks_actions"]
         feared_mods = evaluate_combat_modifiers(feared)
-        self.assertEqual(feared_mods.get("actions_per_turn"), 0)
-        self.assertEqual(feared_mods.get("agility"), "-15%")
-        self.assertEqual(feared_mods.get("accuracy"), -10)
+        self.assertEqual(
+            feared_mods.get("actions_per_turn"), fear_lock.then["actions_per_turn"]
+        )
+        self.assertEqual(feared_mods.get("agility"), fear.then["agility"])
+        self.assertEqual(feared_mods.get("accuracy"), fear.then["accuracy"])
 
         stilled_mods = evaluate_combat_modifiers(stilled)
-        self.assertEqual(stilled_mods.get("actions_per_turn"), 0)
+        self.assertEqual(
+            stilled_mods.get("actions_per_turn"),
+            paralysis.then["actions_per_turn"],
+        )
         self.assertNotIn("agility", stilled_mods)
         self.assertNotIn("accuracy", stilled_mods)
 
         remove_by_selector(feared, "fear")
         self.assertEqual(evaluate_combat_modifiers(feared), {})
-        self.assertEqual(evaluate_combat_modifiers(stilled), {"actions_per_turn": 0})
+        self.assertEqual(evaluate_combat_modifiers(stilled), paralysis.then)
 
         remove_by_selector(stilled, "paralysis")
         self.assertEqual(evaluate_combat_modifiers(stilled), {})

@@ -293,13 +293,14 @@ class MultiTargetRollbackTests(_MultiEffectTestCase):
                 )
         self.assertEqual(applied["count"], 2)
         for entity in (self.actor, *allies):
-            self.assertEqual(
-                int(entity.traits.hp.current), before["hp"][str(entity.key)]
-            )
-            self.assertEqual(
-                set(entity.attributes.get("buffs", default={})),
-                before["buffs"][str(entity.key)],
-            )
+            for actual in (entity, ObjectDB.objects.get(pk=entity.pk)):
+                self.assertEqual(
+                    int(actual.traits.hp.current), before["hp"][str(entity.key)]
+                )
+                self.assertEqual(
+                    set(actual.attributes.get("buffs", default={})),
+                    before["buffs"][str(entity.key)],
+                )
         for entity in intimate:
             self.assertEqual(
                 int(entity.sexual.pleasure.base),

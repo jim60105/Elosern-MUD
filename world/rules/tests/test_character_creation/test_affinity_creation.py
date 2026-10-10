@@ -252,7 +252,10 @@ class AffinityCreationTests(EvenniaTest):
     )
     @covers_requirement("element-affinity::affinity-elements-is-one-validated-per-entity-source-of-truth")
     def test_omnivore_branch_seeds_every_element_and_each_is_favored(self):
-        from world.rules.progression import element_affinity_multiplier
+        from world.rules.progression import (
+            AFFINITY_ELEMENT_MULTIPLIER,
+            element_affinity_multiplier,
+        )
 
         elements = _live_element_keys()
         elf_allocations = balanced_allocations("elf", self.omnivore_branch.key)
@@ -268,7 +271,10 @@ class AffinityCreationTests(EvenniaTest):
         )
         self.assertEqual(set(character.db.affinity_elements), set(elements))
         for element in elements:
-            self.assertEqual(element_affinity_multiplier(character, element), 1.1)
+            self.assertEqual(
+                element_affinity_multiplier(character, element),
+                AFFINITY_ELEMENT_MULTIPLIER,
+            )
 
     @patch.dict(
         "world.rules.character_creation._AFFINITY_INPUT_BOUNDS",

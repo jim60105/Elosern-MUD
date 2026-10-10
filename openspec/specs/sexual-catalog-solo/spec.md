@@ -42,26 +42,26 @@ Every one of these eleven acts SHALL declare
 
 #### Scenario: The five Tier 1 acts share the masturbation_count 10 gate
 - **WHEN** the Tier 1 acts `solo_deep_touch`, `solo_both_hands`, `solo_finger_lick`, `solo_rear_touch`, and `solo_nipple_play` are read from `SOLO_ACTS`
-- **THEN** each declares `unlock={"masturbation_count": 10}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"masturbation_count": <declared positive threshold>}`
 
 #### Scenario: The three Tier 2 toy acts share the masturbation_count 25 gate
 - **WHEN** the Tier 2 acts `solo_toy_vibrator`, `solo_toy_clamps`, and `solo_toy_plug` are read from `SOLO_ACTS`
-- **THEN** each declares `unlock={"masturbation_count": 25}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"masturbation_count": <declared positive threshold>}`
 
 #### Scenario: The three Tier 3 advanced-toy acts share the compound gate
 - **WHEN** the Tier 3 acts `solo_toy_advanced_link`, `solo_toy_advanced_full`, and `solo_bound_masturbation` are read from `SOLO_ACTS`
-- **THEN** each declares the compound gate `unlock={"masturbation_count": 25, "toy_use_count": 15}`
+- **THEN** each declares the compound counter-key topology as synthetic `unlock={"masturbation_count": <declared positive threshold>, "toy_use_count": <declared positive threshold>}`
+
+#### Scenario: Declared thresholds are mutable and boundary examples are synthetic
+- **WHEN** exact numerical boundary cases above are exercised
+- **THEN** local fixed synthetic declarations use those boundary values; shipped acts retain the stated counter-key topology, membership and resistance policy with authored positive thresholds, and tests do not pin their literal unlock counts
 
 ### Requirement: Tier 2 and Tier 3 acts credit both masturbation_count and toy_use_count on cast
-Each of `solo_toy_vibrator`, `solo_toy_clamps`, `solo_toy_plug`, `solo_toy_advanced_link`,
-`solo_toy_advanced_full`, and `solo_bound_masturbation` SHALL declare
-`actor_counters=("masturbation_count", "toy_use_count")`.
+Each of solo_toy_vibrator, solo_toy_clamps, solo_toy_plug, solo_toy_advanced_link, solo_toy_advanced_full and solo_bound_masturbation SHALL retain actor counters masturbation_count and toy_use_count. Real integration actors SHALL satisfy current declared eligibility, not historical unlock counts.
 
 #### Scenario: Casting a toy act increments both counters by exactly one
-- **WHEN** an entity whose `masturbation_count` is `25` and `toy_use_count` is `0` casts
-  `solo_toy_vibrator` on itself
-- **THEN** afterward `entity.sexual.masturbation_count` equals `26` and
-  `entity.sexual.toy_use_count` equals `1`
+- **WHEN** an eligible actor casts solo_toy_vibrator on itself and both counters are snapshotted before the cast
+- **THEN** masturbation_count and toy_use_count each increase by exactly 1, regardless of valid authored threshold changes
 
 ### Requirement: Only the two deepest Tier 1 acts add the masturbation experience type
 `solo_deep_touch` and `solo_both_hands` SHALL each declare `sexual_events=("masturbation_climax",)`.

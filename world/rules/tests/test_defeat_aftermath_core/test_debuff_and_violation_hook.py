@@ -70,6 +70,7 @@ from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS
 
 from ._support import (
     DefeatAftermathBase,
+    wake_target,
 )
 
 
@@ -84,10 +85,13 @@ class WeakDebuffRulebookTests(DefeatAftermathBase):
         self._defeat_by_forfeit()
         self.assertIn("defeat_weak", entity_active_buffs(self.player))
         # The floor writes HP 1; the recovery advance then wakes the player
-        # at exactly ceil(100 * 0.05) = 5 (defeat-aftermath-recovery).
-        self.assertEqual(self.player.traits.hp.current, 5)
-        # The recovery window already consumed 8 of the buff's 300 seconds.
-        tick_buffs(self.player, 291)
+        # at the authored wake target (defeat-aftermath-recovery).
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
+        # The recovery window already consumed real world time from the mount;
+        # the mount's own live remainder drives the expiry tick.
+        remaining = int(self.player.buffs.all["defeat_weak"].remaining_seconds)
+        self.assertGreater(remaining, 1)
+        tick_buffs(self.player, remaining - 1)
         self.assertIn("defeat_weak", entity_active_buffs(self.player))
         tick_buffs(self.player, 1)
         self.assertNotIn("defeat_weak", entity_active_buffs(self.player))
@@ -130,7 +134,7 @@ class ViolationHookGuardTests(DefeatAftermathBase):
         self.assertEqual(calls, [])
         # Core-only losses are unchanged with the flag off; the recovery
         # phase is core settlement math and still wakes at the target.
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         self.assertIn("defeat_weak", entity_active_buffs(self.player))
         self.assertEqual(result["outcome"], "defeat")
 

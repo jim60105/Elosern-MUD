@@ -79,6 +79,8 @@ from ._support import (
     _T_SHOP,
     _T_SHOP_RESTOCK_HOUR,
     _isolate_synthetic_catalog,
+    recovery_seconds,
+    wake_target,
 )
 
 
@@ -103,7 +105,7 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
     )
     def test_retained_winner_blocks_rest_but_not_movement(self):
         self._defeat_by_forfeit()
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         # skip_safety still refuses a time-skip rest with the live winner.
         self.assertEqual(
             evaluate_skip_safety(self.player), SkipRejectReason.HOSTILE_PRESENT
@@ -120,7 +122,7 @@ class RetainedWinnerConsequenceTests(WildernessDefeatMixin, DefeatAftermathBase)
     def test_defeat_then_move_then_rest_to_full(self):
         """Task 3.3 smoke: retained winner -> wake at target -> move -> rest."""
         self._defeat_by_forfeit()
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         self.assertEqual(
             evaluate_skip_safety(self.player), SkipRejectReason.HOSTILE_PRESENT
         )
@@ -210,11 +212,14 @@ class RecoveryWindowClockCausalityTests(
         before = {family: extract() for family, extract in self._manifest().items()}
         self.clock.tick = self.RESTOCK_TICK - 10
         with self.captureOnCommitCallbacks(execute=True):
-            self._defeat_by_forfeit()
+            result = self._defeat_by_forfeit()
         # Combat window (107990, 107996] crossed nothing; the recovery window
         # (107996, 108004] crossed the deadline and the restock together.
-        self.assertEqual(self.clock.tick, self.RESTOCK_TICK + 4)
-        self.assertEqual(self.player.traits.hp.current, 5)
+        self.assertEqual(
+            self.clock.tick,
+            self.RESTOCK_TICK - 10 + 6 + recovery_seconds(result),
+        )
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
         stored = [dict(entry) for entry in (self.player.db.quest_log or [])]
         self.assertEqual(len(stored), 1)
         self.assertEqual(stored[0]["state"], "failed")

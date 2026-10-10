@@ -1159,3 +1159,32 @@ payload 鏡像（檔名刻意落在 `*.test.js` 收集 glob 之外）。唯一�
 `SYNTH_CANONICAL_JSON` 區塊與 Python 端的 `SYNTH_JS_PAYLOADS`；Node 自我測試
 （`synthetic_data.test.js`）與 Python 自我測試雙向比對，任何一邊漂移都會變紅。
 JS 測試引用合成 payload 時只能 import 這兩份 mirror，不得在測試檔裡另刻字串。
+
+### Authored tuning and independent assertions
+
+Classify each assertion by its property. Generic shipped-content checks cover
+schema, identity, references, audience/hit topology and intentional quality
+relationships. They must remain unchanged after valid balance tuning. A
+classification tag never permits a second table of mutable approved values.
+
+Shared mechanism tests use scoped synthetic declarations with fixed outcomes.
+For example, target MP 3, requested drain 10, caster MP 20, cost 10 and full
+recovery share produce target MP 0 and caster MP 13. The observable end state
+detects requested-loss credit and missing payment. Calling the transfer or heal
+calculator to obtain the expectation would hide a shared calculation defect.
+
+Representative production smoke reads current declarations as input and
+observes a different consumer boundary. Stored literal bases after construction
+detect wrong profile selection or baked multipliers. Real policy selection and
+settlement detect wrong ownership and recipients. Reloaded depleted gauges
+detect startup refill. Keep broad arithmetic vectors in shared synthetic
+suites, and inject rollback faults after a write or acquired practice claim.
+
+For local Evennia commands, use `uv run --locked --env-file=<file> evennia test`
+with a file containing `MUD_TEST_SETTINGS=1`, and choose focused test labels.
+The single-token environment-file spelling is required. Local commands must
+remain below ten minutes; a necessary full non-browser run is permitted once
+with `--parallel 16 --noinput`, never serially. Complete managed-browser runs,
+successful-execution traceability evidence and combined branch coverage belong
+to CI. Local handoff runs `tools.contract_gate` and `tools.spec_traceability
+check`; neither establishes the CI-owned aggregate coverage result.

@@ -59,7 +59,12 @@ class NPCTierRegistryTests(unittest.TestCase):
         static_tier = STATIC_TIER_REGISTRY[tier.static_tier_key]
         self.assertEqual(static_tier.race_key, "elf")
         self.assertEqual(race.key, "elf")
-        self.assertEqual(race.lifespan, (800, 1200))
+        # The tier resolves to the elf race's own authored lifespan band: a
+        # non-decreasing integer band, not a duplicated endpoint pair.
+        lower, upper = race.lifespan
+        self.assertIs(type(lower), int)
+        self.assertIs(type(upper), int)
+        self.assertLess(lower, upper)
 
     @covers_requirement("scenario-director::scene-archetype-and-npc-tier-registries-are-immutable-lore-data")
     def test_elven_tier_is_frozen(self):

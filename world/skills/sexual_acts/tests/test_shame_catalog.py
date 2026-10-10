@@ -70,6 +70,13 @@ _TIER_1 = (
     "shame_half_expose_lower",
     "shame_loosen_collar",
 )
+
+
+def _unlock(act_key: str) -> dict[str, int]:
+    """The act's declared unlock mapping (its authored thresholds)."""
+    return dict(SEXUAL_ACT_REGISTRY[act_key].unlock)
+
+
 _ALL_ACTS = (
     *_TIER_1,
     "shame_full_expose",
@@ -248,8 +255,9 @@ class ShameUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-shame::nine-tier-1-4-shame-acts-are-registered-gated-by-exposure-act-count-and-or-watched-count-thresholds")
     def test_public_masturbation_requires_both_exposure_and_masturbation(self):
         entity = _entity()
-        _counter_up(entity, "exposure_act", 20)
-        _counter_up(entity, "masturbation", 24)
+        unlock = _unlock("shame_public_masturbation")
+        _counter_up(entity, "exposure_act", unlock["exposure_act_count"])
+        _counter_up(entity, "masturbation", unlock["masturbation_count"] - 1)
         self.assertNotIn("shame_public_masturbation", entity.skills.owned_keys())
         entity.sexual.record_masturbation()
         self.assertIn("shame_public_masturbation", entity.skills.owned_keys())
@@ -257,15 +265,16 @@ class ShameUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-shame::nine-tier-1-4-shame-acts-are-registered-gated-by-exposure-act-count-and-or-watched-count-thresholds")
     def test_provocative_gaze_is_gated_by_watched_count_alone(self):
         entity = _entity()
-        _counter_up(entity, "watched", 10)
+        _counter_up(entity, "watched", _unlock("shame_provocative_gaze")["watched_count"])
         self.assertEqual(entity.sexual.exposure_act_count, 0)
         self.assertIn("shame_provocative_gaze", entity.skills.owned_keys())
 
     @covers_requirement("sexual-catalog-shame::nine-tier-1-4-shame-acts-are-registered-gated-by-exposure-act-count-and-or-watched-count-thresholds")
     def test_shameless_declaration_requires_both_exposure_and_watched(self):
         entity = _entity()
-        _counter_up(entity, "exposure_act", 50)
-        _counter_up(entity, "watched", 29)
+        unlock = _unlock("shame_shameless_declaration")
+        _counter_up(entity, "exposure_act", unlock["exposure_act_count"])
+        _counter_up(entity, "watched", unlock["watched_count"] - 1)
         self.assertNotIn("shame_shameless_declaration", entity.skills.owned_keys())
         entity.sexual.record_watched()
         self.assertIn("shame_shameless_declaration", entity.skills.owned_keys())
@@ -307,7 +316,7 @@ class ShameCastTests(EvenniaTest):
     def test_tier1_act_raises_the_actors_own_exposure_by_one(self):
         entity = _entity()
         entity.location = self.room1
-        _counter_up(entity, "exposure_act", 5)
+        _counter_up(entity, "exposure_act", _unlock("shame_half_expose_chest")["exposure_act_count"])
         self.assertEqual(entity.sexual.exposure.value, 0)
         result = ActionResolver.resolve(
             ActionRequest(
@@ -324,7 +333,7 @@ class ShameCastTests(EvenniaTest):
     def test_casting_a_tier1_act_grants_the_exposure_experience(self):
         entity = _entity(key="exposure experience caster")
         entity.location = self.room1
-        _counter_up(entity, "exposure_act", 5)
+        _counter_up(entity, "exposure_act", _unlock("shame_half_expose_chest")["exposure_act_count"])
         result = ActionResolver.resolve(
             ActionRequest(
                 entity,
@@ -342,26 +351,20 @@ class ShameCastTests(EvenniaTest):
         # floor (極低, value 0), so "increases by exactly one" never clamps
         # against the five-level cap. SELF acts fire their actor-scoped events
         # on the actor; the two AREA acts are covered by the following test.
-        thresholds = {
-            "shame_half_expose_chest": {"exposure_act": 5},
-            "shame_half_expose_lower": {"exposure_act": 5},
-            "shame_loosen_collar": {"exposure_act": 5},
-            "shame_full_expose": {"exposure_act": 20},
-            "shame_public_masturbation": {
-                "exposure_act": 20,
-                "masturbation": 25,
-            },
-            "shame_shameless_declaration": {
-                "exposure_act": 50,
-                "watched": 30,
-            },
-        }
-        for key, counters in thresholds.items():
+        reusing_acts = (
+            "shame_half_expose_chest",
+            "shame_half_expose_lower",
+            "shame_loosen_collar",
+            "shame_full_expose",
+            "shame_public_masturbation",
+            "shame_shameless_declaration",
+        )
+        for key in reusing_acts:
             with self.subTest(key=key):
                 entity = _entity(key=f"exposure caster {key}")
                 entity.location = self.room1
-                for counter, times in counters.items():
-                    _counter_up(entity, counter, times)
+                for counter, threshold in _unlock(key).items():
+                    _counter_up(entity, counter.removesuffix("_count"), threshold)
                 self.assertEqual(entity.sexual.exposure.value, 0)
                 result = ActionResolver.resolve(
                     ActionRequest(
@@ -426,12 +429,17 @@ class ShameCastTests(EvenniaTest):
     def test_public_masturbation_increments_all_three_counters_by_exactly_one(self):
         # The cast room holds the co-located target, so the cast is observed
         # and the watched event/counter both fire ("when observed").
-        _counter_up(self.actor, "exposure_act", 20)
-        _counter_up(self.actor, "masturbation", 25)
+        unlock = _unlock("shame_public_masturbation")
+        _counter_up(self.actor, "exposure_act", unlock["exposure_act_count"])
+        _counter_up(self.actor, "masturbation", unlock["masturbation_count"])
         result = self._cast("shame_public_masturbation", [])
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.exposure_act_count, 21)
-        self.assertEqual(self.actor.sexual.masturbation_count, 26)
+        self.assertEqual(
+            self.actor.sexual.exposure_act_count, unlock["exposure_act_count"] + 1
+        )
+        self.assertEqual(
+            self.actor.sexual.masturbation_count, unlock["masturbation_count"] + 1
+        )
         self.assertEqual(self.actor.sexual.watched_count, 1)
         for experience in ("露出", "自慰", "被觀看"):
             self.assertIn(experience, self.actor.sexual.experience_types)
@@ -440,8 +448,9 @@ class ShameCastTests(EvenniaTest):
     def test_public_masturbation_alone_skips_only_the_watched_credit(self):
         alone = create_object(Room, key="masturbation alone room")
         self.actor.location = alone
-        _counter_up(self.actor, "exposure_act", 20)
-        _counter_up(self.actor, "masturbation", 25)
+        unlock = _unlock("shame_public_masturbation")
+        _counter_up(self.actor, "exposure_act", unlock["exposure_act_count"])
+        _counter_up(self.actor, "masturbation", unlock["masturbation_count"])
         result = ActionResolver.resolve(
             ActionRequest(
                 self.actor,
@@ -451,8 +460,12 @@ class ShameCastTests(EvenniaTest):
             )
         )
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.exposure_act_count, 21)
-        self.assertEqual(self.actor.sexual.masturbation_count, 26)
+        self.assertEqual(
+            self.actor.sexual.exposure_act_count, unlock["exposure_act_count"] + 1
+        )
+        self.assertEqual(
+            self.actor.sexual.masturbation_count, unlock["masturbation_count"] + 1
+        )
         self.assertEqual(self.actor.sexual.watched_count, 0)
         for experience in ("露出", "自慰"):
             self.assertIn(experience, self.actor.sexual.experience_types)
@@ -460,12 +473,17 @@ class ShameCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-shame::shame-public-performance-credits-both-watched-count-and-exposure-act-count-on-the-actor-and-emits-the-four-public-events")
     def test_public_performance_increments_both_actor_counters_only(self):
-        _counter_up(self.actor, "watched", 10)
-        _counter_up(self.actor, "exposure_act", 20)
+        unlock = _unlock("shame_public_performance")
+        _counter_up(self.actor, "watched", unlock["watched_count"])
+        _counter_up(self.actor, "exposure_act", unlock["exposure_act_count"])
         result = self._cast("shame_public_performance", [self.target])
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.watched_count, 11)
-        self.assertEqual(self.actor.sexual.exposure_act_count, 21)
+        self.assertEqual(
+            self.actor.sexual.watched_count, unlock["watched_count"] + 1
+        )
+        self.assertEqual(
+            self.actor.sexual.exposure_act_count, unlock["exposure_act_count"] + 1
+        )
         for counter in (
             "watched_count",
             "exposure_act_count",
@@ -494,7 +512,7 @@ class ShameCastTests(EvenniaTest):
 
     @covers_requirement("sexual-catalog-shame::shame-provocative-gaze-credits-hostile-act-count-on-both-participants")
     def test_provocative_gaze_credits_hostile_act_count_on_both_participants(self):
-        _counter_up(self.actor, "watched", 10)
+        _counter_up(self.actor, "watched", _unlock("shame_provocative_gaze")["watched_count"])
         self.assertEqual(self.actor.sexual.hostile_act_count, 0)
         self.assertEqual(self.target.sexual.hostile_act_count, 0)
         # resistible=True means the target's participant_counters credit is
@@ -512,17 +530,18 @@ class ShameCastTests(EvenniaTest):
         # by the shipped high_arousal_agility_accuracy_penalty combat-modifier
         # row once a target's pleasure crosses the 高度 band. The
         # modifier's own firing is probabilistic and owned by
-        # combat_modifiers.yaml's suite; what this test pins is that the
-        # act's cast actually moves the target's pleasure (2 participants →
-        # crowd multiplier 1.1; a neutral target receives
-        # round(14 × 1.0 × 1.0 × 1.0 × 1.1) = 15). The target's resist contest
-        # is forced to compliance (roll=1; two floor humans share equal
-        # contest scores) so the target-side pleasure assertion stays
+        # combat_modifiers.yaml's suite; what this test observes is that the
+        # act's cast actually moves both participants' pleasure. The target's
+        # resist contest is forced to compliance (roll=1; two floor humans
+        # share equal contest scores) so the target-side assertion stays
         # deterministic under the shipped resist gate.
-        _counter_up(self.actor, "watched", 10)
+        _counter_up(self.actor, "watched", _unlock("shame_provocative_gaze")["watched_count"])
         with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("shame_provocative_gaze", [self.target])
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.target.sexual.pleasure.base, 15)
-        # D-4 holds for the actor too: round(14 × 0.4 × 1.1) = 6.
-        self.assertEqual(self.actor.sexual.pleasure.base, 6)
+        self.assertGreater(self.target.sexual.pleasure.base, 0)
+        # D-4 holds for the actor too: its lower ratio yields less.
+        self.assertGreater(self.actor.sexual.pleasure.base, 0)
+        self.assertGreater(
+            self.target.sexual.pleasure.base, self.actor.sexual.pleasure.base
+        )

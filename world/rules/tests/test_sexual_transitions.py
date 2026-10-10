@@ -51,29 +51,82 @@ class SexualTransitionTests(EvenniaTestCase):
         return entity
 
     def test_rule_arousal_up_on_stimulus(self):
+        # Synthetic row: the shipped "+8..+14" range is authored tuning, so the
+        # mechanism is pinned with a fixed local row — a resolved delta lands
+        # on the pleasure counter and the row's own range is the one queried.
         entity = self._entity()
         rng = FixedRng(14)
-        apply_event(entity, "stimulus_applied", rng=rng)
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_up_on_stimulus",
+                    {"event": "stimulus_applied"},
+                    {"field": "pleasure", "delta": "+8..+14"},
+                )
+            ],
+        ):
+            apply_event(entity, "stimulus_applied", rng=rng)
         self.assertEqual(entity.sexual.pleasure.value, 14)
-        self.assertIn((8, 14), rng.calls)
+        self.assertEqual(rng.calls, [(8, 14)])
 
     @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
     def test_rule_arousal_up_on_sustained_stimulus(self):
+        # Synthetic fixed-delta row: detects a sustained-stimulus rule that
+        # fails to apply its declared delta to the pleasure counter.
         entity = self._entity()
-        apply_event(entity, "sustained_stimulus_applied")
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_up_on_sustained_stimulus",
+                    {"event": "sustained_stimulus_applied"},
+                    {"field": "pleasure", "delta": "+6"},
+                )
+            ],
+        ):
+            apply_event(entity, "sustained_stimulus_applied")
         self.assertEqual(entity.sexual.pleasure.value, 6)
 
     def test_rule_arousal_extreme_stimulus_to_max(self):
+        # Synthetic set-to-bound row: detects a set effect that fails to reach
+        # the pleasure bound and read back as the top derived level.
         entity = self._entity()
         entity.sexual.pleasure.base = 15
-        apply_event(entity, "extreme_stimulus_applied")
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_extreme_stimulus_to_max",
+                    {"event": "extreme_stimulus_applied"},
+                    {"field": "pleasure", "set": 100},
+                )
+            ],
+        ):
+            apply_event(entity, "extreme_stimulus_applied")
         self.assertEqual(entity.sexual.pleasure.value, 100)
         self.assertEqual(entity.sexual.arousal.level, "極限")
 
     def test_rule_arousal_reset_after_climax(self):
+        # Synthetic reset row: detects a climax reset that fails to drop
+        # pleasure to the declared post-climax level.
         entity = self._entity()
         entity.sexual.pleasure.base = 60
-        apply_event(entity, "climax_ends", rng=FixedRng(-25))
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_reset_after_climax",
+                    {"event": "climax_ends"},
+                    {"field": "pleasure", "set": 15},
+                )
+            ],
+        ):
+            apply_event(entity, "climax_ends")
         self.assertEqual(entity.sexual.pleasure.value, 15)
         self.assertEqual(entity.sexual.arousal.level, "微興奮")
 
@@ -86,18 +139,55 @@ class SexualTransitionTests(EvenniaTestCase):
 
     @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
     def test_band_crossing_pleasure_delta_reports_an_arousal_change(self):
+        # Synthetic rows: a pleasure delta that crosses a band must report the
+        # change under "arousal" (never "pleasure") so the arousal-keyed
+        # listener fires within the same apply_event() call.
         entity = self._entity()
         entity.sexual.pleasure.base = 10
-        changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_up_on_stimulus",
+                    {"event": "stimulus_applied"},
+                    {"field": "pleasure", "delta": "+8..+14"},
+                ),
+                Rule(
+                    "wetness_follows_arousal",
+                    {"field_changed": "arousal", "direction": "up"},
+                    {"field": "wetness", "delta": "+1"},
+                ),
+            ],
+        ):
+            changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(entity.sexual.pleasure.value, 18)
         self.assertEqual(changes, {"arousal": "up", "wetness": "up"})
         self.assertEqual(entity.sexual.wetness.value, 1)
 
     @covers_requirement("sexual-transition-rulebook::pleasure-targeting-rules-write-through-the-bounded-counter-kind-and-report-their-arousal-level-crossing-under-the-field-name-arousal")
     def test_band_staying_pleasure_delta_reports_no_change(self):
+        # Synthetic rows: a pleasure delta that stays within one band must
+        # report no field change, so the arousal-keyed listener never fires.
         entity = self._entity()
         entity.sexual.pleasure.base = 20
-        changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
+        with patch.object(
+            sexual_transitions,
+            "_RULES",
+            [
+                Rule(
+                    "arousal_up_on_stimulus",
+                    {"event": "stimulus_applied"},
+                    {"field": "pleasure", "delta": "+8..+14"},
+                ),
+                Rule(
+                    "wetness_follows_arousal",
+                    {"field_changed": "arousal", "direction": "up"},
+                    {"field": "wetness", "delta": "+1"},
+                ),
+            ],
+        ):
+            changes = apply_event(entity, "stimulus_applied", rng=FixedRng(8))
         self.assertEqual(entity.sexual.pleasure.value, 28)
         self.assertEqual(changes, {})
         self.assertEqual(entity.sexual.wetness.value, 0)
@@ -282,24 +372,40 @@ class SexualTransitionTests(EvenniaTestCase):
         self.assertEqual(entity.sexual.shame.value, 1)
 
     def test_rule_sp_cost_on_climax(self):
+        # Synthetic sp-cost row: detects a vital-gauge cost applied to the
+        # wrong surface or without the gauge's own floor bound.
         entity = self._entity()
         before = entity.traits.sp.value
-        rng = FixedRng(-25)
-        apply_event(entity, "climax_ends", rng=rng)
-        self.assertEqual(entity.traits.sp.value, before - 25)
-        entity.traits.sp.current = 10
-        apply_event(entity, "climax_ends", rng=FixedRng(-25))
-        self.assertEqual(entity.traits.sp.value, 0)
+        rules = [
+            Rule(
+                "sp_cost_on_climax",
+                {"event": "climax_ends"},
+                {"field": "sp", "delta": "-30..-20"},
+            )
+        ]
+        with patch.object(sexual_transitions, "_RULES", rules):
+            apply_event(entity, "climax_ends", rng=FixedRng(-25))
+            self.assertEqual(entity.traits.sp.value, before - 25)
+            entity.traits.sp.current = 10
+            apply_event(entity, "climax_ends", rng=FixedRng(-25))
+            self.assertEqual(entity.traits.sp.value, 0)
 
     def test_rule_sp_cost_on_climax_extension(self):
         entity = self._entity()
         before = entity.traits.sp.value
-        rng = FixedRng(-12)
-        apply_event(entity, "climax_extended", rng=rng)
-        self.assertEqual(entity.traits.sp.value, before - 12)
-        entity.traits.sp.current = 10
-        apply_event(entity, "climax_extended", rng=FixedRng(-12))
-        self.assertEqual(entity.traits.sp.value, 0)
+        rules = [
+            Rule(
+                "sp_cost_on_climax_extension",
+                {"event": "climax_extended"},
+                {"field": "sp", "delta": "-15..-10"},
+            )
+        ]
+        with patch.object(sexual_transitions, "_RULES", rules):
+            apply_event(entity, "climax_extended", rng=FixedRng(-12))
+            self.assertEqual(entity.traits.sp.value, before - 12)
+            entity.traits.sp.current = 10
+            apply_event(entity, "climax_extended", rng=FixedRng(-12))
+            self.assertEqual(entity.traits.sp.value, 0)
 
     @covers_requirement("climax-settlement::climax-extended-costs-half-of-climax-ends-stamina-and-does-not-change-climax-phase")
     def test_climax_extended_never_moves_climax_phase(self):

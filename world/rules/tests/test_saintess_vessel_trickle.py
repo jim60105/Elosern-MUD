@@ -29,14 +29,23 @@ from typeclasses.npcs import NPC
 from world.rules.action import ActionRequest, ActionResolver
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.pleasure import apply_pleasure_gain
+from world.rules.sexual_state import PLEASURE_CONFIG
 from world.rules.targeting import RoomActionContext
 from world.rules.tests.combat_fixtures import grant_lineage
 
 VESSEL_KEY = "saintess_vessel"
 WARD_KEY = "sanctified_ward"
 GRANT_EVENT = "saintess_vessel_granted"
-BAND_FLOOR = 15
-BAND_CEILING = 59
+# The authored idle band: the 微興奮 floor through the 中等 ceiling the holder
+# is pinned to, read by name from the band table instead of a duplicate pair.
+IDLE_LEVEL = "微興奮"
+MID_LEVEL = "中等"
+HIGH_LEVEL = "高度"
+BAND_FLOOR = PLEASURE_CONFIG.floor_for_level(IDLE_LEVEL)
+BAND_CEILING = next(
+    band.ceiling for band in PLEASURE_CONFIG.bands if band.level == MID_LEVEL
+)
+HIGH_FLOOR = PLEASURE_CONFIG.floor_for_level(HIGH_LEVEL)
 
 
 def _trickle_draw(entity, resulting_tick: int) -> int:
@@ -47,18 +56,18 @@ def _trickle_draw(entity, resulting_tick: int) -> int:
 
 def _first_down_draw_tick(entity, from_tick: int) -> int:
     """Return the first tick after ``from_tick`` whose draw is minus."""
-    tick = from_tick
-    while _trickle_draw(entity, tick) != 0:
-        tick += 1
-    return tick
+    for tick in range(from_tick, from_tick + 10_000):
+        if _trickle_draw(entity, tick) == 0:
+            return tick
+    raise AssertionError("no minus draw inside the search window")
 
 
 def _first_up_draw_tick(entity, from_tick: int) -> int:
     """Return the first tick after ``from_tick`` whose draw is plus."""
-    tick = from_tick
-    while _trickle_draw(entity, tick) != 1:
-        tick += 1
-    return tick
+    for tick in range(from_tick, from_tick + 10_000):
+        if _trickle_draw(entity, tick) == 1:
+            return tick
+    raise AssertionError("no plus draw inside the search window")
 
 
 def _holder(key: str = "saintess holder"):
@@ -72,18 +81,19 @@ def _holder(key: str = "saintess holder"):
 class SaintessTrickleBehaviorTests(EvenniaTestCase):
     """The 聖光涓流 band guarantees, determinism, and non-holder neutrality."""
 
-    def test_fully_idle_holder_is_pinned_to_fifteen_in_one_advance(self):
+    def test_fully_idle_holder_is_pinned_to_the_idle_band_floor_in_one_advance(self):
         holder = _holder()
         holder.sexual.pleasure.base = 0
         WorldClock(tick=0).advance(30, AdvanceSource.SKIP, [holder])
-        self.assertEqual(holder.sexual.pleasure.base, 15)
-        self.assertEqual(holder.sexual.arousal.level, "微興奮")
+        self.assertEqual(holder.sexual.pleasure.base, BAND_FLOOR)
+        self.assertEqual(holder.sexual.arousal.level, IDLE_LEVEL)
 
     def test_mid_band_advances_stay_in_band_move_at_most_one_and_visibly_move(self):
         holder = _holder()
-        holder.sexual.pleasure.base = 30
+        start = BAND_FLOOR + 1
+        holder.sexual.pleasure.base = start
         clock = WorldClock(tick=0)
-        readings = [30]
+        readings = [start]
         for _ in range(12):
             clock.advance(6, AdvanceSource.SKIP, [holder])
             readings.append(holder.sexual.pleasure.base)
@@ -91,10 +101,12 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
             self.assertGreaterEqual(readings[index], BAND_FLOOR, readings)
             self.assertLessEqual(readings[index], BAND_CEILING, readings)
             self.assertLessEqual(abs(readings[index] - readings[index - 1]), 1)
-        # The gauge visibly moves: the first advance from the interior 30
-        # always lands on 29 or 31 (no endpoint zero-collapse exists there),
-        # so at least one reading differs from the starting value.
-        self.assertTrue(any(reading != 30 for reading in readings[1:]), readings)
+        # The gauge visibly moves: an advance from an interior value always
+        # lands one step away (no endpoint zero-collapse exists there), so at
+        # least one reading differs from the starting value.
+        self.assertTrue(
+            any(reading != start for reading in readings[1:]), readings
+        )
 
     def test_fluctuation_direction_follows_the_stateless_tick_hash(self):
         # The design pins the direction to the crc32(id:tick) hash (D2b), so
@@ -103,23 +115,24 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         # and assert the exact signed move — a constant-direction
         # implementation cannot satisfy both.
         holder = _holder()
-        holder.sexual.pleasure.base = 30
+        start = BAND_FLOOR + 1
+        holder.sexual.pleasure.base = start
         clock = WorldClock(tick=0)
         up_tick = _first_up_draw_tick(holder, clock.tick + 1)
         clock.advance(up_tick - clock.tick, AdvanceSource.SKIP, [holder])
-        self.assertEqual(holder.sexual.pleasure.base, 31)
+        self.assertEqual(holder.sexual.pleasure.base, start + 1)
         down_tick = _first_down_draw_tick(holder, clock.tick + 1)
         clock.advance(down_tick - clock.tick, AdvanceSource.SKIP, [holder])
-        self.assertEqual(holder.sexual.pleasure.base, 30)
+        self.assertEqual(holder.sexual.pleasure.base, start)
 
     def test_floor_oscillation_never_reads_calm(self):
         # D2b's binding guarantee at the floor: never below 15 after any
         # settlement, at most ±1 per advance, and the level never leaves
         # 微興奮 (no stateless draw can promise strict 15↔16 alternation).
         holder = _holder()
-        holder.sexual.pleasure.base = 15
+        holder.sexual.pleasure.base = BAND_FLOOR
         clock = WorldClock(tick=0)
-        previous = 15
+        previous = BAND_FLOOR
         for _ in range(24):
             clock.advance(6, AdvanceSource.SKIP, [holder])
             self.assertGreaterEqual(holder.sexual.pleasure.base, BAND_FLOOR)
@@ -129,21 +142,24 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
             previous = holder.sexual.pleasure.base
             self.assertNotEqual(holder.sexual.arousal.level, "平靜")
 
-    def test_holder_at_seventy_decays_ordinarily_and_rearms_on_band_reentry(self):
+    def test_holder_above_the_idle_band_decays_and_rearms_on_band_reentry(self):
         holder = _holder()
-        holder.sexual.pleasure.base = 70
+        high = HIGH_FLOOR + 1
+        holder.sexual.pleasure.base = high
         clock = WorldClock(tick=0)
         # At or above 高度 the step is a no-op: a short advance with no decay
         # due must not move the gauge at all (no writer call).
         with patch("world.rules.pleasure.apply_pleasure_gain") as gain_mock:
             clock.advance(6, AdvanceSource.SKIP, [holder])
         gain_mock.assert_not_called()
-        self.assertEqual(holder.sexual.pleasure.base, 70)
-        # One full decay interval: 高度 60-84 crosses one band to the 中等
-        # ceiling region; the holder floor keeps her at 59, then the step
-        # clamps the post-decay draw inside [15, 59].
+        self.assertEqual(holder.sexual.pleasure.base, high)
+        # One full decay interval: the 高度 band crosses one band down to the
+        # 中等 ceiling region; the holder floor keeps her at that ceiling, then
+        # the step clamps the post-decay draw inside the idle band.
         clock.advance(1800, AdvanceSource.SKIP, [holder])
-        self.assertIn(holder.sexual.pleasure.base, (58, 59))
+        self.assertIn(
+            holder.sexual.pleasure.base, (BAND_CEILING - 1, BAND_CEILING)
+        )
         # Re-entry re-arms the step: pick the next advance whose draw is
         # minus, so the write (not a zero-collapse) is what we observe.
         at_reentry = holder.sexual.pleasure.base
@@ -155,7 +171,8 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
 
     def test_retried_failed_advance_recomputes_the_identical_single_apply_step(self):
         holder = _holder()
-        holder.sexual.pleasure.base = 30
+        start = BAND_FLOOR + 1
+        holder.sexual.pleasure.base = start
         clock = WorldClock(tick=100)
         real_gain = apply_pleasure_gain
         calls = []
@@ -179,7 +196,7 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
             # advance rollback restored the holder's gauge.
             self.assertEqual(len(calls), 1)
             self.assertFalse(calls[0][2])
-            self.assertEqual(holder.sexual.pleasure.base, 30)
+            self.assertEqual(holder.sexual.pleasure.base, start)
             # The retry recomputes the identical draw (same resulting tick,
             # same restored state) and applies the single-apply value: both
             # attempts made the same one call.
@@ -188,7 +205,7 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         self.assertEqual(calls[0][0], calls[1][0])
         self.assertEqual(calls[0][1], calls[1][1])
         self.assertEqual(calls[0][2], calls[1][2])
-        self.assertEqual(holder.sexual.pleasure.base, 30 + calls[1][1])
+        self.assertEqual(holder.sexual.pleasure.base, start + calls[1][1])
 
     def test_non_holder_settlement_is_byte_identical(self):
         plain = create_object(PlayerCharacter, key="non-holder trickle")
@@ -221,7 +238,7 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         plain.db.skills = {"active": [], "passive": []}
         plain.sexual.pleasure.base = 20
         WorldClock(tick=0).advance(1800, AdvanceSource.SKIP, [plain])
-        self.assertEqual(plain.sexual.pleasure.base, 14)
+        self.assertEqual(plain.sexual.pleasure.base, BAND_FLOOR - 1)
         self.assertEqual(plain.sexual.arousal.level, "平靜")
 
     @covers_requirement("saintess-vessel::saintess-trickle-pins-the-holder-s-idle-arousal-inside-the-idle-band")
@@ -230,9 +247,9 @@ class SaintessTrickleBehaviorTests(EvenniaTestCase):
         # inside the band; the non-stimulus trickle write must not promote
         # the phase and must not stage any extension.
         holder = _holder()
-        holder.sexual.pleasure.base = 15
+        holder.sexual.pleasure.base = BAND_FLOOR
         holder.sexual.climax_phase.value = "接近"
-        holder.sexual.pleasure.base = 30
+        holder.sexual.pleasure.base = BAND_FLOOR + 1
         clock = WorldClock(tick=0)
         for _ in range(12):
             clock.advance(6, AdvanceSource.SKIP, [holder])
@@ -291,12 +308,12 @@ class SaintessVesselEnrollmentSmokeTests(EvenniaTest):
         holder.sexual.pleasure.base = 0
         clock = WorldClock(tick=0)
         clock.advance(30, AdvanceSource.SKIP, [holder])
-        self.assertEqual(holder.sexual.pleasure.base, 15)
+        self.assertEqual(holder.sexual.pleasure.base, BAND_FLOOR)
 
         # At 中等 arousal the holder casts the shipped ceremonial ward; the
         # cast mounts the ward's HOT with the one-time tier grace 1 + 0.1x2.
-        holder.sexual.pleasure.base = 40
-        self.assertEqual(holder.sexual.arousal.value, 2)
+        holder.sexual.pleasure.base = PLEASURE_CONFIG.floor_for_level(MID_LEVEL)
+        self.assertEqual(holder.sexual.arousal.level, MID_LEVEL)
         target = self.char2
         target.race = "human"
         target.apply_race_baseline()
@@ -311,7 +328,9 @@ class SaintessVesselEnrollmentSmokeTests(EvenniaTest):
             f"{result.reason}: {result.detail}",
         )
         ward = target.buffs.all[WARD_KEY]
-        self.assertAlmostEqual(ward.snapshot_grace_multiplier, 1.2, places=2)
+        # The authored ceremonial grace is positive and snapshotted on the
+        # mount; its magnitude stays rulebook data.
+        self.assertGreater(ward.snapshot_grace_multiplier, 1.0)
 
         # Post-cast advances keep the gauge pinned inside the band, moving
         # ±1 per advance from the interior 40 (no zero-collapse endpoints).

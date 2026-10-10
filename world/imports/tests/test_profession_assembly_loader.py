@@ -447,9 +447,21 @@ class TierAndScheduleTests(ProfessionAssemblyHarness):
             {"type": _MERCHANT, "kwargs": merchant_kwargs()}
         ]
         npc = self.assembled(record)
-        expected = initial_trait_config(record["race"], record["subrace"], _TIER_KEY)
-        for key, config in expected.items():
-            self.assertEqual(getattr(npc.traits, key).base, config["base"], key)
+        # Independent expectation: the declared tier row's own floors and the
+        # declared race/subrace vital floors. Never the constructor the loader
+        # itself calls, which would hide a tiered-construction defect.
+        tiers = _live_registry("world.lore.races", "STATIC", "TIER")
+        tier = tiers[_TIER_KEY]
+        for axis in ("atk_phys", "agility", "defense"):
+            self.assertEqual(getattr(npc.traits, axis).base, tier.band[0], axis)
+        self.assertEqual(npc.traits.magic_power.base, tier.magic_band[0])
+        races = _live_registry("world.lore.races", "RACE")
+        subraces = _live_registry("world.lore.races", "SUBRACE")
+        race = races[record["race"]]
+        overrides = subraces[record["subrace"]].vital_overrides or {}
+        for gauge in ("hp", "mp", "sp"):
+            floor = overrides.get(gauge, getattr(race.vital_baseline, gauge))[0]
+            self.assertEqual(getattr(npc.traits, gauge).base, floor, gauge)
 
     @covers_requirement("import-loader::loaded-trait-values-are-the-literal-imported-stats-merged-onto-the-race-floor-for-omitted-keys-never-re-derived-or-multiplied")
     def test_literal_stats_beat_any_profession_tier(self):

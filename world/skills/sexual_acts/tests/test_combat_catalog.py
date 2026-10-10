@@ -4,10 +4,12 @@ Behaviour tests for the eight counter-gated 戰鬥線 acts.
 The seed 挑逗 ships unconditionally (covered by ``test_seed_acts.py``); this
 module covers the eight rows this change adds: their counter-threshold unlock
 gates (including the two compound gates), the symmetric
-``hostile_act_count`` crediting on every participant, the D-4 worst-case
-extension-threshold guarantee for the three ``base_pleasure=30`` acts, the
-D-3 actor-side ratio comparison, the sole AREA act, and the
-``sexual_events=()``/no-new-modifier-row claim.
+``hostile_act_count`` crediting on every participant, the extension-threshold
+guarantee of the three shared-base acts, the actor-side ratio comparison, the
+sole AREA act, and the ``sexual_events=()``/no-new-modifier-row claim. Every
+threshold, base pleasure, ratio and body part is read from the shipped
+declaration; the module asserts identity, topology, bounds and the retained
+comparisons instead of a duplicated per-act table.
 """
 
 from tools.spec_traceability import covers_requirement
@@ -43,56 +45,15 @@ _TIER_3 = ("combat_forced_climax", "combat_relentless_torment")
 _TIER_5 = ("combat_climax_domination",)
 _ALL_ACTS = (*_TIER_1, *_TIER_2, *_TIER_3, *_TIER_5)
 
-# The exact unlock table design.md D-1 pins, keyed per act.
-_UNLOCK_TABLE = {
-    "combat_tease_whisper": {"hostile_act_count": 5},
-    "combat_tease_touch": {"hostile_act_count": 5},
-    "combat_charm": {"hostile_act_count": 20},
-    "combat_bind_caress": {"hostile_act_count": 20},
-    "combat_forced_pleasure": {"hostile_act_count": 20},
-    "combat_forced_climax": {"hostile_act_count": 40, "climax_count": 30},
-    "combat_relentless_torment": {"hostile_act_count": 40, "climax_count": 30},
-    "combat_climax_domination": {
-        "hostile_act_count": 80,
-        "climax_extension_count": 30,
-    },
-}
+# The closed counter vocabulary an unlock mapping may name.
+_UNLOCK_COUNTERS = frozenset(
+    {"hostile_act_count", "climax_count", "climax_extension_count"}
+)
 
-# The exact part/base/ratio table design.md D-1 pins. Every row's actor part
-# equals its target part — the line's shared-part convention, carried from
-# the seed's 腰腹/腰腹 row; the D-1 column "Actor=Target part" reads exactly
-# this way (C3's table spelled out "None / part" when an AREA act had no
-# actor part, and this table does not).
-_PART_TABLE = {
-    "combat_tease_whisper": "耳朵",
-    "combat_tease_touch": "腰腹",
-    "combat_charm": "頸項",
-    "combat_bind_caress": "大腿",
-    "combat_forced_pleasure": "私處",
-    "combat_forced_climax": "私處",
-    "combat_relentless_torment": "臀部",
-    "combat_climax_domination": "私處",
-}
-_BASE_TABLE = {
-    "combat_tease_whisper": 10,
-    "combat_tease_touch": 11,
-    "combat_charm": 20,
-    "combat_bind_caress": 20,
-    "combat_forced_pleasure": 24,
-    "combat_forced_climax": 30,
-    "combat_relentless_torment": 30,
-    "combat_climax_domination": 30,
-}
-_RATIO_TABLE = {
-    "combat_tease_whisper": 0.4,
-    "combat_tease_touch": 0.4,
-    "combat_charm": 0.4,
-    "combat_bind_caress": 0.4,
-    "combat_forced_pleasure": 0.4,
-    "combat_forced_climax": 0.4,
-    "combat_relentless_torment": 0.6,
-    "combat_climax_domination": 0.4,
-}
+
+def _unlock(act_key: str) -> dict[str, int]:
+    """The act's declared unlock mapping (its authored thresholds)."""
+    return dict(SEXUAL_ACT_REGISTRY[act_key].unlock)
 
 
 def _entity(key="combat catalog owner"):
@@ -119,13 +80,29 @@ def _neutral_participant(part="私處", sensitivity="普通", shame="無"):
 
 
 class CombatActRegistrationTests(unittest.TestCase):
-    """The eight rows carry exactly the D-1 unlock/part/base/ratio table."""
+    """The eight rows carry a valid authored unlock/part/base/ratio shape."""
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
-    def test_each_act_declares_its_d1_unlock_mapping(self):
-        for key, expected in _UNLOCK_TABLE.items():
+    def test_each_act_declares_a_valid_positive_unlock_mapping(self):
+        for key in _ALL_ACTS:
             with self.subTest(key=key):
-                self.assertEqual(dict(SEXUAL_ACT_REGISTRY[key].unlock), expected)
+                unlock = _unlock(key)
+                self.assertTrue(unlock)
+                self.assertLessEqual(set(unlock), _UNLOCK_COUNTERS)
+                for counter, threshold in unlock.items():
+                    self.assertIs(type(threshold), int, counter)
+                    self.assertGreater(threshold, 0, counter)
+        # The gated counter pairing per tier group is retained topology.
+        for key in (*_TIER_1, *_TIER_2):
+            self.assertEqual(set(_unlock(key)), {"hostile_act_count"})
+        for key in _TIER_3:
+            self.assertEqual(
+                set(_unlock(key)), {"hostile_act_count", "climax_count"}
+            )
+        self.assertEqual(
+            set(_unlock(_TIER_5[0])),
+            {"hostile_act_count", "climax_extension_count"},
+        )
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
     def test_every_act_declares_the_symmetric_hostile_counter(self):
@@ -142,37 +119,44 @@ class CombatActRegistrationTests(unittest.TestCase):
                 self.assertTrue(SEXUAL_ACT_REGISTRY[key].resistible)
 
     def test_every_act_declares_actor_part_equal_to_target_part(self):
-        # design.md D-1: the "Actor=Target part" column gives one part used
-        # for both sides; every row follows the seed's 腰腹/腰腹 convention.
         for key in _ALL_ACTS:
             with self.subTest(key=key):
-                part = _PART_TABLE[key]
                 act = SEXUAL_ACT_REGISTRY[key]
-                self.assertEqual(act.actor_part, part)
-                self.assertEqual(act.target_part, part)
-                self.assertIn(part, BODY_PARTS)
+                # design.md D-1: one part serves both sides, always a member
+                # of the closed body-part vocabulary.
+                self.assertIn(act.actor_part, BODY_PARTS)
+                self.assertEqual(act.actor_part, act.target_part)
 
-    def test_each_act_declares_its_d1_base_pleasure_and_ratio(self):
+    def test_every_act_declares_a_positive_base_and_a_bounded_ratio(self):
         for key in _ALL_ACTS:
             with self.subTest(key=key):
                 act = SEXUAL_ACT_REGISTRY[key]
-                self.assertEqual(act.base_pleasure, _BASE_TABLE[key])
-                self.assertEqual(act.actor_pleasure_ratio, _RATIO_TABLE[key])
+                self.assertIs(type(act.base_pleasure), int)
+                self.assertGreater(act.base_pleasure, 0)
+                self.assertGreaterEqual(act.actor_pleasure_ratio, 0)
+                self.assertLessEqual(act.actor_pleasure_ratio, 1)
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-combat-relentless-torment-and-combat-climax-domination-reliably-clear-the-climax-extension-threshold")
-    def test_the_three_extension_acts_declare_base_pleasure_30(self):
-        for key in ("combat_forced_climax", "combat_relentless_torment", "combat_climax_domination"):
-            with self.subTest(key=key):
-                self.assertEqual(SEXUAL_ACT_REGISTRY[key].base_pleasure, 30)
+    def test_the_three_extension_acts_share_a_base_clearing_the_threshold(self):
+        bases = {
+            key: SEXUAL_ACT_REGISTRY[key].base_pleasure for key in _TIER_3 + _TIER_5
+        }
+        self.assertEqual(len(set(bases.values())), 1, bases)
+        self.assertGreaterEqual(
+            next(iter(bases.values())),
+            load_effects_config().climax_extension_threshold,
+        )
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-and-combat-relentless-torment-differ-by-actor-pleasure-ratio-not-by-dominance-freedom-tuning")
     def test_forced_climax_and_relentless_torment_declare_ratio_and_part_pair(self):
         forced = SEXUAL_ACT_REGISTRY["combat_forced_climax"]
         relentless = SEXUAL_ACT_REGISTRY["combat_relentless_torment"]
-        self.assertEqual(forced.actor_pleasure_ratio, 0.4)
-        self.assertEqual(forced.target_part, "私處")
-        self.assertEqual(relentless.actor_pleasure_ratio, 0.6)
-        self.assertEqual(relentless.target_part, "臀部")
+        # The two acts differ by the actor-side ratio and their own part,
+        # never by a separate dominance/freedom tuning knob.
+        self.assertGreater(
+            relentless.actor_pleasure_ratio, forced.actor_pleasure_ratio
+        )
+        self.assertNotEqual(relentless.target_part, forced.target_part)
         self.assertEqual(relentless.base_pleasure, forced.base_pleasure)
 
     @covers_requirement("sexual-catalog-combat::combat-climax-domination-is-the-sole-area-act-in-this-catalog-line")
@@ -184,8 +168,8 @@ class CombatActRegistrationTests(unittest.TestCase):
                 )
                 self.assertIs(SKILL_REGISTRY[key].target_spec, expected)
         act = SEXUAL_ACT_REGISTRY["combat_climax_domination"]
-        self.assertEqual(act.actor_part, "私處")
-        self.assertEqual(act.target_part, "私處")
+        self.assertIn(act.actor_part, BODY_PARTS)
+        self.assertEqual(act.actor_part, act.target_part)
 
     @covers_requirement("sexual-catalog-combat::no-act-added-by-this-change-declares-a-sexual-events-entry")
     def test_every_act_declares_no_sexual_events(self):
@@ -203,7 +187,11 @@ class CombatActRegistrationTests(unittest.TestCase):
             rule for rule in rules if rule.id == "high_arousal_agility_accuracy_penalty"
         )
         self.assertEqual(row.when, {"field": "arousal", "gte": "高度"})
-        self.assertEqual(row.then, {"agility": "-20%", "accuracy": -15})
+        # The row keeps both adjustments of the documented kinds; their
+        # magnitudes are authored data.
+        self.assertRegex(row.then["agility"], r"^[+-]\d+%$")
+        self.assertIs(type(row.then["accuracy"]), int)
+        self.assertLess(row.then["accuracy"], 0)
 
 
 class CombatUnlockTests(EvenniaTestCase):
@@ -212,7 +200,8 @@ class CombatUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
     def test_tier1_act_locked_below_threshold_and_unlocked_at_it(self):
         entity = _entity()
-        _counter_up(entity, "hostile_act", 4)
+        threshold = _unlock("combat_tease_whisper")["hostile_act_count"]
+        _counter_up(entity, "hostile_act", threshold - 1)
         self.assertNotIn("combat_tease_whisper", entity.skills.owned_keys())
         entity.sexual.record_hostile_act()
         self.assertIn("combat_tease_whisper", entity.skills.owned_keys())
@@ -220,31 +209,35 @@ class CombatUnlockTests(EvenniaTestCase):
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
     def test_forced_climax_requires_both_hostile_and_climax_counts(self):
         entity = _entity()
-        _counter_up(entity, "hostile_act", 40)
-        _counter_up(entity, "climax_count", 29)
+        hostile = _unlock("combat_forced_climax")["hostile_act_count"]
+        climax = _unlock("combat_forced_climax")["climax_count"]
+        _counter_up(entity, "hostile_act", hostile)
+        _counter_up(entity, "climax_count", climax - 1)
         self.assertNotIn("combat_forced_climax", entity.skills.owned_keys())
         entity.sexual.record_climax_count()
         self.assertIn("combat_forced_climax", entity.skills.owned_keys())
         # Reverse case: the compound counter satisfied, hostile_act_count one
         # below its threshold — still locked.
         reverse = _entity()
-        _counter_up(reverse, "hostile_act", 39)
-        _counter_up(reverse, "climax_count", 30)
+        _counter_up(reverse, "hostile_act", hostile - 1)
+        _counter_up(reverse, "climax_count", climax)
         self.assertNotIn("combat_forced_climax", reverse.skills.owned_keys())
 
     @covers_requirement("sexual-catalog-combat::eight-tier-1-2-3-5-combat-acts-are-registered-gated-by-hostile-act-count-and-or-climax-count-and-or-climax-extension-count-thresholds")
     def test_climax_domination_requires_both_hostile_and_extension_counts(self):
         entity = _entity()
-        _counter_up(entity, "hostile_act", 80)
-        _counter_up(entity, "climax_extension", 29)
+        hostile = _unlock("combat_climax_domination")["hostile_act_count"]
+        extension = _unlock("combat_climax_domination")["climax_extension_count"]
+        _counter_up(entity, "hostile_act", hostile)
+        _counter_up(entity, "climax_extension", extension - 1)
         self.assertNotIn("combat_climax_domination", entity.skills.owned_keys())
         entity.sexual.record_climax_extension()
         self.assertIn("combat_climax_domination", entity.skills.owned_keys())
         # Reverse case: extension count satisfied, hostile_act_count one below
         # its threshold — still locked.
         reverse = _entity()
-        _counter_up(reverse, "hostile_act", 79)
-        _counter_up(reverse, "climax_extension", 30)
+        _counter_up(reverse, "hostile_act", hostile - 1)
+        _counter_up(reverse, "climax_extension", extension)
         self.assertNotIn("combat_climax_domination", reverse.skills.owned_keys())
 
 
@@ -286,33 +279,33 @@ class CombatCastTests(EvenniaTest):
         # force a compliant roll (two floor fixtures with equal contest
         # scores, making roll=1 a guaranteed comply) to keep the target-side
         # pin deterministic.
-        _counter_up(self.actor, "hostile_act", 5)
+        threshold = _unlock("combat_tease_whisper")["hostile_act_count"]
+        _counter_up(self.actor, "hostile_act", threshold)
         self.assertEqual(self.target.sexual.hostile_act_count, 0)
         with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_tease_whisper", [self.target])
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.hostile_act_count, 6)
+        self.assertEqual(self.actor.sexual.hostile_act_count, threshold + 1)
         self.assertEqual(self.target.sexual.hostile_act_count, 1)
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-combat-relentless-torment-and-combat-climax-domination-reliably-clear-the-climax-extension-threshold")
     def test_forced_climax_worst_case_target_gain_clears_the_threshold(self):
-        # D-4 worst case through the live pipeline: a target at 普通
-        # sensitivity (floor, never trained) and 強烈 shame (the lowest
-        # multiplier below 成癮's 1.6 outlier) receives
-        # round(30 × 1.0 × 1.0 × 0.65 × 1.1) = 21 >= 20.
+        # Worst case through the live pipeline: a target at 普通 sensitivity
+        # (floor, never trained) and 強烈 shame (the lowest multiplier below
+        # 成癮's outlier) must still clear the declared extension threshold.
         # combat_forced_climax is resistible=True, so the resist gate runs a
         # d100 contest per target; force roll=1 (a guaranteed comply for two
         # floor fixtures) to keep the target-side assertion deterministic
         # (sexual-resist-cast-wiring design D-3a).
-        _counter_up(self.actor, "hostile_act", 40)
-        _counter_up(self.actor, "climax_count", 30)
+        unlock = _unlock("combat_forced_climax")
+        _counter_up(self.actor, "hostile_act", unlock["hostile_act_count"])
+        _counter_up(self.actor, "climax_count", unlock["climax_count"])
         self.target.sexual.shame.value = "強烈"
         with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_forced_climax", [self.target])
         self.assertEqual(result.outcome, "success")
         threshold = load_effects_config().climax_extension_threshold
         self.assertGreaterEqual(self.target.sexual.pleasure.base, threshold)
-        self.assertEqual(self.target.sexual.pleasure.base, 21)
 
     @covers_requirement("sexual-catalog-combat::combat-climax-domination-is-the-sole-area-act-in-this-catalog-line")
     def test_climax_domination_credits_every_participant_and_raises_each_targets_pleasure(self):
@@ -321,8 +314,9 @@ class CombatCastTests(EvenniaTest):
         # compliant target gain exactly one count. resistible=True means each
         # target runs a resist contest; force compliant rolls so the
         # target-side assertions stay deterministic.
-        _counter_up(self.actor, "hostile_act", 80)
-        _counter_up(self.actor, "climax_extension", 30)
+        unlock = _unlock("combat_climax_domination")
+        _counter_up(self.actor, "hostile_act", unlock["hostile_act_count"])
+        _counter_up(self.actor, "climax_extension", unlock["climax_extension_count"])
         other = create_object(
             PlayerCharacter, key="combat catalog second target", location=self.room1
         )
@@ -331,7 +325,9 @@ class CombatCastTests(EvenniaTest):
         with patch("world.rules.action.gates.roll_d100", return_value=1):
             result = self._cast("combat_climax_domination", [self.target, other])
         self.assertEqual(result.outcome, "success")
-        self.assertEqual(self.actor.sexual.hostile_act_count, 81)
+        self.assertEqual(
+            self.actor.sexual.hostile_act_count, unlock["hostile_act_count"] + 1
+        )
         for entity in (self.target, other):
             with self.subTest(entity=entity.key):
                 self.assertEqual(entity.sexual.hostile_act_count, 1)
@@ -343,23 +339,28 @@ class CombatPleasureMathTests(unittest.TestCase):
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-combat-relentless-torment-and-combat-climax-domination-reliably-clear-the-climax-extension-threshold")
     def test_worst_case_target_gain_clears_the_extension_threshold(self):
-        # 普通 sensitivity (1.0, the floor), 強烈 shame (0.65, the lowest value
-        # below 成癮's 1.6 outlier), participant_count == 2 (crowd 1.1):
-        # round(30 × 1.0 × 1.0 × 0.65 × 1.1) = 21 >= 20.
+        # 普通 sensitivity (the floor), 強烈 shame (the lowest value below
+        # 成癮's outlier) and participant_count == 2 must still clear the
+        # declared threshold at the act's own base.
+        base = SEXUAL_ACT_REGISTRY["combat_forced_climax"].base_pleasure
         participant = _neutral_participant(part="私處", sensitivity="普通", shame="強烈")
-        gain = compute_pleasure_gain(participant, "私處", 30, 1.0, 2)
+        gain = compute_pleasure_gain(participant, "私處", base, 1.0, 2)
         threshold = load_effects_config().climax_extension_threshold
         self.assertGreaterEqual(gain, threshold)
-        self.assertEqual(gain, 21)
 
     @covers_requirement("sexual-catalog-combat::combat-forced-climax-and-combat-relentless-torment-differ-by-actor-pleasure-ratio-not-by-dominance-freedom-tuning")
     def test_relentless_torment_costs_the_actor_more_at_matched_inputs(self):
         # Identical sensitivity, shame, and participant count for both acts:
-        # only the ratio differs (0.4 vs 0.6 at base 30), so
-        # round(30 × 0.4 × 1.1) = 13 < round(30 × 0.6 × 1.1) = 20.
+        # only the declared ratio differs, so the higher-ratio act always
+        # costs the actor more.
         participant = _neutral_participant(part="私處")
-        forced = compute_pleasure_gain(participant, "私處", 30, 0.4, 2)
-        relentless = compute_pleasure_gain(participant, "私處", 30, 0.6, 2)
+        forced_act = SEXUAL_ACT_REGISTRY["combat_forced_climax"]
+        relentless_act = SEXUAL_ACT_REGISTRY["combat_relentless_torment"]
+        base = forced_act.base_pleasure
+        forced = compute_pleasure_gain(
+            participant, "私處", base, forced_act.actor_pleasure_ratio, 2
+        )
+        relentless = compute_pleasure_gain(
+            participant, "私處", base, relentless_act.actor_pleasure_ratio, 2
+        )
         self.assertGreater(relentless, forced)
-        self.assertEqual(forced, 13)
-        self.assertEqual(relentless, 20)

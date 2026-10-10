@@ -27,7 +27,7 @@ wall-clock input.
 #### Scenario: The north-gate approach coordinate resolves to a literal, spec-pinned monster
 - **WHEN** `population_for_coordinates(60, 103)` is called (`capital_altoria`'s north-gate
   approach cell, and the fixed `CAPITAL_ENTRY_XY` constant)
-- **THEN** it returns `MonsterPopulation(tier="low", name_zh="哥布林")` — the closed-form result of
+- **THEN** it returns `MonsterPopulation(tier="low", name_zh="哥布林")` ;  the closed-form result of
   `12,667,711 % 3 == 1` selecting index 1 of `("史萊姆", "哥布林", "巨鼠")`, pinning the formula and
   the tier registry together against silent drift
 
@@ -54,14 +54,17 @@ wall-clock input.
 
 #### Scenario: Presence outside the hunting band follows the density formula
 - **WHEN** presence is decided for a coordinate outside the hunting band
-- **THEN** it uses `(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the named densities
-  (6 / 3 / 3 / 3 / 7 / 8 / 8 in registry order)
+- **THEN** it uses `(x * 92821 + y * 68917) % 10 < _REGION_DENSITY[region]` with the current valid authored regional density, without a duplicate density vector
 
 #### Scenario: Name selection is formula-derived on every branch
 - **WHEN** the returned monster name is selected, on any branch including the hunting band
-- **THEN** it uses `name_index = (x * 92821 + y * 68917) % len(tier.example_monsters_zh)` — the same
+- **THEN** it uses `name_index = (x * 92821 + y * 68917) % len(tier.example_monsters_zh)` ;  the same
   multiplier pair as the terrain spec, with the index expression explicit so the entry pin is
   formula-derived, not special-cased
+
+#### Scenario: Density tuning does not create an approval mirror
+- **WHEN** valid authored regional density changes
+- **THEN** production checks preserve determinism, references and hunting placement invariants without a second density table; fixed synthetic density fixtures prove deterministic placement boundaries
 
 ### Requirement: A hunting band around the capital's north gate always hosts a low-tier monster
 Every provider-valid coordinate within Chebyshev distance 3 of the `capital_altoria` entry's

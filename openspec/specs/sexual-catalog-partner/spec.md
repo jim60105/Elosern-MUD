@@ -38,23 +38,27 @@ acts SHALL declare `resistible=True`.
 #### Scenario: The four Tier 1 acts declare the duo_act_count 5 gate
 - **WHEN** the unlock gates of `partner_kiss`, `partner_neck_caress`, `partner_breast_play`, and
   `partner_ear_whisper` are read
-- **THEN** each declares `unlock={"duo_act_count": 5}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"duo_act_count": <declared positive threshold>}`
 
 #### Scenario: The five Tier 2 acts declare the duo_act_count 15 gate
 - **WHEN** the unlock gates of `partner_deep_caress`, `partner_oral_service`, `partner_breast_sex`,
   `partner_thigh_rub`, and `partner_foot_service` are read
-- **THEN** each declares `unlock={"duo_act_count": 15}`
+- **THEN** each declares the same counter-key topology as synthetic `unlock={"duo_act_count": <declared positive threshold>}`
 
 #### Scenario: The four Tier 3 acts declare the compound duo and climax gate
 - **WHEN** the unlock gates of `partner_anal_sex`, `partner_mutual_masturbation`,
   `partner_vaginal_sex`, and `partner_deep_vaginal_sex` are read
-- **THEN** each declares the compound gate `unlock={"duo_act_count": 30, "climax_count": 10}`
+- **THEN** each declares the compound counter-key topology as synthetic `unlock={"duo_act_count": <declared positive threshold>, "climax_count": <declared positive threshold>}`
 
 #### Scenario: The three Tier 4 acts declare their group-tier gates
 - **WHEN** the unlock gates of the three Tier 4 AREA acts are read
-- **THEN** `partner_group_caress` declares `unlock={"duo_act_count": 30}`, `partner_group_orgy`
-  declares `unlock={"group_act_count": 15}`, and `partner_group_service` declares
-  `unlock={"group_act_count": 30}`
+- **THEN** `partner_group_caress` declares the same counter-key topology as synthetic `unlock={"duo_act_count": <declared positive threshold>}`, `partner_group_orgy`
+  declares the same counter-key topology as synthetic `unlock={"group_act_count": <declared positive threshold>}`, and `partner_group_service` declares
+  `unlock={"group_act_count": <declared positive threshold>}`
+
+#### Scenario: Declared thresholds are mutable and boundary examples are synthetic
+- **WHEN** exact numerical boundary cases above are exercised
+- **THEN** local fixed synthetic declarations use those boundary values; shipped acts retain the stated counter-key topology, membership and resistance policy with authored positive thresholds, and tests do not pin their literal unlock counts
 
 ### Requirement: Every Tier 1-3 act credits duo_act_count on both the actor and the target; every Tier 4 act credits group_act_count on both
 Each Tier 1-3 partner act SHALL declare `actor_counters=("duo_act_count",)` and
@@ -99,35 +103,22 @@ by this change SHALL declare `sexual_events=()`, with the two intercourse acts d
   recipient, and no other act added by this change ever names that event
 
 ### Requirement: The four Tier 3 acts trade off at baseline sensitivity
-`partner_anal_sex` SHALL declare `base_pleasure=26` and `actor_pleasure_ratio=0.6`.
-`partner_mutual_masturbation` SHALL declare `base_pleasure=18` and `actor_pleasure_ratio=1.0`.
-`partner_vaginal_sex` SHALL declare `base_pleasure=28` and `actor_pleasure_ratio=0.6`.
-`partner_deep_vaginal_sex` SHALL declare `base_pleasure=34` and `actor_pleasure_ratio=0.9`.
+The four existing Tier 3 acts SHALL retain the established baseline trade-offs while base pleasure and actor-side ratios remain authored data. At equal ordinary sensitivity, no shame and two participants, anal intercourse SHALL give the target more pleasure than mutual masturbation while mutual masturbation gives the actor more. Deep vaginal intercourse SHALL exceed ordinary vaginal intercourse for both participants and retain the larger actor-side gap.
 
 #### Scenario: partner_anal_sex grants the target strictly more than partner_mutual_masturbation does at baseline
-- **WHEN** `compute_pleasure_gain` is evaluated for a target entity at baseline (`普通` sensitivity,
-  `無` shame) for both acts, with `participant_count == 2` for both (the only value either
-  `TargetSpec.SINGLE` act can reach)
-- **THEN** `partner_anal_sex`'s target-side gain exceeds `partner_mutual_masturbation`'s target-side
-  gain
-
+- **WHEN** the four acts resolve in separately reset controlled participant states
+- **THEN** observed actor and target pleasure deltas satisfy those relationships without numerical gain pins or expected values derived from the same production calculation
 #### Scenario: partner_mutual_masturbation grants the actor strictly more than partner_anal_sex does at baseline
-- **WHEN** `compute_pleasure_gain` is evaluated for the actor at baseline (`普通` sensitivity, `無`
-  shame) for both acts, with `participant_count == 2` for both
-- **THEN** `partner_mutual_masturbation`'s actor-side gain exceeds `partner_anal_sex`'s actor-side gain
+- **WHEN** separately reset ordinary-sensitivity/no-shame participants execute both acts with equal two-participant and resistance-control conditions
+- **THEN** observed actor pleasure gain is greater for mutual masturbation
 
 #### Scenario: 深度交合 escalates the stakes over 交合 on both sides
-- **WHEN** `compute_pleasure_gain` is evaluated at baseline for the actor and a target for both
-  intercourse acts, with `participant_count == 2`
-- **THEN** `partner_deep_vaginal_sex`'s target-side gain exceeds `partner_vaginal_sex`'s, and the
-  actor-side gain gap between the two acts is strictly larger than the target-side gain gap (the
-  deeper act costs the actor disproportionately more)
+- **WHEN** separately reset baseline participants execute ordinary and deep intercourse
+- **THEN** deep target gain exceeds ordinary target gain and the actor-side gap exceeds the target-side gap
 
 #### Scenario: Baseline trade-offs do not claim per-character dominance
-- **WHEN** the baseline trade-offs are interpreted
-- **THEN** they are not a claim that any act dominates another for every character: per design.md
-  D-4, `sensitivity_mult` is a per-body-part trait (後庭 vs 私處) that can diverge with play
-  history and is not pinned by this requirement
+- **WHEN** the baseline comparison is interpreted
+- **THEN** it is not universal dominance: per-body-part sensitivity can diverge with play history
 
 ### Requirement: All sixteen acts declare resistible=True
 Every one of the sixteen acts this change adds SHALL declare `resistible=True`.

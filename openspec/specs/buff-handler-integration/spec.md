@@ -198,7 +198,7 @@ itself reject, cancel, or otherwise interact with any action — it is a query f
   code is invoked by this function
 
 ### Requirement: Buff tick is exposed as a plain callable, with no settlement order invented
-`world/rules/buffs.py` SHALL expose buff-tick behavior as a plain callable that a caller (change 11's world clock) can invoke explicitly, applying each active buff's rate modifier on tick and returning an ordered tuple of damaging tick records — one per applied rate tick whose modifier targets `hp` with a negative delta — each carrying the definition key, the buff cache's `source_pk` (or `None`), the delta, and the entity's HP immediately before that tick applied.
+`world/rules/buffs.py` SHALL expose buff-tick behavior as a plain callable that a caller (change 11's world clock) can invoke explicitly, applying each active buff's rate modifier on tick and returning an ordered tuple of damaging tick records ;  one per applied rate tick whose modifier targets `hp` with a negative delta ;  each carrying the definition key, the buff cache's `source_pk` (or `None`), the delta, and the entity's HP immediately before that tick applied.
 
 #### Scenario: Buff tick is invokable independently of any clock
 - **WHEN** the buff-tick callable is invoked directly in a test, without any `WorldClock` or scheduler
@@ -214,7 +214,7 @@ itself reject, cancel, or otherwise interact with any action — it is a query f
   class
 
 #### Scenario: A damaging tick returns one ordered record
-- **WHEN** `tick_buffs(entity, 10)` fires both `poisoned` and `fire_scorch` in one call on a living entity
+- **WHEN** `tick_buffs(entity, 10)` fires both synthetic `t_poisoned` and `t_fire_scorch` in one call on a living entity
 - **THEN** it returns two records in application order, each carrying the definition key, the buff cache's `source_pk` (or `None`), its configured rate delta (`-5` and `-8` respectively), and the entity's HP immediately before that tick applied
 
 #### Scenario: Non-damaging ticks return no records
@@ -223,11 +223,15 @@ itself reject, cancel, or otherwise interact with any action — it is a query f
 
 #### Scenario: No settlement order is invented by this change
 - **WHEN** buff ticks coexist with trait regen and sexual-state decay
-- **THEN** this change hardcodes, assumes, or invents no ordering between them — that fixed settlement order is design doc §6.5's and change 11's exclusive concern
+- **THEN** this change hardcodes, assumes, or invents no ordering between them ;  that fixed settlement order is design doc §6.5's and change 11's exclusive concern
 
 #### Scenario: Ignoring the return value preserves old state behavior
 - **WHEN** a caller ignores the returned tuple of damaging tick records
 - **THEN** it observes identical state changes to the pre-change callable
+
+#### Scenario: Authored tuning is distinct from mechanism examples
+- **WHEN** tests exercise exact numerical band, delta, duration, bias or multiplier examples in this requirement
+- **THEN** scoped fixed synthetic rulebook rows provide those numbers and independently known outcomes; production rows receive valid-shape/reference/intentional-invariant checks without a copied expected balance table
 
 ### Requirement: Action-workflow debuff grants are neutralized by worn equipment immunity
 When the action-resolution workflow would grant a debuff-polarity buff to a target whose worn equipment confers immunity to that buff key, the staged effect SHALL be a non-mutating neutralization with a stable `equipment_immune|<entity>|<buff_key>` event tag and Traditional-Chinese renderer text visible to actor and target, and the buff storage SHALL be untouched.

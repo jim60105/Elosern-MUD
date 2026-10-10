@@ -71,6 +71,36 @@ class RequirementParsingTests(unittest.TestCase):
 
 class StaticAnnotationTests(unittest.TestCase):
     @covers_requirement(
+        "spec-test-traceability::test-migrations-preserve-meaningful-current-requirement-coverage"
+    )
+    def test_migration_retains_id_but_requires_new_test_execution(self):
+        """Detect obsolete execution evidence accepted after an assertion migration."""
+        migrated_spec = SPEC.replace(
+            "The system SHALL work.",
+            "The system SHALL preserve independently observed state.",
+        )
+        migrated_test = ANNOTATED_TEST.replace(
+            "def test_behavior(self):\n        self.assertTrue(True)",
+            "def test_observed_state(self):\n        self.assertEqual(13, 10 + 3)",
+        )
+        with fixture_repository(migrated_spec, migrated_test) as root:
+            static = verify(root)
+            self.assertTrue(static.ok)
+            self.assertEqual(static.covered, ("sample::useful-behavior",))
+            evidence = root / "evidence.jsonl"
+            old_record = {
+                "test": "sample.tests.test_sample.SampleTests.test_behavior",
+                "requirements": ["sample::useful-behavior"],
+            }
+            evidence.write_text(json.dumps(old_record) + "\n", encoding="utf-8")
+            old = verify(root, evidence)
+            self.assertFalse(old.ok)
+            self.assertEqual(old.uncovered, ("sample::useful-behavior",))
+            old_record["test"] = "sample.tests.test_sample.SampleTests.test_observed_state"
+            evidence.write_text(json.dumps(old_record) + "\n", encoding="utf-8")
+            self.assertTrue(verify(root, evidence).ok)
+
+    @covers_requirement(
         "spec-test-traceability::existing-tests-declare-requirement-coverage-locally"
     )
     def test_valid_literal_annotation_covers_requirement(self):

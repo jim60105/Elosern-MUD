@@ -67,7 +67,6 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     )
     def test_canonical_rulebook_loads_the_full_roster(self):
         loaded = load_equipment_effect_rules()
-        self.assertEqual(len(loaded), 79)
         self.assertEqual(
             set(loaded),
             {
@@ -76,6 +75,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                 if definition.equipment_slot is not None
             },
         )
+        self.assertTrue(loaded)
         self.assertEqual(dict(EQUIPMENT_EFFECT_RULES), loaded)
 
     @covers_requirement(
@@ -567,13 +567,12 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
     )
     def test_override_cannot_redefine_registry_rarity(self):
-        # Budget lookup follows the REAL registry rarity: the untouched
-        # budgets table still rejects a common club exceeding flat 4.
-        self._expect_rejection(
-            lambda d: d["effects"]["wooden_club"]["adjustments"].update(
-                {"atk_phys": 5}
-            )
-        )
+        # Budget lookup follows the REAL registry rarity, and an entry may not
+        # declare one of its own: the closed entry schema rejects the field.
+        document = _canonical_document()
+        document["effects"]["wooden_club"]["rarity"] = "legendary"
+        with self.assertRaisesRegex(EquipmentEffectsRulebookError, "rarity"):
+            load_equipment_effect_rules(_write_rulebook(document))
 
     @covers_requirement(
         "equipment-effects::registration-and-tradeability-are-independent"
@@ -643,7 +642,6 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
         enum_values = {member.value for member in EquipmentModifierKey}
         self.assertEqual(equipment_keys, enum_values)
         self.assertEqual(enum_values, set(EQUIPMENT_EFFECT_RULES))
-        self.assertEqual(len(enum_values), 79)
         for member in EquipmentModifierKey:
             self.assertEqual(member.value, member.name.lower())
         for definition in ITEM_REGISTRY.values():
@@ -925,23 +923,19 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         )
 
 
-MILITARY_TABLE = (
-    ("e", 3, 0, 3, 0, 350, 300, ItemRarity.COMMON),
-    ("d", 4, 0, 5, 1, 800, 1800, ItemRarity.UNCOMMON),
-    ("c", 6, 1, 6, 1, 1600, 3200, ItemRarity.UNCOMMON),
-    ("b", 8, 1, 8, 2, 100000, 30000, ItemRarity.RARE),
-    ("a", 10, 3, 10, 2, 180000, 60000, ItemRarity.EPIC),
-    ("s", 12, 4, 12, 3, 300000, 120000, ItemRarity.LEGENDARY),
-)
+# The six shipped grade pairs, as identity only: bonuses, prices and stock
+# come from the authored declarations (the historical section 5 numerical
+# table is not duplicated in tests).
+MILITARY_GRADES = ("e", "d", "c", "b", "a", "s")
 
 
 class MilitaryAuthoringContractTests(unittest.TestCase):
-    """Approved section 5 rows, independently pinned to the design table."""
+    """The six shipped pairs stay shared registered declarations."""
 
     @covers_requirement(
         "military-equipment::six-military-pairs-use-shared-registered-effects-and-approved-integer-prices"
     )
-    def test_exact_bonuses_prices_slots_and_finite_shared_offers(self):
+    def test_shared_registered_pairs_use_authored_adjustments_and_finite_offers(self):
         from world.quests.catalog import register_catalog
         register_catalog()
         from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
@@ -949,22 +943,25 @@ class MilitaryAuthoringContractTests(unittest.TestCase):
         from world.skills.equipment import EquipmentSlot
 
         catalog = get_catalog()
-        for grade, attack, sword_agility, defense, armor_agility, sword_price, armor_price, rarity in MILITARY_TABLE:
-            for shape, stat, bonus, agility, price, slot, assortment in (
-                ("sword", "atk_phys", attack, sword_agility, sword_price, EquipmentSlot.WEAPON_MAIN, "common_arms"),
-                ("armor", "defense", defense, armor_agility, armor_price, EquipmentSlot.ARMOR, "common_outfits"),
+        for grade in MILITARY_GRADES:
+            for shape, stat, slot, assortment in (
+                ("sword", "atk_phys", EquipmentSlot.WEAPON_MAIN, "common_arms"),
+                ("armor", "defense", EquipmentSlot.ARMOR, "common_outfits"),
             ):
                 key = f"military_{grade}_{shape}"
                 with self.subTest(item=key):
                     item = ITEM_REGISTRY[key]
                     self.assertEqual(item.equipment_slot, slot)
                     self.assertEqual(item.modifier_key.value, key)
-                    self.assertEqual(item.presentation.rarity, rarity)
+                    self.assertIsInstance(item.presentation.rarity, ItemRarity)
                     self.assertTrue(item.sellable)
-                    expected = {stat: bonus}
-                    if agility:
-                        expected["agility"] = agility
-                    self.assertEqual(dict(EQUIPMENT_EFFECT_RULES[item.modifier_key].adjustments), expected)
+                    adjustments = dict(
+                        EQUIPMENT_EFFECT_RULES[item.modifier_key].adjustments
+                    )
+                    self.assertIn(stat, adjustments)
+                    self.assertTrue(
+                        all(type(value) is int for value in adjustments.values())
+                    )
                     self.assertIn(key, ASSORTMENT_REGISTRY[assortment].item_keys)
                     offers = [
                         offer for config in catalog.shop_configs.values()
@@ -972,16 +969,33 @@ class MilitaryAuthoringContractTests(unittest.TestCase):
                     ]
                     self.assertTrue(offers)
                     for offer in offers:
-                        self.assertEqual((offer.buy_copper, offer.sell_copper), (price, price // 2))
-                        self.assertEqual((offer.initial_stock, offer.max_stock, offer.restock_quantity), (2, 4, 1))
-        self.assertEqual((PRICE_TABLE["magic_armor"].min_copper, PRICE_TABLE["magic_armor"].max_copper), (10000, None))
-        self.assertEqual((PRICE_TABLE["armor"].min_copper, PRICE_TABLE["armor"].max_copper), (200, 5000))
-        self.assertEqual(PRICE_TABLE["magic_weapon"].min_copper, 100000)
+                        # Signed resale and finite stock are authored data:
+                        # only their relations are asserted here.
+                        self.assertIs(type(offer.buy_copper), int)
+                        self.assertGreater(offer.buy_copper, 0)
+                        self.assertEqual(offer.sell_copper, offer.buy_copper // 2)
+                        self.assertGreaterEqual(offer.initial_stock, 0)
+                        self.assertGreaterEqual(
+                            offer.max_stock, offer.initial_stock
+                        )
+                        self.assertGreaterEqual(offer.restock_quantity, 0)
+        # The bands these rows resolve to stay integral and ordered.
+        for band_key in ("magic_armor", "armor", "magic_weapon"):
+            band = PRICE_TABLE[band_key]
+            self.assertIs(type(band.min_copper), int)
+            self.assertTrue(
+                band.max_copper is None or band.max_copper >= band.min_copper
+            )
 
     def test_military_over_budget_rejected_without_budget_change(self):
         document = _canonical_document()
         before = {key: dict(value) for key, value in document["budgets"].items()}
-        document["effects"]["military_s_sword"]["adjustments"]["atk_phys"] = 13
+        # One above the row's own rarity budget, derived from the authored
+        # budget so a valid retune of either side stays consistent.
+        rarity = ITEM_REGISTRY["military_s_sword"].presentation.rarity.value
+        document["effects"]["military_s_sword"]["adjustments"]["atk_phys"] = (
+            document["budgets"][rarity]["flat"] + 1
+        )
         with self.assertRaises(EquipmentEffectsRulebookError):
             validate_equipment_effect_rules(document, ITEM_REGISTRY, BUFF_DEFINITIONS)
         self.assertEqual(document["budgets"], before)
@@ -1019,7 +1033,7 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
         for entity in (player, wearer):
             entity.race = "human"
             entity.apply_race_baseline()
-        for grade, attack, sword_agility, defense, armor_agility, sword_price, armor_price, _ in MILITARY_TABLE:
+        for grade in MILITARY_GRADES:
             keys = (f"military_{grade}_sword", f"military_{grade}_armor")
             player.db.wallet = 2000000
             player.db.inventory = []
@@ -1027,15 +1041,16 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
             for entity in (player, wearer):
                 entity.db.equipment = {"weapon_main": None, "weapon_off": None, "armor": None, "accessories": []}
             merchants = []
-            for key, price in zip(keys, (sword_price, armor_price)):
+            for key in keys:
                 config = next(config for config in catalog.shop_configs.values() if any(o.item_key == key for o in config.offers))
                 offer = next(o for o in config.offers if o.item_key == key)
+                price = offer.buy_copper
                 host = create_object(NPC, key=f"synthetic {key} vendor", location=room)
                 merchant = Merchant.create(host, service_id=key, shop_key=config.shop_key)
                 host.components.add(merchant)
                 merchant.merchant_stock = {o.item_key: o.initial_stock for o in config.offers}
                 merchant.last_restock_day = 0
-                merchants.append((host, merchant))
+                merchants.append((host, merchant, offer))
                 with patch("world.rules.economy.get_world_clock", return_value=WorldClock(12 * 3600)):
                     before = player.db.wallet
                     result = buy(player, host, key, 2)
@@ -1053,21 +1068,42 @@ class MilitaryRuntimeSmokeTests(EvenniaTest):
                         with self.assertRaises(RuntimeError):
                             buy(player, host, key, 1)
                     self.assertEqual((player.db.wallet, list(player.db.inventory), len(player.contents), parse_merchant_stock(merchant)), snapshot)
-                self.assertEqual((offer.initial_stock, offer.max_stock), (2, 4))
+                # Two bought and one resold leaves the declared stock minus one.
+                self.assertEqual(
+                    parse_merchant_stock(merchant)[key], offer.initial_stock - 1
+                )
+            sword_rule = EQUIPMENT_EFFECT_RULES[ITEM_REGISTRY[keys[0]].modifier_key]
+            armor_rule = EQUIPMENT_EFFECT_RULES[ITEM_REGISTRY[keys[1]].modifier_key]
             for entity in (player, wearer):
                 entity.db.inventory = list(keys)
                 for key in keys:
                     res = toggle_equipment(entity, key)
                     assert res.outcome == "success", f"toggle {key} on {entity} failed: {res.outcome} {res.reason}"
+                # Declaration-to-consumer wiring: each worn row's own flat
+                # axes and their sum land in the merged bundle consumers read.
                 bonuses = equipment_adjustments(entity)
-                self.assertEqual(bonuses["atk_phys"], attack)
-                self.assertEqual(bonuses["defense"], defense)
-                self.assertEqual(bonuses.get("agility_flat", 0), sword_agility + armor_agility)
+                self.assertEqual(
+                    bonuses["atk_phys"], int(sword_rule.adjustments["atk_phys"])
+                )
+                self.assertEqual(
+                    bonuses["defense"], int(armor_rule.adjustments["defense"])
+                )
+                self.assertEqual(
+                    bonuses.get("agility_flat", 0),
+                    int(sword_rule.adjustments.get("agility", 0))
+                    + int(armor_rule.adjustments.get("agility", 0)),
+                )
             end_tick = 86400 + 7 * 3600
+            stock_before_restock = {
+                key: parse_merchant_stock(merchant)[key]
+                for key, (_, merchant, _) in zip(keys, merchants)
+            }
             with patch("world.rules.clock.get_world_clock", return_value=WorldClock(end_tick)):
                 settle_caravan_arrivals(12 * 3600, end_tick)
-            for key, (host, merchant) in zip(keys, merchants):
-                self.assertEqual(parse_merchant_stock(merchant)[key], 2)
+            for key, (host, merchant, offer) in zip(keys, merchants):
+                settled = parse_merchant_stock(merchant)[key]
+                self.assertGreaterEqual(settled, stock_before_restock[key])
+                self.assertLessEqual(settled, offer.max_stock)
                 self.assertEqual(merchant.last_restock_day, 1)
                 host.delete()
 

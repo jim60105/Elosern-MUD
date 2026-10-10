@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 import inspect
 import unittest
 import importlib
+from types import MappingProxyType
 from unittest.mock import patch
 
 import world.maps.wilderness_population as wilderness_population_module
@@ -193,15 +194,36 @@ class TerrainPopulationModelTests(unittest.TestCase):
         self.assertNotIn(band_tier, tiers)
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
-    def test_low_density_coordinate_can_be_unpopulated(self):
-        # (203, 30) sits in a sparse region; its presence hash falls outside
-        # the presence band, so the model returns None. The region claim is
-        # table-relative: an unpopulated coordinate cannot sit in the
-        # most-dense region.
-        self.assertIsNone(population_for_coordinates(203, 30))
-        region = region_for_coordinates(203, 30)
-        densities = wilderness_population_module._REGION_DENSITY
-        self.assertLess(densities[region], max(densities.values()))
+    def test_presence_outside_the_hunting_band_follows_the_authored_density(self):
+        # Fixed synthetic density fixture: the presence boundary is the model's
+        # own closed form, ``(x * 92821 + y * 68917) % 10 < density``, so no
+        # shipped density vector is mirrored. ``(223, 223)`` has remainder 4 and
+        # ``(220, 0)`` remainder 0; both are far outside the hunting band.
+        sparse = (223, 223)
+        dense = (220, 0)
+        keys = list(wilderness_population_module._REGION_DENSITY)
+        with patch.object(
+            wilderness_population_module,
+            "_REGION_DENSITY",
+            MappingProxyType({key: 4 for key in keys}),
+        ):
+            # remainder 4 is not < 4 -> unpopulated; remainder 0 is -> populated.
+            self.assertIsNone(population_for_coordinates(*sparse))
+            populated = population_for_coordinates(*dense)
+            self.assertIsNotNone(populated)
+            self.assertEqual(
+                populated.tier,
+                wilderness_population_module._REGION_TIER[
+                    region_for_coordinates(*dense)
+                ],
+            )
+        with patch.object(
+            wilderness_population_module,
+            "_REGION_DENSITY",
+            MappingProxyType({key: 5 for key in keys}),
+        ):
+            # Raising the density one step flips the same coordinate on.
+            self.assertIsNotNone(population_for_coordinates(*sparse))
 
     @covers_requirement("wilderness-monster-population::population-for-coordinates-is-a-pure-deterministic-function-over-the-bounded-map")
     def test_region_tables_cover_every_registry_key(self):
@@ -308,11 +330,20 @@ class WildernessPopulationSpawnTests(EvenniaTest):
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_coordinate_the_model_no_longer_populates_is_cleaned_up(self):
-        # (203, 30) resolves to None (see the pure model tests). A lingering
-        # marker monster there is deleted and dropped from itemcoordinates.
+        # Under the fixed synthetic density fixture below, (203, 30) has hash
+        # remainder 3 and density 3, so the model resolves it to None. A
+        # lingering marker monster there is deleted and dropped from
+        # itemcoordinates.
         monster = self._spawn_foreign_monster((203, 30), key="stale")
         monster.db.population_key = "wilderness:203:30"
-        ensure_population(self.script, (203, 30))
+        with patch.object(
+            wilderness_population_module,
+            "_REGION_DENSITY",
+            MappingProxyType(
+                {key: 3 for key in wilderness_population_module._REGION_DENSITY}
+            ),
+        ):
+            ensure_population(self.script, (203, 30))
         remaining = [
             obj for obj in self._monsters_at((203, 30)) if isinstance(obj, Monster)
         ]

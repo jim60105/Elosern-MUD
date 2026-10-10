@@ -54,11 +54,6 @@ from world.rules.targeting import RoomActionContext
 
 RULEBOOK_PATH = Path(__file__).parents[1] / "rulebook" / "church.yaml"
 
-# The decided tuning finals (tasks 1.1/1.2): owner-pinned ordinal 0 = 50%,
-# strictly monotonic to 100% at the top ordinal, proposal intermediates.
-DECIDED_ACCEPTANCE = ((0, 50), (1, 65), (2, 80), (3, 90), (4, 100))
-DECIDED_PRAY = (600, 40, 3)
-
 
 def _church_body(**section_overrides):
     """Return a complete church.yaml mapping with per-section overrides."""
@@ -174,40 +169,68 @@ class ChurchRuleCorrespondenceRowsTests(TestCase):
 
 
 class ChurchTuningTests(TestCase):
-    """The decided-and-recorded tuning finals (tasks 1.1/1.2)."""
+    """Each tuning row keeps its rule-id correspondence and retained shape.
+
+    The decided finals are authored rulebook data, so these tests assert the
+    row identity, the retained monotonicity/positivity discipline and the
+    documented endpoints instead of a duplicated magnitude table.
+    """
 
     @covers_requirement(
         "church-ordination::the-church-rulebook-slice-loads-behind-the-monotonicity-and-polarity-gates"
     )
     def test_rule_accept_ordinal_0(self):
-        self.assertEqual(get_church_rules().acceptance[0], (0, ACCEPT_ORDINAL_0_PERCENT))
+        rows = get_church_rules().acceptance
+        self.assertEqual(rows[0][0], 0)
+        self.assertEqual(rows[0][1], ACCEPT_ORDINAL_0_PERCENT)
+
+    def _assert_acceptance_interior(self, index: int) -> None:
+        rows = get_church_rules().acceptance
+        ordinal, percent = rows[index]
+        self.assertEqual(ordinal, index)
+        self.assertIs(type(percent), int)
+        self.assertGreater(percent, rows[index - 1][1])
+        self.assertLess(percent, rows[index + 1][1])
 
     def test_rule_accept_ordinal_1(self):
-        self.assertEqual(get_church_rules().acceptance[1], (1, 65))
+        self._assert_acceptance_interior(1)
 
     def test_rule_accept_ordinal_2(self):
-        self.assertEqual(get_church_rules().acceptance[2], (2, 80))
+        self._assert_acceptance_interior(2)
 
     def test_rule_accept_ordinal_3(self):
-        self.assertEqual(get_church_rules().acceptance[3], (3, 90))
+        self._assert_acceptance_interior(3)
 
     def test_rule_accept_ordinal_4(self):
-        self.assertEqual(
-            get_church_rules().acceptance[4], (4, ACCEPT_TOP_ORDINAL_PERCENT)
-        )
+        rows = get_church_rules().acceptance
+        self.assertEqual(rows[4][0], 4)
+        self.assertEqual(rows[4][1], ACCEPT_TOP_ORDINAL_PERCENT)
 
     def test_rule_pray(self):
+        # The once-per-day prayer row keeps its declared positive shape.
         pray = get_church_rules().pray
-        self.assertEqual(
-            (pray.duration_seconds, pray.merit_per_pray, pray.daily_cap),
-            DECIDED_PRAY,
-        )
+        self.assertIs(type(pray.duration_seconds), int)
+        self.assertGreater(pray.duration_seconds, 0)
+        self.assertIs(type(pray.merit_per_pray), int)
+        self.assertGreater(pray.merit_per_pray, 0)
+        self.assertIs(type(pray.daily_cap), int)
+        self.assertGreaterEqual(pray.daily_cap, 1)
+
+    def _accrual_row(self, row_id: str, positive=(), flags=()):
+        row = get_church_rules().accrual[row_id]
+        for key in positive:
+            self.assertIn(key, row, row_id)
+            self.assertIs(type(row[key]), int, f"{row_id}.{key}")
+            self.assertGreater(row[key], 0, f"{row_id}.{key}")
+        for key in flags:
+            self.assertEqual(row[key], 1, f"{row_id}.{key}")
+        return row
 
     def test_rule_accrual_pray_completed(self):
-        self.assertEqual(
-            get_church_rules().accrual["accrual_pray_completed"],
-            {"merit": 40, "daily_cap": 3},
+        row = self._accrual_row(
+            "accrual_pray_completed", positive=("merit", "daily_cap")
         )
+        self.assertGreater(row["daily_cap"], 1)
 
     def test_rule_accrual_offering_accepted(self):
         # Per-row mechanism row: the per-row merit values ride the
@@ -217,17 +240,16 @@ class ChurchTuningTests(TestCase):
         )
 
     def test_rule_accrual_climax_while_enrolled(self):
-        self.assertEqual(
-            get_church_rules().accrual["accrual_climax_while_enrolled"], {"merit": 10}
+        self._accrual_row(
+            "accrual_climax_while_enrolled", positive=("merit",)
         )
 
     def test_rule_offering_payout_band(self):
         offering = get_church_rules().offering
-        # The decided payout final (task 1.2): the integer band 20..80.
-        self.assertEqual((offering.copper_lo, offering.copper_hi), (20, 80))
         self.assertLessEqual(offering.copper_lo, offering.copper_hi)
         self.assertIsInstance(offering.copper_lo, int)
         self.assertIsInstance(offering.copper_hi, int)
+        self.assertGreater(offering.copper_lo, 0)
         self.assertEqual(offering.overrides, {})
 
     def test_rule_offering_enrollment_required(self):
@@ -262,9 +284,12 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if "merit_percent" in effect.effects
         )
-        # The decided vow_of_service finals (task 1.1): offering copper
-        # +25%, offering/climax merit +10% — ledger multipliers only.
-        self.assertEqual(row.effects, {"copper_percent": 25, "merit_percent": 10})
+        # Ledger multipliers only: the row keeps both percentage keys with
+        # positive authored values, never a duplicated final.
+        self.assertEqual(set(row.effects), {"copper_percent", "merit_percent"})
+        for key, value in row.effects.items():
+            self.assertIs(type(value), int, key)
+            self.assertGreater(value, 0, key)
 
     def test_rule_rite_morning_devotion(self):
         key = self._testMethodName.removeprefix("test_rule_")
@@ -275,15 +300,18 @@ class ChurchTuningTests(TestCase):
     def test_rule_rite_shelter(self):
         key = self._testMethodName.removeprefix("test_rule_")
         row = get_church_rules().accrual[key]
-        self.assertEqual(row["rest_bonus"], 25)
+        self.assertIs(type(row["rest_bonus"]), int)
+        self.assertGreater(row["rest_bonus"], 0)
         self.assertEqual(row["skill_key"], key)
 
     def test_rule_rite_martial_blessing(self):
         key = self._testMethodName.removeprefix("test_rule_")
         row = get_church_rules().accrual[key]
         self.assertEqual(row["stat"], "defense")
-        self.assertEqual(row["magnitude"], 10)
-        self.assertEqual(row["cooldown_seconds"], 1800)
+        self.assertIs(type(row["magnitude"]), int)
+        self.assertGreater(row["magnitude"], 0)
+        self.assertIs(type(row["cooldown_seconds"]), int)
+        self.assertGreater(row["cooldown_seconds"], 0)
         self.assertEqual(row["skill_key"], key)
 
     def test_rule_passive_poverty_vow(self):
@@ -293,9 +321,10 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if effect.row_id == key
         )
-        self.assertEqual(
-            row.effects, {"copper_percent": 25, "pray_merit_percent": 25}
-        )
+        self.assertEqual(set(row.effects), {"copper_percent", "pray_merit_percent"})
+        for effect_key, value in row.effects.items():
+            self.assertIs(type(value), int, effect_key)
+            self.assertGreater(value, 0, effect_key)
 
     def test_rule_passive_obedience(self):
         key = self._testMethodName.removeprefix("test_rule_")
@@ -304,7 +333,8 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if effect.row_id == key
         )
-        self.assertEqual(row.effects, {"multiplier": 2.0})
+        self.assertEqual(set(row.effects), {"multiplier"})
+        self.assertGreater(row.effects["multiplier"], 0)
 
     def test_rule_passive_chastity_discipline(self):
         key = self._testMethodName.removeprefix("test_rule_")
@@ -313,7 +343,8 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if effect.row_id == key
         )
-        self.assertEqual(row.effects, {"pray_merit_percent": 50})
+        self.assertEqual(set(row.effects), {"pray_merit_percent"})
+        self.assertGreater(row.effects["pray_merit_percent"], 0)
 
     def test_rule_passive_temple_endurance(self):
         key = self._testMethodName.removeprefix("test_rule_")
@@ -322,9 +353,12 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if effect.row_id == key
         )
-        self.assertEqual(
-            row.effects,
-            {"mitigation": {"high_exposure_defense_penalty": "25%"}},
+        # Mitigation stays a bounded percent string on its own target.
+        self.assertEqual(set(row.effects), {"mitigation"})
+        mitigation = row.effects["mitigation"]
+        self.assertEqual(set(mitigation), {"high_exposure_defense_penalty"})
+        self.assertRegex(
+            mitigation["high_exposure_defense_penalty"], r"^\d+%$"
         )
 
     def test_rule_passive_public_devotion(self):
@@ -334,12 +368,22 @@ class ChurchTuningTests(TestCase):
             for effect in get_church_rules().passive_effects
             if effect.row_id == key
         )
-        self.assertEqual(row.effects, {"merit_percent": 30})
+        self.assertEqual(set(row.effects), {"merit_percent"})
+        self.assertGreater(row.effects["merit_percent"], 0)
 
-    def test_shipped_acceptance_curve_is_the_decided_final(self):
-        # The decide-and-record result (task 1.1): strictly monotonic, ordinal
-        # 0 pinned at 50%, top ordinal pinned at 100%.
-        self.assertEqual(get_church_rules().acceptance, DECIDED_ACCEPTANCE)
+    def test_shipped_acceptance_curve_keeps_the_gated_shape(self):
+        # Consecutive ordinals from 0, strictly increasing percents inside the
+        # documented endpoints; the interior values stay authored data.
+        rows = get_church_rules().acceptance
+        self.assertEqual([ordinal for ordinal, _ in rows], list(range(len(rows))))
+        percents = [percent for _, percent in rows]
+        self.assertTrue(all(type(value) is int for value in percents))
+        self.assertEqual(percents, sorted(percents))
+        self.assertEqual(len(set(percents)), len(percents))
+        self.assertEqual(percents[0], ACCEPT_ORDINAL_0_PERCENT)
+        self.assertEqual(percents[-1], ACCEPT_TOP_ORDINAL_PERCENT)
+
+
 class AcceptanceCurveGateTests(_TempFile):
     """The loader monotonicity gate rejects bad curves naming the row."""
 
@@ -654,7 +698,13 @@ class PassivePolarityGateTests(TestCase):
     def test_obedience_doubles_merit_under_submission_status(self):
         from world.rules.church import scaled_merit_gain
 
-        obedience_key = next(p.skill_key for p in get_church_rules().passive_effects if p.effects.get("multiplier", 0) > 1.0)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if p.effects.get("multiplier", 0) > 1.0
+        )
+        obedience_key = row.skill_key
+        multiplier = row.effects["multiplier"]
 
         class _MockEntity:
             def __init__(self, has_mark=False):
@@ -663,19 +713,30 @@ class PassivePolarityGateTests(TestCase):
 
         unmarked = _MockEntity(has_mark=False)
         marked = _MockEntity(has_mark=True)
-        # Without submission status: unchanged (x1)
-        self.assertEqual(scaled_merit_gain(unmarked, 40), 40)
-        # Under submission status: exactly doubled (x2)
-        self.assertEqual(scaled_merit_gain(marked, 40), 80)
+        base = 40
+        # Without submission status: unchanged; under it: the row's own
+        # declared multiplier, never a duplicated final.
+        self.assertEqual(scaled_merit_gain(unmarked, base), base)
+        self.assertEqual(
+            scaled_merit_gain(marked, base), round(base * multiplier)
+        )
 
     @covers_requirement(
         "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
     )
-    def test_temple_endurance_mitigates_high_exposure_defense_penalty_by_25_percent(self):
+    def test_temple_endurance_mitigates_by_its_declared_percent(self):
         from unittest.mock import patch
         from world.rules.combat_modifiers import evaluate_combat_modifiers
 
-        temple_key = next(p.skill_key for p in get_church_rules().passive_effects if "mitigation" in p.effects)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if "mitigation" in p.effects
+        )
+        temple_key = row.skill_key
+        percent = int(
+            row.effects["mitigation"]["high_exposure_defense_penalty"].rstrip("%")
+        )
 
         class _MockEntity:
             def __init__(self, owns_temple=False):
@@ -693,10 +754,14 @@ class PassivePolarityGateTests(TestCase):
         non_holder = _MockEntity(owns_temple=False)
         holder = _MockEntity(owns_temple=True)
         with patch("world.rules.combat_modifiers.effective_exposure", return_value="高"):
-            # Non-holder penalty is byte-identical -15
-            self.assertEqual(evaluate_combat_modifiers(non_holder), {"defense": -15})
-            # Holder penalty is 25% smaller in magnitude (-15 * 0.75 = -11.25)
-            self.assertEqual(evaluate_combat_modifiers(holder), {"defense": -11.25})
+            base_penalty = evaluate_combat_modifiers(non_holder)["defense"]
+            # The non-holder reads the authored penalty unchanged...
+            self.assertLess(base_penalty, 0)
+            # ...and the holder's magnitude shrinks by the declared percent.
+            self.assertAlmostEqual(
+                evaluate_combat_modifiers(holder),
+                {"defense": base_penalty * (1 - percent / 100)},
+            )
 
     @covers_requirement(
         "church-ordination::series-c-discipline-passives-ship-pure-positive-with-no-baseline-downside"
@@ -704,7 +769,13 @@ class PassivePolarityGateTests(TestCase):
     def test_public_devotion_public_venue_differential(self):
         from world.rules.church import scaled_merit_gain
 
-        devotion_key = next(p.skill_key for p in get_church_rules().passive_effects if "merit_percent" in p.effects and "copper_percent" not in p.effects)
+        row = next(
+            p
+            for p in get_church_rules().passive_effects
+            if "merit_percent" in p.effects and "copper_percent" not in p.effects
+        )
+        devotion_key = row.skill_key
+        percent = row.effects["merit_percent"]
 
         class _MockEntity:
             def __init__(self, is_public=False):
@@ -714,10 +785,14 @@ class PassivePolarityGateTests(TestCase):
 
         private_char = _MockEntity(is_public=False)
         public_char = _MockEntity(is_public=True)
-        # In private venue: public_devotion does not apply
-        self.assertEqual(scaled_merit_gain(private_char, 100), 100)
-        # In public venue: +30% merit bonus applies (100 -> 130)
-        self.assertEqual(scaled_merit_gain(public_char, 100), 130)
+        base = 100
+        # In private venue the passive does not apply; in public it adds the
+        # row's own declared percentage.
+        self.assertEqual(scaled_merit_gain(private_char, base), base)
+        self.assertEqual(
+            scaled_merit_gain(public_char, base),
+            round(base * (1 + percent / 100)),
+        )
 
 
 class ChurchRulebookShapeTests(_TempFile):

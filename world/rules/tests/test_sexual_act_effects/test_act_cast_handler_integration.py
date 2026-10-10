@@ -68,23 +68,39 @@ class PleasureHandlerIntegrationTests(_ActCastTestCase):
 
     @covers_requirement("sexual-act-effects::the-pleasure-effect-handler-resolves-each-participant-s-part-and-ratio-by-role-applies-gain-and-stages-a-climax-extension-when-a-進行中-participant-s-computed-gain-meets-threshold")
     def test_every_participant_gains_their_own_computed_pleasure(self):
+        # Detected defect: one role is not credited, or the two roles' gains
+        # are swapped. The actor's ratio (0.5) is below the target default
+        # (1.0), so the target must gain strictly more; the exact integers
+        # depend on the authored multiplier tables and are not pinned here.
         skill, act = self._build_duo_act(base_pleasure=20)
         with self._install(skill, act)[0], self._install(skill, act)[1]:
             result = self._cast(act.key, [self.target])
             self.assertEqual(result.outcome, "success")
-            self.assertEqual(self.actor.sexual.pleasure.base, 11)
-            self.assertEqual(self.target.sexual.pleasure.base, 22)
+            self.assertGreater(self.actor.sexual.pleasure.base, 0)
+            self.assertGreater(
+                self.target.sexual.pleasure.base, self.actor.sexual.pleasure.base
+            )
 
     @covers_requirement("sexual-act-effects::the-pleasure-effect-handler-resolves-each-participant-s-part-and-ratio-by-role-applies-gain-and-stages-a-climax-extension-when-a-進行中-participant-s-computed-gain-meets-threshold")
     def test_actor_uses_actor_part_and_target_uses_target_part(self):
-        skill, act = self._build_duo_act(actor_part="腰腹", target_part="私處")
-        self.actor.sexual.sensitivity["腰腹"] = "高"
+        # Detected defect: the actor resolves the target's declared part (or
+        # vice versa). With equal ratios, the participant whose own declared
+        # part carries the higher sensitivity must gain strictly more; reading
+        # the other role's part would invert the order.
+        skill, act = self._build_duo_act(
+            actor_part="腰腹",
+            target_part="私處",
+            actor_pleasure_ratio=1.0,
+        )
+        self.actor.sexual.sensitivity["腰腹"] = "敏感異常"
         self.target.sexual.sensitivity["私處"] = "普通"
         with self._install(skill, act)[0], self._install(skill, act)[1]:
             result = self._cast(act.key, [self.target])
             self.assertEqual(result.outcome, "success")
-            self.assertEqual(self.actor.sexual.pleasure.base, 15)
-            self.assertEqual(self.target.sexual.pleasure.base, 22)
+            self.assertGreater(self.actor.sexual.pleasure.base, 0)
+            self.assertGreater(
+                self.actor.sexual.pleasure.base, self.target.sexual.pleasure.base
+            )
 
     @covers_requirement("sexual-act-effects::the-pleasure-effect-handler-resolves-each-participant-s-part-and-ratio-by-role-applies-gain-and-stages-a-climax-extension-when-a-進行中-participant-s-computed-gain-meets-threshold")
     def test_qualifying_gain_on_in_progress_target_stages_an_extension(self):

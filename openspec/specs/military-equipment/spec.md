@@ -6,23 +6,24 @@ Define register six shared military pairs with real effects, prices and finite c
 ## Requirements
 
 ### Requirement: Six military pairs use shared registered effects and approved integer prices
-The system SHALL register E-S mass-produced military sword/armor pairs using exactly the approved section 5 table reproduced in design.md. Players and NPCs SHALL use identical keys/modifiers, existing rarity budgets and normal slots. No rank purchase gate SHALL apply.
+The six existing E-S military sword/armor pairs SHALL remain registered for shared player/NPC use, using identical keys/modifiers, ordinary slots and existing rarity budgets with no rank purchase gate. Prices and adjustment magnitudes SHALL be mutable authoring data; tests SHALL NOT duplicate the historical section 5 numerical table.
 
 #### Scenario: Shared real equipment
-- **WHEN** a synthetic player and NPC wear the same registered pair
-- **THEN** resolver stat readers return the same equipment bonuses
+- **WHEN** a player and NPC equip the same pair through normal equipment APIs
+- **THEN** both receive the declared effects through shared consumers, with independently tested synthetic equipment arithmetic and no holder-specific path
 
 #### Scenario: Authoring fails closed
-- **WHEN** a modifier exceeds its selected rarity budget
-- **THEN** loading rejects it without enlarging the budget
+- **WHEN** an equipment row names a missing identity, buff, price band or violates the established rarity budget
+- **THEN** normal validation rejects it before use
 
 ### Requirement: Military pairs participate in ordinary finite commerce
-Weapons SHALL join common_arms and armor common_outfits with approved buy prices, existing resale rules, initial stock 2, maximum 4 and restock quantity 1 through ordinary clock commerce. Trade SHALL remain transactional.
+Weapons SHALL remain in common_arms and armor in common_outfits through ordinary finite-stock commerce and clock restocking. Buy prices and initial/max/restock quantities SHALL come from valid authored declarations and existing resale rules. Trade SHALL remain transactional.
 
 #### Scenario: Finite purchase and restock
-- **WHEN** a buyer exhausts stock then the configured restock boundary passes
-- **THEN** an out-of-stock buy rejects without mutation and stock returns by one up to four
+- **WHEN** stock is exhausted and a configured restock boundary passes
+- **THEN** purchases reject while empty and restock adds at most the declared quantity up to the declared maximum; fixed synthetic fixtures independently verify arithmetic, wallet/inventory/stock atomicity and resale
 
 #### Scenario: Rollback
-- **WHEN** a purchase persistence step fails
-- **THEN** wallet inventory mirrors and stock equal their prior snapshots
+- **WHEN** a purchase persistence step fails after a relevant write
+- **THEN** wallet, inventory mirrors and stock equal their prior snapshots after reload
+

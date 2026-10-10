@@ -145,6 +145,32 @@ def _attack(player, target):
     return submit_player_action(player, BASIC_ATTACK_KEY, [target])
 
 
+def wake_target(entity) -> int:
+    """The authored wake target: ``ceil(max_hp * declared_wake_fraction)``.
+
+    Read from the loaded rulebook so tuning the authored fraction never
+    requires a duplicated percentage here.
+    """
+    return math.ceil(
+        float(entity.traits.hp.max) * DEFEAT_AFTERMATH_RULEBOOK.recovery.wake_fraction
+    )
+
+
+def recovery_seconds(result) -> int:
+    """The published recovery-advance time of one settlement result.
+
+    Read back from the aftermath EventLog so tuning the authored wake fraction
+    never requires editing a duplicated minimum-time literal here.
+    """
+    return next(
+        entry.data["seconds"]
+        for log in result["logs"]
+        if log.skill_key == "defeat_aftermath"
+        for entry in log.entries
+        if entry.kind == "recovery_advance"
+    )
+
+
 class DefeatAftermathBase(BattlefieldIsolation, EvenniaTestCase):
     """Shared clock isolation: both clock bindings see one WorldClock."""
 

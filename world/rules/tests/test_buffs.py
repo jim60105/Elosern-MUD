@@ -238,11 +238,14 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
     def test_buff_lamb_seal(self):
         """The shipped seal row mounts with its charge pool and stays live."""
         definition = BUFF_DEFINITIONS["lamb_seal"]
-        self.assertEqual(definition.charges, 2)
+        self.assertIs(type(definition.charges), int)
+        self.assertGreater(definition.charges, 0)
         entity = self._entity()
         apply_buff(entity, "lamb_seal")
         self.assertIn("lamb_seal", entity_active_buffs(entity))
-        self.assertEqual(get_charges(entity.buffs.all["lamb_seal"]), 2)
+        self.assertEqual(
+            get_charges(entity.buffs.all["lamb_seal"]), definition.charges
+        )
 
     def test_charges_save_and_restore(self):
         """The charge pool is durable record state, never instance memory."""
@@ -251,23 +254,30 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         apply_buff(entity, definition.key)
         # Saved: the pool is seeded into the persisted buff storage...
         persisted = entity.attributes.get("buffs")[definition.key]
-        self.assertEqual(persisted["charges"], 3)
+        self.assertEqual(persisted["charges"], definition.charges)
         # ...and restore: a cold re-read (attribute-cache reset) re-derives it.
         entity.attributes.reset_cache()
-        self.assertEqual(get_charges(entity.buffs.all[definition.key]), 3)
+        self.assertEqual(
+            get_charges(entity.buffs.all[definition.key]), definition.charges
+        )
         # Consumption persists through the same cold round-trip.
         consume_climax_charges(entity)
         entity.attributes.reset_cache()
-        self.assertEqual(get_charges(entity.buffs.all[definition.key]), 2)
+        self.assertEqual(
+            get_charges(entity.buffs.all[definition.key]), definition.charges - 1
+        )
 
     def test_charges_two_transition_consumption_lifts_the_seal(self):
         """Two 進行中 transitions consume the pool; the second removes the buff."""
         entity = self._entity()
+        definition = BUFF_DEFINITIONS["lamb_seal"]
         apply_buff(entity, "lamb_seal")
         _apply_climax_phase_set(entity, "接近")
         _apply_climax_phase_set(entity, "進行中")
         self.assertIn("lamb_seal", entity_active_buffs(entity))
-        self.assertEqual(get_charges(entity.buffs.all["lamb_seal"]), 1)
+        self.assertEqual(
+            get_charges(entity.buffs.all["lamb_seal"]), definition.charges - 1
+        )
         # Afterglow → critical point → the second climax consumes the last.
         _apply_climax_phase_set(entity, "餘韻")
         _apply_climax_phase_set(entity, "接近")
@@ -338,7 +348,8 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_water_bind(self):
         definition = BUFF_DEFINITIONS["water_bind"]
-        self.assertEqual(definition.duration, 30)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
         self.assertEqual(definition.modifiers, {})
@@ -347,6 +358,14 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
         apply_buff(entity, "water_bind")
         self.assertIn("water_bind", entity_active_buffs(entity))
         self.assertFalse(blocks_action(entity))
+
+    def _assert_bounds_ceilings(self, definition, targets) -> None:
+        """The row targets exactly these axes, each with a negative ceiling."""
+        bounds = definition.modifiers["bounds"]
+        self.assertEqual([entry["target"] for entry in bounds], list(targets))
+        for entry in bounds:
+            self.assertIs(type(entry["ceiling"]), int)
+            self.assertLess(entry["ceiling"], 0)
 
     # Earth rulebook rows carry lore-catalog numbers; per the earth wave's
     # ratified verification contract these stay load/apply/presence checks —
@@ -428,17 +447,11 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_dark_weaken(self):
         definition = BUFF_DEFINITIONS["dark_weaken"]
-        self.assertEqual(definition.duration, 15)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {
-                "bounds": [
-                    {"target": "atk_phys", "ceiling": -3},
-                ]
-            },
-        )
+        self._assert_bounds_ceilings(definition, ("atk_phys",))
 
         entity = self._entity()
         apply_buff(entity, "dark_weaken")
@@ -446,18 +459,12 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_dark_curse(self):
         definition = BUFF_DEFINITIONS["dark_curse"]
-        self.assertEqual(definition.duration, 20)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {
-                "bounds": [
-                    {"target": "atk_phys", "ceiling": -5},
-                    {"target": "defense", "ceiling": -5},
-                    {"target": "agility", "ceiling": -5},
-                ]
-            },
+        self._assert_bounds_ceilings(
+            definition, ("atk_phys", "defense", "agility")
         )
 
         entity = self._entity()
@@ -466,18 +473,12 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_defeat_weak(self):
         definition = BUFF_DEFINITIONS["defeat_weak"]
-        self.assertEqual(definition.duration, 300)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {
-                "bounds": [
-                    {"target": "atk_phys", "ceiling": -5},
-                    {"target": "agility", "ceiling": -5},
-                    {"target": "defense", "ceiling": -5},
-                ]
-            },
+        self._assert_bounds_ceilings(
+            definition, ("atk_phys", "agility", "defense")
         )
 
         entity = self._entity()
@@ -486,13 +487,11 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_aftermath_residue(self):
         definition = BUFF_DEFINITIONS["aftermath_residue"]
-        self.assertEqual(definition.duration, 900)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {"bounds": [{"target": "agility", "ceiling": -2}]},
-        )
+        self._assert_bounds_ceilings(definition, ("agility",))
 
         entity = self._entity()
         apply_buff(entity, "aftermath_residue")
@@ -500,13 +499,11 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_aftermath_humiliated(self):
         definition = BUFF_DEFINITIONS["aftermath_humiliated"]
-        self.assertEqual(definition.duration, 600)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {"bounds": [{"target": "accuracy", "ceiling": -3}]},
-        )
+        self._assert_bounds_ceilings(definition, ("accuracy",))
 
         entity = self._entity()
         apply_buff(entity, "aftermath_humiliated")
@@ -514,14 +511,20 @@ class BuffIntegrationTests(_BuffFixtureMixin, EvenniaTestCase):
 
     def test_buff_dark_corrosion(self):
         definition = BUFF_DEFINITIONS["dark_corrosion"]
-        self.assertEqual(definition.duration, 300)
-        self.assertEqual(definition.tick_interval, 10)
+        self.assertIs(type(definition.duration), int)
+        self.assertGreater(definition.duration, 0)
+        self.assertIs(type(definition.tick_interval), int)
+        self.assertGreater(definition.tick_interval, 0)
         self.assertEqual(definition.stacking, "refresh")
         self.assertEqual(definition.polarity, "debuff")
-        self.assertEqual(
-            definition.modifiers,
-            {"rate": {"target": "hp", "delta": -12, "caster_share": 1.0}},
-        )
+        # The recurring row keeps its gauge target and negative delta; the
+        # magnitude and share are authored data.
+        rate = definition.modifiers["rate"]
+        self.assertEqual(rate["target"], "hp")
+        self.assertIs(type(rate["delta"]), int)
+        self.assertLess(rate["delta"], 0)
+        self.assertGreaterEqual(rate["caster_share"], 0)
+        self.assertLessEqual(rate["caster_share"], 1)
 
         entity = self._entity()
         apply_buff(entity, "dark_corrosion")

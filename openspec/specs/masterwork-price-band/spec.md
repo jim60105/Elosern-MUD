@@ -8,64 +8,46 @@ trade.
 ## Requirements
 
 ### Requirement: A masterwork price band spans everyday and scarce prices for the same object
-`PRICE_TABLE` SHALL carry a `masterwork_gear` band whose floor is 100 copper
-and whose ceiling is 500,000 copper. The band SHALL describe goods whose
-price is set by scarcity rather than materials: ordinary where the maker's
-own community trades them, extraordinary where they are rare. The ceiling
-SHALL stay strictly below the `relic` band's floor so the keepsake band
-retains an exclusive price region.
+`PRICE_TABLE` SHALL retain `masterwork_gear` as an integer bounded authored price band spanning everyday and scarce prices for the same object. Bounds SHALL be mutable data. Its ceiling SHALL remain below the relic floor. Market scarcity SHALL NOT change item identity/definition; the band key SHALL remain race/culture-neutral.
 
 #### Scenario: One item carries an ordinary and a scarce price
-- **WHEN** two shops offer the same `masterwork_gear` item, one at an
-  everyday price near the band floor and one at a far higher price
-- **THEN** both offers pass price-band validation, and a purchase from
-  either shop yields the same item key with the same item definition
+- **WHEN** two shops offer the same masterwork item near its declared floor and at a far higher valid price
+- **THEN** both offers validate and purchases yield the same item key and definition
 
 #### Scenario: A price above the masterwork ceiling is rejected
-- **WHEN** a shop offer prices a `masterwork_gear` item above 500,000 copper
-- **THEN** catalog validation raises before any registry or merchant state
-  changes
+- **WHEN** an offer exceeds the currently declared finite ceiling
+- **THEN** validation rejects before registry/merchant mutation, without a copied ceiling literal
 
 #### Scenario: The masterwork ceiling does not reach the keepsake floor
-- **WHEN** the `masterwork_gear` ceiling and the `relic` floor are compared
-- **THEN** the ceiling is strictly lower, so no price is legal in both bands
+- **WHEN** current masterwork and relic bounds are compared
+- **THEN** masterwork maximum is strictly below relic minimum, with no price legal in both
 
 #### Scenario: One price band describes the object, not one market
-- **WHEN** the band's width is considered
-- **THEN** it SHALL be wide enough that one item key can legally carry an everyday price in the
-  community that makes it and a far higher price elsewhere, because a price band describes what an
-  object is, not what one market charges for it
+- **WHEN** the authored band width is considered
+- **THEN** it accommodates an everyday price in the maker's community and a far higher price elsewhere for one unchanged item
 
 #### Scenario: The band key names no race or culture
-- **WHEN** the band key is authored
-- **THEN** it SHALL NOT name a race or a culture, and master-crafted goods from any people are
-  admissible
+- **WHEN** master-crafted goods are classified
+- **THEN** goods from any people are admissible and the band key names no race/culture
 
 ### Requirement: A keepsake-band item can never be offered for sale
-No item whose price-table band is `relic` SHALL be offered for sale, at any
-price. The `relic` band means a one-of-a-kind keepsake that is never traded.
+No relic-band item SHALL be offered for sale at any price. Relic SHALL remain a one-of-a-kind non-traded keepsake category; its exact authored floor SHALL not affect the absolute prohibition.
 
 #### Scenario: A relic-band item is unshelvable at any price
-- **WHEN** an item whose band is `relic` is priced at exactly the band floor
-- **THEN** it is still not offerable, because the prohibition is on the band
-  rather than on falling short of a price
+- **WHEN** a relic item is priced exactly at the current authored band floor
+- **THEN** it remains unofferable because its band, not its numeric price, is prohibited
 
 #### Scenario: A keepsake stays reachable outside trade
-- **WHEN** a `relic`-band item is granted through authored content rather
-  than a shop
-- **THEN** it is held and inspected normally; only the shop offer path is
-  closed
+- **WHEN** authored non-shop content grants a relic item
+- **THEN** it is held/inspected normally and only shop offers are closed
 
 #### Scenario: The prohibition is made absolute over the band floor
-- **WHEN** the band's 999,999 copper floor is considered — today only an implicit consequence of
-  the prohibition, which an author can satisfy exactly
-- **THEN** this requirement makes the prohibition absolute, so a keepsake cannot reach a shelf by
-  being priced at its own floor
+- **WHEN** an author sets an offer to the current relic floor
+- **THEN** it cannot reach a shelf even though that price meets the numeric band floor
 
 #### Scenario: Enforcement is owned by the goods-list validator
-- **WHEN** the load-time rejection for a relic-band offer is located
-- **THEN** it is owned by the goods-list validator described in the `commerce-assortments`
-  capability; this requirement states the rule the band carries
+- **WHEN** load-time relic-offer rejection is located
+- **THEN** the commerce-assortments goods-list validator owns it
 
 ### Requirement: Goods a community trades everyday do not sit in the keepsake band
 An item that authored content places on sale SHALL NOT declare the `relic`

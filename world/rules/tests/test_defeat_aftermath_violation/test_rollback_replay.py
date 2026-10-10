@@ -41,6 +41,8 @@ from ._support import (
     ViolationBase,
     _aftermath_entries,
     _kinds,
+    recovery_seconds,
+    wake_target,
 )
 
 
@@ -113,8 +115,8 @@ class RollbackReplayTests(EventSourceIsolation, ViolationBase):
         self.assertEqual(_kinds(_aftermath_entries(result)).count("violation_act"), 2)
         self.assertEqual(self.player.sexual.hostile_act_count, 2)
         self.assertEqual(self.monster.sexual.hostile_act_count, 2)
-        self.assertEqual(self.player.traits.hp.current, 5)
-        self.assertEqual(self.clock.tick, 6 + 2 * 120 + 8)
+        self.assertEqual(self.player.traits.hp.current, wake_target(self.player))
+        self.assertEqual(self.clock.tick, 6 + 2 * 120 + recovery_seconds(result))
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement(

@@ -6,6 +6,7 @@ import importlib
 import unittest
 from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
+from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.characters import PlayerCharacter
@@ -16,6 +17,7 @@ from world.rules.action import (
     PendingEffect,
     RejectReason,
     RejectedAction,
+    _EVENT_EFFECT_PLANNERS,
     _stored_trait_value,
     plan_effect_audiences,
 )
@@ -34,6 +36,7 @@ from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
 )
+from world.rules.clock import get_world_clock
 from world.rules.targeting import (
     ActionContext,
     Relation,
@@ -246,9 +249,14 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(self.companion.traits.hp.current, companion_hp_before)
         self.assertEqual(len(entity_active_buffs(self.companion)), 0)
 
-    @covers_requirement("skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior")
+    @covers_requirement(
+        "skill-registry::light-spell-progression-composes-executable-recovery-and-judgment-behavior",
+        "monster-resource-abilities::穗鳴雀-payment-and-atomicity-retain-the-shared-transaction",
+        "monster-resource-abilities::潮燈蟹-payment-and-atomicity-retain-the-shared-transaction",
+    )
     def test_composite_effects_are_actual_state_changes_with_atomic_rollback(self):
         """Scenario: Composite effects are actual state changes."""
+        debuff = self._register_synth_debuff()
         composite_skill = self._register_skill(
             SkillDef(
                 key="t_synth_composite_atomic",
@@ -259,11 +267,12 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
                 cost={"mp": 25},
                 usable_out_of_combat=True,
                 element=None,
-                effects=["heal:area", "damage:fire:magic"],
+                effects=["heal:area", "damage:fire:magic", f"buff_apply:{debuff}"],
                 category=SkillCategory.ELEMENTAL_MAGIC,
                 effect_policies=(
                     EffectPolicy(audience=EffectAudience.ALLIES, coefficient=2.0),
                     EffectPolicy(audience=EffectAudience.ENEMIES, coefficient=1.5),
+                    EffectPolicy(audience=EffectAudience.ENEMIES, requires_hit_from=1),
                 ),
             )
         )
@@ -278,3 +287,58 @@ class EffectRoutingPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         self.assertEqual(self.caster.traits.mp.current, caster_mp_before - 25)
         self.assertGreater(self.companion.traits.hp.current, 50)
+        self.assertLess(self.target.traits.hp.current, 100)
+        self.assertEqual(self.bystander.traits.hp.current, 100)
+        self.assertIn(debuff, entity_active_buffs(self.target))
+        for untouched in (self.caster, self.companion, self.bystander):
+            self.assertNotIn(debuff, entity_active_buffs(untouched))
+
+        entities = (self.caster, self.companion, self.target, self.bystander)
+        before = {
+            entity.pk: (
+                entity.traits.hp.current,
+                entity.traits.mp.current,
+                deepcopy(entity.db.buffs),
+                deepcopy(entity.db.skill_proficiency),
+            )
+            for entity in entities
+        }
+        observed = []
+        clock = get_world_clock()
+        before_tick = clock.tick
+
+        def fail_after_writes():
+            observed.append((
+                self.caster.traits.mp.current,
+                self.companion.traits.hp.current,
+                self.target.traits.hp.current,
+            ))
+            raise RuntimeError("injected after composite writes")
+
+        def late_fault(_request, _log):
+            return [PendingEffect(
+                self.caster, "late composite fault",
+                frozenset({"progression"}), fail_after_writes,
+            )]
+
+        with patch.dict(_EVENT_EFFECT_PLANNERS, {"t_late_fault": late_fault}), (
+            patch("world.rules.combat.damage.roll_d100", return_value=60)
+        ):
+            failed = ActionResolver.resolve(req)
+        self.assertNotEqual(failed.outcome, "success")
+        self.assertIsNone(failed.event_log)
+        self.assertIsNone(failed.time_cost_seconds)
+        self.assertEqual(failed.notifications, ())
+        self.assertEqual(clock.tick, before_tick)
+        self.assertEqual(get_world_clock().tick, before_tick)
+        self.assertEqual(len(observed), 1)
+        self.assertLess(observed[0][0], before[self.caster.pk][1])
+        self.assertLess(observed[0][2], before[self.target.pk][0])
+        for entity in entities:
+            for actual in (entity, ObjectDB.objects.get(pk=entity.pk)):
+                self.assertEqual((
+                    actual.traits.hp.current,
+                    actual.traits.mp.current,
+                    actual.db.buffs,
+                    actual.db.skill_proficiency,
+                ), before[entity.pk])

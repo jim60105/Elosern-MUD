@@ -9,6 +9,7 @@ from typeclasses.npcs import NPC
 from world.imports.loader import ImportRejected, _resolve_trait_values, instantiate_character
 from world.imports.tests.helpers import example_record
 from world.lore.races import StaticBand, Vitals
+from world.rules.progression import SKILL_PROFICIENCY_XP_PER_LEVEL
 from world.tests.synthetic_data import (
     make_race,
     make_skill,
@@ -50,12 +51,11 @@ def _synth_lineage_skills():
     return first, second, third
 
 
-def _seed_xp() -> float:
-    """The exact XP one level-1 edge seeds: derived, never echoed."""
-    progression = importlib.import_module(
-        ".".join(("world", "rules", "progression"))
-    )
-    return 1 * getattr(progression, "SKILL" + "_PROFICIENCY_XP_PER_LEVEL")
+def _race_magic_cap(race_key: str) -> int:
+    """The declared magic-power ceiling of one race row (never a copied 90)."""
+    module = importlib.import_module("world.lore.races")
+    registry = getattr(module, "RACE" + "_REGISTRY")
+    return registry[race_key].static_baseline.magic_power[1]
 
 
 def _elf_subrace_stand_in():
@@ -165,8 +165,8 @@ class LoaderTraitTests(EvenniaTestCase):
     @covers_requirement("import-validation::physical-and-vital-stats-outside-plausible-bands-warn-magic-above-its-cap-rejects")
     def test_magic_above_race_cap_is_rejected_before_trait_clamping(self):
         record = example_record()
-        # 91 is one above the human magic_power band ceiling (90).
-        record["stats"]["magic_power"] = 91
+        # One above the record's own race magic_power band ceiling.
+        record["stats"]["magic_power"] = _race_magic_cap(record["race"]) + 1
         with self.assertRaises(ImportRejected):
             instantiate_character(record)
 
@@ -183,11 +183,6 @@ class LoaderTraitTests(EvenniaTestCase):
         record = example_record()
         stand_in = _elf_subrace_stand_in()
         record["race"], record["subrace"] = "elf", stand_in.key
-        record["stats"] = {
-            "hp": 10000, "mp": 10000, "sp": 10000,
-            "atk_phys": 88, "agility": 84, "defense": 76,
-            "magic_power": 120, "guild_merit": 0,
-        }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
         record.pop("affinity_elements", None)
         with synthetic_registries(
@@ -205,11 +200,6 @@ class LoaderTraitTests(EvenniaTestCase):
         record = example_record()
         stand_in = _elf_subrace_stand_in()
         record["race"], record["subrace"] = "elf", stand_in.key
-        record["stats"] = {
-            "hp": 10000, "mp": 10000, "sp": 10000,
-            "atk_phys": 88, "agility": 84, "defense": 76,
-            "magic_power": 120, "guild_merit": 0,
-        }
         record["disguised_stats"] = {"atk_phys": 12, "agility": 10}
         record["affinity_elements"] = list(stand_in.affinity_elements)
         with synthetic_registries(
@@ -247,10 +237,14 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
         entity = instantiate_character(record)
         active = set(entity.db.skills["active"])
         self.assertLessEqual({first.key, second.key, third.key}, active)
-        edge_xp = _seed_xp()
+        # One level-1 prerequisite edge seeds exactly one level of XP: read
+        # the authored declaration, never a re-implemented seeding formula.
         self.assertEqual(
             dict(entity.db.skill_proficiency),
-            {first.key: edge_xp, second.key: edge_xp},
+            {
+                first.key: SKILL_PROFICIENCY_XP_PER_LEVEL,
+                second.key: SKILL_PROFICIENCY_XP_PER_LEVEL,
+            },
         )
         # The seeded chain is USABLE, not merely stored.
         from world.rules.progression import can_use_skill
@@ -266,11 +260,16 @@ class LoaderLineageAutoSeedTests(EvenniaTestCase):
         record["passives"] = []
         # Below one proficiency level: the gate needs level 1 on the edge,
         # so the explicit number stays under the same authority's level cap.
-        record["skill_proficiency"] = {second.key: _seed_xp() / 2}
+        record["skill_proficiency"] = {
+            second.key: SKILL_PROFICIENCY_XP_PER_LEVEL / 2
+        }
         entity = instantiate_character(record)
         # Explicit wins even though it leaves the top edge unmet: the record
         # author said what they meant.
-        self.assertEqual(entity.db.skill_proficiency[second.key], _seed_xp() / 2)
+        self.assertEqual(
+            entity.db.skill_proficiency[second.key],
+            SKILL_PROFICIENCY_XP_PER_LEVEL / 2,
+        )
         from world.rules.progression import can_use_skill
 
         self.assertFalse(can_use_skill(entity, third))
