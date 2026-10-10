@@ -93,7 +93,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 #### Scenario: Flavour never becomes a number
 - **WHEN** a variant whose narrative mentions magical or elemental behaviour is inspected
 - **THEN** its magic power, MP and SP equal explicit approved literals, never values inferred from narrative; all twelve shipped variants retain zero magic power within their zero tier magic bands
-- **AND** approved resource exceptions are bank_lurker MP/SP 30/40, bay_warden 50/60; grain_pecker MP/SP 20/8; flock_leader MP/SP 30/12; variants not yet approved in this sequence retain their existing zero pools
+- **AND** approved resource exceptions are bank_lurker MP/SP 30/40, bay_warden 50/60; grain_pecker MP/SP 20/8; flock_leader MP/SP 30/12; shore_walker MP/SP 20/9; reef_warden MP/SP 30/15; variants not yet approved in this sequence retain their existing zero pools
 
 #### Scenario: Balance approval populates the same slot
 - **WHEN** a balance-approved complete profile and grade are authored for one variant
@@ -136,7 +136,7 @@ value, and a `magic_power` outside the variant's tier magic band.
 - **AND** consumers SHALL NOT read the registry slot as if it carried that fallback
 
 ### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
-The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are tide_lamp_crab, ridge_burrow_hare, rock_echo_goat, fog_mane_lynx. Crocodile contact MP drain and completed species kits remain authored configuration.
+The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are ridge_burrow_hare, rock_echo_goat, fog_mane_lynx. Crocodile contact MP drain and completed species kits remain authored configuration.
 
 #### Scenario: No behaviour seam is faked
 - **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the still-deferred species listed above
@@ -165,6 +165,10 @@ The registries SHALL permit executable first-batch abilities only through explic
 #### Scenario: sway_whistle_sparrow completes its executable boundary
 - **WHEN** this species' two approved kits are constructed
 - **THEN** `grain_shaking_peck` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
+
+#### Scenario: tide_lamp_crab completes its executable boundary
+- **WHEN** this species' two approved kits are constructed
+- **THEN** `lamp_carapace_claw` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
 
 ### Requirement: Published projections expose only marked public fields
 The species and variant registries SHALL expose published views built from explicitly marked public
@@ -278,7 +282,7 @@ The approval fence SHALL cover exactly these twelve variants. Each approved seve
 - **WHEN** the approved batch is applied to the existing registry
 - **THEN** magic power remains zero for all twelve; resource pools equal the explicit approved exceptions below and all not-yet-delivered variants retain zero MP/SP
 - **AND** species keys, variant keys, names and grades are retained; only explicitly approved delivered species receive their authored ecology and kit integration
-- **AND** tide_devouring_bite remains unchanged for the two crocodile variants; approved completed kits are grain_shaking_peck
+- **AND** tide_devouring_bite remains unchanged for the two crocodile variants; approved completed kits are grain_shaking_peck, lamp_carapace_claw
 
 #### Scenario: The approved literals retire attrition without changing character
 
@@ -300,6 +304,8 @@ The approval fence SHALL cover exactly these twelve variants. Each approved seve
 |---|---|---|
 | `grain_pecker` | 30/20/8/4/7/3/0 | F |
 | `flock_leader` | 55/30/12/8/10/4/0 | E |
+| `shore_walker` | 30/20/9/5/4/5/0 | F |
+| `reef_warden` | 60/30/15/12/4/7/0 | E |
 - **AND** every remaining non-crocodile variant retains its earlier complete profile and zero MP/SP until its own approval and cutover
 
 ### Requirement: Every shipped combat profile and danger grade lies inside its declared tier band

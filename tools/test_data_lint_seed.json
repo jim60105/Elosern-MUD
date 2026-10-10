@@ -13,6 +13,10 @@
       "reason": "sparrow resource skill production combat smoke contract"
     },
     {
+      "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
+      "reason": "crab resource skill production combat smoke contract"
+    },
+    {
       "path": "tests/test_command_docs.py",
       "reason": "player command docs parity contract"
     },

@@ -472,3 +472,11 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+# 魔物資源技能（remaining-monster-resource-skills §5，潮燈蟹燈甲螯擊）：每次已結算且
+# 具合法目標的施放都收緊甲殼，防禦 +2 資料在 combat_modifiers.yaml 的
+# lamp_carapace_guard_defense 列（martial_blessing 的 defense 先例）。
+- key: lamp_carapace_guard
+  duration: 20
+  stacking: refresh
+  polarity: buff
+  modifiers: {}

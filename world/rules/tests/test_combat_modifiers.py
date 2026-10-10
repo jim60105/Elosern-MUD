@@ -935,6 +935,22 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    # Monster resource-skill mounts (remaining-monster-resource-skills): the
+    # correspondence gate only requires one named test per rule id; the
+    # settlement behaviour of each mount is covered by that species' production
+    # combat smoke (world/rules/tests/test_<species>_resource_skill.py).
+    def test_rule_grain_rattle_accuracy(self):
+        entity = self._entity()
+        rule = RULES["grain_rattle_accuracy"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
+    def test_rule_lamp_carapace_guard_defense(self):
+        entity = self._entity()
+        rule = RULES["lamp_carapace_guard_defense"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()

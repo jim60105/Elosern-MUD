@@ -374,3 +374,9 @@
 - code: grain_rattle_accuracy
   label: 震穀分心命中下降
   severity: harmful
+- code: lamp_carapace_guard
+  label: 燈甲護持
+  severity: beneficial
+- code: lamp_carapace_guard_defense
+  label: 燈甲護持防禦提升
+  severity: beneficial
