@@ -119,6 +119,43 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertTrue(is_companion(another, self.player))
         self.assertFalse(has_general_membership(another, self.player))
 
+    def test_leave_refuses_to_silently_detach_a_temporary_only_member(self):
+        from commands.leave import CmdLeave, _ESCORT_ONLY_MESSAGE
+
+        npc = create_object(NPC, key="護衛對象", location=self.room)
+        source = self._source(npc)
+        command = CmdLeave()
+        command.caller = self.player
+        command.args = npc.key
+        with patch.object(self.player, "msg") as msg:
+            command.func()
+        msg.assert_called_once_with(
+            _ESCORT_ONLY_MESSAGE.format(quests=source.quest_id)
+        )
+        self.assertTrue(is_companion(npc, self.player))
+        self.assertEqual(
+            reasons_for(npc, self.player), ((source.quest_id, "escortee"),)
+        )
+
+    def test_leave_removes_only_the_general_identity_of_a_dual_member(self):
+        from commands.leave import CmdLeave
+        from world.rules.party import LEAVE_DISMISSED_MESSAGE
+
+        npc = create_object(NPC, key="護衛對象", location=self.room)
+        join_party(npc, self.player)
+        source = self._source(npc)
+        command = CmdLeave()
+        command.caller = self.player
+        command.args = npc.key
+        with patch.object(self.player, "msg") as msg:
+            command.func()
+        msg.assert_called_once_with(LEAVE_DISMISSED_MESSAGE)
+        self.assertFalse(has_general_membership(npc, self.player))
+        self.assertTrue(is_companion(npc, self.player))
+        self.assertEqual(
+            reasons_for(npc, self.player), ((source.quest_id, "escortee"),)
+        )
+
     def test_terminal_foreign_and_differently_bound_reasons_grant_nothing(self):
         npc = self._npc()
         record = self._source(npc)

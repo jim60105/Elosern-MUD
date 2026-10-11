@@ -11,8 +11,10 @@ from commands.talk import _resolve_npc
 from world.rules.party import (
     LEAVE_DISMISSED_MESSAGE,
     NOT_COMPANION_MESSAGE,
+    has_general_membership,
     is_companion,
     PartyJoinError,
+    reasons_for,
     REASON_HANDBACK_FIRST,
     HANDBACK_FIRST_MESSAGE,
     leave_party,
@@ -21,6 +23,13 @@ from world.rules.party import (
 _MISSING_TARGET = "你想解散誰？請指定一個目標（leave <npc>）。"
 _AMBIGUOUS_TARGET = "這裡有好幾個目標，請說得更明確一些。"
 _NOT_NPC = "那不是你的同伴。"
+#: A temporary-only member's companionship is a live escort commission, not a
+#: general dismissal: detaching it silently would abandon the quest without the
+#: player's chosen commission, so the command names the affected commissions and
+#: points at the existing quest abandonment path (escort-rendezvous §3).
+_ESCORT_ONLY_MESSAGE = (
+    "她仍與你的護送委託同行；請先放棄對應的委託（{quests}）才能解除同行關係。"
+)
 
 
 class CmdLeave(Command):
@@ -47,6 +56,13 @@ class CmdLeave(Command):
         if not is_companion(npc, self.caller):
             self.caller.msg(NOT_COMPANION_MESSAGE)
             return
+        if not has_general_membership(npc, self.caller):
+            reasons = reasons_for(npc, self.caller)
+            if reasons:
+                self.caller.msg(_ESCORT_ONLY_MESSAGE.format(
+                    quests="、".join(sorted({quest_id for quest_id, _ in reasons}))
+                ))
+                return
         if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
             if int(npc.db.possessed_by) == int(self.caller.pk):
                 self.caller.msg(HANDBACK_FIRST_MESSAGE)
