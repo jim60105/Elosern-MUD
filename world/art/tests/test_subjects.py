@@ -26,6 +26,7 @@ from world.art.subjects import (
     scene_description,
     scene_subject_for,
 )
+from world.lore.monster_visuals import get_monster_visual_registry
 from world.prompts.loader import PromptUnavailableError
 
 from tools.spec_traceability import covers_requirement
@@ -328,6 +329,19 @@ _APPEARANCE = {
 }
 
 
+# A test-owned art.yaml fixture. The composition claims below assert ordering,
+# emptiness, a bound, and determinism, so they author their own framing instead
+# of inheriting the deployment-authored shipped template, whose wording (for
+# example commit 858e52dc's appended ", standing, rim light on clothes,") must
+# never break them. The library seam itself stays covered by the shipped-root
+# logic tests in world/prompts/tests.
+_TEST_ART_YAML = (
+    "schema_version: 1\n"
+    "prompts:\n"
+    "  art.character_description: '{race}, {age} years old.{appearance}{equipment}{custom}'\n"
+)
+
+
 @synthetic_registries("subraces")
 class AppearanceDescriptionTests(PromptFixture):
     """The admitted persona ``appearance`` block in character descriptions
@@ -339,6 +353,11 @@ class AppearanceDescriptionTests(PromptFixture):
     the selection explicit."""
 
     _APPEARANCE_ONLY = ("appearance",)
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_file("art.yaml", _TEST_ART_YAML)
+        self.load()
 
     def _full_persona(self):
         # Insertion order deliberately shuffled away from _SUBKEY_ORDER so the
@@ -477,7 +496,7 @@ class AppearanceDescriptionTests(PromptFixture):
             "art.yaml",
             "schema_version: 1\nprompts:\n"
             "  art.character_description: {race}, {age} years old. {oops}\n"
-            '  art.monster_description: "{description} ({display_name}；例如：{examples})"\n',
+            "  art.monster_description: '{description} ({display_name})'\n",
         )
         self.load()
 
@@ -538,6 +557,43 @@ class AppearanceDescriptionTests(PromptFixture):
         )
         self.assertIn("31", text)
         self.assertNotIn("240", text)
+
+
+@synthetic_registries("archetypes", "monster_tiers", "subraces")
+class MonsterDescriptionSeamTests(PromptFixture):
+    """The monster seam supplies both public identity values of the row."""
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_both_public_identity_values_are_supplied_to_the_template(self):
+        # A test-owned template that SELECTS both tokens is the only observer
+        # of the wiring: the shipped {description}-only template never looks up
+        # {display_name}, so it cannot prove the value is supplied, and dropping
+        # either supplied value here fails the render.
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\nprompts:\n"
+            "  art.monster_description: '{description}|{display_name}'\n",
+        )
+        self.load()
+        row = get_monster_visual_registry()["goblin"]
+        self.assertEqual(
+            monster_description(monster_subject_for("goblin")),
+            f"{row.published_appearance_zh}|{row.display_label}",
+        )
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_a_template_selecting_one_token_leaves_the_surplus_value_inert(self):
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\nprompts:\n"
+            "  art.monster_description: '{display_name}'\n",
+        )
+        self.load()
+        row = get_monster_visual_registry()["goblin"]
+        self.assertEqual(
+            monster_description(monster_subject_for("goblin")),
+            row.display_label,
+        )
 
 
 if __name__ == "__main__":
