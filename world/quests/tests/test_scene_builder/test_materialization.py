@@ -146,11 +146,11 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
         rooms_before = InstanceRoom.objects.all().count()
         exits_before = Exit.objects.all().count()
         npcs_before = NPC.objects.all().count()
-        # Patching the scene-builder's own spawn import leaves the instance
+        # Patching the shared materializer's spawn import leaves the instance
         # room and its exit pair created, then the occupant spawn fails: the
         # outer transaction must roll the whole scene back.
         with patch(
-            "world.quests.scene_builder.spawn",
+            "world.quests.materializer.spawn",
             side_effect=RuntimeError("injected occupant spawn failure"),
         ):
             with self.assertRaises(RuntimeError):

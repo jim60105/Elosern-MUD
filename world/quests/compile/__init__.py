@@ -74,6 +74,8 @@ from world.quests.compile.payload import (
 )
 from world.quests.compile.registration import (
     _publish_registration,
+    publish_activated_commission,
+    publish_definition_views,
     register_generated_quest,
     register_restored_quest,
 )
@@ -87,6 +89,8 @@ __all__ = [
     "StageSpawnRequirement",
     "compile_quest_blueprint",
     "payload_to_registrations",
+    "publish_activated_commission",
+    "publish_definition_views",
     "register_generated_quest",
     "register_restored_quest",
     "scene_requirements_for",

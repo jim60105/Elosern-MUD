@@ -332,3 +332,76 @@ def issuer_is_authorized(issuer_key: str) -> bool:
         except IssuerKeyError:  # observability: ignore R2: a host with a malformed authored key is corrupt state that can match no key; the scan answers only whether issuer_key has a carrier
             continue
     return False
+
+
+def issuer_key_owner(issuer_key: str, *, exclude: Any = None) -> Any | None:
+    """Return the carrier resolving to ``issuer_key`` other than ``exclude``.
+
+    The collision scan a rules-owned provisioning uses before granting a
+    generated content key: a key already owned by another actor would let two
+    carriers offer each other's commissions, so provisioning refuses instead of
+    shadowing the existing authority. Read-only.
+    """
+    try:
+        parsed = parse_issuer_key(issuer_key)
+    except IssuerKeyError:  # observability: ignore R2: a malformed key names no carrier
+        return None
+    if parsed.namespace != "npc":
+        return None
+    from typeclasses.npcs import NPC
+
+    exclude_pk = getattr(exclude, "pk", None)
+    for host in NPC.objects.all_family():
+        if exclude_pk is not None and host.pk == exclude_pk:
+            continue
+        try:
+            if resolve_issuer_key(host) == issuer_key:
+                return host
+        except IssuerKeyError:  # observability: ignore R2: corrupt authored key matches nothing
+            continue
+    return None
+
+
+def provision_scoped_issuer(host: Any, *, content_key: str) -> str:
+    """Provision the private-commission authority of one generated role.
+
+    Rules-owned and scope-bearing (design §5.2): the exact host receives a
+    ``QuestIssuer`` component carrying only the validated declared
+    ``content_key``, and the function returns the host's actual grammar-valid
+    issuer key for the caller's strict registration. Display name, typeclass,
+    location, schedule, and dialogue prose confer nothing; an incompatible
+    existing component, a differing authored key, or a key already owned by
+    another actor raises ``QuestIssuanceError`` instead of overwriting authored
+    authority. The caller's surrounding transaction owns rollback.
+    """
+    key = npc_issuer_key(content_key)
+    holder = getattr(host, "components", None)
+    if holder is None:
+        raise QuestIssuanceError(
+            f"a generated issuer host must carry components, got {type(host).__name__}"
+        )
+    existing = holder.get(QuestIssuer.get_component_slot())
+    if existing is not None:
+        authored = existing.issuer_key
+        if authored not in (None, "", content_key):
+            raise QuestIssuanceError(
+                f"host already carries authored issuer key {authored!r}; refusing "
+                f"to provision {content_key!r}"
+            )
+    owner = issuer_key_owner(key, exclude=host)
+    if owner is not None:
+        raise QuestIssuanceError(
+            f"issuer key {key!r} is already owned by {owner.key!r}"
+        )
+    if existing is None:
+        holder.add(QuestIssuer.create(host, issuer_key=content_key))
+    actual = resolve_issuer_key(host)
+    if actual != key:
+        raise QuestIssuanceError(
+            f"provisioned issuer resolved to {actual!r}, expected {key!r}"
+        )
+    log_info(
+        "quest_issuer_provisioned",
+        context={"npc": str(getattr(host, "pk", "?")), "issuer": actual},
+    )
+    return actual

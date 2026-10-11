@@ -70,14 +70,20 @@ class SceneOccupantPrototypeTests(EvenniaTestCase):
         monster_proto = spawner_module.search_prototype(
             "scene_monster", require_single=True
         )[0]
+        llm_npc_proto = spawner_module.search_prototype(
+            "scene_llm_npc", require_single=True
+        )[0]
         self.assertEqual(npc_proto["prototype_key"], "scene_npc")
         self.assertEqual(npc_proto["typeclass"], "typeclasses.npcs.NPC")
         self.assertEqual(monster_proto["prototype_key"], "scene_monster")
         self.assertEqual(monster_proto["typeclass"], "typeclasses.monsters.Monster")
+        self.assertEqual(llm_npc_proto["prototype_key"], "scene_llm_npc")
+        self.assertEqual(llm_npc_proto["typeclass"], "typeclasses.npcs.LLMNPC")
 
-    def test_whitelist_contains_exactly_the_two_scene_prototypes(self):
+    def test_whitelist_contains_exactly_the_scene_prototypes(self):
         self.assertEqual(
-            SCENE_OCCUPANT_PROTOTYPE_WHITELIST, ("scene_npc", "scene_monster")
+            SCENE_OCCUPANT_PROTOTYPE_WHITELIST,
+            ("scene_npc", "scene_monster", "scene_llm_npc"),
         )
 
     def test_validate_occupant_parent_rejects_non_whitelisted_parent_and_override(self):
