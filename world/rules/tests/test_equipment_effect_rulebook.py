@@ -1,4 +1,4 @@
-"""Data-contract test: equipment effect rulebook contract
+"""Data-contract test: equipment effect rulebook and item-lore liturgical-role contract
 Validation tests for the equipment-effect rulebook loader.
 
 Pure unittest. Deviant rulebook copies are built by mutating a fresh parse
@@ -26,6 +26,7 @@ from world.lore.items import (
     EquipmentModifierKey,
     ItemDefinition,
     ItemRarity,
+    LiturgicalRole,
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.buffs import BUFF_DEFINITIONS
@@ -36,6 +37,7 @@ from world.rules.equipment_effects import (
     equipment_adjustment_text,
     load_equipment_effect_rules,
     reload_equipment_effect_rules,
+    validate_church_doctrine,
     validate_equipment_effect_rules,
 )
 
@@ -54,11 +56,20 @@ def _write_rulebook(document: dict) -> Path:
 
 
 class EquipmentEffectRulebookTests(unittest.TestCase):
-    def _expect_rejection(self, mutate) -> None:
+    def _expect_rejection(self, mutate, reason: str | None = None) -> None:
+        """Load one deviant copy; optionally pin the rejection's reason.
+
+        A reason substring is asserted where the test's point is *which*
+        guard fired -- the doctrine pass runs after the schema and budget
+        checks, so an unspecified reason could hide a test that passes on
+        the wrong error.
+        """
         document = _canonical_document()
         mutate(document)
-        with self.assertRaises(EquipmentEffectsRulebookError):
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
             load_equipment_effect_rules(_write_rulebook(document))
+        if reason is not None:
+            self.assertIn(reason, str(caught.exception))
 
     # --- canonical data -------------------------------------------------------
 
@@ -617,19 +628,6 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
 class EquipmentRosterCoverageTests(unittest.TestCase):
     """The equipment bijection and authored trade identities."""
 
-    NEW_ITEM_KEYS = (
-        "purified_pendant",
-        "fearless_brooch",
-        "knight_platemail",
-        "apothecary_beads",
-        "archmage_mending_robe",
-        "enticing_lace_set",
-        "passion_silk_choker",
-        "sister_vestments",
-        "radiant_holy_emblem",
-        "saintess_vestments",
-    )
-
     @covers_requirement(
         "equipment-effects::equipment-items-bind-one-to-one-to-a-closed-effect-identity"
     )
@@ -649,29 +647,54 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
                 self.assertEqual(definition.modifier_key.value, definition.key)
 
     @covers_requirement(
-        "equipment-effects::the-new-equipment-roster-is-registered-and-tradeable"
+        "equipment-effects::equipment-membership-and-stocking-are-authored-data"
     )
-    def test_new_items_are_registered_offered_and_price_resolvable(self):
-        # The specialist split distributes the roster across shops: armour
-        # sells at the tailor, so "tradeable" means offered by SOME capital
-        # shop, not by the general store in particular.
+    def test_every_registered_equipment_item_is_complete_and_price_resolvable(self):
+        # No approved new-item roster: every CURRENT equipment definition must
+        # be complete on its own, so a valid item edit needs no test change.
+        registered = {
+            definition.key
+            for definition in ITEM_REGISTRY.values()
+            if definition.equipment_slot is not None
+        }
+        self.assertTrue(registered)
+        for key in sorted(registered):
+            with self.subTest(item=key):
+                definition = ITEM_REGISTRY[key]
+                self.assertEqual(definition.modifier_key.value, key)
+                self.assertIsInstance(definition.sellable, bool)
+                self.assertIn(definition.price_table_key, PRICE_TABLE)
+                self.assertIn(definition.modifier_key, EQUIPMENT_EFFECT_RULES)
+
+    @covers_requirement(
+        "equipment-effects::equipment-membership-and-stocking-are-authored-data"
+    )
+    def test_stocking_is_authored_data_not_a_registration_consequence(self):
+        # Offers are membership data over registered items, and registration
+        # never implies an offer: a bound, budget-checked item no counter
+        # carries is a valid shipped state that still loads its rule.
+        registered = {
+            definition.key
+            for definition in ITEM_REGISTRY.values()
+            if definition.equipment_slot is not None
+        }
         offered = {
             item_key
             for shop in SHOP_REGISTRY.values()
             for item_key in shop.offered_item_keys
         }
-        for key in self.NEW_ITEM_KEYS:
-            with self.subTest(item=key):
-                definition = ITEM_REGISTRY[key]
-                self.assertIsNotNone(definition.equipment_slot)
-                self.assertIsNotNone(definition.modifier_key)
-                self.assertTrue(definition.sellable)
-                self.assertIn(definition.price_table_key, PRICE_TABLE)
-                self.assertIn(key, offered)
-                self.assertIn(definition.modifier_key, EQUIPMENT_EFFECT_RULES)
+        # An offer names a registered item; registration never implies one.
+        self.assertTrue(offered <= set(ITEM_REGISTRY))
+        unstocked = sorted(registered - offered)
+        self.assertTrue(unstocked, "no unstocked equipment ships at all")
+        for item_key in unstocked:
+            with self.subTest(item=item_key):
+                self.assertIn(
+                    ITEM_REGISTRY[item_key].modifier_key, EQUIPMENT_EFFECT_RULES
+                )
 
     @covers_requirement(
-        "equipment-effects::the-new-equipment-roster-is-registered-and-tradeable"
+        "equipment-effects::registration-and-tradeability-are-independent"
     )
     def test_every_equipment_price_table_key_resolves(self):
         for key, definition in ITEM_REGISTRY.items():
@@ -679,39 +702,43 @@ class EquipmentRosterCoverageTests(unittest.TestCase):
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
 
 
-CHURCH_VESTMENTS_AND_EMBLEMS = (
-    "sister_vestments",
-    "radiant_holy_emblem",
-    "saintess_vestments",
-    "pilgrim_medallion",
-)
+def _role_members(role: LiturgicalRole) -> tuple[str, ...]:
+    """Discover one doctrine sub-set from item lore, never from a named list.
 
-CHURCH_SANCTUARY_DEVICES = (
-    "nymph_buds_clamp",
-    "warm_honey_orb",
-    "hyperesthesia_charm",
-)
+    Membership is the item's own immutable ``liturgical_role``, so authoring a
+    new Church record with the role enters doctrine coverage automatically and
+    no effect-table edit can move an item between the sub-sets.
+    """
+    return tuple(
+        item_key
+        for item_key, definition in sorted(ITEM_REGISTRY.items())
+        if definition.liturgical_role is role
+    )
 
 
 def _percent_magnitude(value: str) -> int:
     return int(value[:-1])
 
 
-def check_church_vestments_and_emblems(
-    rules, keys=CHURCH_VESTMENTS_AND_EMBLEMS
-) -> None:
-    """Raise ValueError when one named Church vestment or emblem breaks doctrine.
+def check_church_vestments_and_emblems(rules, keys=None) -> None:
+    """Raise ValueError when one Church vestment or emblem breaks doctrine.
 
-    Canon (坦露與歡愉為正向、光之治療與淨化): non-negative exposure bias and
-    pleasure, at least one of heal_gain or an immunity, no suppression
-    values. Ordinary combat trade-offs remain permitted.
+    Canon (坦露與歡愉為正向、光之治療與淨化): an explicit non-negative
+    exposure bias and pleasure term, at least one of heal_gain or an
+    immunity, no suppression values. Ordinary combat trade-offs remain
+    permitted. This is the independent oracle: it never calls the production
+    validator to learn the expected outcome.
     """
+    if keys is None:
+        keys = _role_members(LiturgicalRole.VESTMENT_OR_EMBLEM)
     for key in keys:
         rule = rules[EquipmentModifierKey(key)]
         if rule.exposure_bias < 0:
             raise ValueError(f"{key}: negative exposure_bias suppresses canon")
         pleasure = rule.adjustments.get("pleasure_gain")
-        if pleasure is not None and _percent_magnitude(pleasure) < 0:
+        if pleasure is None:
+            raise ValueError(f"{key}: absent pleasure_gain breaks canon")
+        if _percent_magnitude(pleasure) < 0:
             raise ValueError(f"{key}: negative pleasure_gain suppresses canon")
         heal = rule.adjustments.get("heal_gain")
         if heal is not None and _percent_magnitude(heal) < 0:
@@ -723,14 +750,14 @@ def check_church_vestments_and_emblems(
             )
 
 
-def check_church_sanctuary_devices(
-    rules, keys=CHURCH_SANCTUARY_DEVICES
-) -> None:
-    """Raise ValueError when one named Church sanctuary device breaks doctrine.
+def check_church_sanctuary_devices(rules, keys=None) -> None:
+    """Raise ValueError when one Church sanctuary device breaks doctrine.
 
     Sanctuary devices: non-negative exposure_bias, positive pleasure_gain,
     no suppression values. Healing-or-immunity is NOT required.
     """
+    if keys is None:
+        keys = _role_members(LiturgicalRole.SANCTUARY_DEVICE)
     for key in keys:
         rule = rules[EquipmentModifierKey(key)]
         if rule.exposure_bias < 0:
@@ -743,9 +770,9 @@ def check_church_sanctuary_devices(
 
 
 def check_church_doctrine(rules) -> None:
-    """Raise ValueError when any named Church item breaks canon doctrine."""
-    check_church_vestments_and_emblems(rules, CHURCH_VESTMENTS_AND_EMBLEMS)
-    check_church_sanctuary_devices(rules, CHURCH_SANCTUARY_DEVICES)
+    """Raise ValueError when any item-lore role member breaks canon doctrine."""
+    check_church_vestments_and_emblems(rules)
+    check_church_sanctuary_devices(rules)
 
 
 class ChurchDoctrineTests(unittest.TestCase):
@@ -754,20 +781,53 @@ class ChurchDoctrineTests(unittest.TestCase):
         rules[EquipmentModifierKey(key)] = rule
         return rules
 
+    def _expect_load_rejection(self, mutate, reason: str | None = None) -> None:
+        """Load one deviant canonical copy and optionally pin the reason."""
+        document = _canonical_document()
+        mutate(document)
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            load_equipment_effect_rules(_write_rulebook(document))
+        if reason is not None:
+            self.assertIn(reason, str(caught.exception))
+
     @covers_requirement(
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
     )
-    def test_named_church_set_satisfies_doctrine(self):
-        check_church_vestments_and_emblems(EQUIPMENT_EFFECT_RULES)
-        check_church_sanctuary_devices(EQUIPMENT_EFFECT_RULES)
+    def test_every_role_bearing_church_item_satisfies_doctrine(self):
+        vestments = _role_members(LiturgicalRole.VESTMENT_OR_EMBLEM)
+        devices = _role_members(LiturgicalRole.SANCTUARY_DEVICE)
+        self.assertTrue(vestments)
+        self.assertTrue(devices)
+        self.assertFalse(set(vestments) & set(devices))
+        # Every roled item is covered, and every covered key is roled: the
+        # sub-sets are a partition of the item-lore declarations, not a list.
+        self.assertEqual(
+            {
+                item_key
+                for item_key, definition in ITEM_REGISTRY.items()
+                if definition.liturgical_role is not None
+            },
+            set(vestments) | set(devices),
+        )
+        for item_key in vestments + devices:
+            self.assertIn(EquipmentModifierKey(item_key), EQUIPMENT_EFFECT_RULES)
         check_church_doctrine(EQUIPMENT_EFFECT_RULES)
+        # The production load agrees with the independent oracle.
+        validate_church_doctrine(
+            {
+                definition.key: definition
+                for definition in ITEM_REGISTRY.values()
+                if definition.equipment_slot is not None
+            },
+            EQUIPMENT_EFFECT_RULES,
+        )
 
     @covers_requirement(
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
     )
     def test_sanctuary_devices_satisfy_doctrine_without_healing(self):
         check_church_sanctuary_devices(EQUIPMENT_EFFECT_RULES)
-        for key in CHURCH_SANCTUARY_DEVICES:
+        for key in _role_members(LiturgicalRole.SANCTUARY_DEVICE):
             rule = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey(key)]
             self.assertGreaterEqual(rule.exposure_bias, 0)
             self.assertIn("pleasure_gain", rule.adjustments)
@@ -786,6 +846,12 @@ class ChurchDoctrineTests(unittest.TestCase):
             immune=(),
         )
         deviant_rules = self._with_rule("sister_vestments", deviant)
+        # The role lives on the item, so the deviant rule changes what the
+        # item must satisfy -- never which sub-set the item belongs to.
+        self.assertIs(
+            ITEM_REGISTRY["sister_vestments"].liturgical_role,
+            LiturgicalRole.VESTMENT_OR_EMBLEM,
+        )
         # Sanctuary-device check passes for this rule in isolation:
         check_church_sanctuary_devices(deviant_rules, keys=("sister_vestments",))
         # But Church doctrine verification still fails because sister_vestments is in the vestment set:
@@ -800,11 +866,13 @@ class ChurchDoctrineTests(unittest.TestCase):
         "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
     )
     def test_imperial_and_elven_items_are_excluded_from_church_subsets(self):
-        church_items = set(CHURCH_VESTMENTS_AND_EMBLEMS) | set(
-            CHURCH_SANCTUARY_DEVICES
+        church_items = set(_role_members(LiturgicalRole.VESTMENT_OR_EMBLEM)) | set(
+            _role_members(LiturgicalRole.SANCTUARY_DEVICE)
         )
-        self.assertNotIn("warmth_rune_egg", church_items)
-        self.assertNotIn("tremor_crystal", church_items)
+        for key in ("warmth_rune_egg", "tremor_crystal"):
+            with self.subTest(item=key):
+                self.assertIsNone(ITEM_REGISTRY[key].liturgical_role)
+                self.assertNotIn(key, church_items)
 
     def test_sister_vestments_numbers_refused_at_uncommon_rarity(self):
         document = _canonical_document()
@@ -881,6 +949,99 @@ class ChurchDoctrineTests(unittest.TestCase):
                 )
             },
         )
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_absent_pleasure_gain_is_not_an_exemption(self):
+        # Dropping the key must not read as "no negative pleasure": absent is
+        # its own violation, so a vestment cannot evade the canon by omission.
+        self._expect_violation(
+            "sister_vestments",
+            lambda rule: {
+                "adjustments": MappingProxyType(
+                    {
+                        field: value
+                        for field, value in rule.adjustments.items()
+                        if field != "pleasure_gain"
+                    }
+                )
+            },
+        )
+        # The independent oracle holds the same reading as production.
+        rule = EQUIPMENT_EFFECT_RULES[EquipmentModifierKey.SISTER_VESTMENTS]
+        deviant = replace(
+            rule,
+            adjustments=MappingProxyType(
+                {
+                    field: value
+                    for field, value in rule.adjustments.items()
+                    if field != "pleasure_gain"
+                }
+            ),
+        )
+        with self.assertRaises(ValueError) as caught:
+            check_church_vestments_and_emblems(
+                self._with_rule("sister_vestments", deviant)
+            )
+        self.assertIn("absent pleasure_gain", str(caught.exception))
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_an_effect_entry_cannot_declare_a_liturgical_role(self):
+        # Reclassification from the effect side is impossible: the entry
+        # schema is closed, so a role field is an unknown field naming itself.
+        self._expect_load_rejection(
+            lambda d: d["effects"]["sister_vestments"].update(
+                {"liturgical_role": "sanctuary_device"}
+            ),
+            reason="unknown fields",
+        )
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_the_loader_rejects_a_vestment_that_drops_its_obligation(self):
+        # A within-budget mutation that only breaks doctrine: the shipped
+        # loader itself must refuse it, naming the item and the rule.
+        def drop_healing(document):
+            entry = document["effects"]["pilgrim_medallion"]
+            entry["adjustments"].pop("heal_gain", None)
+            entry["immune"] = []
+
+        self._expect_load_rejection(drop_healing, reason="pilgrim_medallion")
+        self._expect_load_rejection(drop_healing, reason="neither")
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_a_role_bearing_item_joins_doctrine_coverage_automatically(self):
+        # A newly authored Church record needs no list edit anywhere: its own
+        # role puts it under the obligation the loader enforces.
+        registry = {
+            item_key: definition
+            for item_key, definition in ITEM_REGISTRY.items()
+            if definition.equipment_slot is not None
+            and item_key != "sister_vestments"
+        }
+        registry["t_synth_vestment"] = replace(
+            ITEM_REGISTRY["sister_vestments"],
+            key="t_synth_vestment",
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
+        )
+        # Covered with the shipped rule ...
+        validate_church_doctrine(registry, EQUIPMENT_EFFECT_RULES)
+        # ... and rejected the moment its own entry breaks the obligation.
+        broken = dict(EQUIPMENT_EFFECT_RULES)
+        broken[EquipmentModifierKey.SISTER_VESTMENTS] = replace(
+            EQUIPMENT_EFFECT_RULES[EquipmentModifierKey.SISTER_VESTMENTS],
+            adjustments=MappingProxyType({}),
+            immune=(),
+        )
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            validate_church_doctrine(registry, broken)
+        self.assertIn("t_synth_vestment", str(caught.exception))
 
 
 class ShippedAdjustmentProseContractTests(unittest.TestCase):
