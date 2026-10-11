@@ -84,6 +84,21 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
   literal framing text; only a change to a template's token set breaks a test, through the
   token-parity or unknown-placeholder load-error check
 
+#### Scenario: Brace pass-through is exercised on test-owned fixtures
+- **WHEN** the loader's brace pass-through contract (a `{{token}}` or a JSON example brace such as
+  `{"name": "…"}` stays literal no matter what values are supplied) is tested
+- **THEN** the assertion runs against a test-owned inline fixture template carrying those brace
+  forms, so the loader behavior stays covered without pinning the shipped files' JSON example
+  fragments, whose content a deployment may retune word for word
+
+#### Scenario: Semantic probes persist only on scenario-named vocabulary
+- **WHEN** a prompt test asserts short shipped-text phrases as semantic contract probes (role,
+  language, fidelity, or output-contract vocabulary)
+- **THEN** the phrases it names are vocabulary spelled out in the requirement scenario its
+  `@covers_requirement` cites — e.g. the persona frame's current-setting-over-history framing terms
+  or the scenario-director's 僅供靈感 guidance terms — and a phrase no owning scenario names is
+  dropped from the assertion rather than pinned incidentally
+
 #### Scenario: Composition claims are asserted over test-owned framing
 - **WHEN** a description-composition test needs to assert an ordering, exclusion, bound, or
   append claim rather than a library-seam claim
