@@ -44,9 +44,6 @@ LEDGER = (
     / "development"
     / "bestiary-editorial-review.md"
 )
-REQUIREMENT = (
-    "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
-)
 DEFAULT_FIELDS = [
     "display_name_zh",
     "published_description_zh",
@@ -94,7 +91,9 @@ def _section(species_key: str, block: dict, *, prose: str = "合成敘述段落�
 class LiveBestiaryDocumentationTests(unittest.TestCase):
     """Requirement: the shipped publication matches the shipped registries."""
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement(
+        "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
+    )
     def test_the_current_documentation_covers_every_shipped_key_both_ways(self):
         problems = check_bestiary_documentation(
             MONSTER_SPECIES_REGISTRY,
@@ -103,7 +102,9 @@ class LiveBestiaryDocumentationTests(unittest.TestCase):
         )
         self.assertEqual(problems, ())
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement(
+        "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
+    )
     def test_a_wording_only_edit_of_a_valid_section_still_passes(self):
         text = BESTIARY.read_text(encoding="utf-8")
         marker = text.index(CURRENT_END_MARKER)
@@ -119,7 +120,9 @@ class LiveBestiaryDocumentationTests(unittest.TestCase):
         )
         self.assertEqual(problems, ())
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement(
+        "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
+    )
     def test_historical_entries_never_satisfy_current_coverage(self):
         text = BESTIARY.read_text(encoding="utf-8")
         marker = text.index(CURRENT_END_MARKER)
@@ -338,7 +341,9 @@ class EditorialLedgerTests(unittest.TestCase):
     def _entries(self, *rows: str):
         return parse_editorial_ledger("\n".join(rows))
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement(
+        "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
+    )
     def test_every_shipped_species_has_one_dated_review_entry(self):
         entries = parse_editorial_ledger(LEDGER.read_text(encoding="utf-8"))
         self.assertEqual(
@@ -348,7 +353,9 @@ class EditorialLedgerTests(unittest.TestCase):
             check_editorial_ledger(MONSTER_SPECIES_REGISTRY, entries), ()
         )
 
-    @covers_requirement(REQUIREMENT)
+    @covers_requirement(
+        "monster-resource-abilities::bestiary-documentation-covers-keyed-public-content-relationships"
+    )
     def test_ledger_relationship_faults_are_named(self):
         rows = {"t_doc_species": object()}
         valid = "| `t_doc_species` | 2026-01-01 | ecology read | boundary read | status read | accepted |"
