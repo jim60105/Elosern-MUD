@@ -26,6 +26,10 @@ Threat SHALL use observed incoming damage and successful opposing healing/contro
 - **WHEN** historical recipients die, escape, disappear or change faction
 - **THEN** their old identifiers confer no permission to target them
 
+#### Scenario: Existing strategy determines threat participation
+- **WHEN** identical settled observations are added for utility profiles using highest_effective_power and lowest_hp
+- **THEN** the former averages its static-power and observed-threat target ranks, while the latter remains unchanged by threat; empty positive history retains the static rank and legacy metric ordering remains unchanged
+
 ### Requirement: Completed coordination is reproducible and intelligence scaled
 Completed utility SHALL add i*w_focus*observed_focus to damage, baseline healing, preference and intelligence-scaled finishing/control/cost/waste. Same-process replay SHALL require identical initial observations, state, scope and tuning. Traces SHALL record the initial observation snapshot.
 

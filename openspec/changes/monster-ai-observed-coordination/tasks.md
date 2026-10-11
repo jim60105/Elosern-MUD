@@ -3,7 +3,7 @@
 ## 1. Behavior and establishing evidence
 
 - [ ] 1.1 Implement bounded focus projection and multi-target averaging; verify no intent access, no duplicate reward and empty-history zero.
-- [ ] 1.2 Implement age-decayed normalized observed threat only for applicable preferences; verify current faction eligibility, unknown outcomes and seal precedence.
+- [ ] 1.2 Implement age-decayed normalized observed threat for utility highest_effective_power target preferences by averaging static-power and observed-threat ranks; verify a paired participating/nonparticipating fixture, empty-history static rank, current faction eligibility, unknown outcomes and seal precedence without a new tuning field or legacy ordering change.
 - [ ] 1.3 Complete the score and opt-in replay observation data; verify real two-monster coordination, unchanged actor stats and replay with identical initial memory.
 - [ ] 1.4 Update docs/development/monster-ai.md with this slice's implemented authoring/runtime contracts and add its release changelog entry; verify documentation matches the exercised fixtures, uses the canonical player-facing term and adds no command documentation.
 
