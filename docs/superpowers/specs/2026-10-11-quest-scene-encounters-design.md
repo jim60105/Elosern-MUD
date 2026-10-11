@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: Conversation design approved; written review pending.
+Status: Conversation design and written review approved.
 
 ## 1. Purpose and approved decisions
 
@@ -319,9 +319,11 @@ is insufficient. No live LLM is required for deterministic acceptance.
 
 ## 10. Interface to the remaining designs
 
-Design 2 consumes stable role bindings, exact actor identity, authorized
-commission references, and phase-transition APIs. It supplies authoritative
-acceptance, escort, reunion, closure, failure, and release observations.
+[Design 2](2026-10-11-escort-rendezvous-design.md) consumes stable role bindings,
+exact actor identity, authorized commission references, and phase-transition APIs.
+It supplies authoritative acceptance, escort, reunion, closure, failure, and
+release observations. Packages may declare distinct role-issued commissions with
+an explicit shared exclusive outcome; they do not collapse into one quest record.
 
 Design 3 supplies validated packages from confirmed requests, durable source
 identity, encounter eligibility, and production activation on actual exploration
