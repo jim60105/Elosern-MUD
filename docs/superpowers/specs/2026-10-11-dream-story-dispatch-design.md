@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: Conversation design approved; written review pending.
+Status: Conversation design and written review approved.
 
 ## 1. Purpose and approved decisions
 
