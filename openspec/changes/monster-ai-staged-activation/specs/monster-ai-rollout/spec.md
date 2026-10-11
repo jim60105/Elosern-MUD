@@ -23,11 +23,15 @@ Expansion SHALL follow review of valid-action rates, wait/exclusion causes, reso
 - **THEN** its focused scenarios are rerun without automatically executing every archetype; no combat stat rebalance is included
 
 ### Requirement: Legacy mode rollback is demonstrated
-Selected variants SHALL be switchable back to legacy with no destructive data migration or DB restoration. Existing sessions SHALL retain recorded tuning until termination; new sessions or deliberate restart SHALL adopt startup mode. Restart SHALL clear tactical history.
+Selected variants SHALL be switchable back to legacy without destructive migration or DB restoration. Changed on-disk tuning SHALL require restart to validate and load startup mode. New sessions SHALL use already-loaded startup tuning and SHALL NOT reload disk edits. Existing sessions SHALL retain recorded tuning until termination or restart. Restart SHALL clear tactical history.
 
 #### Scenario: Rollback encounter
-- **WHEN** an activated variant is switched to legacy and a new session or restart is used
+- **WHEN** an activated variant's mode is edited to legacy and restart validates and loads that startup mode
 - **THEN** focused real smoke reproduces legacy target, skill, flee priority and dice behavior; non-monster delegation and transactions remain unchanged
+
+#### Scenario: A new session does not reload configuration
+- **WHEN** mode is edited on disk while the process remains active and a new session begins
+- **THEN** the session uses the process's already-loaded startup configuration; new-session-only rollback evidence is valid only when that process already loaded the intended legacy mode
 
 #### Scenario: Rollback error boundary
 - **WHEN** a database/resolver exception occurs during rollback verification

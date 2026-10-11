@@ -12,7 +12,7 @@ No stat rebalance, new ability, cooldown, phase mechanic, patrol, behavior tree,
 
 ## Decisions
 
-Choose and record a small named registered set with independently justified intelligence values, never a tier ordering. Require attack/support/coordination regressions, real smoke, all manual evidence and contract gate before changing their default mode. An affected real encounter validates authoring. Rollback changes only the variant mode and uses a new session or deliberate restart; no migration or DB restore.
+Choose and record a small named registered set with independently justified intelligence values, never a tier ordering. Require attack/support/coordination regressions, real smoke, all manual evidence and contract gate before changing their default mode. An affected real encounter validates authoring. Rollback edits the variant mode, restarts to validate and load the changed startup tuning, then exercises production legacy settlement with empty history. A new session alone applies no disk edit; it can demonstrate rollback only if the process already loaded the intended legacy startup mode. No migration or DB restore is required.
 
 Use focused modules under world/rules/monster_ai/ only when their actual behavior is implemented. Proposed responsibility names are models, candidates, estimation, utility, selection and trace. Keep orchestration identity/observation lifetime in existing combat/session owners and rulebook validation in its current owner. Extending one centralized behavior module would combine unrelated lifetimes. Calling handlers or a copied-entity dry-run resolver would risk writes, reactions and resolution RNG; neither alternative is permitted.
 
@@ -24,7 +24,7 @@ Shared files and shard manifests can conflict. Apply dependencies first and assi
 
 ## Migration Plan
 
-This pre-release change adds no data migration. Existing production variants remain legacy until monster-ai-staged-activation consumes accepted evidence. Session configuration stays recorded in process until termination; restart reconstructs with validated startup tuning and empty history. Rollback uses the retained mode switch and a new session or deliberate restart, with normal transaction boundaries.
+This pre-release change adds no data migration. Existing production variants remain legacy until monster-ai-staged-activation consumes accepted evidence. Session configuration stays recorded in process until termination; restart reconstructs with validated startup tuning and empty history. A changed on-disk mode requires restart before rollback smoke. A new session uses only settings already validated at process startup, with normal transaction boundaries.
 
 ## Behavioral evidence and ownership
 

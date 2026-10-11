@@ -5,7 +5,7 @@
 - [ ] 1.1 Review all prerequisite reports, focused tests and complete warm p95 before selecting activation; verify the release evidence links every acceptance criterion.
 - [ ] 1.2 Author independently justified intelligence for a small explicitly named registered variant set and mode overrides; verify real registry binding and all other variants remain legacy.
 - [ ] 1.3 Run one affected real encounter using startup settings and record raw settlement/reload evidence; verify legal actions and unchanged stats/skills.
-- [ ] 1.4 Demonstrate switch-back through a new session or restart with fixed-seed legacy smoke; verify action/dice/flee behavior, empty restart memory and ordinary exception boundaries.
+- [ ] 1.4 Edit variant_decision_mode back to legacy, restart to validate/load changed startup tuning and run fixed-seed production legacy smoke; verify action/dice/flee behavior, empty restart memory and ordinary exception boundaries. Verify a new session without restart retains already-loaded tuning and cannot apply a fresh disk edit.
 - [ ] 1.5 Document expansion and affected-profile retuning operations with a new fingerprint; verify the release record includes exact commands, seeds, configuration and rollback evidence.
 - [ ] 1.6 Update docs/development/monster-ai.md with this slice's implemented authoring/runtime contracts and add its release changelog entry; verify documentation matches the exercised fixtures, uses the canonical player-facing term and adds no command documentation.
 
