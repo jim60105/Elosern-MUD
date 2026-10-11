@@ -52,9 +52,9 @@ These correspond to the handoff's PR 1+2, PR 3, and PR 4. OpenSpec proposals and
 
 There is no archetype intelligence default, tier-derived intelligence, species-level inheritance, copied persistent intelligence trait, or individual GM override in this scope. Legacy variants need not acquire intelligence tuning to continue working. A variant selected for utility must have a validated value. Tier-only or unregistered monsters remain eligible for legacy but cannot silently acquire utility intelligence.
 
-Runtime behavior resolution honors the actual stored `behaviour_tree` binding. Resolving intelligence must validate the registered species/variant pair; reading a variant string alone is insufficient. A session pins the resolved profile, variant intelligence, and configuration fingerprint in process. Configuration is loaded and validated at startup, with no new hot-reload mechanism.
+Runtime behavior resolution honors the actual stored `behaviour_tree` binding. Resolving intelligence must validate the registered species/variant pair; reading a variant string alone is insufficient. A session records the resolved profile, variant intelligence, and configuration fingerprint in process. Configuration is loaded and validated at startup, with no new hot-reload mechanism.
 
-Restart clears the pinned in-process state and tactical memory. An existing combat session reconstructs through its current record and adopts validated startup tuning. Exact cross-restart decision replay is claimed only when the complete configuration and memory starting state also match; no durable AI sidecar is added.
+Restart clears the in-process state and tactical memory. An existing combat session reconstructs through its current record and adopts validated startup tuning. Exact cross-restart decision replay is claimed only when the complete configuration and memory starting state also match; no durable AI sidecar is added.
 
 ## 6. Intelligence and behavior axes
 
@@ -68,13 +68,13 @@ Archetype preferences remain distinct. They favor simple attacks for `instinctiv
 
 Cross-round tactical memory exists only in process. It retains observed resolved events for a bounded window and is keyed by session and stable monster identity. It survives ordinary battlefield reconstruction between submissions, but not server restart.
 
-A transaction-local overlay receives already executed actions before the next decision. The outer successful commit publishes its bounded memory result; rollback discards it. Terminal cleanup wins over publication and retires memory only after successful commit. This covers normal settlement, flee, forfeit, recovery, and missing participants. Selection itself never writes entity state or committed tactical memory.
+A transaction-local overlay receives already executed actions before the next decision. The outer successful commit publishes its bounded memory result; rollback discards it. Terminal cleanup wins over publication and discards memory only after successful commit. This covers normal settlement, flee, forfeit, recovery, and missing participants. Selection itself never writes entity state or committed tactical memory.
 
 ## 8. Validation scale and exclusions
 
 The owner explicitly replaced the original 1,000 encounters per archetype with a small one-time manual check. The baseline is 24 encounters per archetype, 144 total, plus 128 paired selector seeds without running encounters. Detailed allocation and limits are defined in the simulation design. The manual report generator is never part of full test discovery or default CI gates.
 
-Permanent tests cover consumer-visible defects and boundaries with small deterministic fixtures. Do not add source-text assertions, tuning approval tables, exact prose pins, or Monte Carlo encounter sweeps to the suite.
+Permanent tests cover consumer-visible defects and boundaries with small deterministic fixtures. Do not add source-text assertions, tuning approval tables, exact prose assertions, or Monte Carlo encounter campaigns to the suite.
 
 No combat stat rebalance, new abilities, patrol state machine, durable tactical memory, per-monster GM editing, GM UI, cooldown mechanics, phase-switch mechanics, telegraphed attacks, behavior tree, or GOAP planner is included. Existing mechanics may inform estimates; new mechanics require their own design and approval.
 

@@ -25,7 +25,7 @@ For each archetype, run six distinct synthetic situations, two fixed seeds, and 
 | Tactical support and focus | Useful healing/control and already observed allied pressure |
 | Long encounter and lifecycle | Repeated rounds, expiring effects, bounded memory, and terminal cleanup |
 
-Construct all six archetype profiles through the production loader and use synthetic registered species/variants. Do not pin shipped lore keys or numerical balance values in mechanism assertions. Add one separate representative shipped-content smoke only if required to establish authoring/registry binding; label and register it under the repository's data-contract rules.
+Construct all six archetype profiles through the production loader and use synthetic registered species/variants. Do not assert shipped lore keys or numerical balance values in mechanism assertions. Add one separate representative shipped-content smoke only if required to establish authoring/registry binding; label and register it under the repository's data-contract rules.
 
 Each encounter stops at normal terminal settlement or a safety bound of 30 actual rounds. Reaching the bound is reported as an unresolved/capped encounter, never silently counted as a win or loss. A simulator bug or illegal action fails the batch; a capped legal encounter remains visible for interpretation.
 
@@ -37,7 +37,7 @@ Use exactly two legal candidates with a fixed utility gap of 0.5. Inject the sam
 
 Acceptance requires the high-intelligence count to exceed the low-intelligence count by at least 15 percentage points. Report counts and Wilson intervals for each proportion; do not interpret this isolated selector measurement as an encounter win-rate result. Identical seed/config/input replay must reproduce every chosen candidate.
 
-This check runs once as an explicit manual report operation. Permanent selection regressions cover numerical stability, equal-score behavior, invalid input, deterministic replay, and independent combat RNG with small fixed examples. Do not add the 128-seed sweep to full-suite discovery.
+This check runs once as an explicit manual report operation. Permanent selection regressions cover numerical stability, equal-score behavior, invalid input, deterministic replay, and independent combat RNG with small fixed examples. Do not add the 128-seed check to full-suite discovery.
 
 ## 4. Simulator execution boundary
 
@@ -45,7 +45,7 @@ Add a manual report tool using existing uv-managed Django/Evennia setup conventi
 
 The tool constructs real synthetic entities and drives the existing session/round/resolver boundary, including payment, effect settlement, successful commits, and committed reload. Pure score-only loops cannot stand in for encounter evidence. Network/model services are disabled, and each batch uses an isolated scratch database rather than the user's live game or retained test database.
 
-Separate ordinary and overwhelm smoke operations exercise their respective production contexts and internal round/slot identities. These are focused integration checks; they do not multiply the 144-encounter campaign into a full cross-product. Failure/rollback, restart recovery, and invalid-state cases belong to focused deterministic regressions rather than large encounter sweeps.
+Separate ordinary and overwhelm smoke operations exercise their respective production contexts and internal round/slot identities. These are focused integration checks; they do not multiply the 144-encounter campaign into a full cross-product. Failure/rollback, restart recovery, and invalid-state cases belong to focused deterministic regressions rather than large encounter campaigns.
 
 Run one archetype's 24 encounters per short local command. If the expected command exceeds ten minutes, reduce the operation into named scenario batches before execution. Do not run CI shard commands or a full managed browser suite for this non-UI feature.
 
@@ -61,15 +61,15 @@ Detailed decision traces stay opt-in and contain no queued intent or private mod
 
 ## 6. Performance smoke and initial budget
 
-Measure the whole policy call, including snapshot capture, legality, estimation, scoring, sampling, and configured trace overhead. Use monotonic wall-clock timing and count actual ORM queries. Do not time only the final softmax call or exclude preflight costs.
+Measure the whole policy call, including snapshot construction, legality, estimation, scoring, sampling, and configured trace overhead. Use monotonic wall-clock timing and count actual ORM queries. Do not time only the final softmax call or exclude preflight costs.
 
 The reference case has 16 live participants, up to 16 owned active skills per deciding actor, mixed single/area/support plans, and a candidate budget of 256. This is a benchmark envelope, not a restriction on live game participant or skill counts.
 
 Perform five warm-up calls followed by 50 measured decisions for legacy and utility, holding the snapshot state fixed and isolating policy dice from resolution dice. Include a cold first-call measurement separately. Report p50/p95, actual examined/accepted/omitted candidates, and query counts. The initial acceptance budget is warm complete utility p95 <= 50 ms on the recorded reference host, with no candidate-proportional ORM work.
 
-Vary the proposed candidate count on the same captured actor/participant data to expose repeated per-candidate queries. Query work may scale with initial participants/owned-skill capture, but not with subsequent enumeration of their target plans. If the budget fails, profile and improve the path; do not hide the cost by reducing the timed boundary or silently increase the limit.
+Vary the proposed candidate count on the same recorded actor/participant data to expose repeated per-candidate queries. Query work may scale with the initial participant and owned-skill read, but not with subsequent enumeration of their target plans. If the budget fails, profile and improve the path; do not understate the cost by reducing the timed boundary or silently increasing the limit.
 
-This performance operation runs manually once for initial acceptance. It is not a timing assertion in permanent tests. Fixed structural behavior regressions may establish no state mutation or bounded proposal work without pinning host-dependent milliseconds.
+This performance operation runs manually once for initial acceptance. It is not a timing assertion in permanent tests. Permanent regressions can cover no state mutation and bounded proposal work without depending on host speed.
 
 ## 7. Initial tuning and staged activation
 
@@ -77,13 +77,13 @@ Use the attack design's initial archetype weights and explicit variant intellige
 
 Start with all existing variants on legacy. After attack/tactics regressions, real-path smoke, the small manual report, and the repository contract gate pass, enable a small explicitly named set via `variant_decision_mode`. Verify one affected real encounter and retain the mode switch as the rollback mechanism. Expand only after reviewing valid-action rates, waiting/exclusion causes, resource usage, and observed behavior.
 
-Tuning edits may adjust weights and the temperature curve. A changed affected profile needs its focused scenario rerun; do not automatically rerun every archetype. Report a new fingerprint and retire claims based on old tuning. No stat rebalance is smuggled into intelligence tuning.
+Tuning edits may adjust weights and the temperature curve. A changed affected profile needs its focused scenario rerun; do not automatically rerun every archetype. Report a new fingerprint; earlier claims based on the old tuning no longer hold. Intelligence tuning does not include a statistic rebalance.
 
 ## 8. Rollback and release evidence
 
-Switch selected variants back to legacy and start a new session or restart according to the in-process configuration pinning contract. No destructive data migration or database restoration is required. Existing active sessions retain their pinned configuration until termination unless a server restart deliberately rebuilds them using startup settings and empty memory.
+Switch selected variants back to legacy and start a new session or restart according to the in-process configuration recording contract. No destructive data migration or database restoration is required. Existing active sessions retain their recorded configuration until termination unless a server restart deliberately rebuilds them using startup settings and empty memory.
 
-Demonstrate legacy action behavior in focused smoke after the mode change. Preserve non-monster fallback, flee thresholds, mandatory rules, and normal transaction behavior. A rollback cannot conceal database/resolver exceptions behind an AI warning.
+Demonstrate legacy action behavior in focused smoke after the mode change. Preserve non-monster fallback, flee thresholds, mandatory rules, and normal transaction behavior. A rollback must not report database/resolver exceptions as an AI warning.
 
 Deliver the report, exact reproducible operations, seeds, configuration, focused test output, and exercised smoke evidence. Run `uv run --locked python -m tools.contract_gate` before handoff. Run relevant observability lint with focused tests when logging changes. Register any new non-browser test modules in exactly one Evennia shard; manual tool operations are not test modules.
 

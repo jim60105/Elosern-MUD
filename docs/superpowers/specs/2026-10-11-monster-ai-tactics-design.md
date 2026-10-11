@@ -54,7 +54,7 @@ Retain the established distinct archetypes. Pack hunters can focus an observed w
 
 A compact immutable observation contains session, actual round, sequence, source stable ID/faction, skill or item identity when relevant, recipient stable IDs, and resolved public outcome magnitudes/status facts. It contains no pending requests, private prose, arbitrary entity references, or callbacks.
 
-Capture successful ordinary skill settlement, item effects relevant to health/support, and round upkeep effects through the deterministic workflow. The round loop exposes resolved results to a transaction-local observation collector immediately after success and before the next provider call. Upkeep is observed at its actual execution boundary. Rejected/rolled-back actions are not successful observations.
+Observe successful ordinary skill settlement, item effects relevant to health/support, and round upkeep effects through the deterministic workflow. The round loop exposes resolved results to a transaction-local observation collector immediately after success and before the next provider call. Upkeep is observed at its actual execution boundary. Rejected/rolled-back actions are not successful observations.
 
 Store one bounded session event ring, with per-monster eligible projections keyed by session and actor identity. This avoids copying a full event graph for every monster. Initial limits are the most recent three actual rounds and 128 observations per session, whichever expires first. Store no more than one compact outcome record per settled action/upkeep boundary, using bounded recipient summaries for large groups. Capacity loss is visible in the detailed trace.
 
@@ -66,9 +66,9 @@ Begin each actual round with a transaction-local overlay over committed in-proce
 
 On the outermost successful transaction commit, publish the overlay's bounded final state. On rollback, discard it. Never publish directly from an inner savepoint while the enclosing player action can still fail. Direct non-session round execution uses its own real transaction boundary or explicitly isolated ephemeral scope; it must not mutate shared session memory without such a boundary.
 
-A terminal cleanup token supersedes all earlier publication callbacks from that transaction. After commit, retire the session memory and pinned configuration; late callbacks cannot recreate it. On rollback, do not delete the prior committed session memory. Apply this ordering to normal victory/defeat, successful flee, forfeit, invalid-session recovery, and missing/deleted participants.
+A terminal cleanup token supersedes all earlier publication callbacks from that transaction. After commit, discard the session memory and the recorded configuration; late callbacks cannot recreate it. On rollback, do not delete the prior committed session memory. Apply this ordering to normal victory/defeat, successful flee, forfeit, invalid-session recovery, and missing/deleted participants.
 
-Use per-session commit sequence/generation checks so older callbacks cannot overwrite a newer committed overlay. Session hooks install once and do not leak into later rounds or exceptions. Observe and test nested transaction ordering explicitly.
+Use per-session commit sequence/generation checks so older callbacks cannot overwrite a newer committed overlay. Session hooks are installed once and do not remain active into later rounds or after exceptions. Observe and test nested transaction ordering explicitly.
 
 ## 8. Restart, repeatability, and access
 

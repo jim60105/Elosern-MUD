@@ -21,7 +21,7 @@ Add top-level `variant_intelligence` and `variant_decision_mode` mappings to the
 
 No archetype or tier supplies intelligence. Do not add species defaults, per-entity copies, a trait multiplier, or variant inheritance. Utility tuning does not make a tier-only monster registered. Such an object can use legacy; selecting utility without a valid identity and explicit intelligence is a typed invalid decision state and must be diagnosed.
 
-Startup validation verifies authored references and utility activation coverage. Runtime resolution also verifies the actual `behaviour_tree` and species/variant binding because repair tools can alter stored data. The resulting immutable profile and AI configuration fingerprint are pinned for an in-process session. Fingerprints include decision algorithm version, variant intelligence, mode, weights, candidate budget, and relevant rulebook/skill estimation inputs.
+Startup validation verifies authored references and utility activation coverage. Runtime resolution also verifies the actual `behaviour_tree` and species/variant binding because repair tools can alter stored data. The resulting immutable profile and AI configuration fingerprint are recorded for an in-process session. Fingerprints include decision algorithm version, variant intelligence, mode, weights, candidate budget, and relevant rulebook/skill estimation inputs.
 
 ## 3. Snapshot contract
 
@@ -29,9 +29,9 @@ A decision snapshot includes stable session/actor/participant identifiers, actua
 
 Combat trait values follow the existing true-trait resolver path, never `disguised_stats`. No queued player action, unresolved teammate choice, event-handler object, mutable ORM entity graph, wall-clock timestamp, or Python object address enters scoring or seed construction.
 
-Snapshot capture must use no-create read paths. Gauge reads do not regenerate resources or alter timestamps. Buff/stat reads do not initialize caches or attach handlers. Where current accessors perform such work, extract a shared non-mutating reader rather than accepting its side effects inside the snapshot.
+Building a snapshot must use no-create read paths. Gauge reads do not regenerate resources or alter timestamps. Buff/stat reads do not initialize caches or attach handlers. Where current accessors perform such work, extract a shared non-mutating reader rather than accepting its side effects inside the snapshot.
 
-Registry lookups, owned-skill metadata, current costs, participant traits, and buff projections are captured once per decision. Reuse those values across candidates. Do not use a cross-action cache that could conceal an earlier action's resource, health, or status changes.
+Registry lookups, owned-skill metadata, current costs, participant traits, and buff projections are read once per decision. Reuse those values across candidates. Do not use a cross-action cache that could make an earlier action's resource, health, or status changes invisible.
 
 ## 4. Legal candidate generation
 
@@ -39,7 +39,7 @@ Start with owned active skills that contain supported hostile damage. Passive sk
 
 Use `preview_skill()` with the actual settlement context and candidate participants. Share the remaining cast, lineage, proficiency, interaction, capability, and target gates with the resolver through pure validation. Submission revalidation stays in place; the resolver repeats checks after initiative and earlier actions may change state.
 
-The session adapter must construct normal or overwhelm context before policy selection. Round-level callers provide the same effective mode. Preserve `ActionRequest.targets` when it is a recognized shorthand and preserve `scale`; never convert a target string into a character list or drop a non-default scale.
+The session adapter must construct normal or overwhelm context before policy selection. Round-level callers provide the same effective mode. Preserve `ActionRequest.targets` when it is a recognized shorthand and preserve `scale`; never convert a target string into a character list or omit a non-default scale.
 
 ### Target plans
 
@@ -113,7 +113,7 @@ Use independently authored variant intelligence according to lore and observed t
 
 Sort candidates by canonical skill key, normalized target identifiers, and scale before sampling. Use stable softmax with `Umax` subtraction and `T = 1.25 - 1.17 * i`, producing temperatures from 1.25 to 0.08. Reject non-positive/non-finite temperature; equal scores sample uniformly. Handle empty candidates explicitly.
 
-Selection RNG lives in the utility selection module and is injectable. Production seeds use a versioned SHA-256 encoding of session ID, actual round index, actor stable ID, actual actor action slot, and pinned configuration fingerprint. Avoid Python `hash()`, unordered traversal, display names, ORM addresses, and shared combat dice. Repeating an identical decision scope reproduces selection without affecting hit, damage, or initiative rolls.
+Selection RNG lives in the utility selection module and is injectable. Production seeds use a versioned SHA-256 encoding of session ID, actual round index, actor stable ID, actual actor action slot, and recorded configuration fingerprint. Avoid Python `hash()`, unordered traversal, display names, ORM addresses, and shared combat dice. Repeating an identical decision scope reproduces selection without affecting hit, damage, or initiative rolls.
 
 The round engine attaches ephemeral decision scope around every policy call. Multiple actions by one actor get distinct slot indices, and overwhelm supplies each actual internal round number. Restore scope on normal return and on exceptions. Preserve the two-argument provider contract.
 
@@ -121,7 +121,7 @@ A direct two-argument inspection call without execution scope uses canonical act
 
 ## 8. Diagnostics and error boundary
 
-Detailed trace is opt-in for debugging/manual reports. It records scope, config/algorithm version, variant intelligence, seed, candidate/rejection counts, budget omissions, feature contributions, estimation limits, normalized target plans, and selected request. Full trace output uses explicit JSON report files or a programmatic result; normal facade context carries only a bounded summary.
+Detailed trace is opt-in for debugging/manual reports. It records scope, config/algorithm version, variant intelligence, seed, candidate/rejection counts, budget omissions, feature contributions, estimation limits, normalized target plans, and selected request. Full trace output uses explicit JSON report files or a programmatic result; normal facade context includes only a bounded summary.
 
 Malformed tuning fails startup. A narrowly typed invalid runtime decision state emits a facade warning with available identifiers and exception context. The initial configured invalid-state behavior is legacy fallback; a diagnostic setting may select `None`. This fallback does not include empty legal candidates, unsupported individual candidates, late resolver rejection, database errors, or unexpected programming exceptions. Those keep their normal boundaries.
 
