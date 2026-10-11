@@ -22,137 +22,17 @@ from world.quests.encounters import (
     publish_scene_package,
 )
 from world.quests.scene_package import ScenePackageError, validate_scene_package
-from world.quests.tests._card_fixtures import occupant_card_record
-from world.quests.tests._compile_helpers import (
-    _anchor_key,
-    _archetype_key,
-    _issuer_key,
-    _tier_key,
-)
+from world.quests.tests._compile_helpers import _issuer_key
 from world.quests.tests._fixtures import RegistryIsolationMixin
+from world.quests.tests._scene_package_fixtures import (
+    dialogue as _dialogue,
+    package as _package,
+    phase as _phase,
+    quest_payload as _quest_payload,
+    role as _role,
+)
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
-
-_LONG_PROSE = "南門的相遇，旅人在此停下腳步，等著一個承諾被實現。"
-
-
-def _characterization(tag: str) -> dict:
-    return {
-        "display_name": f"測試住民{tag}",
-        "title": "迷路的旅人",
-        "age": 30,
-        "apparent_age": 30,
-        "portrait": {"stable_key": f"test_portrait_{tag}"},
-        "persona": occupant_card_record(tag),
-    }
-
-
-def _anchor_locator(**overrides) -> dict:
-    locator = {
-        "layer": "anchor",
-        "anchor_key": _anchor_key(),
-        "archetype": _archetype_key(),
-        "anchor_near": None,
-        "xyz": None,
-        "scene_sentence": _LONG_PROSE,
-    }
-    locator.update(overrides)
-    return locator
-
-
-def _role(role_id: str, **overrides) -> dict:
-    role = {
-        "role_id": role_id,
-        "tier": _tier_key(),
-        "disposition": None,
-        "characterization": _characterization(role_id),
-        "conversable": True,
-        "retention": _anchor_locator(archetype=None, scene_sentence=None),
-    }
-    role.update(overrides)
-    return role
-
-
-def _phase(phase_id, conditions, *, topics=()):
-    return {
-        "phase_id": phase_id,
-        "conditions": list(conditions),
-        "greeting": f"{_LONG_PROSE}{phase_id}",
-        "topics": list(topics),
-        "freeform_situation": _LONG_PROSE,
-        "freeform_goals": _LONG_PROSE,
-        "offline_response": _LONG_PROSE,
-    }
-
-
-def _dialogue(role_id: str, **overrides) -> dict:
-    dialogue = {
-        "role_id": role_id,
-        "initial_phase": "searching",
-        "phases": [
-            _phase("searching", [{"default": True}]),
-            _phase("everyday", [{"closure": True}], topics=[{"keyword": "近況", "response": _LONG_PROSE}]),
-        ],
-    }
-    dialogue.update(overrides)
-    return dialogue
-
-
-def _quest_payload(*, issuer: str, merit: int = 0, npc_req=None) -> dict:
-    return {
-        "name": "尋找母親",
-        "quest_type": "探索",
-        "rank": "F",
-        "issuer": issuer,
-        "stages": [
-            {
-                "index": 0,
-                "objective": {"kind": "reach_location", "quantity": 1},
-                "location_req": _anchor_locator(),
-                "npc_req": list(npc_req or []),
-            }
-        ],
-        "reward": {"copper": 50, "items": [], "merit": merit},
-        "failure": {"deadline_hours": None, "conditions": []},
-    }
-
-
-def _package(**overrides) -> dict:
-    package = {
-        "display_name": "南門的相遇",
-        "source_id": "synthetic-package-source",
-        "quest": _quest_payload(issuer="mother"),
-        "roles": [_role("mother"), _role("daughter")],
-        "relationships": [
-            {"from_role": "mother", "to_role": "daughter", "kind": "parent_child"}
-        ],
-        "knowledge": [
-            {
-                "role_id": "mother",
-                "claim_id": "separation",
-                "text": _LONG_PROSE,
-                "provenance": {"kind": "role_owner", "ref": "mother"},
-            }
-        ],
-        "encounters": [
-            {
-                "scene_id": "south_gate",
-                "role_ids": ["daughter"],
-                "locator": _anchor_locator(),
-                "prerequisites": [],
-            },
-            {
-                "scene_id": "market",
-                "role_ids": ["mother"],
-                "locator": _anchor_locator(),
-                "prerequisites": [],
-            },
-        ],
-        "dialogue": [_dialogue("mother"), _dialogue("daughter")],
-        "commission": {"role_id": "mother", "issuer_content_key": "story_mother"},
-    }
-    package.update(overrides)
-    return package
 
 
 class ScenePackageValidationTests(EvenniaTestCase):

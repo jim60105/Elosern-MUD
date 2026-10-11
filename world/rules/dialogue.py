@@ -49,6 +49,13 @@ from world.observability import log_error, log_info
 GUILD_STAFF_DIALOGUE_KEY = "guild_staff"
 GUILD_STAFF_TURNIN_KEYWORD = "回報"
 
+# A generated story role's dialogue identity names its package and role, e.g.
+# ``scene_role:pkg_ab12:mother``. The shared resolver reads the role's current
+# permitted phase through the quest-owned scene store, so greetings, keyword
+# responses, topic affordances and action validation all answer from the same
+# place as the authored tables (quest-scene-encounters 4.1).
+GENERATED_DIALOGUE_PREFIX = "scene_role:"
+
 NO_UNDERSTANDING_LINE = "對方皺起眉頭：「我不太明白你的意思。」"
 
 # The session line bound mirrors the accepted-prose bounds the dialogue
@@ -79,6 +86,78 @@ def resolve_dialogue_component(npc: Any) -> Any | None:
     return None
 
 
+@dataclass(frozen=True)
+class GeneratedPhaseDialogue:
+    """One generated role's current permitted phase, as a read-only view."""
+
+    package_id: str
+    role_id: str
+    phase_id: str
+    revision: int
+    greeting: str
+    topics: tuple[tuple[str, str], ...]
+    offline_response: str
+
+
+def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialogue | None:
+    """Resolve a generated dialogue key to its current permitted phase, or ``None``.
+
+    Read-only: a malformed key, an unpublished package, an unknown role or a
+    missing selected phase all resolve to ``None`` (the caller then falls back to
+    the authored table or the no-understanding line). Guarded reunion/escort
+    content is never invented here -- only the committed selected phase's own
+    validated fields are returned.
+    """
+    if not isinstance(dialogue_key, str) or not dialogue_key.startswith(
+        GENERATED_DIALOGUE_PREFIX
+    ):
+        return None
+    package_id, _, role_id = dialogue_key[len(GENERATED_DIALOGUE_PREFIX):].partition(":")
+    if not package_id or not role_id:
+        return None
+    from world.quests import scene_store
+    from world.quests.scene_package import validate_scene_package
+
+    row = scene_store.read_package(package_id)
+    if row is None:
+        return None
+    try:
+        definition = validate_scene_package(row.payload)
+    except Exception:  # observability: ignore R2: a stored package that no longer validates yields no dialogue rather than breaking the read seam
+        return None
+    role_dialogue = definition.role_dialogue(role_id)
+    if role_dialogue is None:
+        return None
+    runtime = scene_store.get_dialogue_phase(package_id, role_id)
+    phase_id = runtime.selected_phase if runtime is not None else role_dialogue.initial_phase
+    revision = int(runtime.revision) if runtime is not None else 0
+    phase = next(
+        (item for item in role_dialogue.phases if item.phase_id == phase_id), None
+    )
+    if phase is None:
+        return None
+    return GeneratedPhaseDialogue(
+        package_id=package_id,
+        role_id=role_id,
+        phase_id=phase.phase_id,
+        revision=revision,
+        greeting=phase.greeting,
+        topics=tuple((topic.keyword, topic.response) for topic in phase.topics),
+        offline_response=phase.offline_response,
+    )
+
+
+def generated_dialogue_for(npc: Any) -> GeneratedPhaseDialogue | None:
+    """Return the current generated phase definition for ``npc``, or ``None``."""
+    return _generated_dialogue_for_key(dialogue_key_for(npc))
+
+
+def dialogue_phase_revision(npc: Any) -> int | None:
+    """Return the current phase revision of a generated host, or ``None``."""
+    generated = generated_dialogue_for(npc)
+    return None if generated is None else generated.revision
+
+
 def is_dialogue_host(npc: Any) -> bool:
     """Whether ``npc`` carries any dialogue component."""
     return resolve_dialogue_component(npc) is not None
@@ -93,7 +172,21 @@ def dialogue_key_for(npc: Any) -> str | None:
 
 
 def table_response(dialogue_key: str, keyword: str, npc: Any = None) -> str:
-    """Return the authored response for one keyword, or the no-understanding line."""
+    """Return the resolved response for one keyword, or the no-understanding line.
+
+    The shared resolver answers authored rows and validated generated
+    current-phase definitions alike, so the text ``talk`` path, the webclient
+    adapter, the topic affordances and action validation all read one seam
+    (quest-scene-encounters 4.1).
+    """
+    generated = _generated_dialogue_for_key(dialogue_key)
+    if generated is not None:
+        for candidate, response in generated.topics:
+            if candidate == keyword:
+                return response
+        if npc is not None:
+            return misunderstood_line_for(npc)
+        return NO_UNDERSTANDING_LINE
     definition = DIALOGUE_TABLE.get(dialogue_key)
     if definition is None:
         return NO_UNDERSTANDING_LINE
@@ -106,11 +199,34 @@ def table_response(dialogue_key: str, keyword: str, npc: Any = None) -> str:
 
 
 def dialogue_has_keyword(dialogue_key: str, keyword: str) -> bool:
-    """Whether ``keyword`` has an authored response in the named table."""
+    """Whether ``keyword`` resolves in the named authored table or generated phase."""
+    generated = _generated_dialogue_for_key(dialogue_key)
+    if generated is not None:
+        return any(candidate == keyword for candidate, _ in generated.topics)
     definition = DIALOGUE_TABLE.get(dialogue_key)
     if definition is None:
         return False
     return any(entry.keyword == keyword for entry in definition.responses)
+
+
+def dialogue_topic_keywords(npc: Any) -> tuple[str, ...]:
+    """Return the ordered topic keyword identities of a host's current definition.
+
+    Authored tables and generated current phases answer through the same
+    resolver, so the version-2 conversation panel, the text ``talk`` command and
+    the action-validation path can never disagree about which topics exist. An
+    empty or unresolved definition yields an empty tuple (no choices).
+    """
+    key = dialogue_key_for(npc)
+    if key is None:
+        return ()
+    generated = _generated_dialogue_for_key(key)
+    if generated is not None:
+        return tuple(candidate for candidate, _ in generated.topics)
+    definition = DIALOGUE_TABLE.get(key)
+    if definition is None:
+        return ()
+    return tuple(entry.keyword for entry in definition.responses)
 
 
 def dialogue_response(npc: Any, actor: Any, keyword: str) -> str | None:
@@ -140,8 +256,12 @@ def greeting_for(npc: Any) -> str | None:
     """Return the host's authored no-keyword greeting, or ``None``.
 
     A missing ``dialogue_key`` or a definition with ``greeting=None`` yields
-    ``None`` so the caller falls back to the no-response line.
+    ``None`` so the caller falls back to the no-response line. A generated
+    role answers with its current permitted phase's fixed greeting.
     """
+    generated = generated_dialogue_for(npc)
+    if generated is not None:
+        return generated.greeting
     key = dialogue_key_for(npc)
     if key is None:
         return None
@@ -250,19 +370,33 @@ def opens_dialogue(npc: Any) -> bool:
     """Whether a conversation can open on ``npc`` (the conversable-host gate).
 
     True for an ``LLMNPC`` (the generative host) or for a host carrying a
-    ``ScriptedDialogue`` component whose authored ``dialogue_key`` resolves in
-    ``DIALOGUE_TABLE``. A component host whose table does not resolve has no
-    greeting and no choices, so opening a session on it would be a dead end;
-    the caller shows its disabled ``dialogue_unavailable`` affordance instead.
-    The adapter and the exploration panel share this one predicate, so the
-    rendered affordance and the committed action agree. Read-only.
+    ``ScriptedDialogue`` component whose ``dialogue_key`` resolves either in
+    ``DIALOGUE_TABLE`` or to a generated role's current phase definition. A
+    component host whose definition does not resolve has no greeting and no
+    choices, so opening a session on it would be a dead end; the caller shows
+    its disabled ``dialogue_unavailable`` affordance instead. The adapter and
+    the exploration panel share this one predicate, so the rendered affordance
+    and the committed action agree. Read-only.
     """
     from typeclasses.npcs import LLMNPC
 
     if isinstance(npc, LLMNPC):
         return True
     key = dialogue_key_for(npc)
-    return key is not None and key in DIALOGUE_TABLE
+    if key is None:
+        return False
+    return key in DIALOGUE_TABLE or _generated_dialogue_for_key(key) is not None
+
+
+def dialogue_offline_response(npc: Any) -> str | None:
+    """Return a generated host's current permitted offline response, or ``None``.
+
+    A generated role always answers offline with its current phase's fixed
+    offline response (design §6); an authored host has no such field, so the
+    caller keeps its existing authored greeting/silence precedence.
+    """
+    generated = generated_dialogue_for(npc)
+    return None if generated is None else generated.offline_response
 
 
 @dataclass(frozen=True)
@@ -304,6 +438,21 @@ def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkRes
             return ScriptedTalkResult(response=response, budget_capped=False)
     if dialogue_key is None or not dialogue_has_keyword(dialogue_key, keyword):
         return ScriptedTalkResult(response=response, budget_capped=False)
+
+    if generated_dialogue_for(npc) is not None:
+        from world.rules.story_effects import apply_story_effect, effect_for_keyword
+
+        declared = effect_for_keyword(npc, keyword)
+        if declared is not None:
+            verb, reference = declared
+            outcome = apply_story_effect(
+                npc, character, keyword=keyword, verb=verb, reference=reference
+            )
+            # An effect-bearing topic is the interaction: the authorized outcome
+            # replaces the fixed line and no talk affinity is granted.
+            return ScriptedTalkResult(
+                response=outcome.line or response, budget_capped=False
+            )
 
     relations_snapshot = attribute_snapshot(npc, "relations_data")
     try:
@@ -383,6 +532,27 @@ def _session_updated_tick() -> int | None:
 
     clock = read_world_clock()
     return None if clock is None else int(clock.tick)
+
+
+def refresh_dialogue_phase(character: Any, npc: Any) -> str | None:
+    """Refresh a live session naming ``npc`` to the host's current fixed line.
+
+    The deterministic phase-change seam (quest-scene-encounters 4.3/4.5): a
+    generated role's phase moved on, so the existing session would otherwise
+    present an obsolete greeting and obsolete choices. This re-records the
+    current permitted greeting through the existing sole session writer and
+    returns it; a character with no live session naming ``npc`` is left alone
+    (``None``), and history is never rewritten. Read-only for everything except
+    the one session attribute the sole writer owns.
+    """
+    session = live_dialogue_session(character)
+    if session is None or session.npc_id != int(npc.pk):
+        return None
+    greeting = greeting_for(npc)
+    if greeting is None:
+        return None
+    open_or_refresh_dialogue(character, npc, greeting)
+    return greeting
 
 
 def open_or_refresh_dialogue(character: Any, npc: Any, line: str) -> DialogueSession:

@@ -148,6 +148,10 @@ class SceneEncounterRuntime(models.Model):
     player_id = models.BigIntegerField()
     state = models.CharField(max_length=16, default="pending")
     activation_tick = models.BigIntegerField(null=True, blank=True)
+    #: The actual room an instance-layer encounter materialized, so a repeat or
+    #: failed-and-retried activation reuses the one room instead of spawning a
+    #: second one. ``NULL`` for a permanent anchor/grid encounter.
+    room_id = models.BigIntegerField(null=True, blank=True)
     reason = models.CharField(max_length=255, blank=True, default="")
     updated_tick = models.BigIntegerField(default=0)
 

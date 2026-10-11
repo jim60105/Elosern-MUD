@@ -60,8 +60,10 @@ RELATIONSHIP_KINDS: tuple[str, ...] = ("parent_child",)
 
 #: The closed domain-effect vocabulary a scripted topic may name. Every verb
 #: resolves through the deterministic commission APIs at execution time; a label
-#: or fixed line can never itself award progress or items (design §6).
-EFFECT_VERBS: tuple[str, ...] = ("offer_commission", "turn_in_commission")
+#: or fixed line can never itself award progress or items (design §6). A private
+#: commission settles automatically on completion, so the only pre-acceptance
+#: interaction a generated issuer offers is accepting its commission.
+EFFECT_VERBS: tuple[str, ...] = ("offer_commission",)
 
 MAX_ID_LENGTH = 64
 MAX_PHASE_TOPICS = 8
@@ -866,6 +868,43 @@ def scene_package_id(canonical: dict[str, Any]) -> str:
     return f"pkg_{digest[:24]}"
 
 
+def select_dialogue_phase(
+    role_dialogue: RoleDialogue, facts: dict[str, bool]
+) -> DialoguePhase:
+    """Return the one complete phase a committed observation selects.
+
+    A non-default phase is selected when every one of its conditions holds under
+    the committed observation; the role's declared default phase is the
+    fallback. Missing coverage, ambiguous selection and conflicting selection
+    all raise :class:`ScenePackageError`, so a role never presents a half-chosen
+    phase (design §6).
+    """
+    matched = [
+        phase
+        for phase in role_dialogue.phases
+        if not any(condition.get("default") for condition in phase.conditions)
+        and all(condition_matches(condition, facts) for condition in phase.conditions)
+    ]
+    if len(matched) > 1:
+        _reject_package(
+            f"role {role_dialogue.role_id!r} has an ambiguous phase selection for "
+            f"one committed observation: {[phase.phase_id for phase in matched]}"
+        )
+    if matched:
+        return matched[0]
+    defaults = [
+        phase
+        for phase in role_dialogue.phases
+        if any(condition.get("default") for condition in phase.conditions)
+    ]
+    if not defaults:
+        _reject_package(
+            f"role {role_dialogue.role_id!r} has no phase for the committed "
+            "observation"
+        )
+    return defaults[0]
+
+
 __all__ = [
     "DialoguePhase",
     "EncounterDefinition",
@@ -880,5 +919,6 @@ __all__ = [
     "ScenePackageError",
     "SymbolicIssuer",
     "scene_package_id",
+    "select_dialogue_phase",
     "validate_scene_package",
 ]

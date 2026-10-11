@@ -15,6 +15,7 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
 from typeclasses.exits import Exit
 from typeclasses.rooms import InstanceRoom
+from world.observability import log_warn
 from world.rules.clock import (
     ScheduledEvent,
     SurfaceSnapshot,
@@ -178,10 +179,33 @@ def _clear_non_player_entities(room) -> None:
     (owned) entities are despawned; everything else is relocated to
     ``settings.DEFAULT_HOME``, matching the non-destructive policy Evennia's own
     ``clear_contents()`` applies to items (map-instance design.md D-6).
+
+    A retained named story role takes precedence over both (quest-scene-
+    encounters design §7): its package declares a validated permanent retention
+    destination, so it is transferred there through the shared movement hook and
+    its ephemeral ownership is dropped instead of being deleted. Every retention
+    destination is validated *before* any movement or deletion, so an
+    unavailable destination can never leave a half-cleared room; the transfer
+    raises ``RetentionTransferError`` and the caller rolls the reclaim back.
     """
+    from world.quests.retention import (
+        retained_role_for,
+        transfer_retained_role,
+        validate_retention_destination,
+    )
+
     owned = {obj for obj in (room.db.owned_entities or []) if obj and obj.pk}
-    for entity in list(room.contents):
-        if not isinstance(entity, LivingEntity):
+    living = [obj for obj in list(room.contents) if isinstance(obj, LivingEntity)]
+    retained = {}
+    for entity in living:
+        record = retained_role_for(entity.pk)
+        if record is not None:
+            validate_retention_destination(record)
+            retained[entity.pk] = record
+    for entity in living:
+        record = retained.get(entity.pk)
+        if record is not None:
+            transfer_retained_role(entity, record)
             continue
         if entity in owned:
             entity.delete()
@@ -223,6 +247,7 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
             events.append(ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key}))
             continue
         prune_deferred = False
+        retained_deferred = False
         with transaction.atomic():
             # Prune the reclaimed room's room:<dbref> from every affected
             # player BEFORE any entity or room mutation (map-knowledge-minimap
@@ -235,6 +260,7 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
                 KnowledgePruneError,
                 prune_reclaimed_room,
             )
+            from world.quests.retention import RetentionTransferError
 
             try:
                 prune_reclaimed_room(room.id)
@@ -242,25 +268,38 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
                 transaction.set_rollback(True)
                 prune_deferred = True
             else:
-                _clear_non_player_entities(room)
-                if room.delete():
-                    events.append(
-                        ScheduledEvent("instance_reclaimed", end_tick, {"room": room.key})
+                try:
+                    _clear_non_player_entities(room)
+                except RetentionTransferError as error:
+                    # A retained named role could not reach its validated
+                    # destination: the whole reclaim rolls back and the room
+                    # survives with its actors, contents and ownership intact.
+                    transaction.set_rollback(True)
+                    retained_deferred = True
+                    log_warn(
+                        "instance_reclaim_retention_failed",
+                        context={"room": room.key},
+                        exc=error,
                     )
                 else:
-                    # Unreachable in the deterministic settlement pass: the
-                    # pre-flight check above and this call see the same pins and
-                    # contents, and nothing between them can change either. Kept as
-                    # a defensive no-raise branch in case a future override changes
-                    # that; the entity clears it would leave behind are the
-                    # accept-once-and-audit cost of that hypothetical, not a normal
-                    # path.
-                    events.append(
-                        ScheduledEvent(
-                            "instance_reclaim_deferred", end_tick, {"room": room.key}
+                    if room.delete():
+                        events.append(
+                            ScheduledEvent("instance_reclaimed", end_tick, {"room": room.key})
                         )
-                    )
-        if prune_deferred:
+                    else:
+                        # Unreachable in the deterministic settlement pass: the
+                        # pre-flight check above and this call see the same pins and
+                        # contents, and nothing between them can change either. Kept as
+                        # a defensive no-raise branch in case a future override changes
+                        # that; the entity clears it would leave behind are the
+                        # accept-once-and-audit cost of that hypothetical, not a normal
+                        # path.
+                        events.append(
+                            ScheduledEvent(
+                                "instance_reclaim_deferred", end_tick, {"room": room.key}
+                            )
+                        )
+        if prune_deferred or retained_deferred:
             events.append(
                 ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key})
             )
@@ -281,6 +320,8 @@ def snapshot_instance_reclamation_surfaces(
     attribute, location, or tag changes.
     """
     registry: dict[int, SurfaceSnapshot] = {}
+    from world.quests.retention import retained_role_for
+
     for room in InstanceRoom.objects.all():
         attributes = {
             (key, None): attribute_snapshot(room, key)
@@ -304,7 +345,12 @@ def snapshot_instance_reclamation_surfaces(
     for room in InstanceRoom.objects.all():
         owned = {obj for obj in (room.db.owned_entities or []) if obj and obj.pk}
         for entity in list(room.contents):
-            if not isinstance(entity, LivingEntity) or entity in owned:
+            if not isinstance(entity, LivingEntity):
+                continue
+            if entity in owned and retained_role_for(entity.pk) is None:
+                # An owned disposable occupant is deleted, never moved, so its
+                # location needs no snapshot; a retained role is *moved*, so it
+                # does -- including when it is still registered as owned.
                 continue
             registry[id(entity)] = SurfaceSnapshot(
                 attributes={},

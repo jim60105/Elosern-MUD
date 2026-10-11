@@ -108,6 +108,11 @@ def dialogue_open_fallback_line(name: str) -> str:
 STALE_PERSONA_NOTE = "人物設定已更新，請重新對話。"
 
 
+# Stable explanation for dialogue exchanges invalidated by a story-phase change
+# (quest-scene-encounters 4.3): the exchange settles after the role moved on.
+STALE_PHASE_NOTE = "話題已經改變，請重新開啟對話。"
+
+
 # Stable defeat-aftermath EventLog templates (defeat-aftermath-core D-C6).
 # Every new aftermath kind ships its zh-tw offline template line here and the
 # rendered text flows through the ordinary EventLog path (Telnet and WebClient

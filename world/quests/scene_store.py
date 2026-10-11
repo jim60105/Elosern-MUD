@@ -279,6 +279,27 @@ def mark_encounter_activated(
     )
 
 
+def set_encounter_room(
+    package: ScenePackage,
+    scene_id: str,
+    player_id: int,
+    room_id: int,
+    *,
+    tick: int = 0,
+) -> bool:
+    """Record the one room an instance-layer encounter materialized.
+
+    Written inside the activation transaction, so a repeat activation reuses the
+    committed room and a rolled-back attempt leaves no room identity behind.
+    """
+    return bool(
+        SceneEncounterRuntime.objects.filter(
+            package=package, scene_id=scene_id, player_id=player_id
+        ).update(room_id=int(room_id), updated_tick=tick)
+    )
+
+
+
 def get_dialogue_phase(package_id: str, role_id: str) -> StoryRoleDialogueRuntime | None:
     return StoryRoleDialogueRuntime.objects.filter(
         package__package_id=package_id, role_id=role_id
