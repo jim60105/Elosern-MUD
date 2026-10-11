@@ -1,0 +1,18 @@
+# Assertion Cutover Matrix
+
+This is apply-time assertion ownership, not a duplicate test suite or runtime verification claim. Modify existing cases first. Preserve unaffected tests. Derive renamed/new merged-main requirement IDs through the existing traceability tools; do not hard-code guessed IDs here.
+
+| Contract / mechanism | Existing assertion owner | Cutover and independent expectation |
+| --- | --- | --- |
+| Monster subject membership and descriptions | `world/art/tests/test_subjects.py`, existing gallery prompt tests | One registered goblin key accepted, all four retired tier keys refused; selected public physical description never includes another species or hidden notes. Registry closure is parameterized from membership, not a copied roster. |
+| Complete-species and baseline provenance | `world/art/tests/test_species_portrait_identity.py`, official refs tests | Replace old same-tier-shared/reject-species contract; complete species wins, invalid complete provenance cannot borrow baseline, unknown/no provenance has no subject but stays monster_anon. |
+| Actual wilderness producer | existing wilderness population tests | Deterministic selected goblin carries authored visual provenance while hash/tier/traits/stats stay identical; owned mismatch replaces normally, foreign residents unchanged. No synthetic name-to-species resolver. |
+| Cross-species runtime isolation | existing species identity/presenter tests | Goblin and slime of the same tier never share cards, defaults, generation or official references. Same-species instances share reusable cards but maintain independent official selection/geometry. |
+| No-image and failed image fallback | existing gallery fallback/presenter tests | Registered and unknown monsters always carry monster_anon, never balance-tier fallback or character age/race defaults. Frontend load outcomes are owned by the dependent change. |
+| Startup and generator admission | existing art service and monster gallery tests | Species rows ensure once; official files suppress automatic generation without live instances; no files allow supported species generation; retired done/pending jobs cannot be read, retried or settle into cards. |
+| Seed, staff and media boundary | existing seed sync, staff and media tests | Valid species seed/requeue/media still work; a retired tier fails admission even with a stored done record or file. Preserve confinement tests instead of cloning them. |
+| Shared runtime vs personal official preferences | existing personalization/gallery model tests | Shared species default survives two differing personal official choices; selecting one individual's image cannot change another's geometry or preference. Character mutual exclusion stays unchanged. |
+| Gallery panel/actions/UI | existing gallery panel/actions and frontend gallery suites | Schema 2 validates the server flag, visual rail is unique/bounded, bare species preview cannot write personal preferences, species card generation and default selection remain supported. |
+| Initial combat and round continuity | `fix-combat-portrait-publication` existing engage/dispatcher/art tests and one managed browser journey | Actual goblin first commit joins to authoritative art, same-tier files stay inert, later rounds/completion and terminal retained actors stay coherent; no legacy humanoid SVG. Do not duplicate this journey in the identity slice. |
+
+Current `test_species_portrait_identity.py` explicitly endorses tier-shared personal state, so its contract must be replaced, not treated as regression authority. Main-spec traceability mappings must follow the new assertion targets before declaring the apply verification complete.
