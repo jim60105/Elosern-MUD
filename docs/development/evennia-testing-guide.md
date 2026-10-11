@@ -333,7 +333,7 @@ Django 的 `TestCase` 使用 class-level 與 method-level transaction，並會�
 
 `EvenniaCommandTest` 繼承 `EvenniaTest`，因此會取得完整 Evennia fixture。
 
-Evennia 提供的 `EvenniaCommandTestMixin.call()` 本身不會啟動完整 cmdhandler，而是直接執行 command lifecycle，包括：
+Evennia 提供的 `EvenniaCommandTestMixin.call()` 本身不會啟動完整 cmdhandler，它直接執行 command lifecycle，包括：
 
 ```text
 at_pre_cmd()
@@ -1137,8 +1137,8 @@ NPC 的人物設定、角色卡、語音與劇本台詞是作者文字，行為�
 「獲得異名：」是呈現文法，其後的顯示名才是資料。固定公會位階稱號「F級冒險者」、教士階梯
 與六個稱號分類頁籤都是保留契約，不隨這項資料所有權變更。
 
-行為測試一律在實際 seam 上換掉正式宣告——`patch("world.lore.titles.STARTER_EPITHET", ...)`，
-改用共享的合成宣告 `world.tests.synthetic_data.SYNTH_STARTER_EPITHET`——再斷言「前綴 ＋ 合成
+行為測試一律在實際 seam 上換掉正式宣告（`patch("world.lore.titles.STARTER_EPITHET", ...)`，
+改用共享的合成宣告 `world.tests.synthetic_data.SYNTH_STARTER_EPITHET`），再斷言「前綴 ＋ 合成
 顯示名」與入庫／合成狀態（CLI 回報、對話回報關鍵字、webclient 回報三個介面用同一個合成
 宣告）；測試不得把正式宣告的顯示名寫成預期值。唯有資料契約測試可以檢查正式宣告本身（非空、
 有界、凍結；見 `world/lore/tests/test_titles_registry.py`）。此資料所有權變更不會改名或重新

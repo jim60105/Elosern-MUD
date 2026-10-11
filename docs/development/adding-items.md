@@ -6,7 +6,7 @@
 
 - `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md`（世界資料與確定性核心的邊界）
 - `openspec/specs/equipment-inventory/spec.md`、`openspec/specs/item-use-resolution/spec.md`、`openspec/specs/inventory-item-actions/spec.md`（物品、裝備與使用行為的現行契約）
-- 已落地的範例：`openspec/changes/archive/2026-08-29-add-inventory-item-actions/`
+- 已交付的範例：`openspec/changes/archive/2026-08-29-add-inventory-item-actions/`
 
 ---
 
@@ -51,7 +51,7 @@
 
 ### Step 0 — 從設計文件取得數值
 
-價格、效果量級不得自行發明。以設計文件與既有 rulebook 為來源；需要新數值時先更新設計文件，再落地。錢幣一律整數銅板（金 1 = 銀 100 = 銅 10000，見 `world/lore/economy.py`）。
+價格、效果量級不得自行發明。以設計文件與既有 rulebook 為來源；需要新數值時先更新設計文件，再實作。錢幣一律整數銅板（金 1 = 銀 100 = 銅 10000，見 `world/lore/economy.py`）。
 
 ### Step 1 — 寫入 `ITEM_REGISTRY`
 
@@ -145,7 +145,7 @@ effects:
 - 聖袍／聖徽：`exposure_bias` 非負、**必須有**非負的 `pleasure_gain`、宣告的 `heal_gain` 非負，且具備正向 `heal_gain` 或一道免疫。
 - 聖所器具：`exposure_bias` 非負且 `pleasure_gain` 必須為正；不要求治療或免疫。
 
-兩者都只是裝備分類；一般戰鬥取捨（負 `defense`、`atk_phys`、敏捷等）仍允許。效果條目的欄位是封閉的，所以**效果表無法宣告或改寫角色**——在條目裡寫 `liturgical_role` 只會被當成未知欄位拒絕，換句話說效果表改不動一件裝備的教義義務。新增一件教會裝備時，只要在物品上宣告角色並補上符合該角色的條目即可，不必改任何清單或規格。
+兩者都只是裝備分類；一般戰鬥取捨（負 `defense`、`atk_phys`、敏捷等）仍允許。效果條目的欄位是封閉的，所以**效果表無法宣告或改寫角色**：在條目裡寫 `liturgical_role` 只會被當成未知欄位拒絕，換句話說效果表改不動一件裝備的教義義務。新增一件教會裝備時，只要在物品上宣告角色並補上符合該角色的條目即可，不必改任何清單或規格。
 
 ### Step 4 — 可交易物品：價格帶與商店 offer
 
@@ -161,8 +161,8 @@ effects:
 AssortmentDefinition(
     key="common_arms",
     display_name_zh="王都兵器",
-    # 貨架政策：這個分類「賣什麼」由這兩組封閉詞彙宣告，而不是由當前的
-    # item_keys 凍結。空集合代表該軸不設限；非裝備物品沒有槽可檢查。
+    # 貨架政策：這個分類「賣什麼」由這兩組封閉詞彙宣告，不由當前的
+    # item_keys 凍結決定。空集合代表該軸不設限；非裝備物品沒有槽可檢查。
     allowed_item_kinds=frozenset({ItemKind.WEAPON, ItemKind.TOOL}),
     allowed_equipment_slots=frozenset(
         {EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF}
@@ -171,7 +171,7 @@ AssortmentDefinition(
 ),
 ```
 
-`item_keys` 是身分，貨架政策是用途：兩者都由載入器逐項比對，所以一把進錯貨架的劍（例如把藥水塞進兵器架）會在載入時指名分類與物品直接拒絕，而**合法的新商品只要 kind 與槽符合該貨架就自動可上架**——不必替商店維護任何具名清單或核准表。跨店共用同一件商品是允許的（一物兩價），只有同一間店引用兩個重疊分類才會被拒絕。
+`item_keys` 是身分，貨架政策是用途：兩者都由載入器逐項比對，所以一把進錯貨架的劍（例如把藥水放進兵器架的分類）會在載入時指名分類與物品直接拒絕，而**合法的新商品只要 kind 與槽符合該貨架就自動可上架**，不必替商店維護任何具名清單或核准表。跨店共用同一件商品是允許的（一物兩價），只有同一間店引用兩個重疊分類才會被拒絕。
 
 再把物品加進商店引用的分類，並在該定居點的 commerce 分檔（`world/rules/rulebook/commerce/<settlement>.yaml`）中該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品；同一個 key 宣告在兩個分檔會直接失敗載入並指名兩檔）。載入器的驗證不對稱，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
 
@@ -194,16 +194,16 @@ shops:
 
 同一間店引用的兩個分類若出現同一個 `item_key`，載入器會指名商店、物品與兩個分類直接拒絕，解析器不會替你挑價格。
 
-**不可販售與信物的優先序**：`sellable=False` 的物品在任何路徑上都不會被買賣——拒絕發生在錢包、背包、庫存、取得進度與好感度寫入之前，於 `buy`／`sell` 一開始就依物品自身的可販售性擋下。`relic`（信物）帶的物品則是在**載入時**就從每一條上架路徑全部擋掉：分類成員、場所加成（`extra_item_keys`）與覆寫（`overrides`）都一樣，指名商店與物品直接拒絕，價格帶無法替它背書。信物本身仍是可持有、可檢視的內容，只是永遠接不上商人交易。
+**不可販售與信物的優先序**：`sellable=False` 的物品在任何路徑上都不會被買賣，拒絕發生在錢包、背包、庫存、取得進度與好感度寫入之前，於 `buy`／`sell` 一開始就依物品自身的可販售性擋下。`relic`（信物）帶的物品則是在**載入時**就從每一條上架路徑全部擋掉：分類成員、場所加成（`extra_item_keys`）與覆寫（`overrides`）都一樣，指名商店與物品直接拒絕，價格帶無法替它背書。信物本身仍是可持有、可檢視的內容，只是永遠接不上商人交易。
 
 ### Step 4b — 開局套裝：`SUBRACE_STARTING_KIT_REGISTRY`
 
-自訂建立時每個亞種醒來帶著的裝備住在 `world/lore/starting_kits.py`，一筆 `SubraceStartingKit(subrace_key, items, max_rarity)`：`items` 是 `(物品鍵, 數量)` 的有序 tuple，`max_rarity` 是該血脈的品質上限（可省略＝不設限）。人類血脈用它表達身分而非財富階梯：
+自訂建立時每個亞種醒來帶著的裝備住在 `world/lore/starting_kits.py`，一筆 `SubraceStartingKit(subrace_key, items, max_rarity)`：`items` 是 `(物品鍵, 數量)` 的有序 tuple，`max_rarity` 是該血脈的品質上限（可省略＝不設限）。人類血脈用它表達身分，不表達財富階梯：
 
 - 三個平民血脈（`human_coastal`／`human_plains`／`human_highland`）宣告 `max_rarity=ItemRarity.COMMON`，所以誰都不會比誰富有。
 - 王族與貴族宣告 `max_rarity=ItemRarity.UNCOMMON`，保留傳家的 UNCOMMON 兵器。
 
-驗證在載入時進行：每個選項必須是已註冊的裝備、槽位可配戴（共用 `validate_wearable_loadout` 的單例槽／飾品上限／重複鍵規則）、且不得超過該套裝自己宣告的品質上限——所以「這件不能進這套」是由套裝的宣告決定，而不是一份歷史上的禁用物品黑名單。換一句話說：合法的選項更動是資料更動，違規的組合會在載入時指名套裝與物品拒絕。
+驗證在載入時進行：每個選項必須是已註冊的裝備、槽位可配戴（共用 `validate_wearable_loadout` 的單例槽／飾品上限／重複鍵規則）、且不得超過該套裝自己宣告的品質上限，所以「這件不能進這套」由套裝的宣告決定，專案不維護歷史禁用物品黑名單。換一句話說：合法的選項更動是資料更動，違規的組合會在載入時指名套裝與物品拒絕。
 
 ### Step 5 — 檢查受影響的消費端（既有數值通常零程式碼）
 
@@ -292,7 +292,7 @@ policy. A/S have no reducing ceilings and retain their domain effects.
 | 想用效果條目改寫教會裝備的教義角色 | 效果條目欄位封閉，`liturgical_role` 只會被當成未知欄位拒絕；角色住在物品自身 |
 | 替聖袍省掉 `pleasure_gain` 以為可以避開教義 | 條目缺少該欄位本身就是違規；角色義務不能靠省略欄位規避 |
 | 商店行誤留舊的 `offers` 欄位 | `shops` 區段只接受 `shop_key` 與三個時段欄位，多餘欄位直接拒絕 |
-| 摘要塞了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |
+| 摘要放了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |
 | 為新物品發明新的 kind／icon／rarity 值卻只改 registry | 構造被封閉列舉拒絕；擴充視覺詞彙見 §5 |
 | 為了讓某個測試通過而捏造 registry 資料 | 世界資料是產品決定；測試該用受控 registry 分層（規則層、adapter 層、Storybook），瀏覽器端只測真實資料 |
 | 把價格、庫存或效果量級抄進測試當期望值 | 每次合法調價都得回頭改測試；改成讀取宣告並只驗證關係與接線（見 Step 6） |
