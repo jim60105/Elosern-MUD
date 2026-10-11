@@ -55,8 +55,7 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
                 "roles": [{"role_id": role} for role in ("issuer", "protected", "meeting")],
                 "commissions": [{"role_id": "issuer", "issuer_content_key": "synthetic_bound_issuer"}],
                 "dialogue": [{"role_id": "issuer", "phases": [{
-                    "phase_id": "offer", "topics": [{"keyword": "escort",
-                        "effect_verb": "offer_commission", "effect_reference": self.definition.key}],
+                    "phase_id": "offer", "topics": self.offer_topics(),
                 }]}], "outcome_groups": self.outcome_groups(),
             },
         )
@@ -68,6 +67,10 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         scene_store.assign_grant_actor(self.package, "issuer", self.definition.key, self.issuer.pk)
         scene_store.set_grant_registered(self.package, "issuer", self.definition.key, True)
         scene_store.set_dialogue_phase(self.package, "issuer", "offer")
+
+    def offer_topics(self):
+        return [{"keyword": "escort", "effect_verb": "offer_commission",
+                 "effect_reference": self.definition.key}]
 
     def outcome_groups(self):
         return []
@@ -172,6 +175,73 @@ class EscortExclusiveOutcomeTests(EscortLifecycleTests):
         self.assertEqual(self.owner.db.wallet, before + 1)
         self.owner.attributes.reset_cache()
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+
+
+class EscortExclusiveAlternativeTests(EscortLifecycleTests):
+    """Two distinct commissions share one exclusive result; one winner pays."""
+
+    ALTERNATIVE = "synthetic_bound_escort_alternative"
+
+    def offer_topics(self):
+        return [*super().offer_topics(), {
+            "keyword": "escort", "effect_verb": "offer_commission",
+            "effect_reference": self.ALTERNATIVE,
+        }]
+
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion",
+            "alternatives": [self.definition.key, self.ALTERNATIVE],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
+
+    def setUp(self):
+        super().setUp()
+        register(quest(
+            self.ALTERNATIVE, quest_type=QuestType.ESCORT,
+            stages=(QuestStage(0, escort(
+                completion=EscortCompletion.RENDEZVOUS,
+                protected_role_refs=("protected",), meeting_role_refs=("meeting",),
+            )),),
+        ))
+        register_quest_issuance(QuestIssuance(
+            definition_key=self.ALTERNATIVE, issuer_key=self.issuer_key,
+            reward=QuestReward(copper=1, items=(), merit=0), settlement=Settlement.AUTO,
+        ))
+        scene_store.ensure_commission_grant(
+            self.package, "issuer", self.ALTERNATIVE, issuer_key=self.issuer_key,
+        )
+        scene_store.assign_grant_actor(self.package, "issuer", self.ALTERNATIVE, self.issuer.pk)
+        scene_store.set_grant_registered(self.package, "issuer", self.ALTERNATIVE, True)
+
+    def test_first_accepted_alternative_wins_and_the_other_is_invalidated(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        winner = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        other = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, winner.quest_id)
+        records = {record.quest_id: record for record in read_records(self.owner)}
+        self.assertEqual(records[winner.quest_id].state.value, "completed")
+        self.assertEqual(records[other.quest_id].state.value, "invalidated")
+        self.assertEqual(
+            records[other.quest_id].invalidated_reason["code"], "obsolete_outcome",
+        )
+        self.assertEqual(self.owner.db.wallet, before + 1)
+        self.owner.attributes.reset_cache()
+        self.protected.attributes.reset_cache()
+        self.assertEqual(list(self.owner.db.guild_reward_claims), [winner.quest_id])
+        # A restarted identical source cannot advance or repay.
+        self.assertTrue(self.protected.move_to(self.room1, quiet=True))
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        self.assertEqual(self.owner.db.wallet, before + 1)
+        reloaded = {record.quest_id: record for record in read_records(self.owner)}
+        self.assertEqual(reloaded[winner.quest_id].state.value, "completed")
+        self.assertEqual(reloaded[other.quest_id].state.value, "invalidated")
 
 
 class EscortCasualtyTests(EscortLifecycleTests):
