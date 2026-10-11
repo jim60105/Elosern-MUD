@@ -46,7 +46,7 @@ prompts:
 | `story_director.system` | `story_director.yaml` | 無 |
 | `npc.thinking` | `npc.yaml` | `{name}` |
 | `art.character_description` | `art.yaml` | `{race}`、`{age}`、`{appearance}`、`{equipment}`、`{custom}` |
-| `art.monster_description` | `art.yaml` | `{description}`、`{display_name}`、`{examples}` |
+| `art.monster_description` | `art.yaml` | `{description}`、`{display_name}` |
 | `art.scene_prompt` | `art.yaml` | `{description}` |
 | `art.portrait_prompt` | `art.yaml` | `{description}` |
 | `art.negative_prompt` | `art.yaml` | 無 |
