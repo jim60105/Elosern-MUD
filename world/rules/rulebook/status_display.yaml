@@ -380,3 +380,9 @@
 - code: lamp_carapace_guard_defense
   label: 燈甲護持防禦提升
   severity: beneficial
+- code: ridge_brace
+  label: 固埂蹬擊
+  severity: beneficial
+- code: ridge_brace_defense
+  label: 固埂蹬擊防禦提升
+  severity: beneficial

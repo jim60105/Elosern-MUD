@@ -228,3 +228,8 @@
 - id: lamp_carapace_guard_defense
   when: {buff_active: lamp_carapace_guard}
   then: {defense: 2}
+# 魔物資源技能（remaining-monster-resource-skills §6）：固埂蹬擊的自身護甲，
+# buff 列為 mount，+3 資料在此（lamp_carapace_guard 的 defense 先例）。
+- id: ridge_brace_defense
+  when: {buff_active: ridge_brace}
+  then: {defense: 3}

@@ -584,11 +584,12 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "居民從一圈圈異常牢固的小土埂辨認巢穴；普通雨水不容易沖散，因此棄置巢穴也會留下痕跡。"
         "族群沿灌溉渠築巢時，土埂可能堵住分水口，坑洞則妨礙農具與牲畜通行。"
         "牠們只能處理巢穴周圍的鬆土，無法鑽穿岩盤、城牆或石造基礎。"
-        "洞道提供正常的逃離路線，不構成瞬間移動。",
+        "洞道提供正常的逃離路線，不構成瞬間移動。"
+        "受逼近時，牠會以土屬性力量穩住身體後蹬擊，短暫提高自身防禦；此招不需要挖洞，也不封鎖他人的移動或行動。",
         ("eastern_plains", "western_hills_valleys"),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；土屬性力量的來源不在設定中交代。",
         "（作者私有：作者解釋）以地形改造描述低階危害（分水口堵塞、通行妨礙），"
-        "不附帶任何戰鬥或控場能力。",
+        "戰鬥以蹬擊與自身防禦呈現，不附帶定身、封路或瞬間移動。",
         "（作者私有：尚未證實的猜想）部分居民相信土埂是牠們的集體記憶痕跡，這種說法未經檢驗。",
         "burrow_maker",
         True,
@@ -719,10 +720,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         True,
         MonsterCombatProfile(
-            hp=30, mp=0, sp=0, atk_phys=4, agility=8, defense=3, magic_power=0
+            hp=30, mp=20, sp=9, atk_phys=4, agility=8, defense=3, magic_power=0
         ),
         "F",
         True,
+        active_skill_keys=("ridge_bracing_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "nest_guard",
@@ -732,10 +736,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "low",
         False,
         MonsterCombatProfile(
-            hp=55, mp=0, sp=0, atk_phys=11, agility=6, defense=6, magic_power=0
+            hp=55, mp=30, sp=15, atk_phys=11, agility=6, defense=6, magic_power=0
         ),
         "E",
         True,
+        active_skill_keys=("ridge_bracing_kick",),
+        passive_skill_keys=(),
+        behaviour_profile_key="instinctive",
     ),
     MonsterVariant(
         "cliff_stepper",

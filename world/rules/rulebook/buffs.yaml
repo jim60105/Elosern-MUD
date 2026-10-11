@@ -480,3 +480,11 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（remaining-monster-resource-skills §6，築埂兔固埂蹬擊）：每次已結算且
+# 具合法目標的施放都穩住身形，防禦 +3 資料在 combat_modifiers.yaml 的
+# ridge_brace_defense 列（lamp_carapace_guard 的 defense 先例）。
+- key: ridge_brace
+  duration: 20
+  stacking: refresh
+  polarity: buff
+  modifiers: {}
