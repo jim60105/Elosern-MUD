@@ -96,8 +96,8 @@ Arrival and escort role-result observation SHALL cap progress and transition eac
 - **THEN** progress is capped at the quantity and the quest transitions at most once
 
 #### Scenario: Post-follow re-observation never re-counts the same arrival
-- **WHEN** the post-follow re-observation (party-follow D-2) runs and a companion was already present in the destination
-- **THEN** the re-run is skipped because the first observation has already advanced every matching stage for that event, so it SHALL NOT re-count the same arrival event
+- **WHEN** final post-follow observation runs after ordinary REACH consumed its transition while an unrelated general companion was already at the destination and protected escort actors arrive with the followers
+- **THEN** the consumed REACH transition is not repeated, the settled ESCORT pass still evaluates the newly arrived exact protected roster and activated meeting roles, and persisted source identity prevents a second transition
 
 ### Requirement: Stage completion advances exactly once and releases obsolete runtime bindings
 Existing stage completion SHALL cap progress, release obsolete stage pins/bindings, reset per-stage counted state and enter at most one next contiguous stage or terminal completion. Terminal `COMPLETED`, `FAILED` and `INVALIDATED` records SHALL ignore later progress. Escort membership reasons SHALL remain valid across intermediate stages only while the definition explicitly retains that protected binding; terminal transitions SHALL release that record's reasons. Declared exclusive final results SHALL arbitrate before a completion or reward becomes eligible.
@@ -105,6 +105,10 @@ Existing stage completion SHALL cap progress, release obsolete stage pins/bindin
 #### Scenario: Intermediate arrival cannot settle a final result
 - **WHEN** a multistage alternative completes an intermediate arrival or clue stage
 - **THEN** it advances one stage, releases obsolete pins, and neither invalidates alternatives nor plans the terminal reward
+
+#### Scenario: Physical final condition during an intermediate transition stays unresolved
+- **WHEN** one source advances an intermediate stage and also leaves the exact reunion roles co-located, and the source is replayed after reload
+- **THEN** candidate eligibility uses the pre-event stage and consumed transition state, the group remains unresolved, active alternatives retain entitlement, no no-commission fallback runs, and replay grants no second-stage progress
 
 #### Scenario: All terminal states reject future progress
 - **WHEN** later matching movement, combat or inventory events reach completed, failed and invalidated records

@@ -21,7 +21,7 @@ Generated escort commissions are currently refused because protected-role bindin
 
 ### Modified Capabilities
 
-Confirmed existing main capability paths are `party-system`, `companion-possession-core`, `quest-lifecycle`, `quest-progress-tracking`, `quest-blueprint`, `quest-auto-settlement`, `quest-reward-settlement`, `quest-issuer-authorization`, `scenario-director`, `scene-builder`, `npc-schedule-runtime`, and `webclient-party-panel`. Their deltas amend membership metadata, handback, acceptance/binding/terminal state, actual-role completion, publication guards, payout eligibility, issuer scope, generated validation/registration, schedule precedence and the complete roster.
+Confirmed existing main capability paths are `party-system`, `companion-possession-core`, `quest-lifecycle`, `quest-progress-tracking`, `quest-failure-conditions`, `quest-blueprint`, `quest-auto-settlement`, `quest-reward-settlement`, `quest-issuer-authorization`, `scenario-director`, `scene-builder`, `npc-schedule-runtime`, `affinity-system`, `affinity-friendly-fire`, `webclient-party-panel`, `webclient-exploration-menu`, `webclient-quest-log-panel`, `webclient-service-menus`, and `webclient-quest-drawer`. Their deltas amend membership/recruitment metadata, handback, acceptance/binding/terminal state and canonical protected-death reason, actual-role completion, publication guards, payout eligibility, issuer scope, generated validation/registration, schedule precedence, affinity departure immunity, complete roster and existing four-state quest/abandonment presentation.
 
 `quest-scene-encounters` is an upstream proposed capability, not a current main capability. This change adds a downstream extension requirement to it for multiple distinct commissions and indexed final-result observation. It consumes `publish_scene_package`, `lookup_story_role`, `activate_scene_encounter`, and `transition_story_dialogue` from `quest-scene-encounters`; it does not re-declare those operations or edit upstream artifacts.
 
@@ -38,8 +38,8 @@ No implementation in this proposal, new escort UI, autonomous NPC framework, ret
 ```text
 depends-on: quest-scene-encounters
 code-conflicts: quest-scene-encounters (quest package/schema/compiler/registration, role lifecycle, issuer scope, dialogue phases, retention integration); ordered implementation
-code-conflicts: exploration-presence-rail (shared exploration affordance consumers and dialogue/client tests; no planned layout edits)
-code-conflicts: exploration-room-actions (shared exploration capability consumers and client manifests/tests; no planned room-action edits)
+code-conflicts: exploration-presence-rail (webclient-exploration-menu spec, shared exploration affordance consumers and dialogue/client tests; no planned layout edits)
+code-conflicts: exploration-room-actions (webclient-exploration-menu spec, shared exploration capability consumers and client manifests/tests; no planned room-action edits)
 code-conflicts: monster-prompt-wiring-and-logic-tests (none in production; shared test-data/contract gates only)
 ```
 

@@ -73,6 +73,77 @@ The party owner SHALL retain one ordered persistent ID roster and one NPC owner 
 - **WHEN** the auto-leave recheck evaluates a companion bound at activation
 - **THEN** it behaves exactly as it does for an invited companion, with no origin-dependent branch
 
+### Requirement: The invite command proposes a party through the AI-judged dialogue seam
+The existing invite command SHALL use ordinary eligibility, dialogue judgment and offline affinity fallback to add general identity. Its preflight and commit checks SHALL reject already-general and foreign-owned actors, count only valid general identities toward four, and admit same-owner temporary-only actors without bypassing ordinary recruitment. Successful promotion SHALL preserve every escort reason and the deduplicated roster.
+
+#### Scenario: A co-located NPC is invited and joins
+- **WHEN** a player invites an eligible co-located NPC and the dialogue accepts
+- **THEN** join_party adds general identity and notifies without duplicating its roster entry
+
+#### Scenario: The NPC declines through the AI
+- **WHEN** an eligible NPC declines through party_invite accept false
+- **THEN** refusal speech appears and no general identity is added
+
+#### Scenario: An illegal party intent keeps the speech
+- **WHEN** the reply intent is invalid
+- **THEN** speech is shown and no identity or escort reason changes
+
+#### Scenario: Offline invitations fall back to the fixed threshold
+- **WHEN** dialogue is unavailable for an otherwise eligible invite
+- **THEN** the existing affinity threshold 70 determines general recruitment and preserves escort reasons
+
+#### Scenario: The AI is not bound by the threshold
+- **WHEN** online dialogue judges an eligible invite below affinity 70
+- **THEN** the verified party_invite decision stands without a threshold override
+
+#### Scenario: An AI decline is never overridden by the threshold
+- **WHEN** online dialogue declines at affinity 70 or above
+- **THEN** the refusal stands and no general identity is added
+
+#### Scenario: Inviting an already-bound companion reports a clear result
+- **WHEN** an invite targets an already-general actor or a foreign-owned actor
+- **THEN** preflight rejects with the existing clear message before dialogue; same-owner temporary-only actors remain eligible under ordinary gates
+
+#### Scenario: A non-dialogue NPC cannot be invited
+- **WHEN** the present actor has no eligible free-form dialogue surface
+- **THEN** preflight refuses before dialogue without source changes
+
+#### Scenario: A party filled after the AI accepted is surfaced to the player
+- **WHEN** dialogue accepts but valid general identities reach four before commit
+- **THEN** speech remains and the full-party refusal adds no general identity or source
+
+#### Scenario: A full party blocks the invite before the AI call
+- **WHEN** a holder of four valid general identities proposes another general recruit
+- **THEN** preflight rejects before dialogue regardless of temporary escort count
+
+#### Scenario: The invite command surface is documented
+- **WHEN** the command reference is inspected
+- **THEN** invite aliases, syntax and general-identity recruitment rules are documented
+
+#### Scenario: Target resolution mirrors talk's error contract
+- **WHEN** a target is absent or ambiguous
+- **THEN** existing localized talk-compatible errors appear without changes
+
+#### Scenario: The deterministic preflight gate admits only eligible invitees
+- **WHEN** invite preflight evaluates local actors
+- **THEN** it requires ordinary eligible free-form dialogue, no existing general identity, same-owner or unbound ownership and available general quota; same-owner temporary membership is not a duplicate rejection
+
+#### Scenario: The reply's speech reaches the player
+- **WHEN** invitation dialogue settles
+- **THEN** speech appears through the existing output path
+
+#### Scenario: An accepted intent is rechecked and applied through join_party
+- **WHEN** a verified accept true intent applies
+- **THEN** join_party rechecks ordinary eligibility, co-location, ownership and general quota, adds general identity and preserves all escort sources
+
+#### Scenario: An unavailable dialogue layer degrades to the fixed threshold
+- **WHEN** the existing dialogue layer is disabled or unavailable
+- **THEN** the existing fixed affinity threshold and deterministic lines apply with no new retry subsystem
+
+#### Scenario: The webclient offers the same invite flow
+- **WHEN** the webclient offers a normal invitation to a temporary-only actor
+- **THEN** the same injected-client preflight and general recruitment flow apply
+
 ### Requirement: The leave command dismisses a companion without affinity change
 The existing leave command and browser flow SHALL remove general membership without changing affinity. Effective escort reasons SHALL require abandonment of selected commissions through the quest owner; dismissal SHALL never silently detach them while their quests remain active. Several reasons SHALL expose the affected commissions and release only selected ones. Ordinary possessed-member manual dismissal SHALL retain its handback-first refusal; escort abandonment SHALL use the compensated terminal release contract.
 
@@ -143,7 +214,7 @@ Negative affinity changes SHALL retain existing relationship writes. Automatic d
 - **THEN** no party call or notification occurs
 
 #### Scenario: Auto-leaving a possessed companion releases first
-- **WHEN** a possessed companion's affinity crosses below the threshold
+- **WHEN** a possessed general-only companion has no valid escort reason and its affinity crosses below the threshold, requiring actual ordinary departure
 - **THEN** the possession release commits before the affinity/party atomic opens, and a release
   failure leaves affinity, party binding, and possession all untouched
 

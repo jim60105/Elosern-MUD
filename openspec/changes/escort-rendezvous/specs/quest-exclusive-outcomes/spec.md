@@ -31,6 +31,14 @@ The quest owner SHALL lock/revalidate a satisfying final result before reward pl
 - **WHEN** an earlier accepted record is physically satisfiable but unrelated to the event's moved/bound protected actors and a later accepted record is attributable
 - **THEN** only the attributable candidate can win
 
+#### Scenario: Meeting movement attributes the stationary protected participant
+- **WHEN** the exact meeting role moves or activates beside a stationary protected actor bound to a terminally eligible accepted escort
+- **THEN** owner-resolved event provenance and indexed meeting/protected references identify that participating exact protected binding, its record may win and receive registered settlement, and unrelated physically satisfiable records are not attributed
+
+#### Scenario: Active intermediate records forbid no-winner fallback
+- **WHEN** the declared physical result holds but active alternatives have no pre-event terminally eligible attributable candidate or already consumed that source's transition
+- **THEN** the group remains unresolved with result_unsatisfied, no active record is invalidated and no entitlement is lost; a later distinct authoritative source may evaluate the resulting current stage
+
 #### Scenario: Resolution replay and stale acceptance are inert
 - **WHEN** the committed source repeats after restart or a closed alternative's old capability is submitted
 - **THEN** resolution identity and winner remain unchanged, no reward/source release repeats, and acceptance reports `outcome_resolved`
@@ -41,10 +49,10 @@ The quest owner SHALL lock/revalidate a satisfying final result before reward pl
 
 #### Scenario: Complete authoritative result arbitration grants at most one winner contract
 - **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
-- **THEN** The quest owner SHALL lock/revalidate the group and relevant records on a satisfying final-result event before reward planning. Eligible winner attribution SHALL use the actual moved/bound protected identities that caused the event. Several terminally satisfying attributable records SHALL be ordered by monotonic acceptance sequence, then stable record identity. The winner SHALL transition to `COMPLETED`; active alternatives SHALL become `INVALIDATED` with a structured obsolete-outcome reason; unaccepted alternatives SHALL close. The same transaction SHALL release affected source reasons/pins, commit result identity, participant knowledge/dialogue phases and required automatic settlement. Technical failure SHALL restore all durable/cache/control surfaces.
+- **THEN** The quest owner SHALL lock/revalidate the group and relevant records on a satisfying final-result event before reward planning. Eligibility SHALL use pre-event stage and consumed-source state. Attribution SHALL identify actual participating protected bindings from moved/bound actors or the indexed declared relation of moved/activated meeting roles, never unrelated physically satisfied records. Several terminally satisfying attributable records SHALL be ordered by monotonic acceptance sequence, then stable record identity. The winner SHALL transition to `COMPLETED`; active alternatives SHALL become `INVALIDATED` with a structured obsolete-outcome reason; unaccepted alternatives SHALL close. The same transaction SHALL release affected source reasons/pins, commit result identity, participant knowledge/dialogue phases and required automatic settlement. Technical failure SHALL restore all durable/cache/control surfaces.
 
 ### Requirement: Unaccepted physical results close offers without inventing a quest
-Actual declared rendezvous SHALL resolve its group even when no alternative was accepted. The result SHALL explicitly have no winner, commit actual participant memory and permitted reunion/closure phases, close obsolete offers and allocate no quest record, retroactive acceptance or reward claim. Repeated sources SHALL preserve the same durable result.
+Actual declared rendezvous SHALL resolve without a commission when no active alternative exists. The result SHALL commit participant memory/phases and close obsolete offers with no invented record, acceptance or claim. Active accepted alternatives without a terminally eligible attributable candidate SHALL keep the group unresolved; no fallback SHALL bypass their pre-event stage or source-consumption rules. Existing terminal history SHALL gain no retroactive reward.
 
 #### Scenario: Reunion without acceptance has no payout
 - **WHEN** actual roles meet under the declared relation before any commission acceptance
