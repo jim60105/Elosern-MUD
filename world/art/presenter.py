@@ -505,7 +505,7 @@ def resolve_entity(entity) -> dict:
             )
         try:
             subject = monster_subject_for(visual_key)
-        except ArtSubjectError:
+        except ArtSubjectError:  # observability: ignore R2: unregistered visual species -> specified unavailable placeholder
             return _placeholder_unavailable(
                 "無法提供", silhouette=_entity_silhouette(entity)
             )

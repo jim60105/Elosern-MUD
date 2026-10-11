@@ -1253,13 +1253,17 @@ def official_preferences_for(subject: ArtSubject, *, entity: Any = None) -> Offi
     if subject.kind is ArtSubjectKind.MONSTER and entity is not None:
         attributes = getattr(entity, "attributes", None)
         if attributes is not None:
+            context = {"subject": subject.full()}
             selection = None
             raw_selection = attributes.get("official_selection")
             if raw_selection is not None:
                 try:
                     selection = validate_official_identity(raw_selection)
                 except GalleryRecordError:
-                    pass
+                    log_warn(
+                        PREFERENCE_INVALID_EVENT,
+                        context={**context, "field": "official_selection"},
+                    )
             geometry: dict[str, dict] = {}
             raw_geometry = attributes.get("official_geometry")
             if raw_geometry and isinstance(raw_geometry, Mapping):
@@ -1268,7 +1272,14 @@ def official_preferences_for(subject: ArtSubject, *, entity: Any = None) -> Offi
                         key = validate_official_identity(identity)
                         geometry[key] = validate_official_geometry(entry)
                     except GalleryRecordError:
-                        pass
+                        log_warn(
+                            PREFERENCE_INVALID_EVENT,
+                            context={
+                                **context,
+                                "field": "official_geometry",
+                                "identity": identity if isinstance(identity, str) else None,
+                            },
+                        )
             return OfficialPreferences(selection, geometry)
 
     if subject.kind is ArtSubjectKind.MONSTER:
