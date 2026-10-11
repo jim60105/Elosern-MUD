@@ -224,6 +224,22 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         handback.assert_not_called()
         self.assertTrue(is_companion(npc, self.player))
 
+    def test_dual_member_retains_low_affinity_with_a_valid_reason(self):
+        from world.rules.affinity import AffinitySource, apply_affinity_change, seed_affinity
+
+        npc = self._npc()
+        join_party(npc, self.player)
+        source = self._source(npc)
+        seed_affinity(npc, self.player, 70)
+        result = apply_affinity_change(npc, self.player, AffinitySource.FRIENDLY_FIRE, -10)
+        self.assertEqual(npc.relations.affinity_for(self.player), 60)
+        self.assertIsNone(result.auto_leave_notification)
+        self.assertTrue(is_companion(npc, self.player))
+        self.assertTrue(has_general_membership(npc, self.player))
+        self.assertEqual(
+            reasons_for(npc, self.player), ((source.quest_id, "escortee"),)
+        )
+
     def test_escort_schedule_silence_ends_with_last_temporary_reason(self):
         from world.rules.service_gate import schedule_silenced
 
