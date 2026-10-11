@@ -205,4 +205,39 @@ ROWS: tuple[SkillDef, ...] = (
             ),
         ),
     ),
+    _skill(
+        "mane_crosswind_pounce",
+        "鬃風佯撲",
+        "以風屬性力量發動佯撲，造成物理傷害；命中後使對手短暫誤判動作，降低其命中率。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 5},
+        # True for every monster ability: the one written
+        # ``usable_out_of_combat`` policy makes every damage-carrying ability
+        # selectable outside combat, and "combat-only" names the action shape
+        # and targeting, never this flag (settled 2026-10-10; same value the
+        # delivered crocodile, sparrow, crab, hare and goat declare).
+        usable_out_of_combat=True,
+        element="wind",
+        effects=["damage:wind:physical", "buff_apply:mane_misdirection"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="wind",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("fog_mane_lynx",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+            ),
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
+            ),
+        ),
+    ),
 )

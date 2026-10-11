@@ -31,11 +31,9 @@ Two boundaries are pinned here and must not be blurred:
   active/passive skill keys or a behaviour profile is executable through the
   shared engine, and one declaring none registers no skill key, behaviour
   profile or combat trait, with no placeholder field standing in for one.
-  There is no species allowlist: the crocodile, sparrow and crab kits
-  (``tide_devouring_bite``, ``grain_shaking_peck``, ``lamp_carapace_claw``)
-  are delivered because their rows declare them, and the hare, goat and lynx
-  abilities stay narrated-only. The authored prose (including its stated
-  limits) lives in the narrative fields only.
+  There is no species allowlist: the crocodile, sparrow, crab, hare, goat and lynx
+  kits are delivered because their rows declare them. The authored prose
+  (including its stated limits) lives in the narrative fields only.
 
 Key grammar (requirement R1) is the shared stable-key contract, whose predicate
 lives in ``world/art/subjects.py``. ``world/lore/`` may not import that module —
@@ -622,11 +620,11 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "頸側長毛隨牠引動的微弱氣流展開，使既有霧氣沿身側聚集，干擾獵物判斷接近方向。"
         "牠主要捕食林中動物；部分個體會在晨霧中跟隨馱獸隊伍，等待落單動物，"
         "因此與部族獵人及山道運輸發生衝突。"
-        "能力依賴既有霧氣，乾燥、無霧的環境中優勢大幅減弱。"
+        "聚霧依賴既有霧氣，乾燥、無霧的環境中聚霧優勢大幅減弱；近身時的鬃風佯撲仍可使用，命中後使對手短暫誤判動作，戰鬥不另計霧氣加成。"
         "牠仍有足跡、氣味與聲音，不能完全隱形、製造任意幻覺或瞬間移動。",
         ("northwest_highland_forest",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；聚霧能力的來源不在設定中交代。",
-        "（作者私有：作者解釋）以環境條件（霧氣）限定優勢，作為中階獵食者的敘事邊界，"
+        "（作者私有：作者解釋）以霧氣限定聚霧生態；近身佯撲及短暫命中干擾由鬃毛氣流與動作產生，作為中階獵食者的敘事邊界，"
         "避免隱形與瞬間移動。",
         "（作者私有：尚未證實的猜想）部族獵人相信牠們聽得懂人語，這種說法交代不出任何證據。",
         "wood_stalker",
@@ -785,10 +783,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=115, mp=0, sp=0, atk_phys=20, agility=20, defense=10, magic_power=0
+            hp=115, mp=30, sp=20, atk_phys=20, agility=20, defense=10, magic_power=0
         ),
         "D",
         True,
+        active_skill_keys=("mane_crosswind_pounce",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "trail_hunter",
@@ -798,10 +799,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=165, mp=0, sp=0, atk_phys=25, agility=22, defense=12, magic_power=0
+            hp=165, mp=50, sp=30, atk_phys=25, agility=22, defense=12, magic_power=0
         ),
         "C",
         True,
+        active_skill_keys=("mane_crosswind_pounce",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "bank_lurker",
