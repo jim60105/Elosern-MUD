@@ -315,7 +315,7 @@ SYNTH_ARCHETYPES: MappingProxyType[str, SceneArchetype] = MappingProxyType(
 SYNTH_DIALOGUE: MappingProxyType = MappingProxyType(
     {
         "t_synth_lodgekeeper": DialogueDefinition(
-            greeting="櫃檯後的老板娘抬起眼：「要住店還是補貨，說一聲就好。」",
+            greeting="櫃檯後的老闆娘抬起眼：「要住店還是補貨，說一聲就好。」",
             responses=(
                 KeywordResponse("住宿", "「雲杉驛站一晚十八銅，先付後住。」"),
                 KeywordResponse("補貨", "「熾焰噴射劑和鐵牙短刃都在櫃檯右側。」"),

@@ -91,7 +91,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
     )
     def test_scripted_success_records_the_delivered_authored_line(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
@@ -104,7 +104,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         self.assertIn(stored["line"], result["message"])
 
     def test_scripted_rejections_record_nothing(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
@@ -116,7 +116,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         "webclient-dialogue-session::the-dialogue-session-is-deterministic-core-only-character-state"
     )
     def test_talk_open_writes_the_greeting_or_the_fixed_fallback_line(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_open_adapter(self.player, {"npc_id": int(host.pk)})
         self.assertEqual(result["outcome"], "success")
@@ -153,7 +153,7 @@ class DialogueSessionRecordingAdapterTests(BattlefieldIsolation, EvenniaTestCase
         self.assertEqual(stored["line"], "我對你點頭。")
 
     def test_freeform_authored_degrade_greeting_records(self):
-        npc = create_object(LLMNPC, key="客棧老板娘", location=self.room1)
+        npc = create_object(LLMNPC, key="客棧老闆娘", location=self.room1)
         npc.components.add(ScriptedDialogue.create(npc, dialogue_key=_T_DIALOGUE))
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
