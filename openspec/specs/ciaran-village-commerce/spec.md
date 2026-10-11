@@ -78,14 +78,11 @@ anywhere between the player's command and the committed transaction.
 - **THEN** the difference between them is entirely in authored data
 
 ### Requirement: The village's hosts are its own people
-Each of the village's hosts SHALL be authored as an elf of the branch native
-to that village, and each SHALL carry an authored sex. None SHALL fall back
-to a default race.
+Each declared village host SHALL carry explicit valid authored race, corresponding subrace when declared, and sex. Synchronization SHALL use that creation-time identity with its declared race baselines and SHALL NOT infer personnel identity from the settlement or a default. Village place, dwelling and commerce contracts SHALL remain unchanged.
 
 #### Scenario: Hosts carry the village's own lineage
-- **WHEN** the village's hosts are created by synchronization
-- **THEN** each carries the elf race and the branch subrace bound to that
-  village, with race baselines applied
+- **WHEN** declared village hosts are created
+- **THEN** each uses its valid authored race/subrace and corresponding race baselines without a settlement-derived identity default
 
 #### Scenario: Host sex is authored, not defaulted
 - **WHEN** the village's hosts are created

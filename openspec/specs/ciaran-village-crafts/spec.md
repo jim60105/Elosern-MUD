@@ -9,10 +9,7 @@ everyday things regardless of what the same keys fetch in the capital.
 ## Requirements
 
 ### Requirement: The village supplies adornments and remedies from two more homes
-The village SHALL carry an adornment-maker and a herbalist, each trading from her own dwelling
-exactly as the village's existing four do: an ordinary merchant place whose room is a home,
-whose host has no shopkeeper title, and whose goods resolve through the same path every other
-shop uses.
+The village SHALL carry adornment-making and herbal-remedy trade in two homes through the ordinary merchant path. Staffing, personal identity and sex SHALL follow authored place declarations. Declared hosts SHALL retain dwelling-appropriate titles rather than shopkeeper, merchant or proprietor titles; personnel edits SHALL NOT alter the two homes or introduce settlement-specific trade logic.
 
 #### Scenario: Both homes trade like any shop
 - **WHEN** a player enters each and buys
@@ -20,8 +17,8 @@ shop uses.
   path tests for this settlement or its archetype
 
 #### Scenario: Neither host is titled as a shopkeeper
-- **WHEN** the two hosts' authored titles are read
-- **THEN** neither describes its bearer as a shopkeeper, merchant or proprietor
+- **WHEN** every declared craft-home host's title is inspected
+- **THEN** none describes its bearer as a shopkeeper, merchant or proprietor
 
 ### Requirement: An elven-made good is everyday at home whatever it is worth abroad
 A good the village makes SHALL be priced in the village as the everyday thing it is there,

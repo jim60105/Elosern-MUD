@@ -57,14 +57,8 @@ nothing, which is indistinguishable at runtime from an intentionally silent NPC.
 - **THEN** it still degrades to the no-understanding line rather than raising
 
 ### Requirement: Adding the blueprint changes no shipped host
-Introducing the attendant profession SHALL NOT alter any shipped place row, service host,
-interior or dialogue answer. The shipped roster SHALL derive exactly the hosts it derived
-before, with the same professions, components and authored identity. The neutrality is
-against alteration, not against growth: a later content change MAY name the blueprint for
-hosts it authors for itself, and doing so alters none of the pre-existing rows.
+Introducing an unused profession blueprint SHALL NOT alter existing place rows, service hosts, interiors or dialogue. Host creation SHALL follow current place declarations and shared assembly without implicit profession-default personnel. A later authored roster edit SHALL take effect through its existing sync contract without freezing historical identities.
 
 #### Scenario: The shipped roster is unchanged by the new blueprint
-- **WHEN** the service-host roster is derived with the attendant blueprint present
-- **THEN** every row that predates the blueprint keeps its profession, service anchor and
-  authored identity exactly as they were, and the blueprint has shipped available for
-  content changes without altering any of them
+- **WHEN** a synthetic unused blueprint is registered while hosted place declarations stay unchanged
+- **THEN** derived identities, professions, anchors and components remain unchanged; adding a place using that blueprint creates only its declared host

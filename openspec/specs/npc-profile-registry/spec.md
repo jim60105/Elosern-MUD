@@ -64,198 +64,6 @@ A machine-readable inventory SHALL list every shipped NPC source with the slice 
 - **WHEN** the shipped NPC sources are inventoried
 - **THEN** the inventory lists each persistent_adventurer source alongside every place host, dialogue table, starting-companion declaration, offline quest template occupant, and shipped NPC import example
 
-### Requirement: Altoria lower-terrace hosts carry individual authored profiles and rewritten dialogue
-Each lower-terrace host owned by the `altoria_lower` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
-### Requirement: Altoria middle-terrace trade hosts carry individual authored profiles and rewritten dialogue
-Each middle-terrace trade host owned by the `altoria_trade` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
-### Requirement: Guild branch master and rank examiners carry individual authored profiles and rewritten dialogue
-Each guild host owned by the `altoria_guild` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Every guild qualification SHALL name a persistent person whose profile has a complete bounded card; a missing person or profile key SHALL fail load naming branch and target.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Every rank names a resolvable examiner profile
-- **WHEN** the guild qualification registry is validated, including a synthetic qualification naming an unregistered examiner profile key
-- **THEN** every shipped qualification's person profile key resolves to a profile with complete card and dialogue coverage, and the synthetic qualification fails load naming the qualification and the field
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, guild, and scripted-dialogue behavior tests run against the rewritten table
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Persistent sources replace removed rank factories
-- **WHEN** source validation runs after cutover
-- **THEN** each qualified person is owned and validated exactly once, including canonical
-  age/provenance and connected residence/schedule authoring, stale temporary-rank sources fail, and
-  unrelated place, companion, import and quest checks stay unchanged
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
-#### Scenario: Additive normal-person source passes independently
-- **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
-- **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining
-
-#### Scenario: Every rank names a valid examiner profile key
-- **WHEN** a guild rank is loaded
-- **THEN** it names no examiner profile key; the examiner's profile resolves through the qualified persistent person, and a missing person or profile key fails load naming the branch and target rank
-
-#### Scenario: Tables keep identifiers and freshly authored lines
-- **WHEN** the owned dialogue tables are rewritten
-- **THEN** each table keeps its keyword identifiers and its greeting, and every greeting and keyword response is newly authored against the host's card
-
-### Requirement: Altoria upper-terrace hosts carry individual authored profiles and rewritten dialogue
-Each upper-terrace host owned by the `altoria_upper` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting. Each corresponding dialogue table SHALL keep its keyword identifiers and its greeting, and every greeting and keyword response SHALL be newly authored against the host's card.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
-### Requirement: Village Ciaran first-home hosts carry individual authored profiles and rewritten dialogue
-Each village (first four homes) host owned by the `ciaran_homes_a` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Dialogue tables keep identifiers and are rewritten against the card
-- **WHEN** the corresponding dialogue tables are rewritten
-- **THEN** each keeps its keyword identifiers and its greeting, and every greeting and keyword response is newly authored against the host's card
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
-### Requirement: Village Ciaran second-home hosts carry individual authored profiles and rewritten dialogue
-Each village (second four homes) host owned by the `ciaran_homes_b` inventory slice SHALL name, through its place record, an authored NPC profile whose key equals the host's service identity, whose card satisfies the compact card contract, and which authors a misunderstanding reply in that host's voice and no profile greeting.
-
-#### Scenario: Every owned host references its own valid profile
-- **WHEN** the shipped place registry is validated against the profile registry
-- **THEN** each owned host's profile key resolves to a registered profile whose card validates
-
-#### Scenario: Service semantics are preserved
-- **WHEN** the existing settlement, merchant, and scripted-dialogue behavior tests run against the rewritten tables
-- **THEN** they pass without weakening any behavior assertion
-
-#### Scenario: Rewording breaks no test
-- **WHEN** any owned greeting, keyword response, or voice line is reworded while staying in character
-- **THEN** no test fails, because no test pins the authored prose
-
-#### Scenario: Dialogue tables keep identifiers and are rewritten against the card
-- **WHEN** the corresponding dialogue tables are rewritten
-- **THEN** each keeps its keyword identifiers and its greeting, and every greeting and keyword response is newly authored against the host's card
-
-#### Scenario: Dialogue lines stay in character
-- **WHEN** any owned greeting, keyword response, or voice line renders
-- **THEN** it is spoken in character and names no command, game mechanic, or interface element
-
-#### Scenario: Dialogue states no live service data
-- **WHEN** the dialogue tables are rewritten
-- **THEN** every service semantic the settlement and dialogue specifications require is kept, and no fixed prices, stock counts, or availability that live service data owns are stated
-
-#### Scenario: Rewrite quality is editorially reviewed
-- **WHEN** the authored prose is assessed
-- **THEN** prose quality, voice distinctness and completeness of the rewrite are established by the change's recorded editorial review, not by tests
-
 ### Requirement: The shipped NPC roster is validated as complete before the game starts
 Before any world synchronization at server start, the system SHALL validate the complete shipped NPC roster and SHALL abort startup when any check fails, reporting every violation with its source kind, source key, and profile or preset key. The same validation SHALL be runnable in tests without a server.
 
@@ -353,3 +161,37 @@ Each shipped persistent-adventurer, place-host and guild-examiner profile SHALL 
 #### Scenario: Additive normal-person source passes independently
 - **WHEN** a persistent-adventurer source with a valid distinct profile/age pair is added
 - **THEN** source equality and orphan/age checks accept the person once, with no rank-owned examiner source remaining
+
+### Requirement: Every registry-derived host has complete individual characterization
+Every host derived from live place records SHALL reference its own valid compact profile by service identity with explicit bounded ages. Every scripted host SHALL author a misunderstanding reply and use its dialogue table as the sole greeting source. Each table SHALL belong to exactly one profiled host. Qualified persistent people SHALL resolve their own cards and offline voices. Inventory equality SHALL be checked in both directions independently of owner-slice labels.
+
+#### Scenario: Complete live-source coverage
+- **WHEN** a new valid hosted place and table are added with characterization and an inventory owner
+- **THEN** coverage includes them without adding a district-specific test; no host or table is omitted
+
+#### Scenario: Missing or stale relationship
+- **WHEN** a host lacks profile, card, age, voice, table or owner, or an inventory row outlives its source
+- **THEN** validation reports source kind/key and missing or stale relationship before world sync
+
+#### Scenario: Qualified people
+- **WHEN** a qualification names a persistent person with a missing profile
+- **THEN** load fails naming branch, target and person/profile; valid distinct persons are owned once
+
+### Requirement: Authored host dialogue preserves service semantics
+Every shipped host dialogue SHALL retain its declared service interactions, bounded in-character greeting/responses and individual voice without fixed prices, stock counts or live availability prose. Prose SHALL remain editable without literal-text tests. Characterization changes SHALL record editorial review of card/voice agreement and rewrite completeness for every affected live source; tests SHALL establish coverage and behavior rather than editorial quality.
+
+#### Scenario: Registry-derived rewrite coverage
+- **WHEN** the authored dialogue corpus is reviewed
+- **THEN** every live host/table is covered, including newly added sources; keyword actions and service behavior remain verified
+
+#### Scenario: Editorial evidence has complete source coverage
+- **WHEN** the characterization review ledger is checked against actual live sources
+- **THEN** each source has one dated review/disposition entry, missing or orphan entries fail, and the check makes no claim to prove prose quality or judgment freshness
+
+#### Scenario: Rewording
+- **WHEN** a valid greeting, response or misunderstanding line is reworded
+- **THEN** behavior and coverage tests pass without updating expected prose; no command/mechanic/UI term or shared placeholder is accepted
+
+#### Scenario: Shared service labels
+- **WHEN** two hosts legitimately expose the same keyword labels
+- **THEN** valid individual cards and voice are accepted without requiring globally unique keyword sets

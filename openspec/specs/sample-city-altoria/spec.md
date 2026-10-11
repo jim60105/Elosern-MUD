@@ -116,10 +116,8 @@ rather than being fixed by this requirement.
 - **THEN** its interior and doorways appear after synchronization with no change to `XYMAP_DATA`
 
 #### Scenario: Specialist shops do not narrow what the capital sells
-- **WHEN** the goods offered across every capital place are collected
-- **THEN** the set equals the set the single general store offered before the split, plus
-  exactly the goods a later change has deliberately added to the capital (altoria-sanctum's
-  twelve intimacy goods), with no key offered by two places
+- **WHEN** offers across capital places are resolved
+- **THEN** each shop exposes precisely its current authored assortment union and allowed place-level additions/removals; no historical roster defines capital availability
 
 #### Scenario: One exterior carries two doors
 - **WHEN** two places declare the same exterior with different doorway names
@@ -127,10 +125,8 @@ rather than being fixed by this requirement.
   leads back to it
 
 #### Scenario: The accessory bundles together are exactly the accessory-slot goods
-- **WHEN** the capital's offered goods are partitioned by equipment slot
-- **THEN** the set of accessory-slot keys the capital sells equals the union of the adornments
-  and sanctum bundles' accessory keys exactly, disjointly, with no accessory-slot key left in
-  another capital bundle
+- **WHEN** capital specialist assortment policies are validated
+- **THEN** every offered accessory obeys its declared shelf eligibility; no fixed named two-bundle membership is required
 
 #### Scenario: Moving a good between shelves does not change its price
 - **WHEN** an item's resolved offer is compared before and after it moves from one capital
@@ -150,20 +146,16 @@ rather than being fixed by this requirement.
 - **THEN** the partition follows what a shop is for, not which shop happened to stock an item first
 
 #### Scenario: The accessory-slot partition is exactly two bundles
-- **WHEN** the capital's accessory-slot goods are assigned to bundles
-- **THEN** they SHALL be carved across exactly two bundles — the adornments bundle and the sanctum
-  bundle (altoria-sanctum: the wearable devices the sanctum's own counter supplies) — and every
-  accessory-slot good the capital sells SHALL sit in one of those two and nowhere else
+- **WHEN** accessory goods are assigned to authored specialist shelves
+- **THEN** every assignment follows explicit registry-owned shop-purpose and eligible-slot declarations; the number and identity of bundles are data
 
 #### Scenario: An omitted accessory good is a gap; a non-accessory good is a leak
-- **WHEN** a good violates the two-bundle accessory partition
-- **THEN** an accessory-slot good the capital sells and both bundles omit is a gap in the partition,
-  and a non-accessory good inside either is a leak
+- **WHEN** an offer references missing item data or violates its declared shelf eligibility
+- **THEN** validation rejects the missing reference or slot/kind mismatch, naming shop, assortment and item
 
 #### Scenario: The partition is stated as a set equality, not a hand-listed inventory
-- **WHEN** the partition rule is stated
-- **THEN** it is a set equality rather than a hand-listed inventory, which is what keeps the next
-  item added to the capital from landing on whichever shelf is nearest
+- **WHEN** resolved shop membership is checked
+- **THEN** membership equals the authored union plus additions minus removals, without an approved item-list snapshot
 
 #### Scenario: Interior attachment leaves grid coordinates, cycles, and the AnchorRoom unchanged
 - **WHEN** service interiors are attached
@@ -241,16 +233,11 @@ contrib's own bare `evennia.contrib.grid.xyzgrid.xyzroom.XYZExit`.
 - **THEN** it SHALL cover diagonal links exactly as it covers cardinal ones
 
 ### Requirement: Altoria service content synchronizes idempotently without resetting live state
-Guild-economy startup SHALL create or update by stable key/tag one guild-service NPC with
-GuildStaff and GuildExaminer components in the guild hall and one Merchant NPC in the interior
-of every merchant place the settlement's place registry declares. Repeated sync SHALL update authored descriptions/component definitions
-without duplicating objects or resetting merchant stock that has already been initialized.
+Startup SHALL create service hosts by stable service identity from every current hosted place declaration, using its authored identity and shared profession blueprint. Repeated sync SHALL update authored descriptions/component definitions without duplicating hosts or resetting initialized merchant stock or mutable identity. Interiors, doorways and exam metadata SHALL retain their existing synchronization contract.
 
 #### Scenario: Fresh startup creates a playable service path
-- **WHEN** startup runs against an empty database after grid sync
-- **THEN** one interior per place-registry row exists, reached by two directed doorway exits
-  from its exterior, alongside the guild service host, one merchant host per merchant place,
-  and exam spawn metadata — all before player commands are accepted
+- **WHEN** startup runs on an empty database after grid sync
+- **THEN** one interior per current place row and its two doorway exits exist, with exactly the declared service hosts/components and exam metadata before commands are accepted
 
 #### Scenario: Repeated startup creates no duplicates
 - **WHEN** guild-economy sync runs twice

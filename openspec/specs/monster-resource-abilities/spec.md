@@ -5,217 +5,96 @@ Defines the approved crocodile resource ability and its complete authored-kit, c
 
 ## Requirements
 
-### Requirement: Crocodile bite is one authored shared-engine physical resource skill
-Both crocodile variants SHALL own active tide_devouring_bite, labeled 吞潮咬擊, with no prerequisites/passive. It SHALL be selectable outside combat (`usable_out_of_combat=True`), with damage resolution requiring the existing battlefield gate, single enemy, close physical contact, water physical school, its authored coefficient and one strike. Nominal payment SHALL be the declared MP and SP costs. Taxonomy SHALL be elemental magic/water without granting player access or freeform scaling.
+### Requirement: Monster ability identity and composition are authored registry data
+Executable monster abilities SHALL come from validated authored skills and variant kits. Species/variant names, kit membership, effect keys and taxonomy choices SHALL remain data. Shared identity eligibility SHALL reject incompatible ownership before dice or writes and exclude monster-only abilities from character catalogs. Existing target, battlefield, cost-tier and freeform-shape gates SHALL apply without species-specific branches.
 
-#### Scenario: Definition uses ordinary mechanics
-- **WHEN** the production bite resolves for an eligible crocodile
-- **THEN** damage reads physical attack with the normal formula, not magic_power; targeting uses existing physical close-contact/displacement rules
+#### Scenario: Declaration closure
+- **WHEN** a shipped kit is inspected
+- **THEN** all skill, kind, eligibility, prerequisite, effect, buff and behavior references resolve; no prose creates an effect
 
-#### Scenario: Enemy component keeps shared selection rules
-- **WHEN** a companion or invalid contact target is selected
-- **THEN** the bite delivers no enemy-only damage/drain to it and ordinary targeting rejects invalid contact without introducing enemy-only faction constraints
+#### Scenario: Contact and shared selection
+- **WHEN** a synthetic physical SINGLE ability selects a dead, displaced, missing target or valid ally
+- **THEN** shared gates reject invalid contact; enemy-only effects never reach allies; selectable-outside-combat damage still requires a battlefield
 
-#### Scenario: No acquired chain or scale is invented
-- **WHEN** the two approved kits and player catalogs are inspected
-- **THEN** basic_attack and flee remain; there is no new passive/prerequisite tree or freeform scale; the price remains valid under the existing cost-tier schema
+#### Scenario: Independent composition checks
+- **WHEN** synthetic damage/transfer, enemy hit-rider and hit-independent self-guard kits execute
+- **THEN** ordinary physical damage reads physical attack, elemental taxonomy adds no magic-power scaling, and effect audiences follow declarations
 
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
+### Requirement: Hit-qualified transfers credit actual removal once
+A hit-dependent resource transfer SHALL use invocation-local hit evidence for its referenced damage occurrence and recipient. It SHALL credit the caster from actual removal within target and caster caps, once per target; misses SHALL transfer nothing. Critical damage SHALL NOT multiply transfer, zero resources SHALL NOT cancel damage, and defeat-crossing hits SHALL finish same-action transfer.
 
-### Requirement: Successful bite drains MP and recovers only actual removal
-The bite SHALL drain up to its declared amount of current target MP once if its damage strike hits and recover its declared share of actual MP removed capped at caster maximum. A miss SHALL drain/recover nothing. Critical damage SHALL NOT multiply the transfer. Zero target MP SHALL NOT cancel physical damage, and crossing defeat HP SHALL NOT suppress same-action transfer.
+#### Scenario: Actual removal oracle
+- **WHEN** a synthetic target has MP 3, drain request 10, full recovery share and caster MP 20 with cost 10
+- **THEN** target ends at 0 and caster at 13; untouched controls remain unchanged
 
-#### Scenario: Hit and miss evidence
-- **WHEN** a deterministic bite hits and another misses
-- **THEN** the hit damages and transfers up to the declared drain amount; the miss transfers none and still pays the declared MP/SP costs
+#### Scenario: Hit evidence and defeat
+- **WHEN** synthetic hit, miss, absorbed hit, critical and defeat-crossing cases execute
+- **THEN** hit qualifies independently of HP loss, miss excludes the rider, and no duplicate credit or second hit roll occurs
 
-#### Scenario: Partial and empty pools
-- **WHEN** hit targets have 3 MP and 0 MP respectively
-- **THEN** removal/recovery is at most 3 and exactly 0 respectively, with physical damage in both cases
+#### Scenario: Transfer limits
+- **WHEN** a transfer-only component is read
+- **THEN** it grants no undeclared HP healing or permanent stat mutation
 
-#### Scenario: Critical and defeat crossing
-- **WHEN** one hit is critical and another crosses the defeat threshold
-- **THEN** ordinary damage applies while each transfer remains once and bounded by the declared drain amount; defeat settlement follows the complete action
+### Requirement: Monster effects and payments share the ordinary atomic action
+Affordability SHALL precede dice/effects for both adjusted resource costs. Effects and capped recovery SHALL precede payment once in the ordinary transaction. Rejected requests SHALL write nothing; late failure SHALL restore all touched gauges, buffs and practice claims. Resource modifiers and reactions SHALL keep their existing order. Narrative and forged environment context SHALL grant no runtime effect.
 
-#### Scenario: No healing or lasting magic loss
-- **WHEN** bite outcomes settle
-- **THEN** no HP recovery or permanent magic-power reduction occurs; no remote river-wide drain exists
+#### Scenario: Order at the cap
+- **WHEN** a synthetic caster starts at maximum MP 30, removes 10 with full share and pays MP 10/SP 5
+- **THEN** MP ends at 20 and SP drops by 5; starting MP 20 also ends at 20
 
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
+#### Scenario: Unaffordable and invalid requests
+- **WHEN** either resource is short or the target is invalid or missing
+- **THEN** no roll, buff, damage, cost or practice occurs; drain cannot fund initial affordability
 
-### Requirement: Affordability precedes effects and recovery precedes costs
-The caster SHALL already afford both adjusted declared costs before any roll/effect. Damage, target drain and capped caster recovery SHALL precede MP/SP payment in the shared transaction. Canonical reactions SHALL remain in force and overflow SHALL be discarded. Tests SHALL cover this order once with fixed synthetic fixtures.
+#### Scenario: Late rollback
+- **WHEN** failure follows a relevant gauge/buff write and acquired practice claim
+- **THEN** reload and caches match pre-action snapshots and a retry succeeds without stale claims
 
-#### Scenario: Full cap loses nominal cost
-- **WHEN** a synthetic caster starts at maximum MP 30, removes 10 target MP with full recovery share, and pays cost 10 MP plus 5 SP
-- **THEN** caster MP ends at 20 and SP decreases by 5; a caster starting at 20 MP also ends at 20
+#### Scenario: Environment remains prose
+- **WHEN** otherwise identical sessions vary ecological prose or forged environmental facts
+- **THEN** outcomes stay unchanged without a new environment engine
 
-#### Scenario: Room under the cap follows current order
-- **WHEN** the same fixed synthetic caster starts at MP 20 under cap 30 and removes 10 target MP
-- **THEN** recovery reaches 30 before MP payment 10 leaves 20, without credit exceeding actual removal
+### Requirement: Timed monster effects follow declared recipients and lifetime
+Timed effects SHALL use their declared audience, hit dependency, duration, polarity and modifier reference. Refresh SHALL replace lifetime without accumulating magnitude; expiry/removal SHALL remove the contribution. Enemy riders SHALL require the referenced enemy hit. A hit-independent self effect SHALL reach only the caster on a valid affordable resolved attempt, including misses, and SHALL grant nothing on rejected or no-target requests.
 
-#### Scenario: Drain cannot finance an action
-- **WHEN** either resource is below its adjusted declared cost despite plentiful target MP
-- **THEN** resolution rejects before dice, effects or practice
+#### Scenario: Rider routing
+- **WHEN** a synthetic enemy-rider kit hits, misses and hits with fully absorbed damage
+- **THEN** only hit-qualified selected enemies gain one effect; caster/ally controls stay unchanged
 
-#### Scenario: Canonical modifiers still apply
-- **WHEN** existing resource modifiers or MP reactions participate
-- **THEN** shared APIs apply them without reordering existing skills or storing discarded recovery
+#### Scenario: Self routing
+- **WHEN** a synthetic guard kit misses a valid enemy and then attempts invalid/no-target casts
+- **THEN** the valid attempt grants caster guard only; rejected casts grant nothing
 
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
+#### Scenario: Lifetime
+- **WHEN** an aged instance is refreshed then time crosses its refreshed expiry
+- **THEN** one same-key contribution persists until expiry and none remains afterward; no undeclared DoT, displacement or lock appears
 
-### Requirement: Production crocodile delivery includes real combat and persistence evidence
-Delivery SHALL validate both variants generically and retain a representative formally constructed resolver-backed session smoke observing victim HP, both MP pools, caster SP, ordinary fallback and reload. Shared synthetic engine suites SHALL cover hit/miss vectors and construction/action rollback rather than duplicate an exhaustive suite per variant. Runtime smoke SHALL use no live generative or image service.
+### Requirement: Delivered monster compositions retain representative consumer evidence
+Every shipped variant SHALL receive generic identity/profile/kit/reference checks. Representative production smoke SHALL execute each distinct delivered composition through formal construction, real policy selection, resolver payment and committed reload without live generative services. Shared synthetic suites SHALL establish mechanism arithmetic, hit/miss, recipient controls and post-write rollback; a new species reusing a composition SHALL NOT clone that engine battery.
 
-#### Scenario: Complete production loop
-- **WHEN** both variants enter real resolver-backed sessions after production construction
-- **THEN** their current authored profiles, usable kits and profile bindings participate; depletion changes policy to ordinary attack and reload preserves current values
+#### Scenario: Real consumer boundaries
+- **WHEN** representatives of all delivered composition shapes execute then deplete either payable resource
+- **THEN** victim/caster/control state, payment, ordinary fallback and reloaded identity/kit/depleted resources are observed independently
 
-#### Scenario: Atomicity covers both participants
-- **WHEN** failure is injected after staged damage/transfer or during kit/profile construction
-- **THEN** no partial participant state or ownership/configuration remains; rolled-back practice claims are released
+#### Scenario: Shared reuse
+- **WHEN** a second synthetic species is constructed with an eligible synthetic transfer kit
+- **THEN** it actually executes the same APIs with isolated hit evidence and independently known end state
 
-#### Scenario: Second species proves shared reuse
-- **WHEN** a synthetic second species owns an eligible synthetic damage/transfer ability
-- **THEN** it executes through identical dependency/transfer APIs without a species-specific branch
+#### Scenario: Data edit
+- **WHEN** valid species names or kit keys change with all references updated
+- **THEN** integrity and representative wiring tests pass without copying a roster approval table
 
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
+### Requirement: Bestiary documentation covers keyed public content relationships
+Published bestiary documentation SHALL identify every shipped species and variant by stable key, attach each variant to its owning species and reference only public narrative fields. Current executable status SHALL follow declared kits; historical approval notes SHALL be separate. Programmatic checks SHALL reject missing, duplicate, orphan or wrong-owner documentation links and private-field references without pinning prose sentences.
 
-### Requirement: Crocodile ecology documents implemented limits
-Public crocodile ecology and author notes SHALL describe implemented contact MP pressure with no HP healing, remote drain or permanent magic loss. Assertions that crocodile mechanics/numbers remain deferred SHALL be removed. Delivered approved species SHALL use their authored kits and revised boundaries; still-deferred species are ridge_burrow_hare, rock_echo_goat, fog_mane_lynx.
+#### Scenario: Complete keyed documentation
+- **WHEN** the shipped registries and current bestiary index are checked
+- **THEN** species and variant keys match in both directions, each public field link resolves and every variant links to its actual species
 
-#### Scenario: Public projection and notes agree
-- **WHEN** the registry, bestiary and relevant author guidance are read
-- **THEN** crocodile mechanics and limits agree without exposing private fields, inventing unapproved species abilities or claiming recalibrated grades
+#### Scenario: Fault detection
+- **WHEN** a section link is removed, duplicated, orphaned, assigned to a wrong species or points to a private field
+- **THEN** the check fails naming key and relationship
 
-### Requirement: 穗鳴雀 owns its approved contact resource ability
-Both `sway_whistle_sparrow` variants SHALL own `grain_shaking_peck` (震穗啄擊) as a prerequisite-free single-target physical ability selectable outside combat (`usable_out_of_combat=True`) with `wind` elemental-magic taxonomy and monster/species eligibility, whose damage resolution requires the existing battlefield gate. Its sole strike SHALL use its authored coefficient and the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
-
-#### Scenario: Exact ordered composition
-- **WHEN** the approved ability is read
-- **THEN** its ordered effects are `damage:wind:physical` and `buff_apply:grain_rattle`, with enemy damage and enemy buff requiring hit occurrence 0; damage reads physical attack, never magic power
-
-#### Scenario: Shared identity containment
-- **WHEN** a player, NPC or wrong-species monster corruptly owns the ability
-- **THEN** invocation rejects before dice, costs, buffs or practice, and player catalog/lineage admission remains denied
-
-#### Scenario: Contact and faction remain shared
-- **WHEN** an invalid, dead or positional-displaced contact target is supplied, or a valid ally is selected
-- **THEN** ordinary target gates reject invalid contact; ANY faction keeps candidate selection unrestricted but enemy components deliver nothing to allies
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 穗鳴雀 timed modifier follows its authored recipient and lifetime
-The `grain_rattle` mount SHALL last its authored duration in world seconds, refresh without accumulating magnitude and apply its authored negative accuracy adjustment once to each selected enemy hit by its source strike. It SHALL have debuff polarity and no DoT, ground/positional marker or action lock. Expiry/removal SHALL restore the control modifier result.
-
-#### Scenario: Hit and miss separate delivery from payment
-- **WHEN** deterministic hit and miss attempts resolve
-- **THEN** only the hit applies the target buff once, including an absorbed hit and both pay the declared MP/SP costs exactly once under unmodified costs
-
-#### Scenario: Refresh and expiry
-- **WHEN** the mount is reapplied before expiry then world time passes its refreshed lifetime
-- **THEN** magnitude never accumulates and the modifier is absent after expiry
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 穗鳴雀 payment and atomicity retain the shared transaction
-Affordability SHALL precede dice/effects, with normal modifiers and effects-before-cost payment. Any failure SHALL restore all touched gauges, buffs and practice claims. Ecological fog, light, grain, soil or rock descriptions SHALL NOT change any combat result.
-
-#### Scenario: Either insufficient resource rejects before effects
-- **WHEN** either current resource is below its adjusted declared cost under unmodified costs
-- **THEN** the cast rejects before dice, HP loss, buff application, payment or practice
-
-#### Scenario: Late failure restores the participants
-- **WHEN** a late failure follows staged damage, buff and payment
-- **THEN** actor/target HP, MP/SP, buffs and practice match their pre-action values and a retry has no stale claim
-
-#### Scenario: Environment prose cannot act as a fact
-- **WHEN** otherwise equal sessions use different scene prose, habitat labels or forged fog/light/rock request facts
-- **THEN** the contact action and magnitude are identical and no ecological bonus or environment-dependent damage is produced
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 穗鳴雀 public ecology reflects the completed contact kit
-The registry public ecology and bestiary SHALL publish the same approved sentence edits in the proposed remaining-species design §4. Existing ecological conditions and untouched limits SHALL remain true, while current executable-deferral claims for this species SHALL be removed. Historical approval notes SHALL remain distinguishable from current implementation status.
-
-#### Scenario: Revised prose and private boundaries
-- **WHEN** public ecology, bestiary and author guides are read after implementation
-- **THEN** they disclose environment-independent contact behavior, retain the design's unchanged limits, remove only this species' current deferral and expose no author-private origin or conjecture
-
-### Requirement: 潮燈蟹 owns its approved contact resource ability
-Both `tide_lamp_crab` variants SHALL own `lamp_carapace_claw` (燈甲螯擊) as a prerequisite-free single-target physical ability selectable outside combat (`usable_out_of_combat=True`) with `light` elemental-magic taxonomy and monster/species eligibility, whose damage resolution requires the existing battlefield gate. Its sole strike SHALL use its authored coefficient and the declared MP and SP costs. It SHALL have no passive, healing, transfer, environment gate or freeform scale.
-
-#### Scenario: Exact ordered composition
-- **WHEN** the approved ability is read
-- **THEN** its ordered effects are `damage:light:physical` and `self_buff_apply:lamp_carapace_guard`, with enemy damage and self guard independent of hit; damage reads physical attack, never magic power
-
-#### Scenario: Shared identity containment
-- **WHEN** a player, NPC or wrong-species monster corruptly owns the ability
-- **THEN** invocation rejects before dice, costs, buffs or practice, and player catalog/lineage admission remains denied
-
-#### Scenario: Contact and faction remain shared
-- **WHEN** an invalid, dead or positional-displaced contact target is supplied, or a valid ally is selected
-- **THEN** ordinary target gates reject invalid contact; ANY faction keeps candidate selection unrestricted but enemy components deliver nothing to allies
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 潮燈蟹 timed modifier follows its authored recipient and lifetime
-The `lamp_carapace_guard` mount SHALL last its authored duration in world seconds, refresh without accumulating magnitude and apply its authored positive defense adjustment to its caster on each affordable resolved attempt with a valid selected contact target, including a miss. Rejected or no-target requests SHALL grant nothing. It SHALL have buff polarity and no DoT, ground/positional marker or action lock. Expiry/removal SHALL restore the control modifier result.
-
-#### Scenario: Hit and miss separate delivery from payment
-- **WHEN** deterministic hit and miss attempts against a valid selected enemy resolve
-- **THEN** both attempts mount caster guard once and both pay the declared MP/SP costs exactly once under unmodified costs
-
-#### Scenario: Refresh and expiry
-- **WHEN** the mount is reapplied before expiry then world time passes its refreshed lifetime
-- **THEN** magnitude never accumulates and the modifier is absent after expiry
-
-#### Scenario: Missing or invalid contact cannot grant guard
-- **WHEN** the SINGLE request has no selected target or its target fails ordinary contact validation
-- **THEN** the ordinary target gate rejects before guard, damage, resource payment or practice
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 潮燈蟹 payment and atomicity retain the shared transaction
-Affordability SHALL precede dice/effects, with normal modifiers and effects-before-cost payment. Any failure SHALL restore all touched gauges, buffs and practice claims. Ecological fog, light, grain, soil or rock descriptions SHALL NOT change any combat result.
-
-#### Scenario: Either insufficient resource rejects before effects
-- **WHEN** either current resource is below its adjusted declared cost under unmodified costs
-- **THEN** the cast rejects before dice, HP loss, buff application, payment or practice
-
-#### Scenario: Late failure restores the participants
-- **WHEN** a late failure follows staged damage, buff and payment
-- **THEN** actor/target HP, MP/SP, buffs and practice match their pre-action values and a retry has no stale claim
-
-#### Scenario: Environment prose cannot act as a fact
-- **WHEN** otherwise equal sessions use different scene prose, habitat labels or forged fog/light/rock request facts
-- **THEN** the contact action and magnitude are identical and no ecological bonus or environment-dependent damage is produced
-
-#### Scenario: Content values remain tunable
-- **WHEN** valid authored costs, coefficients, duration, modifier or drain amount change
-- **THEN** integrity checks and representative consumer smoke remain green without duplicated numeric expectations; synthetic shared tests independently establish the retained mechanics
-
-### Requirement: 潮燈蟹 public ecology reflects the completed contact kit
-The registry public ecology and bestiary SHALL publish the same approved sentence edits in the proposed remaining-species design §5. Existing ecological conditions and untouched limits SHALL remain true, while current executable-deferral claims for this species SHALL be removed. Historical approval notes SHALL remain distinguishable from current implementation status.
-
-#### Scenario: Revised prose and private boundaries
-- **WHEN** public ecology, bestiary and author guides are read after implementation
-- **THEN** they disclose environment-independent contact behavior, retain the design's unchanged limits, remove only this species' current deferral and expose no author-private origin or conjecture
+#### Scenario: Prose remains editable
+- **WHEN** public prose is reworded in its existing valid keyed sections
+- **THEN** relationship checks pass; editorial review assesses semantic accuracy and approved ability limits

@@ -41,15 +41,7 @@ outside the identity registry.
 - **THEN** it SHALL NOT declare opening hours, a host, or a location; it describes goods, not a business
 
 ### Requirement: An assortment may not contain a keepsake-band item
-Catalog loading SHALL reject an assortment containing an item whose
-price-table band is the keepsake band, at any price, naming the assortment
-and the item.
-
-The keepsake band means a one-of-a-kind item that is never traded. Its
-prohibition is otherwise only an implicit consequence of its very high price
-floor, which an author can satisfy exactly. Because an assortment is the only
-route by which an item reaches a shelf, rejecting it here closes the rule for
-every shop at once.
+Catalog loading SHALL reject a keepsake-band item in any resolved merchant offer, including assortment membership, place additions and overrides, regardless of price. Validation SHALL name the shop or assortment and item before registry or merchant state changes. Keepsakes SHALL remain grantable, holdable and inspectable; price-band eligibility SHALL NOT override non-sellability.
 
 #### Scenario: A keepsake in an assortment fails load
 - **WHEN** an assortment names an item whose band is the keepsake band, at
@@ -59,13 +51,10 @@ every shop at once.
 
 #### Scenario: A keepsake stays holdable
 - **WHEN** a keepsake-band item is granted through authored content
-- **THEN** it is held and inspected normally; only the assortment route is
-  closed
+- **THEN** it remains holdable and inspectable but no listing route can authorize merchant trade
 
 ### Requirement: A shop's offered goods are derived from the assortments it references
-A shop SHALL declare which assortments it references rather than listing its
-own item keys. Its offered goods SHALL be the union of those assortments'
-item sets, and its offer rules SHALL be those assortments' offer rules.
+A shop SHALL derive offered goods from its referenced assortment union plus existing authored place-level additions minus removals, with existing price scaling/overrides. Duplicate membership within one shop SHALL fail without implicit precedence; different shops MAY share an item. Item and shelf membership SHALL remain data and follow declared shop-purpose eligibility. All existing downstream trading, stock and opening semantics SHALL remain unchanged.
 
 #### Scenario: Two shops referencing one assortment stock the same goods
 - **WHEN** two shops reference the same assortment and nothing else

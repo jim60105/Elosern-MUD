@@ -137,8 +137,8 @@ and inside that same all-or-nothing claim transaction call
 `world/rules/titles.py::grant_first_quest_epithet`.
 
 #### Scenario: First completed claim grants the epithet
-- **WHEN** a registered member with an empty claims list turns in any completed quest for the first time
-- **THEN** the epithet 「南門新客」 is banked and auto-equipped in the same commit as the reward, and the response carries 「獲得異名：南門新客」 for every claim surface to echo
+- **WHEN** a registered member with an empty claims list turns in any completed quest
+- **THEN** the configured starter display and origin are banked and an empty epithet slot auto-equips in the reward commit; every claim surface echoes 「獲得異名：」 followed by that display
 
 #### Scenario: Later claims never re-grant
 - **WHEN** the same member turns in any further completed quest, including a second acceptance of the same definition
@@ -153,15 +153,12 @@ and inside that same all-or-nothing claim transaction call
 - **THEN** the epithet grants exactly as for any other first claim
 
 #### Scenario: The grant banks the starter epithet through the regular writer
-- **WHEN** `grant_first_quest_epithet` runs inside the claim transaction
-- **THEN** it banks the starter epithet 「南門新客」 (`origin_quote` from `world/lore/titles.py`'s
-  `STARTER_EPITHET`) through the regular `bank_epithet` writer, auto-equipping an empty epithet slot
+- **WHEN** the first-claim grant runs inside the claim transaction
+- **THEN** the regular writer banks the authored starter display and origin basis and auto-equips only an empty epithet slot
 
 #### Scenario: The grant notification merges into the claim response and echoes everywhere
 - **WHEN** the first-ever claim succeeds
-- **THEN** the grant notification 「獲得異名：南門新客」 merges into the claim response payload
-  (`title_notifications`) and every claim surface (CLI turn-in, the turn-in dialogue keyword, the
-  webclient claim action) echoes those lines with the reward summary
+- **THEN** the grant notification carrying the configured display joins title_notifications; CLI, dialogue keyword and webclient claim echo it with the reward summary
 
 #### Scenario: Title attributes join the claim transaction's snapshot set
 - **WHEN** the claim transaction takes its snapshot set

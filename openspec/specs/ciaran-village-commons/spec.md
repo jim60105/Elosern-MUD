@@ -9,15 +9,11 @@ no gate.
 ## Requirements
 
 ### Requirement: The village has a communal shelter, a sword instructor and an elder
-The village SHALL carry these three locations. The shelter SHALL hold no host and SHALL still
-be a complete, enterable, permanently tagged room reachable from and back to its exterior. The
-instructor and the elder SHALL each hold one authored host who converses. The instructor's
-dwelling SHALL share the training ground's exterior with the blade-smith's.
+The village SHALL carry a communal shelter, a sword instructor's dwelling and an elder's dwelling as complete, enterable tagged locations reachable both ways. Staffing and host identity SHALL follow current place declarations. The instructor's dwelling SHALL share the training ground's exterior with the blade-smith's. Staffing changes SHALL NOT introduce the excluded institutions, counters or guild work.
 
 #### Scenario: Three locations exist, two of them with someone in them
 - **WHEN** synchronization completes
-- **THEN** all three interiors exist once and are reachable both ways, the instructor's and
-  the elder's each hold one dialogue-carrying host, and the shelter holds none
+- **THEN** all three interiors exist once and remain reachable both ways; every declared dialogue host exists and declared hostless records create none
 
 #### Scenario: The training ground carries two dwellings
 - **WHEN** the training ground's exterior is inspected

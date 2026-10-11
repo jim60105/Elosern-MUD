@@ -56,20 +56,15 @@ SHALL represent that as one square with two doors rather than as two separate bu
   interior, and each interior leads back out to that same exterior
 
 ### Requirement: The sanctuary's host ministers and does not trade
-The sanctuary's own host SHALL carry a dialogue capability and no trade capability: her
-counter blesses, preaches and answers questions about the ministry, and sells nothing. The
-shop's host SHALL carry the trade capability. Affinity with the sanctuary SHALL therefore
-accumulate through conversation and affinity with its shop through trade.
+Declared sanctuary ministry hosts SHALL converse without trade capability; ministry blesses, preaches and answers questions and sells nothing. Declared shop hosts SHALL carry trade capability. Host identities and staffing SHALL remain registry data. Sanctuary affinity SHALL accrue through conversation and shop affinity through trade, without a ministry host advertising actions it cannot execute.
 
 #### Scenario: The two hosts' trade offices are disjoint
-- **WHEN** both hosts' components are inspected after synchronization
-- **THEN** the sanctuary's host carries a scripted-dialogue component and no merchant
-  component, and the shop's host carries a merchant component; the priest's own table
-  ships no trade guidance she could not execute
+- **WHEN** all declared ministry and shop hosts are inspected
+- **THEN** ministry hosts have dialogue and no merchant component; shop hosts have merchant capability and each table advertises only its actual office
 
 #### Scenario: The shop host answers from her own table
-- **WHEN** the shop's host answers visitors
-- **THEN** like every capital merchant she answers from her own shopkeeper's table about her own goods, never from the sanctuary's offices
+- **WHEN** a declared sanctuary shop host answers a visitor
+- **THEN** the host uses its own authored shop table about its own declared goods, not ministry offices
 
 #### Scenario: Affinity channels follow the host's capability
 - **WHEN** affinity accrues around the sanctuary and its shop

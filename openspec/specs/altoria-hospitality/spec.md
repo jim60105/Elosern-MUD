@@ -11,14 +11,11 @@ three unproposed.
 ## Requirements
 
 ### Requirement: The capital has a tavern, an inn and a bathhouse
-The capital SHALL carry three hospitality locations — a tavern, an inn and a public bathhouse —
-each a permanent interior with an authored host who converses. The inn and the tavern SHALL
-share one exterior, because an inn lane with both on it is one street.
+The capital SHALL carry three hospitality locations, a tavern, an inn and a public bathhouse, each a permanent interior. Staffing and authored host identity SHALL follow each current place declaration. The inn and tavern SHALL share one exterior, because an inn lane with both on it is one street.
 
 #### Scenario: All three exist and are enterable
 - **WHEN** synchronization completes
-- **THEN** each of the three interiors exists once, is reachable from and back to its exterior,
-  and holds one host carrying a dialogue capability
+- **THEN** each of the three interiors exists once, is reachable both ways and contains exactly its declared dialogue-capable staffing
 
 ### Requirement: A hospitality location adds no mechanism it does not have
 None of the three SHALL introduce a command, a cost, a state effect or a persisted field.
@@ -43,11 +40,9 @@ element, and SHALL describe the activity the world offers (resting, sleeping, qu
 conversation, finding a travelling companion) rather than how a player performs it.
 
 #### Scenario: Talking to a hospitality host surfaces its affordances
-- **WHEN** a player talks to each of the three hosts
-- **THEN** the innkeeper's lines speak of resting, sleeping and practising, the tavern keeper's
-  speak of conversation and inviting a travelling companion, and the bathhouse keeper's explain
-  the separated sides
+- **WHEN** a player talks to every declared hospitality host
+- **THEN** dialogue describes the unchanged purpose of its location: inn resting/sleeping/practice, tavern conversation/companions and bathhouse separated sides
 
 #### Scenario: No hospitality line breaks character
-- **WHEN** the three hosts' greetings and keyword responses are inspected
-- **THEN** none contains a backticked command token or a command name
+- **WHEN** every current hospitality greeting and keyword response is inspected
+- **THEN** none names commands, game mechanics or interface elements
