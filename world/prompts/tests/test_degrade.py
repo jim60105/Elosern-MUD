@@ -34,7 +34,6 @@ from world.prompts.tests.fixtures import PromptFixture
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
-    SYNTH_MONSTER_TIERS,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -132,12 +131,14 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
 
     def _break_art(self):
+        # The duplicate art.character_description key alone rejects the file;
+        # every other art.* key is simply absent, so all of them are
+        # unavailable and the art fallback paths are what run.
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
             "  art.character_description: {race}, {age} years old.\n"
-            "  art.character_description: {race}, {age} years old.\n"
-            "  art.monster_description: \"{description} ({display_name}；例如：{examples})\"\n",
+            "  art.character_description: {race}, {age} years old.\n",
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
@@ -222,7 +223,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
         self.assertEqual(LLMNPC._thinking_text(npc), "")
 
-    @synthetic_registries("archetypes", "monster_tiers", "subraces")
+    @synthetic_registries("archetypes", "subraces")
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_broken_art_file_degrades_to_deterministic_fallback_descriptions(self):
         from unittest.mock import Mock
@@ -234,6 +235,7 @@ class BoundedFailureDegradeTests(PromptFixture):
             monster_subject_for,
             scene_subject_for,
         )
+        from world.lore.monster_visuals import get_monster_visual_registry
 
         self._break_art()
         library = self.load()
@@ -241,11 +243,10 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.assertIn("art.negative_prompt", library.errors)
 
         # The fallback producers resolve their subjects against the scene
-        # archetype / monster tier / subrace catalogs, so the kit rows stand
-        # in — the degrade claim is about the registry-driven fallback text,
-        # not the shipped archetype/bestiary/lore prose.
+        # archetype / subrace catalogs, so the kit rows stand in — the degrade
+        # claim is about the registry-driven fallback text, not the shipped
+        # archetype/lore prose.
         synth_scene = sorted(SYNTH_ARCHETYPES)[0]
-        synth_tier = sorted(SYNTH_MONSTER_TIERS)[0]
         synth_subrace = sorted(SYNTH_SUBRACES)[0]
 
         scene = scene_subject_for(synth_scene)
@@ -264,10 +265,13 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.assertIn(SYNTH_SUBRACES[synth_subrace].display_name_zh, text)
         self.assertIn("24", text)
 
-        monster = monster_subject_for(synth_tier)
+        # The monster half rides a registered visual species (a threat-tier key
+        # is not a visual key), and its degraded text IS that row's own
+        # published appearance projection.
+        monster = monster_subject_for("goblin")
         self.assertEqual(
             monster_description(monster),
-            SYNTH_MONSTER_TIERS[synth_tier].description,
+            get_monster_visual_registry()["goblin"].published_appearance_zh,
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
@@ -301,7 +305,9 @@ class BoundedFailureDegradeTests(PromptFixture):
         library = self.load()
         self.assertEqual(library.unavailable, frozenset({"narrator.system"}))
         thinking = render_prompt("npc.thinking", name="甲")
-        self.assertEqual(thinking, "（甲 沉思片刻……）")
+        self.assertIn("甲", thinking)
+        self.assertNotIn("{name}", thinking)
+        self.assertEqual(thinking, render_prompt("npc.thinking", name="甲"))
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_startup_seam_never_aborts_even_if_the_loader_itself_throws(self):

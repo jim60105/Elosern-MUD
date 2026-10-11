@@ -1,17 +1,25 @@
-"""Byte-for-byte shipment pinning for the prompt library (prompt-library).
+"""Program-logic contract for the shipped prompt library (prompt-library).
 
-The initial ``prompts/*.yaml`` files ship the current prompt text verbatim, so
-behavior is byte-identical until an admin edits a file. These tests pin every
-rendered system message and deterministic description against the exact text
-that previously lived as Python constants, and pin the source-of-truth
-scenarios: each generative layer renders its prompt from the library.
+The shipped ``prompts/*.yaml`` wording is deployment-authored and retuned
+freely, so this module asserts no literal shipped sentence: every key must load
+from the shipped root, its template token set must stay inside its declared
+allowlist, each supplied value must substitute exactly as often as the template
+spells its token leaving no ``{token}`` behind, and two identical renders must
+be byte-identical. ``LibrarySourceTests`` keeps the source-of-truth checks —
+each consumer's prompt equals the library render from the same inputs — which
+compare against the seam and never against a literal.
 """
 
 from __future__ import annotations
 
 import unittest
 
-from world.prompts.loader import load_prompt_library, render_prompt, reset_prompt_library
+from world.prompts.loader import (
+    _PLACEHOLDER_RE,
+    load_prompt_library,
+    render_prompt,
+    reset_prompt_library,
+)
 from world.prompts.registry import PROMPT_SPECS
 from world.prompts.tests.fixtures import REPO_PROMPTS
 
@@ -19,268 +27,69 @@ from tools.spec_traceability import covers_requirement
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
-    SYNTH_MONSTER_TIERS,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
 
-
-# The exact text of the removed Python constants (verbatim from git history).
-_NARRATOR_SYSTEM = (
-    "你是《伊洛瑟恩大陸》的旁白敘述者。請以正體中文，將底下的事件紀錄改寫成流暢的散文敘事。"
-    "必須嚴格忠於紀錄：只能描述實際發生的事件，不得虛構任何事件、結果、數字或狀態。"
-    "只輸出敘事散文本身，不要加上任何標題、前言、註解或元資訊。\n"
-    "敗北後的侵犯事件（violation_attempt、violation_resisted、violation_act）請以輕冒險的語調帶過："
-    "著墨於難為情、狼狽與身體的餘韻，避免痛苦、殘虐或壓迫的描寫；"
-    "violation_resisted 代表受害者掙扎成功，該次侵犯沒有得逞，不得寫成得手。"
-    "violation 條目的 target 是該次侵犯實際指向的受害者（可能是同伴）；"
-    "companion_wake 是同伴受害者甦醒時的觀察，同樣以輕冒險的難為情語調帶過。"
-    "digest_outcome 是侵犯結束後身體餘韻沉澱的紀錄，wake_observation 是未被選中的同伴旁觀者的觀察；"
-    "兩者同樣以輕冒險的難為情語調帶過，不得添加任何新的結果或數值。"
-)
-_SCENARIO_DIRECTOR_SYSTEM = (
-    "你是《伊洛瑟恩大陸》的任務企劃（ScenarioDirector）。請以正體中文，"
-    "根據請求設計一個冒險者公會任務的提案。你只能引用世界上真實存在的內容："
-    "不得編造任何公會階級、場景類型、NPC 階級、怪物階級、物品、地點或獎勵。"
-    "只輸出一個 JSON 物件，其結構必須符合 QuestBlueprint："
-    '{"name": "…", "quest_type": "採集/討伐/護衛/探索/緊急", "rank": "F", '
-    '"issuer": "guild_branch_…", "stages": [{"index": 0, "objective": '
-    '{"kind": "defeat/reach_location/escort/acquire", "quantity": 1, '
-    '"monster_tier": null, "item_key": null}, "location_req": {"layer": '
-    '"anchor/grid/instance", "archetype": "…", "anchor_key": null, '
-    '"anchor_near": null, "xyz": null, "scene_sentence": null}, "npc_req": '
-    '[{"role": "…", "tier": "…", "disposition": null, "display_name": "…", '
-    '"title": "…", "persona": {"identity": {"public": "…", "hidden": ""}, '
-    '"appearance": "…", "personality": "…", "speech_style": "…", '
-    '"life_story": "…", "habit": "…", "social_connection": ""}}]}], "reward": '
-    '{"copper": 100, "items": [{"item_key": "healing_potion", "quantity": 1}], '
-    '"merit": 25}, "failure": {"deadline_hours": 72, "conditions": []}}。'
-    "stage 的 index 必須從 0 開始連續遞增。"
-    "每個 npc_req 必須附帶 display_name 與 title；以下名字僅供靈感，"
-    "可直接採用或依角色的性別、背景與語氣改寫："
-    "{name_inspiration}。"
-    "每個 npc_req 也必須附帶 persona 人物卡物件，恰好包含七個欄位："
-    "identity（身分，為物件，含 public 公開身分與 hidden 隱秘身分）、"
-    "appearance（外觀）、personality（性格）、"
-    "speech_style（說話風格，描述此人如何說話，例如語氣、用詞與口頭禪）、"
-    "life_story（人生經歷）、habit（習慣）、social_connection（人脈）；"
-    "不得加入其他欄位。identity.hidden 與 social_connection 可為空字串，"
-    "其餘欄位皆不得為空。每個欄位上限 600 個字元，身分段落上限 600 個字元，"
-    "整張人物卡呈現後上限 2000 個字元；請讓每張人物卡保持精簡，"
-    "約 800 個字元左右。整份提案所有 stage 的 npc_req 合計最多 3 個。"
-)
-_NPC_DIALOGUE_TEMPLATE = (
-    "你只能根據自己確實能觀察到的情況回應；"
-    "玩家在你面前展現出的樣貌，就是你所見到的真實。"
-    "請以正體中文和對方說話，並只輸出一個 JSON 物件："
-    '{"speech": "你要說的話", "intent": {"kind": "..."}}。'
-    "若玩家資料裡提供你對她的好感度，"
-    "你可以依此決定是否送出 intent 為 adjust_relation、"
-    "delta 為 0 到 10 之間整數的好感度調整；"
-    "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
-    "不得虛構任何結果、數字、對話或世界狀態；"
-    "你沒有把握能確實執行的行為，不要寫進 intent。"
-    "\n\n### 人物定錨\n{persona}你是《伊洛瑟恩大陸》中的 {name}。{desc}。{location}"
-)
-_NPC_THINKING = "（{name} 沉思片刻……）"
-# The shipped template after gallery-prompt-composition admitted the
-# {equipment} and {custom} section slots (the pre-composition sentence is
-# byte-identical whenever every section slot is empty).
-_ART_CHARACTER_TEMPLATE = (
-    "{race}, {age} years old."
-    "{appearance}{equipment}{custom}"
-)
-_SCENE_BUILDER_SYSTEM = (
-    "你是《伊洛瑟恩大陸》的場景氛圍描述者。場景句子：{scene_sentence}。"
-    "任務脈絡：{quest_context}。房間名稱：{room_name}。地區：{region}。"
-    "請以正體中文，為這個任務場景寫一段 50 到 200 字的氛圍散文，"
-    "只描寫環境與感官氛圍（光線、聲音、氣味、溫度、空間感）。"
-    "你只能依據上面提供的四項資訊寫作：不得虛構任何人物、怪物、物品、數字或世界狀態，"
-    "不得描述正在發生的事件，也不得預言後續發展。"
-    "只輸出氛圍散文本身，不要加上任何標題、前言、註解或元資訊。"
-)
-_ACTION_OPTIONS_SYSTEM = (
-    "你是《伊洛瑟恩大陸》的遊戲企劃，負責為單人冒險的主角規劃接下來可以採取的行動。"
-    "請以正體中文，從底下提供的行動清單中挑選 3 到 5 個主角現在就能執行的行動，做成建議卡片。"
-    "每張卡片只有兩種形式：known_action 卡片必須採用清單中給定的行動程式碼（action_code），"
-    "不得自創或改寫程式碼與參數；freeform 卡片只能用來表達主角對在場人物說得出口、且合理的台詞。"
-    "鐵律：卡片標籤（label）與說明（hint）中不得出現任何數字，也不得洩漏隱藏數值、真實屬性或好感度；"
-    "不得虛構目標，卡片只能引用現場確實存在的人物、地點與物品；"
-    "結構欄位（如 npc_index、params）不受此限，必須依照指定的 JSON 格式輸出。"
-    "只輸出 JSON 本身，不要加上任何前言、註解或說明。"
-)
-_ACTION_OPTIONS_USER = (
-    "場景名稱：{room_name}\n"
-    "場景描述：{room_summary}\n"
-    "在場 NPC（每個條目附有 npc_index 供 freeform 卡片引用）：{npc_entries}\n"
-    "在場怪物：{monster_entries}\n"
-    "目前目標：{objective}\n"
-    "近期脈絡：{narrative_tail}\n"
-    "可執行行動（每個行動附有 action_code 與參數）：{affordances}\n"
-    "請依照系統提示的規則，以正體中文輸出 JSON 行動建議。"
-    'known_action 卡片格式為 {"action_code": "清單中的程式碼", '
-    '"label": "正體中文標籤", "params": {"參數": 值}, "hint": "正體中文說明"}；'
-    'freeform 卡片格式為 {"npc_index": 0, "label": "對該人物說的話", '
-    '"hint": "正體中文說明"}。重申鐵律：label 與 hint 中不得出現任何數字，'
-    "不得洩漏隱藏數值，不得虛構目標，卡片只能引用現場存在的人事物；"
-    "npc_index、params 等結構欄位不受此限，並嚴格依照上述 JSON 格式輸出。"
-)
+# The one shipped key whose template deliberately selects a subset of its
+# allowlist: ``art.monster_description`` declares both public identity tokens
+# while the shipped text uses only ``{description}``. A key renders with the
+# tokens it declares and an unused declared value is inert (change design D1),
+# so the template side of parity is a subset there and exact everywhere else.
+_SUBSET_PARITY_KEY = "art.monster_description"
 
 
 class VerbatimShipmentTests(unittest.TestCase):
+    """The code-level contract every shipped prompt key must satisfy."""
+
     def setUp(self) -> None:
         load_prompt_library(str(REPO_PROMPTS))
 
     def tearDown(self) -> None:
         reset_prompt_library()
 
-    @covers_requirement("narrator::narrator-prompt-construction-is-deterministic-bounded-and-faithful")
-    def test_narrator_system_message_is_shipped_verbatim(self):
-        system = render_prompt("narrator.system")
-        self.assertEqual(system, _NARRATOR_SYSTEM)
-        self.assertIn("正體中文", system)
-        self.assertIn("不得虛構", system)
+    @covers_requirement(
+        "prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt",
+        "prompt-library::prompt-library-tests-verify-program-logic-not-shipped-wording",
+    )
+    def test_every_shipped_key_loads_with_placeholder_parity(self):
+        library = load_prompt_library(str(REPO_PROMPTS))
+        self.assertEqual(library.unavailable, frozenset())
+        self.assertEqual(set(library.texts), set(PROMPT_SPECS))
+        for key, spec in PROMPT_SPECS.items():
+            with self.subTest(key=key):
+                tokens = set(_PLACEHOLDER_RE.findall(library.text(key)))
+                allowed = set(spec.allowed_placeholders)
+                # A shipped token outside the allowlist is already a load-time
+                # unknown-placeholder error, so the template is always a
+                # subset; the allowlist itself is the declared contract.
+                self.assertLessEqual(tokens, allowed)
+                if key != _SUBSET_PARITY_KEY:
+                    self.assertEqual(tokens, allowed)
 
-    @covers_requirement("scenario-director::scenariodirector-prompt-construction-is-deterministic-bounded-and-faithful")
-    def test_scenario_director_system_message_is_shipped_verbatim(self):
-        bank = "加斯帕‧斯諾、貝莎‧鐵砧"
-        system = render_prompt("scenario_director.system", name_inspiration=bank)
-        self.assertEqual(
-            system, _SCENARIO_DIRECTOR_SYSTEM.replace("{name_inspiration}", bank)
-        )
-        self.assertIn("QuestBlueprint", system)
-        self.assertIn("不得編造", system)
-
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
-    def test_npc_dialogue_system_template_is_shipped_verbatim(self):
-        rendered = render_prompt(
-            "npc_dialogue.system",
-            name="甲",
-            desc="乙",
-            location="丙",
-            persona="",
-        )
-        self.assertEqual(
-            rendered,
-            _NPC_DIALOGUE_TEMPLATE.replace("{persona}", "")
-            .replace("{name}", "甲")
-            .replace("{desc}", "乙")
-            .replace("{location}", "丙"),
-        )
-
-    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
-    def test_npc_thinking_template_is_shipped_verbatim(self):
-        self.assertEqual(
-            render_prompt("npc.thinking", name="甲"),
-            _NPC_THINKING.format(name="甲"),
-        )
-
-    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
-    def test_art_character_description_is_shipped_verbatim(self):
-        self.assertEqual(
-            render_prompt(
-                "art.character_description",
-                race="t_ashfolk",
-                age="24",
-                appearance="",
-                equipment="",
-                custom="",
-            ),
-            _ART_CHARACTER_TEMPLATE.format(
-                race="t_ashfolk",
-                age="24",
-                appearance="",
-                equipment="",
-                custom="",
-            ),
-        )
-        self.assertEqual(
-            render_prompt(
-                "art.character_description",
-                race="t_ashfolk",
-                age="24",
-                appearance="",
-                equipment="",
-                custom="",
-            ),
-            "t_ashfolk, 24 years old.",
-        )
-
-    @covers_requirement("npc-dialogue::npc-dialogue-prompts-are-deterministic-bounded-and-inject-disguised-stats-affinity-context-and-persona")
-    def test_npc_dialogue_render_preserves_contract_before_character_anchor(self):
-        rendered = render_prompt(
-            "npc_dialogue.system",
-            name="甲",
-            desc="乙",
-            location="丙",
-            persona="",
-        )
-        self.assertEqual(
-            rendered,
-            "你只能根據自己確實能觀察到的情況回應；"
-            "玩家在你面前展現出的樣貌，就是你所見到的真實。"
-            "請以正體中文和對方說話，並只輸出一個 JSON 物件："
-            '{"speech": "你要說的話", "intent": {"kind": "..."}}。'
-            "若玩家資料裡提供你對她的好感度，"
-            "你可以依此決定是否送出 intent 為 adjust_relation、"
-            "delta 為 0 到 10 之間整數的好感度調整；"
-            "但好感度的數值與上限是你心中的祕密，絕不可在 speech 中說出。"
-            "不得虛構任何結果、數字、對話或世界狀態；"
-            "你沒有把握能確實執行的行為，不要寫進 intent。"
-            "\n\n### 人物定錨\n你是《伊洛瑟恩大陸》中的 甲。乙。丙",
-        )
-
-    @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
-    def test_scene_builder_system_is_shipped_verbatim(self):
-        rendered = render_prompt(
-            "scene_builder.system",
-            scene_sentence="古老森林深處的祭壇",
-            quest_context="採集任務",
-            room_name="林間祭壇",
-            region="遺忘森林",
-        )
-        self.assertEqual(
-            rendered,
-            _SCENE_BUILDER_SYSTEM.replace("{scene_sentence}", "古老森林深處的祭壇")
-            .replace("{quest_context}", "採集任務")
-            .replace("{room_name}", "林間祭壇")
-            .replace("{region}", "遺忘森林"),
-        )
-        self.assertIn("正體中文", rendered)
-        self.assertIn("不得虛構", rendered)
-
-    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys")
-    def test_action_options_system_prompt_is_shipped_verbatim(self):
-        system = render_prompt("action_options.system")
-        self.assertEqual(system, _ACTION_OPTIONS_SYSTEM)
-        self.assertIn("正體中文", system)
-        self.assertIn("不得洩漏隱藏數值", system)
-        self.assertIn("不得虛構目標", system)
-
-    @covers_requirement("ai-action-options-prompts::prompts-action-options-yaml-ships-the-system-and-user-prompt-keys")
-    def test_action_options_user_template_is_shipped_verbatim(self):
-        rendered = render_prompt(
-            "action_options.user",
-            room_name="林間祭壇",
-            room_summary="古老森林深處的祭壇",
-            npc_entries="1. 艾洛西亞（npc_index=0）",
-            monster_entries="無",
-            objective="採集靈藥草",
-            narrative_tail="你沿著小徑走進森林。",
-            affordances="explore.look",
-        )
-        self.assertEqual(
-            rendered,
-            _ACTION_OPTIONS_USER.replace("{room_name}", "林間祭壇")
-            .replace("{room_summary}", "古老森林深處的祭壇")
-            .replace("{npc_entries}", "1. 艾洛西亞（npc_index=0）")
-            .replace("{monster_entries}", "無")
-            .replace("{objective}", "採集靈藥草")
-            .replace("{narrative_tail}", "你沿著小徑走進森林。")
-            .replace("{affordances}", "explore.look"),
-        )
-        self.assertIn("正體中文", rendered)
-        self.assertIn("npc_index", rendered)
+    @covers_requirement(
+        "prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically",
+        "prompt-library::prompt-library-tests-verify-program-logic-not-shipped-wording",
+    )
+    def test_every_shipped_key_substitutes_its_supplied_values_once(self):
+        library = load_prompt_library(str(REPO_PROMPTS))
+        for key, spec in PROMPT_SPECS.items():
+            with self.subTest(key=key):
+                text = library.text(key)
+                # One distinct, test-owned marker per allowlisted token: every
+                # token the template selects lands exactly as often as the
+                # template spells it and leaves nothing unsubstituted, while an
+                # allowlisted token the template does not select stays inert.
+                values = {token: f"<{token}>" for token in spec.allowed_placeholders}
+                rendered = render_prompt(key, **values)
+                for token in _PLACEHOLDER_RE.findall(text):
+                    self.assertEqual(rendered.count(f"<{token}>"), 1)
+                    self.assertNotIn(f"{{{token}}}", rendered)
+                for token in set(spec.allowed_placeholders) - set(
+                    _PLACEHOLDER_RE.findall(text)
+                ):
+                    self.assertNotIn(f"<{token}>", rendered)
+                self.assertEqual(render_prompt(key, **values), rendered)
 
 
 class LibrarySourceTests(unittest.TestCase):
@@ -384,7 +193,7 @@ class LibrarySourceTests(unittest.TestCase):
             ),
         )
 
-    @synthetic_registries("archetypes", "monster_tiers", "subraces")
+    @synthetic_registries("archetypes", "subraces")
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_descriptions_render_from_the_library_solely(self):
         from unittest.mock import Mock
@@ -396,15 +205,14 @@ class LibrarySourceTests(unittest.TestCase):
             monster_subject_for,
             scene_subject_for,
         )
+        from world.lore.monster_visuals import get_monster_visual_registry
 
         # The description producers resolve their subjects against the scene
-        # archetype / monster tier / subrace catalogs, so the kit rows stand in:
-        # the byte-fidelity claim is about the library render path, not the
-        # shipped archetype/bestiary/lore text.
+        # archetype / subrace catalogs, so the kit rows stand in: the
+        # source-of-truth claim compares each consumer against the library
+        # render from the same inputs, never against literal text.
         synth_scene = sorted(SYNTH_ARCHETYPES)[0]
-        synth_tier = sorted(SYNTH_MONSTER_TIERS)[0]
         synth_subrace = sorted(SYNTH_SUBRACES)[0]
-        tier = SYNTH_MONSTER_TIERS[synth_tier]
 
         scene = scene_subject_for(synth_scene)
         self.assertEqual(
@@ -420,19 +228,29 @@ class LibrarySourceTests(unittest.TestCase):
         label = SYNTH_SUBRACES[synth_subrace].display_name_zh
         self.assertEqual(
             character_description(character, 24, fields=("appearance",)),
-            f"{label}, 24 years old.",
+            render_prompt(
+                "art.character_description",
+                race=label,
+                age="24",
+                appearance="",
+                equipment="",
+                custom="",
+            ),
         )
 
-        monster = monster_subject_for(synth_tier)
+        # A registered visual species: the seam supplies both public identity
+        # values of the selected row, so the description IS the library render.
+        monster = monster_subject_for("goblin")
+        row = get_monster_visual_registry()["goblin"]
         self.assertEqual(
             monster_description(monster),
             render_prompt(
                 "art.monster_description",
-                description=tier.description,
-                display_name=tier.display_name_zh,
-                examples="、".join(tier.example_monsters_zh),
+                description=row.published_appearance_zh,
+                display_name=row.display_label,
             ),
         )
+
 
 if __name__ == "__main__":
     unittest.main()

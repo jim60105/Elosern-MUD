@@ -34,7 +34,7 @@ selection.
 
 #### Scenario: A monster card records an empty provenance
 - **WHEN** a registered visual species monster gallery generation settles successfully
-- **THEN** requested_fields is empty and its description contains only the selected visual species public physical appearance, with no threat-tier rank or mixed-species examples
+- **THEN** requested_fields is empty and its description draws only on the selected visual species' published physical appearance and that species' own public display label, with no threat-tier rank or mixed-species examples
 
 #### Scenario: A write claiming field provenance for a kind without selection is refused
 - **WHEN** a card carrying a non-empty `requested_fields` is appended for a subject whose kind declaration supports no field selection
