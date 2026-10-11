@@ -36,10 +36,10 @@ Every other non-archived `openspec/changes/*` directory is read-only. No checkbo
 
 ## 5. WP5: Authored starter epithet and first-claim surfaces
 
-- [ ] 5.1 Keep the existing frozen starter declaration as sole display/origin authority and preserve regular banking, first-ever arbitrary-definition claim timing, dedupe and empty-slot auto-equip; completion includes a synthetic configured display/origin, occupied slots, later claims and a post-write rollback case with independent state assertions.
-- [ ] 5.2 Migrate CLI, dialogue turn-in and web claim expectations to the same synthetic declaration and prefix-plus-display notification, without changing fixed guild titles; completion shows committed first-claim state and notification echoed on all three actual surfaces.
-- [ ] 5.3 Align title codex/protocol/browser/seed fixtures and freeze reasons as explicitly synthetic, retaining clergy ladder/category-tab contracts and title composition/validation behavior; completion is no behavior expectation pinned to the shipped starter spelling, with source-data integrity still checked.
-- [ ] 5.4 Update title/quest documentation and assertion/metadata mappings with data ownership and no live epithet migration; completion is documentation matching first-claim semantics and complete package traceability.
+- [x] 5.1 Keep the existing frozen starter declaration as sole display/origin authority and preserve regular banking, first-ever arbitrary-definition claim timing, dedupe and empty-slot auto-equip; completion includes a synthetic configured display/origin, occupied slots, later claims and a post-write rollback case with independent state assertions.
+- [x] 5.2 Migrate CLI, dialogue turn-in and web claim expectations to the same synthetic declaration and prefix-plus-display notification, without changing fixed guild titles; completion shows committed first-claim state and notification echoed on all three actual surfaces.
+- [x] 5.3 Align title codex/protocol/browser/seed fixtures and freeze reasons as explicitly synthetic, retaining clergy ladder/category-tab contracts and title composition/validation behavior; completion is no behavior expectation pinned to the shipped starter spelling, with source-data integrity still checked.
+- [x] 5.4 Update title/quest documentation and assertion/metadata mappings with data ownership and no live epithet migration; completion is documentation matching first-claim semantics and complete package traceability.
 
 ## 6. WP6: Equipment and shop membership with military exception
 

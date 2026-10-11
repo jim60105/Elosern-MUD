@@ -42,8 +42,14 @@ Consumers of that one declaration (all patch the same seam):
 
 `world/rules/tests/test_titles/_support.py` and
 `world/rules/tests/test_title_view.py` now alias `T_STARTER` to the same kit
-declaration (previously their own identical literal), so there is exactly one
-synthetic starter value in the Python suites.
+declaration (previously their own identical literal), so every WP5 claim-surface
+suite and both `T_STARTER` aliases share one synthetic starter value. Two
+pre-existing local synthetic declarations are deliberately left as they are —
+they already patched the same seam with invented prose and pin nothing shipped:
+`web/webclient/presentation/tests/test_character_panel/_support.py`
+(`StarterEpithet("苔徑新客", …)`, whose expectations derive from its own
+constant) and the `_EPITHET` fixture entry in
+`world/rules/tests/test_titles/_support.py`.
 
 ## 2. Task 5.1 — frozen declaration authority, banking, timing, dedupe, slots
 
@@ -177,12 +183,15 @@ byte-identical to the handover tip.
 | same, `world.rules.tests.test_titles.test_title_commit_rollback test_title_planner test_title_predicates test_epithet_nomination_rules test_epithet_removal_rules` | `Ran 58 tests ... OK` |
 | `node --test web/static/webclient/js/tests/protocol_title_codex.test.js protocol_character.test.js protocol_core.test.js` | `tests 36 / pass 36 / fail 0` |
 | `npx --no-install vitest run web/webclient-app/tests/overlays/title_codex_panel.test.js web/webclient-app/tests/data/character_status_drawer.test.js` | `Test Files 2 passed (2)`, `Tests 41 passed (41)` |
-| `uv run --locked --env-file=<MUD_TEST_SETTINGS=1> python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_title_codex` | see §10 (the one-class browser budget run) |
+| `uv run --locked --env-file=<MUD_TEST_SETTINGS=1> python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_title_codex` | `Ran 3 tests in 117.244s ... OK` — the one-class browser budget run. Prerequisite observed: the gitignored Vite bundle `web/static/webclient/app/dist/` must exist (`pnpm build`); the first attempt (without it) failed inside `wait_for_shell_active` with `connected: False` before any codex assertion, i.e. a checkout precondition, not a WP5 expectation |
+| `uv run --locked python -m tools.contract_gate` | observability `violations=0`, test-data `violations=0`, manifests OK, contracts `Ran 18 tests ... OK`; the gate fails only on traceability with the unchanged 86 pre-sync errors (the change's own new ids plus the five WP3 bestiary `dynamic-requirement-id` sites WP7 owns); no WP5 file appears among them |
+| `openspec validate generalize-content-identity-contracts --strict` | `Change 'generalize-content-identity-contracts' is valid` |
+| `openspec validate --all --strict` / `--specs --strict` | `315 passed, 3 failed (318 items)` (the three unchanged deferred monster proposals) / `312 passed, 0 failed (312 items)`; WP5 edited no spec file, so neither total moved by this package |
 | `git diff --check` | clean |
 
-456 focused Python tests, 36 Node protocol tests and 41 Vitest tests were
-actually executed; the integrated Python/JS/browser and metadata gates remain
-WP7's.
+456 focused Python tests, 36 Node protocol tests, 41 Vitest tests and the
+3-test browser journey were actually executed; the integrated Python/JS/browser
+and metadata gates remain WP7's.
 
 ## 7. Retained contracts (untouched)
 
@@ -237,3 +246,25 @@ plus the codex window (§4a); replace the paired fixture basis, not only the
 display (§4b); record the prefix-plus-display notification contract (§3); leave
 the clergy/six-tab/dedupe tests untouched (§7); do not prune `seedDebtPaths`
 (§4d). Rejected: none.
+
+**Post-implementation critique (blocking pass, verdict `fix`, no blocking
+findings) — both non-blocking findings dispositioned:**
+
+1. *Overstated unification.* Adopted: §1 now scopes the whole-value unification
+   to the WP5 claim-surface suites and the two `T_STARTER` aliases, and names the
+   two pre-existing local synthetic declarations it does not move. Both files
+   keep patching the correct `world.lore.titles` seam with invented prose, so no
+   behavior expectation pins the shipped spelling and no future authoring edit
+   of `STARTER_EPITHET` breaks them; no code change was needed.
+2. *Alleged residual fixture basis at `test_title_commit_rollback.py:150`.*
+   **Rejected with evidence, not because the fix was hard:** the tree at HEAD
+   contains zero occurrences of the shipped-era basis. A scan of the seven lint
+   corpus roots for `初入南門` returns no hits, and for `南門新客` returns only
+   `world/lore/titles.py:129`; line 150 of that file reads
+   `bank_epithet(self.actor, _starter().display, "初次走入苔徑。", 1)`. The
+   finding described the pre-change revision.
+
+The reviewer independently re-checked §4c's scan result, the lint-universe
+explanation, the touched files' `seedDebtPaths` membership, the registry test's
+constant pair and annotation, and the quest/testing-guide prose, and confirmed
+every one of them, so the §6-recorded claims stand unchanged.
