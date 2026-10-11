@@ -14,6 +14,7 @@ from world.lore.items.vocab import (
     ItemKind,
     ItemIconKey,
     ItemRarity,
+    LiturgicalRole,
 )
 
 from world.skills.equipment import EquipmentSlot
@@ -33,6 +34,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.NYMPH_BUDS_CLAMP,
+            liturgical_role=LiturgicalRole.SANCTUARY_DEVICE,
         ),
         ItemDefinition(
             key="warm_honey_orb",
@@ -47,6 +49,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.WARM_HONEY_ORB,
+            liturgical_role=LiturgicalRole.SANCTUARY_DEVICE,
         ),
         ItemDefinition(
             key="hyperesthesia_charm",
@@ -61,6 +64,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.HYPERESTHESIA_CHARM,
+            liturgical_role=LiturgicalRole.SANCTUARY_DEVICE,
         ),
         ItemDefinition(
             key="warmth_rune_egg",

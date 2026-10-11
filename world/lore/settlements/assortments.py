@@ -5,11 +5,21 @@ Traditional Chinese display name, and an immutable tuple of item keys as
 its identity. Exact integer buy/sell copper, stock and restock quantities
 for each item live in the ``world/rules/rulebook/commerce/`` slices and are joined
 to these identities by the catalog loader in ``world/rules/guild_config.py``.
+
+Each bundle also declares its shelf policy as two immutable, closed-vocabulary
+eligibility sets: ``allowed_item_kinds`` and ``allowed_equipment_slots``. They
+state what the shelf is *for* -- an armory does not sell potions and a
+remedies counter does not equip weapons -- instead of freezing the item keys
+currently on it, so adding a good to a shelf that accepts its kind and slot
+stays a data edit. An empty set means "no restriction on this axis"; a
+non-equipment item has no slot to check.
 """
 
 from dataclasses import dataclass, field
 
+from world.lore.items.vocab import ItemDefinition, ItemKind
 from world.lore.registry_refs import ref_many
+from world.skills.equipment import EquipmentSlot
 
 #: The ``PRICE_TABLE`` band whose rows are one-of-a-kind keepsakes, never
 #: traded (masterwork-gear-price-band states the rule; this package owns the
@@ -24,6 +34,39 @@ class AssortmentDefinition:
     key: str
     display_name_zh: str
     item_keys: tuple[str, ...] = field(metadata=ref_many("items", inverse="assortments"))
+    allowed_item_kinds: frozenset[ItemKind] = frozenset()
+    allowed_equipment_slots: frozenset[EquipmentSlot] = frozenset()
+
+
+def assortment_membership_violation(
+    definition: AssortmentDefinition, item: ItemDefinition
+) -> str | None:
+    """Return why ``item`` cannot sit on ``definition``'s shelf, else ``None``.
+
+    Both axes are pure declarations: an item whose closed ``presentation.kind``
+    is not on the shelf's declared kinds, or whose equipment slot is not among
+    the declared slots, is an authoring mistake with no runtime meaning -- the
+    counter would simply never be able to sell it to anyone who reads the
+    shelf's purpose. An empty set asserts nothing on that axis.
+    """
+    if (
+        definition.allowed_item_kinds
+        and item.presentation.kind not in definition.allowed_item_kinds
+    ):
+        return (
+            f"is a {item.presentation.kind.value!r}, which shelf "
+            f"{definition.key!r} does not stock"
+        )
+    if (
+        item.equipment_slot is not None
+        and definition.allowed_equipment_slots
+        and item.equipment_slot not in definition.allowed_equipment_slots
+    ):
+        return (
+            f"equips to slot {item.equipment_slot.value!r}, which shelf "
+            f"{definition.key!r} does not stock"
+        )
+    return None
 
 
 # The four capital assortments split the former 58-item general-store
@@ -48,6 +91,10 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="common_arms",
             display_name_zh="王都兵器",
+            allowed_item_kinds=frozenset({ItemKind.WEAPON, ItemKind.TOOL}),
+            allowed_equipment_slots=frozenset(
+                {EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF}
+            ),
             item_keys=(
                 "plain_sword", "iron_dagger", "hunting_throwing_axe",
                 "hunters_longbow", "apprentice_focus_staff", "knight_blade",
@@ -59,6 +106,10 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="common_outfits",
             display_name_zh="王都衣甲",
+            allowed_item_kinds=frozenset({ItemKind.ARMOR}),
+            allowed_equipment_slots=frozenset(
+                {EquipmentSlot.ARMOR, EquipmentSlot.WEAPON_OFF}
+            ),
             item_keys=(
                 "leather_armor", "mage_robe", "chainmail", "iron_shield",
                 "knight_platemail", "archmage_mending_robe",
@@ -70,6 +121,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="staple_meals",
             display_name_zh="王都飯食",
+            allowed_item_kinds=frozenset({ItemKind.FOOD}),
             item_keys=(
                 "meal", "kingdom_rye_hardtack", "adventurer_field_ration",
                 "imperial_candied_fruit", "beastfolk_smoked_jerky",
@@ -90,6 +142,9 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="general_sundries",
             display_name_zh="王都雜貨",
+            allowed_item_kinds=frozenset(
+                {ItemKind.MATERIAL, ItemKind.TOOL, ItemKind.POTION}
+            ),
             item_keys=(
                 "magic_lamp", "healing_herb",
                 "rough_iron_ore", "beast_crystal", "evernight_shard",
@@ -102,6 +157,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="capital_adornments",
             display_name_zh="王都飾品",
+            allowed_item_kinds=frozenset({ItemKind.ACCESSORY}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
             item_keys=(
                 "silver_hairpin", "wolf_fang_necklace", "pilgrim_medallion",
                 "protective_ring", "storage_pouch", "gliding_cloak",
@@ -112,6 +169,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="capital_remedies",
             display_name_zh="王都藥劑",
+            allowed_item_kinds=frozenset({ItemKind.POTION}),
             item_keys=(
                 "healing_potion", "greater_healing_potion", "mana_potion",
                 "miners_bracing_broth", "beastfolk_herbal_salve",
@@ -128,6 +186,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="sanctum_wares",
             display_name_zh="聖所用品",
+            allowed_item_kinds=frozenset({ItemKind.TOY, ItemKind.POTION}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
             item_keys=(
                 "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
                 "warmth_rune_egg", "tremor_crystal", "aphrodisiac_bath_salts",
@@ -139,6 +199,10 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_crafted_arms",
             display_name_zh="精靈兵刃",
+            allowed_item_kinds=frozenset({ItemKind.WEAPON}),
+            allowed_equipment_slots=frozenset(
+                {EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF}
+            ),
             item_keys=(
                 "shadow_blade", "shadow_blade_echo",
             ),
@@ -146,6 +210,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_attire",
             display_name_zh="精靈衣飾",
+            allowed_item_kinds=frozenset({ItemKind.ARMOR}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ARMOR}),
             item_keys=(
                 "dark_elf_kimono", "dark_elf_ninja_garb",
                 "elven_traditional_robe", "elven_forest_veil",
@@ -154,6 +220,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_fare",
             display_name_zh="精靈飯食",
+            allowed_item_kinds=frozenset({ItemKind.FOOD}),
             item_keys=(
                 "elven_candied_blossom",
             ),
@@ -161,6 +228,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_sundries",
             display_name_zh="精靈雜貨",
+            allowed_item_kinds=frozenset({ItemKind.MATERIAL}),
             item_keys=(
                 "elven_spider_silk",
             ),
@@ -174,6 +242,8 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_adornments",
             display_name_zh="精靈綴飾",
+            allowed_item_kinds=frozenset({ItemKind.ACCESSORY}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
             item_keys=(
                 "prism_charm", "crescent_earring",
             ),
@@ -181,6 +251,7 @@ ASSORTMENT_REGISTRY: dict[str, AssortmentDefinition] = {
         AssortmentDefinition(
             key="elven_remedies",
             display_name_zh="精靈調藥",
+            allowed_item_kinds=frozenset({ItemKind.POTION}),
             item_keys=(
                 "greater_healing_potion", "mana_potion",
             ),

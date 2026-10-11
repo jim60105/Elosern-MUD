@@ -1,11 +1,11 @@
 """Vocabulary and value types for the item registry.
 
 Holds the ``SUMMARY_MAX`` bound, the closed ``ItemKind``/``ItemIconKey``/
-``ItemRarity``/``EquipmentModifierKey`` vocabularies, and the frozen
-``ItemUseMechanics``/``ItemPresentation``/``ItemDefinition`` dataclasses,
-moved verbatim from the head of the single ``world/lore/items.py`` module.
-``EquipmentSlot`` stays imported here because ``ItemDefinition`` validates
-against it at construction.
+``ItemRarity``/``EquipmentModifierKey``/``LiturgicalRole`` vocabularies, and
+the frozen ``ItemUseMechanics``/``ItemPresentation``/``ItemDefinition``
+dataclasses, moved verbatim from the head of the single ``world/lore/items.py``
+module. ``EquipmentSlot`` stays imported here because ``ItemDefinition``
+validates against it at construction.
 """
 
 from dataclasses import dataclass, field
@@ -66,6 +66,36 @@ class ItemRarity(StrEnum):
     RARE = "rare"
     EPIC = "epic"
     LEGENDARY = "legendary"
+
+
+class LiturgicalRole(StrEnum):
+    """Closed Church-of-Light liturgical-role vocabulary.
+
+    A role is immutable item lore belonging to the equipment record itself,
+    never to its effect entry: a rulebook edit can tune magnitudes but can
+    never move an item between doctrine sub-sets or borrow another role's
+    exemption (``church-of-light-equipment-obeys-its-canon-doctrine``). An
+    item declaring a role must be equipment, so the role always has a worn
+    identity to validate against.
+    """
+
+    VESTMENT_OR_EMBLEM = "vestment_or_emblem"
+    SANCTUARY_DEVICE = "sanctuary_device"
+
+
+class LiturgicalRole(StrEnum):
+    """Closed Church-of-Light liturgical-role vocabulary.
+
+    A role is immutable item lore belonging to the equipment record itself,
+    never to its effect entry: a rulebook edit may tune magnitudes but can
+    never move an item between doctrine sub-sets or borrow another role's
+    exemption (``church-of-light-equipment-obeys-its-canon-doctrine``). An
+    item declaring a role must be equipment, so the role always has a worn
+    identity to validate against.
+    """
+
+    VESTMENT_OR_EMBLEM = "vestment_or_emblem"
+    SANCTUARY_DEVICE = "sanctuary_device"
 
 
 class EquipmentModifierKey(StrEnum):
@@ -245,6 +275,11 @@ class ItemDefinition:
     equipment_slot: EquipmentSlot | None = None
     modifier_key: EquipmentModifierKey | None = None
     guild_property: bool = False
+    # The Church-of-Light liturgical role this equipment plays, if any: the
+    # immutable item-lore classification that owns doctrine coverage, so an
+    # effect-rule edit can never reclassify a vestment into (or out of) a
+    # doctrine sub-set.
+    liturgical_role: LiturgicalRole | None = None
 
     def __post_init__(self) -> None:
         """Require the frozen presentation object and exclusive mechanics."""
@@ -252,6 +287,18 @@ class ItemDefinition:
             raise ValueError("guild_property must be a boolean")
         if self.guild_property and self.sellable:
             raise ValueError("guild property cannot be sellable")
+        if self.liturgical_role is not None:
+            if not isinstance(self.liturgical_role, LiturgicalRole):
+                raise ValueError(
+                    f"item {self.key!r} liturgical_role must be a "
+                    f"LiturgicalRole member, got {self.liturgical_role!r}"
+                )
+            if self.equipment_slot is None:
+                raise ValueError(
+                    f"item {self.key!r} declares liturgical_role "
+                    f"{self.liturgical_role.value!r} without an equipment "
+                    "slot; doctrine roles describe worn equipment only"
+                )
         if not isinstance(self.presentation, ItemPresentation):
             raise ValueError(
                 f"item {self.key!r} presentation must be an ItemPresentation"

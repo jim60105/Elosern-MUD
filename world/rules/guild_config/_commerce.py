@@ -13,6 +13,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.lore.settlements.assortments import (
     ASSORTMENT_REGISTRY,
     KEEPSAKE_BAND_KEY,
+    assortment_membership_violation,
 )
 from world.lore.settlements.settlements import SETTLEMENT_REGISTRY
 
@@ -81,6 +82,14 @@ def validate_assortment_configs(raw: Any) -> dict[str, dict[str, ItemOfferRule]]
                 raise _commerce_error(
                     f"assortments.{assortment_key} contains keepsake-band item "
                     f"{item_key!r}: the {KEEPSAKE_BAND_KEY!r} band is never traded"
+                )
+            violation = assortment_membership_violation(
+                definition, ITEM_REGISTRY[item_key]
+            )
+            if violation is not None:
+                raise _commerce_error(
+                    f"assortments.{assortment_key} contains {item_key!r} which "
+                    f"{violation}; a shelf's declared purpose is authored data"
                 )
         offers_entry = entry.get("offers")
         if not isinstance(offers_entry, list):
@@ -401,6 +410,16 @@ def _resolve_shop_offers(
                 f"{what} adds {item_key!r} without a complete override"
             )
     offered = (assortment_items - excluded) | extras
+    # Every route onto the counter is checked against the keepsake band, not
+    # just assortment membership: a place addition or a complete override is
+    # the same hidden listing the assortment check exists to stop, and
+    # ``offered`` is exactly the resolved key set all three routes produce.
+    for item_key in sorted(offered):
+        if ITEM_REGISTRY[item_key].price_table_key == KEEPSAKE_BAND_KEY:
+            raise _commerce_error(
+                f"{what} resolves keepsake-band item {item_key!r}: the "
+                f"{KEEPSAKE_BAND_KEY!r} band is never traded on any shelf route"
+            )
     for item_key in overrides:
         if item_key not in offered:
             raise _commerce_error(

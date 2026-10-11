@@ -14,6 +14,7 @@ from world.lore.items.vocab import (
     ItemKind,
     ItemIconKey,
     ItemRarity,
+    LiturgicalRole,
 )
 
 from world.skills.equipment import EquipmentSlot
@@ -346,6 +347,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ARMOR,
             modifier_key=EquipmentModifierKey.SISTER_VESTMENTS,
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         ),
         ItemDefinition(
             key="radiant_holy_emblem",
@@ -360,6 +362,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.RADIANT_HOLY_EMBLEM,
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         ),
         ItemDefinition(
             key="saintess_vestments",
@@ -374,6 +377,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ARMOR,
             modifier_key=EquipmentModifierKey.SAINTESS_VESTMENTS,
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         ),
         ItemDefinition(
             key="royal_traveling_robe",
