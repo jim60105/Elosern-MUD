@@ -57,7 +57,10 @@ def _build() -> dict[str, PromptSpec]:
         PromptSpec(
             "art.monster_description",
             "art.yaml",
-            ("description", "display_name", "examples"),
+            # ``examples`` was dropped: the art-subject-model spec forbids
+            # multi-species examples in a monster description, and the visual
+            # registry row carries no examples field to wire to it.
+            ("description", "display_name"),
         ),
         PromptSpec("art.scene_prompt", "art.yaml", ("description",)),
         PromptSpec("art.portrait_prompt", "art.yaml", ("description",)),
