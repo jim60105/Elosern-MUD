@@ -74,7 +74,10 @@ MIN_QUANTITY = 1
 MAX_PRESENTATION_KEY_CODE_POINTS = 32
 MAX_PRESENTATION_SUMMARY_CODE_POINTS = 240
 
-QUEST_STATES = frozenset({"in_progress", "completed", "failed"})
+#: The closed stored quest-state vocabulary the service rows accept. A row in
+#: ``invalidated`` is terminal without payout: it offers no abandon and no
+#: turn-in, exactly like every other terminal state.
+QUEST_STATES = frozenset({"in_progress", "completed", "failed", "invalidated"})
 REGISTER_ACTION = "guild.register"
 ACCEPT_ACTION = "guild.quest_accept"
 ABANDON_ACTION = "guild.quest_abandon"

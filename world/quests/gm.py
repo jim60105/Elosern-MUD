@@ -53,6 +53,14 @@ def _repair(target, quest_id, *, state=None, stage=None):
         stage_progress=definition.stages[index].objective.quantity if desired is runtime.QuestState.COMPLETED else 0,
         stage_room_id=None, objective_target_ids=(), protected_entity_ids=(),
         counted_defeat_ids=(), failure_reason="gm_repair" if desired is runtime.QuestState.FAILED else None,
+        invalidated_reason=(
+            {
+                "code": runtime.INVALIDATED_OBSOLETE_OUTCOME,
+                "message": runtime.OBSOLETE_OUTCOME_MESSAGE,
+            }
+            if desired is runtime.QuestState.INVALIDATED
+            else None
+        ),
     )
     runtime.validate_record_runtime(replacement)
     pins = transitions.release_stage_binding(actor, record)

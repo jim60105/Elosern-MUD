@@ -41,6 +41,9 @@ _STATE_LABELS = {
     "in_progress": "進行中",
     "completed": "已完成",
     "failed": "已失敗",
+    # The terminal invalidation of an accepted alternative whose shared
+    # exclusive outcome was resolved elsewhere: no payout, no penalty.
+    "invalidated": "已作廢",
 }
 
 
@@ -227,6 +230,7 @@ def describe_quest_detail(
     """
     stage = definition.stages[record.stage_index]
     state_value = getattr(record.state, "value", record.state)
+    invalidated_reason = getattr(record, "invalidated_reason", None)
     lines = [
         f"{definition.display_name}",
         f"狀態：{_STATE_LABELS.get(state_value, str(state_value))}",
@@ -235,6 +239,12 @@ def describe_quest_detail(
         f"進度：{record.stage_progress} / {stage.objective.quantity}",
         _grade_line(definition),
     ]
+    if (
+        state_value == "invalidated"
+        and isinstance(invalidated_reason, dict)
+        and invalidated_reason.get("message")
+    ):
+        lines.append(f"作廢原因：{invalidated_reason['message']}")
     if definition.rating_rationale_zh is not None:
         lines.append(f"評價理由：{definition.rating_rationale_zh}")
     if definition.background_flavor_zh is not None:
