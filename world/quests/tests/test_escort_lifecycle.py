@@ -245,3 +245,41 @@ class EscortCasualtyTests(EscortLifecycleTests):
         stored = read_records(self.owner)[0]
         self.assertEqual(stored.quest_id, record.quest_id)
         self.assertEqual(stored.state.value, "in_progress")
+
+
+class EscortEventBoundaryTests(EscortLifecycleTests):
+    """Movement boundaries settle exactly once and attribute real actors."""
+
+    def test_unrelated_general_companion_move_cannot_advance_a_rendezvous(self):
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        unrelated = create_object(NPC, key="unrelated companion", location=self.room1)
+        join_party(unrelated, self.owner)
+        self.assertTrue(unrelated.move_to(self.room2, quiet=True))
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "in_progress")
+
+    def test_restart_replay_does_not_advance_again(self):
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        completed = read_records(self.owner)[0]
+        self.assertEqual(completed.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.assertTrue(self.protected.move_to(self.room1, quiet=True))
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        self.assertEqual(read_records(self.owner)[0], completed)
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+
+    def test_protected_actor_under_possession_completes_for_the_owner(self):
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        self.protected.location = self.room1
+        self.owner.db.possession = {"npc_dbid": int(self.protected.pk), "since_tick": 0}
+        self.protected.db.possessed_by = int(self.owner.pk)
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        completed = read_records(self.owner)[0]
+        self.assertEqual(completed.quest_id, record.quest_id)
+        self.assertEqual(completed.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.assertEqual(self.owner.location, self.room1)
