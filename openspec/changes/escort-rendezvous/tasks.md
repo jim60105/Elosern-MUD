@@ -3,7 +3,7 @@
 ## 1. Deterministic definition and state cutover
 
 - [x] 1.1 After `quest-scene-encounters` implementation/verification, extend immutable objective and package data with exact protected/meeting roles, closed destination/rendezvous fields, typed relations, distinct commission references and explicit final-result groups. Add pure synthetic validation/round-trip tests now; keep every generated-publication guard active.
-- [ ] 1.2 Add JSON-safe `INVALIDATED` state/reason, acceptance sequence, retained protected-role metadata and quest-owned group/source persistence with database uniqueness under existing serialized write discipline. Update strict record parsing, all terminal checks/planners/deadlines/tracking/detail/objective/log readers together. Preserve unrelated retry/default behavior; add reload and terminal-rejection tests without migration or reset execution.
+- [x] 1.2 Add JSON-safe `INVALIDATED` state/reason, acceptance sequence, retained protected-role metadata and quest-owned group/source persistence with database uniqueness under existing serialized write discipline. Update strict record parsing, all terminal checks/planners/deadlines/tracking/detail/objective/log readers together. Preserve unrelated retry/default behavior; add reload and terminal-rejection tests without migration or reset execution.
 
 ## 2. Canonical party and possession owners
 

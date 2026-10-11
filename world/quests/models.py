@@ -220,3 +220,66 @@ class StoryCommissionGrant(models.Model):
                 name="quests_unique_commission_grant",
             )
         ]
+
+
+class ExclusiveOutcomeGroup(models.Model):
+    """One owner/package/group's durable exclusive-result state (escort §7).
+
+    A group is identified by ``(owner_id, package_id, group_id)`` and is
+    database-unique, so one owner can never hold two competing resolution rows
+    for the same declared group and a restart re-reads exactly the committed
+    state instead of inventing a second one. Acceptance sequences are allocated
+    from ``next_sequence`` under the same serialized write discipline, because
+    world tick alone cannot order two acceptances in one tick.
+    """
+
+    owner_id = models.BigIntegerField()
+    package_id = models.CharField(max_length=128)
+    group_id = models.CharField(max_length=128)
+    resolved = models.BooleanField(default=False)
+    resolution_source = models.CharField(max_length=200, blank=True, default="")
+    winner_quest_id = models.CharField(max_length=128, blank=True, default="")
+    no_commission = models.BooleanField(default=False)
+    next_sequence = models.PositiveIntegerField(default=1)
+    updated_tick = models.BigIntegerField(default=0)
+
+    class Meta:
+        app_label = "quests"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_id", "package_id", "group_id"],
+                name="quests_unique_outcome_group",
+            )
+        ]
+
+    @property
+    def unresolved(self) -> bool:
+        """Whether this group still admits acceptances and arbitration."""
+        return not self.resolved
+
+
+class EscortEventTransition(models.Model):
+    """One consumed ``(owner, record, source)`` escort event identity.
+
+    The one-transition-per-event rule (escort design §6.2/§7): the boundary that
+    owns a movement/activation/binding/living-state change builds one stable
+    durable source identity and the evaluator inserts a row for it *only when a
+    stage advanced or a resolution was attributed*. ``(owner_id, record_id,
+    source_key)`` is database-unique, so a pre-follow receive and a post-follow
+    recheck cannot advance two stages, and replaying the same settled movement
+    after a committed reload advances nothing.
+    """
+
+    owner_id = models.BigIntegerField()
+    record_id = models.CharField(max_length=128)
+    source_key = models.CharField(max_length=200)
+    consumed_tick = models.BigIntegerField(default=0)
+
+    class Meta:
+        app_label = "quests"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner_id", "record_id", "source_key"],
+                name="quests_unique_escort_transition",
+            )
+        ]
