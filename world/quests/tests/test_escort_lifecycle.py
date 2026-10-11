@@ -350,6 +350,19 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         # invalidated by a resolution that never named it.
         self.assertEqual(records[singleton.quest_id].state.value, "in_progress")
 
+    def test_a_closed_unaccepted_offer_cannot_be_accepted(self):
+        from world.quests.escort_lifecycle import EscortOperationError
+
+        accept_quest(self.owner, self.definition.key, self.issuer_key)
+        # The meeting role comes to the still-co-located protected actor, so the
+        # group resolves while the issuer offer preflight still passes.
+        self.assertTrue(self.meeting.move_to(self.room1, quiet=True))
+        with self.assertRaises(EscortOperationError) as failure:
+            accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        self.assertEqual(failure.exception.reason, "outcome_resolved")
+        records = {record.quest_id: record for record in read_records(self.owner)}
+        self.assertEqual(list(records), ["synthetic_bound_escort:1"])
+
 
 class EscortEntitlementTests(EscortLifecycleTests):
     """Only the group winner, or a group-less record, is ever entitled."""
