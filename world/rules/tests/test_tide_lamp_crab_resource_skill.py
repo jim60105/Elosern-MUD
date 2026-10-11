@@ -33,7 +33,7 @@ from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
 
 # The representative the composition-coverage check derives for this group.
-REPRESENTATIVE_VARIANT = "reef_warden"
+REPRESENTATIVE_VARIANT = "burrow_maker"
 REPRESENTATIVE_ROW = MONSTER_VARIANT_REGISTRY[REPRESENTATIVE_VARIANT]
 SKILL_KEY = REPRESENTATIVE_ROW.active_skill_keys[0]
 BEHAVIOUR_KEY = REPRESENTATIVE_ROW.behaviour_profile_key
