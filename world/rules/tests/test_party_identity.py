@@ -5,7 +5,7 @@ from dataclasses import replace
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
-from evennia.utils.test_resources import EvenniaTestCase
+from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
@@ -21,7 +21,7 @@ from world.rules.party import (
 )
 
 
-class PartyIdentityTests(QuestRegistryIsolation, EvenniaTestCase):
+class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         self.room = create_object(Room, key="identity room")
@@ -196,3 +196,88 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTestCase):
         release_record_reasons(self.player, source.quest_id)
         self.assertFalse(schedule_silenced(npc))
         self.assertIs(npc.location, self.room)
+
+    def test_last_source_hands_back_but_surviving_sources_preserve_control(self):
+        from world.rules.possession import current_possession, enter_possession
+
+        npc = self._npc()
+        first = self._source(npc)
+        second = self._source(npc, 2)
+        enter_possession(self.player, npc)
+        release_record_reasons(self.player, first.quest_id)
+        self.assertEqual(current_possession(self.player)["npc_dbid"], npc.pk)
+        join_party(npc, self.player)
+        release_record_reasons(self.player, second.quest_id)
+        self.assertEqual(current_possession(self.player)["npc_dbid"], npc.pk)
+        # General-only dismissal retains the established handback-first gate.
+        with self.assertRaises(PartyJoinError):
+            leave_party(npc, self.player, "dismissed")
+
+    def test_temporary_last_source_release_clears_control_after_reload(self):
+        from world.rules.possession import current_possession, enter_possession
+
+        npc = self._npc()
+        source = self._source(npc)
+        enter_possession(self.player, npc)
+        release_record_reasons(self.player, source.quest_id)
+        for reload in (False, True):
+            if reload:
+                self.player.attributes.reset_cache()
+                npc.attributes.reset_cache()
+            self.assertIsNone(current_possession(self.player))
+            self.assertIsNone(npc.db.possessed_by)
+            self.assertFalse(is_companion(npc, self.player))
+
+    def test_write_after_successful_handback_restores_control_and_membership(self):
+        from world.rules.possession import current_possession, enter_possession
+
+        npc = self._npc()
+        source = self._source(npc)
+        enter_possession(self.player, npc)
+        before = party_meta(self.player)
+        with patch("world.rules.party._write_binding", side_effect=RuntimeError("after handback")):
+            with self.assertRaisesRegex(RuntimeError, "after handback"):
+                release_record_reasons(self.player, source.quest_id)
+        for reload in (False, True):
+            if reload:
+                self.player.attributes.reset_cache()
+                npc.attributes.reset_cache()
+            self.assertEqual(current_possession(self.player)["npc_dbid"], npc.pk)
+            self.assertEqual(npc.db.possessed_by, self.player.pk)
+            self.assertEqual(party_meta(self.player), before)
+            self.assertTrue(is_companion(npc, self.player))
+
+    def test_technical_handback_refusal_keeps_last_source(self):
+        from world.rules.possession import enter_possession
+
+        npc = self._npc()
+        source = self._source(npc)
+        enter_possession(self.player, npc)
+        with patch("world.rules.possession.release_for_party_change", side_effect=RuntimeError("refused")):
+            with self.assertRaisesRegex(RuntimeError, "refused"):
+                release_record_reasons(self.player, source.quest_id)
+        self.assertEqual(reasons_for(npc, self.player), ((source.quest_id, "escortee"),))
+        self.assertEqual(npc.db.possessed_by, self.player.pk)
+
+    def test_real_session_last_source_rollback_uses_fresh_sequence(self):
+        from commands.default_cmdsets import PossessedCharacterCmdSet
+        from world.rules.possession import enter_possession
+
+        self.player = self.char1
+        self.player.location = self.room
+        npc = self._npc()
+        source = self._source(npc)
+        enter_possession(self.player, npc)
+        self.assertIs(self.session.puppet, npc)
+        before_lock = npc.locks.get("puppet")
+        with patch("world.rules.party._write_binding", side_effect=RuntimeError("after handback")):
+            with self.assertRaisesRegex(RuntimeError, "after handback"):
+                release_record_reasons(self.player, source.quest_id)
+        self.assertIs(self.account.get_puppet(self.session), npc)
+        self.assertEqual(npc.locks.get("puppet"), before_lock)
+        self.assertTrue(npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertEqual(npc.db.possessed_by, self.player.pk)
+        self.assertTrue(is_companion(npc, self.player))
+        release_record_reasons(self.player, source.quest_id)
+        self.assertIs(self.account.get_puppet(self.session), self.player)
+        self.assertFalse(npc.cmdset.has(PossessedCharacterCmdSet))

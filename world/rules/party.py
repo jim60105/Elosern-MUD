@@ -470,7 +470,8 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
     both surfaces are restored and ``PartyWriteError`` is raised.
     """
     del reason
-    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+    remaining = reasons_for(npc, player)
+    if not remaining and getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
         if int(npc.db.possessed_by) == int(player.pk):
             raise PartyJoinError(REASON_HANDBACK_FIRST)
     party = party_ids(player)
@@ -480,7 +481,6 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
     if not bound:
         return
     metadata = party_meta(player)
-    remaining = reasons_for(npc, player)
     if remaining and member_is_ours:
         metadata[str(npc.pk)] = {"general": False, "reasons": [list(pair) for pair in remaining]}
         _write_binding(npc, player, party, member, metadata)
@@ -621,7 +621,7 @@ def add_temporary_source(npc: Any, player: Any, record_id: str, role_id: str) ->
 
 
 def remove_reason(npc: Any, player: Any, record_id: str, role_id: str) -> None:
-    """Remove exactly one source; the terminal owner handles control handback."""
+    """Remove exactly one source, handing back control only on actual release."""
     metadata = party_meta(player)
     identity = member_meta(player, npc.pk)
     pair = [record_id, role_id]
@@ -638,11 +638,26 @@ def remove_reason(npc: Any, player: Any, record_id: str, role_id: str) -> None:
     else:
         metadata.pop(str(npc.pk), None)
     member = npc.db.party_member
-    _write_binding(
-        npc, player,
-        party_ids(player) if retained else [dbid for dbid in party_ids(player) if dbid != npc.pk],
-        member if retained or member != player.pk else None, metadata,
+    from world.rules.possession import (
+        release_for_party_change, restore_party_control, snapshot_party_control,
     )
+
+    party_before = party_ids(player)
+    meta_before = deepcopy(player.db.party_meta)
+    control = snapshot_party_control(player, npc)
+    try:
+        with transaction.atomic():
+            if not retained and member == player.pk:
+                release_for_party_change(npc, player)
+            _write_binding(
+                npc, player,
+                party_before if retained else [dbid for dbid in party_before if dbid != npc.pk],
+                member if retained or member != player.pk else None, metadata,
+            )
+    except Exception:
+        restore_membership_surfaces(player, party_before, {npc.pk: member}, meta_before)
+        restore_party_control(player, npc, control)
+        raise
 
 
 def release_record_reasons(player: Any, record_id: str) -> None:
