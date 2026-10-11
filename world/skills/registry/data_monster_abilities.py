@@ -170,4 +170,39 @@ ROWS: tuple[SkillDef, ...] = (
             ),
         ),
     ),
+    _skill(
+        "rock_echo_ram",
+        "岩響角撞",
+        "以土屬性力量結合角撞衝擊單一敵方目標，造成物理傷害；命中後使對手短暫步伐不穩，降低其敏捷。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 5},
+        # True for every monster ability: the one written
+        # ``usable_out_of_combat`` policy makes every damage-carrying ability
+        # selectable outside combat, and "combat-only" names the action shape
+        # and targeting, never this flag (settled 2026-10-10; same value the
+        # delivered crocodile, sparrow, crab and hare declare).
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "buff_apply:rock_echo_stagger"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("rock_echo_goat",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            EffectPolicy(
+                coefficient=1.2,
+                audience=EffectAudience.ENEMIES,
+            ),
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.ENEMIES,
+                requires_hit_from=0,
+            ),
+        ),
+    ),
 )

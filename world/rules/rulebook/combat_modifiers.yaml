@@ -233,3 +233,8 @@
 - id: ridge_brace_defense
   when: {buff_active: ridge_brace}
   then: {defense: 3}
+# 魔物資源技能（remaining-monster-resource-skills §7）：岩響角撞的步伐干擾，
+# buff 列為 mount，−3 資料在此（martial_hamstring 的 agility_flat 先例）。
+- id: rock_echo_stagger_agility_flat
+  when: {buff_active: rock_echo_stagger}
+  then: {agility_flat: -3}

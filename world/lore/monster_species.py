@@ -604,10 +604,11 @@ _SPECIES_DECLARATIONS: tuple[MonsterSpecies, ...] = (
         "採石工人會留意牠們的敲岩聲，因為族群常出現在不穩定岩坡附近；"
         "牠們占據狹窄運料路線時，便形成難以繞過的威脅。"
         "脈動無法粉碎完整岩盤，不會造成大範圍地震。"
-        "地形與既有鬆石是能力成立的重要條件，不能將牠們描述為隨處都能引發同等規模的崩塌。",
+        "落石脈動需要接觸岩面及既有鬆石；近身角撞則能在沒有鬆石時使用，"
+        "命中後使對手短暫步伐不穩，不附帶落石傷害或崩塌。",
         ("western_hills_valleys",),
         "（作者私有：隱秘真相）本物種沒有已定的起源真相；敲岩與脈動的來源不在設定中交代。",
-        "（作者私有：作者解釋）中階物種示範地形依賴型能力：威力取決於既有鬆石，"
+        "（作者私有：作者解釋）中階物種示範地形依賴型能力：落石生態取決於既有鬆石，戰鬥角撞與短暫步伐干擾無環境條件，"
         "作為配置與評級理由的素材。",
         "（作者私有：尚未證實的猜想）採石業者謠傳牠們的敲擊聲能預言崩塌，因果未經證實。",
         "cliff_stepper",
@@ -752,10 +753,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         True,
         MonsterCombatProfile(
-            hp=130, mp=0, sp=0, atk_phys=20, agility=16, defense=12, magic_power=0
+            hp=130, mp=30, sp=20, atk_phys=20, agility=16, defense=12, magic_power=0
         ),
         "D",
         True,
+        active_skill_keys=("rock_echo_ram",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "pass_warden",
@@ -765,10 +769,13 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
         "mid",
         False,
         MonsterCombatProfile(
-            hp=170, mp=0, sp=0, atk_phys=26, agility=14, defense=14, magic_power=0
+            hp=170, mp=50, sp=30, atk_phys=26, agility=14, defense=14, magic_power=0
         ),
         "C",
         True,
+        active_skill_keys=("rock_echo_ram",),
+        passive_skill_keys=(),
+        behaviour_profile_key="ambush_predator",
     ),
     MonsterVariant(
         "wood_stalker",

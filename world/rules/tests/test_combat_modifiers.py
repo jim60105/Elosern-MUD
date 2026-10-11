@@ -1043,6 +1043,12 @@ class CombatModifierTests(EvenniaTestCase):
         apply_buff(entity, rule.when["buff_active"])
         self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
 
+    def test_rule_rock_echo_stagger_agility_flat(self):
+        entity = self._entity()
+        rule = RULES["rock_echo_stagger_agility_flat"]
+        apply_buff(entity, rule.when["buff_active"])
+        self.assertEqual(evaluate_combat_modifiers(entity), rule.then)
+
     @covers_requirement("combat-modifier-table::combat-modifiers-yaml-is-one-table-evaluated-by-one-condition-engine-with-no")
     def test_fear_locks_actions_and_stays_key_independent_of_physical_stillness(self):
         feared = self._entity()
