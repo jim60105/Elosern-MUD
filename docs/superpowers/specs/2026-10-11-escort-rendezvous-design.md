@@ -2,7 +2,7 @@
 
 Date: 2026-10-11
 
-Status: Conversation design approved; written review pending.
+Status: Conversation design and written review approved.
 
 ## 1. Purpose and approved decisions
 
@@ -56,6 +56,11 @@ and settlement requirements affected by dual membership, role completion,
 rejection only after valid protected-role binding, actual movement, and settlement
 are implemented and proved. Do not bypass the guard with a special mother/girl
 payload or relabel the commission as another quest type.
+
+Cover every current rejection boundary, including `server/ai_director_service.py`,
+ScenarioDirector semantic validation, the compiler, and generated registration.
+Enable only payloads/templates with the complete new protected-role and
+completion contract; unsupported templates do not gain invented nearby actors.
 
 ## 3. Ownership and interfaces
 
@@ -282,6 +287,8 @@ added. Apply the current knocked-out-member engagement behavior.
 The party view identifies general and temporary status and associated commissions;
 a member carrying both is still one row. Surface quota information separately
 from total roster size so a full ordinary party plus escorts is not mislabeled.
+Render the complete effective roster rather than truncating it to the ordinary
+quota; temporary members must remain reachable through existing party controls.
 Preserve existing layout/input behavior; do not add a new escort-control UI.
 Refresh versioned capabilities on membership/phase/offer changes and reject stale
 choices. The text client must retain equivalent interaction and explicit reasons.
@@ -342,11 +349,13 @@ validated issuer scope, retention, and phase-aware dialogue. Amend its package
 contract to permit multiple distinct issuances and exclusive-group references;
 do not replace issuer authority with prose or one shared quest record.
 
-Design 3 must preserve both possible encounter orders, consume the extended
-blueprint contract, activate relevant roles before final movement-result
-observation, and publish these commissions without autoaccepting them. Its request
-lifecycle must not treat a textual quest proposal as successful execution.
+[Design 3](2026-10-11-dream-story-dispatch-design.md) must preserve both possible
+encounter orders, consume the extended blueprint contract, activate relevant roles
+before final movement-result observation, and publish these commissions without
+autoaccepting them. Its request lifecycle must not treat a textual quest proposal
+as successful execution.
 
-No migration or backward-compatibility layer is added. Preserve the existing
-party ID roster and normal defaults, extend the live metadata contract, and
-update every affected reader/writer in one cutover.
+No data migration or backward-compatibility layer is added. Deployment uses the
+fresh database approved in design 3, with current schema initialization. Preserve
+the existing party ID roster shape and normal defaults, extend its metadata
+contract, and update every affected reader/writer in one cutover.

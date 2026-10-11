@@ -325,10 +325,12 @@ It supplies authoritative acceptance, escort, reunion, closure, failure, and
 release observations. Packages may declare distinct role-issued commissions with
 an explicit shared exclusive outcome; they do not collapse into one quest record.
 
-Design 3 supplies validated packages from confirmed requests, durable source
-identity, encounter eligibility, and production activation on actual exploration
-boundaries. It cannot autoaccept a commission or mark reunion from generated
-prose. This first design does not claim that the current dream path is wired.
+[Design 3](2026-10-11-dream-story-dispatch-design.md) supplies validated packages
+from confirmed requests, durable source identity, encounter eligibility, and
+production activation on actual exploration boundaries. It cannot autoaccept a
+commission or mark reunion from generated prose. This first design does not claim
+that the current dream path is wired.
 
 No autonomous NPC agent framework, arbitrary action scripting, unrelated registry
-refactor, or compatibility migration is introduced.
+refactor, or compatibility migration is introduced. Deployment uses the fresh
+database boundary approved in design 3.
