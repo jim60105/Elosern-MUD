@@ -51,7 +51,7 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
                 "dialogue": [{"role_id": "issuer", "phases": [{
                     "phase_id": "offer", "topics": [{"keyword": "escort",
                         "effect_verb": "offer_commission", "effect_reference": self.definition.key}],
-                }]}], "outcome_groups": [],
+                }]}], "outcome_groups": self.outcome_groups(),
             },
         )
         for role, actor in (("issuer", self.issuer), ("protected", self.protected), ("meeting", self.meeting)):
@@ -62,6 +62,9 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         scene_store.assign_grant_actor(self.package, "issuer", self.definition.key, self.issuer.pk)
         scene_store.set_grant_registered(self.package, "issuer", self.definition.key, True)
         scene_store.set_dialogue_phase(self.package, "issuer", "offer")
+
+    def outcome_groups(self):
+        return []
 
     def test_acceptance_returns_exact_persisted_binding_beyond_general_quota(self):
         for _ in range(4):
@@ -114,3 +117,52 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(failed.failure_reason, "abandoned")
         self.assertEqual(reasons_for(self.protected, self.owner), ())
         self.assertTrue(is_companion(self.protected, self.owner))
+
+    def test_real_direct_protected_move_completes_pays_and_reloads(self):
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        completed = read_records(self.owner)[0]
+        self.assertEqual(completed.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+        self.assertFalse(is_companion(self.protected, self.owner))
+        self.owner.attributes.reset_cache()
+        self.protected.attributes.reset_cache()
+        self.assertEqual(read_records(self.owner)[0], completed)
+        self.assertTrue(self.protected.move_to(self.room1, quiet=True))
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+
+    def test_forged_source_is_rejected_without_writes(self):
+        from world.quests.escort_events import EscortSource, evaluate_escort_event
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        with self.assertRaises(EscortOperationError) as failure:
+            evaluate_escort_event(self.owner, self.package.package_id, source=EscortSource())
+        self.assertEqual(failure.exception.reason, "invalid_source")
+        self.assertEqual(read_records(self.owner)[0], record)
+
+
+class EscortExclusiveOutcomeTests(EscortLifecycleTests):
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion", "alternatives": [self.definition.key],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
+
+    def test_real_meeting_move_selects_winner_before_payment(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        before = self.owner.db.wallet or 0
+        self.assertTrue(self.meeting.move_to(self.room1, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, record.quest_id)
+        self.assertFalse(group.no_commission)
+        self.assertEqual(read_records(self.owner)[0].state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, before + 1)
+        self.owner.attributes.reset_cache()
+        self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
