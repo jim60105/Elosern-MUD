@@ -668,7 +668,7 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 
 #### Scenario: Engage transitions to the combat dock
 - **WHEN** an actor submits `explore.engage` for a present living hostile monster
-- **THEN** `engage` returns its record, the update carries mode `combat` and a `context_actions` combat payload, the exploration dock unloads, and no exploration mutation is admitted in combat mode
+- **THEN** `engage` returns its record, the update carries mode `combat`, a `context_actions` combat payload and a freshly rendered `art` catalog for those participants, the exploration dock unloads, and no exploration mutation is admitted in combat mode
 
 #### Scenario: Engage rejects a remote or non-hostile target
 - **WHEN** an actor submits `explore.engage` for a target that is absent, dead, or not a hostile `Monster`
@@ -688,7 +688,7 @@ The production action registry SHALL register `explore.engage`. Its payload SHAL
 
 #### Scenario: A successful engage switches mode and refreshes both panels
 - **WHEN** an engage succeeds
-- **THEN** the completion publishes `status` and `context_actions` at one newer revision with the mode change to `combat` so the browser tears down the exploration dock and mounts the ordinary combat menu, and `services` and `exploration` are unavailable in combat mode
+- **THEN** completion publishes status, context_actions, dialogue and art at one newer revision with mode combat; every non-null participant portrait_ref resolves in that same catalog before the correlated result releases the action gate, and services/exploration remain unavailable in combat
 
 #### Scenario: An engage rejection creates nothing
 - **WHEN** an engage is rejected

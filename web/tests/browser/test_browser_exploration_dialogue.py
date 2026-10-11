@@ -1003,6 +1003,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-exploration-menu::explore-engage-delegates-to-the-existing-engage-contract")
     @covers_requirement("webclient-frame-resolution::teardown-resets-the-stack-to-the-mode-root-from-one-decision-point")
+    @covers_requirement(
+        "webclient-art-panel::combat-portrait-references-and-catalog-are-committed-coherently"
+    )
     def test_engage_transitions_to_combat(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

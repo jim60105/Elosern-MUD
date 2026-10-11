@@ -1046,6 +1046,9 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
     @covers_requirement(
         "webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes"
     )
+    @covers_requirement(
+        "webclient-art-panel::combat-portrait-references-and-catalog-are-committed-coherently"
+    )
     def test_initial_engage_publishes_combat_art_catalog_in_same_revision(self):
         from web.webclient.actions.registry import build_production_action_registry
         from web.webclient.actions.dispatcher import handle_ui_action

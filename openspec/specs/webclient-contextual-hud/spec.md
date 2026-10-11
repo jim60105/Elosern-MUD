@@ -2968,7 +2968,11 @@ Standing portraits SHALL retain their supplied image contours and align their fe
 
 #### Scenario: Actors without a fallback identity keep the old treatment
 - **WHEN** no fallback media identity is carried (e.g. a scene-kind actor)
-- **THEN** the existing grounded standing-silhouette treatment applies unchanged
+- **THEN** only truthful identity and availability text remains, without the retired standing humanoid SVG or any invented figure
+
+#### Scenario: Dialogue hosts without catalog artwork show text only
+- **WHEN** a dialogue host has a null or unresolved portrait reference and no carried fallback identity
+- **THEN** its initial, name and truthful availability remain, without a stock figure, standing SVG or guessed source
 
 #### Scenario: Unavailable portrait is not generating
 - **WHEN** an actor has missing or failed art
