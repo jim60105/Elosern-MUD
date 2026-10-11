@@ -436,6 +436,37 @@ class EscortCasualtyTests(EscortLifecycleTests):
         self.assertEqual(stored.quest_id, record.quest_id)
         self.assertEqual(stored.state.value, "in_progress")
 
+    def test_surviving_unattributed_tick_does_not_fail_the_escort(self):
+        from world.rules.buffs import apply_buff
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        monster = create_object(Monster, key="mild source", location=self.room1)
+        self.protected.traits.hp.base = 100
+        self.protected.traits.hp.current = 100
+        apply_buff(self.protected, "poisoned")
+        field = self._field(self.owner, monster)
+        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        self.assertGreater(self.protected.traits.hp.current, 0)
+        settle_upkeep(field, records)
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "in_progress")
+
+    def test_simulated_unattributed_lethal_tick_does_not_fail_the_escort(self):
+        from world.rules.buffs import apply_buff
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        monster = create_object(Monster, key="exam source", location=self.room1)
+        self.protected.traits.hp.base = 3
+        self.protected.traits.hp.current = 3
+        apply_buff(self.protected, "poisoned")
+        field = self._field(self.owner, monster)
+        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        settle_upkeep(field, records, simulated=True)
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "in_progress")
+
 
 class EscortEventBoundaryTests(EscortLifecycleTests):
     """Movement boundaries settle exactly once and attribute real actors."""

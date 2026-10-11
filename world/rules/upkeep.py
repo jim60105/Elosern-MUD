@@ -63,6 +63,8 @@ def _stage_casualties(
     battlefield: Any,
     losses: dict[int, tuple[Any, float, float]],
     defeated_ids: set[int],
+    *,
+    simulated: bool = False,
 ) -> list[PendingEffect]:
     """Stage the quest effects of unattributed lethal crossings (escort §8).
 
@@ -81,6 +83,11 @@ def _stage_casualties(
         dbref = getattr(entity, "pk", None)
         if dbref is None or dbref in defeated_ids:
             continue
+        # Only a positive-to-non-positive crossing is a death, exactly as the
+        # attributed ``_defeated_entry`` requires. A surviving unattributed
+        # tick emits nothing and fails no escort.
+        if not (before > 0 and before - applied <= 0):
+            continue
         defeated_ids.add(dbref)
         data: dict[str, Any] = {"target_id": int(dbref)}
         data["monster_tier"] = getattr(entity, "threat_tier", None)
@@ -88,6 +95,8 @@ def _stage_casualties(
         if species_key is not None:
             data["species_key"] = species_key
             data["variant_key"] = getattr(entity, "variant_key", None)
+        if simulated:
+            data["simulated"] = True
         entries.append(
             EventEntry(
                 kind="target_defeated",
@@ -161,7 +170,9 @@ def settle_upkeep(
             source = _resolve_source(battlefield, record.source_pk)
             if source is None:
                 applied = min(-record.delta, record.hp_before)
-                if applied > 0 and record.hp_before > 0 and key not in nonlethal_keys:
+                if (applied > 0 and record.hp_before > 0
+                        and record.hp_before - applied <= 0
+                        and key not in nonlethal_keys):
                     unattributed_losses[id(entity)] = (entity, record.hp_before, applied)
                 continue
             # Group by the validated source dbref, never the display key:
@@ -245,7 +256,11 @@ def settle_upkeep(
                         "event-effect planner returned a non-PendingEffect value"
                     )
                 pending.append(effect)
-    pending.extend(_stage_casualties(battlefield, unattributed_losses, defeated_ids))
+    pending.extend(
+        _stage_casualties(
+            battlefield, unattributed_losses, defeated_ids, simulated=simulated,
+        )
+    )
     if pending:
         _commit(
             # System-attributed commit: no character performed these effects.

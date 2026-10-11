@@ -62,6 +62,19 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(read_records(self.player), [])
         self.assertEqual(self.room.db.desc, None)
 
+    def test_activation_runs_the_settled_escort_pass_with_the_exact_actors(self):
+        with patch("world.quests.escort_events.evaluate_escort_event") as evaluate:
+            result = self._activate()
+        self.assertTrue(result.activated)
+        evaluate.assert_called()
+        args, kwargs = evaluate.call_args
+        self.assertEqual(args[0].pk, self.player.pk)
+        self.assertEqual(args[1], self.published.package_id)
+        # The materialized role is attributable, not merely present.
+        self.assertIn(
+            result.role_bindings["daughter"], kwargs["source"].actor_ids,
+        )
+
     @covers_requirement(
         "quest-scene-encounters::encounter-activation-is-independent-of-quest-acceptance",
         "persistent-story-roles::reusable-roles-bind-exact-actor-identities",
