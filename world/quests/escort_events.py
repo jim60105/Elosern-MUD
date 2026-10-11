@@ -242,6 +242,19 @@ def resolve_exclusive_outcome(owner: Any, package_id: str, group_id: str, *, sou
             fulfill_record_for(owner, record, definition_for(record))
             if winner is not None and record.quest_id == winner.quest_id else invalidate_record(record)
         )
+        if record.quest_id != winner.quest_id:
+            transaction.on_commit(
+                lambda record=record: log_info(
+                    "escort_quest_invalidated",
+                    context={
+                        "char": owner.pk,
+                        "quest": record.quest_id,
+                        "package": package_id,
+                        "group": group_id,
+                        "source": source.key,
+                    },
+                )
+            )
         pins.extend(release_stage_binding(owner, record))
     if replacements:
         apply_quest_log_replacement(owner, [replacements.get(record.quest_id, record)
