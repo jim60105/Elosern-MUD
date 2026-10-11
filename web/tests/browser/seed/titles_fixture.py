@@ -11,6 +11,11 @@ def _titles_fixture(character) -> None:
     newer one is removable — and persists one nomination ballot, so the codex
     window renders locked/unlocked rows, the ★ mark, the server-computed
     ``can_remove`` flags, and the 提名中 tab without any LLM call.
+
+    The two epithets are explicitly synthetic authored fixture data, never the
+    shipped starter declaration (``world/lore/titles.py``'s ``STARTER_EPITHET``
+    owns that spelling); this seed helper is a fixture, not a data-contract
+    test, and stays unregistered in the test-data ledger.
     """
     import os
 
@@ -33,7 +38,7 @@ def _titles_fixture(character) -> None:
     synth = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
     for banked in (SYNTH_TITLE_BANKED_KEYS if synth else (SHIPPED_TITLE_RANK_F_KEY, SHIPPED_TITLE_RANK_E_KEY)):
         bank_fixed(character, banked, tick)
-    bank_epithet(character, "南門新客", "初入南門。", tick)
+    bank_epithet(character, "苔徑新客", "初次走入苔徑。", tick)
     bank_epithet(character, "破城先鋒", "率先破門。", tick + 1)
     persist_nomination_ballot(
         character,

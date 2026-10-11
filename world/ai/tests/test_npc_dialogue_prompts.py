@@ -240,6 +240,12 @@ class PersonaPromptTests(unittest.TestCase):
         )
 
 
+# The synthetic title inputs these prompt tests feed in; the shipped starter
+# declaration's own display/basis spelling is never mirrored here.
+_T_EPITHET = "苔徑新客"
+_T_FULL_TITLE = f"F級冒險者　{_T_EPITHET}"
+
+
 class TitleContextPromptTests(unittest.TestCase):
     """The named title sections of the player block (title-system D6)."""
 
@@ -253,8 +259,8 @@ class TitleContextPromptTests(unittest.TestCase):
         self.assertNotIn("identity_entries", plain[1]["content"])
 
     def test_a_non_empty_epithet_becomes_the_named_section(self):
-        payload = self._payload(_player_context(epithet="F級冒險者　南門新客"))
-        self.assertEqual(payload["player"]["epithet"], "F級冒險者　南門新客")
+        payload = self._payload(_player_context(epithet=_T_FULL_TITLE))
+        self.assertEqual(payload["player"]["epithet"], _T_FULL_TITLE)
 
     def test_blank_or_non_string_epithet_is_omitted_not_placeholdered(self):
         for value in ("", "   ", "\n", None, 7, ["F級冒險者"]):
@@ -287,25 +293,25 @@ class TitleContextPromptTests(unittest.TestCase):
     def test_malformed_identity_rows_and_non_lists_are_dropped(self):
         for value in (
             None,
-            "南門新客",
+            _T_EPITHET,
             [],
             [{"basis": "只有引文"}],
             [{"display": "  ", "basis": "引文"}],
-            ["南門新客"],
+            [_T_EPITHET],
         ):
             with self.subTest(value=value):
                 payload = self._payload(_player_context(identity_entries=value))
                 self.assertNotIn("identity_entries", payload["player"])
         # A row without a basis keeps only its display.
-        payload = self._payload(_player_context(identity_entries=[{"display": "南門新客"}]))
+        payload = self._payload(_player_context(identity_entries=[{"display": _T_EPITHET}]))
         self.assertEqual(
-            payload["player"]["identity_entries"], [{"display": "南門新客"}]
+            payload["player"]["identity_entries"], [{"display": _T_EPITHET}]
         )
 
     def test_identical_title_inputs_produce_byte_identical_prompts(self):
         context = _player_context(
-            epithet="F級冒險者　南門新客",
-            identity_entries=[{"display": "南門新客", "basis": "守衛的目送"}],
+            epithet=_T_FULL_TITLE,
+            identity_entries=[{"display": _T_EPITHET, "basis": "苔徑初始的記號"}],
         )
         first = build_npc_dialogue_prompt(_npc_context(), context, _memory())
         second = build_npc_dialogue_prompt(_npc_context(), context, _memory())

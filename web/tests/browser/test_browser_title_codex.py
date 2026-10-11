@@ -33,10 +33,10 @@ from ._journey_support import _wait_mode
 from .test_browser_input_narrative import _wait_inp_line
 
 CODEX = title_codex_values()
-#: The fixture's starter epithet is free-form authored identity (the seed
-#: banks the same two epithets in both boot modes), so it is authored test
-#: data, not shipped catalog content.
-STARTER_EPITHET = "南門新客"
+#: The fixture banks this explicitly synthetic epithet as its auto-equipped
+#: row (the seed banks the same two epithets in both boot modes); it is
+#: authored test data and never the shipped starter declaration's spelling.
+STARTER_EPITHET = "苔徑新客"
 
 
 def _codex_panel(state: dict) -> dict:
@@ -233,7 +233,7 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         _wait_inp_line(page, 1, "title remove epithet 破城先鋒 confirm", exact=True)
         self._wait_codex(
             page,
-            lambda p: [row["display"] for row in p["epithet_rows"]] == ["南門新客"],
+            lambda p: [row["display"] for row in p["epithet_rows"]] == ["苔徑新客"],
         )
 
         # Ballot tab: the numbered accept dispatches title.accept and banks
@@ -246,5 +246,5 @@ class TitleCodexBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page,
             lambda p: p["pending_ballot"] == []
             and [row["display"] for row in p["epithet_rows"]]
-            == ["夜襲之人", "南門新客"],
+            == ["夜襲之人", "苔徑新客"],
         )

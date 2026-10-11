@@ -28,6 +28,8 @@ from world.lore.titles import (
     _live_faces,
     validate_fixed_titles,
 )
+from world.rules.title_view import TITLE_MAX_BASIS_CHARS
+from world.rules.titles import MAX_EPITHET_DISPLAY_CODE_POINTS
 
 # One valid parameter value per family against the fixture faces below.
 _FAMILY_SAMPLE = {
@@ -213,10 +215,19 @@ class FixedTitleRegistryContentTests(unittest.TestCase):
             entry.predicate.guild_rank = "S"
         self.assertTrue(dataclasses.is_dataclass(entry))
 
+    @covers_requirement("title-system::the-fixed-title-lore-registry-validates-and-syncs-idempotently")
     def test_starter_epithet_is_a_frozen_display_and_basis_pair(self):
+        # Source-data integrity without pinning the shipped spelling: the
+        # declaration must be a frozen non-empty pair whose display the epithet
+        # writer can actually bank and whose origin basis fits the codex basis
+        # window a title-codex row renders.
         self.assertIsInstance(STARTER_EPITHET, StarterEpithet)
-        self.assertTrue(STARTER_EPITHET.display.strip())
-        self.assertTrue(STARTER_EPITHET.origin_basis.strip())
+        display = STARTER_EPITHET.display
+        basis = STARTER_EPITHET.origin_basis
+        self.assertTrue(display.strip())
+        self.assertTrue(basis.strip())
+        self.assertLessEqual(len(display), MAX_EPITHET_DISPLAY_CODE_POINTS)
+        self.assertLessEqual(len(basis), TITLE_MAX_BASIS_CHARS)
         with self.assertRaises(dataclasses.FrozenInstanceError):
             STARTER_EPITHET.display = "改名"
 

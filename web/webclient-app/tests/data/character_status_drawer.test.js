@@ -344,7 +344,7 @@ describe("CharacterStatusDrawer full-title line", () => {
       character: CHARACTER_PANEL_TITLED_SAMPLE,
     });
     expect(w.get('[data-testid="character-status-drawer__full-title"]').text()).toBe(
-      "F級冒險者　南門新客",
+      "F級冒險者　苔徑新客",
     );
   });
 
@@ -371,7 +371,7 @@ describe("CharacterStatusDrawer full-title line", () => {
       character: CHARACTER_UNAVAILABLE,
     });
     expect(w.get('[data-testid="character-status-drawer__full-title"]').text()).toBe(
-      "F級冒險者　南門新客",
+      "F級冒險者　苔徑新客",
     );
     // The rank belongs to the unavailable character panel: omitted, not guessed.
     expect(w.find('[data-testid="character-status-drawer__hero-rank"]').exists()).toBe(false);

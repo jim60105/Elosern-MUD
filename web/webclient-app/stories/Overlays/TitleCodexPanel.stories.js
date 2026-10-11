@@ -23,10 +23,10 @@ const codex = {
   ],
   epithet_rows: [
     { display: "破城先鋒", basis: "率先破門。", granted_tick: 121, equipped: false, can_remove: true },
-    { display: "南門新客", basis: "初入南門。", granted_tick: 120, equipped: true, can_remove: false },
+    { display: "苔徑新客", basis: "初次走入苔徑。", granted_tick: 120, equipped: true, can_remove: false },
   ],
-  equipped: { fixed: "g_f_rank", epithet: "南門新客" },
-  full_title: "F級冒險者　南門新客",
+  equipped: { fixed: "g_f_rank", epithet: "苔徑新客" },
+  full_title: "F級冒險者　苔徑新客",
   unlocked: 1,
   total: 2,
   pending_ballot: [
