@@ -37,8 +37,18 @@ from world.rules.dialogue import (
     open_or_refresh_dialogue,
     run_scripted_talk,
 )
+from world.quests.scene_builder import materialize_stage
+from world.quests.tests._scene_package_fixtures import role as _role
 
 COMMISSION_KEYWORD = "接受委託"
+
+
+def _npc_req(role_id: str) -> dict:
+    """One permanent-destination occupant entry carrying the authored identity."""
+    entry = _role(role_id)
+    request = {"role": role_id, "tier": entry["tier"], "disposition": None}
+    request.update(entry["characterization"])
+    return request
 
 
 class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
@@ -51,13 +61,21 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
 
         # 1. Publish: validated, immutable, and no actor, acceptance or authority.
         payload = _package()
+        # The accepted stage also requires the role at a permanent destination:
+        # the package owns it, so the stage adopts the exact binding instead of
+        # rejecting the occupant.
+        payload["quest"]["stages"][0]["npc_req"] = [_npc_req("mother")]
         payload["dialogue"] = [
             self._dialogue_with_commission(_dialogue("mother")),
             _dialogue("daughter"),
         ]
         from world.quests.compile.compiler import compile_blueprint_core
 
-        definition_key = compile_blueprint_core(payload["quest"]).definition.key
+        # The package's own validated role set is what makes its permanent
+        # occupant legal, exactly as the package validator will pass it.
+        definition_key = compile_blueprint_core(
+            payload["quest"], package_roles=frozenset({"mother", "daughter"})
+        ).definition.key
         payload["dialogue"][0]["phases"][0]["topics"][-1]["effect_reference"] = (
             definition_key
         )
@@ -90,7 +108,7 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(repeat.role_bindings, activation.role_bindings)
 
         # 4. Provision the role-issued commission by activating its encounter.
-        activate_scene_encounter(
+        market = activate_scene_encounter(
             player, published.package_id, "market", room=room, tick=7
         )
         mother = ObjectDB.objects.filter(
@@ -114,6 +132,23 @@ class ScenePackageRuntimeSmokeTests(RegistryIsolationMixin, EvenniaTest):
         run_scripted_talk(mother, player, COMMISSION_KEYWORD)
         records = read_records(player)
         self.assertEqual([record.definition_key for record in records], [definition_key])
+
+        # 6b. The accepted permanent stage adopts the same exact actor in the
+        # existing room without rewriting its description or gaining a binding.
+        staged = materialize_stage(player, records[0].quest_id)
+        self.assertEqual(staged.room.pk, room.pk)
+        self.assertEqual(staged.room.db.desc, None)
+        self.assertEqual(
+            scene_store.get_role_binding(published.package_id, "mother").npc_id,
+            market.role_bindings["mother"],
+        )
+        self.assertIsNone(
+            next(
+                record
+                for record in read_records(player)
+                if record.quest_id == records[0].quest_id
+            ).stage_room_id
+        )
 
         # 7. Commit a closure transition: the live window refreshes to everyday topics.
         with self.captureOnCommitCallbacks(execute=True):
