@@ -73,6 +73,7 @@ from world.tests.synthetic_data import (
     SYNTH_MONSTER_VARIANTS,
     SYNTH_REGIONS,
     SYNTH_SHOPS,
+    SYNTH_STARTER_EPITHET,
     synthetic_registries,
 )
 
@@ -129,6 +130,13 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
     def setUp(self):
         open_synthetic_scope(self, "races", "static_tiers", "subraces", "starting_kits", "items", "prices", "elements", "guild_branches")
         super().setUp()
+        # The claim path banks whatever declaration sits on the shipped seam;
+        # this surface asserts the synthetic starter, never the shipped one.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
         self.char1.race = "t_duskmari"
@@ -152,7 +160,7 @@ class GuildCommandTests(CommandIsolation, EvenniaCommandTestMixin, EvenniaTest):
             [completed if r.quest_id == record.quest_id else r for r in records],
         )
         output = self.call(CmdGuildTurnIn(), record.quest_id, "你回報了任務")
-        self.assertIn("獲得異名：南門新客", output)
+        self.assertIn(f"獲得異名：{SYNTH_STARTER_EPITHET.display}", output)
         # The retired onboarding welcome must never resurface on a claim.
         self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
         floor = _turnin_copper()

@@ -46,7 +46,11 @@ from world.rules.affinity import apply_affinity_change
 from world.rules.npc_intents import is_stale_context
 from world.rules.npc_persona import initialize_npc_persona, update_npc_persona
 from world.rules.player_messages import STALE_PERSONA_NOTE
-from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_PRESETS
+from world.tests.synthetic_data import (
+    SYNTH_ITEMS,
+    SYNTH_PRESETS,
+    SYNTH_STARTER_EPITHET,
+)
 
 # Kit item key used as an invented transfer token in intent tests (the
 # dialogue seam moves whatever key the intent carries; no shipped item
@@ -878,6 +882,13 @@ class TitleDialogueContextTests(EvenniaTest):
         super().setUp()
         from world.quests.catalog import register_catalog
 
+        # The composed epithet section reads whatever the starter seam holds;
+        # assert the shared synthetic declaration, never the shipped spelling.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         register_catalog()
         _reset_all()
         register_npc_dialogue()
@@ -902,7 +913,9 @@ class TitleDialogueContextTests(EvenniaTest):
 
         grant_first_quest_epithet(self.player)
         context = self.npc._player_context(self.player)
-        self.assertEqual(context["epithet"], "F級冒險者　南門新客")
+        self.assertEqual(
+            context["epithet"], f"F級冒險者　{SYNTH_STARTER_EPITHET.display}"
+        )
         # Identity detail is opt-in; the ordinary context stays minimal.
         self.assertNotIn("identity_entries", context)
 
@@ -930,7 +943,9 @@ class TitleDialogueContextTests(EvenniaTest):
         self.assertEqual(len(entries), MAX_TITLE_ENTRIES)
         self.assertEqual(entries[0]["display"], "異名5")
         self.assertEqual(entries[0]["basis"], "引文5")
-        self.assertEqual(context["epithet"], "F級冒險者　南門新客")
+        self.assertEqual(
+            context["epithet"], f"F級冒險者　{SYNTH_STARTER_EPITHET.display}"
+        )
 
     def test_malformed_title_state_degrades_to_no_section(self):
         from world.rules.titles import grant_first_quest_epithet, grant_rank_title
@@ -954,7 +969,9 @@ class TitleDialogueContextTests(EvenniaTest):
         client.add_response(lambda d: True, _reply_text())
         await_result(self.npc.run_npc_exchange("你好", self.player, client))
         content = self._content(client)
-        self.assertIn('"epithet": "F級冒險者　南門新客"', content)
+        self.assertIn(
+            f'"epithet": "F級冒險者　{SYNTH_STARTER_EPITHET.display}"', content
+        )
         self.assertNotIn("identity_entries", content)
 
     def test_being_addressed_passes_the_identity_detail(self):
@@ -969,7 +986,9 @@ class TitleDialogueContextTests(EvenniaTest):
         with patch.object(self.player, "msg"):
             await_result(self.npc.at_talked_to("你好", self.player, client))
         content = self._content(client)
-        self.assertIn('"epithet": "F級冒險者　南門新客"', content)
+        self.assertIn(
+            f'"epithet": "F級冒險者　{SYNTH_STARTER_EPITHET.display}"', content
+        )
         self.assertIn('"identity_entries"', content)
         self.assertIn("夜行者", content)
 

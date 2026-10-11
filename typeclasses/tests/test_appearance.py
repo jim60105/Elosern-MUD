@@ -8,6 +8,7 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
 from typeclasses.rooms import InstanceRoom, Room
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
 
 class SceneFlavorParagraphTests(EvenniaTest):
@@ -455,6 +456,14 @@ class TitleAppearanceLineTests(EvenniaTest):
         super().setUp()
         from world.quests.catalog import register_catalog
 
+        # The composed 稱號 line reads the banked epithet; the starter seam is
+        # swapped for the shared synthetic declaration so the line is asserted
+        # without pinning the shipped display spelling.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         register_catalog()
         self.room1.key = "測試房間"
         self.room1.save()
@@ -481,7 +490,7 @@ class TitleAppearanceLineTests(EvenniaTest):
 
         grant_first_quest_epithet(self.target)
         appearance = self.char1.at_look(self.target)
-        self.assertIn("稱號：F級冒險者　南門新客", appearance)
+        self.assertIn(f"稱號：F級冒險者　{SYNTH_STARTER_EPITHET.display}", appearance)
 
     def test_the_line_follows_the_description_and_the_displayed_stats_block(self):
         from world.rules.titles import grant_first_quest_epithet, grant_rank_title
@@ -519,7 +528,10 @@ class TitleAppearanceLineTests(EvenniaTest):
         with _patch.object(self.char1, "msg") as msg:
             result = _look_adapter(self.char1, {"target_id": int(self.target.pk)})
         self.assertEqual(result["outcome"], "success")
-        self.assertIn("稱號：F級冒險者　南門新客", str(msg.call_args[0][0]))
+        self.assertIn(
+            f"稱號：F級冒險者　{SYNTH_STARTER_EPITHET.display}",
+            str(msg.call_args[0][0]),
+        )
 
     def test_malformed_title_state_degrades_to_the_untitled_appearance(self):
         from world.rules.titles import grant_first_quest_epithet, grant_rank_title

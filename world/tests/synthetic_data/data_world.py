@@ -19,6 +19,7 @@ from world.lore.settlements.settlements import (
 from world.lore.settlements.shops import ShopDefinition
 from world.lore.titles import (
     FixedTitleDef,
+    StarterEpithet,
     TitleCategory,
     TitlePredicate,
     TitlePredicateFamily,
@@ -94,6 +95,18 @@ SYNTH_TITLES: MappingProxyType[str, FixedTitleDef] = MappingProxyType(
             TitlePredicate(family=TitlePredicateFamily.COUNTER_THRESHOLD, counter="t_synthetic_counter", threshold=99),
         ),
     }
+)
+
+
+#: The stand-in starter epithet every behavior test patches over the shipped
+#: ``world.lore.titles.STARTER_EPITHET`` seam: the claim path banks whatever
+#: declaration the seam holds, so tests assert this authored display/origin
+#: instead of pinning the shipped spelling. Not a catalog mapping, so the
+#: kit's catalog self-tests skip it; the kit file scan still proves its prose
+#: never collides with a shipped token.
+SYNTH_STARTER_EPITHET = StarterEpithet(
+    "苔徑新旅",
+    "你在合成公會完成第一次任務回報。",
 )
 
 SYNTH_ANCHORS: dict[str, Anchor] = {

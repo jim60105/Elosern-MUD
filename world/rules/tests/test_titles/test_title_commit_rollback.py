@@ -147,7 +147,7 @@ class TitleCommitRollbackTests(EvenniaTest):
         # The durable removal log is registered in the commit-window entity
         # snapshot: a failed commit restores it byte-identically alongside
         # the title attributes (no orphaned removal record).
-        bank_epithet(self.actor, _starter().display, "初入南門。", 1)
+        bank_epithet(self.actor, _starter().display, "初次走入苔徑。", 1)
         bank_epithet(self.actor, "待放之名", "舊事蹟。", 2)
         remove_epithet(self.actor, "待放之名")
         before_log = deepcopy(self.actor.attributes.get(REMOVALS_LOG_KEY))

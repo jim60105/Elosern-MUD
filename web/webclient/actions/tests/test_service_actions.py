@@ -41,7 +41,6 @@ from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.coordinator import attach_coordinator
 from web.webclient.presentation.registry import build_production_registry
 from world.lore.guild import GuildRank
-from world.lore.titles import StarterEpithet
 from world.quests.definitions import QUEST_DEFINITION_REGISTRY
 from world.quests.runtime import QuestState, read_records
 from world.quests.catalog import register_catalog
@@ -77,7 +76,7 @@ from world.rules.tests._guild_service_probes import (
     synthetic_branch_key,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
-from world.tests.synthetic_data import make_title
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, make_title
 
 # Kit identities: the synthetic branch for the guild hosts, the kit shop for
 # the store, and kit items as the offered goods. Reward copper/merit and
@@ -128,7 +127,9 @@ _T_BOARD_DISPLAY = "合成看板委託"
 #: The patched starter-epithet seam the first-claim branch banks and echoes
 #: (the world/rules/tests title-suite idiom: the grant path reads the owner
 #: module attribute at call time, so the scope swaps it for authored data).
-_T_STARTER_EPITHET = StarterEpithet("破曉新丁", "首次完成公會委託。")
+#: The shared synthetic kit declaration is the one value the CLI and dialogue
+#: turn-in surfaces patch too, so all three claim surfaces assert it.
+_T_STARTER_EPITHET = SYNTH_STARTER_EPITHET
 
 
 TICK_NOON = 12 * 3600

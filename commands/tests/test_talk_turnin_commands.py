@@ -10,6 +10,8 @@ registered rows restored by the shared quest-registry isolation.
 
 from tools.spec_traceability import covers_requirement
 
+from unittest.mock import patch
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest
 
@@ -43,7 +45,7 @@ from world.rules.quest_issuance import (
     guild_issuer_key,
 )
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
-from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
+from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY, SYNTH_STARTER_EPITHET
 
 # Locally authored quest surface: one bronze-keyed defeat quest, its guild
 # commission, and its board offer. Reward copper is this fixture's number.
@@ -93,6 +95,13 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         super().setUp()
         from world.rules.guild import register_adventurer
 
+        # The dialogue turn-in surface banks whatever declaration sits on the
+        # shipped seam; assert the synthetic starter, never the shipped one.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         _install_reportable_quest()
         self.hall = create_object(Room, key="guild hall")
         self.char1.location = self.hall
@@ -142,7 +151,7 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         output = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
         self.assertIn("你回報了任務", output)
         # First-ever claim echoes the starter-epithet grant on this surface.
-        self.assertIn("獲得異名：南門新客", output)
+        self.assertIn(f"獲得異名：{SYNTH_STARTER_EPITHET.display}", output)
         self.assertNotIn("你的第一個日子在這裡圓滿結束", output)
         self.assertEqual(self.char1.db.wallet, _REWARD.copper)
         second = self.call(CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}")
@@ -158,7 +167,7 @@ class TalkTurnInCommandTests(TalkTurnInCommandIsolation, EvenniaCommandTestMixin
         first = self.call(
             CmdsTalk(), f"公會職員 {GUILD_STAFF_TURNIN_KEYWORD} {quest_id}"
         )
-        self.assertIn("獲得異名：南門新客", first)
+        self.assertIn(f"獲得異名：{SYNTH_STARTER_EPITHET.display}", first)
         from world.quests.runtime import accept_quest
         from world.rules.quest_issuance import guild_issuer_key
 

@@ -20,7 +20,6 @@ from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from world.lore.titles import (
     FixedTitleDef,
-    StarterEpithet,
     TitleCategory,
     TitlePredicate,
     TitlePredicateFamily,
@@ -90,7 +89,7 @@ from world.rules.tests.test_cast_settlement import (
     _raising_stage,
 )
 from world.lore.guild import GuildRank
-from world.tests.synthetic_data import make_title
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET, make_title
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._knowledge_probes import basic_attack_key, live_fixed_title_registry, live_guild_rank_registry, live_registry
 
@@ -160,8 +159,9 @@ T_F_DISPLAY = _PAIR_TITLES[T_F_KEY].display_name_zh
 T_E_DISPLAY = _PAIR_TITLES[T_E_KEY].display_name_zh
 
 
-# The (patched) starter-epithet seam constant the guild claim path banks.
-T_STARTER = StarterEpithet("苔徑新旅", "你在合成公會完成第一次任務回報。")
+# The (patched) starter-epithet seam constant the guild claim path banks; the
+# shared synthetic kit declaration is the single source of truth for it.
+T_STARTER = SYNTH_STARTER_EPITHET
 
 
 def _open_title_scope(test):
