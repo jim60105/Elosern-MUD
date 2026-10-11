@@ -351,6 +351,38 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         self.assertEqual(records[singleton.quest_id].state.value, "in_progress")
 
 
+class EscortEntitlementTests(EscortLifecycleTests):
+    """Only the group winner, or a group-less record, is ever entitled."""
+
+    def test_entitlement_follows_the_group_result(self):
+        from types import SimpleNamespace
+
+        from world.quests import outcome_store
+        from world.quests.escort_events import reward_entitled
+
+        outcome_store.mark_group_resolved(
+            owner_id=self.owner.pk, package_id="pkg", group_id="g",
+            resolution_source="s", winner_quest_id="winner:1",
+        )
+        self.assertTrue(reward_entitled(
+            self.owner, SimpleNamespace(group_id="g", package_id="pkg", quest_id="winner:1")
+        ))
+        self.assertFalse(reward_entitled(
+            self.owner, SimpleNamespace(group_id="g", package_id="pkg", quest_id="loser:1")
+        ))
+        outcome_store.mark_group_resolved(
+            owner_id=self.owner.pk, package_id="pkg2", group_id="g2",
+            resolution_source="s2", no_commission=True,
+        )
+        self.assertFalse(reward_entitled(
+            self.owner, SimpleNamespace(group_id="g2", package_id="pkg2", quest_id="any:1")
+        ))
+        # A record with no exclusive group is unconditionally entitled.
+        self.assertTrue(reward_entitled(
+            self.owner, SimpleNamespace(group_id=None, package_id=None, quest_id="free:1")
+        ))
+
+
 class EscortIntermediateStageTests(EscortExclusiveAlternativeTests):
     """A multi-stage alternative advances without settling its final group."""
 
