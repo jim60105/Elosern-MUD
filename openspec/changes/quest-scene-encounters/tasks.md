@@ -1,10 +1,12 @@
 # Tasks
 
+The complete implementation targets eight hours using proposal.md's allocation. Add behavior tests alongside their changes; reserve the final hour for focused execution, traceability and docs. All acceptance remains required. Missing reuse prerequisites must be reported before scope expansion, never replaced with stubs or weakened guards.
+
 ## 1. Deterministic definitions and persistent ownership
 
 - [ ] 1.1 Extend generated quest persistence with immutable normalized package/role/relationship/knowledge/encounter/dialogue definitions and separate runtime records; declare database uniqueness for source/package, role binding and encounter identities without data migration or compatibility transforms. Test canonical reload, source replay/conflict and role-reference consistency using synthetic fixtures.
 - [ ] 1.2 Implement deterministic whole-package validation using existing map, characterization, age, registry and schema bounds; reject unknown/ambiguous places, invalid exact existing-NPC references, inconsistent reciprocal relations, hidden-knowledge grants, phase coverage/selection/cycle errors, unsupported effects and numeric/typeclass/code injection before writes.
-- [ ] 1.3 Establish deterministic phase selection/transition APIs with exact role/actor and committed provenance, permission-filtered knowledge and monotonic revision. Cover supported generic closure and unresolved outcomes while preserving persona/history. Keep escort/reunion observation guards and guarded tests until design 2 supplies their actual owning capability; do not fake those outcomes.
+- [ ] 1.3 Establish the publish_scene_package, lookup_story_role, activate_scene_encounter and transition_story_dialogue boundary contracts defined in design.md. Implement deterministic phase selection with exact role/actor and owner-resolved committed provenance, permission-filtered knowledge and monotonic revision. Cover supported generic closure and unresolved outcomes while preserving persona/history. Keep escort/reunion observation guards and guarded tests until design 2 supplies their actual owning capability; do not fake those outcomes.
 
 ## 2. Shared deterministic construction and issuer authorization
 

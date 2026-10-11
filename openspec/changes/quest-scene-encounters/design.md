@@ -46,11 +46,24 @@ Scripted effects name registered domain verbs and validated references. Both scr
 
 Role identity outlives stage release and terminal quest states. Require validated permanent retention locators for retained instance roles at publication. Maps reclamation transfers only retained actors still inside using movement hooks, removes ephemeral ownership and reclaims disposable objects in one transaction. Actors outside remain untouched. Preserve actor living state and history; never resurrect or clone. On failure restore caches and retain the room without destructive partial cleanup. Existing player/pin safety and promotion remain unchanged; party/follow and quest release cannot be bypassed, and future escort release remains guarded.
 
+### Downstream operation contracts
+
+These proposed operation names are the implementation interface contract, not claims that the functions already exist. Export them from the quest-owned package boundary; internal module organization may follow existing compiler conventions.
+
+| Operation | Inputs | Successful result | Named non-success outcomes |
+| --- | --- | --- | --- |
+| `publish_scene_package` | Bounded canonical payload, owner identity, optional durable source/decision identity | Stable immutable package/version identity; replay returns the same publication | Invalid reference/locator/phase/effect/authority, unsupported guarded capability, conflicting source content |
+| `lookup_story_role` | Package identity and exact role ID | Read-only definition and binding status, exact NPC identity if materialized, availability/provenance and scoped commission references | Unknown package/role; missing/dead/deleted/departed actor reported without repair |
+| `activate_scene_encounter` | Player identity, package/scene identity, actual room, world tick and owner-authoritative prerequisite observations | Durable encounter identity/state, exact required role bindings and registered authorized commission references | Pending prerequisite, wrong locator, cancelled or unavailable actor; technical failure rolls back and leaves the same identity invocable |
+| `transition_story_dialogue` | Package/role identity, exact participants, expected phase revision and committed observation provenance resolved through its owner | Selected permitted phase and next revision, unchanged baseline/history, post-commit session refresh | Stale revision, unsupported guarded observation, invalid participant/provenance or ambiguous selection |
+
+Lookup is read-only. Publication writes definitions atomically without actor creation or quest acceptance. Activation owns its transaction and invokes rules-owned scoped issuer provisioning followed by existing strict registration; its returned commission references contain actual issuer keys and definition/issuance identities, never symbolic authority. A replay of activated state returns the original identity. Phase transitions join the owning committed observation transaction, with presentation deferred until commit. Callers cannot gain authority by supplying a fabricated observation mapping; the owner resolves provenance and current state before mutation. Designs 2 and 3 may consume these boundaries without introducing their mechanics or production callers here.
+
 ## Risks / Trade-offs
 
 The current generated Script is deliberately smaller than normalized package persistence. New uniqueness constraints are required despite the single-player process; schema validation alone is insufficient across restart. Attribute caching and process-local registries need explicit compensation in addition to transaction rollback. Permanent-room occupancy is safe only once ownership and retention validation replace the old guard. Dialogue phase freshness must cover all consumers, particularly queued replies and reused topic IDs.
 
-The one-day scope depends on reuse of implemented subsystems and excludes production dispatch, escort mechanics, visual redesign and registry refactors. Synthetic packages use supported non-escort quest objectives to exercise registration and conversation now. Actual reunion acceptance remains a design-2 integration criterion; this change tests its generic transition boundary without fake reunion completion or disabling guards.
+The eight-hour estimate and allocation are recorded in proposal.md. They depend on reuse of implemented subsystems and exclude production dispatch, escort mechanics, visual redesign and registry refactors. Conditions use a finite registry of supported state/knowledge predicates with explicit validation, without a general expression interpreter. Domain effects remain existing whitelisted verbs; this change adds authorization/context checks rather than new mechanics. Synthetic packages use supported non-escort quest objectives to exercise registration and conversation now. Actual reunion acceptance remains a design-2 integration criterion; this change tests its generic transition boundary without fake reunion completion or disabling guards.
 
 ## Verification and traceability plan
 

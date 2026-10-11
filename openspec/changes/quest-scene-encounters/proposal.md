@@ -37,7 +37,21 @@ Extend `world/quests/compile/`, `generated_quest_store.py`, `scene_builder.py`, 
 
 ## Scope and delivery
 
-One engineer-day integration change, reusing implemented compiler, prototype, characterization, component, narrative, and versioned presentation infrastructure. Implement deterministic contracts before proposal-schema changes and presentation cutover. No new UI, agent framework, live-model requirement, retry engine, migration, compatibility layer, or deployment boundary.
+An eight-hour implementation target, reusing implemented compiler, prototype, characterization, component, narrative, and versioned presentation infrastructure. Implement deterministic contracts before proposal-schema changes and presentation cutover. No new UI, agent framework, live-model requirement, retry engine, migration, compatibility layer, or deployment boundary.
+
+The allocation includes implementation, tests and documentation. It is a planning estimate, not observed delivery time. Keep new code limited to normalized persistence, package validation, exact role/activation orchestration and phase resolution; delegate existing mechanical effects, knowledge, movement, commission lifecycle and presentation to their current owners. Do not add a generic workflow language, a new ORM framework, a second construction pipeline, new content packages or visual redesign.
+
+| Work package | Hours | Existing paths reused |
+| --- | ---: | --- |
+| Persistent definitions, uniqueness and bounded validation | 1.5 | Generated quest persistence, canonical payload and characterization validators |
+| Shared actor construction, scoped authority and atomic activation | 2.0 | SceneBuilder, component helpers, issuer resolution and registration compensation |
+| Terminal retention and reclamation transfers | 0.75 | Stage release, maps reclamation and movement hooks |
+| Phase resolver, effects and asynchronous freshness | 1.5 | Scripted dialogue, narrative context, intent applier and session freshness |
+| Canonical schema and existing presentation consumer cutover | 0.75 | ScenarioDirector contract and version-2 conversation panel |
+| Focused acceptance, traceability, docs and gates | 1.0 | Existing synthetic fixtures, owner suites and contract tools |
+| **Total** | **8.0** | |
+
+Behavior tests are added with each work package; the last hour runs the focused batch and completes documentation/traceability. If the implementation discovers a missing prerequisite that defeats this reuse plan, report it before expanding scope. Do not meet the time target by removing acceptance scenarios, weakening database uniqueness, bypassing rollback or removing forward guards.
 
 Source of truth is `docs/superpowers/specs/2026-10-11-quest-scene-encounters-design.md`, including sections 2 and 10. Escort mechanics and production dream/exploration dispatch belong to subsequent designs. ESCORT publication stays guarded until its protected-role flow lands. This change exposes exact actor, commission, and phase APIs without requiring sibling artifacts.
 
