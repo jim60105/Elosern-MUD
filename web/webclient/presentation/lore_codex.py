@@ -29,7 +29,6 @@ from web.webclient.presentation.protocol import (
     _require_exact_fields,
     _require_int,
     _require_str,
-    _validate_identifier,
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
@@ -87,9 +86,10 @@ def _validate_card_field(value: Any, index: int) -> dict[str, str]:
 def _validate_entry(value: Any, index: int) -> dict[str, Any]:
     label = f"lore codex entry[{index}]"
     _require_exact_fields(value, label, {"key", "title", "card"}, {})
-    raw_key = _validate_identifier(value["key"], f"{label} key")
-    if len(raw_key) > LORE_CODEX_MAX_KEY_CODE_POINTS:
-        raise LoreCodexPanelError(f"{label} key exceeds its bound")
+    # Registry keys are opaque domain identities, not protocol action identifiers.
+    raw_key = _require_str(value, "key", maximum=LORE_CODEX_MAX_KEY_CODE_POINTS)
+    if not raw_key or ":" in raw_key:
+        raise LoreCodexPanelError(f"{label} key must be non-empty and contain no colon")
     _reject_lone_surrogates(raw_key, f"{label} key")
 
     title = _require_str(value, "title", maximum=LORE_CODEX_MAX_TITLE_CODE_POINTS)

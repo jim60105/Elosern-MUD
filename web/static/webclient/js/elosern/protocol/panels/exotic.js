@@ -3,13 +3,11 @@
 var C = require("../constants.js");
 var core = require("../core.js");
 
-var codePoints = core.codePoints;
 var jsonByteSize = core.jsonByteSize;
 var requireExactFields = core.requireExactFields;
 var requireInt = core.requireInt;
 var requireBool = core.requireBool;
 var requireString = core.requireString;
-var validateIdentifier = core.validateIdentifier;
 var hasLoneSurrogate = core.hasLoneSurrogate;
 
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
@@ -89,9 +87,10 @@ function validateLoreCodexCardField(value, index) {
 function validateLoreCodexEntry(value, index) {
   var label = "lore codex entry[" + index + "]";
   requireExactFields(value, label, ["key", "title", "card"], []);
-  var rawKey = validateIdentifier(value.key, label + " key");
-  if (codePoints(rawKey) > LORE_CODEX_MAX_KEY_CODE_POINTS) {
-    throw new Error(label + " key exceeds its bound");
+  // Registry keys are opaque domain identities, not protocol action identifiers.
+  var rawKey = requireString(value.key, label + " key", LORE_CODEX_MAX_KEY_CODE_POINTS);
+  if (!rawKey || rawKey.indexOf(":") !== -1) {
+    throw new Error(label + " key must be non-empty and contain no colon");
   }
   if (hasLoneSurrogate(rawKey)) {
     throw new Error(label + " key contains an unpaired surrogate code point");

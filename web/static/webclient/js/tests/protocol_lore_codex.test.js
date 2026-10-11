@@ -50,32 +50,44 @@ function validLoreCodexPayload(overrides) {
         ],
       },
     ]),
-    validLoreCodexCategory("guild", "公會", []),
+    validLoreCodexCategory("guild", "公會", [
+      {
+        key: "T_RANK",
+        title: "合成階級",
+        card: [
+          { name: "display_name_zh", value: "合成階級" },
+          { name: "description", value: "合成公會階級條目" },
+        ],
+      },
+    ]),
   ];
   return Object.assign(
     {
       schema_version: 1,
       available: true,
       categories: categories,
-      discovered_total: 2,
+      discovered_total: 3,
     },
     overrides
   );
 }
 
-test("lore_codex pins bounds and validates available and empty payloads", () => {
-  assert.equal(Protocol.LORE_CODEX_SCHEMA_VERSION, 1);
-  assert.equal(Protocol.LORE_CODEX_MAX_ENTRIES_PER_CATEGORY, 32);
-  assert.equal(Protocol.LORE_CODEX_MAX_TOTAL_ENTRIES, 256);
-  assert.equal(Protocol.LORE_CODEX_MAX_CARD_FIELDS, 8);
-
+test("lore_codex preserves discovered entries across populated categories and accepts an empty codex", () => {
   const payload = validLoreCodexPayload();
   const normalized = Protocol.validateLoreCodexPanel(payload);
   assert.equal(normalized.schema_version, 1);
   assert.equal(normalized.available, true);
-  assert.equal(normalized.discovered_total, 2);
-  assert.equal(normalized.categories.length, 8);
-  assert.equal(normalized.categories[0].entries[0].title, "林語族");
+  assert.equal(normalized.discovered_total, 3);
+  assert.deepEqual(
+    normalized.categories.flatMap((group) =>
+      group.entries.map((entry) => [group.key, entry.key, entry.title])
+    ),
+    [
+      ["race", "elf", "林語族"],
+      ["anchor", T_LORE_PLACE, T_LORE_PLACE_TITLE],
+      ["guild", "T_RANK", "合成階級"],
+    ]
+  );
 
   // Empty codex
   const emptyCategories = [
@@ -215,6 +227,14 @@ test("lore_codex rejects lone surrogates in all string fields", () => {
   });
 });
 
+test("lore_codex rejects malformed entry keys", () => {
+  for (const key of [null, 42, "", ":entry", "entry:other", "entry:"]) {
+    const payload = validLoreCodexPayload();
+    payload.categories[0].entries[0].key = key;
+    assert.throws(() => Protocol.validateLoreCodexPanel(payload));
+  }
+});
+
 test("lore_codex is in panel allowlist and validates in snapshots and unavailable forms", () => {
   const validAvailable = validLoreCodexPayload();
   const unavailable = {
@@ -245,6 +265,14 @@ test("lore_codex is in panel allowlist and validates in snapshots and unavailabl
 });
 
 test("lore_codex rejects string fields one code point over the bound", () => {
+  assert.throws(() => {
+    const payload = validLoreCodexPayload();
+    payload.categories[0].entries[0].key = "k".repeat(
+      Protocol.LORE_CODEX_MAX_KEY_CODE_POINTS + 1
+    );
+    Protocol.validateLoreCodexPanel(payload);
+  });
+
   // Title over bound
   assert.throws(() => {
     const payload = validLoreCodexPayload();

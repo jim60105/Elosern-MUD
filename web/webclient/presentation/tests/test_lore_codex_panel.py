@@ -248,6 +248,14 @@ class LoreCodexValidatorTests(unittest.TestCase):
         with self.assertRaises(LoreCodexPanelError):
             validate_lore_codex(payload)
 
+    def test_malformed_entry_keys_raise(self):
+        for key in (None, 42, "", ":entry", "entry:other", "entry:"):
+            with self.subTest(key=key):
+                payload = _valid_payload()
+                payload["categories"][0]["entries"][0]["key"] = key
+                with self.assertRaises(ProtocolValidationError):
+                    validate_lore_codex(payload)
+
     def test_lone_surrogates_in_string_fields_raise(self):
         # Surrogate in entry key
         payload = _valid_payload()
@@ -327,6 +335,13 @@ class LoreCodexValidatorTests(unittest.TestCase):
         "webclient-lore-codex-panel::the-panel-is-bounded-and-fails-closed-on-registry-growth"
     )
     def test_string_field_code_point_bounds_breach_raises(self):
+        payload = _valid_payload()
+        payload["categories"][0]["entries"][0]["key"] = "k" * (
+            LORE_CODEX_MAX_KEY_CODE_POINTS + 1
+        )
+        with self.assertRaises(ProtocolValidationError):
+            validate_lore_codex(payload)
+
         # Title: exactly one code point over the bound is rejected.
         payload = _valid_payload()
         payload["categories"][0]["entries"][0]["title"] = "字" * (

@@ -1,6 +1,10 @@
 {
   "contract": [
     {
+      "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
+      "reason": "every registered lore entry is representable by the codex panel"
+    },
+    {
       "path": "world/imports/tests/test_yohanna_demo.py",
       "reason": "authored Yohanna import card and real protection setup contract"
     },

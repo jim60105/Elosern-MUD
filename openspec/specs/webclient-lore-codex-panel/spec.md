@@ -44,6 +44,15 @@ registered common unavailable form SHALL keep the shared field set, reason, and 
   category's declared card fields rendered through the canonical `lore_card` renderer, each field
   carrying exactly `name` and `value`
 
+#### Scenario: Legal registry entries survive presentation validation
+- **WHEN** a holder has discovered any entry that resolves in its category's registry and fits the
+  declared panel bounds
+- **THEN** the server and client validators accept its serialized entry, preserving the registry
+  key without normalization or applying the protocol action-identifier grammar
+- **AND** the entry key is an opaque non-empty string without a colon or unpaired surrogate,
+  bounded by `LORE_CODEX_MAX_KEY_CODE_POINTS`; registry membership is resolved by the server's
+  canonical lore reader and renderer, not duplicated in the client
+
 #### Scenario: discovered_total sums the category counts
 - **WHEN** the panel serializes
 - **THEN** `discovered_total` equals the sum of the category counts
