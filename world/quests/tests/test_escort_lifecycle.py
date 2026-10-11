@@ -154,6 +154,18 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(failure.exception.reason, "invalid_source")
         self.assertEqual(read_records(self.owner)[0], record)
 
+    def test_acceptance_settles_an_already_satisfied_rendezvous(self):
+        # The meeting role already stands beside the exact protected actor, so
+        # the acceptance's own settled pass completes and pays the commission.
+        self.meeting.location = self.room1
+        wallet_before = self.owner.db.wallet or 0
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+
 
 class EscortExclusiveOutcomeTests(EscortLifecycleTests):
     def outcome_groups(self):
@@ -419,6 +431,23 @@ class EscortCasualtyTests(EscortLifecycleTests):
         self.assertEqual(failed.state.value, "failed")
         self.assertEqual(failed.failure_reason, "protected_actor_dead")
 
+    def test_attributed_hostile_tick_fails_the_protected_escort(self):
+        from world.rules.buffs import apply_buff
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        monster = create_object(Monster, key="hostile caster", location=self.room1)
+        self.protected.traits.hp.base = 3
+        self.protected.traits.hp.current = 3
+        apply_buff(self.protected, "poisoned", source_pk=int(monster.pk))
+        field = self._field(self.owner, monster, self.protected)
+        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        settle_upkeep(field, records)
+        failed = read_records(self.owner)[0]
+        self.assertEqual(failed.quest_id, record.quest_id)
+        self.assertEqual(failed.state.value, "failed")
+        self.assertEqual(failed.failure_reason, "protected_actor_dead")
+        self.assertEqual(reasons_for(self.protected, self.owner), ())
+
     def test_source_less_monster_kill_still_grants_no_quest_progress(self):
         from world.rules.buffs import apply_buff
 
@@ -504,3 +533,28 @@ class EscortEventBoundaryTests(EscortLifecycleTests):
         self.assertEqual(completed.state.value, "completed")
         self.assertEqual(self.owner.db.wallet, wallet_before + 1)
         self.assertEqual(self.owner.location, self.room1)
+
+    def test_follower_settlement_completes_the_rendezvous_once(self):
+        from world.rules.movement_settlement import settle_movement
+        from world.rules.party import follow_companions
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        wallet_before = self.owner.db.wallet or 0
+        source = self.owner.location
+
+        def traverse():
+            self.owner.move_to(self.room2, quiet=True)
+            follow_companions(self.owner, source, destination=self.room2)
+
+        settle_movement(
+            self.owner, source, traverse=traverse, destination=self.room2,
+        )
+        completed = read_records(self.owner)[0]
+        self.assertEqual(completed.quest_id, record.quest_id)
+        self.assertEqual(completed.state.value, "completed")
+        self.assertEqual(self.protected.location, self.room2)
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        # A replayed identical settled movement neither advances nor repays.
+        self.assertTrue(self.protected.move_to(self.room1, quiet=True))
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)

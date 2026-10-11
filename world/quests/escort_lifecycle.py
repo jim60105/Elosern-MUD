@@ -143,41 +143,56 @@ def accept_escort_commission(
     package, group_id, protected = _offer_context(
         owner, definition_key, issuer_key, actual_actor, expected_revision,
     )
+    from .escort_events import (
+        collect_escort_actors,
+        escort_event_boundary,
+        evaluate_escort_event,
+        refresh_escort_scope,
+    )
+
     try:
-        with escort_transaction(owner, tuple(actor for _, actor in protected)):
-            # Revalidate after acquiring all deterministic entity locks.
-            package, group_id, protected = _offer_context(
-                owner, definition_key, issuer_key, actual_actor, expected_revision,
-            )
-            current = read_records(owner)
-            if any(record.definition_key == definition_key and record.state is QuestState.IN_PROGRESS
-                   for record in current):
-                raise QuestAlreadyActive(definition_key)
-            tick = _current_tick()
-            sequence = allocate_acceptance_sequence(
-                owner_id=owner.pk, package_id=package.package_id, group_id=group_id, tick=tick,
-            ) if group_id else None
-            number = sum(record.definition_key == definition_key for record in current) + 1
-            record = QuestRecord(
-                quest_id=f"{definition_key}:{number}", definition_key=definition_key,
-                issuer_key=issuer_key, state=QuestState.IN_PROGRESS, stage_index=0,
-                stage_progress=0, accepted_tick=tick,
-                deadline_tick=None if definition.deadline_hours is None else (
-                    tick + definition.deadline_hours * CLOCK_YAML["seconds_per_hour"]
-                ), stage_room_id=None, objective_target_ids=(),
-                protected_entity_ids=tuple(actor.pk for _, actor in protected),
-                failure_reason=None, package_id=package.package_id, group_id=group_id,
-                acceptance_sequence=sequence,
-                protected_roles=tuple((role, actor.pk) for role, actor in protected),
-            )
-            apply_quest_log_replacement(owner, [*current, record])
-            for role, actor in protected:
-                add_temporary_source(actor, owner, record.quest_id, role)
-            transaction.on_commit(lambda: log_info("escort_commission_accepted", context={
-                "char": owner.pk, "quest": record.quest_id, "package": package.package_id,
-                "group": group_id, "issuer": issuer_key, "sequence": sequence,
-            }))
-            return record
+        # The acceptance joins an owner-issued event receipt: after every
+        # binding settles, one settled escort pass runs inside the same
+        # transaction so an already-satisfied binding observes its own source
+        # (escort-rendezvous §5).
+        with escort_event_boundary((owner,)) as source:
+            with escort_transaction(owner, tuple(actor for _, actor in protected)):
+                # Revalidate after acquiring all deterministic entity locks.
+                package, group_id, protected = _offer_context(
+                    owner, definition_key, issuer_key, actual_actor, expected_revision,
+                )
+                current = read_records(owner)
+                if any(record.definition_key == definition_key and record.state is QuestState.IN_PROGRESS
+                       for record in current):
+                    raise QuestAlreadyActive(definition_key)
+                tick = _current_tick()
+                sequence = allocate_acceptance_sequence(
+                    owner_id=owner.pk, package_id=package.package_id, group_id=group_id, tick=tick,
+                ) if group_id else None
+                number = sum(record.definition_key == definition_key for record in current) + 1
+                record = QuestRecord(
+                    quest_id=f"{definition_key}:{number}", definition_key=definition_key,
+                    issuer_key=issuer_key, state=QuestState.IN_PROGRESS, stage_index=0,
+                    stage_progress=0, accepted_tick=tick,
+                    deadline_tick=None if definition.deadline_hours is None else (
+                        tick + definition.deadline_hours * CLOCK_YAML["seconds_per_hour"]
+                    ), stage_room_id=None, objective_target_ids=(),
+                    protected_entity_ids=tuple(actor.pk for _, actor in protected),
+                    failure_reason=None, package_id=package.package_id, group_id=group_id,
+                    acceptance_sequence=sequence,
+                    protected_roles=tuple((role, actor.pk) for role, actor in protected),
+                )
+                apply_quest_log_replacement(owner, [*current, record])
+                for role, actor in protected:
+                    add_temporary_source(actor, owner, record.quest_id, role)
+                collect_escort_actors(tuple(actor for _, actor in protected))
+                refresh_escort_scope(owner, package.package_id)
+                evaluate_escort_event(owner, package.package_id, source=source)
+                transaction.on_commit(lambda: log_info("escort_commission_accepted", context={
+                    "char": owner.pk, "quest": record.quest_id, "package": package.package_id,
+                    "group": group_id, "issuer": issuer_key, "sequence": sequence,
+                }))
+                return record
     except (EscortOperationError, QuestAlreadyActive):
         raise
     except Exception as error:

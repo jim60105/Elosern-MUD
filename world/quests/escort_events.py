@@ -70,6 +70,21 @@ def enlist_escort_scope(owner: Any, package_id: str) -> None:
     source.records[identity] = records
 
 
+def refresh_escort_scope(owner: Any, package_id: str) -> None:
+    """Re-snapshot one scope's records after its owning operation commits a
+    binding (acceptance), so the same receipt's final evaluation sees the new
+    record. A scope not yet enlisted is simply enlisted normally.
+    """
+    source = _CURRENT_SOURCE.get()
+    if source is None:
+        return
+    identity = (owner.pk, package_id)
+    if identity not in source.scopes:
+        enlist_escort_scope(owner, package_id)
+        return
+    source.records[identity] = tuple(read_records(owner))
+
+
 def collect_escort_actors(actors: tuple[Any, ...], *, affected: bool = True) -> None:
     """Collect actual moved/bound actors without consuming stage eligibility."""
     source = _CURRENT_SOURCE.get()
