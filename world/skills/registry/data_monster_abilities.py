@@ -130,4 +130,44 @@ ROWS: tuple[SkillDef, ...] = (
             ),
         ),
     ),
+    _skill(
+        "ridge_bracing_kick",
+        "固埂蹬擊",
+        "以土屬性力量穩住身形後奮力蹬擊單一敵方目標，造成物理傷害；出招時短暫提高自身防禦。",
+        SkillKind.ACTIVE,
+        TargetSpec.SINGLE,
+        cost={"mp": 10, "sp": 3},
+        # True for every monster ability: the one written
+        # ``usable_out_of_combat`` policy makes every damage-carrying ability
+        # selectable outside combat, and "combat-only" names the action shape
+        # and targeting, never this flag (settled 2026-10-10; same value the
+        # delivered crocodile, sparrow and crab declare).
+        usable_out_of_combat=True,
+        element="earth",
+        effects=["damage:earth:physical", "self_buff_apply:ridge_brace"],
+        category=SkillCategory.ELEMENTAL_MAGIC,
+        group="earth",
+        faction_constraint=FactionConstraint.ANY,
+        eligibility=SkillEligibility(
+            allowed_actor_kinds=("monster",),
+            allowed_species=("ridge_burrow_hare",),
+        ),
+        prerequisites=(),
+        effect_policies=(
+            # Occurrence 0 is the ordinary enemy strike.
+            EffectPolicy(
+                coefficient=0.8,
+                audience=EffectAudience.ENEMIES,
+            ),
+            # Occurrence 1 binds the caster with no hit dependency: the guard is
+            # part of an affordable, target-resolved attempt, including a miss.
+            # A source-enemy-hit dependency would intersect the SELF audience
+            # away from the actor (see world/rules/action/routing.py), so this
+            # self mount deliberately declares none.
+            EffectPolicy(
+                coefficient=1.0,
+                audience=EffectAudience.SELF,
+            ),
+        ),
+    ),
 )
