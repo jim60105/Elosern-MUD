@@ -64,13 +64,13 @@ PLAYER = "艾洛希雅"
 # compares candidates against whatever displays the context feeds it, so the
 # suite names invented prose instead of shipped title text.
 FIXED = frozenset({"苔徑守誓者", "受矚者"})
-OWNED = frozenset({"南門新客"})
+OWNED = frozenset({"苔徑新客"})
 
 
 def _context(**overrides):
     base = {
         "player_name": PLAYER,
-        "full_title": "苔徑守誓者　南門新客",
+        "full_title": "苔徑守誓者　苔徑新客",
         "declined": (),
         "owned_epithet_displays": OWNED,
         "fixed_displays": FIXED,
@@ -160,7 +160,7 @@ class FilterMatrixTests(unittest.TestCase):
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_live_collection_collision_rejected(self):
-        survivors = self._filter([_candidate(1, "南門新客"), _candidate(2, "新月")])
+        survivors = self._filter([_candidate(1, "苔徑新客"), _candidate(2, "新月")])
         self.assertEqual([c.display for c in survivors], ["新月"])
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
@@ -168,9 +168,9 @@ class FilterMatrixTests(unittest.TestCase):
         # The collection is read live: a deleted epithet is simply absent
         # from owned_epithet_displays, so the same name survives again.
         survivors = self._filter(
-            [_candidate(1, "南門新客")], owned_epithet_displays=frozenset()
+            [_candidate(1, "苔徑新客")], owned_epithet_displays=frozenset()
         )
-        self.assertEqual([c.display for c in survivors], ["南門新客"])
+        self.assertEqual([c.display for c in survivors], ["苔徑新客"])
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_in_batch_duplicates_keep_first(self):
@@ -210,7 +210,7 @@ class FilterMatrixTests(unittest.TestCase):
         self.assertEqual(len(two), 2)
         one = self._filter([_candidate(1, "新月"), _candidate(2, "新月")])
         self.assertEqual([c.display for c in one], ["新月"])
-        zero = self._filter([_candidate(i, "南門新客") for i in range(1, 6)])
+        zero = self._filter([_candidate(i, "苔徑新客") for i in range(1, 6)])
         self.assertEqual(zero, ())
 
     def test_basis_has_no_form_gate(self):
@@ -367,7 +367,7 @@ class DegradeTests(unittest.TestCase):
 
     @covers_requirement("title-system::the-nomination-pipeline-is-5-candidates-through-schema-and-collision-filters")
     def test_all_candidates_filtered_returns_empty_tuple_not_none(self):
-        text = _reply([_candidate(i, "南門新客") for i in range(1, 6)])
+        text = _reply([_candidate(i, "苔徑新客") for i in range(1, 6)])
         client = _client_replying(text)
         with override_settings(LLM_PROFILES=_profiles()):
             result = await_result(generate_epithet_candidates(_context(), client))

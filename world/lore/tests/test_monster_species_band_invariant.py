@@ -85,6 +85,7 @@ def _variant(**overrides: object) -> MonsterVariant:
         "ordinary_variant": True,
         "combat_profile": _profile(),
         "danger_grade": RANK_MID,
+        "profile_required": True,
     }
     values.update(overrides)
     return MonsterVariant(**values)  # type: ignore[arg-type]
@@ -276,6 +277,7 @@ class TierBandInvariantTests(unittest.TestCase):
                 threat_tier=UNBANDED_TIER,
                 combat_profile=None,
                 danger_grade=None,
+                profile_required=False,
             )
         )
         self.assertIn(UNBANDED_TIER, message)

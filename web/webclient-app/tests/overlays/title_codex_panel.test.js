@@ -22,7 +22,7 @@ const T_ROW = SYNTH_TITLE.id;
 const T_ROW_DISPLAY = SYNTH_TITLE.display;
 const T_ROW2 = "t_ember_gate";
 const T_ROW2_DISPLAY = "合格合成者";
-const T_EPITHET = "南門新客";
+const T_EPITHET = "苔徑新客";
 const T_FULL_TITLE = T_ROW_DISPLAY + "\u3000" + T_EPITHET;
 
 function fixedRow(overrides = {}) {
@@ -41,7 +41,7 @@ function fixedRow(overrides = {}) {
 function epithetRow(overrides = {}) {
   return {
     display: T_EPITHET,
-    basis: "初入南門。",
+    basis: "初次走入苔徑。",
     granted_tick: 121,
     equipped: true,
     can_remove: false,
@@ -134,7 +134,7 @@ describe("TitleCodexPanel (title-codex-removal)", () => {
     expect(w.findAll('[data-testid="title-codex-star"]')).toHaveLength(1);
     await w.get('[data-testid="title-codex-epithet-equip-1"]').trigger("click");
     expect(w.emitted("action")).toEqual([
-      [{ action_id: "title.equip", payload: { kind: "epithet", identifier: "南門新客" } }],
+      [{ action_id: "title.equip", payload: { kind: "epithet", identifier: T_EPITHET } }],
     ]);
   });
 

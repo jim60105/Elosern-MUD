@@ -1,5 +1,9 @@
-"""Data-contract test: guild/shop config validation contract
-Slice of ``test_guild_config``: ServiceHostRosterTests.
+"""Data-contract test: place-derived service host roster and current place-declaration contract
+Slice of ``test_guild_config``: ServiceHostRosterTests. The derived service
+hosts are exactly the hosted place declarations, checked in both directions;
+the authored host names, titles and personnel tables this file used to pin are
+gone, while every place key, kind, exterior, doorway name, dwelling lineage and
+host-less shape assertion stays.
 """
 from tools.spec_traceability import covers_requirement
 from dataclasses import replace
@@ -25,137 +29,74 @@ from ._support import (
 class ServiceHostRosterTests(CatalogRegistryIsolation):
     """Derived service-host roster: places yield rows; rejections are unchanged (design §3.2)."""
 
-    # The rows the hand-authored service_hosts roster shipped before this
-    # change removed it. The derived roster must reproduce them field for
-    # field — that is the change's behaviour-neutrality gate. The merchant
-    # row carries one extension since merchant-dialogue: a dialogue_key
-    # beside the shop_key (the shopkeeper blueprint now answers too). The
-    # guild row's two kwargs stay pinned exactly as they shipped.
-    FORMER_YAML_ROWS = (
-        {
-            "name": "葛里安‧衛登",
-            "title": "阿爾托利亞分會會長",
-            "profession": "guild_staff",
-            "anchor_room": "altoria_guild_hall",
-            "service_id": "altoria_guild_master",
-            "branch_key": "guild_branch_altoria",
-            "dialogue_key": "guild_staff",
-        },
-        {
-            "name": "瑪爾特‧金秤",
-            "title": "阿爾托利亞雜貨商店老闆",
-            "profession": "merchant",
-            "anchor_room": "altoria_general_store",
-            "service_id": "altoria_merchant",
-            "shop_key": "altoria_general_store",
-            "dialogue_key": "altoria_general_store",
-        },
-    )
+    @staticmethod
+    def _hosted_places():
+        """Every shipped place that declares a service host, in registry order."""
+        return [
+            place for place in PLACE_REGISTRY.values() if place.service_id is not None
+        ]
 
-    # The assembled roster order is the terrace-slice order
-    # (altoria-place-slices): the lower terrace's eatery host leads, the
-    # middle terrace's guild/store/forge/tailor/jeweller/alchemist follow
-    # (altoria-adornments-and-remedies closed the specialist family and this
-    # pin had never ridden that growth), the upper terrace's temple 主祭 and
-    # sanctum 執事 close the capital block (altoria-sanctum), the village
-    # homes close (altoria-hospitality grew the capital block to eleven hosts;
-    # the 共食棚 still contributes nothing, ciaran-village-commons).
-    # altoria-crown-and-watch grows it to fourteen: the guard captain rides
-    # behind the bathhouse (the guardhouse appended to the LOWER slice), and
-    # the noble-quarter captain and the drill instructor close the capital
-    # block behind the sanctum 執事 (the upper slice); the host-less palace
-    # contributes nothing, exactly as the 共食棚 never has.
-    # This is the order the slices deliberately
-    # establish; the content-neutral field comparisons below locate rows by
-    # service_id so they guard identities, not a sequence.
-    ASSEMBLED_ROSTER_ORDER = [
-        "altoria_eatery_owner",
-        # altoria-hospitality: the lower terrace's three attendant hosts ride
-        # directly behind the eatery, in the slice's authored row order.
-        "altoria_tavern_keeper", "altoria_innkeeper", "altoria_bathhouse_keeper",
-        # altoria-crown-and-watch: the 衛兵駐所 captain, appended to the
-        # lower slice behind the bathhouse.
-        "altoria_guard_captain",
-        "altoria_guild_master", "altoria_merchant",
-        "altoria_blacksmith", "altoria_tailor", "altoria_jeweller",
-        "altoria_alchemist",
-        # altoria-learning-and-exchange: the 商會公所 master, appended to the
-        # middle slice behind the alchemist (the host-less 市集棚 contributes
-        # no row).
-        "altoria_merchant_master",
-        "altoria_high_priestess", "altoria_sanctum_deacon",
-        # altoria-crown-and-watch: the noble-quarter captain and the drill
-        # instructor, appended to the upper slice behind the sanctum.
-        "altoria_noble_watch_captain", "altoria_drill_instructor",
-        # altoria-learning-and-exchange: the 王立魔法學院 dean, appended to
-        # the upper slice behind the drill yard.
-        "altoria_academy_dean",
-        "ciaran_elenis",
-        "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
-        "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn", "ciaran_vethiel",
-    ]
-
-    def _assert_reproduces_former_rows(self, rows):
+    def _assert_rows_follow_the_places(self, rows):
+        """Both directions of the current place-to-derived-roster correspondence."""
+        places = self._hosted_places()
         self.assertEqual(
             [row.service_id for row in rows],
-            list(self.ASSEMBLED_ROSTER_ORDER),
+            [place.service_id for place in places],
+            "the derived roster must be exactly the hosted places, in place order",
         )
         by_service = {row.service_id: row for row in rows}
-        for former in self.FORMER_YAML_ROWS:
-            row = by_service[former["service_id"]]
-            self.assertEqual(row.name, former["name"])
-            self.assertEqual(row.title, former["title"])
-            self.assertEqual(row.profession.key, former["profession"])
-            self.assertEqual(row.anchor_room, former["anchor_room"])
-            self.assertEqual(row.service_id, former["service_id"])
-            expected_kwargs = {
-                key: value
-                for key, value in former.items()
-                if key not in ("name", "title", "profession", "anchor_room", "service_id")
-            }
-            self.assertEqual(row.authored_kwargs, expected_kwargs)
+        for place in places:
+            row = by_service[place.service_id]
+            with self.subTest(service_id=place.service_id):
+                self.assertEqual(row.name, place.host_name)
+                self.assertEqual(row.title, place.host_title)
+                self.assertEqual(row.profession.key, place.profession)
+                self.assertEqual(row.anchor_room, place.key)
+                self.assertEqual(row.authored_kwargs, dict(place.authored_kwargs))
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
     )
-    def test_shipped_roster_reproduces_the_removed_yaml_rows_exactly(self):
+    def test_derived_roster_is_the_current_place_delegation_projection(self):
+        # No frozen roster: the derived rows ARE the current place
+        # declarations, checked both ways, so a valid later authored personnel
+        # or host edit takes effect and a row with no hosted place fails.
         rows = validate_service_hosts()
-        self._assert_reproduces_former_rows(rows)
+        self._assert_rows_follow_the_places(rows)
         by_service = {row.service_id: row for row in rows}
-        guild = by_service["altoria_guild_master"]
-        merchant = by_service["altoria_merchant"]
-        branch = GUILD_BRANCH_REGISTRY["guild_branch_altoria"]
-        store = SHOP_REGISTRY["altoria_general_store"]
-        # The identity join that used to be hand-synchronized across four
-        # files still holds: the guild host's authored identity is the guild
-        # branch's, and the merchant host's is the derived shop's.
-        self.assertEqual((guild.name, guild.title), (branch.host_name, branch.host_title))
-        self.assertEqual((merchant.name, merchant.title), (store.host_name, store.host_title))
+        # The cross-registry identity join a hand-authored roster used to keep
+        # synchronized still holds: the guild host's authored identity is the
+        # guild branch record's, and each shop host's is its derived shop row's.
+        guild_place = next(
+            place
+            for place in self._hosted_places()
+            if "branch_key" in dict(place.authored_kwargs)
+        )
+        branch = GUILD_BRANCH_REGISTRY[dict(guild_place.authored_kwargs)["branch_key"]]
+        guild_row = by_service[guild_place.service_id]
+        self.assertEqual(
+            (guild_row.name, guild_row.title), (branch.host_name, branch.host_title)
+        )
+        for place in self._hosted_places():
+            shop_key = dict(place.authored_kwargs).get("shop_key")
+            if shop_key is None:
+                continue
+            with self.subTest(place=place.key):
+                shop = SHOP_REGISTRY[shop_key]
+                row = by_service[place.service_id]
+                self.assertEqual(
+                    (row.name, row.title), (shop.host_name, shop.host_title)
+                )
 
     def test_catalog_exposes_the_roster(self):
         catalog = load_guild_catalog(QUEST_DEFINITION_REGISTRY)
         self.assertEqual(
             [row.service_id for row in catalog.service_hosts],
-            list(self.ASSEMBLED_ROSTER_ORDER),
+            [place.service_id for place in self._hosted_places()],
         )
         self.assertEqual(
             set(catalog.host_by_service_id),
-            {
-                "altoria_guild_master", "altoria_merchant", "altoria_blacksmith",
-                "altoria_eatery_owner", "altoria_tailor", "altoria_jeweller",
-                "altoria_alchemist",
-                "altoria_tavern_keeper", "altoria_innkeeper",
-                "altoria_bathhouse_keeper",
-                "altoria_high_priestess", "altoria_sanctum_deacon",
-                "altoria_guard_captain",
-                "altoria_noble_watch_captain", "altoria_drill_instructor",
-                # altoria-learning-and-exchange: the dean and the guild master.
-                "altoria_academy_dean", "altoria_merchant_master",
-                "ciaran_elenis",
-                "ciaran_gwenaera", "ciaran_hailiel", "ciaran_lareneth",
-                "ciaran_nireth", "ciaran_teliel", "ciaran_valwyn",
-                "ciaran_vethiel",
-            },
+            {place.service_id for place in self._hosted_places()},
         )
 
     def test_rulebook_no_longer_hand_authors_a_service_hosts_roster(self):
@@ -168,193 +109,58 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
     @covers_requirement(
         "place-attendant-hosts::adding-the-blueprint-changes-no-shipped-host"
     )
-    def test_the_attendant_blueprint_ships_without_moving_any_baseline_row(self):
+    def test_the_attendant_blueprint_changes_no_shipped_host(self):
         # Neutrality gate (place-attendant-profession, as modified by
-        # ciaran-village-commons): every derived row equals its pre-change
-        # baseline entry field by field — name, title, profession, anchor,
-        # service_id, authored identity — so a shipped host's identity
-        # cannot silently move while the roster grows. The blueprint shipped
-        # unused until ciaran-village-commons named its first two hosts;
-        # those rows are this change's own subject (covered against the
-        # ciaran-village-commons capability), not part of this neutrality
-        # claim, so no row count or profession-absence pin belongs here.
-        rows = validate_service_hosts()
-        for expected in self.PRE_CHANGE_BASELINE:
-            row = next(r for r in rows if r.service_id == expected["service_id"])
-            with self.subTest(service_id=row.service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    (
-                        expected["name"],
-                        expected["title"],
-                        expected["profession"],
-                        expected["anchor_room"],
-                        expected["service_id"],
-                        expected["authored_kwargs"],
-                    ),
-                )
+        # ciaran-village-commons), both halves of the scenario: registering an
+        # unused profession blueprint changes no shipped host, and a place that
+        # later declares that blueprint creates only its own declared host. The
+        # comparison is against the rows derived before the blueprint is
+        # registered, never against a frozen roster.
+        from world.rules import profession_config
+        from world.rules.profession_config import Profession, ProfessionComponent
 
-    # The complete roster as it shipped BEFORE place-attendant-profession,
-    # written as literals (never derived from the live registry): the fixed
-    # rows the blueprint addition must reproduce untouched. Each
-    # merchant row's authored_kwargs gained its dialogue_key with
-    # merchant-dialogue (a shopkeeper both trades and answers); every other
-    # field remains the pre-change literal, so an identity cannot silently
-    # move under the extension. ciaran-village-crafts appended the two new
-    # village homes (格威娜拉, 妮瑞斯) — the gate still fails if any of the
-    # earlier rows drifts while the roster grows.
-    PRE_CHANGE_BASELINE = (
-        {
-            "name": "葛里安‧衛登",
-            "title": "阿爾托利亞分會會長",
-            "profession": "guild_staff",
-            "anchor_room": "altoria_guild_hall",
-            "service_id": "altoria_guild_master",
-            "authored_kwargs": {
-                "branch_key": "guild_branch_altoria",
-                "dialogue_key": "guild_staff",
-            },
-        },
-        {
-            "name": "瑪爾特‧金秤",
-            "title": "阿爾托利亞雜貨商店老闆",
-            "profession": "merchant",
-            "anchor_room": "altoria_general_store",
-            "service_id": "altoria_merchant",
-            "authored_kwargs": {
-                "shop_key": "altoria_general_store",
-                "dialogue_key": "altoria_general_store",
-            },
-        },
-        {
-            "name": "維爾登‧黑潭",
-            "title": "聖潔王都鍛造鋪鐵匠",
-            "profession": "merchant",
-            "anchor_room": "altoria_forge",
-            "service_id": "altoria_blacksmith",
-            "authored_kwargs": {
-                "shop_key": "altoria_forge",
-                "dialogue_key": "altoria_forge",
-            },
-        },
-        {
-            "name": "西格瑪‧庫柏",
-            "title": "聖潔王都餐館老闆",
-            "profession": "merchant",
-            "anchor_room": "altoria_eatery",
-            "service_id": "altoria_eatery_owner",
-            "authored_kwargs": {
-                "shop_key": "altoria_eatery",
-                "dialogue_key": "altoria_eatery",
-            },
-        },
-        {
-            "name": "妮絲塔‧狐溪",
-            "title": "聖潔王都裁縫坊坊主",
-            "profession": "merchant",
-            "anchor_room": "altoria_tailor",
-            "service_id": "altoria_tailor",
-            "authored_kwargs": {
-                "shop_key": "altoria_tailor",
-                "dialogue_key": "altoria_tailor",
-            },
-        },
-        {
-            "name": "艾蓮娜‧鴉丘",
-            "title": "聖潔王都首飾坊主",
-            "profession": "merchant",
-            "anchor_room": "altoria_jeweller",
-            "service_id": "altoria_jeweller",
-            "authored_kwargs": {
-                "shop_key": "altoria_jeweller",
-                "dialogue_key": "altoria_jeweller",
-            },
-        },
-        {
-            "name": "希碧拉‧灰沼",
-            "title": "聖潔王都鍊金坊主",
-            "profession": "merchant",
-            "anchor_room": "altoria_alchemist",
-            "service_id": "altoria_alchemist",
-            "authored_kwargs": {
-                "shop_key": "altoria_alchemist",
-                "dialogue_key": "altoria_alchemist",
-            },
-        },
-        {
-            "name": "海莉爾‧斯塔爾法爾",
-            "title": "暗影谷村鑄刃者",
-            "profession": "merchant",
-            "anchor_room": "ciaran_hailiel_home",
-            "service_id": "ciaran_hailiel",
-            "authored_kwargs": {
-                "shop_key": "ciaran_hailiel_home",
-                "dialogue_key": "ciaran_hailiel_home",
-            },
-        },
-        {
-            "name": "格威娜拉‧希爾維爾莉夫",
-            "title": "暗影谷村綴飾者",
-            "profession": "merchant",
-            "anchor_room": "ciaran_gwenaera_home",
-            "service_id": "ciaran_gwenaera",
-            "authored_kwargs": {
-                "shop_key": "ciaran_gwenaera_home",
-                "dialogue_key": "ciaran_gwenaera_home",
-            },
-        },
-        {
-            "name": "拉瑞內斯‧妮特布倫",
-            "title": "暗影谷村花饌好手",
-            "profession": "merchant",
-            "anchor_room": "ciaran_lareneth_home",
-            "service_id": "ciaran_lareneth",
-            "authored_kwargs": {
-                "shop_key": "ciaran_lareneth_home",
-                "dialogue_key": "ciaran_lareneth_home",
-            },
-        },
-        {
-            "name": "妮瑞斯‧米斯特瓦勒",
-            "title": "暗影谷村調藥者",
-            "profession": "merchant",
-            "anchor_room": "ciaran_nireth_home",
-            "service_id": "ciaran_nireth",
-            "authored_kwargs": {
-                "shop_key": "ciaran_nireth_home",
-                "dialogue_key": "ciaran_nireth_home",
-            },
-        },
-        {
-            "name": "瓦爾溫‧斯蒂爾瓦特爾",
-            "title": "暗影谷村蒐羅者",
-            "profession": "merchant",
-            "anchor_room": "ciaran_valwyn_home",
-            "service_id": "ciaran_valwyn",
-            "authored_kwargs": {
-                "shop_key": "ciaran_valwyn_home",
-                "dialogue_key": "ciaran_valwyn_home",
-            },
-        },
-        {
-            "name": "維特希爾‧威爾德布瑞亞爾",
-            "title": "暗影谷村織衣者",
-            "profession": "merchant",
-            "anchor_room": "ciaran_vethiel_home",
-            "service_id": "ciaran_vethiel",
-            "authored_kwargs": {
-                "shop_key": "ciaran_vethiel_home",
-                "dialogue_key": "ciaran_vethiel_home",
-            },
-        },
-    )
+        def row_fields(row):
+            return (
+                row.name,
+                row.title,
+                row.profession.key,
+                row.anchor_room,
+                row.service_id,
+                row.authored_kwargs,
+            )
+
+        before = validate_service_hosts()
+        blueprint = Profession(
+            key="t_unused_blueprint",
+            components=(ProfessionComponent("scripted_dialogue", "place"),),
+            schedule_template=None,
+            default_tier=None,
+        )
+        table = {**profession_config.TABLE, blueprint.key: blueprint}
+        with mock.patch.object(profession_config, "TABLE", table):
+            after = validate_service_hosts()
+            self.assertEqual([row_fields(row) for row in after], [row_fields(row) for row in before])
+            new_place = replace(
+                PLACE_REGISTRY["altoria_general_store"],
+                key="t_new_blueprint_place",
+                service_id="t_new_blueprint_host",
+                profession=blueprint.key,
+                assortment_keys=(),
+                authored_kwargs=(("dialogue_key", "guild_staff"),),
+            )
+            with mock.patch.dict(PLACE_REGISTRY, {"t_new_blueprint_place": new_place}):
+                grown = validate_service_hosts()
+            self.assertEqual(
+                [row.service_id for row in grown],
+                [row.service_id for row in before] + ["t_new_blueprint_host"],
+            )
+            added = grown[-1]
+            self.assertEqual(added.anchor_room, "t_new_blueprint_place")
+            self.assertEqual(added.profession.key, blueprint.key)
+            self.assertEqual(
+                [(c.type_key, c.default_binding) for c in added.profession.components],
+                [("scripted_dialogue", "place")],
+            )
 
     @covers_requirement(
         "guild-registration::service-hosts-are-created-and-converged-from-a-declarative-yaml-roster"
@@ -685,78 +491,34 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             with self.subTest(place=place.key):
                 for field in HOST_IDENTITY_FIELDS:
                     self.assertIsNotNone(getattr(place, field), field)
-        rows = validate_service_hosts()
-        for expected in self.PRE_CHANGE_BASELINE:
-            row = next(r for r in rows if r.service_id == expected["service_id"])
-            with self.subTest(service_id=row.service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    (
-                        expected["name"],
-                        expected["title"],
-                        expected["profession"],
-                        expected["anchor_room"],
-                        expected["service_id"],
-                        expected["authored_kwargs"],
-                    ),
-                )
-
-    #: The three ciaran-village-commons rows as LITERALS — the historical
-    #: neutrality baseline deliberately excludes them, so their authored
-    #: identity needs its own independent data contract: a coordinated drift
-    #: between a row and the sync output would pass every derived comparison.
-    CIARAN_COMMONS_ROWS = {
-        "ciaran_elenis": (
-            "艾莉妮斯‧達恩斯特瑞德爾",
-            "暗影谷村長老",
-            "attendant",
-            "ciaran_elenis_home",
-            "ciaran_elenis",
-            {"dialogue_key": "ciaran_elenis_home"},
-        ),
-        "ciaran_teliel": (
-            "泰莉爾‧菲溫德",
-            "暗影谷村刀術導師",
-            "attendant",
-            "ciaran_teliel_home",
-            "ciaran_teliel",
-            {"dialogue_key": "ciaran_teliel_home"},
-        ),
-    }
+        # Every hosted place still contributes exactly one matching row, and
+        # the sanctioned host-less group above contributes none.
+        self._assert_rows_follow_the_places(validate_service_hosts())
 
     @covers_requirement(
         "ciaran-village-commons::the-village-has-a-communal-shelter-a-sword-instructor-and-an-elder"
     )
-    def test_the_three_commons_rows_are_their_own_literal_data_contract(self):
-        # The two attendant identities are pinned as literals (name, title,
-        # profession, anchor, service_id, authored kwargs) against the
-        # derived roster, and the shelter's host-less shape (every host
-        # scalar None, no profession, no service_id, no kwargs, no goods)
-        # against the registry row — independent of the sync projection.
+    def test_the_commons_places_keep_their_shape_and_staffing(self):
+        # The dwelling contract lives at the place registry, not in a frozen
+        # roster: the shelter's host-less shape (every host scalar None, no
+        # profession, no service id, no kwargs, no goods) and the two attendant
+        # homes' authored lineage and staff are pinned there, and the derived
+        # roster follows each place's own declaration.
         from world.lore.settlements.places import HOST_IDENTITY_FIELDS, place_is_hostless
 
-        rows = validate_service_hosts()
-        for service_id, expected in self.CIARAN_COMMONS_ROWS.items():
-            row = next(r for r in rows if r.service_id == service_id)
-            with self.subTest(service_id=service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    expected,
-                )
+        rows = {row.service_id: row for row in validate_service_hosts()}
+        for key in ("ciaran_elenis_home", "ciaran_teliel_home"):
+            place = PLACE_REGISTRY[key]
+            with self.subTest(place=key):
+                self.assertEqual(place.kind.value, "home")
+                self.assertEqual(place.host_race, "elf")
+                self.assertEqual(place.host_subrace, "ciaran")
+                self.assertEqual(place.host_sex, "female")
+                self.assertEqual(place.profession, "attendant")
+                row = rows[place.service_id]
+                self.assertEqual(row.anchor_room, key)
+                self.assertEqual(row.authored_kwargs, dict(place.authored_kwargs))
+                self.assertEqual(row.profession.key, "attendant")
         shelter = PLACE_REGISTRY["ciaran_shelter"]
         self.assertTrue(place_is_hostless(shelter))
         self.assertEqual(shelter.kind, "commons")
@@ -770,83 +532,29 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
             with self.subTest(field=field):
                 self.assertIsNone(getattr(shelter, field), field)
 
-    #: The three altoria-hospitality rows as LITERALS — the historical
-    #: neutrality baseline excludes them too, so the lane's identities need
-    #: their own independent data contract: a coordinated drift between a
-    #: place row and the sync projection would pass every derived comparison.
-    #: These are the capital's first attendants with nothing to sell: each
-    #: row's whole authored payload is its dialogue key.
-    HOSPITALITY_ROWS = {
-        "altoria_tavern_keeper": (
-            "蘿溫‧古橡",
-            "聖潔王都酒館老闆",
-            "attendant",
-            "altoria_tavern",
-            "altoria_tavern_keeper",
-            {"dialogue_key": "altoria_tavern"},
-        ),
-        "altoria_innkeeper": (
-            "溫弗蕾德‧古林",
-            "聖潔王都旅店老闆娘",
-            "attendant",
-            "altoria_lodging",
-            "altoria_innkeeper",
-            {"dialogue_key": "altoria_lodging"},
-        ),
-        "altoria_bathhouse_keeper": (
-            "伊莎貝爾‧葦沼",
-            "聖潔王都公共浴場管理員",
-            "attendant",
-            "altoria_bathhouse",
-            "altoria_bathhouse_keeper",
-            {"dialogue_key": "altoria_bathhouse"},
-        ),
-    }
-
-    @covers_requirement(
-        "altoria-hospitality::the-capital-has-a-tavern-an-inn-and-a-bathhouse"
-    )
-    def test_the_three_hospitality_rows_are_their_own_literal_data_contract(self):
-        # Name, title, profession, anchor, service_id and authored kwargs are
-        # pinned as literals against the derived roster (the CIARAN_COMMONS_ROWS
-        # pattern), independent of the sync projection.
-        rows = validate_service_hosts()
-        for service_id, expected in self.HOSPITALITY_ROWS.items():
-            row = next(r for r in rows if r.service_id == service_id)
-            with self.subTest(service_id=service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    expected,
-                )
-
-    #: The same three places pinned at the PLACE registry, where the map
-    #: contract lives: the derived ServiceHostRow carries no coordinate or
-    #: doorway field, so without this literal the lane could move to another
-    #: exterior (or the bathhouse off 浴場前) while every derived comparison
-    #: and every sync test stayed green (post-implementation review).
-    #: Shape: place key -> (kind, exterior_xy, doorway name, host name,
-    #: host race, host sex, assortment keys, authored kwargs).
+    #: The three hospitality places pinned at the PLACE registry, where the map
+    #: and dwelling contract lives: the derived ServiceHostRow carries no
+    #: coordinate or doorway field, so without this literal the lane could move
+    #: to another exterior (or the bathhouse off 浴場前) while every derived
+    #: comparison and every sync test stayed green. The hosts' authored names
+    #: and titles are deliberately not pinned: they follow the current place
+    #: declaration, which the correspondence test above checks both ways.
+    #: Shape: place key -> (kind, exterior_xy, doorway name, host race,
+    #: host sex, assortment keys, authored kwargs).
     HOSPITALITY_PLACE_ROWS = {
         "altoria_tavern": (
             "tavern", (4, 1), "醉月酒館",
-            "蘿溫‧古橡", "human", "female", (),
+            "human", "female", (),
             {"dialogue_key": "altoria_tavern"},
         ),
         "altoria_lodging": (
             "lodging", (4, 1), "爐火旅店",
-            "溫弗蕾德‧古林", "human", "female", (),
+            "human", "female", (),
             {"dialogue_key": "altoria_lodging"},
         ),
         "altoria_bathhouse": (
             "bathhouse", (5, 1), "公共浴場",
-            "伊莎貝爾‧葦沼", "human", "female", (),
+            "human", "female", (),
             {"dialogue_key": "altoria_bathhouse"},
         ),
     }
@@ -867,7 +575,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                         place.kind.value,
                         place.exterior_xy,
                         place.doorway_key_zh,
-                        place.host_name,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,
@@ -876,89 +583,34 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                     expected,
                 )
 
-    #: The three altoria-crown-and-watch attendant rows as LITERALS — the
-    #: historical neutrality baseline excludes them, so the watch's and the
-    #: yard's identities need their own independent data contract: a
-    #: coordinated drift between a place row and the sync projection would
-    #: pass every derived comparison (the HOSPITALITY_ROWS pattern).
-    CROWN_WATCH_ROWS = {
-        "altoria_guard_captain": (
-            "托瓦德‧鄧堡",
-            "聖潔王都衛兵隊隊長",
-            "attendant",
-            "altoria_guardhouse",
-            "altoria_guard_captain",
-            {"dialogue_key": "altoria_guardhouse"},
-        ),
-        "altoria_noble_watch_captain": (
-            "古利安‧鷹守",
-            "聖潔王都貴族區衛隊長",
-            "attendant",
-            "altoria_noble_watch",
-            "altoria_noble_watch_captain",
-            {"dialogue_key": "altoria_noble_watch"},
-        ),
-        "altoria_drill_instructor": (
-            "伊沃‧高丘",
-            "聖潔王都訓練場教頭",
-            "attendant",
-            "altoria_drill_yard",
-            "altoria_drill_instructor",
-            {"dialogue_key": "altoria_drill_yard"},
-        ),
-    }
-
-    @covers_requirement(
-        "altoria-crown-and-watch::the-capital-has-a-palace-a-noble-quarter-a-guardhouse-and-a-drill-yard"
-    )
-    def test_the_three_crown_watch_rows_are_their_own_literal_data_contract(self):
-        # Name, title, profession, anchor, service_id and authored kwargs are
-        # pinned as literals against the derived roster, independent of the
-        # sync projection.
-        rows = validate_service_hosts()
-        for service_id, expected in self.CROWN_WATCH_ROWS.items():
-            row = next(r for r in rows if r.service_id == service_id)
-            with self.subTest(service_id=service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    expected,
-                )
-
     #: The four altoria-crown-and-watch places pinned at the PLACE registry,
-    #: where the map contract lives (the HOSPITALITY_PLACE_ROWS pattern):
-    #: the derived ServiceHostRow carries no coordinate or doorway field, so
-    #: without this literal the palace could move off 王宮前庭 or the
-    #: guardhouse off 南門 while every derived comparison stayed green.
-    #: Shape: place key -> (kind, exterior_xy, doorway name, host name,
-    #: host race, host sex, assortment keys, authored kwargs). The palace's
-    #: host half of the tuple is the literal None triple — the row is the
-    #: capital's first host-less place, and pinning its emptiness here is
-    #: what keeps an attendant from quietly appearing behind the throne.
+    #: where the map and dwelling contract lives (the HOSPITALITY_PLACE_ROWS
+    #: pattern): the derived ServiceHostRow carries no coordinate or doorway
+    #: field, so without this literal the palace could move off 王宮前庭 or the
+    #: guardhouse off 南門 while every derived comparison stayed green. The
+    #: hosts' authored names and titles are deliberately not pinned; the
+    #: palace's host half stays the literal None pair, which is what keeps an
+    #: attendant from quietly appearing behind the throne.
+    #: Shape: place key -> (kind, exterior_xy, doorway name, host race,
+    #: host sex, assortment keys, authored kwargs).
     CROWN_WATCH_PLACE_ROWS = {
         "altoria_palace": (
             "palace", (4, 6), "王宮",
-            None, None, None, (), {},
+            None, None, (), {},
         ),
         "altoria_noble_watch": (
             "watch_post", (3, 5), "貴族區衛所",
-            "古利安‧鷹守", "human", "male", (),
+            "human", "male", (),
             {"dialogue_key": "altoria_noble_watch"},
         ),
         "altoria_drill_yard": (
             "training_ground", (2, 4), "校場",
-            "伊沃‧高丘", "human", "male", (),
+            "human", "male", (),
             {"dialogue_key": "altoria_drill_yard"},
         ),
         "altoria_guardhouse": (
             "watch_post", (3, 0), "衛兵駐所",
-            "托瓦德‧鄧堡", "human", "male", (),
+            "human", "male", (),
             {"dialogue_key": "altoria_guardhouse"},
         ),
     }
@@ -978,7 +630,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                         place.kind.value,
                         place.exterior_xy,
                         place.doorway_key_zh,
-                        place.host_name,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,
@@ -1014,74 +665,31 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
         anchors = {row.anchor_room for row in validate_service_hosts()}
         self.assertNotIn("altoria_palace", anchors)
 
-    #: The two altoria-learning-and-exchange attendant rows as LITERALS —
-    #: the CROWN_WATCH_ROWS pattern: name, title, profession, anchor,
-    #: service id and authored kwargs pinned against the derived roster
-    #: independently of the sync projection, so a coordinated drift between
-    #: a place row and the projection cannot pass every derived comparison.
-    LEARNING_EXCHANGE_ROWS = {
-        "altoria_academy_dean": (
-            "奧德溫‧薩契",
-            "聖潔王都魔法學院院長",
-            "attendant",
-            "altoria_academy",
-            "altoria_academy_dean",
-            {"dialogue_key": "altoria_academy"},
-        ),
-        "altoria_merchant_master": (
-            "尤斯汀‧柯德溫",
-            "聖潔王都商會會長",
-            "attendant",
-            "altoria_merchant_hall",
-            "altoria_merchant_master",
-            {"dialogue_key": "altoria_merchant_hall"},
-        ),
-    }
-
-    @covers_requirement(
-        "altoria-learning-and-exchange::the-capital-has-an-academy-a-merchant-hall-and-covered-market-stalls"
-    )
-    def test_the_two_learning_exchange_rows_are_their_own_literal_data_contract(self):
-        # Both hosts land as plain attendants — the academy grants no skill
-        # and the hall posts no work, and neither authored a branch, shop or
-        # quest kwarg that would say otherwise.
-        rows = validate_service_hosts()
-        for service_id, expected in self.LEARNING_EXCHANGE_ROWS.items():
-            row = next(r for r in rows if r.service_id == service_id)
-            with self.subTest(service_id=service_id):
-                self.assertEqual(
-                    (
-                        row.name,
-                        row.title,
-                        row.profession.key,
-                        row.anchor_room,
-                        row.service_id,
-                        row.authored_kwargs,
-                    ),
-                    expected,
-                )
-
     #: The three altoria-learning-and-exchange places pinned at the PLACE
-    #: registry, where the map contract lives (the CROWN_WATCH_PLACE_ROWS
-    #: pattern): the academy on the 學院前 square (5,5) the upper terrace's
-    #: own, the merchant hall sharing 東市 (5,3) with the alchemist under a
-    #: second door name, and the stalls the third door on 市場街 (2,3) behind
-    #: the general store and the jeweller. The stalls' host half is the
-    #: literal None triple — the capital's second deliberate emptiness.
+    #: registry, where the map and institutional contract lives (the
+    #: CROWN_WATCH_PLACE_ROWS pattern): the academy on the 學院前 square (5,5)
+    #: the upper terrace's own, the merchant hall sharing 東市 (5,3) with the
+    #: alchemist under a second door name, and the stalls the third door on
+    #: 市場街 (2,3) behind the general store and the jeweller. The stalls' host
+    #: half stays the literal None pair — the capital's second deliberate
+    #: emptiness. The hosts' authored names and titles are deliberately not
+    #: pinned: both hosts land as plain attendants whose whole authored payload
+    #: is a dialogue key, and the correspondence test above checks that
+    #: neither authored a branch, shop or quest kwarg.
     LEARNING_EXCHANGE_PLACE_ROWS = {
         "altoria_academy": (
             "academy", (5, 5), "王立魔法學院",
-            "奧德溫‧薩契", "human", "male", (),
+            "human", "male", (),
             {"dialogue_key": "altoria_academy"},
         ),
         "altoria_merchant_hall": (
             "merchant_hall", (5, 3), "商會公所",
-            "尤斯汀‧柯德溫", "human", "male", (),
+            "human", "male", (),
             {"dialogue_key": "altoria_merchant_hall"},
         ),
         "altoria_market_stalls": (
             "market", (2, 3), "市集棚",
-            None, None, None, (), {},
+            None, None, (), {},
         ),
     }
 
@@ -1101,7 +709,6 @@ class ServiceHostRosterTests(CatalogRegistryIsolation):
                         place.kind.value,
                         place.exterior_xy,
                         place.doorway_key_zh,
-                        place.host_name,
                         place.host_race,
                         place.host_sex,
                         place.assortment_keys,

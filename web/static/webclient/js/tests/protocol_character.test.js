@@ -104,7 +104,7 @@ test("validates the character panel available/unavailable discriminator", () => 
   assert.throws(() => Protocol.validateCharacterPanel(missingIntimate));
   // The optional composed full-title row mirrors the status panel's contract.
   assert.doesNotThrow(() =>
-    Protocol.validateCharacterPanel(validCharacterPanel({ full_title: "F級冒險者　南門新客" }))
+    Protocol.validateCharacterPanel(validCharacterPanel({ full_title: "F級冒險者　苔徑新客" }))
   );
   assert.throws(() =>
     Protocol.validateCharacterPanel(validCharacterPanel({ full_title: "　" }))

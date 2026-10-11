@@ -172,6 +172,7 @@ from world.tests.synthetic_data.data_world import (
     SYNTH_GUILD_RANKS,
     SYNTH_GUILD_BRANCHES,
     SYNTH_TITLES,
+    SYNTH_STARTER_EPITHET,
     SYNTH_ANCHORS,
     SYNTH_ANCHOR_PLACEMENTS,
     SYNTH_NATIONS,

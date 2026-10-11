@@ -13,18 +13,15 @@ document rules out a parallel bounty system.
 ## Requirements
 
 ### Requirement: The capital has a palace, a noble quarter, a guardhouse and a drill yard
-The capital SHALL carry these four locations as permanent interiors. Three SHALL hold an
-authored host who converses; the palace SHALL hold none, and SHALL still be a complete,
-enterable, permanently tagged room reachable from and back to its exterior.
+The capital SHALL carry a palace, a noble quarter, a guardhouse and a drill yard as permanent, complete, enterable tagged interiors reachable both ways. Staffing and authored host identity SHALL follow current place declarations, not historical personnel counts. Declared dialogue hosts SHALL converse without gaining forbidden watch-work capabilities.
 
 #### Scenario: Four locations exist, three of them staffed
 - **WHEN** synchronization completes
-- **THEN** all four interiors exist once and are reachable both ways, three hold one
-  dialogue-carrying host each, and the palace holds no service host
+- **THEN** all four interiors exist once and remain reachable both ways; staffing matches declarations, including absent hosts
 
 #### Scenario: The empty palace survives a resynchronization
-- **WHEN** synchronization runs twice
-- **THEN** the palace interior exists exactly once and no host is created in it on either run
+- **WHEN** a currently hostless place is synchronized twice
+- **THEN** its interior exists once and no service host appears on either run
 
 ### Requirement: The crown's rooms stand open until a story closes them
 Neither the palace nor the noble quarter SHALL carry an access lock, a rank check, a quest

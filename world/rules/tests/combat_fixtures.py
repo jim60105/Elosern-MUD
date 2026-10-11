@@ -79,6 +79,25 @@ class FakeGauge:
         return self._data["base"]
 
 
+def flee_edge(maximum_hp: float, threshold: float) -> int:
+    """The highest stored HP that still meets ``threshold`` for ``maximum_hp``.
+
+    Locates a representative's inherited flee boundary with the engine's own
+    comparison (``stored / maximum <= threshold``, evaluated in the same
+    binary floats the policy uses) instead of re-deriving it with a
+    multiply-and-floor guess: those two expressions round differently, so an
+    arithmetic edge can sit one HP away from the real one. The outcome
+    assertion still goes through the policy itself - this only says which HP to
+    ask about.
+    """
+    top = int(maximum_hp)
+    if top <= 0:
+        return 0
+    return max(
+        stored for stored in range(top, 0, -1) if stored / maximum_hp <= threshold
+    )
+
+
 def grant_lineage(
     entity,
     active: list[str],

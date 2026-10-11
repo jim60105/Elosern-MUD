@@ -70,8 +70,10 @@ class PersistentHumanGuildHostTests(EvenniaTest):
                      schedules.ScheduleEntry(70, "move", target="frontage"),
                      schedules.ScheduleEntry(100, "move", target="home")),
         )
+        self.template = template
         home_place = PlaceDefinition("t_home", "t_settlement", PlaceKind.HOME,
                                      "合成住家", "小屋", (1, 1), "住家", ())
+        self.home_place = home_place
         for target, value in (
             ("world.lore.guild.GUILD_RANK_REGISTRY", {"t_rank": object()}),
             ("world.lore.guild.GUILD_BRANCH_REGISTRY", {"t_branch": object()}),
@@ -226,5 +228,106 @@ class PersistentHumanGuildHostTests(EvenniaTest):
         with patch.object(hosts, "set_npc_schedule", side_effect=RuntimeError("synthetic write failure")):
             with self.assertRaises(RuntimeError):
                 self.sync()
+        self.assertEqual(NPC.objects.all_family().count(), before)
+        self.assertIsNone(hosts.find_persistent_adventurer(self.person.key))
+
+    @covers_requirement(
+        "human-guild-hosts::normal-hosts-own-literal-bases-gear-and-usable-complete-human-skill-lineages"
+    )
+    def test_a_valid_changed_personnel_declaration_syncs_its_new_values(self):
+        # A personnel edit is authored data: new bases, new gear membership and
+        # a new age pair are accepted and land on the created host, with no
+        # second literal table to keep in step.
+        changed_bases = (160, 130, 125, 16, 17, 16, 27)
+        self.people[self.person.key] = replace(
+            self.person, bases=changed_bases, equipment=(self.person.equipment[0],)
+        )
+        changed_profile = replace(self.profile, age=51, apparent_age=48)
+        self.profiles[self.profile.key] = changed_profile
+
+        host, = self.sync()
+
+        self.assertEqual(
+            (host.db.age, host.db.apparent_age),
+            (changed_profile.age, changed_profile.apparent_age),
+        )
+        self.assertEqual(
+            tuple(
+                getattr(host.traits, stat).base
+                for stat in ("hp", "mp", "sp", "atk_phys", "agility", "defense", "magic_power")
+            ),
+            changed_bases,
+        )
+        self.assertEqual(host.db.equipment["weapon_main"], self.person.equipment[0])
+
+    @covers_requirement(
+        "human-guild-hosts::normal-hosts-own-literal-bases-gear-and-usable-complete-human-skill-lineages"
+    )
+    def test_a_missing_or_shared_person_profile_is_rejected(self):
+        before = NPC.objects.all_family().count()
+        self.people[self.person.key] = replace(self.person, profile_key="t_absent_profile")
+        with self.assertRaises(hosts.GuildHostIntegrityError):
+            self.sync()
+        self.people[self.person.key] = self.person
+        self.people["t_second"] = replace(
+            self.person, key="t_second", name="合成旅人二"
+        )
+        with self.assertRaises(hosts.GuildHostIntegrityError):
+            self.sync()
+        self.assertEqual(NPC.objects.all_family().count(), before)
+        self.assertIsNone(hosts.find_persistent_adventurer(self.person.key))
+
+    @covers_requirement(
+        "human-guild-hosts::hosts-live-in-connected-residences-and-traverse-authored-recurring-guild-visits"
+    )
+    def test_an_unregistered_or_hosted_residence_is_rejected(self):
+        # The route is real place/exits travel: a home that no place declares,
+        # or one that hosts a service of its own, cannot be a person's home.
+        before = NPC.objects.all_family().count()
+        self.people[self.person.key] = replace(self.person, home_key="t_nowhere")
+        with self.assertRaises(hosts.GuildHostIntegrityError):
+            self.sync()
+        self.people[self.person.key] = replace(self.person, home_key="t_hosted_home")
+        with patch(
+            "world.lore.settlements.places.PLACE_REGISTRY",
+            {
+                "t_home": self.home_place,
+                "t_hosted_home": replace(
+                    self.home_place, key="t_hosted_home", service_id="t_service"
+                ),
+            },
+        ):
+            with self.assertRaises(hosts.GuildHostIntegrityError):
+                self.sync()
+        self.assertEqual(NPC.objects.all_family().count(), before)
+        self.assertIsNone(hosts.find_persistent_adventurer(self.person.key))
+
+    @covers_requirement(
+        "human-guild-hosts::hosts-live-in-connected-residences-and-traverse-authored-recurring-guild-visits"
+    )
+    def test_an_invalid_residence_routine_is_rejected(self):
+        before = NPC.objects.all_family().count()
+        for reason, template in (
+            ("resting duty", replace(self.template, default_state="resting")),
+            (
+                "unknown target",
+                replace(
+                    self.template,
+                    entries=(schedules.ScheduleEntry(10, "move", target="elsewhere"),),
+                ),
+            ),
+        ):
+            with self.subTest(reason=reason):
+                self.people[self.person.key] = replace(
+                    self.person, schedule_template=template.key
+                )
+                with patch(
+                    "world.rules.npc_schedules._RULEBOOK",
+                    schedules.ScheduleRulebook(
+                        1, ("duty", "resting", "busy"), (template,)
+                    ),
+                ):
+                    with self.assertRaises(hosts.GuildHostIntegrityError):
+                        self.sync()
         self.assertEqual(NPC.objects.all_family().count(), before)
         self.assertIsNone(hosts.find_persistent_adventurer(self.person.key))

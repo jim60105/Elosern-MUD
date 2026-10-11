@@ -3,13 +3,15 @@
 Slice of ``test_guild_config``: CommerceRulebookSliceTests.
 """
 from tools.spec_traceability import covers_requirement
-import json
 import tempfile
 import unittest
 from pathlib import Path
 
 import yaml
 
+from world.lore.settlements.assortments import ASSORTMENT_REGISTRY
+from world.lore.settlements.places import PLACE_REGISTRY
+from world.lore.settlements.shops import SHOP_REGISTRY
 from world.rules.guild_config import (
     GuildConfigError,
     load_commerce_config,
@@ -19,7 +21,15 @@ from world.rules.guild_config import (
 )
 
 _SHIPPED_DIR = Path(__file__).resolve().parents[3] / "rules" / "rulebook" / "commerce"
-_BASELINE = Path(__file__).resolve().parent / "commerce_catalog_baseline.json"
+
+
+def _place_by_shop() -> dict:
+    """The place that authors each derived shop identity."""
+    return {
+        dict(place.authored_kwargs)["shop_key"]: place
+        for place in PLACE_REGISTRY.values()
+        if dict(place.authored_kwargs).get("shop_key")
+    }
 
 _A_ASSORTMENTS = """
 assortments:
@@ -228,147 +238,93 @@ class CommerceRulebookSliceTests(unittest.TestCase):
                 load_commerce_config(root)
             self.assertIn("commerce/bad.yaml", str(caught.exception))
 
-    def test_shipped_rulebook_is_a_directory_of_sorted_slices(self):
-        files = sorted(_SHIPPED_DIR.glob("*.yaml"))
-        self.assertEqual(
-            [path.name for path in files],
-            ["altoria.yaml", "ciaran.yaml", "scales.yaml"],
-        )
-        catalog = load_commerce_config(_SHIPPED_DIR)
-        # ciaran-village-crafts grew the village to six shelves and six
-        # homes; altoria-adornments-and-remedies split two more capital
-        # bundles out of the sundries, and altoria-sanctum added the
-        # sanctum's own bundle and counter: five capital + six elven
-        # assortments, thirteen shops.
-        self.assertEqual(len(catalog["assortments"]), 13)
-        self.assertEqual(len(catalog["shops"]), 13)
-        self.assertEqual(
-            catalog["price_scales"], {"capital_altoria": 100, "village_ciaran": 100}
-        )
-
     @covers_requirement(
         "commerce-assortments::commerce-balance-data-is-a-set-of-files-not-one-file"
     )
-    def test_resolved_shipped_catalog_equals_the_pre_split_baseline(self):
-        # The split promised the resolved catalog moved verbatim: every
-        # shop's offers, prices, stock and hours. The baseline started as
-        # the pre-split resolved catalog (normalized JSON) captured before
-        # the directory existed and is the equality guard the slice loader
-        # must keep passing — re-baselined whenever a content change
-        # deliberately moves the catalog (ciaran-village-crafts added the
-        # two village homes' shops, moved the earring offer between
-        # shelves, and added the remedy offers). What it must NEVER absorb
-        # is drift from the SLICE LOADERS: the offers still have to resolve
-        # through the same merge/validation path the split introduced.
-        commerce = load_commerce_config(_SHIPPED_DIR)
-        configs = validate_shop_configs(
-            commerce["shops"],
-            validate_assortment_configs(commerce["assortments"]),
-            validate_price_scales(commerce["price_scales"]),
+    def test_shipped_rulebook_is_a_directory_of_sorted_slices(self):
+        files = sorted(_SHIPPED_DIR.glob("*.yaml"))
+        # The directory is the contract: names stay sorted and unique (the
+        # loader merges in filename order), but the roster itself is data --
+        # a new settlement slice must not need a test edit.
+        names = [path.name for path in files]
+        self.assertTrue(names)
+        self.assertEqual(names, sorted(set(names)))
+        self.assertTrue(all(name.endswith(".yaml") for name in names))
+        catalog = load_commerce_config(_SHIPPED_DIR)
+        # Structural, not counted: every declared row resolves through the
+        # sorted merge and every section is non-empty, so adding a settlement
+        # slice is a data edit while an emptied one still fails loudly.
+        self.assertTrue(catalog["assortments"])
+        self.assertTrue(catalog["shops"])
+        for row in catalog["assortments"]:
+            self.assertIn(row["key"], ASSORTMENT_REGISTRY)
+        self.assertEqual(
+            {row["shop_key"] for row in catalog["shops"]}, set(SHOP_REGISTRY)
         )
-        resolved = {
-            "price_scales": dict(sorted(validate_price_scales(commerce["price_scales"]).items())),
-            "shops": {
-                shop_key: {
-                    "open_hour": cfg.open_hour,
-                    "close_hour": cfg.close_hour,
-                    "restock_hour": cfg.restock_hour,
-                    "offers": [
-                        {
-                            "item_key": offer.item_key,
-                            "buy_copper": offer.buy_copper,
-                            "sell_copper": offer.sell_copper,
-                            "max_stock": offer.max_stock,
-                            "initial_stock": offer.initial_stock,
-                            "restock_quantity": offer.restock_quantity,
-                        }
-                        for offer in sorted(cfg.offers, key=lambda o: o.item_key)
-                    ],
-                }
-                for shop_key, cfg in sorted(configs.items())
-            },
-        }
-        baseline = json.loads(_BASELINE.read_text(encoding="utf-8"))
-        self.assertEqual(resolved["price_scales"], baseline["price_scales"])
-        self.assertEqual(resolved["shops"], baseline["shops"])
+        scales = validate_price_scales(catalog["price_scales"])
+        self.assertTrue(scales)
+        for scale in scales.values():
+            self.assertIs(type(scale), int)
+            self.assertGreaterEqual(scale, 1)
 
     @covers_requirement(
         "sample-city-altoria::the-sample-city-s-xyzgrid-remains-thirteen-exterior-nodes-while-permanent-service-interiors-are-attached"
     )
-    def test_the_moved_offers_travel_field_for_field(self):
-        # altoria-adornments-and-remedies moved seventeen offer rows out of
-        # general_sundries into the two new specialist bundles, and
-        # altoria-sanctum moved 受洗聖水 verbatim onto the sanctum's own
-        # counter. A hand-moved row where a digit went missing is exactly
-        # what this guards: the
-        # literal BEFORE table below is the pre-move resolved offer of every
-        # moved item (captured from the shipped data at the parent commit and
-        # equal, field for field, to the re-baselined commerce_catalog_
-        # baseline.json's pre-move general-store rows); after the move, each
-        # key resolves — through the real loader and validators, not a
-        # re-parse of the YAML — in exactly ONE capital shop, with all five
-        # fields identical.
-        before = {
-            # accessory-slot adornments -> capital_adornments / altoria_jeweller
-            "silver_hairpin": (200, 100, 10, 5, 2),
-            "wolf_fang_necklace": (800, 400, 5, 2, 1),
-            "pilgrim_medallion": (1500, 750, 5, 2, 1),
-            "protective_ring": (30000, 15000, 1, 1, 1),
-            "storage_pouch": (10000, 5000, 3, 3, 1),
-            "gliding_cloak": (80000, 40000, 1, 1, 1),
-            "purified_pendant": (15000, 7500, 3, 1, 1),
-            "fearless_brooch": (15000, 7500, 3, 1, 1),
-            "apothecary_beads": (2500, 1250, 5, 2, 2),
-            "passion_silk_choker": (4800, 2400, 3, 1, 1),
-            "radiant_holy_emblem": (20000, 10000, 2, 1, 1),
-            # remedies -> capital_remedies / altoria_alchemist
-            "healing_potion": (100, 50, 5, 3, 2),
-            "greater_healing_potion": (250, 125, 5, 3, 2),
-            "mana_potion": (120, 60, 10, 4, 2),
-            "miners_bracing_broth": (50, 25, 20, 10, 5),
-            "beastfolk_herbal_salve": (60, 30, 20, 10, 5),
-            "passion_draught": (300, 150, 5, 2, 1),
-            # 受洗聖水 -> sanctum_wares / altoria_sanctum_shop
-            # (altoria-sanctum)
-            "baptismal_holy_water": (120, 60, 10, 4, 2),
-        }
+    def test_at_par_slice_offers_travel_field_for_field(self):
+        # "Moving a good between shelves does not change its price": where a
+        # shop's settlement is at par and the shop declares neither its own
+        # price_scale nor an override, every resolved offer must equal the
+        # authored assortment row verbatim -- all five fields. A hand-moved
+        # row that lost or repriced a field on its way from the slice to the
+        # counter fails here, and no pre-split snapshot is needed to see it.
+        # Attached to sample-city-altoria because that is the requirement
+        # whose merchandise scenarios (a shop exposing precisely its current
+        # authored union, goods moving between shelves without repricing)
+        # this asserts; the grid/interior half of it stays in
+        # world/maps/tests/test_service_interiors.py.
         commerce = load_commerce_config(_SHIPPED_DIR)
-        configs = validate_shop_configs(
-            commerce["shops"],
-            validate_assortment_configs(commerce["assortments"]),
-            validate_price_scales(commerce["price_scales"]),
-        )
-        for item_key, fields in before.items():
-            with self.subTest(item=item_key):
-                homes = [
-                    (shop_key, offer)
-                    for shop_key, cfg in configs.items()
-                    # Capital shops only: the village shelves deliberately
-                    # share remedy keys with the capital at village prices
-                    # (settlement-shops design §4.1).
-                    if shop_key.startswith("altoria_")
-                    for offer in cfg.offers
-                    if offer.item_key == item_key
-                ]
-                self.assertEqual(len(homes), 1, f"{item_key} offered by {len(homes)} shops")
-                offer = homes[0][1]
-                self.assertEqual(
-                    (
-                        offer.buy_copper,
-                        offer.sell_copper,
-                        offer.max_stock,
-                        offer.initial_stock,
-                        offer.restock_quantity,
-                    ),
-                    fields,
-                    f"{item_key} drifted from its pre-move offer",
-                )
-        # The new shops are where the goods landed, in bundle size: the
-        # eleven-plus-six of the adornments split, and altoria-sanctum's
-        # thirteen (twelve intimacy goods plus the moved 受洗聖水).
-        self.assertEqual(len(configs["altoria_jeweller"].offers), 11)
-        self.assertEqual(len(configs["altoria_alchemist"].offers), 6)
-        self.assertEqual(len(configs["altoria_sanctum_shop"].offers), 13)
+        scales = validate_price_scales(commerce["price_scales"])
+        assortment_offers = validate_assortment_configs(commerce["assortments"])
+        configs = validate_shop_configs(commerce["shops"], assortment_offers, scales)
+        places = _place_by_shop()
+        rows = {row["shop_key"]: row for row in commerce["shops"]}
+        checked = 0
+        for shop_key, config in configs.items():
+            row = rows[shop_key]
+            place = places[shop_key]
+            if (
+                scales[place.settlement_key] != 100
+                or "price_scale" in row
+                or "overrides" in row
+            ):
+                continue
+            shop = SHOP_REGISTRY[shop_key]
+            excluded = set(place.excluded_item_keys)
+            resolved = {offer.item_key: offer for offer in config.offers}
+            for assortment_key in shop.assortment_keys:
+                for base in assortment_offers[assortment_key].values():
+                    if base.item_key in excluded:
+                        continue
+                    offer = resolved[base.item_key]
+                    with self.subTest(shop=shop_key, item=base.item_key):
+                        self.assertEqual(
+                            (
+                                offer.buy_copper,
+                                offer.sell_copper,
+                                offer.max_stock,
+                                offer.initial_stock,
+                                offer.restock_quantity,
+                            ),
+                            (
+                                base.buy_copper,
+                                base.sell_copper,
+                                base.max_stock,
+                                base.initial_stock,
+                                base.restock_quantity,
+                            ),
+                        )
+                    checked += 1
+        self.assertGreater(checked, 0)
 
 
 if __name__ == "__main__":

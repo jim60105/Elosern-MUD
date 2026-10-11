@@ -59,8 +59,8 @@ An item declaring itself non-sellable SHALL NOT be buyable or sellable regardles
 - **THEN** the sale is refused and neither the wallet nor the inventory changes
 
 #### Scenario: Sellability outranks a shop listing
-- **WHEN** a shop's offers list a non-sellable item key
-- **THEN** buying and selling it are still refused
+- **WHEN** a synthetic non-sellable item is introduced through an assortment, place addition or price override
+- **THEN** buy and sell still refuse before wallet, inventory, stock, acquisition progress or affinity changes; a valid price band cannot authorize trade
 
 ### Requirement: Registration does not entitle an item to a market
 A registered item SHALL NOT become purchasable merely by existing. An item no shop offers SHALL remain fully functional through every non-shop path — granted into inventory, held, inspected, equipped if it is equipment, used if it is usable, and named by a quest objective, a starting kit, a preset, or a generated scenario. No loader, validator, or startup check SHALL treat "registered but offered nowhere" as an incomplete or invalid state.

@@ -32,18 +32,28 @@ from world.rules.economy import (
     shop_is_open,
 )
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
-from world.rules.guild_config import GuildConfigError, validate_shop_configs
+from world.rules.guild_config import (
+    GuildConfigError,
+    ItemOfferRule,
+    validate_shop_configs,
+)
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.rules.tests._guild_service_probes import (
     install_synthetic_catalog,
     live_item_registry,
+    live_price_table,
     price_band,
     synth_catalog,
     synth_offer_rule,
     synth_shop_config,
 )
 from world.skills.equipment import list_items
-from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_SHOPS, make_item
+from world.tests.synthetic_data import (
+    SYNTH_ITEMS,
+    SYNTH_SHOPS,
+    make_item,
+    make_price,
+)
 from world.tests.synthetic_data.data_world import SYNTH_PLACES
 
 T_SHOP = next(iter(SYNTH_SHOPS))
@@ -239,6 +249,89 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
             self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
             self.assertEqual(self.player.db.wallet, 100)
             self.assertEqual(self.player.db.inventory, [_T_PASS])
+
+    @covers_requirement(
+        "lore-item-catalog::a-non-sellable-item-never-reaches-a-merchant-transaction"
+    )
+    def test_a_listed_keepsake_refuses_both_directions_before_any_write(self):
+        # A file-local keepsake-band item that a synthetic shop lists anyway:
+        # the load-time rejections keep such a listing from shipping, and this
+        # is the runtime backstop. Buy and sell must refuse on the item's own
+        # sellability before wallet, inventory, stock, acquisition progress or
+        # affinity change -- and the held keepsake stays holdable and
+        # inspectable.
+        keepsake = make_item(
+            "t_keepsake_probe",
+            display_name_zh="合成信物",
+            price_table_key="t_keepsake_band",
+            sellable=False,
+        )
+        band = make_price(
+            "t_keepsake_band",
+            display_name_zh="合成信物帶",
+            min_copper=999_999,
+            max_copper=None,
+            notes="Synthetic keepsake band.",
+        )
+        config = synth_shop_config(
+            T_SHOP,
+            (_T_SPRAY, _T_FANG, _T_APPLE, _T_KNIFE, keepsake.key),
+            offer_rules=(
+                synth_offer_rule(_T_SPRAY, max_stock=20),
+                synth_offer_rule(_T_FANG, max_stock=3),
+                synth_offer_rule(_T_APPLE, max_stock=20),
+                synth_offer_rule(_T_KNIFE, max_stock=20, initial_stock=1),
+                ItemOfferRule(
+                    item_key=keepsake.key,
+                    buy_copper=999_999,
+                    sell_copper=0,
+                    max_stock=2,
+                    initial_stock=2,
+                    restock_quantity=1,
+                ),
+            ),
+        )
+        live_item_registry()[keepsake.key] = keepsake
+        live_price_table()[band.key] = band
+        try:
+            install_synthetic_catalog(
+                self, synth_catalog(shop_configs={T_SHOP: config})
+            )
+            self.player.db.wallet = 5_000_000
+            self.player.db.inventory = [keepsake.key]
+            self.player.db.quest_log = []
+
+            def snapshot():
+                return (
+                    int(self.player.db.wallet),
+                    list(self.player.db.inventory),
+                    list(self.player.db.quest_log or []),
+                    dict(parse_merchant_stock(self.merchant)),
+                    self.merchant_npc.relations.has_record(self.player),
+                    self.merchant_npc.relations.affinity_for(self.player),
+                )
+
+            before = snapshot()
+            with patch(
+                "world.rules.economy.get_world_clock",
+                return_value=self._open_clock(),
+            ):
+                with self.assertRaises(TradeError) as ctx:
+                    sell(self.player, self.merchant_npc, keepsake.key, 1)
+                self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+                with self.assertRaises(TradeError) as ctx:
+                    buy(self.player, self.merchant_npc, keepsake.key, 1)
+                self.assertEqual(ctx.exception.args[0], TradeReason.UNSELLABLE)
+            self.assertEqual(snapshot(), before)
+
+            # Still held and inspectable: identity and presentation resolve.
+            self.assertEqual(list_items(self.player), [keepsake.key])
+            held = live_item_registry()[keepsake.key]
+            self.assertEqual(held.display_name_zh, "合成信物")
+            self.assertTrue(held.presentation.summary_zh.strip())
+        finally:
+            live_item_registry().pop(keepsake.key, None)
+            live_price_table().pop(band.key, None)
 
     @covers_requirement(
         "lore-item-catalog::registration-does-not-entitle-an-item-to-a-market"

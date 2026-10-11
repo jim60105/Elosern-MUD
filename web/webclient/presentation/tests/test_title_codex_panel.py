@@ -70,6 +70,11 @@ _T_GATEKEEPER = make_title(
 _T_VIEW_TITLES = {_T_GUILD_START.key: _T_GUILD_START, _T_GATEKEEPER.key: _T_GATEKEEPER}
 _T_VIEW_ROW_COUNT = len(SYNTH_TITLES) + len(_T_VIEW_TITLES)
 
+# The synthetic epithet every codex fixture in this file carries; the shipped
+# starter declaration's own display/basis spelling is never mirrored here.
+_T_EPITHET = "苔徑新客"
+_T_EPITHET_BASIS = "初次走入苔徑。"
+
 
 def _fixed_row(**overrides):
     value = {
@@ -87,8 +92,8 @@ def _fixed_row(**overrides):
 
 def _epithet_row(**overrides):
     value = {
-        "display": "南門新客",
-        "basis": "初入南門。",
+        "display": _T_EPITHET,
+        "basis": _T_EPITHET_BASIS,
         "granted_tick": 121,
         "equipped": True,
         "can_remove": False,
@@ -104,8 +109,8 @@ def _valid_panel(**overrides):
         "kind": "title_codex",
         "fixed_rows": [_fixed_row()],
         "epithet_rows": [_epithet_row()],
-        "equipped": {"fixed": _T_GUILD_START.key, "epithet": "南門新客"},
-        "full_title": f"{_T_GUILD_START.display_name_zh}　南門新客",
+        "equipped": {"fixed": _T_GUILD_START.key, "epithet": _T_EPITHET},
+        "full_title": f"{_T_GUILD_START.display_name_zh}　{_T_EPITHET}",
         "unlocked": 1,
         "total": 2,
         "pending_ballot": [],
@@ -166,8 +171,8 @@ class TitleCodexSchemaTests(unittest.TestCase):
             _valid_panel(
                 fixed_rows=fixed_at_cap,
                 unlocked=0,
-                equipped={"fixed": None, "epithet": "南門新客"},
-                full_title="南門新客",
+                equipped={"fixed": None, "epithet": _T_EPITHET},
+                full_title=_T_EPITHET,
             )
         )
         with self.assertRaises(ProtocolValidationError):
@@ -212,8 +217,8 @@ class TitleCodexSchemaTests(unittest.TestCase):
         locked = _fixed_row(unlocked=False, hint="完成公會註冊", flavor="", granted_tick=0)
         normalized = validate_title_codex(
             _valid_panel(fixed_rows=[locked], unlocked=0,
-                         equipped={"fixed": None, "epithet": "南門新客"},
-                         full_title="南門新客")
+                         equipped={"fixed": None, "epithet": _T_EPITHET},
+                         full_title=_T_EPITHET)
         )
         self.assertEqual(normalized["fixed_rows"][0]["hint"], "完成公會註冊")
 
@@ -221,7 +226,7 @@ class TitleCodexSchemaTests(unittest.TestCase):
         with self.assertRaises(ProtocolValidationError):
             validate_title_codex(_valid_panel(unlocked=8))
         with self.assertRaises(ProtocolValidationError):
-            validate_title_codex(_valid_panel(equipped={"fixed": "BAD KEY", "epithet": "南門新客"}))
+            validate_title_codex(_valid_panel(equipped={"fixed": "BAD KEY", "epithet": _T_EPITHET}))
         with self.assertRaises(ProtocolValidationError):
             validate_title_codex(_valid_panel(equipped={"fixed": None, "epithet": ""}))
         validate_title_codex(
@@ -403,24 +408,24 @@ class TitleCodexPresenterTests(EvenniaTestCase):
 
     def test_granted_state_renders_verbatim_rows_and_flags(self):
         bank_fixed(self.player, _T_GUILD_START.key, 120)
-        bank_epithet(self.player, "南門新客", "初入南門。", 121)
+        bank_epithet(self.player, _T_EPITHET, _T_EPITHET_BASIS, 121)
         bank_epithet(self.player, "破城先鋒", "率先破門。", 500)
         payload = self._render()
-        self.assertEqual(payload["full_title"], "銅階新血　南門新客")
+        self.assertEqual(payload["full_title"], f"銅階新血　{_T_EPITHET}")
         self.assertEqual(
             payload["equipped"],
-            {"fixed": _T_GUILD_START.key, "epithet": "南門新客"},
+            {"fixed": _T_GUILD_START.key, "epithet": _T_EPITHET},
         )
         self.assertEqual(payload["unlocked"], 1)
         by_display = {row["display"]: row for row in payload["epithet_rows"]}
-        # Newest-first: 破城先鋒 (tick 500) precedes the starter (real tick).
+        # Newest-first: 破城先鋒 (tick 500) precedes the tick-121 epithet.
         self.assertEqual(
             [row["display"] for row in payload["epithet_rows"]],
-            ["破城先鋒", "南門新客"],
+            ["破城先鋒", _T_EPITHET],
         )
         self.assertTrue(by_display["破城先鋒"]["can_remove"])
-        self.assertFalse(by_display["南門新客"]["can_remove"])
-        self.assertTrue(by_display["南門新客"]["equipped"])
+        self.assertFalse(by_display[_T_EPITHET]["can_remove"])
+        self.assertTrue(by_display[_T_EPITHET]["equipped"])
         # Output passes its own validator (self-certifying presenter).
         self.assertEqual(validate_title_codex(payload), payload)
 
@@ -445,13 +450,13 @@ class TitleCodexPresenterTests(EvenniaTestCase):
 
     @covers_requirement("title-system::the-ballot-persists-unchanged-until-consent")
     def test_malformed_ballot_degrades_only_the_ballot_field(self):
-        bank_epithet(self.player, "南門新客", "初入南門。", 1)
+        bank_epithet(self.player, _T_EPITHET, _T_EPITHET_BASIS, 1)
         self.player.attributes.add("pending_title_ballot", "not-a-ballot")
         payload = self._render()
         self.assertTrue(payload["available"])
         self.assertEqual(payload["pending_ballot"], [])
         self.assertEqual(
-            [row["display"] for row in payload["epithet_rows"]], ["南門新客"]
+            [row["display"] for row in payload["epithet_rows"]], [_T_EPITHET]
         )
 
     def test_registry_spec_owns_the_stable_unavailable_pair(self):
@@ -472,5 +477,5 @@ class TitleCodexPresenterTests(EvenniaTestCase):
 
     def test_presenter_directly_matches_the_registry_render(self):
         bank_fixed(self.player, _T_GUILD_START.key, 120)
-        bank_epithet(self.player, "南門新客", "初入南門。", 121)
+        bank_epithet(self.player, _T_EPITHET, _T_EPITHET_BASIS, 121)
         self.assertEqual(title_codex_presenter(self._context()), self._render())

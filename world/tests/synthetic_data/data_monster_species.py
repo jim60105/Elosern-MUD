@@ -40,6 +40,7 @@ SYNTH_MONSTER_VARIANTS: dict[str, MonsterVariant] = {
         True,
         None,
         None,
+        False,
     ),
     "t_whisper_quail_stronger": MonsterVariant(
         "t_whisper_quail_stronger",
@@ -58,6 +59,7 @@ SYNTH_MONSTER_VARIANTS: dict[str, MonsterVariant] = {
             magic_power=1,
         ),
         "t_bronze",
+        True,
     ),
     "t_whisper_quail_poor": MonsterVariant(
         "t_whisper_quail_poor",
@@ -76,5 +78,6 @@ SYNTH_MONSTER_VARIANTS: dict[str, MonsterVariant] = {
             magic_power=0,
         ),
         "t_faint",
+        True,
     ),
 }

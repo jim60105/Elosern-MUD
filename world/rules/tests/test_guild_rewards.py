@@ -53,7 +53,7 @@ from world.rules.tests._guild_service_probes import (
     rank_reward_band,
     synthetic_branch_key,
 )
-from world.tests.synthetic_data import SYNTH_ITEMS
+from world.tests.synthetic_data import SYNTH_ITEMS, SYNTH_STARTER_EPITHET
 from world.quests.tests._fixtures import register_catalog_once
 
 # The shipped affinity rulebook cross-references one catalog quest by key, so
@@ -394,6 +394,14 @@ class BoardAcceptanceIssuerKeyTests(OfferRegistryIsolation, EvenniaTestCase):
 class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
     def setUp(self):
         super().setUp()
+        # The first-claim path banks whatever declaration sits on the shipped
+        # seam, so the whole class asserts the synthetic starter instead of
+        # pinning the shipped display/origin spelling.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         self.hall = create_object(Room, key="hall")
         self.staff = create_object(NPC, key="turnin staff", location=self.hall)
         _attach_staff(self.staff)
@@ -669,15 +677,53 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         registered_title = compose_full_title(self.player)
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
-        self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
+        self.assertEqual(
+            result["title_notifications"],
+            [f"獲得異名：{SYNTH_STARTER_EPITHET.display}"],
+        )
         self.assertEqual(
             compose_full_title(self.player),
-            compose_title(registered_title, "南門新客"),
+            compose_title(registered_title, SYNTH_STARTER_EPITHET.display),
         )
         collection, equipped = read_title_state(self.player)
         epithets = [entry for entry in collection if entry["kind"] == "epithet"]
-        self.assertEqual([entry["display"] for entry in epithets], ["南門新客"])
-        self.assertEqual(equipped["epithet"], "南門新客")
+        self.assertEqual(
+            [entry["display"] for entry in epithets],
+            [SYNTH_STARTER_EPITHET.display],
+        )
+        self.assertEqual(epithets[0]["origin_quote"], SYNTH_STARTER_EPITHET.origin_basis)
+        self.assertEqual(equipped["epithet"], SYNTH_STARTER_EPITHET.display)
+
+    @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
+    def test_first_claim_banks_without_replacing_an_occupied_epithet_slot(self):
+        # A member can adopt a nominated epithet before their first reward
+        # claim, so the claim must bank the starter through the regular writer
+        # while leaving the already-occupied epithet slot alone.
+        from world.rules.titles import (
+            bank_epithet,
+            compose_full_title,
+            read_title_state,
+        )
+
+        bank_epithet(self.player, "先佔之名", "先佔事蹟。", 0)
+        occupied_title = compose_full_title(self.player)
+        self.assertIn("先佔之名", occupied_title)
+        quest_id = self._complete()
+        result = turn_in_quest(self.player, self.staff, quest_id)
+        self.assertEqual(
+            result["title_notifications"],
+            [f"獲得異名：{SYNTH_STARTER_EPITHET.display}"],
+        )
+        collection, equipped = read_title_state(self.player)
+        self.assertEqual(
+            [entry["display"] for entry in collection if entry["kind"] == "epithet"],
+            ["先佔之名", SYNTH_STARTER_EPITHET.display],
+        )
+        self.assertEqual(
+            collection[-1]["origin_quote"], SYNTH_STARTER_EPITHET.origin_basis
+        )
+        self.assertEqual(equipped["epithet"], "先佔之名")
+        self.assertEqual(compose_full_title(self.player), occupied_title)
 
     @covers_requirement("quest-reward-settlement::the-first-ever-reward-claim-grants-the-starter-epithet-atomically")
     def test_later_claims_never_re_grant(self):
@@ -742,10 +788,13 @@ class RewardSettlementTests(OfferRegistryIsolation, EvenniaTestCase):
         registered_title = compose_full_title(self.player)
         quest_id = self._complete()
         result = turn_in_quest(self.player, self.staff, quest_id)
-        self.assertEqual(result["title_notifications"], ["獲得異名：南門新客"])
+        self.assertEqual(
+            result["title_notifications"],
+            [f"獲得異名：{SYNTH_STARTER_EPITHET.display}"],
+        )
         self.assertEqual(
             compose_full_title(self.player),
-            compose_title(registered_title, "南門新客"),
+            compose_title(registered_title, SYNTH_STARTER_EPITHET.display),
         )
 
 

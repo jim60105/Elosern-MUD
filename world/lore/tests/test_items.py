@@ -1,5 +1,9 @@
-"""Data-contract test: item registry content contract
-Registry contract tests for the immutable item presentation metadata."""
+"""Data-contract test: item registry registration/metadata/reference contract
+Registry contract tests for the immutable item presentation metadata: every
+registered definition carries complete typed metadata, resolves its own
+references, and is the only authority for the mechanics seam. No expected key
+roster is kept here -- a valid item add/rename/retire edit must pass without
+touching this file."""
 
 from tools.spec_traceability import covers_requirement
 
@@ -8,6 +12,7 @@ import re
 from dataclasses import fields
 from pathlib import Path
 
+from world.lore.economy import PRICE_TABLE
 from world.lore.items import (
     ITEM_REGISTRY,
     EquipmentModifierKey,
@@ -17,6 +22,7 @@ from world.lore.items import (
     ItemPresentation,
     ItemRarity,
     ItemUseMechanics,
+    LiturgicalRole,
     SUMMARY_MAX,
 )
 from world.skills.equipment import EquipmentSlot
@@ -45,68 +51,28 @@ class ItemPresentationTests(unittest.TestCase):
         "item-presentation-metadata::registered-items-have-immutable-visual-identities"
     )
     def test_every_registered_item_resolves_complete_metadata(self):
-        self.assertEqual(
-            set(ITEM_REGISTRY),
-            {
-                "meal", "healing_potion", "plain_sword",
-                "iron_dagger", "hunting_throwing_axe", "hunters_longbow",
-                "apprentice_focus_staff", "knight_blade", "wooden_club",
-                "gilded_saber", "great_axe", "ashen_scimitar",
-                "steel_fang_dagger", "magic_sword",
-                "leather_armor", "mage_robe", "chainmail", "iron_shield",
-                "silver_hairpin", "wolf_fang_necklace", "pilgrim_medallion",
-                "prism_charm", "protective_ring", "storage_pouch",
-                "gliding_cloak",
-                "magic_lamp", "healing_herb", "rough_iron_ore", "beast_crystal",
-                "evernight_shard", "mana_core", "dragon_scale_fragment",
-                "elven_spider_silk", "baptismal_holy_water",
-                "greater_healing_potion", "mana_potion",
-                "elven_traditional_robe", "royal_signet_ring",
-                "royal_heirloom_pendant", "rose_crest_rapier", "black_maid_dress",
-                "silver_feather_earring", "crescent_earring", "dark_elf_kimono",
-                "royal_traveling_robe",
-                "shadow_blade", "shadow_blade_echo", "dark_elf_ninja_garb",
-                "guild_recruit_badge",
-                "purified_pendant", "fearless_brooch", "knight_platemail",
-                "apothecary_beads", "archmage_mending_robe", "enticing_lace_set",
-                "passion_silk_choker", "sister_vestments", "radiant_holy_emblem",
-                "saintess_vestments",
-                "kingdom_rye_hardtack", "adventurer_field_ration", "imperial_candied_fruit",
-                "beastfolk_smoked_jerky", "harbor_lobster_bisque", "elven_candied_blossom",
-                "miners_bracing_broth", "beastfolk_herbal_salve", "passion_draught",
-                "spirit_dew", "elven_tear", "enchanted_compass", "dungeon_flare_talisman",
-                "beastfolk_signal_conch", "camp_ward_kit", "goblin_ear", "slime_residue",
-                "earth_drake_scale", "troll_fang", "elven_essence", "ancient_dragon_heart",
-                "family_crest_token", "ancient_mystery_key", "elven_child_toy",
-                "beastfolk_warhammer", "beastfolk_repeating_bow", "beastfolk_war_spear",
-                "beastfolk_twin_claws", "beastfolk_spirit_wand", "elven_longbow",
-                "dragon_lair_trophy_blade", "beastfolk_heavy_hide_armor",
-                "beastfolk_stalker_garb", "elven_forest_veil", "beastfolk_tribal_totem",
-                "beastfolk_gale_earring",
-                "nymph_buds_clamp", "warm_honey_orb", "hyperesthesia_charm",
-                "warmth_rune_egg", "tremor_crystal",
-                "aphrodisiac_bath_salts", "slime_lube_gel", "hot_kiss_potion",
-                "spark_candy", "embracing_vine", "kiss_of_goddess_mist",
-                "censer_of_desire",
-                # shared-military-equipment: the twelve E–S mass-produced
-                # weapons and armors the capital's forge and tailor carry.
-                "military_e_sword", "military_d_sword", "military_c_sword",
-                "military_b_sword", "military_a_sword", "military_s_sword",
-                "military_e_armor", "military_d_armor", "military_c_armor",
-                "military_b_armor", "military_a_armor", "military_s_armor",
-                # guild-exam-restriction-policy: one rank accessory per
-                # restricted examination rank (E–B).
-                "guild_limit_e", "guild_limit_d", "guild_limit_c",
-                "guild_limit_b",
-            }
-        )
+        # No approved-key roster: every CURRENT entry must be complete, and a
+        # valid add/rename/retire edit is accepted by construction.
+        self.assertTrue(ITEM_REGISTRY)
         for key, definition in ITEM_REGISTRY.items():
             presentation = definition.presentation
             with self.subTest(item=key):
+                self.assertEqual(definition.key, key)
+                self.assertTrue(definition.display_name_zh.strip())
+                self.assertIsInstance(definition.sellable, bool)
+                self.assertIn(definition.price_table_key, PRICE_TABLE)
                 self.assertIsInstance(presentation, ItemPresentation)
                 self.assertIsInstance(presentation.kind, ItemKind)
                 self.assertIsInstance(presentation.icon_key, ItemIconKey)
                 self.assertIsInstance(presentation.rarity, ItemRarity)
+                if definition.liturgical_role is not None:
+                    self.assertIsInstance(
+                        definition.liturgical_role, LiturgicalRole
+                    )
+                    self.assertIsNotNone(
+                        definition.equipment_slot,
+                        "a liturgical role describes worn equipment only",
+                    )
                 self.assertTrue(presentation.summary_zh.strip())
                 self.assertLessEqual(
                     sum(1 for _ in presentation.summary_zh), SUMMARY_MAX
@@ -263,6 +229,9 @@ class ItemPresentationTests(unittest.TestCase):
                 # guild-exam-restriction-policy carries the guild property
                 # binding here so an item can require a guild rank.
                 "guild_property",
+                # Church-of-Light doctrine coverage: the immutable item-lore
+                # role, owned here rather than by the effect rulebook.
+                "liturgical_role",
             ],
         )
         self.assertEqual(
@@ -403,6 +372,28 @@ class ItemMechanicsTests(unittest.TestCase):
             modifier_key=EquipmentModifierKey.PLAIN_SWORD,
         )
         self.assertIs(definition.modifier_key, EquipmentModifierKey.PLAIN_SWORD)
+
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_liturgical_role_metadata_is_closed_and_equipment_only(self):
+        # A role is item lore, so its malformed or unsupported shapes must
+        # fail at construction -- an effect rule cannot express it at all.
+        role_bearing = self._definition(
+            equipment_slot=EquipmentSlot.ARMOR,
+            modifier_key=EquipmentModifierKey.SISTER_VESTMENTS,
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
+        )
+        self.assertIs(
+            role_bearing.liturgical_role, LiturgicalRole.VESTMENT_OR_EMBLEM
+        )
+        with self.assertRaises(ValueError) as caught:
+            self._definition(liturgical_role="vestment_or_emblem")
+        self.assertIn("liturgical_role", str(caught.exception))
+        # A non-equipment item has no worn identity for a role to describe.
+        with self.assertRaises(ValueError) as caught:
+            self._definition(liturgical_role=LiturgicalRole.SANCTUARY_DEVICE)
+        self.assertIn("equipment slot", str(caught.exception))
 
 
 if __name__ == "__main__":

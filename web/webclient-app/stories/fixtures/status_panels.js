@@ -59,7 +59,7 @@ export const STATUS_PANEL_TITLED_SAMPLE = {
   ...STATUS_PANEL_SAMPLE,
   actor: {
     ...STATUS_PANEL_SAMPLE.actor,
-    full_title: "F級冒險者　南門新客",
+    full_title: "F級冒險者　苔徑新客",
   },
 };
 

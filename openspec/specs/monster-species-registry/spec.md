@@ -79,96 +79,6 @@ different species, or names a variant whose `ordinary_variant` is false.
 - **THEN** variant display names SHALL NOT be used to classify it: the classification SHALL be an
   explicit authored field
 
-### Requirement: Numeric combat profiles and danger grades are balance-gated slots, never invented values
-`MonsterVariant.combat_profile` SHALL be either None or a frozen complete authored record of HP/MP/SP/atk_phys/agility/defense/magic_power. `danger_grade` SHALL be None or a valid authored guild grade. Authoring SHALL provide explicit values; narrative, display names and other variants SHALL NOT infer them. Tests SHALL validate schema and established independent tier/grade constraints without reproducing a literal approval table or forbidding an otherwise valid author edit.
-
-#### Scenario: Incomplete or invalid profile
-- **WHEN** a profile omits a field, supplies None in a populated record, a non-integer or negative value, or magic outside its declared tier band
-- **THEN** registry validation raises the named error before publication
-
-#### Scenario: None retains optional-source semantics outside the required profiled set
-- **WHEN** a variant outside the twelve required first-batch profiles has no authored profile or grade
-- **THEN** consumers treat None as absence; only individual construction may use and report its existing tier fallback, and no registry consumer substitutes inferred numbers
-
-#### Scenario: Authored pools remain independent
-- **WHEN** an author adjusts explicit MP/SP pools
-- **THEN** no MP/SP tier band or narrative-derived pool is introduced, and physical/magic tier validation remains unchanged
-
-#### Scenario: A partial numeric profile is rejected
-- **WHEN** one of seven fields is absent or None inside a populated profile
-- **THEN** named registry validation rejects before publication
-
-#### Scenario: Flavour never becomes a number
-- **WHEN** narrative mentions magical/elemental behavior
-- **THEN** magic/MP/SP remain explicit declarations rather than inferred values, with existing zero magic bands enforced
-
-#### Scenario: Balance approval populates the same slot
-- **WHEN** an author supplies a valid complete profile and grade
-- **THEN** the same record shape validates and becomes the single source consumers read
-
-#### Scenario: An unapproved slot still means "no approved profile"
-- **WHEN** an optional future variant outside the required twelve lacks a profile or grade
-- **THEN** None means absence, never zero, without requiring a duplicate approval record
-
-#### Scenario: An approved value is never re-derived at the registry
-- **WHEN** a consumer reads an explicit authored profile
-- **THEN** it never derives replacement values from names, other fields or tier ranges; otherwise valid author edits remain permitted
-
-#### Scenario: MP and SP pools are gated by approval, not inference
-- **WHEN** an author declares MP/SP pools
-- **THEN** they are explicit valid integer data with no invented tier band or narrative inference; no historical approval table pins their magnitudes
-
-#### Scenario: Only explicit user balance approval populates a slot
-- **WHEN** a profile or grade is populated
-- **THEN** an explicit author declaration is required, not inferred/interpolated consumer data; valid author retuning does not require changing a duplicate test approval
-
-#### Scenario: Granted approval ships both profile and grade
-- **WHEN** a required first-batch profile is published
-- **THEN** both its complete authored record and valid guild danger grade are present
-
-#### Scenario: A None slot means no approved profile exists
-- **WHEN** an optional future variant has a None slot
-- **THEN** no consumer treats absence as zero, invented flavor data or a populated tier-band profile
-
-#### Scenario: The interim fallback is owned by individual construction
-- **WHEN** such an absent profile needs numeric construction
-- **THEN** only the existing named individual-construction tier fallback provides and records the source; the registry slot itself stays absent
-
-### Requirement: Special abilities are narrative boundaries with a named mechanics prerequisite, never fake skills
-The registries SHALL permit executable first-batch abilities only through explicitly approved shared-engine skills and validated kits. Narrative SHALL NOT supply runtime effects. Still-deferred species after this change are ridge_burrow_hare, rock_echo_goat, fog_mane_lynx. Crocodile contact MP drain and completed species kits remain authored configuration.
-
-#### Scenario: No behaviour seam is faked
-- **WHEN** the shipped registry is inspected for skill keys, behaviour-profile keys, or combat traits naming the still-deferred species listed above
-- **THEN** it carries none, and the ability prose remains in the published description fields only
-
-#### Scenario: Narrative does not unlock a behaviour
-- **WHEN** the existing behaviour-selection path resolves a variant whose narrative describes a still-deferred special ability
-- **THEN** the resolved behaviour is exactly the existing damage-oriented decision path with no new effect, and the proposal records the mechanics prerequisite rather than an implementation
-
-#### Scenario: Crocodile behavior comes from validated configuration
-- **WHEN** the crocodile contact-drain ability is available in combat
-- **THEN** its executable behavior comes from the validated authored kit and shared skill engine, never from interpreting narrative text
-
-#### Scenario: Ability text is published narrative only
-
-- **WHEN** ability text is authored for one of the still-deferred species listed above
-- **THEN** it SHALL be permitted only as published narrative prose, including its approved limits
-
-#### Scenario: Executable abilities are an external prerequisite
-
-- **WHEN** an executable form of a still-deferred ability is wanted
-- **THEN** it is a named external prerequisite owned by the skill/behaviour-mechanics work; a
-  registry field, a stored trait, or a placeholder value SHALL NOT stand in for it
-- **AND** no consumer SHALL be permitted to interpret narrative text as an available effect
-
-#### Scenario: sway_whistle_sparrow completes its executable boundary
-- **WHEN** this species' two approved kits are constructed
-- **THEN** `grain_shaking_peck` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
-
-#### Scenario: tide_lamp_crab completes its executable boundary
-- **WHEN** this species' two approved kits are constructed
-- **THEN** `lamp_carapace_claw` is executable through the common engine, while ecological environment conditions remain prose and never generate runtime effects
-
 ### Requirement: Published projections expose only marked public fields
 The species and variant registries SHALL expose published views built from explicitly marked public
 fields only. `author_hidden_truth_zh`, `author_explanation_zh`, and `author_conjecture_zh` SHALL NOT
@@ -206,84 +116,6 @@ tags match a habitat SHALL be equally capable of being absent from every room of
 #### Scenario: The registry offers no spawn API
 - **WHEN** the species registry module's public surface is inspected
 - **THEN** it exposes read and validation operations only, with no spawn, place, or reconcile callable
-
-### Requirement: Approved bestiary narrative lands as zh-TW display strings and synchronizes idempotently
-The registries SHALL carry the six approved bestiary species and their twelve approved named variant
-directions with display and description strings in the canonical Traditional Chinese prose of
-`docs/lore/bestiary.md`, and the startup synchronization SHALL mirror the registries into their
-runtime store idempotently.
-
-#### Scenario: Repeated startup synchronization is a no-op
-- **WHEN** the species synchronization step runs twice in one process
-- **THEN** the mirrored content is equal before and after the second run and no second creation occurs
-
-#### Scenario: Synchronization touches no runtime entity
-- **WHEN** synchronization runs against a database containing monsters, rooms, and quest records
-- **THEN** a before/after comparison shows those records unchanged
-
-#### Scenario: Logging stays inside the facade
-- **WHEN** the new registry and synchronization modules are linted for logging
-- **THEN** they import only `world.observability` named functions and every event carries a context dict with the registry identifiers
-
-#### Scenario: Each synchronization step logs one boundary event
-
-- **WHEN** a synchronization step runs
-- **THEN** it emits one boundary info event through the `world.observability` facade with
-  registry-scoped context keys
-
-#### Scenario: Synchronization is state-preserving and entity-safe
-
-- **WHEN** synchronization repeats or runs against runtime data
-- **THEN** repeating synchronization SHALL leave the mirrored state unchanged
-- **AND** synchronization SHALL NOT create, modify, or delete any monster, room, quest, or art record
-
-### Requirement: The approved first-batch profiles and grades are user-approved literals
-All twelve currently shipped first-batch variants SHALL retain complete authored profiles and valid authored grades, with no None slots. Values SHALL be adjustable data, without a duplicate approval table. Completeness, identity/default membership, independent tier-axis/grade-range checks and explicit MP/SP pools SHALL remain. Six delivered ability kits remain delivered; undelivered hare/goat/lynx ability kits remain deferred independently of their already-shipped profiles.
-
-#### Scenario: Benign authoring change
-- **WHEN** a delivered or already-profiled first-batch variant's HP, physical axis or MP/SP changes within the established schema and tier constraints
-- **THEN** content tests pass without editing expected numerical tables and a newly constructed individual uses the declaration without coefficients baked into storage
-
-#### Scenario: Existing bounds remain authoritative
-- **WHEN** a profile is partial, mistyped, negative, or outside an established tier axis or grade range
-- **THEN** existing validation rejects it by variant and field, including nonzero magic under a zero magic band
-
-#### Scenario: Live state is preserved
-- **WHEN** the registry changes after an individual exists
-- **THEN** reload preserves that individual's identity, owned kit and current stored traits/resources without migration or refill
-
-#### Scenario: New instance
-- **WHEN** a registered variant constructs a new monster
-- **THEN** its current authored profile is authoritative without skill/gear multipliers baked into storage
-
-#### Scenario: Every shipped batch variant carries its approved values
-- **WHEN** all twelve first-batch profiles and grades are inspected
-- **THEN** all seven fields and a valid grade are present with no None slots; authored values, not an approval mirror, govern
-
-#### Scenario: Approval does not extend to unapproved content
-- **WHEN** an undelivered ability kit or profile outside the required first-batch set is inspected
-- **THEN** no inference from this batch grants that kit; any explicitly authored optional profile follows the same schema without a historical numerical approval fence
-
-#### Scenario: The approved profile table is pinned verbatim
-- **WHEN** authored first-batch profiles are checked
-- **THEN** the historical numerical approval table is removed, not moved; completeness and current declared bounds remain independently checked for all twelve
-
-#### Scenario: Zero pools and retained identities survive the batch
-- **WHEN** current first-batch declarations are validated
-- **THEN** zero remains a valid explicitly authored pool rather than inferred absence; magic remains zero under existing tier magic bands, and all species/variant identities and authored grade validity remain
-- **AND** only the six delivered kits are present; tide_devouring_bite, grain_shaking_peck and lamp_carapace_claw retain their existing ownership and effect intent
-
-#### Scenario: The approved literals retire attrition without changing character
-- **WHEN** valid authored profiles are revised
-- **THEN** the existing cat mobility, crocodile endurance and crab defensive content intent stays reflected in independent axes and ecology; no old-versus-new numerical table or new universal encounter band is imposed
-
-#### Scenario: Crocodile resource values replace only their previous zero pools
-- **WHEN** crocodile profiles are authored or consumed
-- **THEN** explicit MP/SP pools and complete profile/grade are retained without a 140/30/40 or 210/50/60 approval mirror; kit/binding/effect mechanics remain unchanged
-
-#### Scenario: Approved delivered resource rows are literal
-- **WHEN** both delivered variants per crocodile, sparrow and crab species are constructed
-- **THEN** their current complete authored profile/grade and defined owned kit are used; the other six required profiles remain complete while their ability kits remain deferred
 
 ### Requirement: Every shipped combat profile and danger grade lies inside its declared tier band
 Validation SHALL independently check HP, attack, agility, defense and magic against their own tier
@@ -367,5 +199,53 @@ Variants SHALL optionally carry ordered active/passive skill keys and a behavior
 - **THEN** formal construction fails before persistence with no partial ownership/configuration
 
 #### Scenario: No invented progression
-- **WHEN** both crocodile variants author the prerequisite-free bite
-- **THEN** they own it before innate attack with no new passive or fabricated progression chain
+- **WHEN** a synthetic variant authors a prerequisite-free active kit
+- **THEN** its declared active order precedes innate actions without fabricated prerequisites or passives
+
+### Requirement: Authored profile requirements are declared per variant
+Combat profiles SHALL retain complete explicit seven-field records or optional absence, valid authored grades and established tier/grade checks. Whether a shipped variant requires a populated profile and grade SHALL be declared in its registry data. Required records SHALL reject absence; optional absence SHALL retain the existing individual-construction fallback semantics. Names, prose and other variants SHALL infer no values.
+
+#### Scenario: Complete required rows
+- **WHEN** every shipped variant is checked from its profile-required declaration
+- **THEN** required profiles have all seven typed fields and a valid grade; optional None is absence and only construction may use its reported tier fallback
+
+#### Scenario: Valid content edit
+- **WHEN** a valid variant is added, renamed or retired together with its references
+- **THEN** integrity follows the registry without changing a named roster in the spec or tests; established bounds remain unchanged
+
+#### Scenario: Live state
+- **WHEN** an existing individual reloads after a registry edit
+- **THEN** identity and stored bases/kit/current gauges are preserved without automatic migration or refill
+
+### Requirement: Narrative and executable monster configurations remain separate
+Executable abilities SHALL require authored validated skill kits and behavior references through the shared engine. Rows with no delivered kit SHALL retain innate actions and tier-default behavior. Narrated abilities SHALL grant no ownership, resources or effects. Delivery status SHALL follow the authored kit data without a species allowlist, and future executable content SHALL require its own owning implementation.
+
+#### Scenario: No fake seam
+- **WHEN** a kit-less row has ecological ability text
+- **THEN** no runtime effect or owned skill is inferred; configured kits validate through the same shared engine
+
+#### Scenario: Delivered identity edit
+- **WHEN** a configured species or variant display is renamed
+- **THEN** its stable-key kit binding remains usable and player eligibility remains unchanged
+
+### Requirement: Authored monster narratives synchronize without a fixed roster
+Shipped species and variants SHALL carry non-empty public Traditional Chinese narrative fields and stable identities, with registry membership as the content authority. Synchronization SHALL mirror the authored registries idempotently through the observability facade and SHALL leave runtime monsters, rooms, quests and art untouched. Documentation SHALL satisfy the keyed public-content relationship contract without fixing species counts or narrative sentences.
+
+#### Scenario: Idempotent entity-safe sync
+- **WHEN** startup synchronization runs twice with runtime entities present
+- **THEN** mirror state and object counts are unchanged after the second run and runtime monsters/rooms/quests/art remain unchanged; one registry-scoped facade boundary event is emitted per step
+
+### Requirement: Shipped profile completeness follows authored declarations
+Every variant declared profile-required SHALL ship a complete explicit profile and valid grade. All shipped rows SHALL satisfy identity/default membership and independent tier-axis/grade constraints; MP/SP SHALL remain explicit authored pools. Ability-kit delivery SHALL remain independent of profile completeness. New construction SHALL use current declarations without baked multipliers, and registry edits SHALL preserve live state.
+
+#### Scenario: Complete required rows
+- **WHEN** every shipped variant is checked from its profile-required declaration
+- **THEN** required profiles have all seven typed fields and a valid grade; optional None is absence and only construction may use its reported tier fallback
+
+#### Scenario: Valid content edit
+- **WHEN** a valid variant is added, renamed or retired together with its references
+- **THEN** integrity follows the registry without changing a named roster in the spec or tests; established bounds remain unchanged
+
+#### Scenario: Live state
+- **WHEN** an existing individual reloads after a registry edit
+- **THEN** identity and stored bases/kit/current gauges are preserved without automatic migration or refill

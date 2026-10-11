@@ -32,8 +32,8 @@ function validTitleCodexFixedRow(overrides) {
 function validTitleCodexEpithetRow(overrides) {
   return Object.assign(
     {
-      display: "南門新客",
-      basis: "初入南門。",
+      display: "苔徑新客",
+      basis: "初次走入苔徑。",
       granted_tick: 121,
       equipped: true,
       can_remove: false,
@@ -50,8 +50,8 @@ function validTitleCodexPanel(overrides) {
       kind: "title_codex",
       fixed_rows: [validTitleCodexFixedRow()],
       epithet_rows: [validTitleCodexEpithetRow()],
-      equipped: { fixed: T_TITLE_IDENT, epithet: "南門新客" },
-      full_title: "F級冒險者　南門新客",
+      equipped: { fixed: T_TITLE_IDENT, epithet: "苔徑新客" },
+      full_title: "F級冒險者　苔徑新客",
       unlocked: 1,
       total: 7,
       pending_ballot: [],
@@ -81,7 +81,7 @@ test("title_codex pins its mirrored bounds and validates the minimal payload", (
     validTitleCodexPanel()
   );
   assert.equal(normalized.kind, "title_codex");
-  assert.equal(normalized.epithet_rows[0].display, "南門新客");
+  assert.equal(normalized.epithet_rows[0].display, "苔徑新客");
 });
 
 test("title_codex rejects wrong kind, version, and discriminator", () => {
@@ -210,7 +210,7 @@ test("title_codex requires counters, equipped slots, and ballot shape", () => {
   assert.throws(() =>
     Protocol.validateTitleCodexPanel(
       validTitleCodexPanel({
-        equipped: { fixed: "BAD KEY", epithet: "南門新客" },
+        equipped: { fixed: "BAD KEY", epithet: "苔徑新客" },
       })
     )
   );

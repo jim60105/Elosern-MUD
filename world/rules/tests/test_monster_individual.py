@@ -150,7 +150,8 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
         self.assertEqual(_object_count(), before)
 
     @covers_requirement(
-        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point"
+        "monster-individual-construction::species-backed-individuals-are-constructed-through-one-validated-deterministic-entry-point",
+        "monster-individual-construction::shipped-variants-construct-their-declared-configuration-through-the-common-boundary",
     )
     def test_a_failed_application_leaves_no_individual_and_no_event(self):
         before = _object_count()
@@ -433,6 +434,197 @@ class MonsterIndividualConstructionTests(EvenniaTestCase):
                 except RuntimeError:
                     pass
             self.assertEqual(info.call_count, 0)
+
+    @covers_requirement(
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+        "monster-individual-construction::the-construction-entry-point-validates-the-declared-kit-and-behavior-binding",
+    )
+    def test_invalid_kit_references_create_nothing(self):
+        from world.skills.registry import SkillEligibility, SkillKind, SkillPrerequisite, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        valid = make_skill(
+            "t_fault_valid", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        passive_only = make_skill("t_fault_passive", kind=SkillKind.PASSIVE)
+        active_only = make_skill(
+            "t_fault_active_2", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        foreign = make_skill(
+            "t_fault_foreign",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            eligibility=SkillEligibility(
+                allowed_actor_kinds=("monster",),
+                allowed_species=(OTHER_SPECIES,),
+            ),
+        )
+        chained = make_skill(
+            "t_fault_chained",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            prerequisites=(SkillPrerequisite("t_fault_absent", 1),),
+        )
+        effect_carrier = make_skill(
+            "t_fault_effect",
+            kind=SkillKind.ACTIVE,
+            target_spec=TargetSpec.SINGLE,
+            effects=["damage:fire:physical"],
+        )
+        library = {
+            skill.key: skill
+            for skill in (
+                valid,
+                passive_only,
+                active_only,
+                foreign,
+                chained,
+                effect_carrier,
+            )
+        }
+        base = {ORDINARY: ORDINARY_ROW, STRONGER: STRONGER_ROW, ORPHAN: ORPHAN_ROW}
+
+        cases = {
+            "unknown active skill key": {"active_skill_keys": ("t_fault_absent",)},
+            "unknown behaviour profile": {
+                "behaviour_profile_key": "t_fault_absent_profile"
+            },
+            "identity-ineligible active skill": {"active_skill_keys": (foreign.key,)},
+            "unusable active prerequisite": {"active_skill_keys": (chained.key,)},
+            "duplicate active key": {"active_skill_keys": (valid.key, valid.key)},
+            "active slot declaring a PASSIVE": {
+                "active_skill_keys": (passive_only.key,)
+            },
+            "passive slot declaring an ACTIVE": {
+                "passive_skill_keys": (active_only.key,)
+            },
+            "duplicate passive key": {
+                "passive_skill_keys": (passive_only.key, passive_only.key)
+            },
+        }
+        with patch.dict("world.skills.registry.SKILL_REGISTRY", library):
+            for label, overrides in cases.items():
+                with self.subTest(case=label):
+                    before = _object_count()
+                    broken = replace(ORDINARY_ROW, **overrides)
+                    mapping = dict(base, **{ORDINARY: broken})
+                    with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping):
+                        with self.assertRaises(MonsterConstructionError):
+                            construct_species_individual(SPECIES, ORDINARY)
+                    self.assertEqual(_object_count(), before, label)
+
+            # An unavailable effect is a prefix the resolver has no handler
+            # for, even though the effect string itself parses.
+            with self.subTest(case="unavailable effect handler"):
+                before = _object_count()
+                kitted = replace(
+                    ORDINARY_ROW, active_skill_keys=(effect_carrier.key,)
+                )
+                mapping = dict(base, **{ORDINARY: kitted})
+                with (
+                    patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping),
+                    patch.dict(
+                        "world.rules.action.contracts._EFFECT_HANDLERS", {}, clear=True
+                    ),
+                ):
+                    with self.assertRaises(MonsterConstructionError):
+                        construct_species_individual(SPECIES, ORDINARY)
+                self.assertEqual(_object_count(), before)
+
+    @covers_requirement(
+        "monster-species-registry::variant-skill-kits-and-behavior-references-are-immutable-authored-configuration",
+    )
+    def test_a_declared_kit_is_constructed_verbatim_without_invented_progression(self):
+        from world.skills.registry import SkillKind, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        first = make_skill(
+            "t_ordered_first", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        second = make_skill(
+            "t_ordered_second", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {first.key: first, second.key: second},
+        ):
+            kitted = replace(
+                ORDINARY_ROW,
+                active_skill_keys=(second.key, first.key),
+                behaviour_profile_key="ambush_predator",
+            )
+            mapping = {
+                ORDINARY: kitted,
+                STRONGER: STRONGER_ROW,
+                ORPHAN: ORPHAN_ROW,
+            }
+            with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping):
+                with self.captureOnCommitCallbacks(execute=True):
+                    individual = construct_species_individual(SPECIES, ORDINARY)
+        # The declared order is the stored order, no prerequisite or passive is
+        # fabricated beside it, and the prerequisite-free kit builds nothing else.
+        self.assertEqual(individual.db.skills["active"], [second.key, first.key])
+        self.assertEqual(individual.db.skills["passive"], [])
+        self.assertEqual(individual.db.behaviour_tree, "ambush_predator")
+
+    @covers_requirement(
+        "monster-individual-construction::shipped-variants-construct-their-declared-configuration-through-the-common-boundary",
+    )
+    def test_committed_kit_binding_and_depleted_pools_survive_a_reload(self):
+        from world.skills.registry import SkillKind, TargetSpec
+        from world.tests.synthetic_data import make_skill
+
+        skill = make_skill(
+            "t_reload_kit", kind=SkillKind.ACTIVE, target_spec=TargetSpec.SINGLE
+        )
+        kitted = replace(
+            STRONGER_ROW,
+            active_skill_keys=(skill.key,),
+            behaviour_profile_key="ambush_predator",
+        )
+        mapping = {ORDINARY: ORDINARY_ROW, STRONGER: kitted, ORPHAN: ORPHAN_ROW}
+        with (
+            patch.dict("world.skills.registry.SKILL_REGISTRY", {skill.key: skill}),
+            patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", mapping),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            individual = construct_species_individual(SPECIES, STRONGER)
+            individual.traits.mp.current = 2
+            individual.traits.sp.current = 0
+
+        bases = _stored_values(individual)
+        gauges = {key: getattr(individual.traits, key).current for key in ("hp", "mp", "sp")}
+        self.assertEqual(gauges["mp"], 2)
+        self.assertEqual(gauges["sp"], 0)
+
+        # A later registry edit is data the committed individual must not be
+        # migrated to: the reload reads its own stored identity, kit, binding
+        # and pools rather than re-deriving them from the edited declaration.
+        rebalanced = {
+            ORDINARY: ORDINARY_ROW,
+            STRONGER: replace(
+                STRONGER_ROW,
+                display_name_zh="合成敘述：重新平衡後的版本。",
+                active_skill_keys=(),
+                behaviour_profile_key=None,
+            ),
+            ORPHAN: ORPHAN_ROW,
+        }
+        with patch("world.rules.monster_individual.MONSTER_VARIANT_REGISTRY", rebalanced):
+            reloaded = Monster.objects.get(pk=individual.pk)
+            self.assertEqual(reloaded.species_key, SPECIES)
+            self.assertEqual(reloaded.variant_key, STRONGER)
+            self.assertEqual(reloaded.db.skills["active"], [skill.key])
+            self.assertEqual(reloaded.db.skills["passive"], [])
+            self.assertEqual(reloaded.db.behaviour_tree, "ambush_predator")
+            self.assertEqual(_stored_values(reloaded), bases)
+            self.assertEqual(
+                {
+                    key: getattr(reloaded.traits, key).current
+                    for key in ("hp", "mp", "sp")
+                },
+                gauges,
+            )
 
 
 if __name__ == "__main__":

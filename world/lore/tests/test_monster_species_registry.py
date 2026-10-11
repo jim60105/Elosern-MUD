@@ -138,6 +138,7 @@ def _variant(key: str = "t_fixture_ordinary", **overrides: object) -> MonsterVar
         "ordinary_variant": True,
         "combat_profile": None,
         "danger_grade": None,
+        "profile_required": False,
     }
     values.update(overrides)
     return MonsterVariant(**values)
@@ -376,6 +377,7 @@ class RecordShapeTests(unittest.TestCase):
                 "ordinary_variant",
                 "combat_profile",
                 "danger_grade",
+                "profile_required",
                 "active_skill_keys",
                 "passive_skill_keys",
                 "behaviour_profile_key",
@@ -483,7 +485,7 @@ class MembershipValidationTests(unittest.TestCase):
             registry.validate_monster_species_registry(species, stronger, **_faces())
 
     @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
     )
     def test_an_unknown_habitat_tier_or_grade_is_rejected(self):
         species = {"t_fixture_species": _species(habitat_tags=("t_fixture_unmapped",))}
@@ -540,14 +542,14 @@ class BalanceSlotTests(unittest.TestCase):
         return MonsterCombatProfile(**values)  # type: ignore[arg-type]
 
     @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
     )
     def test_a_partial_profile_cannot_be_constructed(self):
         with self.assertRaises(MonsterSpeciesRegistryError):
             MonsterCombatProfile(hp=1, mp=0, sp=0, atk_phys=1, agility=1, defense=1)
 
     @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
     )
     def test_an_unpopulated_or_non_integer_or_negative_value_is_rejected(self):
         for overrides in ({"magic_power": None}, {"hp": 1.5}, {"hp": True}, {"hp": -1}):
@@ -556,7 +558,7 @@ class BalanceSlotTests(unittest.TestCase):
                     self._complete(**overrides)
 
     @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
     )
     def test_a_complete_profile_is_accepted_and_projected_verbatim(self):
         profile = self._complete()
@@ -582,7 +584,7 @@ class BalanceSlotTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "monster-species-registry::numeric-combat-profiles-and-danger-grades-are-balance-gated-slots-never-invented-values"
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
     )
     def test_a_magic_flavoured_variant_reads_none_and_never_an_inferred_number(self):
         species, variants = _valid_registry()
@@ -600,6 +602,143 @@ class BalanceSlotTests(unittest.TestCase):
         self.assertIsNone(view["combat_profile"])
         self.assertIsNone(view["danger_grade"])
         self.assertNotIn("magic_power", view)
+
+
+class ProfileObligationTests(unittest.TestCase):
+    """Requirement: each variant authors whether it requires a profile."""
+
+    @staticmethod
+    def _complete() -> MonsterCombatProfile:
+        return MonsterCombatProfile(
+            hp=12, mp=3, sp=2, atk_phys=5, agility=4, defense=6, magic_power=1
+        )
+
+    def _validate(self, variants, species=None, **overrides) -> None:
+        registry.validate_monster_species_registry(
+            _valid_registry()[0] if species is None else species,
+            variants,
+            **_faces(**overrides),
+        )
+
+    @covers_requirement(
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
+    )
+    def test_a_required_row_missing_a_profile_or_grade_is_rejected(self):
+        for missing in (
+            {"combat_profile": None},
+            {"danger_grade": None},
+            {"combat_profile": None, "danger_grade": None},
+        ):
+            with self.subTest(missing=missing):
+                species, variants = _valid_registry()
+                values: dict[str, object] = {
+                    "combat_profile": self._complete(),
+                    "danger_grade": GRADE,
+                    "profile_required": True,
+                }
+                values.update(missing)
+                variants["t_fixture_ordinary"] = _variant(
+                    "t_fixture_ordinary", **values
+                )
+                with self.assertRaises(MonsterSpeciesRegistryError):
+                    self._validate(variants, species)
+
+    @covers_requirement(
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
+    )
+    def test_a_non_boolean_obligation_is_rejected(self):
+        for value in (1, 0, "yes", None):
+            with self.subTest(value=value):
+                species, variants = _valid_registry()
+                variants["t_fixture_ordinary"] = _variant(
+                    "t_fixture_ordinary",
+                    combat_profile=self._complete(),
+                    danger_grade=GRADE,
+                    profile_required=value,
+                )
+                with self.assertRaises(MonsterSpeciesRegistryError):
+                    self._validate(variants, species)
+
+    @covers_requirement(
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
+    )
+    def test_a_required_row_carrying_both_records_is_accepted(self):
+        species, variants = _valid_registry()
+        variants["t_fixture_ordinary"] = _variant(
+            "t_fixture_ordinary",
+            combat_profile=self._complete(),
+            danger_grade=GRADE,
+            profile_required=True,
+        )
+        self._validate(variants, species)
+        self.assertTrue(variants["t_fixture_ordinary"].profile_required)
+
+    @covers_requirement(
+        "monster-species-registry::authored-profile-requirements-are-declared-per-variant"
+    )
+    def test_an_optional_row_keeps_the_absence_semantics(self):
+        species, variants = _valid_registry()
+        self._validate(variants, species)
+        optional = variants["t_fixture_ordinary"]
+        self.assertFalse(optional.profile_required)
+        self.assertIsNone(optional.combat_profile)
+        self.assertIsNone(optional.danger_grade)
+        # The same row may also carry a profile it does not require.
+        species, variants = _valid_registry()
+        variants["t_fixture_ordinary"] = _variant(
+            "t_fixture_ordinary", combat_profile=self._complete(), danger_grade=GRADE
+        )
+        self._validate(variants, species)
+
+    @covers_requirement(
+        "monster-species-registry::shipped-profile-completeness-follows-authored-declarations"
+    )
+    def test_a_valid_add_rename_and_retirement_keeps_the_registry_valid(self):
+        species, variants = _valid_registry()
+
+        added = _variant(
+            "t_fixture_added",
+            display_name_zh="試製新增型",
+            threat_tier=STRONGER_TIER,
+            ordinary_variant=False,
+            combat_profile=self._complete(),
+            danger_grade=GRADE,
+            profile_required=True,
+        )
+        self._validate(dict(variants, t_fixture_added=added), species)
+
+        renamed = dict(
+            variants,
+            t_fixture_ordinary=replace(
+                variants["t_fixture_ordinary"], display_name_zh="試製改名型"
+            ),
+        )
+        self._validate(renamed, species)
+
+        retired = {
+            key: variant
+            for key, variant in variants.items()
+            if key != "t_fixture_stronger"
+        }
+        self._validate(retired, species)
+
+        # Retiring the baseline is valid only when the species repoints its
+        # default to another ordinary variant; the un-repointed retirement is
+        # the named negative beside it.
+        successor = _variant("t_fixture_successor", display_name_zh="試製接替型")
+        without_default = {
+            "t_fixture_stronger": variants["t_fixture_stronger"],
+            "t_fixture_successor": successor,
+        }
+        repointed = {
+            "t_fixture_species": replace(
+                species["t_fixture_species"],
+                default_variant_key="t_fixture_successor",
+            )
+        }
+        self._validate(without_default, repointed)
+        with self.assertRaises(MonsterSpeciesRegistryError):
+            self._validate(without_default, species)
 
 
 class PublishedProjectionTests(unittest.TestCase):
@@ -778,7 +917,7 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
     def test_the_step_mirrors_exactly_the_species_and_variant_records(self):
         expected = self._expected_record_keys()
@@ -794,7 +933,7 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
                 self.assertEqual(records[0].db.category, category)
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
     def test_repeating_the_step_is_a_no_op(self):
         def mirrored_rows():
@@ -818,7 +957,7 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         self.assertEqual(first_keys, second_keys)
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
     def test_the_mirror_touches_no_monster_room_quest_or_art_record(self):
         before = self._runtime_state()
@@ -829,7 +968,7 @@ class MonsterSpeciesSyncTests(EvenniaTestCase):
         self.assertEqual(after_first_run, self._runtime_state())
 
     @covers_requirement(
-        "monster-species-registry::approved-bestiary-narrative-lands-as-zh-tw-display-strings-and-synchronizes-idempotently"
+        "monster-species-registry::authored-monster-narratives-synchronize-without-a-fixed-roster"
     )
     def test_one_boundary_event_carries_the_registry_context(self):
         with patch("world.lore.sync.log_info") as info:

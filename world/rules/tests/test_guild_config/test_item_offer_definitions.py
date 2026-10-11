@@ -36,14 +36,10 @@ class ItemDefinitionTests(unittest.TestCase):
         "shop-economy::item-and-shop-identities-are-immutable-while-numeric-trade-rules-are-yaml-and-lore-constrained"
     )
     def test_initial_items_have_lore_price_identity_without_numbers(self):
-        # 123 shipped items, up from the 107 of the earlier commerce
-        # baseline: shared-military-equipment added the twelve E–S military
-        # weapons/armors, and guild-exam-restriction-policy added the four
-        # guild_limit_* rank accessories.
-        self.assertEqual(len(ITEM_REGISTRY), 123)
-        self.assertTrue(
-            {"meal", "healing_potion", "plain_sword"} <= set(ITEM_REGISTRY)
-        )
+        # No fixed count and no starter-key snapshot: every CURRENT definition
+        # must carry lore-owned numeric-free identity, so a valid item edit
+        # (add, rename, retire) passes without touching this file.
+        self.assertTrue(ITEM_REGISTRY)
         for key, definition in ITEM_REGISTRY.items():
             with self.subTest(item=key):
                 self.assertIn(definition.price_table_key, PRICE_TABLE)
@@ -64,23 +60,17 @@ class ItemDefinitionTests(unittest.TestCase):
         self.assertEqual(ITEM_REGISTRY["meal"].display_name_zh, "普通餐食")
 
     def test_shop_definitions_reference_only_known_items(self):
-        self.assertEqual(
-            set(SHOP_REGISTRY),
-            {
-                "altoria_general_store", "altoria_forge",
-                "altoria_eatery", "altoria_tailor",
-                "altoria_jeweller", "altoria_alchemist",
-                # altoria-sanctum landed the 聖所's counter but left this pin
-                # behind (its own suites' pins were widened; this one was
-                # missed — found by altoria-learning-and-exchange's run).
-                "altoria_sanctum_shop",
-                "ciaran_hailiel_home", "ciaran_lareneth_home",
-                "ciaran_valwyn_home", "ciaran_vethiel_home",
-                "ciaran_gwenaera_home", "ciaran_nireth_home",
-            },
-        )
+        self.assertTrue(SHOP_REGISTRY)
         for shop in SHOP_REGISTRY.values():
-            self.assertTrue(all(key in ITEM_REGISTRY for key in shop.offered_item_keys))
+            with self.subTest(shop=shop.key):
+                # A shop is defined by the assortments it references, and
+                # every key it derives must resolve in the item registry.
+                self.assertTrue(shop.assortment_keys)
+                self.assertTrue(
+                    all(
+                        key in ITEM_REGISTRY for key in shop.offered_item_keys
+                    )
+                )
 
     @covers_requirement(
         "masterwork-price-band::goods-a-community-trades-everyday-do-not-sit-in-the-keepsake-band"

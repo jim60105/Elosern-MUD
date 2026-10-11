@@ -397,42 +397,35 @@ The price registry SHALL retain separate authored `magic_armor`, mundane armor a
 - **THEN** it includes the intimacy-device band shared by the codex's wearable and usable 性玩具 entries
 
 ### Requirement: Human starting kits express lineage character, not an affluence ladder
-This requirement fixes only the concrete human selections in the starting-kit registry; the general kit-existence/equipment-only/load-time-validation contract stays owned by the `player-character-creation` capability's kit requirements, which deliberately leave per-subrace selections to registry data. The starting-kit registry SHALL map the five human bloodline subraces to exactly the approved lineage kits, keyed by the renamed subrace keys.
+Human starting-kit membership SHALL be authored registry data under existing subrace keys. Commoner-lineage kits SHALL preserve equal COMMON rarity profiles without an affluence gradient; noble lineages SHALL retain UNCOMMON inherited arms. General kit existence, equipment-only reference closure and load-time validation SHALL remain owned by player-character-creation. No requirement SHALL list the individual kit items.
 
 #### Scenario: The five human kits match the lineage table
-- **WHEN** the starting-kit registry's human entries are inspected
-- **THEN** `human_royal`, `human_noble`, `human_coastal`, `human_plains`, and `human_highland`
-  resolve to exactly the item-key sets `("gilded_saber", "chainmail", "silver_hairpin")`,
-  `("knight_blade", "leather_armor", "silver_hairpin")`, `("plain_sword", "leather_armor",
-  "iron_dagger")`, `("plain_sword", "leather_armor", "silver_hairpin")`, and
-  `("plain_sword", "leather_armor", "hunting_throwing_axe")` respectively, with no legacy
-  `human_wealthy` / `human_commoner` / `human_laborer` kit keys
+- **WHEN** human kit entries are checked
+- **THEN** every current human subrace resolves its declared valid equipment references; existing renamed subrace keys remain unchanged
 
 #### Scenario: The three commoner lineages are equipotent
-- **WHEN** the `human_coastal`, `human_plains`, and `human_highland` kits' items are inspected
-  against `ITEM_REGISTRY`
-- **THEN** each kit holds exactly three items and every item's rarity is `COMMON`, so no
-  commoner lineage starts richer than another
+- **WHEN** commoner lineage kit rarity profiles are compared
+- **THEN** each has the same number of COMMON items; content identity differences do not create an affluence gradient
 
 #### Scenario: Wooden club is retired from every kit
-- **WHEN** every kit in the starting-kit registry is inspected
-- **THEN** no kit contains `wooden_club`
+- **WHEN** kit equipment is validated
+- **THEN** every entry satisfies its authored lineage eligibility, slot and quality rules without a named prohibited-item blacklist
 
 #### Scenario: The lineage kits carry the approved item sets
-- **WHEN** the five human kits are inspected
-- **THEN** `human_royal` → 鍍金軍刀 + 鎖子甲 + 銀髮簪 (`gilded_saber`, `chainmail`, `silver_hairpin` — UNCOMMON, UNCOMMON, COMMON); `human_noble` → 騎士制式長劍 + 皮甲 + 銀髮簪 (`knight_blade`, `leather_armor`, `silver_hairpin` — UNCOMMON, COMMON, COMMON); `human_coastal` → 普通劍 + 皮甲 + 鐵短刀 (`plain_sword`, `leather_armor`, `iron_dagger`); `human_plains` → 普通劍 + 皮甲 + 銀髮簪 (`plain_sword`, `leather_armor`, `silver_hairpin`); `human_highland` → 普通劍 + 皮甲 + 狩獵擲斧 (`plain_sword`, `leather_armor`, `hunting_throwing_axe`)
+- **WHEN** kit entries are consumed by character creation
+- **THEN** the resulting equipment matches the selected current registry kit rather than duplicated approved key tuples
 
 #### Scenario: The commoner-lineage kits share an identical rarity profile
-- **WHEN** the three commoner-lineage kits are inspected
-- **THEN** each holds exactly three COMMON items — identical rarity profiles differentiated only by the character of the third item (dockside 鐵短刀, everyday 銀髮簪, hill-woodland 狩獵擲斧), never an affluence gradient
+- **WHEN** commoner lineage kits are inspected
+- **THEN** their rarity profiles are identical and all COMMON; individual item selections remain data
 
 #### Scenario: The noble lineages keep their UNCOMMON inherited arms
 - **WHEN** the 王族 and 貴族 kits are inspected
 - **THEN** they keep their UNCOMMON inherited arms; the equality that matters is among the three commoner lineages
 
 #### Scenario: Rejected items appear in no human kit
-- **WHEN** every human kit is inspected
-- **THEN** items rejected on tier or incongruity grounds (`great_axe` — the UNCOMMON bearfolk weapon; `storage_pouch` — RARE, 帝國壟斷的空間魔法小袋; `gliding_cloak` — EPIC) SHALL NOT appear in any human kit
+- **WHEN** a synthetic kit includes an item violating its declared lineage/quality eligibility
+- **THEN** validation rejects the relationship without consulting a historical item-name blacklist
 
 ### Requirement: Human lineage renames ship without a save-data compatibility layer
 The human subrace rename SHALL remain a clean breaking change without aliases, migration scripts or compatibility handling for retired keys. The unrelated human_commoner StaticTier identity SHALL survive independently of its mutable authored physical band.

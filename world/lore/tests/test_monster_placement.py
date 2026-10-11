@@ -101,6 +101,7 @@ def _variant_row(key: str, *, species_key: str = SPECIES) -> MonsterVariant:
         True,
         None,
         None,
+        False,
     )
 
 

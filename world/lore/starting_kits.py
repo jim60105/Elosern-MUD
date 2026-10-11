@@ -1,11 +1,32 @@
-"""Deterministic per-subrace basic starting equipment kits for custom creation."""
+"""Deterministic per-subrace basic starting equipment kits for custom creation.
+
+A kit is authored membership data: its subrace key, its item selections, and
+the lineage quality ceiling the selections must respect. The ceiling is the
+one piece of lineage policy that cannot be derived from the items themselves
+(``human-starting-kits-express-lineage-character-not-an-affluence-ladder``):
+a commoner bloodline never wakes with better than COMMON gear, while a noble
+or royal bloodline may inherit UNCOMMON arms. It replaces a named
+prohibited-item list, so a future legitimate selection edit stays a data
+change while an ineligible one fails at registry load.
+"""
 
 from dataclasses import dataclass
 from collections.abc import Callable, Sequence
 
-from world.lore.items import ITEM_REGISTRY
+from world.lore.items import ITEM_REGISTRY, ItemRarity
 from world.lore.races import SUBRACE_REGISTRY
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
+
+#: The rarity vocabulary in ascending quality order; a kit's ``max_rarity``
+#: bounds every one of its selections, and the ceiling lives here rather than
+#: in the item registry because it is a lineage policy, not item identity.
+_RARITY_ORDER = (
+    ItemRarity.COMMON,
+    ItemRarity.UNCOMMON,
+    ItemRarity.RARE,
+    ItemRarity.EPIC,
+    ItemRarity.LEGENDARY,
+)
 
 
 @dataclass(frozen=True)
@@ -14,6 +35,7 @@ class SubraceStartingKit:
 
     subrace_key: str
     items: tuple[tuple[str, int], ...]
+    max_rarity: ItemRarity | None = None
 
     def inventory_list(self) -> list[str]:
         """Return the flat repeated-key inventory the activation hands out."""
@@ -24,8 +46,14 @@ class SubraceStartingKit:
         ]
 
 
-def _kit(subrace_key: str, *item_keys: str) -> SubraceStartingKit:
-    return SubraceStartingKit(subrace_key, tuple((key, 1) for key in item_keys))
+def _kit(
+    subrace_key: str,
+    *item_keys: str,
+    max_rarity: ItemRarity | None = None,
+) -> SubraceStartingKit:
+    return SubraceStartingKit(
+        subrace_key, tuple((key, 1) for key in item_keys), max_rarity
+    )
 
 
 def validate_wearable_loadout(
@@ -94,11 +122,45 @@ def validate_wearable_loadout(
 SUBRACE_STARTING_KIT_REGISTRY: dict[str, SubraceStartingKit] = {
     kit.subrace_key: kit
     for kit in (
-        _kit("human_royal", "gilded_saber", "chainmail", "silver_hairpin"),
-        _kit("human_noble", "knight_blade", "leather_armor", "silver_hairpin"),
-        _kit("human_coastal", "plain_sword", "leather_armor", "iron_dagger"),
-        _kit("human_plains", "plain_sword", "leather_armor", "silver_hairpin"),
-        _kit("human_highland", "plain_sword", "leather_armor", "hunting_throwing_axe"),
+        # Human bloodline kits declare the lineage's quality ceiling: the
+        # crowned and noble houses may hand down an UNCOMMON inherited arm,
+        # the three commoner bloodlines wake with COMMON gear only (so no
+        # commoner lineage can start richer than another).
+        _kit(
+            "human_royal",
+            "gilded_saber",
+            "chainmail",
+            "silver_hairpin",
+            max_rarity=ItemRarity.UNCOMMON,
+        ),
+        _kit(
+            "human_noble",
+            "knight_blade",
+            "leather_armor",
+            "silver_hairpin",
+            max_rarity=ItemRarity.UNCOMMON,
+        ),
+        _kit(
+            "human_coastal",
+            "plain_sword",
+            "leather_armor",
+            "iron_dagger",
+            max_rarity=ItemRarity.COMMON,
+        ),
+        _kit(
+            "human_plains",
+            "plain_sword",
+            "leather_armor",
+            "silver_hairpin",
+            max_rarity=ItemRarity.COMMON,
+        ),
+        _kit(
+            "human_highland",
+            "plain_sword",
+            "leather_armor",
+            "hunting_throwing_axe",
+            max_rarity=ItemRarity.COMMON,
+        ),
         _kit("fionnen", "hunters_longbow", "leather_armor"),
         _kit("ciaran", "ashen_scimitar", "leather_armor"),
         _kit("eolas", "apprentice_focus_staff", "mage_robe", "prism_charm"),
@@ -142,6 +204,14 @@ def _validate_starting_kit(registry_key: str, kit: object) -> None:
         )
     if not isinstance(kit.items, tuple) or len(kit.items) == 0:
         raise ValueError(f"starting kit {registry_key!r} must be a non-empty tuple")
+    if kit.max_rarity is not None and not isinstance(kit.max_rarity, ItemRarity):
+        raise ValueError(
+            f"starting kit {registry_key!r} declares max_rarity "
+            f"{kit.max_rarity!r}; a lineage ceiling must be an ItemRarity member"
+        )
+    ceiling = (
+        None if kit.max_rarity is None else _RARITY_ORDER.index(kit.max_rarity)
+    )
     for entry in kit.items:
         if not isinstance(entry, tuple) or len(entry) != 2:
             raise ValueError(
@@ -156,6 +226,13 @@ def _validate_starting_kit(registry_key: str, kit: object) -> None:
             raise ValueError(
                 f"starting kit {registry_key!r} declares non-equipment item "
                 f"{item_key!r}"
+            )
+        rarity = ITEM_REGISTRY[item_key].presentation.rarity
+        if ceiling is not None and _RARITY_ORDER.index(rarity) > ceiling:
+            raise ValueError(
+                f"starting kit {registry_key!r} declares {item_key!r} at "
+                f"{rarity.value} rarity, above its {kit.max_rarity.value} "
+                "lineage ceiling"
             )
         if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity < 1:
             raise ValueError(

@@ -13,6 +13,7 @@ from world.lore.items.vocab import (
     ItemKind,
     ItemIconKey,
     ItemRarity,
+    LiturgicalRole,
 )
 
 from world.skills.equipment import EquipmentSlot
@@ -115,6 +116,7 @@ ROWS: tuple[ItemDefinition, ...] = (
             ),
             equipment_slot=EquipmentSlot.ACCESSORY,
             modifier_key=EquipmentModifierKey.PILGRIM_MEDALLION,
+            liturgical_role=LiturgicalRole.VESTMENT_OR_EMBLEM,
         ),
         ItemDefinition(
             key="prism_charm",

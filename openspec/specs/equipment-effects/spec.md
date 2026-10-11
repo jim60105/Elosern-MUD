@@ -128,44 +128,28 @@ Rulebook fields whose consumers arrive in later changes (combat/stat merge, immu
 - **WHEN** two deviant rulebook copies differ only in dormant-only fields (for example `pleasure_gain` values) while the consuming changes have not landed
 - **THEN** combat, act resolution, and buff application produce byte-for-byte identical results between the two copies, and no production module outside the validated loader and the change-authorized consumers imports the equipment-effect rulebook
 
-### Requirement: The new equipment roster is registered and tradeable
-The roster SHALL add the ten designed equipment items — 淨化吊墜, 無懼胸針, 騎士全套板甲,
-藥師珠串, 大術師補綴長袍, 誘蠱蕾絲內衣, 迷情絲頸環, 修女聖袍, 光輝聖徽, 聖女聖袍 — each
-with a registry presentation identity, an existing price-table key, an effect binding, and a
-listing in the offered keys of at least one Altoria shop.
-
-#### Scenario: New items are purchasable and fully bound
-- **WHEN** the capital's shops are inspected after this change
-- **THEN** each of the ten new item keys appears in at least one capital shop's offered keys
-  with a resolvable price entry and a budget-checked rulebook entry
-
-#### Scenario: The tradeable guarantee is per-roster, not per-shelf
-- **WHEN** altoria-adornments-and-remedies moves the roster's five accessory pieces to 聖潔王都首飾坊 (the armor pieces already sat with 聖潔王都裁縫坊), superseding the original wording "a listing in the existing general store's offered keys"
-- **THEN** the shipped behavioral test asserts offered-by-some-capital-shop and the roster stays tradeable across shelves
-
 ### Requirement: Church-of-Light equipment obeys its canon doctrine
-The named 光明教會 equipment set is governed by the Church's canon doctrine (坦露與歡愉為正向、光之治療與淨化) and is split into two sub-sets by liturgical function. The **vestment-and-emblem** sub-set — `sister_vestments`, `radiant_holy_emblem`, `saintess_vestments`, and `pilgrim_medallion` — SHALL carry non-negative `exposure_bias` and non-negative `pleasure_gain`, and SHALL provide at least one of `heal_gain` or an immunity.
+Church equipment SHALL declare its liturgical role in immutable item lore independently of effect rules. Vestment/emblem roles SHALL carry non-negative exposure_bias, pleasure_gain and any heal_gain, and positive healing or immunity. Sanctuary-device roles SHALL carry non-negative exposure_bias and positive pleasure_gain without required healing. Effect entries SHALL NOT reclassify themselves to evade doctrine; ordinary combat trade-offs remain permitted.
 
 #### Scenario: Doctrine coverage for the named Church set
-- **WHEN** the rulebook entries of the four named vestment-and-emblem keys are validated
-- **THEN** each has non-negative `exposure_bias` and `pleasure_gain`, at least one of `heal_gain` or an immunity, and no suppression value
+- **WHEN** all item-lore vestment/emblem members are validated
+- **THEN** each has non-negative exposure and pleasure modifiers and healing or immunity; ordinary combat trade-offs remain allowed
 
 #### Scenario: Doctrine coverage for the sanctuary-device sub-set
-- **WHEN** the rulebook entries of the named 聖所 device keys are validated
-- **THEN** each has non-negative `exposure_bias`, positive `pleasure_gain`, and no suppression value, and none is failed for lacking `heal_gain` or an immunity
+- **WHEN** all item-lore sanctuary-device members are validated
+- **THEN** each has non-negative exposure and positive pleasure modifiers; absence of healing/immunity is accepted
 
 #### Scenario: Doctrine violation blocks a named Church item
-- **WHEN** a deviant rulebook copy gives a named Church item a negative `pleasure_gain`
-- **THEN** the doctrine coverage test fails and the change cannot ship
+- **WHEN** a synthetic declared Church item receives a negative pleasure modifier
+- **THEN** validation fails regardless of its key or shop listing
 
 #### Scenario: A sanctuary device may not borrow the healing exemption
-- **WHEN** a deviant rulebook copy moves a vestment key into the sanctuary-device sub-set to drop its healing obligation
-- **THEN** the coverage test still fails, because sub-set membership is the named list in this requirement and not a property the rulebook can assert
+- **WHEN** a deviant effect rule tries to reclassify a vestment as a sanctuary device
+- **THEN** item-lore role remains authoritative and missing vestment healing/immunity fails
 
 #### Scenario: Sanctuary-device sub-set carries pleasure-only doctrine
-- **WHEN** the 聖所 devices the codex catalogues — currently `nymph_buds_clamp`, `warm_honey_orb`, and `hyperesthesia_charm` — are validated
-- **THEN** each carries non-negative `exposure_bias` and positive `pleasure_gain`, and none is required to provide `heal_gain` or an immunity
-- **AND** the doctrine rationale holds: a garment or sigil of the faith channels the Light's healing and cleansing, while a device serves the rite of pleasure itself rather than dispensing the Light
+- **WHEN** sanctuary-device members are validated
+- **THEN** each satisfies the declared device role without healing; liturgical role expresses the unchanged ministry distinction
 
 #### Scenario: No sub-set member carries chastity-style suppression
 - **WHEN** any member of either sub-set is validated
@@ -173,9 +157,8 @@ The named 光明教會 equipment set is governed by the Church's canon doctrine 
 - **AND** ordinary combat trade-offs (negative `defense`, `atk_phys`, agility, etc.) remain permitted as the mechanical cost of holiness
 
 #### Scenario: Sub-set membership is amended by name, not by tag
-- **WHEN** a new Church item is added
-- **THEN** it enters by amending this requirement in the change that adds it, naming the sub-set it joins; membership is these named sets
-- **AND** a future registry-owned faith-identity tag remains out of scope
+- **WHEN** a new Church equipment record is authored
+- **THEN** its immutable item-lore role determines doctrine coverage without a named membership list in the specification
 
 ### Requirement: Equipment adjustments reach every consumer through one accessor
 
@@ -245,8 +228,8 @@ An equipment item SHALL be complete when it declares a slot, binds one-to-one to
 - **THEN** it occupies its declared slot and its adjustments reach the shared accessor with the authored values
 
 #### Scenario: Tradeability is a stated roster property
-- **WHEN** a roster added by this capability is inspected
-- **THEN** its requirement states whether its members are stocked, and the shipped offers match that statement
+- **WHEN** authored shop memberships are inspected
+- **THEN** offers follow current data and do not determine equipment registration completeness
 
 #### Scenario: Unstocked items are a valid shipped state
 - **WHEN** a bound, budget-checked equipment item that no shop offers ships
@@ -254,6 +237,20 @@ An equipment item SHALL be complete when it declares a slot, binds one-to-one to
 - **AND** it equips and applies its adjustments exactly as a stocked item of the same shape would
 
 #### Scenario: Stocking statements follow lore provenance
-- **WHEN** a roster added by this capability ships
-- **THEN** its statement of whether its members are stocked follows the roster's lore provenance rather than a default
-- **AND** the regional equipment roster (7 weapons, 3 armors, 2 accessories) ships unstocked until its regional storefronts land
+- **WHEN** equipment lore and shop membership are reviewed
+- **THEN** stocking is explicitly authored according to provenance; unoffered registered equipment is valid without a fixed regional roster count
+
+### Requirement: Equipment membership and stocking are authored data
+Every registered equipment item SHALL bind one-to-one to a complete budget-checked effect entry and valid presentation/price metadata. Item membership and shop listings SHALL remain authored data; registration SHALL NOT imply stocking. Declared offers SHALL resolve registered items and numeric rules without a fixed approved roster, and non-sellable restrictions SHALL prevail over any listing.
+
+#### Scenario: New complete item
+- **WHEN** a valid synthetic equipment item and effect binding are added without a shop listing
+- **THEN** load, grant and equip succeed without changing a roster contract
+
+#### Scenario: Declared listing
+- **WHEN** a synthetic sellable item is listed in a valid authored shop
+- **THEN** ordinary purchase exposes that listing; removing it leaves the equipment valid but unoffered
+
+#### Scenario: Military exception
+- **WHEN** military E-S equipment is checked
+- **THEN** the six named sword/armor pairs remain protected by military-equipment because guild examiner content depends on them; examiner-facing statements remain named

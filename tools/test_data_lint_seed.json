@@ -10,15 +10,19 @@
     },
     {
       "path": "world/rules/tests/test_crocodile_resource_skill.py",
-      "reason": "crocodile resource skill production combat smoke contract"
+      "reason": "crocodile representative-composition production smoke over the generic transfer/policy contracts"
     },
     {
       "path": "world/rules/tests/test_sway_whistle_sparrow_resource_skill.py",
-      "reason": "sparrow resource skill production combat smoke contract"
+      "reason": "sparrow representative-composition production smoke over the generic rider/lifetime contracts"
     },
     {
       "path": "world/rules/tests/test_tide_lamp_crab_resource_skill.py",
-      "reason": "crab resource skill production combat smoke contract"
+      "reason": "crab representative-composition production smoke over the generic self-guard/lifetime contracts"
+    },
+    {
+      "path": "world/rules/tests/test_monster_composition_coverage.py",
+      "reason": "authored-kit composition grouping and representative wiring contract"
     },
     {
       "path": "tests/test_command_docs.py",
@@ -70,7 +74,7 @@
     },
     {
       "path": "world/lore/tests/test_items.py",
-      "reason": "item registry content contract"
+      "reason": "item registry registration/metadata/reference contract"
     },
     {
       "path": "world/lore/tests/test_magic.py",
@@ -81,8 +85,12 @@
       "reason": "monster tier data contract"
     },
     {
+      "path": "world/lore/tests/test_bestiary_documentation.py",
+      "reason": "keyed bestiary documentation relationship contract"
+    },
+    {
       "path": "world/lore/tests/test_monster_species_content.py",
-      "reason": "shipped bestiary identity, narrative, profile integrity and construction wiring"
+      "reason": "registry-derived monster identity, profile/kit coverage and public narrative contract"
     },
     {
       "path": "world/lore/tests/test_names.py",
@@ -93,12 +101,16 @@
       "reason": "nation data contract"
     },
     {
+      "path": "world/lore/tests/test_npc_editorial_review.py",
+      "reason": "registry-indexed NPC characterization editorial review contract"
+    },
+    {
       "path": "world/lore/tests/test_npc_profile_inventory.py",
-      "reason": "shipped NPC source inventory data contract"
+      "reason": "shipped NPC source inventory equality contract"
     },
     {
       "path": "world/lore/tests/test_npc_profile_slice_content.py",
-      "reason": "per-slice authored NPC profiles and rewritten dialogue content contract"
+      "reason": "registry-derived NPC host characterization and authored dialogue coverage contract"
     },
     {
       "path": "world/lore/tests/test_npc_tiers.py",
@@ -226,7 +238,7 @@
     },
     {
       "path": "world/rules/tests/test_equipment_effect_rulebook.py",
-      "reason": "equipment effect rulebook contract"
+      "reason": "equipment effect rulebook and item-lore liturgical-role contract"
     },
     {
       "path": "world/rules/tests/test_guild_config/_support.py",
@@ -258,7 +270,7 @@
     },
     {
       "path": "world/rules/tests/test_guild_config/test_service_host_roster.py",
-      "reason": "guild/shop config validation contract"
+      "reason": "place-derived service host roster and current place-declaration contract"
     },
     {
       "path": "world/rules/tests/test_church_hosts.py",
@@ -274,7 +286,7 @@
     },
     {
       "path": "world/rules/tests/test_npc_roster_validation.py",
-      "reason": "shipped NPC persona roster validation contract"
+      "reason": "registry-derived NPC roster completeness and fault-diagnostic contract"
     },
     {
       "path": "world/rules/tests/test_npc_schedules.py",
@@ -366,7 +378,7 @@
     },
     {
       "path": "world/skills/tests/test_skill_registry/test_registry_contract.py",
-      "reason": "skill registry content contract"
+      "reason": "skill registry typed kit/reference contract"
     },
     {
       "path": "world/skills/tests/test_spell_catalogs.py",

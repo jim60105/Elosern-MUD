@@ -37,8 +37,8 @@ Define deterministic title storage, the fixed-title lore registry, transactional
 `world/rules/titles.py` SHALL define `compose_title(fixed: str | None, epithet: str | None) -> str` joining the non-empty parts fixed-first, epithet-second, with a full-width space (「　」), returning the empty string when both slots are empty. No consumer SHALL store a composed copy; every read composes live from the two slots' identifiers.
 
 #### Scenario: Both slots compose with the full-width space
-- **WHEN** `compose_title("F級冒險者", "南門新客")` is called
-- **THEN** it returns 「F級冒險者　南門新客」
+- **WHEN** `compose_title("F級冒險者", "測試異名")` is called
+- **THEN** it returns 「F級冒險者　測試異名」
 
 #### Scenario: A single occupied slot omits the separator
 - **WHEN** either argument is `None`
@@ -49,7 +49,7 @@ Define deterministic title storage, the fixed-title lore registry, transactional
 - **THEN** narrative consumers fall back to the character's own name and the LLM prompt's identity section is omitted entirely, never filled with a placeholder
 
 ### Requirement: The fixed-title lore registry validates and syncs idempotently
-`world/lore/titles.py` SHALL hold frozen `FixedTitleDef(key, display_name_zh, category, flavor_zh, hint_zh, predicate)` entries in a keyed registry mirrored into Evennia Scripts idempotently at startup, alongside the registry constant `STARTER_EPITHET` (display 「南門新客」). Load validation SHALL reject malformed or ambiguous registries before anything is published.
+`world/lore/titles.py` SHALL hold frozen `FixedTitleDef(key, display_name_zh, category, flavor_zh, hint_zh, predicate)` entries in a keyed registry mirrored into Evennia Scripts idempotently at startup, alongside the registry constant `STARTER_EPITHET` (authored display and origin basis). Load validation SHALL reject malformed or ambiguous registries before anything is published.
 
 #### Scenario: A dangling predicate reference fails at load
 - **WHEN** a registry row's predicate names a nonexistent quest key
@@ -111,7 +111,7 @@ Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing `world/r
 
 #### Scenario: The composed starter title arrives at the first reward claim
 - **WHEN** a registered member completes their first guild reward claim
-- **THEN** the collection holds fixed 「F級冒險者」 plus epithet 「南門新客」, both slots auto-equipped, and the live full title is 「F級冒險者　南門新客」
+- **THEN** the collection holds fixed 「F級冒險者」 plus the authored starter epithet, both empty slots auto-equip and the live full title composes that fixed title with the authored epithet display
 
 #### Scenario: Re-registration is inert
 - **WHEN** an already-registered member registers again
@@ -127,12 +127,11 @@ Each `GUILD_RANK_REGISTRY` row SHALL pair one fixed title. The existing `world/r
 
 #### Scenario: The starter epithet is granted at the first reward claim, not registration
 - **WHEN** guild registration completes
-- **THEN** the starter epithet 「南門新客」 is not granted; it is granted by `world/rules/titles.py::grant_first_quest_epithet` inside the actor's first guild reward-claim transaction (quest-reward-settlement), through the regular `bank_epithet` writer
+- **THEN** the authored starter epithet is not granted; the actor's first reward claim banks its configured display and origin through the regular writer in the claim transaction
 
 #### Scenario: Non-promotion guild changes never revoke titles
 - **WHEN** merit changes, branch moves, or any future demotion occurs
 - **THEN** banked titles are not revoked
-
 
 ### Requirement: Slot non-empty is an invariant with auto-equip and no unequip
 For each kind, collection-non-empty SHALL imply the matching equip slot is non-empty. Every mutator that banks an entry (fixed grant, the first-quest epithet grant, and the future epithet adoption) SHALL auto-equip it into an empty slot within the same transaction, and SHALL only bank into an occupied slot. No code path, command, or API SHALL empty a slot (there is no `title clear`).
@@ -148,7 +147,6 @@ For each kind, collection-non-empty SHALL imply the matching equip slot is non-e
 #### Scenario: The empty-slot windows are bounded
 - **WHEN** the entity's lifecycle is examined for empty slots
 - **THEN** the only empty-slot window for the fixed slot is after character activation and before guild registration, and the only empty-slot window for the epithet slot is before the member's first completed guild reward claim
-
 
 ### Requirement: The title equip surface swaps identifiers and never un equips
 `title list` SHALL print both blocks — every registry fixed row (locked rows show
@@ -450,4 +448,3 @@ The fixed-title registry SHALL carry a five-row clergy ladder in the 聖職 cate
 #### Scenario: The 聖女 office stays prose
 - **WHEN** the shipped registry is audited for any naming of the 聖女 office
 - **THEN** no fixed-title row of ANY category displays or otherwise names it ;  the office stays prose per the saintess-vessel spec (reaffirmed, design §9)
-

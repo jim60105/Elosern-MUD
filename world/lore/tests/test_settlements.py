@@ -23,6 +23,28 @@ from world.lore.settlements.settlements import (
 from world.lore.settlements.shops import SHOP_REGISTRY
 
 
+def _place_fields(place) -> tuple:
+    """The place's own authored data, in the capture's shape.
+
+    Deliberately excludes the host's name/title, profession, service identity,
+    profile key and the offered-item keys: those follow the current place-to-
+    roster correspondence and the shop registry, and belong to no snapshot.
+    """
+    return (
+        place.key,
+        place.settlement_key,
+        place.kind,
+        place.room_name_zh,
+        place.room_desc_zh,
+        place.exterior_xy,
+        place.doorway_key_zh,
+        place.doorway_aliases,
+        place.host_race,
+        place.host_subrace,
+        place.host_sex,
+    )
+
+
 class SettlementRegistryTests(unittest.TestCase):
     """Settlement records: closed archetype vocabulary and anchor-key parity."""
 
@@ -110,131 +132,110 @@ class PlaceRegistryTests(unittest.TestCase):
         self.assertTrue(all(place_is_hostless(place) for place in branches))
         self.assertTrue(all(place.kind == PlaceKind.COURIER_STATION for place in branches))
 
-    # The altoria-place-slices content-parity guard. Every assembled row is
-    # captured as authored-field literals BEFORE the terrace split (a live dump
-    # of PLACE_REGISTRY, transcribed verbatim); the split moves rows between
-    # slice files and must change no field. Keyed by place key rather than
-    # listed in registry order on purpose — the split deliberately reorders the
-    # assembly, and the iteration-order test above owns that change. If a row
-    # disappears, duplicates, or drifts a field during the move, this fails.
-    PRE_SPLIT_CONTENT_CAPTURE = {
+    # The altoria-place-slices content-parity guard, split into the place's own
+    # authored data. Every captured row is transcribed verbatim from a live
+    # dump BEFORE the terrace split: the split moves rows between slice files
+    # and must change no place field, so key, settlement, kind, room name,
+    # room description, exterior, doorway name and aliases, plus the dwelling
+    # lineage values, are literals here. Shape: place key -> (key,
+    # settlement_key, kind, room_name_zh, room_desc_zh, exterior_xy,
+    # doorway_key_zh, doorway_aliases, host_race, host_subrace, host_sex).
+    # Keyed by place key rather than listed in registry order on purpose — the
+    # split deliberately reorders the assembly, and the iteration-order test
+    # above owns that change. If a row disappears, duplicates, or drifts a
+    # place field during the move, this fails.
+    #
+    # What is deliberately NOT here: the host's name and title, the host's
+    # profession, service identity and profile key, and the offered-item keys.
+    # Those belong to the current place-to-roster correspondence (checked in
+    # test_guild_config/test_service_host_roster.py) and to the shop registry,
+    # so a valid later personnel or merchandise edit does not fail this guard.
+    PRE_SPLIT_PLACE_CAPTURE = {
         "altoria_guild_hall": (
             'altoria_guild_hall', 'capital_altoria', PlaceKind.GUILD_HALL, '阿爾托利亞冒險者公會大廳',
             '阿爾托利亞的冒險者公會大廳，屋裡最顯眼的是一面大任務板，以及一座環形訓練場。', (4, 3),
-            '冒險者公會大廳', ('guild hall', 'hall'), '葛里安‧衛登', '阿爾托利亞分會會長', 'human', None, 'other', 'guild_staff',
-            'altoria_guild_master', (),
-            (('branch_key', 'guild_branch_altoria'), ('dialogue_key', 'guild_staff')), (), (),
-            # npc-persona-content-altoria-guild names the host's own profile.
-            'altoria_guild_master'
+            '冒險者公會大廳', ('guild hall', 'hall'),
+            'human', None, 'other',
         ),
         "altoria_general_store": (
             'altoria_general_store', 'capital_altoria', PlaceKind.GENERAL_STORE, '阿爾托利亞雜貨店',
             '阿爾托利亞的雜貨店，貨架總留著幾格空位，像在任何一支商隊趕來之前先替它們留好位置。',
-            (2, 3), '雜貨店', ('general store', 'store', 'shop'), '瑪爾特‧金秤', '阿爾托利亞雜貨商店老闆', 'human', None,
-            'other', 'merchant', 'altoria_merchant', ('general_sundries',),
-            (('shop_key', 'altoria_general_store'), ('dialogue_key', 'altoria_general_store')), (), (),
-            # npc-persona-content-altoria-trade names the host's own profile.
-            'altoria_merchant'
+            (2, 3), '雜貨店', ('general store', 'store', 'shop'),
+            'human', None, 'other',
         ),
         "altoria_forge": (
             'altoria_forge', 'capital_altoria', PlaceKind.WEAPONSMITH, '聖潔王都鍛造鋪',
             "聖潔王都的鍛造鋪，砧聲在屋簷下響著，替這座王都的兵器生意一聲聲定了價。",
-            (1, 3), '鍛造鋪', ('forge', 'smithy'), '維爾登‧黑潭', '聖潔王都鍛造鋪鐵匠', 'human', 'human_plains', 'male',
-            'merchant', 'altoria_blacksmith', ('common_arms',),
-            (('shop_key', 'altoria_forge'), ('dialogue_key', 'altoria_forge')), (), (),
-            # npc-persona-content-altoria-trade names the host's own profile.
-            'altoria_blacksmith'
+            (1, 3), '鍛造鋪', ('forge', 'smithy'),
+            'human', 'human_plains', 'male',
         ),
         "altoria_eatery": (
             'altoria_eatery', 'capital_altoria', PlaceKind.EATERY, '聖潔王都餐館',
             "聖潔王都的餐館，廚房蒸氣從門口漫出去，罩在南大道的人流上頭。",
-            (3, 1), '餐館', ('eatery', 'restaurant', 'diner'), '西格瑪‧庫柏', '聖潔王都餐館老闆', 'human', 'human_plains',
-            'male', 'merchant', 'altoria_eatery_owner', ('staple_meals',),
-            (('shop_key', 'altoria_eatery'), ('dialogue_key', 'altoria_eatery')), (), (),
-            # npc-persona-content-altoria-lower names the host's own profile.
-            'altoria_eatery_owner'
+            (3, 1), '餐館', ('eatery', 'restaurant', 'diner'),
+            'human', 'human_plains', 'male',
         ),
         "altoria_tailor": (
             'altoria_tailor', 'capital_altoria', PlaceKind.OUTFITTER, '聖潔王都裁縫坊',
             "聖潔王都的裁縫坊，一卷卷布匹擱在案邊，等著北大道那些貴族的訂單。",
-            (1, 3), '裁縫坊', ('tailor', 'tailor shop'), '妮絲塔‧狐溪', '聖潔王都裁縫坊坊主', 'human', 'human_plains',
-            'female', 'merchant', 'altoria_tailor', ('common_outfits',),
-            (('shop_key', 'altoria_tailor'), ('dialogue_key', 'altoria_tailor')), (), (),
-            # npc-persona-content-altoria-trade names the host's own profile.
-            'altoria_tailor'
+            (1, 3), '裁縫坊', ('tailor', 'tailor shop'),
+            'human', 'human_plains', 'female',
         ),
         "ciaran_hailiel_home": (
             'ciaran_hailiel_home', 'village_ciaran', PlaceKind.HOME, '海莉爾的家',
             "一道厚樑下是一間低矮溫暖的屋子。爐膛用餘燼蓋著過夜，窗邊的坐位望出去正是村中的練刀場，年幼的刀舞者從清晨到日暮都在那裡練刀。這屋家的器具沿牆收得整整齊齊；沒有任何一樣擺著等誰來買。",
-            (2, 1), '海莉爾的家', ('hailiel', "hailiel's home"), '海莉爾‧斯塔爾法爾', '暗影谷村鑄刃者', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_hailiel', ('elven_crafted_arms',),
-            (('shop_key', 'ciaran_hailiel_home'), ('dialogue_key', 'ciaran_hailiel_home')), (), (),
-            # npc-persona-content-ciaran-homes-a names the host's own profile.
-            'ciaran_hailiel'
+            (2, 1), '海莉爾的家', ('hailiel', "hailiel's home"),
+            'elf', 'ciaran', 'female',
         ),
         "ciaran_gwenaera_home": (
             'ciaran_gwenaera_home', 'village_ciaran', PlaceKind.HOME, '格威娜拉的家',
             "銀絲與做了一半的飾品攤在工作檯的布上，分的標準出自手藝人的眼光，不是商人的眼光。完成的作品掛在窗邊的繩上，旁邊晾著從下面坡上採來的花頭；爐火溫著一壺水，沒人指望會有客人要用。這是一個喜歡綴飾工作的人的家，會做買賣只是因為村子請她做。",
-            (2, 3), '格威娜拉的家', ('gwenaera', "gwenaera's home"), '格威娜拉‧希爾維爾莉夫', '暗影谷村綴飾者', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_gwenaera', ('elven_adornments',),
-            (('shop_key', 'ciaran_gwenaera_home'), ('dialogue_key', 'ciaran_gwenaera_home')), (), (),
-            # npc-persona-content-ciaran-homes-a names the host's own profile.
-            'ciaran_gwenaera'
+            (2, 3), '格威娜拉的家', ('gwenaera', "gwenaera's home"),
+            'elf', 'ciaran', 'female',
         ),
         "ciaran_lareneth_home": (
             'ciaran_lareneth_home', 'village_ciaran', PlaceKind.HOME, '拉瑞內斯的家',
             "溪畔小徑旁這戶人家，空氣裡懸著糖漬花的香氣。曬乾的花瓣織在籃裡擱著，挨著一方小爐石；窗邊一張矮凳上擺著今日待客的小點，為每個經過的人留著。",
-            (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"), '拉瑞內斯‧妮特布倫', '暗影谷村花饌好手', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_lareneth', ('elven_fare',),
-            (('shop_key', 'ciaran_lareneth_home'), ('dialogue_key', 'ciaran_lareneth_home')), (), (),
-            # npc-persona-content-ciaran-homes-a names the host's own profile.
-            'ciaran_lareneth'
+            (1, 0), '拉瑞內斯的家', ('lareneth', "lareneth's home"),
+            'elf', 'ciaran', 'female',
         ),
         "ciaran_nireth_home": (
             'ciaran_nireth_home', 'village_ciaran', PlaceKind.HOME, '妮瑞斯的家',
             "成把的藥草與塞著木塞的小藥罐擠滿這間曬得到太陽的屋子，按摘下的時辰排，不按值多少錢排。窗邊一方臼，窗外望得見村子的藥草園，門口一帶的空氣苦裡帶甜。藥是留給需要的人的；被村子請託把藥換成錢賣，是同一座種藥的村子順便想到的事。",
-            (3, 1), '妮瑞斯的家', ('nireth', "nireth's home"), '妮瑞斯‧米斯特瓦勒', '暗影谷村調藥者', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_nireth', ('elven_remedies',),
-            (('shop_key', 'ciaran_nireth_home'), ('dialogue_key', 'ciaran_nireth_home')), (), (),
-            # npc-persona-content-ciaran-homes-b names the host's own profile.
-            'ciaran_nireth'
+            (3, 1), '妮瑞斯的家', ('nireth', "nireth's home"),
+            'elf', 'ciaran', 'female',
         ),
         "ciaran_valwyn_home": (
             'ciaran_valwyn_home', 'village_ciaran', PlaceKind.HOME, '瓦爾溫的家',
             "村北那株老樹下，樹根環抱間是這戶人家。沿著每一面牆，一輩子蒐羅來的零物擱在織籃與挖空的石裡，羽毛、種子、一綑綑紮起的絲，樣樣被細心留著，樣樣有一個故事。這是一個被留下來的事物裝滿的家，不是一間鋪子。",
-            (1, 2), '瓦爾溫的家', ('valwyn', "valwyn's home"), '瓦爾溫‧斯蒂爾瓦特爾', '暗影谷村蒐羅者', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_valwyn', ('elven_sundries',),
-            (('shop_key', 'ciaran_valwyn_home'), ('dialogue_key', 'ciaran_valwyn_home')), (), (),
-            # npc-persona-content-ciaran-homes-b names the host's own profile.
-            'ciaran_valwyn'
+            (1, 2), '瓦爾溫的家', ('valwyn', "valwyn's home"),
+            'elf', 'ciaran', 'female',
         ),
         "ciaran_vethiel_home": (
             'ciaran_vethiel_home', 'village_ciaran', PlaceKind.HOME, '維特希爾的家',
             "藥草倒掛在椽上晾乾，染好的線繞在織機邊的木釘上。木架上看得見許多手的磨損，可這間屋子首先是個住家，地上一個坐墊，火邊一壺水，織品之間攤著幾件衣服等人欣賞。",
-            (2, 2), '維特希爾的家', ('vethiel', "vethiel's home"), '維特希爾‧威爾德布瑞亞爾', '暗影谷村織衣者', 'elf', 'ciaran',
-            'female', 'merchant', 'ciaran_vethiel', ('elven_attire',),
-            (('shop_key', 'ciaran_vethiel_home'), ('dialogue_key', 'ciaran_vethiel_home')), (), (),
-            # npc-persona-content-ciaran-homes-b names the host's own profile.
-            'ciaran_vethiel'
+            (2, 2), '維特希爾的家', ('vethiel', "vethiel's home"),
+            'elf', 'ciaran', 'female',
         ),
     }
 
     def test_pre_split_captured_rows_remain_verbatim_in_assembled_registry(self):
-        from dataclasses import astuple
-
-        # altoria-adornments-and-remedies projects the comparison onto the
-        # CAPTURED keys instead of the whole live registry: the capture is a
-        # historical migration guard (the terrace split moved these rows and
-        # changed no field), not a growing current-state snapshot — a later
-        # change adds a row (the jeweller and the alchemist, say) by editing
-        # THIS module's pins nowhere except the order and kind tests below.
+        # The comparison projects onto the CAPTURED keys instead of the whole
+        # live registry: the capture is a historical migration guard (the
+        # terrace split moved these rows and changed no place field), not a
+        # growing current-state snapshot — a later change adds a row (the
+        # jeweller and the alchemist, say) by editing THIS module's pins nowhere
+        # except the order and kind tests below.
         self.assertTrue(
-            set(self.PRE_SPLIT_CONTENT_CAPTURE) <= set(PLACE_REGISTRY),
+            set(self.PRE_SPLIT_PLACE_CAPTURE) <= set(PLACE_REGISTRY),
             "the assembled registry lost a row the split preserved",
         )
         self.assertEqual(
-            {key: astuple(PLACE_REGISTRY[key]) for key in self.PRE_SPLIT_CONTENT_CAPTURE},
-            {key: (*row, False) for key, row in self.PRE_SPLIT_CONTENT_CAPTURE.items()},
+            {
+                key: _place_fields(PLACE_REGISTRY[key])
+                for key in self.PRE_SPLIT_PLACE_CAPTURE
+            },
+            dict(self.PRE_SPLIT_PLACE_CAPTURE),
         )
 
     # ---- the kind vocabulary (place-kind-vocabulary) -----------------------
@@ -375,59 +376,40 @@ class PlaceRegistryTests(unittest.TestCase):
             self.assertIsNone(place.host_subrace)
             self.assertEqual(place.host_sex, "other")
 
-    def test_capital_places_keep_their_identities_after_the_replan(self):
+    def test_capital_places_keep_their_place_identity_after_the_replan(self):
         # The altoria-capital-replan neutrality gate: only exterior_xy moved.
-        # Every identity field and every resolved shop offer of the shipped
-        # capital five is pinned to its pre-replan value; the exteriors are
-        # pinned to the new teardrop addresses. A row edited beyond its
-        # address fails here.
-        expected = [
-            (
-                "altoria_guild_hall", "阿爾托利亞冒險者公會大廳", (4, 3),
-                "冒險者公會大廳", "葛里安‧衛登", "阿爾托利亞分會會長",
-                "altoria_guild_master", (),
-            ),
-            (
-                "altoria_general_store", "阿爾托利亞雜貨店", (2, 3),
-                "雜貨店", "瑪爾特‧金秤", "阿爾托利亞雜貨商店老闆",
-                "altoria_merchant", ("general_sundries",),
-            ),
-            (
-                "altoria_forge", "聖潔王都鍛造鋪", (1, 3),
-                "鍛造鋪", "維爾登‧黑潭", "聖潔王都鍛造鋪鐵匠",
-                "altoria_blacksmith", ("common_arms",),
-            ),
-            (
-                "altoria_eatery", "聖潔王都餐館", (3, 1),
-                "餐館", "西格瑪‧庫柏", "聖潔王都餐館老闆",
-                "altoria_eatery_owner", ("staple_meals",),
-            ),
-            (
-                "altoria_tailor", "聖潔王都裁縫坊", (1, 3),
-                "裁縫坊", "妮絲塔‧狐溪", "聖潔王都裁縫坊坊主",
-                "altoria_tailor", ("common_outfits",),
-            ),
-        ]
-        shops = SHOP_REGISTRY
-        for (
-            key, room_name, exterior, doorway, host, title, service, assortments
-        ) in expected:
+        # Each capital place's room name, exterior and doorway name are pinned
+        # to their pre-replan values, with the exteriors carrying the new
+        # teardrop addresses. The host's name, title, service identity and
+        # offered goods are deliberately NOT pinned here: they follow the
+        # current place declaration (checked by the place-to-roster
+        # correspondence test) and the derived shop registry, so a valid later
+        # personnel or merchandise edit does not fail this guard.
+        expected = {
+            "altoria_guild_hall": ("阿爾托利亞冒險者公會大廳", (4, 3), "冒險者公會大廳"),
+            "altoria_general_store": ("阿爾托利亞雜貨店", (2, 3), "雜貨店"),
+            "altoria_forge": ("聖潔王都鍛造鋪", (1, 3), "鍛造鋪"),
+            "altoria_eatery": ("聖潔王都餐館", (3, 1), "餐館"),
+            "altoria_tailor": ("聖潔王都裁縫坊", (1, 3), "裁縫坊"),
+        }
+        for key, (room_name, exterior, doorway) in expected.items():
             with self.subTest(place=key):
                 place = PLACE_REGISTRY[key]
                 self.assertEqual(place.room_name_zh, room_name)
                 self.assertEqual(place.exterior_xy, exterior)
                 self.assertEqual(place.doorway_key_zh, doorway)
-                self.assertEqual(place.host_name, host)
-                self.assertEqual(place.host_title, title)
-                self.assertEqual(place.service_id, service)
-                self.assertEqual(place.assortment_keys, assortments)
-                # The resolved offer set follows the assortment rows.
+                # The derived shop row follows this place's own declaration:
+                # its identity and its assortment keys are the place's, and no
+                # shop row exists for a place that authors no shop identity.
                 shop_key = dict(place.authored_kwargs).get("shop_key")
                 if shop_key is None:
-                    self.assertNotIn(key, shops)
                     continue
-                self.assertEqual(shops[shop_key].assortment_keys, assortments)
-                self.assertEqual(shops[shop_key].host_name, host)
+                shop = SHOP_REGISTRY[shop_key]
+                self.assertEqual(
+                    (shop.host_name, shop.host_title),
+                    (place.host_name, place.host_title),
+                )
+                self.assertEqual(shop.assortment_keys, place.assortment_keys)
 
     def _plant(self, place, **changes):
         return replace(place, key="t_offense_place", service_id="t_offense", **changes)

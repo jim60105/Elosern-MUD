@@ -1,10 +1,12 @@
 """Monster species and variant registries (monster-data-model design §2-§3).
 
-The approved first bestiary batch (``docs/lore/bestiary.md``, content-approved
-2026-10-05) as read-only lore data: six frozen ``MonsterSpecies`` rows and
-twelve frozen ``MonsterVariant`` rows, keyed by stable keys, validated while
-the module-level registries are built (design D-S2: an authored typo fails at
-import, so no consumer can observe a half-valid registry).
+The authored bestiary (``docs/lore/bestiary.md``) as read-only lore data:
+six frozen ``MonsterSpecies`` rows and twelve frozen ``MonsterVariant`` rows,
+keyed by stable keys, validated while the module-level registries are built
+(design D-S2: an authored typo fails at import, so no consumer can observe a
+half-valid registry). Registry membership is the content authority: nothing
+here enumerates an approved key list, and adding, renaming or retiring a row
+is a data edit rather than a requirement change.
 
 The layering is deliberately additive. ``world.lore.monsters``'s
 ``MONSTER_TIER_REGISTRY`` stays the coarse threat classification it has always
@@ -15,24 +17,25 @@ registries.
 
 Two boundaries are pinned here and must not be blurred:
 
-* **Balance honesty (design D-S4).** ``combat_profile`` is either ``None`` or a
-  complete frozen :class:`MonsterCombatProfile`; ``danger_grade`` is either
-  ``None`` or an authored guild danger grade. The user granted the balance
-  approval on 2026-10-06 for the twelve first-batch variants, so every shipped
-  row carries the approved literal profile and grade recorded below
-  (``monster-balance-profiles``); a variant whose approval has not been granted
-  carries both as ``None``. ``None`` means "no approved per-variant profile
-  exists" — never a zero, never a number inferred from flavoured names, and
-  never tier-band truth.
-* **Abilities are narrative until a species' mechanics land (design D-S5,
-  requirement R4).** A delivered species carries its authored kit and
-  behaviour binding here; a species still awaiting mechanics registers no
-  skill key, behaviour profile, or combat trait, and no placeholder field
-  stands in for one. Delivered: the crocodile (``tide_devouring_bite``), the
-  sparrow (``grain_shaking_peck``) and the crab (``lamp_carapace_claw``); the
-  hare, goat and lynx abilities remain deferred to the
-  skill/behaviour-mechanics work. The approved prose (including its stated
-  limits) lives in the published narrative fields only.
+* **Profile obligation (design D-S4).** ``combat_profile`` is either ``None``
+  or a complete frozen :class:`MonsterCombatProfile`; ``danger_grade`` is
+  either ``None`` or an authored guild danger grade. Whether a variant
+  *requires* a populated profile and grade is that row's own authored
+  declaration, :attr:`MonsterVariant.profile_required`: a required row rejects
+  absence at load, and an optional row keeps the documented tier-band fallback
+  of individual construction. ``None`` means "no authored per-variant profile"
+  — never a zero, never a number inferred from a flavoured name, prose or
+  another variant, and never tier-band truth.
+* **Abilities are narrative until a species' mechanics land (design D-S5).**
+  Delivery follows the authored kit data and nothing else: a variant declaring
+  active/passive skill keys or a behaviour profile is executable through the
+  shared engine, and one declaring none registers no skill key, behaviour
+  profile or combat trait, with no placeholder field standing in for one.
+  There is no species allowlist: the crocodile, sparrow and crab kits
+  (``tide_devouring_bite``, ``grain_shaking_peck``, ``lamp_carapace_claw``)
+  are delivered because their rows declare them, and the hare, goat and lynx
+  abilities stay narrated-only. The authored prose (including its stated
+  limits) lives in the narrative fields only.
 
 Key grammar (requirement R1) is the shared stable-key contract, whose predicate
 lives in ``world/art/subjects.py``. ``world/lore/`` may not import that module —
@@ -62,8 +65,8 @@ class MonsterSpeciesRegistryError(ValueError):
 
 # The completeness sentinel of :class:`MonsterCombatProfile`: a field left at
 # this value means the authored profile omitted it, which is a construction
-# error rather than a silently defaulted number (requirement R3's "partial
-# profile is rejected" — never a zero, never an inferred value).
+# error rather than a silently defaulted number — never a zero, never an
+# inferred value.
 _INCOMPLETE = object()
 
 
@@ -138,8 +141,15 @@ class MonsterVariant:
     """One complete standalone variant; no parent, no override chain.
 
     ``threat_tier`` is the coarse band of ``MONSTER_TIER_REGISTRY`` and never
-    substitutes for identity (requirement R2). Every record is complete on its
-    own: nothing merges values from the species row.
+    substitutes for identity. Every record is complete on its own: nothing
+    merges values from the species row.
+
+    ``profile_required`` is the variant's own authored profile obligation, not
+    another key list: a required row must carry a complete ``combat_profile``
+    and a ``danger_grade`` (validated at load), while an optional row may omit
+    both and keep the documented individual-construction tier-band fallback.
+    It is a plain declared field, so completeness can never silently become
+    optional by omission.
     """
 
     key: str
@@ -150,6 +160,7 @@ class MonsterVariant:
     ordinary_variant: bool
     combat_profile: MonsterCombatProfile | None
     danger_grade: str | None
+    profile_required: bool
     active_skill_keys: tuple[str, ...] = ()
     passive_skill_keys: tuple[str, ...] = ()
     behaviour_profile_key: str | None = None
@@ -353,6 +364,12 @@ def validate_monster_species_registry(
     its order inside the tier's guild rank range. MP and SP have no band here,
     for the reason :func:`_check_profile_bands` records.
 
+    ``profile_required`` is a typed obligation, not a second key list: a
+    variant that does not declare it as a boolean is rejected, and a variant
+    declaring it ``True`` must carry both a ``combat_profile`` and a
+    ``danger_grade``. A variant declaring it ``False`` may carry neither, or
+    either, and what it does carry is still shape- and band-checked above.
+
     The cross-species variant-key collision rule is not enforced here: a keyed
     mapping cannot express two owners of one key, so it is enforced where the
     registry is merged (:func:`build_monster_variant_registry`). Validation
@@ -420,6 +437,21 @@ def validate_monster_species_registry(
                 f"variant {mapping_key!r} must author its ordinary/stronger "
                 "classification as a boolean"
             )
+        if not isinstance(row.profile_required, bool):
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} must declare its combat-profile "
+                f"obligation as a boolean, got {row.profile_required!r}"
+            )
+        if row.profile_required and row.combat_profile is None:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} declares a required combat profile "
+                "but carries none"
+            )
+        if row.profile_required and row.danger_grade is None:
+            raise MonsterSpeciesRegistryError(
+                f"variant {mapping_key!r} declares a required combat profile "
+                "but declares no danger grade"
+            )
         if row.combat_profile is not None and not isinstance(
             row.combat_profile, MonsterCombatProfile
         ):
@@ -480,17 +512,22 @@ def validate_monster_species_registry(
 
 
 # --------------------------------------------------------------------------
-# The approved first bestiary batch (docs/lore/bestiary.md, approved
-# 2026-10-05). Display/description prose is the approved zh-TW narrative; the
-# published appearance excerpt is the same approved sentence's physical clause.
-# The combat profiles and danger grades are the user's balance approval of
-# 2026-10-06 (monster-balance-profiles) and are literals only: each value below
-# is the approved value transcribed verbatim, never re-derived, re-tuned,
-# re-rounded, or interpolated from a display name, a description, a threat
-# tier, another variant, or a tier band. MP and SP are the approved delivered
-# resource pools of the species whose mechanic has landed and authored zeros
-# for every other variant; ``magic_power`` is zero for all twelve and every
-# tier's magic band is deliberately ``(0, 0)``.
+# The authored bestiary rows (docs/lore/bestiary.md). Display/description prose
+# is the authored zh-TW narrative; the published appearance excerpt is the same
+# sentence's physical clause. Every value below is an authored literal
+# transcribed as written, never re-derived, re-tuned, re-rounded, or
+# interpolated from a display name, a description, a threat tier, another
+# variant, or a tier band. MP and SP are the authored resource pools of the
+# variants whose mechanic has landed and authored zeros for the rest;
+# ``magic_power`` is zero for all twelve and every tier's magic band is
+# deliberately ``(0, 0)``.
+#
+# ``profile_required`` is authored per row and is ``True`` for all twelve: each
+# currently ships a complete profile and a danger grade, and the declaration is
+# what keeps that completeness an obligation rather than an incidental fact
+# about today's data. A future row authored without a profile states ``False``
+# and keeps the tier-band fallback of individual construction.
+#
 # Author-private notes are reasoned from the bestiary's own usage boundary
 # (in-world origins stay unknown): the hidden-truth field records that no
 # origin truth is authored, the explanation field carries the authoring
@@ -625,6 +662,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=30, mp=20, sp=8, atk_phys=4, agility=7, defense=3, magic_power=0
         ),
         "F",
+        True,
         active_skill_keys=("grain_shaking_peck",),
         behaviour_profile_key="instinctive",
     ),
@@ -639,6 +677,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=55, mp=30, sp=12, atk_phys=8, agility=10, defense=4, magic_power=0
         ),
         "E",
+        True,
         active_skill_keys=("grain_shaking_peck",),
         behaviour_profile_key="instinctive",
     ),
@@ -653,6 +692,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=30, mp=20, sp=9, atk_phys=5, agility=4, defense=5, magic_power=0
         ),
         "F",
+        True,
         active_skill_keys=("lamp_carapace_claw",),
         behaviour_profile_key="instinctive",
     ),
@@ -667,6 +707,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=60, mp=30, sp=15, atk_phys=12, agility=4, defense=7, magic_power=0
         ),
         "E",
+        True,
         active_skill_keys=("lamp_carapace_claw",),
         behaviour_profile_key="instinctive",
     ),
@@ -681,6 +722,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=30, mp=0, sp=0, atk_phys=4, agility=8, defense=3, magic_power=0
         ),
         "F",
+        True,
     ),
     MonsterVariant(
         "nest_guard",
@@ -693,6 +735,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=55, mp=0, sp=0, atk_phys=11, agility=6, defense=6, magic_power=0
         ),
         "E",
+        True,
     ),
     MonsterVariant(
         "cliff_stepper",
@@ -705,6 +748,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=130, mp=0, sp=0, atk_phys=20, agility=16, defense=12, magic_power=0
         ),
         "D",
+        True,
     ),
     MonsterVariant(
         "pass_warden",
@@ -717,6 +761,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=170, mp=0, sp=0, atk_phys=26, agility=14, defense=14, magic_power=0
         ),
         "C",
+        True,
     ),
     MonsterVariant(
         "wood_stalker",
@@ -729,6 +774,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=115, mp=0, sp=0, atk_phys=20, agility=20, defense=10, magic_power=0
         ),
         "D",
+        True,
     ),
     MonsterVariant(
         "trail_hunter",
@@ -741,6 +787,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=165, mp=0, sp=0, atk_phys=25, agility=22, defense=12, magic_power=0
         ),
         "C",
+        True,
     ),
     MonsterVariant(
         "bank_lurker",
@@ -753,6 +800,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=140, mp=30, sp=40, atk_phys=22, agility=12, defense=14, magic_power=0
         ),
         "D",
+        True,
         active_skill_keys=("tide_devouring_bite",),
         behaviour_profile_key="ambush_predator",
     ),
@@ -767,6 +815,7 @@ _VARIANT_DECLARATIONS: tuple[MonsterVariant, ...] = (
             hp=210, mp=50, sp=60, atk_phys=28, agility=12, defense=15, magic_power=0
         ),
         "C",
+        True,
         active_skill_keys=("tide_devouring_bite",),
         behaviour_profile_key="ambush_predator",
     ),

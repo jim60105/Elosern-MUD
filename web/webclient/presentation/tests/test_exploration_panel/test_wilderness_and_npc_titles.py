@@ -20,6 +20,12 @@ from world.rules.map_knowledge import record_arrival
 from ._support import _context
 
 
+# The example NPC identity these panel rows carry: explicitly synthetic and
+# local to this HUD consumer test, so no assertion here names a shipped
+# character or borrows another test area's example identity.
+_HUD_NAME = "合成看板人"
+_HUD_TITLE = "合成看板稱號"
+
 
 class WildernessExplorationPresenterTests(EvenniaTestCase):
     """Wilderness move rows advertise canonical arrival nodes (fix-wilderness-web-navigation)."""
@@ -151,27 +157,33 @@ class NPCTitlePanelRowsTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_titled_npc_reads_with_title_on_both_row_kinds(self):
-        npc = create_object(NPC, key="塞提斯", location=self.room1)
-        npc.npc_title = "南門守衛"
+        npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
+        npc.npc_title = _HUD_TITLE
         payload = self._render()
         self.assertTrue(payload["available"])
         pk = int(npc.pk)
         self.assertEqual(
-            self._entity_rows(payload, pk)["display_name"], "塞提斯　南門守衛"
+            self._entity_rows(payload, pk)["display_name"], f"{_HUD_NAME}　{_HUD_TITLE}"
         )
         interact = self._interact_rows(payload, pk)
         self.assertTrue(interact)
         self.assertTrue(
-            all(row["display_name"] == "塞提斯　南門守衛" for row in interact)
+            all(row["display_name"] == f"{_HUD_NAME}　{_HUD_TITLE}" for row in interact)
         )
+        # The row is the client's only source for the truthful portrait
+        # placeholder: it carries the composed display name and no portrait
+        # reference, so the placeholder initial is never guessed from another
+        # field and never comes from a stock image.
+        for row in (self._entity_rows(payload, pk), *interact):
+            self.assertIsNone(row["portrait_ref"])
         validate_exploration(payload)
 
     @covers_requirement('npc-identity-titles::the-webclient-exploration-panel-renders-the-npc-full-identity-on-entity-and-interact-rows')
     def test_non_entity_rows_keep_the_plain_key_source(self):
         from web.webclient.presentation.affordances import _bounded_display_name
 
-        npc = create_object(NPC, key="塞提斯", location=self.room1)
-        npc.npc_title = "南門守衛"
+        npc = create_object(NPC, key=_HUD_NAME, location=self.room1)
+        npc.npc_title = _HUD_TITLE
         monster = create_object(Monster, key="野狼", location=self.room1)
         coin = create_object("typeclasses.objects.Object", key="銅幣", location=self.room1)
         destination = create_object(Room, key="南大道", location=None)

@@ -27,6 +27,7 @@ from world.ai.title_nomination import register_title_nomination
 from world.rules import guild_exams
 from world.rules import titles as title_rules
 from world.quests import runtime as quest_runtime
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
 
 def _profiles(**overrides):
@@ -76,6 +77,14 @@ class _NoPush:
 class NominationSchedulingTests(EvenniaTest):
     def setUp(self):
         super().setUp()
+        # The first-claim grant banks whatever the starter seam holds; patch
+        # the shared synthetic declaration so a collision candidate can match
+        # the banked display without pinning the shipped spelling.
+        starter_seam = patch(
+            "world.lore.titles.STARTER_EPITHET", SYNTH_STARTER_EPITHET
+        )
+        starter_seam.start()
+        self.addCleanup(starter_seam.stop)
         # The test runner does not boot the server hooks; install the layer
         # registration the same way at_server_start does (idempotent).
         register_title_nomination()
@@ -161,7 +170,7 @@ class NominationSchedulingTests(EvenniaTest):
     def test_removal_digest_flows_into_the_prompt(self):
         # The durable removal log is the second soft-learning feed: the
         # removed display must appear in the next round's user message.
-        title_rules.bank_epithet(self.player, "南門新客", "初入南門。", 1)
+        title_rules.bank_epithet(self.player, "苔徑新客", "初次走入苔徑。", 1)
         title_rules.bank_epithet(self.player, "放下之名", "舊事蹟。", 2)
         title_rules.remove_epithet(self.player, "放下之名")
         client = _good_client()
@@ -242,7 +251,7 @@ class NominationSchedulingTests(EvenniaTest):
         client = FakeLLMClient()
         client.add_response(
             lambda descriptor: True,
-            _reply([{"display": "南門新客", "basis": "撞名"}] * 5),
+            _reply([{"display": SYNTH_STARTER_EPITHET.display, "basis": "撞名"}] * 5),
         )
         title_rules.grant_first_quest_epithet(self.player)
         self._schedule(client)

@@ -195,7 +195,7 @@ test("validates the status panel available/unavailable discriminator exactly", (
           name: "x",
           identity: "1",
           location: null,
-          full_title: "F級冒險者　南門新客",
+          full_title: "F級冒險者　苔徑新客",
         },
       })
     )

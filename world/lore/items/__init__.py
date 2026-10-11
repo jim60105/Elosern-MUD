@@ -40,6 +40,7 @@ from world.lore.items.vocab import (
     ItemPresentation,
     ItemRarity,
     ItemUseMechanics,
+    LiturgicalRole,
 )
 
 # Byte-identical old-module namespace parity: the single-module history's
@@ -62,4 +63,5 @@ __all__ = [
     "ItemPresentation",
     "ItemRarity",
     "ItemUseMechanics",
+    "LiturgicalRole",
 ]

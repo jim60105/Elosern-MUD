@@ -2488,8 +2488,8 @@ Each standing portrait on the stage SHALL be rendered by one stage-actor compone
 - **THEN** the actor-right host renders that complete image bottom-aligned with contain fit and requests no other image source
 
 #### Scenario: A pending or missing portrait shows the truthful placeholder
-- **WHEN** the host's catalog entry is pending, and later a host named `葛里安‧衛登` has a null ref
-- **THEN** the first actor shows its grounded silhouette, identity and pending state; the second shows initial `葛`, identity and missing state, with neither inventing an image
+- **WHEN** the host's catalog entry is pending, and later a host named `測試人物` has a null ref
+- **THEN** the first actor shows its grounded silhouette, identity and pending state; the second shows initial `測`, identity and missing state, with neither inventing an image
 
 #### Scenario: The host speaks and the player is dimmed
 - **WHEN** a conversation opens and its greeting commits

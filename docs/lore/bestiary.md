@@ -6,6 +6,14 @@
 
 本篇是內容設定，不宣告物種登錄表、生成配置、技能效果或物種圖片已實作。分級示例與測試資料中的其他名稱，不會因本篇發布而成為核准物種。
 
+每個現行物種小節開頭的 `bestiary` 區塊是機器可讀的身分索引：物種鍵、母物種鍵、預設變體鍵、
+擁有的變體鍵與各變體依登錄技能宣告的執行狀態，以及本節所引用的公開登錄欄位。標記
+`<!-- bestiary-current-end -->` 之後的附錄為歷史紀錄，不構成現行收錄；現行收錄一律由這些索引區塊
+決定，顯示名稱與章節標題都不是查詢鍵（關係檢查見 `world/lore/bestiary_documentation.py`）。
+生態敘述、能力邊界與歷史／現行分界的內容審查，另以索引化的審查紀錄維護，見
+[魔物圖鑑編輯審查紀錄](/development/bestiary-editorial-review)；該紀錄證明每個現行物種都經審查，
+不判定文筆品質、不偵測兩段敘述是否互相矛盾，也不主張審查仍然新鮮。
+
 ## 收錄總覽
 
 | 層級 | 物種 | 主要生活環境 | 核心特色 | 變體方向 |
@@ -23,6 +31,25 @@
 
 ### 穗鳴雀
 
+```bestiary
+species: sway_whistle_sparrow
+parent-species: sway_whistle_sparrow
+default-variant: grain_pecker
+variants:
+  - key: grain_pecker
+    status: delivered
+  - key: flock_leader
+    status: delivered
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: delivered
+```
+
 **原型與棲地。**麻雀類的小型群居鳥，生活於東部平原的田埂、灌木與收穫後的農地。
 
 **特殊生態。**啄食成熟穀物前，族群會發出短促而整齊的鳴聲，接著以微弱風屬性氣流震落乾燥穀粒。穗間響起的沙沙聲，是農民辨認牠們的線索。牠們造成的麻煩集中於收穫期；田地仍能正常耕作，但反覆造訪的族群會損耗尚未收起的穀物。
@@ -38,6 +65,25 @@
 
 ### 潮燈蟹
 
+```bestiary
+species: tide_lamp_crab
+parent-species: tide_lamp_crab
+default-variant: shore_walker
+variants:
+  - key: shore_walker
+    status: delivered
+  - key: reef_warden
+    status: delivered
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: delivered
+```
+
 **原型與棲地。**近岸蟹類，棲息於兩側海岸的礁隙、潮池與港外灘地。
 
 **特殊生態。**背甲上的發光斑紋會追隨附近燈光的明暗節奏。沿岸居民知道牠們會聚集在魔法燈附近，漁人偶爾將牠們當成潮池的位置標記。大量聚集時，不熟悉港口的小船可能誤判岸邊訊號；靠近礁洞的人也可能受到螯足攻擊。
@@ -52,6 +98,25 @@
 **委託背景示例。**港外的候船燈附近聚集了一批潮燈蟹，已有夜歸小船認錯泊岸方向。碼頭請公會清理這處聚集地，恢復燈號辨識。
 
 ### 築埂兔
+
+```bestiary
+species: ridge_burrow_hare
+parent-species: ridge_burrow_hare
+default-variant: burrow_maker
+variants:
+  - key: burrow_maker
+    status: narrative
+  - key: nest_guard
+    status: narrative
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: narrative
+```
 
 **原型與棲地。**穴居兔類，生活於平原邊緣與丘陵的鬆土帶。
 
@@ -70,6 +135,25 @@
 
 ### 岩響山羊
 
+```bestiary
+species: rock_echo_goat
+parent-species: rock_echo_goat
+default-variant: cliff_stepper
+variants:
+  - key: cliff_stepper
+    status: narrative
+  - key: pass_warden
+    status: narrative
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: narrative
+```
+
 **原型與棲地。**山羊類魔獸，生活於西部丘陵的岩坡、偏遠採石地與山麓。
 
 **特殊生態。**牠們落足前會用角敲擊岩面，辨認裂隙與鬆動岩層。遇到威脅時，可以沿接觸的岩面傳出土屬性脈動，使原本已鬆動的碎石滑落。採石工人會留意牠們的敲岩聲，因為族群常出現在不穩定岩坡附近；牠們占據狹窄運料路線時，便形成難以繞過的威脅。
@@ -84,6 +168,25 @@
 **委託背景示例。**採石場的運料路被岩響山羊占據。工人能聽見上方敲岩聲，卻不敢再推車通過。業主請公會處理守路個體，重新開通運料線。
 
 ### 霧鬃山貓
+
+```bestiary
+species: fog_mane_lynx
+parent-species: fog_mane_lynx
+default-variant: wood_stalker
+variants:
+  - key: wood_stalker
+    status: narrative
+  - key: trail_hunter
+    status: narrative
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: narrative
+```
 
 **原型與棲地。**山貓類的獨居獵食者，活動於西北高地森林與潮濕山谷。
 
@@ -100,6 +203,25 @@
 
 ### 吞潮鱷
 
+```bestiary
+species: tide_devouring_crocodile
+parent-species: tide_devouring_crocodile
+default-variant: bank_lurker
+variants:
+  - key: bank_lurker
+    status: delivered
+  - key: bay_warden
+    status: delivered
+public-fields:
+  - display_name_zh
+  - published_description_zh
+  - published_appearance_zh
+  - published_ecology_zh
+  - habitat_tags
+  - description_zh
+status: delivered
+```
+
 **原型與棲地。**大型鱷類，棲息於東南部偏遠河口、濕地與潮汐支流。
 
 **特殊生態。**牠在接觸活物時，可以透過水屬性力量吸取對方的部分魔力。施法者與牠纏鬥時，可能先感到魔力消耗異常，再發現危險。牠仍依靠咬合與伏擊捕食，並非遠距離施法者。
@@ -111,6 +233,8 @@
 | 守灣型 | 占據有遮蔽的泊岸入口，阻礙小船靠岸 |
 
 **委託背景示例。**河口渡運站的側灣出現吞潮鱷，船員已停用該泊位。一名協助驅趕的法師在接觸後出現異常魔力損失，渡運站因此改向公會求援。
+
+<!-- bestiary-current-end -->
 
 ## 使用邊界
 

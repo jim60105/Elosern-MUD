@@ -15,17 +15,11 @@ does not exist).
 ## Requirements
 
 ### Requirement: The capital has an academy, a merchant hall and covered market stalls
-The capital SHALL carry these three locations as permanent interiors. The academy and the
-merchant hall SHALL each hold one authored host who converses; the market stalls SHALL hold
-none, and SHALL still be a complete, enterable, permanently tagged room reachable from and
-back to its exterior. The stalls are host-less by design, not by omission: the source document
-states that a market street's trade hangs on individual stallholders rather than on a fixed
-functional NPC.
+The capital SHALL carry an academy, a merchant hall and covered market stalls as permanent, complete, enterable tagged interiors reachable both ways from their declared exteriors. Staffing and authored host identity SHALL follow current place declarations rather than historical personnel counts. Declared dialogue hosts SHALL converse without acquiring tutoring or commission capabilities.
 
 #### Scenario: Three locations exist, two of them staffed
 - **WHEN** synchronization completes
-- **THEN** all three interiors exist once and are reachable both ways, the academy and the
-  merchant hall each hold one dialogue-carrying host, and the stalls hold no service host
+- **THEN** all three interiors exist once and remain reachable both ways; every declared host is present and every declared hostless record creates no service host
 
 ### Requirement: The academy is where magical knowledge is asked about
 The academy host's dialogue SHALL answer on the world's magic-rank and element vocabulary, so

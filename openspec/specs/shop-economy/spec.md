@@ -14,18 +14,16 @@ stock, restock quantity, and opening/restock hours SHALL come from the
 `world/rules/rulebook/commerce/` slices (one file per settlement plus `scales.yaml`).
 
 #### Scenario: Initial ordinary goods validate
-- **WHEN** the meal, potion, and plain-sword offers are loaded
-- **THEN** every exact buy price lies within its existing lore price range, every money value is int,
-  and every offered item has complete valid presentation metadata
+- **WHEN** every currently offered item is loaded
+- **THEN** each exact price lies in its existing lore range, money is integer and offered presentation metadata is valid
 
 #### Scenario: Floating price is rejected
 - **WHEN** an offer declares `buy_copper=50.0`
 - **THEN** catalog validation raises before registry or merchant state changes
 
 #### Scenario: A shop's offered keys follow its assortments
-- **WHEN** a shop references two assortments
-- **THEN** its offered item keys are exactly the union of those assortments' item keys, and adding an
-  item to one assortment adds it to that shop without editing the shop
+- **WHEN** a shop references two assortments and declares existing place-level additions/removals
+- **THEN** resolved keys equal the union plus additions minus removals; data membership edits need no shop-specific approval table
 
 #### Scenario: Item definitions carry the stable identity fields
 - **WHEN** an `ITEM_REGISTRY` definition is inspected
@@ -40,8 +38,7 @@ stock, restock quantity, and opening/restock hours SHALL come from the
 
 #### Scenario: Offered keys are derived, not listed on the shop
 - **WHEN** a shop definition is inspected
-- **THEN** its offered item keys are derived from its referenced assortments rather than listed on
-  the shop
+- **THEN** its keys derive from referenced assortments and existing place adjustments, never a duplicate hand-authored shop item list
 
 #### Scenario: Shops carry no component-type field
 - **WHEN** any shop definition is inspected

@@ -7,6 +7,7 @@ import unittest
 
 from world.lore.items import ITEM_REGISTRY, ItemRarity
 from world.lore.races import SUBRACE_REGISTRY
+from world.skills.equipment import EquipmentSlot
 from world.lore.starting_kits import (
     SUBRACE_STARTING_KIT_REGISTRY,
     SubraceStartingKit,
@@ -224,34 +225,94 @@ class SubraceStartingKitTests(unittest.TestCase):
         )
 
     @covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")
-    def test_human_kits_match_the_lineage_table(self):
-        expected = {
-            "human_royal": ("gilded_saber", "chainmail", "silver_hairpin"),
-            "human_noble": ("knight_blade", "leather_armor", "silver_hairpin"),
-            "human_coastal": ("plain_sword", "leather_armor", "iron_dagger"),
-            "human_plains": ("plain_sword", "leather_armor", "silver_hairpin"),
-            "human_highland": ("plain_sword", "leather_armor", "hunting_throwing_axe"),
-        }
-        for subrace_key, item_keys in expected.items():
-            with self.subTest(subrace=subrace_key):
-                kit = SUBRACE_STARTING_KIT_REGISTRY[subrace_key]
-                self.assertEqual(tuple(key for key, _ in kit.items), item_keys)
-        # The three commoner lineages are equipotent: three COMMON items each,
-        # so no commoner lineage starts richer than another.
-        for subrace_key in ("human_coastal", "human_plains", "human_highland"):
-            kit = SUBRACE_STARTING_KIT_REGISTRY[subrace_key]
-            with self.subTest(subrace=subrace_key):
-                self.assertEqual(len(kit.items), 3)
-                for item_key, _ in kit.items:
-                    self.assertEqual(
-                        ITEM_REGISTRY[item_key].presentation.rarity,
-                        ItemRarity.COMMON,
-                        f"{subrace_key} kit item {item_key!r} must be COMMON",
-                    )
-        # 木製棍棒 is retired from every kit.
+    def test_every_selection_satisfies_its_declared_lineage_ceiling(self):
+        # Reference closure and eligibility are both computed from the live
+        # registries: a valid selection edit is a data edit, and an
+        # ineligible one is rejected by the kit's own declaration rather
+        # than by a named prohibited-item blacklist.
         for subrace_key, kit in SUBRACE_STARTING_KIT_REGISTRY.items():
             with self.subTest(subrace=subrace_key):
-                self.assertNotIn("wooden_club", tuple(key for key, _ in kit.items))
+                for item_key, _ in kit.items:
+                    self.assertIn(item_key, ITEM_REGISTRY)
+                    self.assertIsNotNone(ITEM_REGISTRY[item_key].equipment_slot)
+                if kit.max_rarity is not None:
+                    self.assertIsInstance(kit.max_rarity, ItemRarity)
+
+    @covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")
+    def test_the_commoner_lineages_share_one_common_rarity_profile(self):
+        # "Commoner" is derived, not listed: the lineage kits whose declared
+        # ceiling is COMMON. They must be equipotent -- identical rarity
+        # profiles, every item COMMON -- so no commoner bloodline starts
+        # richer than another. The individual selections stay data.
+        commoner_kits = {
+            key: kit
+            for key, kit in SUBRACE_STARTING_KIT_REGISTRY.items()
+            if kit.max_rarity is ItemRarity.COMMON
+        }
+        self.assertTrue(commoner_kits, "no commoner lineage kit declares the COMMON ceiling")
+        profiles = {
+            key: tuple(
+                sorted(ITEM_REGISTRY[item_key].presentation.rarity for item_key, _ in kit.items)
+            )
+            for key, kit in commoner_kits.items()
+        }
+        first = next(iter(profiles.values()))
+        for subrace_key, profile in profiles.items():
+            with self.subTest(subrace=subrace_key):
+                self.assertEqual(profile, first)
+                self.assertTrue(all(rarity is ItemRarity.COMMON for rarity in profile))
+
+    @covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")
+    def test_the_noble_lineages_keep_their_uncommon_inherited_arms(self):
+        # The two noble bloodlines the delta names: 王族 and 貴族 hand down an
+        # UNCOMMON weapon -- the inherited arm -- while their armour and
+        # accessory stay COMMON.
+        for subrace_key in ("human_royal", "human_noble"):
+            kit = SUBRACE_STARTING_KIT_REGISTRY[subrace_key]
+            with self.subTest(subrace=subrace_key):
+                self.assertIs(kit.max_rarity, ItemRarity.UNCOMMON)
+                inherited_arms = [
+                    ITEM_REGISTRY[item_key].presentation.rarity
+                    for item_key, _ in kit.items
+                    if ITEM_REGISTRY[item_key].equipment_slot
+                    is EquipmentSlot.WEAPON_MAIN
+                ]
+                self.assertEqual(inherited_arms, [ItemRarity.UNCOMMON])
+
+    @covers_requirement("lore-registries::human-starting-kits-express-lineage-character-not-an-affluence-ladder")
+    def test_an_ineligible_selection_fails_at_registry_load(self):
+        # A synthetic commoner kit reaching for an UNCOMMON arm violates its
+        # own declared lineage ceiling; the rejection names the kit and the
+        # item and consults no historical item-name list.
+        above_ceiling = SubraceStartingKit(
+            "t_synth_lineage",
+            (("knight_blade", 1),),
+            ItemRarity.COMMON,
+        )
+        with self.assertRaises(ValueError) as caught:
+            _validate_starting_kit("t_synth_lineage", above_ceiling)
+        message = str(caught.exception)
+        self.assertIn("t_synth_lineage", message)
+        self.assertIn("knight_blade", message)
+        self.assertIn("lineage ceiling", message)
+        # The same declaration accepts a selection inside its ceiling, and a
+        # malformed ceiling is itself rejected.
+        _validate_starting_kit(
+            "t_synth_lineage",
+            SubraceStartingKit(
+                "t_synth_lineage",
+                (("plain_sword", 1),),
+                ItemRarity.COMMON,
+            ),
+        )
+        with self.assertRaises(ValueError) as caught:
+            _validate_starting_kit(
+                "t_synth_lineage",
+                SubraceStartingKit(
+                    "t_synth_lineage", (("plain_sword", 1),), "common"
+                ),
+            )
+        self.assertIn("max_rarity", str(caught.exception))
 
 
 if __name__ == "__main__":

@@ -118,7 +118,7 @@ across repeated startup syncs.
 The registration transaction SHALL additionally grant the F-rank fixed title
 (「F級冒險者」) into `db.title_collection`,
 auto-equipping the empty fixed slot, inside the same all-or-nothing commit that
-grants F rank — no planner, no LLM. The starter epithet (「南門新客」) SHALL NOT
+grants F rank — no planner, no LLM. The registry-authored starter epithet SHALL NOT
 be granted at registration; it is granted by the first guild reward claim
 (quest-reward-settlement).
 
@@ -147,9 +147,8 @@ components through the shared `world/rules/profession_assembly.py` helper, never
 component literal.
 
 #### Scenario: Shipped roster recreates today's two hosts bit-for-bit
-- **WHEN** sync runs against a database whose two service hosts were deleted
-- **THEN** the recreated guild master and merchant carry the same key, title, room, race
-  baseline, canonical ages, and component kwargs as the pre-change sync produced
+- **WHEN** all declared service hosts are deleted and sync runs
+- **THEN** each recreated host matches its live authored identity, provenance, canonical ages, anchor and blueprint component arguments
 
 #### Scenario: Config-time roster validation rejects a nameable offense without DB access
 - **WHEN** a place declares `profession: blacksmith` (no such registry row) or omits the
@@ -176,9 +175,8 @@ component literal.
 - **THEN** none remains, and every host's name, title and profession appear only on its place
 
 #### Scenario: The derived roster reproduces the pre-change hosts
-- **WHEN** the place-derived roster is compared with the pre-change configuration
-- **THEN** it reproduces the two hosts exactly — same names, titles, rooms, `service_id`s
-  `altoria_guild_master` / `altoria_merchant`, and component kwargs — keeping sync behavior-neutral
+- **WHEN** the place-derived roster is compared with current hosted place records
+- **THEN** one matching row exists per declared service identity, with no historical count, personal-name or two-host approval table
 
 #### Scenario: Config-time batch validation covers every named offense
 - **WHEN** a derived roster row has missing fields, a `profession` naming no registry row, a

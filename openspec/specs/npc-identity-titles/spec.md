@@ -76,8 +76,8 @@ The `NPC` typeclass SHALL declare a persistent `npc_title` attribute through `At
 
 #### Scenario: A titled NPC composes with the full-width separator
 
-- **WHEN** `npc_display_name` is called for an NPC named 塞提斯 whose title is 南門守衛
-- **THEN** it returns `"塞提斯　南門守衛"` with exactly one U+3000 between the two parts
+- **WHEN** `npc_display_name` is called for an NPC named 測試人物 whose title is 測試稱號
+- **THEN** it returns `"測試人物　測試稱號"` with exactly one U+3000 between the two parts
 
 #### Scenario: An untitled NPC degrades to the plain name
 
@@ -337,8 +337,8 @@ The author-supplied name at the import face is the record's `key` — the value 
 
 #### Scenario: A record colliding with an existing NPC fails the whole batch
 
-- **WHEN** an NPC named 塞提斯 already exists and a two-record batch contains one record keyed 塞提斯 alongside one valid new record
-- **THEN** the load raises with a report whose 塞提斯 record carries a `key` rejection, and neither record produces an entity
+- **WHEN** an NPC named 測試人物 already exists and a two-record batch contains one record keyed 測試人物 alongside one valid new record
+- **THEN** the load raises with a report whose 測試人物 record carries a `key` rejection, and neither record produces an entity
 
 #### Scenario: An existing NPC is never reused, renamed, or overwritten
 
@@ -490,9 +490,9 @@ the SceneBuilder SHALL raise `SceneBuilderSpawnError` and roll back the whole ma
 before creating any room or entity.
 
 #### Scenario: A materialized occupant answers to its authored name
-- **WHEN** a compiled stage with `npc_req: [{"role": "bandit", "tier": "bandit", "display_name": "黑鬍", "title": "林間盜匪頭目", ...}]` materializes
-- **THEN** the spawned NPC's `key` is `黑鬍`, its `npc_title` is `林間盜匪頭目`, and the full
-  identity composer renders 「黑鬍　林間盜匪頭目」 on full-identity surfaces
+- **WHEN** a compiled stage with `npc_req: [{"role": "bandit", "tier": "bandit", "display_name": "測試人物", "title": "測試稱號", ...}]` materializes
+- **THEN** the spawned NPC's `key` is `測試人物`, its `npc_title` is `測試稱號`, and the full
+  identity composer renders 「測試人物　測試稱號」 on full-identity surfaces
 
 #### Scenario: A missing title rolls back the materialization
 - **WHEN** a forge-constructed spawn requirement reaches the SceneBuilder with `title` absent or

@@ -13,6 +13,13 @@ from world.imports.loader import ImportRejected, instantiate_character, load_bat
 from world.imports.tests.helpers import EXAMPLE_PATH, example_record
 from world.imports.validate import main, validate_batch
 
+# The example identity the import face collides with: explicitly synthetic and
+# local to this module, so no assertion here names a shipped character or
+# borrows another test area's example, and a later content rename cannot change
+# what the NPC-name uniqueness gate is tested against.
+_COLLIDING_KEY = "合成匯入撞名者"
+_COLLIDING_TITLE = "合成匯入撞名稱號"
+
 
 class BatchFileHarness:
     """Temp-dir record writer shared by the batch-facing test classes."""
@@ -173,32 +180,32 @@ class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
     def _colliding_pair(self):
         first = self.write("first.json", example_record())
         collide = example_record()
-        collide["key"] = "塞提斯門衛"
+        collide["key"] = _COLLIDING_KEY
         second = self.write("second.json", collide)
         return first, second
 
     @covers_requirement("npc-identity-titles::the-import-face-rejects-a-name-already-used-by-an-existing-npc")
     def test_existing_npc_collision_fails_the_whole_batch(self):
-        keeper = self._existing("塞提斯門衛", npc_title="南門守衛")
+        keeper = self._existing(_COLLIDING_KEY, npc_title=_COLLIDING_TITLE)
         first, second = self._colliding_pair()
         with patch("world.imports.loader._instantiate_validated_character") as instantiate:
             with self.assertRaises(ImportRejected) as ctx:
                 load_batch([first, second])
         instantiate.assert_not_called()
-        colliding = next(r for r in ctx.exception.report.records if r.key == "塞提斯門衛")
+        colliding = next(r for r in ctx.exception.report.records if r.key == _COLLIDING_KEY)
         self.assertTrue(
             any(i.field == "key" and "existing NPC" in i.message for i in colliding.rejections)
         )
         self.assertFalse(NPC.objects.filter(db_key="human_reference").exists())
         keeper.refresh_from_db()
-        self.assertEqual(keeper.key, "塞提斯門衛")
-        self.assertEqual(keeper.attributes.get("npc_title"), "南門守衛")
+        self.assertEqual(keeper.key, _COLLIDING_KEY)
+        self.assertEqual(keeper.attributes.get("npc_title"), _COLLIDING_TITLE)
 
     @covers_requirement("npc-identity-titles::the-import-face-rejects-a-name-already-used-by-an-existing-npc")
     def test_existing_llmnpc_collision_is_rejected_too(self):
         from typeclasses.npcs import LLMNPC
 
-        self._existing("塞提斯門衛", typeclass=LLMNPC)
+        self._existing(_COLLIDING_KEY, typeclass=LLMNPC)
         first, second = self._colliding_pair()
         with self.assertRaises(ImportRejected) as ctx:
             load_batch([first, second])
@@ -209,14 +216,14 @@ class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
                 for i in r.rejections
             )
         )
-        self.assertEqual(NPC.objects.filter_family(db_key="塞提斯門衛").count(), 1)
+        self.assertEqual(NPC.objects.filter_family(db_key=_COLLIDING_KEY).count(), 1)
 
     def test_gate_applies_to_player_character_target(self):
-        self._existing("塞提斯門衛")
+        self._existing(_COLLIDING_KEY)
         first, second = self._colliding_pair()
         with self.assertRaises(ImportRejected) as ctx:
             load_batch([first, second], typeclass=PlayerCharacter)
-        colliding = next(r for r in ctx.exception.report.records if r.key == "塞提斯門衛")
+        colliding = next(r for r in ctx.exception.report.records if r.key == _COLLIDING_KEY)
         self.assertTrue(
             any(i.field == "key" and "existing NPC" in i.message for i in colliding.rejections),
             colliding.rejections,
@@ -230,10 +237,12 @@ class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
 
         for other in (PlayerCharacter, Monster, Room, Object):
             with self.subTest(other=other.__name__):
-                holder = create_object(other, key="塞提斯門衛")
+                holder = create_object(other, key=_COLLIDING_KEY)
                 first, second = self._colliding_pair()
                 entities = load_batch([first, second])
-                self.assertEqual({entity.key for entity in entities}, {"human_reference", "塞提斯門衛"})
+                self.assertEqual(
+                    {entity.key for entity in entities}, {"human_reference", _COLLIDING_KEY}
+                )
                 holder.delete()
                 for entity in entities:
                     entity.delete()
@@ -283,9 +292,9 @@ class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
 
     @covers_requirement("npc-identity-titles::the-offline-validation-cli-stays-a-file-scope-check-with-no-database-access")
     def test_cli_validates_a_colliding_file_cleanly_but_load_rejects(self):
-        self._existing("塞提斯門衛")
+        self._existing(_COLLIDING_KEY)
         collide = example_record()
-        collide["key"] = "塞提斯門衛"
+        collide["key"] = _COLLIDING_KEY
         path = self.write("collide.json", collide)
         report = validate_batch([path])
         self.assertTrue(report.all_valid)
@@ -295,17 +304,17 @@ class ExistingNpcNameGateTests(BatchFileHarness, EvenniaTestCase):
             load_batch([path])
 
     def test_single_record_entry_rejects_a_collision(self):
-        keeper = self._existing("塞提斯門衛", npc_title="南門守衛")
+        keeper = self._existing(_COLLIDING_KEY, npc_title=_COLLIDING_TITLE)
         record = example_record()
-        record["key"] = "塞提斯門衛"
+        record["key"] = _COLLIDING_KEY
         with self.assertRaises(ImportRejected) as ctx:
             instantiate_character(record)
         self.assertTrue(
             any(i.field == "key" for r in ctx.exception.report.records for i in r.rejections)
         )
-        self.assertEqual(NPC.objects.filter_family(db_key="塞提斯門衛").count(), 1)
+        self.assertEqual(NPC.objects.filter_family(db_key=_COLLIDING_KEY).count(), 1)
         keeper.refresh_from_db()
-        self.assertEqual(keeper.attributes.get("npc_title"), "南門守衛")
+        self.assertEqual(keeper.attributes.get("npc_title"), _COLLIDING_TITLE)
 
     def test_single_record_entry_builds_on_a_clear_name(self):
         entity = instantiate_character(example_record())
@@ -370,9 +379,9 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
     def test_name_collision_rejection_warns_with_reason(self):
         from evennia.utils.create import create_object
 
-        create_object(NPC, key="塞提斯門衛")
+        create_object(NPC, key=_COLLIDING_KEY)
         collide = example_record()
-        collide["key"] = "塞提斯門衛"
+        collide["key"] = _COLLIDING_KEY
         path = self.write("collide.json", collide)
         with patch("world.imports.loader.log_info") as info, patch(
             "world.imports.loader.log_warn"
@@ -396,9 +405,9 @@ class ImportBoundaryEventTests(BatchFileHarness, EvenniaTestCase):
         self.assertEqual(warn.call_args.kwargs["context"]["typeclass"], "NPC")
         from evennia.utils.create import create_object
 
-        create_object(NPC, key="塞提斯門衛")
+        create_object(NPC, key=_COLLIDING_KEY)
         collide = example_record()
-        collide["key"] = "塞提斯門衛"
+        collide["key"] = _COLLIDING_KEY
         with patch("world.imports.loader.log_warn") as warn:
             with self.assertRaises(ImportRejected):
                 instantiate_character(collide)

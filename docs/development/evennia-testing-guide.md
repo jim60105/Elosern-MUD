@@ -1111,6 +1111,40 @@ uv run --locked python -m tools.test_data_lint check
 JS/TS 字串／模板字面量），並比照 `tools/test_data_freeze.json` 的 `contract`／`debt`
 帳本放行既有例外。`debt` 帳本只減不增：遷移時在讓檔案變乾淨的同一個 commit 移除條目。
 
+### 同一變更的需求退役與重新掛載
+
+移除需求時，其識別碼在同一次實作內退役並重新掛載；標註角色與目標的完整規則見
+`docs/development/spec-test-traceability.md` 的「同一變更內的需求退役與重新掛載」一節。
+
+資料契約測試（`Data-contract test:`）的理由字串存在三處且必須一致：檔案第一行、
+`tools/test_data_lint_seed.json` 的 `contract` 理由，以及由前者重新產生的
+`tools/test_data_freeze.json`。變更理由時一律**先改 seed，再以
+`uv run --locked python -m tools.test_data_lint seed` 重新產生帳本**（可用 `--dry-run` 先預覽），
+否則 `seed-mismatch`／`untagged-contract` 會直接失敗；切勿只手改其中一份，也不要手動編輯帳本。
+完成後請以 `uv run --locked python -m tools.test_data_lint check` 驗證，且不得為此新增
+`debt`、`deny` 或任何允許清單條目。
+
+### NPC 人物設定與台詞的審查紀錄
+
+NPC 的人物設定、角色卡、語音與劇本台詞是作者文字，行為測試不得以「預期台詞」的 fixture 釘死它們。這批內容的審查證據是 `docs/development/npc-editorial-review.md` 這份以實際來源為索引、帶日期的帳本，由 `world/lore/tests/test_npc_editorial_review.py` 搭配純檢查器 `world/lore/npc_editorial_review.py` 驗證覆蓋。該檢查只證明每個實際來源都有一筆具名處置，不判斷文字品質，也不保證審查仍然新鮮。新增或改寫任何一個來源時，在同一次變更內更新帳本；只改散文敘述不會讓檢查失敗。
+
+### 稱號與啟始異名的資料擁有權
+
+啟始異名的顯示名與事蹟依據是 `world/lore/titles.py` 的凍結宣告 `STARTER_EPITHET`，它是唯一的
+顯示／來源權威；該宣告在玩家**生涯第一次成功回報公會任務**時，由
+`world/rules/titles/planner.py::grant_first_quest_epithet` 透過一般寫入者 `bank_epithet` 於該次
+回報交易內入庫（不是公會註冊時），維持 display 去重、只自動裝備空槽，並隨交易快照回滾。
+「獲得異名：」是呈現文法，其後的顯示名才是資料。固定公會位階稱號「F級冒險者」、教士階梯
+與六個稱號分類頁籤都是保留契約，不隨這項資料所有權變更。
+
+行為測試一律在實際 seam 上換掉正式宣告——`patch("world.lore.titles.STARTER_EPITHET", ...)`，
+改用共享的合成宣告 `world.tests.synthetic_data.SYNTH_STARTER_EPITHET`——再斷言「前綴 ＋ 合成
+顯示名」與入庫／合成狀態（CLI 回報、對話回報關鍵字、webclient 回報三個介面用同一個合成
+宣告）；測試不得把正式宣告的顯示名寫成預期值。唯有資料契約測試可以檢查正式宣告本身（非空、
+有界、凍結；見 `world/lore/tests/test_titles_registry.py`）。此資料所有權變更不會改名或重新
+授予任何既有角色的已入庫異名；WP5 的斷言與 metadata 對應記於
+`openspec/changes/generalize-content-identity-contracts/wp5-starter-epithet-first-claim-disposition.md`。
+
 ### Synthetic test-data kit 使用指引
 
 `world/tests/synthetic_data/`（import 路徑 `world.tests.synthetic_data`）是全庫共用的替身世界：每個 catalog 都是**真實

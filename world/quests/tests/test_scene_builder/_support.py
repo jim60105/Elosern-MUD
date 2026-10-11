@@ -59,6 +59,14 @@ from world.tests.synthetic_data import (
 from tools.spec_traceability import covers_requirement
 from world.quests.tests._card_fixtures import occupant_card_record
 
+# The synthetic scene-occupant identity the payloads below author: explicitly
+# synthetic and local to the scene-builder area, independent of shipped content
+# and of the other test areas' example identities. The authored name IS the
+# spawned key, so the tests assert the round trip precisely.
+SYNTH_OCCUPANT_NAME = "合成場面客"
+SYNTH_OCCUPANT_TITLE = "合成場面稱號"
+
+
 def _portrait_callbacks(callbacks):
     """The captured on-commit callbacks excluding other boundary events.
 
@@ -173,8 +181,8 @@ def _instance_bound_payload(**overrides):
                         "role": "bandit",
                         "tier": _T_NPC_TIER,
                         "disposition": None,
-                        "display_name": "黑鬍",
-                        "title": "林間盜匪首領",
+                        "display_name": SYNTH_OCCUPANT_NAME,
+                        "title": SYNTH_OCCUPANT_TITLE,
                         "persona": occupant_card_record(),
                     }
                 ],

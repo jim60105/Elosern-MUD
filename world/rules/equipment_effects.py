@@ -38,7 +38,13 @@ from typing import Any, Mapping
 
 import yaml
 
-from world.lore.items import ITEM_REGISTRY, EquipmentModifierKey, ItemDefinition, ItemRarity
+from world.lore.items import (
+    ITEM_REGISTRY,
+    EquipmentModifierKey,
+    ItemDefinition,
+    ItemRarity,
+    LiturgicalRole,
+)
 from world.rules.buffs import BUFF_DEFINITIONS, BuffDefinition
 
 _RULEBOOK_PATH = Path(__file__).parent / "rulebook" / "equipment_effects.yaml"
@@ -339,6 +345,82 @@ def _validate_entry(
     )
 
 
+def _signed_percent_magnitude(value: str) -> int:
+    """Read the integer magnitude of an already-validated signed percent."""
+    return int(str(value)[:-1])
+
+
+def validate_church_doctrine(
+    registry: Mapping[str, ItemDefinition],
+    rules: Mapping[EquipmentModifierKey, EquipmentEffectRule],
+) -> None:
+    """Validate every item-lore liturgical role against its loaded entry.
+
+    Membership is item lore, never the effect table: a rulebook edit may
+    retune magnitudes but can neither move an item between the canon's
+    sub-sets nor let it omit the term its own role obliges
+    (``church-of-light-equipment-obeys-its-canon-doctrine``). Both roles
+    require an explicit non-negative ``pleasure_gain`` -- omitting the key is
+    how a vestment would otherwise evade the no-suppression clause -- and
+    neither tolerates a negative ``exposure_bias``. Vestments and emblems
+    additionally carry a non-negative ``heal_gain`` when they declare one and
+    must offer positive healing or an immunity; sanctuary devices must offer
+    positive ``pleasure_gain`` and need no healing. Ordinary combat
+    trade-offs (negative defence, attack, agility) remain permitted.
+    """
+    for item_key, definition in sorted(registry.items()):
+        role = definition.liturgical_role
+        if role is None:
+            continue
+        rule = rules.get(definition.modifier_key)
+        if rule is None:
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} declares liturgical role "
+                f"{role.value!r} but binds no loaded effect entry"
+            )
+        if rule.exposure_bias < 0:
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"exposure_bias {rule.exposure_bias}: the canon of exposure is "
+                "never suppressed"
+            )
+        pleasure = rule.adjustments.get("pleasure_gain")
+        if pleasure is None:
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} role {role.value!r} declares no "
+                "pleasure_gain: the canon requires an explicit non-negative "
+                "pleasure term"
+            )
+        pleasure_magnitude = _signed_percent_magnitude(pleasure)  # type: ignore[arg-type]
+        if pleasure_magnitude < 0:
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"pleasure_gain {pleasure!r}: the canon of joy is never "
+                "suppressed"
+            )
+        if role is LiturgicalRole.SANCTUARY_DEVICE:
+            if pleasure_magnitude == 0:
+                raise EquipmentEffectsRulebookError(
+                    f"church item {item_key!r} role {role.value!r} carries no "
+                    "positive pleasure_gain: a sanctuary device ministers by "
+                    "positive pleasure alone"
+                )
+            continue
+        heal = rule.adjustments.get("heal_gain")
+        if heal is not None and _signed_percent_magnitude(heal) < 0:  # type: ignore[arg-type]
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} role {role.value!r} carries negative "
+                f"heal_gain {heal!r}: the canon of healing is never inverted"
+            )
+        offers_healing = heal is not None and _signed_percent_magnitude(heal) > 0
+        if not offers_healing and not rule.immune:
+            raise EquipmentEffectsRulebookError(
+                f"church item {item_key!r} role {role.value!r} offers neither "
+                "positive heal_gain nor an immunity: a vestment or emblem must "
+                "carry the light's healing or its ward"
+            )
+
+
 def validate_equipment_effect_rules(
     document: Any,
     registry: Mapping[str, ItemDefinition],
@@ -434,7 +516,12 @@ def validate_equipment_effect_rules(
             rarity,
             buff_definitions,
         )
-    return {key: rules[key] for key in sorted(rules, key=str)}
+    ordered = {key: rules[key] for key in sorted(rules, key=str)}
+    # The Church-of-Light doctrine rides the same load: role membership is
+    # item lore, so this pass can only confirm the authored entries honour
+    # the roles the items declare -- it can never be edited out of the entries.
+    validate_church_doctrine(registry, ordered)
+    return ordered
 
 
 _equipped = {

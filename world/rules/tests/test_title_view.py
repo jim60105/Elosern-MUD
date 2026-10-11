@@ -24,7 +24,6 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from world.lore.guild import GuildRank
-from world.lore.titles import StarterEpithet
 from world.rules import titles as titles_module
 from world.rules.title_view import (
     TITLE_MAX_BASIS_CHARS,
@@ -42,6 +41,7 @@ from world.rules.titles import (
     grant_first_quest_epithet,
     grant_rank_title,
 )
+from world.tests.synthetic_data import SYNTH_STARTER_EPITHET
 
 from ._combat_session_helpers import open_synthetic_scope
 from ._knowledge_probes import live_fixed_title_registry, live_registry
@@ -57,8 +57,9 @@ T_RANK_F = GuildRank(
     "F", 1, 10, 100, "Synthetic F-rank tasks.", T_FIRST,
 )
 
-# The starter epithet the (patched) guild-claim path banks.
-T_STARTER = StarterEpithet("苔徑新旅", "你在合成公會完成第一次任務回報。")
+# The starter epithet the (patched) guild-claim path banks; the shared kit
+# declaration is the single source of truth for the synthetic value.
+T_STARTER = SYNTH_STARTER_EPITHET
 
 
 def _starter():
