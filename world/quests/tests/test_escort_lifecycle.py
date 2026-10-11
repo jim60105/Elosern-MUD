@@ -22,7 +22,9 @@ from world.rules.buffs import tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.upkeep import settle_upkeep
 
-from ._fixtures import QuestRegistryIsolation, escort, quest, register
+from ._fixtures import (
+    QuestRegistryIsolation, bound_instance_locator, escort, quest, register,
+)
 
 
 class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
@@ -181,12 +183,16 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
     """Two distinct commissions share one exclusive result; one winner pays."""
 
     ALTERNATIVE = "synthetic_bound_escort_alternative"
+    SINGLETON = "synthetic_bound_escort_singleton"
 
     def offer_topics(self):
-        return [*super().offer_topics(), {
-            "keyword": "escort", "effect_verb": "offer_commission",
-            "effect_reference": self.ALTERNATIVE,
-        }]
+        return [
+            *super().offer_topics(),
+            {"keyword": "escort", "effect_verb": "offer_commission",
+             "effect_reference": self.ALTERNATIVE},
+            {"keyword": "escort", "effect_verb": "offer_commission",
+             "effect_reference": self.SINGLETON},
+        ]
 
     def outcome_groups(self):
         return [{
@@ -211,6 +217,23 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         )
         scene_store.assign_grant_actor(self.package, "issuer", self.ALTERNATIVE, self.issuer.pk)
         scene_store.set_grant_registered(self.package, "issuer", self.ALTERNATIVE, True)
+        # An unrelated escort commission on the same package that belongs to no
+        # exclusive group; resolving the group must leave it untouched.
+        register(quest(
+            self.SINGLETON, quest_type=QuestType.ESCORT,
+            stages=(QuestStage(0, escort(
+                bound_instance_locator(), protected_role_refs=("protected",),
+            )),),
+        ))
+        register_quest_issuance(QuestIssuance(
+            definition_key=self.SINGLETON, issuer_key=self.issuer_key,
+            reward=QuestReward(copper=1, items=(), merit=0), settlement=Settlement.AUTO,
+        ))
+        scene_store.ensure_commission_grant(
+            self.package, "issuer", self.SINGLETON, issuer_key=self.issuer_key,
+        )
+        scene_store.assign_grant_actor(self.package, "issuer", self.SINGLETON, self.issuer.pk)
+        scene_store.set_grant_registered(self.package, "issuer", self.SINGLETON, True)
 
     def alternative_stages(self):
         return (QuestStage(0, escort(
@@ -298,6 +321,22 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         self.assertFalse(group.resolved)
         records = read_records(self.owner)
         self.assertEqual({record.state.value for record in records}, {"in_progress"})
+
+    def test_unrelated_commission_is_not_invalidated_by_group_resolution(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        winner = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        singleton = accept_quest(self.owner, self.SINGLETON, self.issuer_key)
+        self.assertIsNone(singleton.group_id)
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, winner.quest_id)
+        records = {record.quest_id: record for record in read_records(self.owner)}
+        # The group-less commission is untouched: neither completed nor
+        # invalidated by a resolution that never named it.
+        self.assertEqual(records[singleton.quest_id].state.value, "in_progress")
 
 
 class EscortIntermediateStageTests(EscortExclusiveAlternativeTests):
