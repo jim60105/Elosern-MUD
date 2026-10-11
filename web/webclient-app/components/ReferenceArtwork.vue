@@ -107,12 +107,6 @@ function onImageError() {
         <span v-if="maskLoaded" class="reference-artwork__mask-fill" :style="{ '--silhouette-mask': `url('${maskSource}')` }"></span>
         <img class="reference-artwork__mask-probe" :src="maskSource" alt="" aria-hidden="true" @load="onMaskLoad" @error="onMaskError" />
       </div>
-      <!-- No built-in identity is carried (e.g. a roster portrait): the
-           grounded standing silhouette stands unchanged. A failed bundled
-           mask leaves the name and the truthful text label alone. -->
-      <svg v-else-if="!fallbackUrl" viewBox="0 0 240 360" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <path d="M120 8c-19 0-30 15-30 34 0 17 8 29 16 34l-4 14-33 13c-13 7-20 25-23 44L30 239l19 5 24-81-1 89-9 106h47l10-91 10 91h47l-9-106-1-89 24 81 19-5-16-92c-3-19-10-37-23-44l-33-13-4-14c8-5 16-17 16-34 0-19-11-34-30-34Z" />
-      </svg>
       <div class="reference-artwork__chest">
         <span class="reference-artwork__placeholder-glyph">{{ portraitGlyph(stageName) }}</span>
         <span class="reference-artwork__identity">{{ stageName }}</span>
@@ -199,13 +193,6 @@ function onImageError() {
   background: radial-gradient(ellipse, rgba(3, 3, 7, .75), transparent 70%);
 }
 .reference-artwork__silhouette { position: absolute; inset: 0; }
-.reference-artwork__silhouette svg {
-  width: 100%; height: 100%;
-  fill: #17191f;
-  stroke: rgba(185, 154, 96, .3);
-  stroke-width: 1;
-  filter: drop-shadow(0 calc(3px * var(--ui-scale)) calc(7px * var(--ui-scale)) #07070b);
-}
 /* The server-selected built-in silhouette: the committed image's own alpha
    mask over the existing dark fill, using the stage editor's mask idiom
    (mask + -webkit-mask, contain, bottom center). mask-mode is named
@@ -266,13 +253,11 @@ function onImageError() {
   clip-path: inset(50%);
   white-space: nowrap;
 }
-.reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__mask,
-.reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette svg {
+.reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__mask {
   animation: actor-pending var(--motion-pending) ease-in-out infinite;
 }
 @keyframes actor-pending { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) {
-  :root:not([data-motion]) .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__mask,
-  :root:not([data-motion]) .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette svg { animation: none; }
+  :root:not([data-motion]) .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__mask { animation: none; }
 }
 </style>

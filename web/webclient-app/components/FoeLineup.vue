@@ -66,7 +66,12 @@ function entryFor(participant) {
   if (ref === null || ref === undefined) {
     return null;
   }
-  return props.artPanel?.portrait_catalog?.[ref] ?? null;
+  const strRef = String(ref);
+  return (
+    props.artPanel?.portrait_catalog?.[strRef] ??
+    props.stage?.foeCatalog?.[strRef] ??
+    null
+  );
 }
 
 function slotStyle(index) {

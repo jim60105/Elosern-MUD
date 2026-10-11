@@ -712,10 +712,10 @@ class DialogueWireTransitionTests(BattlefieldIsolation, EvenniaTest):
         result = _engage_adapter(self.player, {"monster_id": int(monster.pk)})
         self.assertEqual(result["outcome"], "success")
         self.assertEqual(
-            result["affected_panels"], ("status", "context_actions", "dialogue")
+            result["affected_panels"], ("status", "context_actions", "dialogue", "art")
         )
         spec = self.action_registry.spec("explore.engage")
-        self.assertEqual(spec.affected_panels, ("status", "context_actions", "dialogue"))
+        self.assertEqual(spec.affected_panels, ("status", "context_actions", "dialogue", "art"))
 
     def test_npc_departure_pushes_unavailable_dialogue_to_live_watchers(self):
         session, coordinator = self._coordinator()

@@ -204,6 +204,27 @@ describe("FoeLineup", () => {
       expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2", "3", "4"]);
     });
 
+    it("resolves current entry before held entry and retains pre-round foe artwork", () => {
+      const heldEntry = entry(99);
+      heldEntry.url = "/art/portraits/held_foe.webp";
+      const foe99 = foe(99, { display_name: "殘留敵手" });
+      wrapper = mount(FoeLineup, {
+        props: {
+          foes: [foe99],
+          artPanel: { ...ART, portrait_catalog: {} },
+          stage: {
+            key: "round:1",
+            foes: [foe99],
+            foeCatalog: { "99": heldEntry },
+            gestures: {},
+          },
+        },
+      });
+      const slot = slots()[0];
+      expect(slot.find("img").exists()).toBe(true);
+      expect(slot.find("img").attributes("src")).toBe("/art/portraits/held_foe.webp");
+    });
+
     it("follows the displayed hit points on each gauge, with no numerals", async () => {
       wrapper = mount(FoeLineup, {
         props: {

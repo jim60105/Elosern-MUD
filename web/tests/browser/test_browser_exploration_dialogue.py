@@ -1030,3 +1030,17 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             1,
             "the combat adoption did not collapse the frame stack to one root",
         )
+
+        # Assert the first engaged combat catalog contains monster_anon mask,
+        # no standing SVG figure, and no tier-keyed imagery.
+        art_panel = store_state(page).get("panels", {}).get("art", {})
+        catalog = art_panel.get("portrait_catalog", {})
+        goblin_pk = str(goblin["identity"])
+        self.assertIn(goblin_pk, catalog)
+        goblin_entry = catalog[goblin_pk]
+        self.assertEqual(goblin_entry.get("fallback", {}).get("key"), "monster_anon")
+        self.assertIsNone(goblin_entry.get("url"))
+
+        # Ensure standing humanoid SVG is absent from the stage
+        svg_count = page.locator('[data-anchor="actor-right"] [data-testid="reference-artwork"] svg').count()
+        self.assertEqual(svg_count, 0, "legacy standing humanoid SVG must not be rendered")
