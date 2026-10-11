@@ -495,6 +495,17 @@ def activate_scene_encounter(
         for actor in (ObjectDB.objects.filter(id=pk).first() for pk in bindings.values())
         if actor is not None
     ]
+    # Activating an encounter materializes or revalidates its exact roles, so a
+    # settled final escort pass runs here: an encounter whose meeting role now
+    # stands beside an accepted escort's protected actor resolves the group,
+    # and the indexed owner/package references keep the pass off any global
+    # player or story scan (escort-rendezvous §5). One shared transaction makes
+    # the evaluation commit or roll back with nothing partially applied.
+    if actors:
+        from .escort_events import escort_event_boundary
+
+        with escort_event_boundary((player, *actors)):
+            pass
     if actors:
         transaction.on_commit(lambda present=actors: schedule_occupant_portraits(present))
     log_info(

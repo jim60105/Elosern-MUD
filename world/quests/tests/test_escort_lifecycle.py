@@ -200,10 +200,7 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         super().setUp()
         register(quest(
             self.ALTERNATIVE, quest_type=QuestType.ESCORT,
-            stages=(QuestStage(0, escort(
-                completion=EscortCompletion.RENDEZVOUS,
-                protected_role_refs=("protected",), meeting_role_refs=("meeting",),
-            )),),
+            stages=self.alternative_stages(),
         ))
         register_quest_issuance(QuestIssuance(
             definition_key=self.ALTERNATIVE, issuer_key=self.issuer_key,
@@ -214,6 +211,12 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         )
         scene_store.assign_grant_actor(self.package, "issuer", self.ALTERNATIVE, self.issuer.pk)
         scene_store.set_grant_registered(self.package, "issuer", self.ALTERNATIVE, True)
+
+    def alternative_stages(self):
+        return (QuestStage(0, escort(
+            completion=EscortCompletion.RENDEZVOUS,
+            protected_role_refs=("protected",), meeting_role_refs=("meeting",),
+        )),)
 
     def test_first_accepted_alternative_wins_and_the_other_is_invalidated(self):
         from world.quests.escort_events import exclusive_outcome_status
@@ -242,6 +245,84 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         reloaded = {record.quest_id: record for record in read_records(self.owner)}
         self.assertEqual(reloaded[winner.quest_id].state.value, "completed")
         self.assertEqual(reloaded[other.quest_id].state.value, "invalidated")
+
+    def test_distinct_acceptances_get_monotonic_sequences(self):
+        first = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        second = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        self.assertIsNotNone(first.acceptance_sequence)
+        self.assertIsNotNone(second.acceptance_sequence)
+        self.assertLess(first.acceptance_sequence, second.acceptance_sequence)
+
+    def test_meeting_first_order_selects_the_earlier_sequence(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        winner = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        other = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        # The exact meeting role walks to the stationary protected actor.
+        self.assertTrue(self.meeting.move_to(self.room1, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, winner.quest_id)
+        records = {record.quest_id: record for record in read_records(self.owner)}
+        self.assertEqual(records[winner.quest_id].state.value, "completed")
+        self.assertEqual(records[other.quest_id].state.value, "invalidated")
+
+    def test_simultaneous_satisfaction_picks_the_earlier_sequence(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        winner = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        other = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        before = self.owner.db.wallet or 0
+        # Moving the protected actor beside the meeting role satisfies both
+        # alternatives at once; the earlier acceptance sequence wins.
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, winner.quest_id)
+        records = {record.quest_id: record for record in read_records(self.owner)}
+        self.assertEqual(records[winner.quest_id].state.value, "completed")
+        self.assertEqual(records[other.quest_id].state.value, "invalidated")
+        self.assertEqual(self.owner.db.wallet, before + 1)
+
+    def test_active_alternatives_without_an_attributable_candidate_stay_unresolved(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        accept_quest(self.owner, self.definition.key, self.issuer_key)
+        accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        # An unrelated companion moves; no protected or meeting binding moves,
+        # so nothing is attributable and the group must stay unresolved.
+        unrelated = create_object(NPC, key="bystander", location=self.room1)
+        join_party(unrelated, self.owner)
+        self.assertTrue(unrelated.move_to(self.room2, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertFalse(group.resolved)
+        records = read_records(self.owner)
+        self.assertEqual({record.state.value for record in records}, {"in_progress"})
+
+
+class EscortIntermediateStageTests(EscortExclusiveAlternativeTests):
+    """A multi-stage alternative advances without settling its final group."""
+
+    def alternative_stages(self):
+        stage = escort(
+            completion=EscortCompletion.RENDEZVOUS,
+            protected_role_refs=("protected",), meeting_role_refs=("meeting",),
+        )
+        return (QuestStage(0, stage), QuestStage(1, stage))
+
+    def test_intermediate_stage_advances_without_resolving_the_group(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        record = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        advanced = read_records(self.owner)[0]
+        self.assertEqual(advanced.quest_id, record.quest_id)
+        self.assertEqual(advanced.state.value, "in_progress")
+        self.assertEqual(advanced.stage_index, 1)
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertFalse(group.resolved)
+        self.assertEqual(self.owner.db.wallet, before)
 
 
 class EscortCasualtyTests(EscortLifecycleTests):

@@ -227,7 +227,16 @@ def resolve_exclusive_outcome(owner: Any, package_id: str, group_id: str, *, sou
     replacements = {}
     pins = []
     for record in active:
-        if not outcome_store.consume_transition(owner_id=owner.pk, record_id=record.quest_id, source_key=source.key):
+        # An active alternative may already have consumed this source when it
+        # advanced an intermediate stage earlier in the same settled pass; the
+        # final arbitration must treat that as already-observed rather than a
+        # forged source, and still invalidate the record as a losing
+        # alternative (escort-rendezvous §7).
+        if not outcome_store.transition_consumed(
+            owner_id=owner.pk, record_id=record.quest_id, source_key=source.key,
+        ) and not outcome_store.consume_transition(
+            owner_id=owner.pk, record_id=record.quest_id, source_key=source.key,
+        ):
             raise EscortOperationError("invalid_source")
         replacements[record.quest_id] = (
             fulfill_record_for(owner, record, definition_for(record))
