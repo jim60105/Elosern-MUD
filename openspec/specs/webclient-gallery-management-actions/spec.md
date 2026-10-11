@@ -144,12 +144,12 @@ minted `image_id` in the result's bounded `data` slot.
 
 #### Scenario: Monster generation is field-free and replace-shaped
 
-- **WHEN** `gallery.generate` names a monster-tier subject with empty fields and empty free text
+- **WHEN** `gallery.generate` names a monster visual-species subject with empty fields and empty free text
 - **THEN** the request succeeds, and when its job settles the subject holds exactly one card (the cap's replace semantics), with no binding affordances offered by the panel's capability flags
 
 #### Scenario: A monster request carrying fields is refused naming the capability
 
-- **WHEN** `gallery.generate` names a monster-tier subject with a non-empty `fields` list
+- **WHEN** `gallery.generate` names a monster visual-species subject with a non-empty `fields` list
 - **THEN** the result is `rejected` with a stable capability-naming code and nothing is queued
 
 #### Scenario: Prompt text bounds follow the shared printable-text validator
@@ -182,6 +182,10 @@ minted `image_id` in the result's bounded `data` slot.
 - **WHEN** the image server is unreachable when a generation request is admitted
 - **THEN** the adapter does not probe service connectivity, the request stays successful (§12.3.1),
   and the failure surfaces later as the panel's failed row
+
+#### Scenario: Direct retired-tier requests refuse before writing
+- **WHEN** a client names a threat-tier monster subject for generation, default selection, delete, placement or subject selection
+- **THEN** the domain returns a stable invalid-subject rejection, with no card, job, preference or file write
 
 ### Requirement: Default set and card delete follow the shipped delete-never-dangles contract
 
@@ -367,8 +371,8 @@ image's personal geometry triple (face rectangle and stage), and clearing one ge
 each bound to one exact payload validator.
 
 #### Scenario: Selection adapter writes only the preference
-- **WHEN** a client dispatches the official-select action with a valid identity inside the selected subject's content reference
-- **THEN** the request succeeds through the gallery preference API, one affected-panel update carries freshly rendered gallery/art/roster, and the official directory plus every runtime file are unchanged
+- **WHEN** a client dispatches official-select with a valid identity inside an eligible entity-context subject reference
+- **THEN** the gallery preference API writes only that entity preference; one gallery/art/roster update publishes and no official or runtime image file changes
 
 #### Scenario: An out-of-reference identity is refused
 - **WHEN** a selection or geometry request names an official identity outside the selected subject's content reference, an unindexed identity, or a malformed triple
@@ -398,3 +402,6 @@ each bound to one exact payload validator.
 - **WHEN** the client renders official-art surfaces
 - **THEN** it hides or disables the corresponding affordances, while the backend rejection holds for
   direct requests regardless of client state
+#### Scenario: Bare species rows have no personal write target
+- **WHEN** a personal official selection, clear or geometry action names a species rail subject with no entity context
+- **THEN** it rejects with entity_required and no shared species preference or individual preference is changed

@@ -32,8 +32,8 @@ full-key string; every access path SHALL go through a parsed `ArtSubject`.
 - **AND** anything else raises a named `ArtSubjectError`
 
 ### Requirement: Scene and generic-monster subjects resolve from immutable registries
-A scene subject SHALL re-validate its archetype against `SCENE_ARCHETYPE_REGISTRY`; a monster
-subject SHALL re-validate its archetype against `MONSTER_TIER_REGISTRY`. An unresolvable registry
+A scene subject SHALL re-validate its visual species against `SCENE_ARCHETYPE_REGISTRY`; a monster
+subject SHALL re-validate its visual species against the registered visual-species vocabulary. An unresolvable registry
 key SHALL raise a named `ArtSubjectError` and produce no record.
 
 #### Scenario: A registered archetype yields a valid scene subject
@@ -46,13 +46,12 @@ key SHALL raise a named `ArtSubjectError` and produce no record.
 - **THEN** resolution raises a named `ArtSubjectError` and no asset record is created
 
 #### Scenario: A species key is not a subject key
-- **WHEN** a registered species key is forged into a `portrait:monster` subject
-- **THEN** it is rejected exactly like any other key absent from `MONSTER_TIER_REGISTRY`, and the species' official reference resolves through its own provenance-derived path instead
+- **WHEN** a registered visual species key is supplied as a monster art subject
+- **THEN** it resolves that species subject; a threat-tier or unknown key is rejected before any record or prompt
 
 #### Scenario: The tier-validated vocabulary is the generic layer's only monster subject vocabulary
-- **WHEN** the built-in silhouette/gallery generic layer resolves monster subjects through any queue, store, worker, command, or presenter path
-- **THEN** the tier-validated monster subject vocabulary is the only monster subject vocabulary available, and a species key is never a valid `portrait:monster` subject key
-- **AND** a species-backed individual's species image identity lives exclusively in the official content reference layer (the `species-portrait-identity` capability), so no path can smuggle a species key into the tier-validated subject vocabulary or confuse the two identity layers
+- **WHEN** any queue, store, worker, command or presenter resolves a monster subject
+- **THEN** only registered visual-species keys are admitted; the subject and its official reference name the same declared visual species, and no threat tier is an image identity
 
 ### Requirement: Named-character portrait eligibility is explicit policy, never inferred
 `world/art/subjects.py` SHALL derive a `portrait:character` subject only from an explicit
@@ -101,9 +100,8 @@ and no checkpoint renders it.
 - **THEN** the appearance section is empty and the result is the bare template stem with no dangling separator
 
 #### Scenario: Scene and monster descriptions are registry text
-- **WHEN** scene and generic-monster descriptions are generated
-- **THEN** they equal the immutable archetype/archetype-description text and are identical across
-  regenerations for the same subject
+- **WHEN** scene and monster descriptions are generated
+- **THEN** scenes retain their immutable scene sentence; a monster uses only its selected visual species public physical appearance or authored baseline physical category, with no tier description or multi-species examples
 
 #### Scenario: The style fragment and templates are sourced from the prompt library
 - **WHEN** a character or monster description is generated, and the shipped prompt library is enumerated
@@ -183,8 +181,8 @@ and no checkpoint renders it.
 - **THEN** it remains registry-driven, reads no persona data, and carries no display name — the degraded path does not reintroduce what the template removed
 
 #### Scenario: Each subject kind draws from its allowed data source
-- **WHEN** descriptions are generated for scenes, generic monsters, and characters
-- **THEN** scenes use the one-sentence `scene_sentence`, generic monsters use the bestiary archetype description, and characters use a template over race/subrace, APPARENT age, and the entity's authored physical appearance
+- **WHEN** descriptions are generated for scenes, monsters and characters
+- **THEN** scenes use scene_sentence, monsters use their declared visual species public physical appearance, and characters keep race/subrace, apparent age and authored physical appearance
 
 ### Requirement: Subject producer validation rejects unrepresentable keys
 `_validate_subject_key` SHALL reject keys containing `|`, `/`, `:`, `{`, `}`, or control

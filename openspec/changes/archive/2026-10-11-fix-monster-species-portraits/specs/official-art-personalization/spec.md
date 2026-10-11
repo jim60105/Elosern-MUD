@@ -3,7 +3,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: A personal official selection is an entity-local art preference
-An entity SHALL be able to explicitly select one official image — identified by its stable root-relative identity within its content reference — as a personal art preference stored on the entity's own art state. For character subjects, setting an explicit runtime default SHALL clear personal official selection and selecting official artwork SHALL clear the explicit runtime default. For monsters, a shared species card default SHALL remain separate from an entity-local official choice; the entity choice SHALL win without changing another individual.
+An entity SHALL be able to select one official image, identified by its stable root-relative
+identity within its content reference, as a personal art preference stored on its own art state.
+For characters, setting an explicit runtime default SHALL clear the personal selection, and vice
+versa. For monsters, the shared species card default SHALL stay separate from the entity-local
+choice, which SHALL win without changing another individual.
 
 #### Scenario: Explicit official selection presents ahead of the runtime default
 - **WHEN** a subject holds a gallery default card and explicitly selects a valid official image from its content reference

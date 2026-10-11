@@ -112,6 +112,10 @@ valid output.
 - **THEN** both queues share the one process-wide queue lock, the one pending ordering, and the one
   worker concurrency slot
 
+#### Scenario: Monster jobs require current visual membership
+- **WHEN** ensure, gallery enqueue, retry, claim or settle encounters an unregistered monster visual key, including a retired tier
+- **THEN** no current monster card or output is produced or applied; rejection leaves valid scene, character and species jobs independent
+
 ### Requirement: Scenes and portraits share one serialization lock and one worker concurrency slot
 `world/art/` SHALL expose a single queue lock shared by scene and portrait operations. Claiming,
 settling, and forced requeues SHALL acquire the lock, while the external worker subprocess SHALL run
@@ -506,6 +510,10 @@ or the store root.
   any download, extraction, or re-scan
 - **AND** personal gallery URLs and built-in `defaults/` URLs retain their existing ownership and
   confinement rules unchanged
+
+#### Scenario: Referenced tier artwork remains unservable
+- **WHEN** a retired tier monster classic or gallery identity is requested, even with a done record or exact old card reference
+- **THEN** the route returns 404; registered species runtime identities, admitted official artwork and monster_anon remain servable through their existing confined routes
 
 ### Requirement: In-flight generation exposes a wire-stable status
 The art presenter SHALL normalize the internal `in_progress` record status to a wire-accepted value

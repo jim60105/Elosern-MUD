@@ -117,6 +117,10 @@ root, and append one card through the gallery write API.
 - **THEN** the file it points at is never overwritten even when the card itself no longer
   validates
 
+#### Scenario: Monster seed keys must name registered visual species
+- **WHEN** the seed root contains monster/goblin imagery and retired monster/low, monster/mid, monster/high or monster/calamity directories
+- **THEN** only registered visual-species entries can synchronize; retired tier entries are refused before copying or appending, with bounded diagnostics
+
 ### Requirement: Seed cards carry seed provenance and no reproduction set
 A card appended by seed synchronization SHALL carry `source` `seed`, `prompt` `None`, `seed` `None`,
 `checkpoint` `None`, an empty `requested_fields`, and `binding` `None`. It SHALL otherwise be an

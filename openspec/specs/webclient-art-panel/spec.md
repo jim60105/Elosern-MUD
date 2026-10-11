@@ -101,9 +101,8 @@ alternative text, and bounded display context (name plus role/target label).
   truthful placeholder, and its display context, and no browser-constructed key or URL exists
 
 #### Scenario: A generic monster shares one portrait per bestiary archetype
-- **WHEN** a present monster carries a valid bestiary `threat_tier`
-- **THEN** its catalog entry resolves `portrait:monster:<threat_tier>` with the archetype-shared asset
-  or its placeholder, and its name and role context are keyed by the opaque entity identity
+- **WHEN** a present monster has registered visual-species provenance
+- **THEN** its entry resolves portrait:monster:<visual-key> with only that species runtime or official artwork; missing images carry monster_anon and context remains keyed by opaque entity identity
 
 #### Scenario: Missing or malformed age values reject without a prompt
 - **WHEN** a present character's `age` or `apparent_age` is missing, non-integer, or otherwise
@@ -182,11 +181,8 @@ alternative text, and bounded display context (name plus role/target label).
   `fallback` field established by `art-gallery-fallback` — no second image reference
 
 #### Scenario: Subject resolution dispatches by entity kind
-- **WHEN** a present entity's portrait subject is resolved
-- **THEN** a named character resolves `portrait:character:<stable-key>` only from an explicit
-  named `portrait_policy` through the canonical-age check, a generic monster resolves
-  `portrait:monster:<archetype>` from its bestiary `MONSTER_TIER_REGISTRY` archetype without any
-  character age gate, and anything else is the unavailable placeholder
+- **WHEN** a present entity portrait is resolved
+- **THEN** characters retain explicit named policy and canonical-age validation; monsters resolve declared visual-species provenance without a character-age gate, and unresolvable monsters retain monster_anon without a fabricated subject
 
 #### Scenario: Eligibility is never inferred
 - **WHEN** the server decides portrait eligibility for an entity

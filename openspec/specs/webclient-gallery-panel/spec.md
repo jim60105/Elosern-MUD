@@ -11,9 +11,9 @@ of rendering, and never reachable by any mutation path.
 
 ## Requirements
 
-### Requirement: The gallery panel is an exact read-only version-1 presentation panel
+### Requirement: The gallery panel is an exact read-only version-2 presentation panel
 
-The presentation registry SHALL register a `gallery` panel at schema version 1,
+The presentation registry SHALL register a `gallery` panel at schema version 2,
 available in exploration mode. Its available form SHALL contain exactly
 `schema_version`, `available`, `kind` (the literal `gallery`), `subjects`,
 `selected`, `filters`, `cards`, `official_entries`, `equipment_summary`, `capabilities`,
@@ -85,13 +85,17 @@ reason, and semantics.
 - **WHEN** a catalog image's identity or URL exceeds the budget
 - **THEN** it is omitted from the list with one bounded diagnostic instead of failing the whole panel, exactly as the portrait payload's official branch falls through over budget
 
+#### Scenario: Personal preference availability is explicit
+- **WHEN** a species gallery row has no live individual preference target
+- **THEN** capabilities.supports_personal_official_preferences is false, official rows remain previewable, and both validators enforce the new boolean; eligible character rows retain true
+
 ### Requirement: The subject rail names every gallery-bearing subject with companion-first ordering
 
 `subjects` SHALL be a bounded ordered list (at most 24 rows) of
 `{subject_key, kind, display_name, is_puppet}` entries: first the rendered
 puppet's own character subject; then live character subjects with a gallery —
 active-party companions before all other characters (design §8.3), ordering
-facts taken from the party surface; then every `MONSTER_TIER_REGISTRY` entry
+facts taken from the party surface; then registered visual-species entries in stable-key order
 resolved through the monster kind's typed producer.
 
 #### Scenario: Active party companions precede other characters
@@ -100,9 +104,8 @@ resolved through the monster kind's typed producer.
 - **THEN** the rail lists the party companion before the non-party character
 
 #### Scenario: The bestiary is listed without any scene subject
-
-- **WHEN** the rail is built for any puppet
-- **THEN** every monster-tier subject appears and no scene-kind subject appears in any row
+- **WHEN** the rail is built for a puppet
+- **THEN** registered visual-species subjects are eligible in stable-key order within the 24-row budget, retired tiers and scene subjects never appear
 
 #### Scenario: Gallery-less kinds never appear on the rail
 
@@ -115,9 +118,8 @@ resolved through the monster kind's typed producer.
 - **THEN** `selected` names one entry of `subjects`
 
 #### Scenario: Truncation preserves the puppet and bestiary
-
-- **WHEN** the bounded rail exceeds its 24-row cap
-- **THEN** it reserves space for the puppet and all bestiary entries, truncating only the character candidate list in companion-first, numeric entity primary-key order
+- **WHEN** the puppet, eligible character candidates and visual-species candidates exceed 24 rows
+- **THEN** the puppet is retained; reserve at most 23 slots for visual-species rows, taking their stable-key prefix, and fill remaining slots with companions then other characters in numeric identity order; never exceed 24 or reserve an unbounded species count
 
 #### Scenario: Subject keys are unique across the world gallery
 
@@ -325,7 +327,7 @@ equipment state without materializing a handler; otherwise it SHALL be null.
 
 #### Scenario: Monster subjects carry no binding affordances
 
-- **WHEN** the selected subject is a monster-tier subject
+- **WHEN** the selected subject is a monster visual-species subject
 - **THEN** `equipment_summary` is null and `capabilities.supports_bindings` is false
 
 #### Scenario: Counts match the listed rows exactly
@@ -346,7 +348,7 @@ equipment state without materializing a handler; otherwise it SHALL be null.
 #### Scenario: The summary mirrors the kind's declared capabilities
 
 - **WHEN** the panel presents `capabilities`
-- **THEN** it mirrors the subject kind's declaration fields the management surface needs (`supports_bindings`, `supports_field_selection`, `supports_free_text`, `max_cards` or null)
+- **THEN** it mirrors the subject kind's declaration fields the management surface needs (`supports_bindings`, `supports_field_selection`, `supports_free_text`, `max_cards` or null, plus the server-resolved `supports_personal_official_preferences` context flag)
 
 #### Scenario: error_state carries the record's last error
 
@@ -372,45 +374,40 @@ equipment state without materializing a handler; otherwise it SHALL be null.
 
 The panel's schema version SHALL be one server-side constant shared by the
 presenter and the registry registration; `web/static/webclient/js/elosern/protocol.js`
-SHALL register `gallery: 1` in `PANEL_ALLOWLIST` and mirror every bound in an
+SHALL register `gallery: 2` in `PANEL_ALLOWLIST` and mirror every bound in an
 exact per-panel validator, and the dual-direction parity tests SHALL reject a
-payload accepted on one side and rejected on the other. Adding the panel SHALL
-be additive: no existing panel's schema or envelope changes.
+payload accepted on one side and rejected on the other. No existing other
+panel's schema or envelope changes. Server and client SHALL ship together.
 
 #### Scenario: A stale client rejects rather than renders
-
 - **WHEN** a gallery payload carries a field outside the mirrored exact schema
-- **THEN** both the Python validator and the JavaScript validator reject it and the panel degrades to that renderer's recovery path
+- **THEN** both validators reject it and the panel degrades to its recovery path
 
-Real card stage SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL reject a missing stage key, null stage on a real card or non-null stage on a synthetic row. Schema version SHALL remain 1; server and client SHALL ship together.
+Real card stage SHALL satisfy the exact bounded finite triple contract; both
+validator sides SHALL reject a missing stage key, null stage on a real card
+or non-null stage on a synthetic row. Schema version SHALL be 2.
 
 #### Scenario: Both validators enforce identity, ordering, and URL facts
-
 - **WHEN** either validator side checks a gallery payload
 - **THEN** it enforces unique canonical UUID image IDs, unique full subject keys, selected membership, puppet-first ordering, positive confined face rectangles, gallery URLs bound to the selected subject and image with the closed store extensions, coherent status/flags/chips/provenance, and exact nonnegative filter counts
 
 #### Scenario: Synthetic rows are bounded and neutralized
-
 - **WHEN** synthetic rows are validated
 - **THEN** pending rows are bounded to eight and failed rows to one, and synthetic rows carry null URL/rectangle/stage, false flags, and empty chips/provenance
 
 #### Scenario: Every field carries its documented bound
-
 - **WHEN** payload fields are validated
 - **THEN** defaults are at most one, labels at most 128 code points, chips at most 16, URLs at most 129, and warning conditions at most four nonempty lines of at most 512 code points
 
 #### Scenario: Warnings name unique visible cards newest-first
-
 - **WHEN** warning entries are validated
 - **THEN** they name unique visible bound cards in newest-first order
 
 #### Scenario: Lone surrogates and unsafe numbers are rejected
-
 - **WHEN** a payload carries lone surrogates or unsafe numbers
 - **THEN** both validators reject it
 
 #### Scenario: The oversized gallery fails closed at the JSON limit
-
 - **WHEN** a character gallery exceeds the existing 65,536-byte canonical JSON limit
 - **THEN** it fails closed and does not silently truncate cards
 
@@ -420,7 +417,7 @@ Real card stage SHALL satisfy the exact bounded finite triple contract; both val
 
 #### Scenario: Null synthetic stage is accepted at the existing version
 - **WHEN** otherwise valid pending and failed rows carry stage null
-- **THEN** both validators accept at schema version 1 without new chips or counts
+- **THEN** both validators accept at schema version 2 without new chips or counts
 
 ### Requirement: The personal selection state is server-authored in the panel payload
 

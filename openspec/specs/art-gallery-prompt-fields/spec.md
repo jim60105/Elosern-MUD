@@ -33,8 +33,8 @@ selection.
 - **THEN** a typed error is raised, no prompt is rendered, no record is created, and the card provenance never claims a field the kind cannot use
 
 #### Scenario: A monster card records an empty provenance
-- **WHEN** a monster gallery generation settles successfully
-- **THEN** the settled card's `requested_fields` is empty and its description came from the monster registry
+- **WHEN** a registered visual species monster gallery generation settles successfully
+- **THEN** requested_fields is empty and its description contains only the selected visual species public physical appearance, with no threat-tier rank or mixed-species examples
 
 #### Scenario: A write claiming field provenance for a kind without selection is refused
 - **WHEN** a card carrying a non-empty `requested_fields` is appended for a subject whose kind declaration supports no field selection
@@ -42,7 +42,7 @@ selection.
 
 #### Scenario: A kind without selection support declares no selectable field
 - **WHEN** a subject kind's capability declaration does not support field selection — the generic
-  monster kind, whose description is registry-owned
+  monster kind, whose visual species physical description is registry-owned
 - **THEN** it has no selectable field, and a non-empty selection for such a kind raises a typed
   error at the service boundary naming the undeclared capability rather than being silently dropped
 

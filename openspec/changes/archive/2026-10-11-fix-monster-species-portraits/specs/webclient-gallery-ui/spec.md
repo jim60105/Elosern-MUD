@@ -5,12 +5,11 @@
 ### Requirement: Official entries render as selectable read-only rows with personal geometry affordances
 
 The gallery surface SHALL render the committed `official_entries` beside the
-card rows as selectable, previewable rows and, when the committed supports_personal_official_preferences flag is true, SHALL offer exactly the
-official-entry affordances 選為預設影像, 清除選取, 臉部框選, 比例調整 and
-清除個人調整. Delete, replace, and regenerate-overwrite affordances SHALL NOT
-be rendered for an official entry. The surface SHALL NOT compose any official
-fact locally: the identity, URL, rectangle, and both markers are committed
-payload values.
+card rows as selectable, previewable rows and, when the committed
+`supports_personal_official_preferences` flag is true, SHALL offer exactly the official-entry
+affordances 選為預設影像, 清除選取, 臉部框選, 比例調整 and 清除個人調整. Delete, replace, and
+regenerate-overwrite affordances SHALL NOT be rendered for an official entry, and the surface SHALL
+compose no official fact locally.
 
 #### Scenario: An official row offers selection and geometry only
 
