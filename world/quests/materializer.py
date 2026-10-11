@@ -73,6 +73,10 @@ class SceneBuilderSpawnError(SceneBuilderError):
     """A scene key failed to resolve or the spawner produced an invalid object."""
 
 
+class SceneBuilderRoleUnavailable(SceneBuilderError):
+    """A required package-owned role has no available actor (never repaired)."""
+
+
 @dataclass(frozen=True)
 class RoleSpawn:
     """One validated actor to materialize for a role.
@@ -321,6 +325,7 @@ __all__ = [
     "SceneBuilderLocationError",
     "SceneBuilderNoRequirements",
     "SceneBuilderNotActive",
+    "SceneBuilderRoleUnavailable",
     "SceneBuilderSpawnError",
     "apply_characterization",
     "card_record",

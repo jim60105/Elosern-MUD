@@ -279,6 +279,70 @@ def _provision_role(
     return actual
 
 
+def ensure_package_role(
+    row: Any,
+    definition: ScenePackageDefinition,
+    role_id: str,
+    room: Any,
+    *,
+    provenance: dict[str, Any],
+    created_pks: list[int] | None = None,
+    tick: int = 0,
+) -> tuple[Any, str | None]:
+    """Return the exact actor bound to one package role, materializing it if unbound.
+
+    Shared by the pre-acceptance activation boundary and the accepted-stage
+    permanent-destination path (design §5.3), so the two cannot drift. A role
+    with a committed binding keeps its exact actor at its actual location --
+    never teleported, re-created, or re-configured -- and a missing, dead or
+    departed actor raises ``EncounterUnavailable`` with its named reason instead
+    of producing a replacement. Only an unbound role is spawned through the
+    shared materializer, bound, given its initial phase, granted its own
+    permitted knowledge and -- when it owns the package commission -- provisioned
+    and registered. Historical knowledge is append-only, so a repeat entry is
+    idempotent. Returns ``(actor, commission_key_or_None)``.
+    """
+    binding = scene_store.get_role_binding(row.package_id, role_id)
+    if binding is not None:
+        actor, reason = _resolve_actor(binding.npc_id)
+        if actor is None:
+            raise EncounterUnavailable(reason)
+    else:
+        role = definition.role(role_id)
+        if role is None:
+            raise EncounterUnavailable("unknown_role")
+        role_dialogue = definition.role_dialogue(role_id)
+        actor = spawn_role_actor(
+            room,
+            RoleSpawn(
+                role=role_id,
+                tier=role.tier,
+                disposition=role.disposition,
+                characterization=role.characterization,
+                conversable=role.conversable,
+                dialogue_key=(
+                    f"scene_role:{row.package_id}:{role_id}"
+                    if role.conversable
+                    else None
+                ),
+            ),
+            provenance,
+        )
+        if created_pks is not None:
+            created_pks.append(int(actor.pk))
+        scene_store.bind_role(
+            row, role_id, int(actor.pk), provenance=provenance, tick=tick
+        )
+        scene_store.set_role_availability(row.package_id, role_id, "bound", tick=tick)
+        if role_dialogue is not None:
+            scene_store.set_dialogue_phase(
+                row, role_id, role_dialogue.initial_phase, tick=tick
+            )
+    _grant_role_knowledge(actor, definition, role_id, row.package_id, tick=tick)
+    key = _provision_role(definition, role_id, row, actor, tick=tick)
+    return actor, key
+
+
 def _replay(
     row: Any,
     encounter: Any,
@@ -399,56 +463,24 @@ def activate_scene_encounter(
                 if located is None:
                     raise EncounterUnavailable(reason)
             for role_id in encounter.role_ids:
-                actor = bound.get(role_id)
-                if actor is None:
-                    role = definition.role(role_id)
-                    assert role is not None
-                    role_dialogue = definition.role_dialogue(role_id)
-                    actor = spawn_role_actor(
-                        located,
-                        RoleSpawn(
-                            role=role_id,
-                            tier=role.tier,
-                            disposition=role.disposition,
-                            characterization=role.characterization,
-                            conversable=role.conversable,
-                            dialogue_key=(
-                                f"scene_role:{package_id}:{role_id}"
-                                if role.conversable
-                                else None
-                            ),
-                        ),
-                        {
-                            "kind": "scene_encounter",
-                            "package": package_id,
-                            "scene": scene_id,
-                            "role": role_id,
-                        },
-                    )
-                    created_pks.append(int(actor.pk))
-                    scene_store.bind_role(
-                        row,
-                        role_id,
-                        int(actor.pk),
-                        provenance={
-                            "kind": "scene_encounter",
-                            "package": package_id,
-                            "scene": scene_id,
-                        },
-                        tick=tick,
-                    )
-                    scene_store.set_role_availability(package_id, role_id, "bound", tick=tick)
-                    if role_dialogue is not None:
-                        scene_store.set_dialogue_phase(
-                            row, role_id, role_dialogue.initial_phase, tick=tick
-                        )
-                    key = _provision_role(definition, role_id, row, actor, tick=tick)
-                    if key is not None:
-                        commission_keys.append(key)
-                # A reused actor stays exactly where it is: never teleported back,
-                # never re-created, never re-configured. Its own permitted
-                # knowledge is re-recorded idempotently.
-                _grant_role_knowledge(actor, definition, role_id, package_id, tick=tick)
+                # One shared path for both boundaries: a bound role keeps its
+                # exact actor where it is, an unbound role is materialized once.
+                actor, key = ensure_package_role(
+                    row,
+                    definition,
+                    role_id,
+                    located,
+                    provenance={
+                        "kind": "scene_encounter",
+                        "package": package_id,
+                        "scene": scene_id,
+                        "role": role_id,
+                    },
+                    created_pks=created_pks,
+                    tick=tick,
+                )
+                if key is not None:
+                    commission_keys.append(key)
                 bindings[role_id] = int(actor.pk)
             scene_store.mark_encounter_activated(
                 row, scene_id, int(player.pk), activation_tick=tick, tick=tick

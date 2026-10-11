@@ -791,7 +791,9 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
     quest_payload = _require_mapping(payload.get("quest"), "package.quest")
     issuer = quest_payload.get("issuer")
     commission_entry = payload.get("commission")
-    quest_core = compile_blueprint_core(quest_payload)
+    # The published package's own validated role set enables the single bounded
+    # permanent-occupant exception; a standalone payload passes none.
+    quest_core = compile_blueprint_core(quest_payload, package_roles=role_ids)
     definition_key = quest_core.definition.key
 
     commission: SymbolicIssuer | None = None
@@ -866,6 +868,28 @@ def scene_package_id(canonical: dict[str, Any]) -> str:
     )
     digest = hashlib.sha256(encoded.encode("utf-8")).hexdigest()
     return f"pkg_{digest[:24]}"
+
+
+#: A published package's identity IS its content digest and its payload is
+#: immutable, so a validated definition may be cached by package id. Runtime
+#: state (a role's selected phase, an encounter's activation) is never cached.
+_VALIDATED_PACKAGE_CACHE: dict[str, ScenePackageDefinition] = {}
+_VALIDATED_PACKAGE_CACHE_LIMIT = 64
+
+
+def validated_package(package_id: str, payload: Any) -> ScenePackageDefinition | None:
+    """Return one published payload's validated definition, or ``None``."""
+    cached = _VALIDATED_PACKAGE_CACHE.get(package_id)
+    if cached is not None:
+        return cached
+    try:
+        definition = validate_scene_package(payload)
+    except Exception:  # noqa: BLE001 - a stored payload that no longer validates yields no definition
+        return None
+    if len(_VALIDATED_PACKAGE_CACHE) >= _VALIDATED_PACKAGE_CACHE_LIMIT:
+        _VALIDATED_PACKAGE_CACHE.pop(next(iter(_VALIDATED_PACKAGE_CACHE)))
+    _VALIDATED_PACKAGE_CACHE[package_id] = definition
+    return definition
 
 
 def select_dialogue_phase(

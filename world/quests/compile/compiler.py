@@ -66,6 +66,8 @@ def _validate_scene_bound_rules(
     location: RoomLocator | None,
     objective: QuestObjective,
     npc_reqs: tuple[tuple[str, str, str | None], ...],
+    *,
+    package_roles: frozenset[str] = frozenset(),
 ) -> None:
     """Enforce the shared scene-bound rules the guardrail also checks (D5).
 
@@ -79,13 +81,14 @@ def _validate_scene_bound_rules(
     declare a quantity no greater than its ``npc_req`` count so the objective
     is always satisfiable by defeating the bound targets.
 
-    The instance-only rule stays closed for now: design §5.1 removes the
-    permanent-occupant rejection only once validated package ownership, exact
-    role binding and the retention replacement contract are implemented in both
-    schema validation and deterministic compilation. Until the encounter
-    boundary materializes exact retained role bindings into permanent rooms, a
-    permanent occupant would be located but never bound, leaving the stage
-    uncompletable -- so a permanent ``npc_req`` payload is still refused here.
+    The instance-only rule has exactly one bounded exception (design §5.1):
+    ``package_roles`` is a *published package's own* validated role set, never a
+    caller flag. It lifts the rule only when every declared occupant role is one
+    of those package-owned roles AND the objective needs no stage binding -- a
+    bound-target DEFEAT can only bind an instance room, so at a permanent
+    destination it would be left uncompletable. A standalone payload (the
+    direct compile path) passes no ``package_roles`` and keeps the blanket
+    rejection unchanged, and ESCORT stays refused on both paths.
     """
     if objective.kind is ObjectiveKind.ESCORT:
         _reject(
@@ -93,12 +96,21 @@ def _validate_scene_bound_rules(
             "published until a protected-entity binding flow exists"
         )
     has_occupants = bool(npc_reqs)
+    roles = {entry[0] for entry in npc_reqs}
+    package_owned = (
+        bool(package_roles) and bool(roles) and roles.issubset(package_roles)
+    )
+    needs_stage_binding = (
+        objective.kind is ObjectiveKind.DEFEAT and objective.requires_bound_targets
+    )
     if has_occupants and not (
         location is not None and location.kind is DestinationKind.BOUND_INSTANCE
-    ):
+    ) and not (package_owned and not needs_stage_binding):
         _reject(
             f"stage {stage_index} declares NPC requirements outside an "
-            "instance-layer destination; occupant-bearing scenes must be instances"
+            "instance-layer destination; occupant-bearing scenes must be instances "
+            "unless every occupant role is a validated package role on an "
+            "objective that needs no stage binding"
         )
     if (
         objective.kind is ObjectiveKind.DEFEAT
@@ -131,6 +143,8 @@ class CompiledBlueprintCore:
 
 def compile_blueprint_core(
     validated_payload: Any,
+    *,
+    package_roles: frozenset[str] = frozenset(),
 ) -> CompiledBlueprintCore:
     """Re-validate a validated proposal payload into its issuer-independent core.
 
@@ -142,6 +156,10 @@ def compile_blueprint_core(
     runtime's own definition rules, and ``QuestCompileError`` names the failing
     field before any mutation.
 
+    ``package_roles`` is the published package's own validated role set when the
+    caller is the scene-package boundary; it enables the single bounded
+    permanent-occupant exception documented on
+    :func:`_validate_scene_bound_rules` and is never a free-form caller flag.
     """
     payload = _require_mapping(validated_payload, "payload")
 
@@ -241,7 +259,9 @@ def compile_blueprint_core(
             location,
             bool(npc_reqs),
         )
-        _validate_scene_bound_rules(position, location, objective, npc_reqs)
+        _validate_scene_bound_rules(
+            position, location, objective, npc_reqs, package_roles=package_roles
+        )
         quest_stages.append(QuestStage(index=index, objective=objective))
         stage_requirements.append(
             StageSpawnRequirement(

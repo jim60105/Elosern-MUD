@@ -145,29 +145,16 @@ def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialo
     )
 
 
-#: A published package's identity IS its content digest and its payload is
-#: immutable, so its validated definition may be cached by package id. The
-#: *selected phase* is runtime state and is never cached: it is read from the
-#: store on every call.
-_VALIDATED_PACKAGE_CACHE: dict[str, Any] = {}
-_VALIDATED_PACKAGE_CACHE_LIMIT = 64
-
-
 def _validated_package(package_id: str, payload: Any) -> Any | None:
-    """Return one published payload's validated definition, or ``None``."""
-    cached = _VALIDATED_PACKAGE_CACHE.get(package_id)
-    if cached is not None:
-        return cached
-    from world.quests.scene_package import validate_scene_package
+    """Return one published payload's validated definition (shared cache).
 
-    try:
-        definition = validate_scene_package(payload)
-    except Exception:  # observability: ignore R2: a stored payload that no longer validates yields no dialogue rather than breaking the read seam
-        return None
-    if len(_VALIDATED_PACKAGE_CACHE) >= _VALIDATED_PACKAGE_CACHE_LIMIT:
-        _VALIDATED_PACKAGE_CACHE.pop(next(iter(_VALIDATED_PACKAGE_CACHE)))
-    _VALIDATED_PACKAGE_CACHE[package_id] = definition
-    return definition
+    The definition is cached by package id inside the validator (a published
+    payload is immutable and its id IS the content digest); the *selected phase*
+    stays runtime state and is read fresh on every call.
+    """
+    from world.quests.scene_package import validated_package
+
+    return validated_package(package_id, payload)
 
 
 def generated_dialogue_for(npc: Any) -> GeneratedPhaseDialogue | None:

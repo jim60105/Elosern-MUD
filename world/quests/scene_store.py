@@ -112,6 +112,24 @@ def list_packages() -> list[ScenePackage]:
     return list(ScenePackage.objects.order_by("id"))
 
 
+def package_for_definition(definition_key: str) -> ScenePackage | None:
+    """Return the published package whose compiled definition key matches, or ``None``.
+
+    Read-only: the accepted-stage consumer uses it to tell a validated
+    package-owned scene from a hand-written one. The payload is validated
+    through the shared cache, so the scan does not recompile on every call.
+    """
+    from .scene_package import validated_package
+
+    for row in list_packages():
+        if row.status != PACKAGE_STATUS_PUBLISHED:
+            continue
+        definition = validated_package(row.package_id, row.payload)
+        if definition is not None and definition.quest.definition.key == definition_key:
+            return row
+    return None
+
+
 def cancel_package(package_id: str) -> bool:
     """Mark one unactivated package cancelled (definitions stay for replay).
 

@@ -36,6 +36,7 @@ from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
+from world.quests import scene_store
 from world.quests.materializer import (
     SCENE_OCCUPANT_PROTOTYPE_WHITELIST,
     RoleSpawn,
@@ -43,6 +44,7 @@ from world.quests.materializer import (
     SceneBuilderLocationError,
     SceneBuilderNoRequirements,
     SceneBuilderNotActive,
+    SceneBuilderRoleUnavailable,
     SceneBuilderSpawnError,
     schedule_occupant_portraits as _schedule_occupant_portraits,
     scene_name as _materializer_scene_name,
@@ -369,6 +371,68 @@ def _materialize_instance(actor, record, definition, requirement, origin_room):
         raise
 
 
+def _materialize_permanent(record, definition, requirement, room) -> SceneMaterialization:
+    """Locate a permanent destination, adopting validated package-owned occupants.
+
+    A stage without ``npc_reqs`` is located only, exactly as before, and never
+    grants escort progress. A stage whose ``npc_reqs`` are validated package-owned
+    roles (a published package declares this definition) adopts their exact role
+    bindings in the **existing** room: no room or exit is created, the shared
+    room description is never rewritten, and a previously bound actor stays at
+    its actual location instead of being teleported back to the stage's origin.
+
+    The role work runs through one transaction with the same shared helper the
+    pre-acceptance activation boundary uses, so a role's actor is created at
+    most once across both paths. A required actor that is missing, dead or
+    departed raises :class:`SceneBuilderRoleUnavailable` naming the reason; it is
+    never repaired or replaced. Repeat materialization is idempotent: the same
+    bindings are revalidated and no actor is recreated.
+    """
+    if not requirement.npc_reqs:
+        return SceneMaterialization(room, record)
+    from world.quests.encounter_activation import (
+        EncounterUnavailable,
+        ensure_package_role,
+    )
+    from world.quests.scene_package import validated_package
+
+    package_row = scene_store.package_for_definition(definition.key)
+    if package_row is None:
+        raise SceneBuilderSpawnError(
+            f"stage {requirement.index} of quest {record.quest_id!r} declares "
+            "occupants at a permanent destination, but no published package owns "
+            "this definition"
+        )
+    package_definition = validated_package(package_row.package_id, package_row.payload)
+    if package_definition is None:
+        raise SceneBuilderSpawnError(
+            f"package {package_row.package_id!r} no longer validates; refusing to "
+            "materialize its occupants"
+        )
+    tick = int(getattr(record, "accepted_tick", 0) or 0)
+    with transaction.atomic():
+        for role, _tier, _disposition in requirement.npc_reqs:
+            try:
+                ensure_package_role(
+                    package_row,
+                    package_definition,
+                    role,
+                    room,
+                    provenance={
+                        "kind": "accepted_stage",
+                        "quest": record.quest_id,
+                        "stage": requirement.index,
+                        "role": role,
+                    },
+                    tick=tick,
+                )
+            except EncounterUnavailable as error:
+                raise SceneBuilderRoleUnavailable(
+                    f"required role {role!r} is unavailable: {error.reason}"
+                ) from error
+    return SceneMaterialization(room, record)
+
+
 def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMaterialization:
     """Materialize the actor's current active stage's scene requirements.
 
@@ -376,11 +440,15 @@ def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMateria
     a plain exit pair, sets the scene metadata, spawns lore-statted occupants,
     registers them as owned entities, and binds room and entity identities
     through ``bind_stage_runtime`` -- all inside one outer ``transaction.atomic()``.
-    For a permanent ``anchor``/``grid`` destination it only locates the existing
-    room and never spawns or binds. An already-bound current stage returns the
-    existing binding and spawns nothing. Named ``SceneBuilderError`` variants
-    reject unknown/inactive quests, stages without spawn requirements, and
-    mismatched origins with no state change.
+    For a permanent ``anchor``/``grid`` destination it locates the existing room
+    and never creates a room, an exit or a stage binding: a stage without
+    ``npc_reqs`` is located only, while a stage whose ``npc_reqs`` are validated
+    package-owned roles adopts those exact role bindings in that same room
+    without rewriting its description or teleporting a bound actor. An
+    already-bound current stage returns the existing binding and spawns nothing.
+    Named ``SceneBuilderError`` variants reject unknown/inactive quests, stages
+    without spawn requirements, mismatched origins and unavailable package roles
+    with no state change.
     """
     records = read_records(actor)
     record = find_record(records, quest_id)
@@ -405,7 +473,7 @@ def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMateria
         return _materialize_instance(actor, record, definition, requirement, origin_room)
     if requirement.location.kind in (DestinationKind.ANCHOR, DestinationKind.GRID):
         room = _locate_permanent(requirement.location)
-        return SceneMaterialization(room, record)
+        return _materialize_permanent(record, definition, requirement, room)
     raise SceneBuilderSpawnError(
         f"unsupported destination kind {requirement.location.kind.value}"
     )
