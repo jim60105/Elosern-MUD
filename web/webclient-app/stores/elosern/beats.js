@@ -123,6 +123,7 @@ export function applyBeats(ctx) {
     const statusPanel = prev && prev.panels ? prev.panels.status : null;
     const resources = statusPanel && statusPanel.resources;
     const actor = statusPanel && statusPanel.actor;
+    const artCatalog = prev?.panels?.art?.portrait_catalog ?? null;
     const plan = planRound({
       panel,
       roster: prev ? prev.combatParticipants : [],
@@ -131,6 +132,7 @@ export function applyBeats(ctx) {
       level: ctx.effectiveMotionLevel(),
       startSeq: flight.responseMark,
       terminal: rs.mode !== "combat",
+      artCatalog,
     });
     if (!plan) {
       return;

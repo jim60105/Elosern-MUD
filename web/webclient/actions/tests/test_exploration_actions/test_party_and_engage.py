@@ -440,7 +440,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         # Engage clears the dialogue session inside the deterministic core, so
         # the partial update must re-render ``dialogue`` too (webclient-align-10).
         self.assertEqual(
-            result["affected_panels"], ("status", "context_actions", "dialogue")
+            result["affected_panels"], ("status", "context_actions", "dialogue", "art")
         )
         self.assertTrue(is_in_active_session(self.player))
 

@@ -300,6 +300,9 @@ replace the current panel.
 - OOB disconnected during completion: reconnect snapshot resolves current asset status from store.
 - Browser image load fails: show fallback text/placeholder and do not repeatedly fetch without a new URL
   or user reload.
+- Absence of portrait identity or failed mask: render truthful name and state text only, without any
+  standing humanoid SVG or invented figure. Same-revision first combat catalog delivery guarantees
+  combat participant references and art catalog are committed in one atomic revision.
 - LLM unavailable: deterministic description and fixed worker/degradation behavior remain valid.
 
 ---

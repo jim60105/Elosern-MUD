@@ -1043,6 +1043,79 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(envelope["panels"]["art"]["kind"], "scene")
         self.assertEqual(envelope["panels"]["art"]["scene"]["archetype"], "t_synth_bazaar")
 
+    @covers_requirement(
+        "webclient-art-panel::the-art-panel-is-an-exact-read-only-panel-available-in-exploration-and-combat-modes"
+    )
+    @covers_requirement(
+        "webclient-art-panel::combat-portrait-references-and-catalog-are-committed-coherently"
+    )
+    def test_initial_engage_publishes_combat_art_catalog_in_same_revision(self):
+        from web.webclient.actions.registry import build_production_action_registry
+        from web.webclient.actions.dispatcher import handle_ui_action
+        from web.webclient.presentation.registry import build_production_registry
+
+        room = create_object(Room, key="coherent engage arena")
+        room.scene_archetype = "t_synth_bazaar"
+        self.char1.location = room
+        monster = create_object(Monster, key="森林哥布林", location=room)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        monster.art_species_key = "goblin"
+
+        envelope = self._sync()
+        coordinator = __import__(
+            "web.webclient.presentation.coordinator", fromlist=["attach_coordinator"]
+        ).attach_coordinator(self.ws_session, build_production_registry())
+        self.sessionhandler.data_out.reset_mock()
+
+        action = {
+            "protocol_version": 1,
+            "presentation_epoch": coordinator.epoch,
+            "request_id": "engage:1",
+            "base_revision": coordinator.revision,
+            "action_id": "explore.engage",
+            "payload": {"monster_id": int(monster.pk)},
+        }
+        handle_ui_action(
+            self.ws_session,
+            self.char1,
+            action,
+            build_production_action_registry(),
+            coordinator.registry,
+        )
+
+        # Verify that an update was emitted in one single revision before the action result
+        updates = [
+            call.kwargs["ui_update"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_update" in call.kwargs
+        ]
+        self.assertTrue(updates, "engage must publish an atomic update")
+        committed = updates[-1]
+        self.assertEqual(committed["mode"], "combat")
+        panels = committed["panels"]
+        for expected_panel in ("status", "context_actions", "dialogue", "art"):
+            self.assertIn(expected_panel, panels)
+
+        # Verify art panel has both participants
+        art_panel = panels["art"]
+        self.assertTrue(art_panel["available"])
+        catalog = art_panel["portrait_catalog"]
+        self.assertIn(str(monster.pk), catalog)
+        self.assertIn(str(self.char1.pk), catalog)
+
+        # Check monster entry fallback is monster_anon
+        monster_entry = catalog[str(monster.pk)]
+        self.assertEqual(monster_entry["fallback"]["key"], "monster_anon")
+
+        # Verify that the action result was emitted with matching revision and outcome success
+        results = [
+            call.kwargs["ui_action_result"][0][0]
+            for call in self.sessionhandler.data_out.call_args_list
+            if "ui_action_result" in call.kwargs
+        ]
+        self.assertTrue(results, "engage must emit action result")
+        self.assertEqual(results[-1]["outcome"], "success")
 
 if __name__ == "__main__":
     unittest.main()

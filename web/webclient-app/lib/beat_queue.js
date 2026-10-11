@@ -50,7 +50,7 @@ function preRoundHp(roster, statusHp, playerKey, known) {
 // D3: map one committed panel to the round's plan. Returns null when the
 // publication carries no available panel (the fallback case), so a caller can
 // treat "no plan" as "page this round as an ordinary response".
-export function planRound({ panel, roster, statusHp, playerKey, level, startSeq, terminal }) {
+export function planRound({ panel, roster, statusHp, playerKey, level, startSeq, terminal, artCatalog }) {
   if (!panel || panel.available !== true || !Array.isArray(panel.beats)) {
     return null;
   }
@@ -108,12 +108,28 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
     (row) => row && row.team === "foes" && row.state === "active",
   );
 
+  // Bounded decorative retention: capture only the pre-round active foes'
+  // catalog entries from the previous committed art panel, keyed by portrait_ref.
+  const foeCatalog = {};
+  if (artCatalog && typeof artCatalog === "object") {
+    for (const foe of foes) {
+      const ref = foe?.portrait_ref;
+      if (ref != null) {
+        const strRef = String(ref);
+        if (artCatalog[strRef]) {
+          foeCatalog[strRef] = artCatalog[strRef];
+        }
+      }
+    }
+  }
+
   return {
     round: typeof panel.round === "string" ? panel.round : "",
     startSeq: typeof startSeq === "number" ? startSeq : null,
     terminal: !!terminal,
     playerKey: playerKey == null ? null : String(playerKey),
     foes,
+    foeCatalog,
     // `off` never waits, so it never plays by itself (D2's 0ms token, D4's
     // start-at-done rule).
     auto: level !== "off",
@@ -289,6 +305,7 @@ export function stageFor(state) {
     key: `${plan.round}:${index}`,
     step: index,
     foes,
+    foeCatalog: plan.foeCatalog || {},
     defeated,
     gestures,
   };

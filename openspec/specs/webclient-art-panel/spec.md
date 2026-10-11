@@ -551,6 +551,14 @@ deterministic coverage gate.
   labels render outside the decorative mask, and the pending shimmer and reduced-motion behavior
   are retained
 
+#### Scenario: No identity never revives the legacy figure
+- **WHEN** either mode receives no catalog entry or stage mode receives no admitted fallback identity
+- **THEN** it renders truthful name and state text only, without a standing humanoid SVG, guessed bitmap, mask URL or subject key
+
+#### Scenario: Failed species imagery uses its authoritative monster fallback
+- **WHEN** a monster species image fails to load while its entry carries monster_anon
+- **THEN** stage mode renders that committed alpha mask with a load-failure state; a failed mask leaves text only and a new species URL can recover without remount
+
 ### Requirement: Resolved artwork carries stage without changing asset or placeholder truth
 Resolved gallery-card portraits SHALL carry validated card stage. A malformed stored stage reaching presentation SHALL degrade to `{scale: 1.0, x: 0.0, y: 0.0}` with one bounded `art_stage_invalid` warning carrying the subject. Placeholders SHALL carry null stage.
 
@@ -641,3 +649,22 @@ face rectangle (extents w, h) substantially fills the frame.
 - **WHEN** the client zoom-crops a portrait
 - **THEN** the server stores rectangles verbatim and does not crop, resize, or derive any second
   image
+
+### Requirement: Combat portrait references and catalog are committed coherently
+A publication that starts combat SHALL include the current participant descriptors and their freshly rendered art catalog in one authoritative revision. Subsequent actions, round playback and reconnect SHALL preserve opaque participant identity and authoritative species artwork or monster_anon, without tier art or browser-derived sources.
+
+#### Scenario: First goblin engage has no artwork
+- **WHEN** a real wilderness goblin is engaged and no goblin-specific image exists
+- **THEN** the first combat commit contains its catalog entry carrying monster_anon and the stage renders that mask without an intervening humanoid figure
+
+#### Scenario: Species artwork exists before engagement
+- **WHEN** that goblin has admitted goblin-specific official or runtime artwork
+- **THEN** the first combat catalog carries and renders that artwork, never a same-tier other-species image
+
+#### Scenario: Actions and completion retain species identity
+- **WHEN** rounds, targeted artwork completion or reconnect update an active goblin
+- **THEN** its opaque reference remains joined to goblin-specific artwork or monster_anon, never a retired tier image
+
+#### Scenario: A terminal round retains only its decorative actor artwork
+- **WHEN** committed mode leaves combat while prior foe beats still play
+- **THEN** retained foe actors keep their last admitted catalog artwork for playback until release; current scene identity and canonical mode remain current, and skip, flush or epoch reset releases retained actors

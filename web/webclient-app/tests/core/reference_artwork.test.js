@@ -167,14 +167,14 @@ describe("stage silhouette mask", () => {
     wrapper.unmount();
   });
 
-  it("keeps the grounded standing silhouette when no identity is carried", () => {
+  it("renders text only and no svg when no identity is carried", () => {
     const wrapper = mount(ReferenceArtwork, {
       props: {
         portrait: { url: null, status: "pending", placeholder: { kind: "missing", label: "肖像生成中" } },
         stage: true,
       },
     });
-    expect(wrapper.find("svg").exists()).toBe(true);
+    expect(wrapper.find("svg").exists()).toBe(false);
     expect(wrapper.find(MASK).exists()).toBe(false);
     expect(wrapper.get(".reference-artwork__placeholder-label").text()).toBe("肖像生成中");
     wrapper.unmount();

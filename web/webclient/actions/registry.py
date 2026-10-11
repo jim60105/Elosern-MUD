@@ -139,6 +139,7 @@ def build_production_action_registry() -> ActionRegistry:
         validate_creation_roll_name_payload,
     )
     from web.webclient.actions.exploration_actions import (
+        AFFECTED_ENGAGE,
         _dialogue_leave_adapter,
         _deliver_adapter,
         _engage_adapter,
@@ -476,7 +477,7 @@ def build_production_action_registry() -> ActionRegistry:
             action_id="explore.engage",
             validate_payload=validate_engage_payload,
             adapter=_engage_adapter,
-            affected_panels=("status", "context_actions", "dialogue"),
+            affected_panels=AFFECTED_ENGAGE,
         )
     )
     registry.register(
