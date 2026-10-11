@@ -28,6 +28,12 @@ from .scene_package import validate_scene_package
 class RetentionTransferError(RuntimeError):
     """A retained actor could not be transferred to its declared destination."""
 
+    def __init__(self, message: str, *, destinations: tuple[Any, ...] = ()) -> None:
+        super().__init__(message)
+        #: The destination rooms already written by this reclaim pass, so the
+        #: caller can reconcile their cached contents after a rollback.
+        self.destinations = destinations
+
 
 @dataclass(frozen=True)
 class RetainedRole:
@@ -100,7 +106,12 @@ def validate_retention_destination(retained: RetainedRole) -> Any:
 
 
 def transfer_retained_role(
-    entity: Any, retained: RetainedRole, *, room: Any = None, tick: int = 0
+    entity: Any,
+    retained: RetainedRole,
+    *,
+    room: Any = None,
+    source_room: Any = None,
+    tick: int = 0,
 ) -> bool:
     """Move one retained actor to its declared destination and drop ownership.
 
@@ -119,7 +130,7 @@ def transfer_retained_role(
     if getattr(entity, "location", None) is None:
         return False
     if entity.location.pk == destination.pk:
-        _drop_ownership(entity)
+        _drop_ownership(entity, source_room)
         return True
     moved = entity.move_to(destination, quiet=True)
     if moved is False:
@@ -127,7 +138,7 @@ def transfer_retained_role(
             f"retained actor {retained.npc_id} could not move to its retention "
             "destination"
         )
-    _drop_ownership(entity)
+    _drop_ownership(entity, source_room)
     log_info(
         "retained_role_transferred",
         context={
@@ -141,9 +152,15 @@ def transfer_retained_role(
     return True
 
 
-def _drop_ownership(entity: Any) -> None:
-    """Remove one entity from every room's ephemeral ownership registry."""
-    for room in _rooms_owning(entity):
+def _drop_ownership(entity: Any, source_room: Any = None) -> None:
+    """Remove one entity from the ephemeral ownership registry.
+
+    The reclaim pass knows the source room, so the common path touches exactly
+    that row; the full scan is only the fallback for a caller that does not.
+    """
+    for room in ([source_room] if source_room is not None else _rooms_owning(entity)):
+        if room is None:
+            continue
         owned = [entry for entry in (room.db.owned_entities or []) if entry and entry.pk]
         if any(entry.pk == entity.pk for entry in owned):
             remaining = [entry for entry in owned if entry.pk != entity.pk]

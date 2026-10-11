@@ -116,14 +116,12 @@ def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialo
     if not package_id or not role_id:
         return None
     from world.quests import scene_store
-    from world.quests.scene_package import validate_scene_package
 
     row = scene_store.read_package(package_id)
     if row is None:
         return None
-    try:
-        definition = validate_scene_package(row.payload)
-    except Exception:  # observability: ignore R2: a stored package that no longer validates yields no dialogue rather than breaking the read seam
+    definition = _validated_package(package_id, row.payload)
+    if definition is None:
         return None
     role_dialogue = definition.role_dialogue(role_id)
     if role_dialogue is None:
@@ -145,6 +143,31 @@ def _generated_dialogue_for_key(dialogue_key: str | None) -> GeneratedPhaseDialo
         topics=tuple((topic.keyword, topic.response) for topic in phase.topics),
         offline_response=phase.offline_response,
     )
+
+
+#: A published package's identity IS its content digest and its payload is
+#: immutable, so its validated definition may be cached by package id. The
+#: *selected phase* is runtime state and is never cached: it is read from the
+#: store on every call.
+_VALIDATED_PACKAGE_CACHE: dict[str, Any] = {}
+_VALIDATED_PACKAGE_CACHE_LIMIT = 64
+
+
+def _validated_package(package_id: str, payload: Any) -> Any | None:
+    """Return one published payload's validated definition, or ``None``."""
+    cached = _VALIDATED_PACKAGE_CACHE.get(package_id)
+    if cached is not None:
+        return cached
+    from world.quests.scene_package import validate_scene_package
+
+    try:
+        definition = validate_scene_package(payload)
+    except Exception:  # observability: ignore R2: a stored payload that no longer validates yields no dialogue rather than breaking the read seam
+        return None
+    if len(_VALIDATED_PACKAGE_CACHE) >= _VALIDATED_PACKAGE_CACHE_LIMIT:
+        _VALIDATED_PACKAGE_CACHE.pop(next(iter(_VALIDATED_PACKAGE_CACHE)))
+    _VALIDATED_PACKAGE_CACHE[package_id] = definition
+    return definition
 
 
 def generated_dialogue_for(npc: Any) -> GeneratedPhaseDialogue | None:
@@ -445,14 +468,14 @@ def run_scripted_talk(npc: Any, character: Any, keyword: str) -> ScriptedTalkRes
         declared = effect_for_keyword(npc, keyword)
         if declared is not None:
             verb, reference = declared
-            outcome = apply_story_effect(
+            apply_story_effect(
                 npc, character, keyword=keyword, verb=verb, reference=reference
             )
-            # An effect-bearing topic is the interaction: the authorized outcome
-            # replaces the fixed line and no talk affinity is granted.
-            return ScriptedTalkResult(
-                response=outcome.line or response, budget_capped=False
-            )
+            # An effect-bearing topic is the interaction: the fixed topic line is
+            # the answer and no talk affinity is granted. A refused effect still
+            # answers with that line (the deterministic APIs already rechecked
+            # everything, and the refusal is logged by the effect boundary).
+            return ScriptedTalkResult(response=response, budget_capped=False)
 
     relations_snapshot = attribute_snapshot(npc, "relations_data")
     try:

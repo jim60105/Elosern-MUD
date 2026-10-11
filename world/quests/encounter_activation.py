@@ -23,10 +23,12 @@ The boundary is deterministic and owns its transaction:
 5. schedule the portrait ensures only after the commit.
 
 A named unavailable outcome (wrong locator, unmet prerequisite, missing, dead or
-departed actor, cancelled encounter, issuer-key collision) performs no write and
-leaves the scene invocable under the same identity. A technical failure rolls the
-transaction back, evicts the Evennia caches of anything it created, and leaves
-the same identity invocable.
+departed actor, cancelled encounter, issuer-key collision) writes no activation,
+binding, commission or quest state and leaves the scene invocable under the same
+identity; it may record the actor's current availability on the role binding as a
+diagnostic (``lookup_story_role`` reports it) but never the activation itself. A
+technical failure rolls the transaction back, evicts the Evennia caches of
+anything it created, and leaves the same identity invocable.
 """
 
 from __future__ import annotations
@@ -451,7 +453,7 @@ def activate_scene_encounter(
             scene_store.mark_encounter_activated(
                 row, scene_id, int(player.pk), activation_tick=tick, tick=tick
             )
-    except EncounterUnavailable as error:
+    except EncounterUnavailable as error:  # observability: ignore R2: the named unavailability is emitted as scene_encounter_unavailable by _unavailable() and returned to the caller
         _evict_created(created_pks)
         return _unavailable(package_id, scene_id, player, error.reason, tick=tick)
     except Exception:

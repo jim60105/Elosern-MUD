@@ -27,11 +27,10 @@ STORY_EFFECT_VERBS: tuple[str, ...] = (OFFER_COMMISSION,)
 
 @dataclass(frozen=True)
 class StoryEffectOutcome:
-    """The result of one authorized story effect: applied, reason, and line."""
+    """The result of one authorized story effect: whether it applied and why."""
 
     applied: bool
     reason: str
-    line: str | None = None
 
 
 def _resolve_context(
@@ -138,7 +137,7 @@ def apply_story_effect(
             "tick": str(tick),
         },
     )
-    return StoryEffectOutcome(True, "accepted", line=None)
+    return StoryEffectOutcome(True, "accepted")
 
 
 def effect_for_keyword(npc: Any, keyword: str) -> tuple[str, str] | None:

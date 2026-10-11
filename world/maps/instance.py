@@ -10,6 +10,7 @@ from django.conf import settings
 from django.db import transaction
 from evennia.objects.models import ObjectDB
 from evennia.prototypes.spawner import spawn
+from evennia.utils.idmapper.models import flush_cache
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
@@ -189,6 +190,7 @@ def _clear_non_player_entities(room) -> None:
     raises ``RetentionTransferError`` and the caller rolls the reclaim back.
     """
     from world.quests.retention import (
+        RetentionTransferError,
         retained_role_for,
         transfer_retained_role,
         validate_retention_destination,
@@ -202,10 +204,25 @@ def _clear_non_player_entities(room) -> None:
         if record is not None:
             validate_retention_destination(record)
             retained[entity.pk] = record
+    destinations: list[Any] = []
     for entity in living:
         record = retained.get(entity.pk)
         if record is not None:
-            transfer_retained_role(entity, record)
+            destination = validate_retention_destination(record)
+            try:
+                transfer_retained_role(
+                    entity, record, room=destination, source_room=room
+                )
+            except RetentionTransferError as error:  # observability: ignore R2: the failure is re-raised (wrapped with the destinations already written) and reported by the caller's instance_reclaim_retention_failed event
+                # Attach the destinations already written, so the caller can
+                # reconcile their cached contents after the rollback.
+                raise RetentionTransferError(
+                    str(error), destinations=tuple(destinations)
+                ) from error
+            destinations.append(destination)
+            # The move updated this room's cached contents; re-reading from the
+            # database after a rollback then shows the true (unmoved) contents.
+            destination.contents_cache.clear()
             continue
         if entity in owned:
             entity.delete()
@@ -228,6 +245,8 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
     side-effect-free by construction, rather than requiring an unreliable
     database rollback (rubber-duck review, map-instance design.md).
     """
+    from world.quests.retention import RetentionTransferError
+
     events = []
     for room in InstanceRoom.objects.all():
         expire_tick = room.db.expire_tick
@@ -248,6 +267,15 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
             continue
         prune_deferred = False
         retained_deferred = False
+        # Compensation for a retention failure must run AFTER the atomic block:
+        # a rolled-back transaction refuses further queries, and re-reading the
+        # destination's cached contents both clears the phantom occupant and is
+        # a query.
+        retention_failure: RetentionTransferError | None = None
+        # ``_clear_non_player_entities`` mutates the room's owned-entity registry
+        # as it transfers; the snapshot lets a rolled-back pass reinstate the
+        # pre-clear value in memory (the database value is already reverted).
+        had_owned, owned_snapshot = _db_safe_attribute_snapshot(room, "owned_entities")
         with transaction.atomic():
             # Prune the reclaimed room's room:<dbref> from every affected
             # player BEFORE any entity or room mutation (map-knowledge-minimap
@@ -260,27 +288,21 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
                 KnowledgePruneError,
                 prune_reclaimed_room,
             )
-            from world.quests.retention import RetentionTransferError
-
             try:
                 prune_reclaimed_room(room.id)
-            except KnowledgePruneError:
+            except KnowledgePruneError:  # observability: ignore R2: the deferral is reported by the instance_reclaim_deferred event this branch appends after leaving the atomic block
                 transaction.set_rollback(True)
                 prune_deferred = True
             else:
                 try:
                     _clear_non_player_entities(room)
-                except RetentionTransferError as error:
+                except RetentionTransferError as error:  # observability: ignore R2: the failure is reported by the instance_reclaim_retention_failed warning and the instance_reclaim_deferred event, both emitted after the atomic block
                     # A retained named role could not reach its validated
                     # destination: the whole reclaim rolls back and the room
                     # survives with its actors, contents and ownership intact.
                     transaction.set_rollback(True)
                     retained_deferred = True
-                    log_warn(
-                        "instance_reclaim_retention_failed",
-                        context={"room": room.key},
-                        exc=error,
-                    )
+                    retention_failure = error
                 else:
                     if room.delete():
                         events.append(
@@ -299,6 +321,22 @@ def reclaim_due_instances(start_tick, end_tick) -> list[ScheduledEvent]:
                                 "instance_reclaim_deferred", end_tick, {"room": room.key}
                             )
                         )
+        if retention_failure is not None:
+            if had_owned:
+                room.db.owned_entities = owned_snapshot
+            # A disposable occupant earlier in the pass may already have been
+            # deleted; its row is restored by the rollback while the idmapper
+            # still holds the deleted instance, so the cache is flushed. Like
+            # the activation boundary's rollback, this runs only on the rare
+            # failure path.
+            flush_cache()
+            for destination in retention_failure.destinations:
+                destination.contents_cache.clear()
+            log_warn(
+                "instance_reclaim_retention_failed",
+                context={"room": room.key},
+                exc=retention_failure,
+            )
         if prune_deferred or retained_deferred:
             events.append(
                 ScheduledEvent("instance_reclaim_deferred", end_tick, {"room": room.key})

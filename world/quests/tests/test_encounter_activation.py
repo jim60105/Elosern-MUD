@@ -14,7 +14,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import QuestIssuer
-from typeclasses.rooms import AnchorRoom
+from typeclasses.rooms import AnchorRoom, InstanceRoom
 from world.quests import scene_store
 from world.quests.encounter_activation import (
     EncounterUnavailable,
@@ -161,6 +161,52 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertTrue(facts["separation"])
         self.assertTrue(facts["unresolved"])
         self.assertFalse(facts["closure"])
+
+    def test_an_instance_encounter_materializes_one_room_and_reuses_it(self):
+        from typeclasses.rooms import Room
+
+        payload = _package()
+        payload["source_id"] = "synthetic-instance-source"
+        payload["encounters"][0]["locator"] = {"layer": "instance"}
+        published = publish_scene_package(payload, owner="tester")
+        origin = create_object(Room, key="村口")
+        first = activate_scene_encounter(
+            self.player, published.package_id, "south_gate", room=origin, tick=5
+        )
+        self.assertTrue(first.activated)
+        self.assertIsNotNone(first.room_id)
+        self.assertEqual(InstanceRoom.objects.all().count(), 1)
+        second = activate_scene_encounter(
+            self.player, published.package_id, "south_gate", room=origin, tick=6
+        )
+        self.assertFalse(second.created)
+        self.assertEqual(second.room_id, first.room_id)
+        self.assertEqual(InstanceRoom.objects.all().count(), 1)
+        actor = ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first()
+        self.assertEqual(actor.location.pk, first.room_id)
+
+    def test_a_failed_instance_activation_leaves_no_room_behind(self):
+        from typeclasses.rooms import Room
+
+        payload = _package()
+        payload["source_id"] = "synthetic-instance-rollback-source"
+        payload["encounters"][0]["locator"] = {"layer": "instance"}
+        published = publish_scene_package(payload, owner="tester")
+        origin = create_object(Room, key="村口")
+        with patch(
+            "world.quests.scene_store.mark_encounter_activated",
+            side_effect=RuntimeError("injected post-creation failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                activate_scene_encounter(
+                    self.player, published.package_id, "south_gate", room=origin, tick=5
+                )
+        self.assertEqual(InstanceRoom.objects.all().count(), 0)
+        result = activate_scene_encounter(
+            self.player, published.package_id, "south_gate", room=origin, tick=6
+        )
+        self.assertTrue(result.activated)
+        self.assertEqual(InstanceRoom.objects.all().count(), 1)
 
     def test_a_failure_after_creation_rolls_back_and_reuses_the_identity(self):
         with patch(

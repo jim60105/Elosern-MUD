@@ -8,6 +8,7 @@ the actor intact and defers the reclaim.
 """
 
 from evennia.utils.create import create_object
+from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.npcs import NPC
@@ -84,3 +85,59 @@ class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertFalse(NPC.objects.filter(id=disposable_pk).exists())
         self.actor.refresh_from_db()
         self.assertEqual(self.actor.location.pk, destination.pk)
+
+    def test_a_mid_pass_transfer_failure_keeps_the_scene_and_reconciles_caches(self):
+        from unittest.mock import patch
+
+        from world.quests import retention
+
+        destination = create_object(AnchorRoom, key="南門")
+        destination.db.anchor_key = _anchor_key()
+        second = create_object(NPC, key="測試住民mother")
+        second.move_to(self.room, quiet=True)
+        register_owned_entity(self.room, second)
+        row = scene_store.read_package(self.published.package_id)
+        scene_store.bind_role(
+            row, "mother", int(second.pk), provenance={"kind": "test"}, tick=1
+        )
+
+        real_transfer = retention.transfer_retained_role
+        calls = {"count": 0}
+
+        def flaky(entity, record, **kwargs):
+            calls["count"] += 1
+            if calls["count"] == 2:
+                raise retention.RetentionTransferError("injected mid-pass failure")
+            return real_transfer(entity, record, **kwargs)
+
+        with patch(
+            "world.quests.retention.transfer_retained_role", side_effect=flaky
+        ):
+            events = reclaim_due_instances(0, 100)
+
+        self.assertTrue(InstanceRoom.objects.filter(id=self.room.id).exists())
+        self.assertIn(
+            ScheduledEvent("instance_reclaim_deferred", 100, {"room": self.room.key}),
+            events,
+        )
+        for entity in (self.actor, second):
+            # The raw column value is the rolled-back truth; the idmapper may
+            # still hold a cached instance for these rows.
+            self.assertEqual(
+                ObjectDB.objects.filter(pk=entity.pk)
+                .values_list("db_location_id", flat=True)
+                .first(),
+                self.room.pk,
+            )
+        owned_pks = {
+            obj.pk
+            for obj in (self.room.db.owned_entities or [])
+            if obj and obj.pk
+        }
+        self.assertEqual(owned_pks, {self.actor.pk, second.pk})
+        # The destination the first transfer already wrote is re-read from the
+        # rolled-back database, so it shows no phantom occupant.
+        self.assertNotIn(
+            self.actor.pk,
+            {obj.pk for obj in destination.contents_cache.get() if obj and obj.pk},
+        )
