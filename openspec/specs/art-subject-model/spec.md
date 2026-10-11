@@ -76,8 +76,9 @@ LLM wrote the NPC.
 `world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
 description per subject from allowed immutable or validated data. A character description SHALL
 be composed exclusively of the subject's visual truth; it SHALL NOT carry the character's
-`display_name` or any other identity string, because a proper noun is not a visual instruction
-and no checkpoint renders it.
+`display_name` or any other identity string. A monster description SHALL be composed exclusively
+of the selected visual-species row's public identity fields — its published physical appearance
+and its display label.
 
 #### Scenario: Character descriptions contain the appearance block and nothing else from the persona
 - **WHEN** a character description is generated for a character with a full persona and a disguise
@@ -101,7 +102,15 @@ and no checkpoint renders it.
 
 #### Scenario: Scene and monster descriptions are registry text
 - **WHEN** scene and monster descriptions are generated
-- **THEN** scenes retain their immutable scene sentence; a monster uses only its selected visual species public physical appearance or authored baseline physical category, with no tier description or multi-species examples
+- **THEN** scenes retain their immutable scene sentence; a monster uses only its selected visual species' published physical appearance and that species' own public display label, with no tier description or multi-species examples
+
+#### Scenario: The monster render always supplies both public identity values
+- **WHEN** a monster description is rendered from the prompt library
+- **THEN** the seam supplies both `description` (the row's published physical appearance) and `display_name` (the row's public display label) for every registered visual species, so a shipped template that declares `{display_name}` never hits a missing-value failure the degrade path cannot catch, and a template that ignores the value is unaffected
+
+#### Scenario: The degraded monster fallback is the published appearance alone
+- **WHEN** the prompt library cannot resolve `art.monster_description`
+- **THEN** the monster description is exactly the selected visual registry row's published physical appearance — no display label, no template framing, and nothing read from threat-tier data
 
 #### Scenario: The style fragment and templates are sourced from the prompt library
 - **WHEN** a character or monster description is generated, and the shipped prompt library is enumerated
@@ -182,7 +191,7 @@ and no checkpoint renders it.
 
 #### Scenario: Each subject kind draws from its allowed data source
 - **WHEN** descriptions are generated for scenes, monsters and characters
-- **THEN** scenes use scene_sentence, monsters use their declared visual species public physical appearance, and characters keep race/subrace, apparent age and authored physical appearance
+- **THEN** scenes use scene_sentence, monsters use only their declared visual species' public physical appearance with that species' public display label as the sole identity token the template may select, and characters keep race/subrace, apparent age and authored physical appearance
 
 ### Requirement: Subject producer validation rejects unrepresentable keys
 `_validate_subject_key` SHALL reject keys containing `|`, `/`, `:`, `{`, `}`, or control

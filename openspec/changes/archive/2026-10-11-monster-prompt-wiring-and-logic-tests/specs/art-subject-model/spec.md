@@ -6,12 +6,9 @@
 `world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
 description per subject from allowed immutable or validated data. A character description SHALL
 be composed exclusively of the subject's visual truth; it SHALL NOT carry the character's
-`display_name` or any other identity string, because a proper noun is not a visual instruction
-and no checkpoint renders it. A monster description SHALL be composed exclusively of the selected
-visual-species row's public identity fields — its published physical appearance and its display
-label — and the seam SHALL supply a value for every token the key's allowlist declares, so the
-template owns which tokens it actually uses; on `PromptUnavailableError` the monster fallback SHALL
-be the published physical appearance alone.
+`display_name` or any other identity string. A monster description SHALL be composed exclusively
+of the selected visual-species row's public identity fields — its published physical appearance
+and its display label.
 
 #### Scenario: Character descriptions contain the appearance block and nothing else from the persona
 - **WHEN** a character description is generated for a character with a full persona and a disguise

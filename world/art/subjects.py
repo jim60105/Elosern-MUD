@@ -354,7 +354,12 @@ def monster_description(subject: ArtSubject) -> str:
     try:
         return render_prompt(
             "art.monster_description",
+            # Both public identity fields are always supplied: the template
+            # owns which tokens it actually uses, so an unused value is inert
+            # while a missing one would raise a KeyError the degrade path
+            # cannot catch.
             description=visual.published_appearance_zh,
+            display_name=visual.display_label,
         )
     except PromptUnavailableError:
         return visual.published_appearance_zh

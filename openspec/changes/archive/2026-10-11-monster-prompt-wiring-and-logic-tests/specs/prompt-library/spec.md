@@ -52,9 +52,10 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
 
 #### Scenario: Determinism is two renders, not a wording pin
 - **WHEN** a prompt-library test renders a shipped key twice with identical values
-- **THEN** it asserts the two renders are byte-identical and that supplied values appear with no
-  unsubstituted `{token}` remaining, and it never compares the output to a literal shipped-template
-  sentence
+- **THEN** it asserts the two renders are byte-identical and that every token the template actually
+  selects is substituted exactly as many times as the template spells it, with no unsubstituted
+  `{token}` remaining — a declared token the template does not select is inert and is never
+  required to appear — and it never compares the output to a literal shipped-template sentence
 
 #### Scenario: Verbatim shipment pins retire for every prompt file
 - **WHEN** the prompt suite is inspected for byte-for-byte comparisons of rendered shipped-library
@@ -73,16 +74,21 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
 #### Scenario: Placeholder parity is guarded for both art description keys
 - **WHEN** the shipped `art.character_description` and `art.monster_description` templates are
   compared against their `PROMPT_SPECS` allowlists
-- **THEN** each template's `{token}` set equals its allowlist exactly, so a token added to one side
-  without the other fails the parity test rather than crashing at render time
+- **THEN** each declared allowlist carries exactly its contract's tokens — the character key's five
+  tokens, and the monster key's `description` plus `display_name`, never `examples` — and each
+  template's `{token}` set is a subset of its allowlist, so a token added to a template without the
+  allowlist fails as a load-time unknown-placeholder error, a token added to an allowlist without
+  the contract fails the parity test, and the one documented subset — the shipped monster
+  template's `{description}`-only text, whose unused `display_name` is inert — keeps loading
 
 #### Scenario: A wording-only shipped edit breaks no test
 - **WHEN** a deployment retunes a shipped template's framing wording inside its existing token
   skeleton — appending pose, lighting, or LoRA/quality tags as a prompt-authoring edit does — and
   the prompt suite plus the description-composition suites run against that wording
 - **THEN** every test stays green, because no test compares rendered shipped-library output to
-  literal framing text; only a change to a template's token set breaks a test, through the
-  token-parity or unknown-placeholder load-error check
+  literal framing text; only a token-set edit breaks a test — adding an undeclared `{token}`
+  through the unknown-placeholder load error, and adding or dropping a declared token on either
+  side of every key except the documented `art.monster_description` subset through the parity check
 
 #### Scenario: Brace pass-through is exercised on test-owned fixtures
 - **WHEN** the loader's brace pass-through contract (a `{{token}}` or a JSON example brace such as

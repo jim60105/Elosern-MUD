@@ -60,6 +60,19 @@ _SYNTH_TRINKET_B = "t_ember_spray"
 _APPEARANCE_TEXT = {"feature": "a silver ear piercing", "height": "tall"}
 
 
+# A test-owned art.yaml fixture. The composition claims below assert field
+# ordering, an append position, and selection-independent output, so they
+# author their own framing instead of inheriting the deployment-authored
+# shipped template, whose wording must never break them. The library seam
+# itself stays covered by the shipped-root logic tests in world/prompts/tests.
+_TEST_ART_YAML = (
+    "schema_version: 1\n"
+    "prompts:\n"
+    "  art.character_description: '{race}, {age} years old.{appearance}{equipment}{custom}'\n"
+    "  art.monster_description: '{description} ({display_name})'\n"
+)
+
+
 def _entity(persona=None, equipment=None):
     """A DB-free stand-in character with fixed identity and stored state."""
     entity = Mock()
@@ -288,6 +301,11 @@ class CompositionTests(PromptFixture):
 
     _BASE = f"{_SYNTH_RACE_LABEL}, {{age}} years old."
 
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_file("art.yaml", _TEST_ART_YAML)
+        self.load()
+
     @covers_requirement(
         "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"
     )
@@ -398,7 +416,7 @@ class CompositionTests(PromptFixture):
             "art.yaml",
             "schema_version: 1\nprompts:\n"
             "  art.character_description: '{race}, {age} years old.|{appearance}|{equipment}|{custom}'\n"
-            "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n",
+            "  art.monster_description: '{description} ({display_name})'\n",
         )
         self.load()
         entity = _entity(
@@ -417,8 +435,8 @@ class CompositionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.character_description: {race}, {age} years old. {oops}\n"
-            "  art.monster_description: \"{description} ({display_name}；例如：{examples})\"\n",
+            "  art.character_description: '{race}, {age} years old. {oops}'\n"
+            "  art.monster_description: '{description} ({display_name})'\n",
         )
         self.load()
 
@@ -523,6 +541,11 @@ class CompositionTests(PromptFixture):
 @synthetic_registries("archetypes", "monster_species", "subraces")
 class DescriptionDispatcherTests(PromptFixture):
     """The description_for boundary: explicit selection only for characters."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_file("art.yaml", _TEST_ART_YAML)
+        self.load()
 
     @covers_requirement(
         "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth"

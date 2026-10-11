@@ -40,7 +40,7 @@ class ValidLoadTests(unittest.TestCase):
         first = render_prompt("narrator.system")
         second = render_prompt("narrator.system")
         self.assertEqual(first, second)
-        self.assertIn("伊洛瑟恩大陸", first)
+        self.assertTrue(first)
 
     @covers_requirement("prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt")
     def test_every_generative_layer_has_a_registered_prompt_file(self):
@@ -234,6 +234,7 @@ class ValidLoadTests(unittest.TestCase):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_empty_persona_value_substitutes_without_error_or_literal_token(self):
         load_prompt_library(str(REPO_PROMPTS))
+        block = "性格：沉穩\n人生經歷：曾在邊境服役"
         text = render_prompt(
             "npc_dialogue.system",
             name="艾洛西亞",
@@ -241,32 +242,22 @@ class ValidLoadTests(unittest.TestCase):
             location="王都",
             persona="",
         )
+        self.assertIn("艾洛西亞", text)
+        self.assertNotIn("{name}", text)
         self.assertNotIn("{persona}", text)
-        self.assertNotIn("性格：", text)
-        self.assertIn("### 人物定錨\n你是《伊洛瑟恩大陸》中的 艾洛西亞。", text)
-
-    @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
-    def test_double_braced_tokens_and_json_braces_pass_through(self):
-        load_prompt_library(str(REPO_PROMPTS))
-        scenario = render_prompt(
-            "scenario_director.system", name_inspiration="加斯帕‧斯諾"
-        )
-        self.assertIn('{"name": "…"', scenario)
-        self.assertIn('"item_key": "healing_potion"', scenario)
-        dialogue = render_prompt(
-            "npc_dialogue.system", name="甲", desc="乙", location="丙", persona=""
-        )
-        self.assertIn('{"speech": "你要說的話", "intent": {"kind": "..."}}', dialogue)
-        thinking = render_prompt("npc.thinking", name="甲")
-        self.assertEqual(thinking, "（甲 沉思片刻……）")
+        # The test-owned block is what an empty persona value must not leak.
+        self.assertNotIn(block, text)
 
     @covers_requirement("prompt-library::the-npc-persona-frame-key-is-registered-with-exactly-the-block-placeholder")
     def test_npc_dialogue_persona_frame_key_loads_and_renders(self):
         load_prompt_library(str(REPO_PROMPTS))
         rendered = render_prompt("npc_dialogue.persona_frame", block="性格：忠誠")
-        self.assertIn("以下是你目前的人物設定", rendered)
+        # Only the vocabulary the owning scenario spells out: the frame
+        # presents the block as the speaking NPC's CURRENT character setting
+        # while earlier conversation stays history the setting does not rewrite.
+        self.assertIn("目前的人物設定", rendered)
+        self.assertIn("歷史", rendered)
         self.assertIn("性格：忠誠", rendered)
-        self.assertTrue(rendered.endswith("\n"))
         self.assertNotIn("{block}", rendered)
 
 
@@ -370,6 +361,22 @@ class ValidationFailureTests(PromptFixture):
         self.assertIn("unknown placeholder", error.problem)
         self.assertIn("nmme", error.problem)
         self.assertNotIn("scene_builder.system", library.texts)
+
+    @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
+    def test_examples_in_the_monster_template_is_an_unknown_placeholder(self):
+        # `examples` was retired from the monster allowlist, so a shipped-style
+        # template carrying it fails as an unknown placeholder for that key
+        # rather than silently dropping the token.
+        self.write_file(
+            "art.yaml",
+            "schema_version: 1\nprompts:\n"
+            "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n",
+        )
+        library = self.load()
+        error = library.errors["art.monster_description"]
+        self.assertIn("unknown placeholder", error.problem)
+        self.assertIn("examples", error.problem)
+        self.assertNotIn("art.monster_description", library.texts)
 
     @covers_requirement("ai-action-options-prompts::the-registry-declares-the-action-options-entries-with-an-exact-placeholder-allowlist")
     def test_action_options_hostile_fixture_records_unknown_placeholder_errors(self):
@@ -498,24 +505,40 @@ class RenderContractTests(PromptFixture):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_render_is_byte_identical_for_identical_input(self):
         self.load()
-        first = render_prompt(
-            "art.character_description",
-            race="t_ashfolk",
-            age="24",
-            appearance="",
-            equipment="",
-            custom="",
-        )
-        second = render_prompt(
-            "art.character_description",
-            race="t_ashfolk",
-            age="24",
-            appearance="",
-            equipment="",
-            custom="",
-        )
+        values = {
+            "race": "t_ashfolk",
+            "age": "24",
+            "appearance": "",
+            "equipment": "",
+            "custom": "",
+        }
+        first = render_prompt("art.character_description", **values)
+        second = render_prompt("art.character_description", **values)
         self.assertEqual(first, second)
-        self.assertEqual(first, "t_ashfolk, 24 years old.")
+        # Substitution logic, not shipped wording: the supplied values land and
+        # no declared token survives; the framing around them belongs to the
+        # deployment.
+        self.assertIn("t_ashfolk", first)
+        self.assertIn("24", first)
+        for token in values:
+            self.assertNotIn(f"{{{token}}}", first)
+
+    @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
+    def test_double_braced_tokens_and_json_braces_pass_through(self):
+        # The brace pass-through contract runs on a test-owned fixture template:
+        # a shipped file's JSON example fragments and framing wording are the
+        # deployment's to retune, so no test may pin them.
+        self.write_file(
+            "npc.yaml",
+            """schema_version: 1
+prompts:
+  npc.thinking: 'A{{name}}B {"kind": "…"} C{name}D'
+""",
+        )
+        self.load()
+        rendered = render_prompt("npc.thinking", name="甲")
+        self.assertEqual(rendered, 'A{{name}}B {"kind": "…"} C甲D')
+        self.assertEqual(render_prompt("npc.thinking", name="甲"), rendered)
 
 
 class ArtGenerationPromptTests(PromptFixture):
@@ -533,7 +556,10 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertIn("desc", portrait)
         self.assertNotIn("{description}", scene)
         self.assertNotIn("{description}", portrait)
-        self.assertNotIn("{", negative)
+        # The negative key declares no token, so rendering returns its text
+        # unchanged; a brace in that text is legal deployment wording (an SD
+        # emphasis group), not a placeholder.
+        self.assertEqual(negative, library.text("art.negative_prompt"))
         self.assertEqual(scene, render_prompt("art.scene_prompt", description="desc"))
         self.assertEqual(portrait, render_prompt("art.portrait_prompt", description="desc"))
 
@@ -553,24 +579,33 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertNotIn("art.scene_prompt", library.texts)
 
     def test_editing_an_art_template_changes_the_rendered_prompt_text(self):
-        library = self.load()
-        before = render_prompt("art.scene_prompt", description="desc")
-        self.write_file(
-            "art.yaml",
+        # Two test-owned revisions of the whole art file: the rendered text
+        # follows the loaded library (an admin edit of the mounted file is the
+        # same mechanism), and neither revision pins shipped wording.
+        first_revision = (
             "schema_version: 1\n"
             "prompts:\n"
             "  art.character_description: |-\n"
             "    {race}, {age} years old.{appearance}{equipment}{custom}\n"
-            "  art.monster_description: '{description} ({display_name}；例如：{examples})'\n"
+            "  art.monster_description: '{description} ({display_name})'\n"
             "  art.negative_prompt: lowres, text\n"
             "  art.portrait_prompt: |-\n"
             "    A portrait — {description} — painted.\n"
             "  art.scene_prompt: |-\n"
-            "    A wide scene — {description} — painted.\n",
+            "    A wide scene — {description} — painted.\n"
         )
+        second_revision = first_revision.replace(
+            "A wide scene — {description} — painted.",
+            "A tight scene — {description} — repainted.",
+        )
+        self.write_file("art.yaml", first_revision)
         self.load()
+        before = render_prompt("art.scene_prompt", description="desc")
+        self.write_file("art.yaml", second_revision)
+        library = self.load()
         after = render_prompt("art.scene_prompt", description="desc")
         self.assertNotEqual(before, after)
+        self.assertIn("desc", after)
         self.assertEqual(library.unavailable, frozenset())
 
     @covers_requirement(
@@ -591,6 +626,62 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertEqual(allowed, expected)
         self.assertNotIn("name", tokens)
         self.assertNotIn("style", tokens)
+
+    @covers_requirement(
+        "prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt",
+        "prompt-library::prompt-library-tests-verify-program-logic-not-shipped-wording",
+    )
+    def test_monster_description_allowlist_is_the_two_public_identity_tokens(self):
+        """The monster key declares exactly description and display_name, never
+        examples, and the shipped template selects only allowlisted tokens.
+
+        A key renders with the tokens it declares (design D1), so the shipped
+        `{description}`-only text stays legal while an allowlisted token the
+        template does not select is simply inert."""
+        import yaml
+
+        declared = yaml.safe_load((REPO_PROMPTS / "art.yaml").read_text("utf-8"))
+        text = declared["prompts"]["art.monster_description"]
+        tokens = set(_PLACEHOLDER_RE.findall(text))
+        allowed = set(PROMPT_SPECS["art.monster_description"].allowed_placeholders)
+        self.assertEqual(allowed, {"description", "display_name"})
+        self.assertLessEqual(tokens, allowed)
+        self.assertNotIn("examples", allowed)
+        self.assertNotIn("examples", tokens)
+
+    @covers_requirement(
+        "prompt-library::prompt-library-tests-verify-program-logic-not-shipped-wording",
+        "prompt-library::the-prompt-library-is-the-single-source-of-truth-for-every-llm-prompt",
+    )
+    def test_monster_contract_is_asserted_on_logic_not_tokens_in_text(self):
+        """A template that selects one token of two renders with the surplus
+        supplied value inert; a value outside the allowlist fails loudly."""
+        for template, expected in (
+            ("{description} only", "甲外觀 only"),
+            ("[{display_name}] only", "[哥布林] only"),
+        ):
+            with self.subTest(template=template):
+                self.write_file(
+                    "art.yaml",
+                    "schema_version: 1\nprompts:\n"
+                    f"  art.monster_description: '{template}'\n",
+                )
+                self.load()
+                self.assertEqual(
+                    render_prompt(
+                        "art.monster_description",
+                        description="甲外觀",
+                        display_name="哥布林",
+                    ),
+                    expected,
+                )
+                with self.assertRaises(UnexpectedPromptValueError):
+                    render_prompt(
+                        "art.monster_description",
+                        description="甲外觀",
+                        display_name="哥布林",
+                        examples="史萊姆",
+                    )
 
 
 class LoadLifecycleTests(unittest.TestCase):
@@ -620,14 +711,17 @@ class LoadLifecycleTests(unittest.TestCase):
         for thread in threads:
             thread.join(timeout=30)
         self.assertEqual(len(results), 2)
-        for text in results:
-            self.assertIn("伊洛瑟恩大陸", text)
+        self.assertTrue(all(results))
+        self.assertEqual(len(set(results)), 1)
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_first_use_auto_loads_from_the_default_root(self):
         reset_prompt_library()
         text = render_prompt("narrator.system")
-        self.assertIn("伊洛瑟恩大陸", text)
+        self.assertTrue(text)
+        self.assertEqual(
+            text, load_prompt_library(str(REPO_PROMPTS)).text("narrator.system")
+        )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
     def test_reset_then_explicit_root_reload_without_state_leak(self):
@@ -645,7 +739,12 @@ class LoadLifecycleTests(unittest.TestCase):
             load_prompt_library(str(root))
             self.assertEqual(render_prompt("narrator.system"), "測試旁白。")
             reset_prompt_library()
-            self.assertIn("伊洛瑟恩大陸", render_prompt("narrator.system"))
+            reloaded = render_prompt("narrator.system")
+            self.assertNotEqual(reloaded, "測試旁白。")
+            self.assertEqual(
+                reloaded,
+                load_prompt_library(str(REPO_PROMPTS)).text("narrator.system"),
+            )
 
 
 class ScenarioDirectorNameInspirationTests(PromptFixture):
