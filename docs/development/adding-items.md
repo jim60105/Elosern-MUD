@@ -1,6 +1,6 @@
 # 新增物品指南
 
-本指南說明如何為 Elosern 加入一個新的物品。以目前三筆（`meal`、`healing_potion`、`plain_sword`）的 registry 為基準，走一遍新增物品的完整流程：決定物品形狀、寫入 `ITEM_REGISTRY`、接上效果與價格的 rulebook、補測試，以及哪些消費端會自動跟著動。
+本指南說明如何為 Elosern 加入一個新的物品。以目前的 `ITEM_REGISTRY` 為基準（筆數本身不是契約），走一遍新增物品的完整流程：決定物品形狀、寫入 `ITEM_REGISTRY`、接上效果與價格的 rulebook、補測試，以及哪些消費端會自動跟著動。
 
 本文假設你已讀過：
 
@@ -16,9 +16,10 @@
 
 | 資料域 | 位置 | 內容 |
 |---|---|---|
-| 身份＋外觀＋機制宣告 | `world/lore/items/`（`ITEM_REGISTRY`） | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制 |
+| 身份＋外觀＋機制宣告 | `world/lore/items/`（`ITEM_REGISTRY`） | key、正體中文名稱、`price_table_key`、`sellable`、presentation、三選一的機制，以及可選的 `guild_property` 與 `liturgical_role` |
 | 價格帶 | `world/lore/economy.py::PRICE_TABLE` | 每個 `price_table_key` 的 `min_copper`／`max_copper` 上下界 |
 | 商店成交值 | `world/rules/rulebook/commerce/`（每個定居點一個分檔，另有 `scales.yaml`） | 各分類 offer 的 `buy_copper`／`sell_copper`（整數銅板）、庫存、補貨；商店時段也在同一分檔 |
+| 貨架用途 | `world/lore/settlements/assortments.py`（`ASSORTMENT_REGISTRY`） | 每個分類的 `item_keys` 身分，以及它的貨架政策 `allowed_item_kinds`／`allowed_equipment_slots` |
 | 使用效果條目 | `world/rules/rulebook/item_effects.yaml` | 每件可使用物品（以物品 `key` 為鍵）的有序型別化效果列表：`stat`＋`amount`（帶號非零整數，絕對值上限 9999）／`apply_status`／`remove_status`，可選 `scope`（`self` 預設／`single`／`all-allies`／`all-enemies`／`all` 五檔全開放），以及非戰鬥使用耗時 `item_use_seconds`（目前 6 秒） |
 | 裝備效果數值 | `world/rules/rulebook/equipment_effects.yaml` | 每個 `EquipmentModifierKey` 的調整值、護盾上限、免疫、掛載 buff、暴露偏向，受稀有度預算表約束 |
 
@@ -86,6 +87,7 @@ ItemDefinition(
 | `modifier_key` 必須是 `EquipmentModifierKey` 成員 | `modifier_key` |
 | `equipment_slot` 與 `modifier_key` 必須成對出現（有槽沒鍵、有鍵沒槽都拋錯） | `ItemDefinition` |
 | use 與 slot 互斥 | `ItemDefinition` |
+| `liturgical_role` 必須是 `LiturgicalRole` 成員，且只有裝備物品可以宣告（非裝備物品沒有可配戴的身分） | `ItemDefinition` |
 
 icon 只存 key，SVG 由 Vue 端自行映射，registry 不接受任何圖片位址或 CSS。
 
@@ -136,6 +138,15 @@ effects:
 
 數值來自設計文件（`docs/superpowers/specs/2026-08-29-equipment-combat-effects-design.md` 的平衡表），不得自行發明。**注意**：本 rulebook 在 P1 階段僅由啟動驗證載入，目前尚無遊戲消費端，要由後續 change 接管。
 
+### Step 2c — 光明教會裝備：`liturgical_role`
+
+教會裝備的教義歸屬是**物品自身的不可變資料**，不是效果表的一欄，也是一份具名清單：在 `ItemDefinition` 上宣告 `liturgical_role`（`LiturgicalRole.VESTMENT_OR_EMBLEM` 或 `LiturgicalRole.SANCTUARY_DEVICE`，不宣告就是不屬於教會教義範圍）。載入器 `world/rules/equipment_effects.py::validate_church_doctrine` 會在每次載入時，依物品自己的角色檢查對應條目：
+
+- 聖袍／聖徽：`exposure_bias` 非負、**必須有**非負的 `pleasure_gain`、宣告的 `heal_gain` 非負，且具備正向 `heal_gain` 或一道免疫。
+- 聖所器具：`exposure_bias` 非負且 `pleasure_gain` 必須為正；不要求治療或免疫。
+
+兩者都只是裝備分類；一般戰鬥取捨（負 `defense`、`atk_phys`、敏捷等）仍允許。效果條目的欄位是封閉的，所以**效果表無法宣告或改寫角色**——在條目裡寫 `liturgical_role` 只會被當成未知欄位拒絕，換句話說效果表改不動一件裝備的教義義務。新增一件教會裝備時，只要在物品上宣告角色並補上符合該角色的條目即可，不必改任何清單或規格。
+
 ### Step 4 — 可交易物品：價格帶與商店 offer
 
 先在 `world/lore/economy.py::PRICE_TABLE` 註冊價格帶（若 `price_table_key` 已存在可沿用，例如魔法藥劑共用 `potion`）：
@@ -150,9 +161,17 @@ effects:
 AssortmentDefinition(
     key="common_arms",
     display_name_zh="王都兵器",
+    # 貨架政策：這個分類「賣什麼」由這兩組封閉詞彙宣告，而不是由當前的
+    # item_keys 凍結。空集合代表該軸不設限；非裝備物品沒有槽可檢查。
+    allowed_item_kinds=frozenset({ItemKind.WEAPON, ItemKind.TOOL}),
+    allowed_equipment_slots=frozenset(
+        {EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF}
+    ),
     item_keys=("plain_sword", "iron_dagger", "lucky_charm"),
 ),
 ```
+
+`item_keys` 是身分，貨架政策是用途：兩者都由載入器逐項比對，所以一把進錯貨架的劍（例如把藥水塞進兵器架）會在載入時指名分類與物品直接拒絕，而**合法的新商品只要 kind 與槽符合該貨架就自動可上架**——不必替商店維護任何具名清單或核准表。跨店共用同一件商品是允許的（一物兩價），只有同一間店引用兩個重疊分類才會被拒絕。
 
 再把物品加進商店引用的分類，並在該定居點的 commerce 分檔（`world/rules/rulebook/commerce/<settlement>.yaml`）中該分類的 `offers` 加入成交值（商店本身只寫營業時段，不寫商品；同一個 key 宣告在兩個分檔會直接失敗載入並指名兩檔）。載入器的驗證不對稱，別誤會價格帶的保護範圍：`buy_copper` 必須非負且落在價格帶 `min_copper`～`max_copper` 內；`sell_copper` 只要求非負且不超過 `buy_copper`，**不受價格帶下限約束**：
 
@@ -173,7 +192,18 @@ shops:
     restock_hour: 6
 ```
 
-同一間店引用的兩個分類若出現同一個 `item_key`，載入器會指名商店、物品與兩個分類直接拒絕，解析器不會替你挑價格。`relic`（信物）帶的物品永遠不能進分類，載入時指名分類與物品直接拒絕。
+同一間店引用的兩個分類若出現同一個 `item_key`，載入器會指名商店、物品與兩個分類直接拒絕，解析器不會替你挑價格。
+
+**不可販售與信物的優先序**：`sellable=False` 的物品在任何路徑上都不會被買賣——拒絕發生在錢包、背包、庫存、取得進度與好感度寫入之前，於 `buy`／`sell` 一開始就依物品自身的可販售性擋下。`relic`（信物）帶的物品則是在**載入時**就從每一條上架路徑全部擋掉：分類成員、場所加成（`extra_item_keys`）與覆寫（`overrides`）都一樣，指名商店與物品直接拒絕，價格帶無法替它背書。信物本身仍是可持有、可檢視的內容，只是永遠接不上商人交易。
+
+### Step 4b — 開局套裝：`SUBRACE_STARTING_KIT_REGISTRY`
+
+自訂建立時每個亞種醒來帶著的裝備住在 `world/lore/starting_kits.py`，一筆 `SubraceStartingKit(subrace_key, items, max_rarity)`：`items` 是 `(物品鍵, 數量)` 的有序 tuple，`max_rarity` 是該血脈的品質上限（可省略＝不設限）。人類血脈用它表達身分而非財富階梯：
+
+- 三個平民血脈（`human_coastal`／`human_plains`／`human_highland`）宣告 `max_rarity=ItemRarity.COMMON`，所以誰都不會比誰富有。
+- 王族與貴族宣告 `max_rarity=ItemRarity.UNCOMMON`，保留傳家的 UNCOMMON 兵器。
+
+驗證在載入時進行：每個選項必須是已註冊的裝備、槽位可配戴（共用 `validate_wearable_loadout` 的單例槽／飾品上限／重複鍵規則）、且不得超過該套裝自己宣告的品質上限——所以「這件不能進這套」是由套裝的宣告決定，而不是一份歷史上的禁用物品黑名單。換一句話說：合法的選項更動是資料更動，違規的組合會在載入時指名套裝與物品拒絕。
 
 ### Step 5 — 檢查受影響的消費端（既有數值通常零程式碼）
 
@@ -257,6 +287,10 @@ policy. A/S have no reducing ceilings and retain their domain effects.
 | 分類 `buy_copper` 超出價格帶 | `guild_config` 載入失敗，啟動即爆；注意 `sell_copper` 不受價格帶約束 |
 | 只改 commerce 分檔沒把物品加進分類的 `item_keys`（或反之） | 兩邊不一致，載入時 `GuildConfigError`，指名分類與物品 |
 | 把信物（`relic` 帶）物品放進分類 | 載入時直接拒絕，信物永不交易，指名分類與物品 |
+| 用場所加成（`extra_item_keys`）或覆寫（`overrides`）夾帶信物上架 | 解析時同樣直接拒絕，指名商店與物品；上架路徑不只分類一條 |
+| 把物品放進 kind／slot 不符其貨架政策的分類 | 載入時指名分類與物品拒絕；貨架政策是用途宣告，不是具名商品清單 |
+| 想用效果條目改寫教會裝備的教義角色 | 效果條目欄位封閉，`liturgical_role` 只會被當成未知欄位拒絕；角色住在物品自身 |
+| 替聖袍省掉 `pleasure_gain` 以為可以避開教義 | 條目缺少該欄位本身就是違規；角色義務不能靠省略欄位規避 |
 | 商店行誤留舊的 `offers` 欄位 | `shops` 區段只接受 `shop_key` 與三個時段欄位，多餘欄位直接拒絕 |
 | 摘要塞了連結、emoji 或換行 | 構造時被 `summary_zh` 驗證拒絕 |
 | 為新物品發明新的 kind／icon／rarity 值卻只改 registry | 構造被封閉列舉拒絕；擴充視覺詞彙見 §5 |

@@ -7,6 +7,7 @@ from dataclasses import replace
 from unittest import mock
 from world.lore.economy import PRICE_TABLE
 from world.lore.items import ITEM_REGISTRY
+from world.lore.items import EquipmentModifierKey
 from world.lore.items import ItemDefinition
 from world.lore.items import ItemIconKey
 from world.lore.items import ItemKind
@@ -22,6 +23,7 @@ from world.rules.guild_config import ItemOfferRule
 from world.rules.guild_config import ShopConfig
 from world.rules.guild_config import validate_assortment_configs
 from world.rules.guild_config import validate_shop_configs
+from world.skills.equipment import EquipmentSlot
 from ._support import (
     _assortment_row,
     _shipped_scales,
@@ -416,6 +418,242 @@ class ShopRuleTests(unittest.TestCase):
                 {offer.item_key for offer in configs["altoria_general_store"].offers},
                 set(first.offered_item_keys),
             )
+
+
+def _synthetic_price_item(
+    key: str,
+    *,
+    kind: ItemKind = ItemKind.POTION,
+    slot: EquipmentSlot | None = None,
+    band: str = "potion",
+    sellable: bool = True,
+) -> ItemDefinition:
+    """One file-local synthetic item; never a shipped key."""
+    return ItemDefinition(
+        key=key,
+        display_name_zh="合成測試物品",
+        price_table_key=band,
+        sellable=sellable,
+        presentation=ItemPresentation(
+            kind=kind,
+            icon_key=ItemIconKey.MISC,
+            rarity=ItemRarity.COMMON,
+            summary_zh="供商店分類與貨架測試使用的合成物品。",
+        ),
+        equipment_slot=slot,
+        modifier_key=(
+            EquipmentModifierKey.PLAIN_SWORD if slot is not None else None
+        ),
+    )
+
+
+def _complete_override(item_key: str, buy_copper: int) -> dict:
+    return {
+        "item_key": item_key,
+        "buy_copper": buy_copper,
+        "sell_copper": buy_copper // 2,
+        "max_stock": 2,
+        "initial_stock": 1,
+        "restock_quantity": 1,
+    }
+
+
+def _place_by_shop() -> dict:
+    return {
+        dict(place.authored_kwargs)["shop_key"]: place
+        for place in PLACE_REGISTRY.values()
+        if dict(place.authored_kwargs).get("shop_key")
+    }
+
+
+class ShopMembershipRouteTests(unittest.TestCase):
+    """Offers derive from authored membership; nothing smuggles a good in."""
+
+    @staticmethod
+    def _shipped_offers() -> dict:
+        return validate_assortment_configs(raw_commerce()["assortments"])
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_every_shop_resolves_its_authored_union_minus_removals_plus_additions(self):
+        # Set equality against live data, not a snapshot: the union of the
+        # referenced assortments, minus the place's removals, plus its
+        # additions -- no historical roster defines what a counter carries.
+        configs = validate_shop_configs(
+            raw_commerce()["shops"], self._shipped_offers(), _shipped_scales()
+        )
+        places = _place_by_shop()
+        self.assertEqual(set(configs), set(SHOP_REGISTRY))
+        for shop_key, shop in SHOP_REGISTRY.items():
+            place = places[shop_key]
+            expected = (
+                set(shop.offered_item_keys) - set(place.excluded_item_keys)
+            ) | set(place.extra_item_keys)
+            with self.subTest(shop=shop_key):
+                self.assertEqual(
+                    {offer.item_key for offer in configs[shop_key].offers},
+                    expected,
+                )
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_a_shelf_rejects_an_item_outside_its_declared_eligibility(self):
+        # A shelf that declares itself an accessory counter cannot hold a
+        # potion: the mismatch is a load error naming the shelf and the item.
+        potion = _synthetic_price_item("t_shelf_potion")
+        shelf = AssortmentDefinition(
+            "t_shelf_rack",
+            "合成貨架",
+            ("t_shelf_potion",),
+            allowed_item_kinds=frozenset({ItemKind.ACCESSORY}),
+            allowed_equipment_slots=frozenset({EquipmentSlot.ACCESSORY}),
+        )
+        row = {
+            "key": "t_shelf_rack",
+            "offers": [_complete_override("t_shelf_potion", 100)],
+        }
+        with mock.patch.dict(
+            ITEM_REGISTRY, {"t_shelf_potion": potion}, clear=False
+        ), mock.patch.dict(
+            ASSORTMENT_REGISTRY, {"t_shelf_rack": shelf}, clear=False
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_assortment_configs([row])
+            message = str(caught.exception)
+            self.assertIn("t_shelf_rack", message)
+            self.assertIn("t_shelf_potion", message)
+            self.assertIn("does not stock", message)
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-may-not-contain-a-keepsake-band-item"
+    )
+    def test_a_place_addition_cannot_smuggle_a_keepsake_onto_a_counter(self):
+        keepsake = _synthetic_price_item(
+            "t_addition_keepsake", band="relic", sellable=False
+        )
+        place = replace(
+            PLACE_REGISTRY["altoria_general_store"],
+            extra_item_keys=("t_addition_keepsake",),
+        )
+        row = {
+            **raw_commerce()["shops"][0],
+            "overrides": [_complete_override("t_addition_keepsake", 999_999)],
+        }
+        with mock.patch.dict(
+            ITEM_REGISTRY, {"t_addition_keepsake": keepsake}, clear=False
+        ), mock.patch.dict(
+            PLACE_REGISTRY,
+            {"altoria_general_store": place},
+            clear=False,
+        ):
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], self._shipped_offers(), _shipped_scales())
+            message = str(caught.exception)
+            self.assertIn("altoria_general_store", message)
+            self.assertIn("t_addition_keepsake", message)
+            self.assertIn("keepsake", message)
+
+    @covers_requirement(
+        "commerce-assortments::an-assortment-may-not-contain-a-keepsake-band-item"
+    )
+    def test_a_hand_listed_offer_route_cannot_carry_a_keepsake_either(self):
+        # ``validate_shop_configs`` accepts a caller-supplied offer mapping,
+        # so the resolution itself -- not only the assortment validator -- is
+        # the gate: a keepsake reaching ``offered`` is refused here.
+        keepsake = _synthetic_price_item(
+            "t_keepsake_probe", band="relic", sellable=False
+        )
+        offers = {
+            "common_arms": {
+                **self._shipped_offers()["common_arms"],
+                "t_keepsake_probe": ItemOfferRule(
+                    item_key="t_keepsake_probe",
+                    buy_copper=999_999,
+                    sell_copper=0,
+                    max_stock=1,
+                    initial_stock=1,
+                    restock_quantity=1,
+                ),
+            }
+        }
+        shop = replace(
+            SHOP_REGISTRY["altoria_general_store"],
+            assortment_keys=("common_arms",),
+        )
+        with mock.patch.dict(
+            ITEM_REGISTRY, {"t_keepsake_probe": keepsake}, clear=False
+        ), mock.patch.dict(
+            ASSORTMENT_REGISTRY,
+            {
+                "common_arms": replace(
+                    ASSORTMENT_REGISTRY["common_arms"],
+                    item_keys=(
+                        *ASSORTMENT_REGISTRY["common_arms"].item_keys,
+                        "t_keepsake_probe",
+                    ),
+                )
+            },
+            clear=False,
+        ), mock.patch.dict(
+            SHOP_REGISTRY,
+            {"altoria_general_store": shop},
+            clear=True,
+        ):
+            row = {**raw_commerce()["shops"][0]}
+            with self.assertRaises(GuildConfigError) as caught:
+                validate_shop_configs([row], offers, _shipped_scales())
+            message = str(caught.exception)
+            self.assertIn("altoria_general_store", message)
+            self.assertIn("t_keepsake_probe", message)
+            self.assertIn("keepsake", message)
+
+    @covers_requirement(
+        "commerce-assortments::a-shop-s-offered-goods-are-derived-from-the-assortments-it-references"
+    )
+    def test_a_valid_new_equipment_item_can_be_stocked(self):
+        # Registration plus a shelf membership plus a numeric offer is all a
+        # new good needs: no shop-specific approval table is edited.
+        blade = _synthetic_price_item(
+            "t_stocked_blade",
+            kind=ItemKind.WEAPON,
+            slot=EquipmentSlot.WEAPON_MAIN,
+            band="mundane_weapon",
+        )
+        arms = replace(
+            ASSORTMENT_REGISTRY["common_arms"],
+            item_keys=(
+                *ASSORTMENT_REGISTRY["common_arms"].item_keys,
+                "t_stocked_blade",
+            ),
+        )
+        rows = _assortment_row(
+            "common_arms",
+            lambda offers: [
+                *offers,
+                _complete_override("t_stocked_blade", 200),
+            ],
+        )
+        with mock.patch.dict(
+            ITEM_REGISTRY, {"t_stocked_blade": blade}, clear=False
+        ), mock.patch.dict(
+            ASSORTMENT_REGISTRY, {"common_arms": arms}, clear=False
+        ):
+            configs = validate_shop_configs(
+                raw_commerce()["shops"],
+                validate_assortment_configs(rows),
+                _shipped_scales(),
+            )
+        stocked = {
+            shop_key
+            for shop_key, config in configs.items()
+            if any(offer.item_key == "t_stocked_blade" for offer in config.offers)
+        }
+        self.assertTrue(stocked, "the new good reached no counter")
+        for shop_key, shop in SHOP_REGISTRY.items():
+            if "common_arms" in shop.assortment_keys:
+                self.assertIn(shop_key, stocked)
 
 
 if __name__ == "__main__":
