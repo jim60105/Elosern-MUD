@@ -74,21 +74,21 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
 #### Scenario: Placeholder parity is guarded for both art description keys
 - **WHEN** the shipped `art.character_description` and `art.monster_description` templates are
   compared against their `PROMPT_SPECS` allowlists
-- **THEN** each template's `{token}` set is a subset of its allowlist (a shipped token outside the
-  allowlist is already a load-time unknown-placeholder error) and each allowlist carries exactly
-  its contract's tokens — the character key's five tokens, and the monster key's `description` plus
-  `display_name`, never `examples` — so a token added to the allowlist without the contract fails
-  the parity test, a shipped template that selects a subset of its declared tokens stays legal, and
-  no declared token can be missing at render time
+- **THEN** each declared allowlist carries exactly its contract's tokens — the character key's five
+  tokens, and the monster key's `description` plus `display_name`, never `examples` — and each
+  template's `{token}` set is a subset of its allowlist, so a token added to a template without the
+  allowlist fails as a load-time unknown-placeholder error, a token added to an allowlist without
+  the contract fails the parity test, and the one documented subset — the shipped monster
+  template's `{description}`-only text, whose unused `display_name` is inert — keeps loading
 
 #### Scenario: A wording-only shipped edit breaks no test
 - **WHEN** a deployment retunes a shipped template's framing wording inside its existing token
   skeleton — appending pose, lighting, or LoRA/quality tags as a prompt-authoring edit does — and
   the prompt suite plus the description-composition suites run against that wording
 - **THEN** every test stays green, because no test compares rendered shipped-library output to
-  literal framing text; only adding an undeclared `{token}` to a template breaks a test, through
-  the unknown-placeholder load error, while adding an allowlisted token or dropping a declared one
-  stays green because a key renders with the tokens it declares
+  literal framing text; only a token-set edit breaks a test — adding an undeclared `{token}`
+  through the unknown-placeholder load error, and adding or dropping a declared token on either
+  side of every key except the documented `art.monster_description` subset through the parity check
 
 #### Scenario: Brace pass-through is exercised on test-owned fixtures
 - **WHEN** the loader's brace pass-through contract (a `{{token}}` or a JSON example brace such as
