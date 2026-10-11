@@ -54,6 +54,12 @@ def restore_scene_packages() -> None:
         for grant in scene_store.list_commission_grants(row.package_id):
             if not grant.registered:
                 continue
+            if grant.npc_id <= 0:
+                raise scene_store.SceneStoreError(
+                    f"commission {grant.definition_key!r} of role "
+                    f"{grant.role_id!r} is marked registered without its assigned "
+                    "actor; refusing to fabricate runtime authority"
+                )
             publish_activated_commission(
                 grant.definition_key,
                 grant.issuer_key,

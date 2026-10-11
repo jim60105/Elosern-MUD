@@ -36,6 +36,11 @@ def _archetype_key() -> str:
     return _first_key("world.lore.scene_archetypes", "SCENE_ARCHETYPE" + "_REGISTRY")
 
 
+def _tier_key() -> str:
+    """The first NPC tier row in registration order (deterministic per catalog)."""
+    return _first_key("world.lore.npc_tiers", "NPC_TIER" + "_REGISTRY")
+
+
 def _anchor_key() -> str:
     """The first *placed* anchor — compile validates anchor rows against the
     placement registry, so the pick must exist in both."""

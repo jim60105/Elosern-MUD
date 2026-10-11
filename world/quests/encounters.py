@@ -26,6 +26,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from django.db import transaction
+
 from world.observability import log_info
 
 from . import scene_store
@@ -34,8 +36,14 @@ from .compile import (
     _publish_registration,
     publish_definition_views,
 )
+from .compile.registration import publication_scope
 from .scene_package import ScenePackageDefinition, validate_scene_package
-from world.rules.quest_issuance import Settlement, guild_issuer_key, npc_issuer_key
+from world.rules.quest_issuance import (
+    IssuerKeyError,
+    Settlement,
+    guild_issuer_key,
+    npc_issuer_key,
+)
 
 
 def guild_descriptor(branch_key: str) -> IssuanceDescriptor:
@@ -51,7 +59,7 @@ def symbolic_issuer_key(content_key: Any) -> str | None:
         return None
     try:
         return npc_issuer_key(content_key)
-    except Exception:  # noqa: BLE001 - a malformed key is reported as absent
+    except IssuerKeyError:  # observability: ignore R2: a malformed stored symbolic key is reported as an absent lookup value, never fabricated into an issuer key
         return None
 
 
@@ -112,46 +120,37 @@ def publish_scene_package(
         raise ValueError("owner must be a non-empty string")
     definition = validate_scene_package(payload)
     resolved_source = source_id if source_id is not None else definition.source_id
-    row, created = scene_store.publish_package(
-        package_id=definition.package_id,
-        source_id=resolved_source,
-        owner_id=owner,
-        payload=payload,
-        tick=tick,
-    )
-    if not created:
-        _publish_definition_views_for(row, definition)
-        return PublishedPackage(
-            package_id=row.package_id,
-            definition_key=definition.quest.definition.key,
-            created=False,
-            definition=definition,
+    # One transaction for the immutable row, its commission grant, and the
+    # process-local definition/requirement/offer views. A failure anywhere rolls
+    # the database back and ``publication_scope`` restores the registries, so a
+    # failed publication leaves neither a durable package without its views nor
+    # registered views without their package (design §5.1).
+    with publication_scope():
+        with transaction.atomic():
+            row, created = scene_store.publish_package(
+                package_id=definition.package_id,
+                source_id=resolved_source,
+                owner_id=owner,
+                payload=payload,
+                tick=tick,
+            )
+            _publish_definition_views_for(row, definition)
+    if created:
+        log_info(
+            "scene_package_published",
+            context={
+                "package": definition.package_id,
+                "owner": owner,
+                "source": resolved_source or "",
+                "definition": definition.quest.definition.key,
+                "roles": str(len(definition.roles)),
+                "scenes": str(len(definition.encounters)),
+            },
         )
-    try:
-        _publish_definition_views_for(row, definition)
-    except Exception:
-        # The row is immutable and expensive to un-register safely; a failed
-        # publication must not leave a registered definition whose package row
-        # was never stored, so the row this call created is removed again.
-        from .models import ScenePackage
-
-        ScenePackage.objects.filter(package_id=row.package_id).delete()
-        raise
-    log_info(
-        "scene_package_published",
-        context={
-            "package": definition.package_id,
-            "owner": owner,
-            "source": resolved_source or "",
-            "definition": definition.quest.definition.key,
-            "roles": str(len(definition.roles)),
-            "scenes": str(len(definition.encounters)),
-        },
-    )
     return PublishedPackage(
         package_id=row.package_id,
         definition_key=definition.quest.definition.key,
-        created=True,
+        created=created,
         definition=definition,
     )
 

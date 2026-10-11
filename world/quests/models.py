@@ -51,6 +51,18 @@ class ImmutableScenePackageQuerySet(models.QuerySet):
             raise ValueError("Published scene packages are immutable.")
         return super().bulk_create(objs, **kwargs)
 
+    def transition_status(self, package_id: str, status: str) -> int:
+        """Apply the one documented lifecycle transition: publication status only.
+
+        The published payload, identity and version stay immutable; this narrow,
+        store-owned escape hatch exists so ``cancel_package`` can retire an
+        unactivated definition without overwriting what was published. The base
+        ``update`` is invoked explicitly, so this never re-enters the overridden
+        ``update`` above.
+        """
+        queryset = self.filter(package_id=package_id)
+        return models.QuerySet.update(queryset, status=status)
+
 
 class ScenePackage(models.Model):
     """One immutable published scene package (design §4).

@@ -40,7 +40,11 @@ from world.quests.compile.fields import (
     _validate_strings,
 )
 from world.quests.definitions import DestinationKind, RoomLocator
-from world.quests.phases import validate_condition
+from world.quests.phases import (
+    REGISTERED_FACTS,
+    condition_matches,
+    validate_condition,
+)
 from world.rules.quest_issuance import npc_issuer_key, IssuerKeyError
 
 
@@ -275,7 +279,15 @@ def _validate_relationships(
         from_role = entry.get("from_role")
         to_role = entry.get("to_role")
         kind = entry.get("kind")
-        if from_role not in role_ids or to_role not in role_ids:
+        # Validate the reference types before any membership lookup: a JSON
+        # array/object is unhashable and must be a named rejection, not a
+        # TypeError escaping the package validator.
+        if (
+            not isinstance(from_role, str)
+            or not isinstance(to_role, str)
+            or from_role not in role_ids
+            or to_role not in role_ids
+        ):
             _reject_package(
                 f"relationships[{position}] references an unknown role "
                 f"({from_role!r}, {to_role!r})"
@@ -320,7 +332,7 @@ def _validate_knowledge(
                 "provenance; knowledge is role-owned and visibility is never widened"
             )
         role_id = entry.get("role_id")
-        if role_id not in role_ids:
+        if not isinstance(role_id, str) or role_id not in role_ids:
             _reject_package(f"knowledge[{position}] names unknown role {role_id!r}")
         claim_id = entry.get("claim_id")
         if not isinstance(claim_id, str) or not claim_id:
@@ -396,7 +408,7 @@ def _validate_encounters(
         if not isinstance(role_refs, list) or not role_refs:
             _reject_package(f"encounter {scene_id!r} must require at least one role")
         for role in role_refs:
-            if role not in role_ids:
+            if not isinstance(role, str) or role not in role_ids:
                 _reject_package(f"encounter {scene_id!r} references unknown role {role!r}")
         locator_payload = _require_mapping(
             entry.get("locator"), f"encounter {scene_id!r} locator"
@@ -467,9 +479,9 @@ def _validate_dialogue(
                 f"dialogue[{position}] must declare exactly role_id, initial_phase, phases"
             )
         role_id = entry.get("role_id")
-        role = roles.get(role_id)
-        if role is None:
+        if not isinstance(role_id, str) or role_id not in roles:
             _reject_package(f"dialogue[{position}] names unknown role {role_id!r}")
+        role = roles[role_id]
         if role_id in seen_roles:
             _reject_package(f"duplicate dialogue definition for role {role_id!r}")
         seen_roles.add(role_id)
@@ -641,28 +653,62 @@ def _validate_dialogue(
     return tuple(dialogues)
 
 
-def _reject_overlapping_phases(role_id: str, phases: list[DialoguePhase]) -> None:
-    """Reject two non-default phases selected by an identical condition set.
+def _observation_assignments() -> tuple[dict[str, bool], ...]:
+    """Every committed-observation assignment over the registered facts.
 
-    Overlapping selection is otherwise ambiguous at transition time; a pair of
-    phases that can only be told apart by an identical condition set is a
-    declared conflict and fails publication (design §6). Runtime ambiguity is
-    still rejected by the transition boundary for condition sets that overlap
-    only for a specific observation.
+    The registry has four Boolean facts, so enumerating all sixteen assignments
+    is a complete decision procedure for the declared conditions: it makes
+    "exactly one phase is selected for any committed observation" a static
+    property instead of one deferred to the transition boundary.
     """
-    seen: set[tuple[tuple[tuple[str, Any], ...], ...]] = set()
-    for phase in phases:
-        if any(condition.get("default") for condition in phase.conditions):
-            continue
-        key = tuple(
-            tuple(sorted(condition.items())) for condition in phase.conditions
-        )
-        if key in seen:
+    from itertools import product
+
+    facts = sorted(REGISTERED_FACTS)
+    return tuple(
+        dict(zip(facts, combination))
+        for combination in product((False, True), repeat=len(facts))
+    )
+
+
+def _reject_overlapping_phases(role_id: str, phases: list[DialoguePhase]) -> None:
+    """Reject ambiguous or unsatisfiable non-default phase selection (design §6).
+
+    Overlapping selection is ambiguous: two non-default phases that are both
+    satisfiable under one committed observation could never be told apart at
+    transition time. An unsatisfiable conjunction (a contradiction such as
+    ``closure`` true and false together) can never be selected, so it is an
+    authored conflict too. Both are rejected at publication by enumerating every
+    observation assignment over the registered facts; the runtime boundary
+    additionally rejects ambiguity for the concrete observation it receives.
+    """
+    non_default = [
+        phase
+        for phase in phases
+        if not any(condition.get("default") for condition in phase.conditions)
+    ]
+    if not non_default:
+        return
+    assignments = _observation_assignments()
+    for phase in non_default:
+        if not any(
+            all(condition_matches(condition, assignment) for condition in phase.conditions)
+            for assignment in assignments
+        ):
             _reject_package(
-                f"role {role_id!r} declares overlapping selection for phase "
-                f"{phase.phase_id!r}"
+                f"role {role_id!r} phase {phase.phase_id!r} declares an "
+                "unsatisfiable condition combination"
             )
-        seen.add(key)
+    for assignment in assignments:
+        matched = [
+            phase.phase_id
+            for phase in non_default
+            if all(condition_matches(condition, assignment) for condition in phase.conditions)
+        ]
+        if len(matched) > 1:
+            _reject_package(
+                f"role {role_id!r} phases {matched} overlap for one committed "
+                "observation"
+            )
 
 
 def _validate_commission(
@@ -676,7 +722,7 @@ def _validate_commission(
             "package.commission must declare exactly role_id and issuer_content_key"
         )
     role_id = entry.get("role_id")
-    if role_id not in roles:
+    if not isinstance(role_id, str) or role_id not in roles:
         _reject_package(f"package.commission names unknown role {role_id!r}")
     content_key = entry.get("issuer_content_key")
     if not isinstance(content_key, str) or not content_key:
@@ -743,7 +789,7 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
     quest_payload = _require_mapping(payload.get("quest"), "package.quest")
     issuer = quest_payload.get("issuer")
     commission_entry = payload.get("commission")
-    quest_core = compile_blueprint_core(quest_payload, package_roles=role_ids)
+    quest_core = compile_blueprint_core(quest_payload)
     definition_key = quest_core.definition.key
 
     commission: SymbolicIssuer | None = None

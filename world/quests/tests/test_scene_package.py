@@ -27,18 +27,13 @@ from world.quests.tests._compile_helpers import (
     _anchor_key,
     _archetype_key,
     _issuer_key,
+    _tier_key,
 )
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 from world.rules.quest_issuance import QUEST_ISSUANCE_REGISTRY
-from world.lore.npc_tiers import NPC_TIER_REGISTRY
 
 _LONG_PROSE = "南門的相遇，旅人在此停下腳步，等著一個承諾被實現。"
-
-
-def _tier_key() -> str:
-    """The first live NPC tier row (never a shipped key literal)."""
-    return next(iter(NPC_TIER_REGISTRY))
 
 
 def _characterization(tag: str) -> dict:
@@ -214,7 +209,7 @@ class ScenePackageValidationTests(EvenniaTestCase):
         dialogue["phases"].append(_phase("duplicate", [{"abandoned": True}, {"abandoned": True}]))
         with self.assertRaises(ScenePackageError) as caught:
             validate_scene_package(package)
-        self.assertIn("overlapping", str(caught.exception))
+        self.assertIn("overlap", str(caught.exception))
 
     def test_a_guarded_reunion_observation_is_rejected(self):
         package = _package()
@@ -335,9 +330,18 @@ class ScenePackageRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
 
     def test_restore_reregisters_only_an_activated_grant(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.npcs import NPC
+
         published = publish_scene_package(_package(), owner="tester")
         row = scene_store.read_package(published.package_id)
         grant = scene_store.list_commission_grants(published.package_id)[0]
+        actor = create_object(NPC, key="測試住民mother")
+        scene_store.bind_role(row, grant.role_id, actor.pk)
+        scene_store.assign_grant_actor(
+            row, grant.role_id, grant.definition_key, actor.pk
+        )
         scene_store.set_grant_registered(
             row, grant.role_id, grant.definition_key, True
         )
@@ -350,6 +354,115 @@ class ScenePackageRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
             resolve_issuance(grant.definition_key, grant.issuer_key)
         )
         self.assertIsNotNone(row)
+
+    def test_restore_refuses_a_registered_grant_without_an_actor(self):
+        published = publish_scene_package(_package(), owner="tester")
+        grant = scene_store.list_commission_grants(published.package_id)[0]
+        from world.quests.models import StoryCommissionGrant
+
+        StoryCommissionGrant.objects.filter(pk=grant.pk).update(registered=True)
+        with self.assertRaises(scene_store.SceneStoreError):
+            restore_scene_packages()
+
+
+class ScenePackageCancellationTests(RegistryIsolationMixin, EvenniaTestCase):
+    """Cancellation retires an unactivated definition without rewriting it."""
+
+    def test_cancellation_transitions_once(self):
+        published = publish_scene_package(_package(), owner="tester")
+        self.assertTrue(scene_store.cancel_package(published.package_id))
+        self.assertFalse(scene_store.cancel_package(published.package_id))
+        row = scene_store.read_package(published.package_id)
+        self.assertEqual(row.status, scene_store.PACKAGE_STATUS_CANCELLED)
+        self.assertEqual(row.payload, _package())
+
+    def test_payload_rewrite_is_still_refused(self):
+        from world.quests.models import ScenePackage
+
+        published = publish_scene_package(_package(), owner="tester")
+        with self.assertRaises(ValueError):
+            ScenePackage.objects.filter(package_id=published.package_id).update(
+                payload={}
+            )
+
+
+class SceneStoreRuntimeContractTests(RegistryIsolationMixin, EvenniaTestCase):
+    """The runtime store refuses stale revisions and unassigned authority."""
+
+    def _published_with_phase(self):
+        published = publish_scene_package(_package(), owner="tester")
+        row = scene_store.read_package(published.package_id)
+        scene_store.set_dialogue_phase(row, "mother", "searching")
+        return row
+
+    def test_a_stale_phase_revision_is_refused(self):
+        row = self._published_with_phase()
+        advanced = scene_store.advance_dialogue_phase(
+            row, "mother", "everyday", expected_revision=0
+        )
+        self.assertEqual(advanced.selected_phase, "everyday")
+        self.assertEqual(advanced.revision, 1)
+        stale = scene_store.advance_dialogue_phase(
+            row, "mother", "searching", expected_revision=0
+        )
+        self.assertIsNone(stale)
+        self.assertEqual(
+            scene_store.get_dialogue_phase(row.package_id, "mother").revision, 1
+        )
+
+    def test_a_grant_cannot_be_registered_before_its_actor(self):
+        published = publish_scene_package(_package(), owner="tester")
+        row = scene_store.read_package(published.package_id)
+        grant = scene_store.list_commission_grants(published.package_id)[0]
+        with self.assertRaises(scene_store.SceneStoreError):
+            scene_store.set_grant_registered(
+                row, grant.role_id, grant.definition_key, True
+            )
+
+    def test_a_grant_cannot_authorize_an_unbound_actor(self):
+        from evennia.utils.create import create_object
+
+        from typeclasses.npcs import NPC
+
+        published = publish_scene_package(_package(), owner="tester")
+        row = scene_store.read_package(published.package_id)
+        grant = scene_store.list_commission_grants(published.package_id)[0]
+        stranger = create_object(NPC, key="陌生人")
+        with self.assertRaises(scene_store.SceneStoreError):
+            scene_store.assign_grant_actor(
+                row, grant.role_id, grant.definition_key, stranger.pk
+            )
+
+
+class ScenePackageAmbiguityTests(EvenniaTestCase):
+    """Static phase selection is unambiguous or the package is refused."""
+
+    def test_intersecting_non_default_phases_are_rejected(self):
+        package = _package()
+        package["dialogue"][0]["phases"].append(
+            _phase("closed_again", [{"closure": True}])
+        )
+        with self.assertRaises(ScenePackageError) as caught:
+            validate_scene_package(package)
+        self.assertIn("overlap", str(caught.exception))
+
+    def test_a_contradictory_condition_is_rejected(self):
+        package = _package()
+        package["dialogue"][0]["phases"][1]["conditions"] = [
+            {"closure": True},
+            {"closure": False},
+        ]
+        with self.assertRaises(ScenePackageError) as caught:
+            validate_scene_package(package)
+        self.assertIn("unsatisfiable", str(caught.exception))
+
+    def test_an_unhashable_role_reference_is_rejected(self):
+        package = _package()
+        package["relationships"] = [
+            {"from_role": ["mother"], "to_role": "daughter", "kind": "parent_child"}
+        ]
+        with self.assertRaises(ScenePackageError):
+            validate_scene_package(package)
 
 
 if __name__ == "__main__":  # pragma: no cover

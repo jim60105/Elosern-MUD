@@ -123,12 +123,10 @@ def cancel_package(package_id: str) -> bool:
         return False
     if row.status == PACKAGE_STATUS_CANCELLED:
         return False
-    # ``status`` is the one mutable field on the otherwise immutable row, so the
-    # documented immutability guard (save/update/bulk) still refuses a payload
-    # rewrite while this narrow lifecycle transition bypasses it explicitly.
-    ScenePackage.objects.filter(package_id=package_id).update(
-        status=PACKAGE_STATUS_CANCELLED
-    )
+    # ``status`` is the one mutable field on the otherwise immutable row; the
+    # store-owned transition applies only that field and still refuses a payload
+    # rewrite through the manager's normal update/delete guards.
+    ScenePackage.objects.transition_status(package_id, PACKAGE_STATUS_CANCELLED)
     return True
 
 
@@ -321,22 +319,22 @@ def advance_dialogue_phase(
     role_id: str,
     phase_id: str,
     *,
+    expected_revision: int,
     tick: int = 0,
 ) -> StoryRoleDialogueRuntime | None:
     """Advance one role's phase with a monotonic revision, or ``None``.
 
-    The revision increments by exactly one and is written under a conditional
-    ``UPDATE`` on the expected previous revision, so a stale or concurrent
-    transition cannot silently overwrite a newer one (design §5.2/§6).
+    ``expected_revision`` is the revision the deterministic caller resolved its
+    decision against -- not one this helper reads for itself. The conditional
+    ``UPDATE`` matches that exact revision, so a caller acting on a stale
+    revision is refused (``None``) instead of silently overwriting a newer
+    selected phase, and the revision increments by exactly one (design §5.2/§6).
     """
-    current = get_dialogue_phase(package.package_id, role_id)
-    if current is None:
-        return None
     updated = StoryRoleDialogueRuntime.objects.filter(
-        pk=current.pk, revision=current.revision
+        package=package, role_id=role_id, revision=expected_revision
     ).update(
         selected_phase=phase_id,
-        revision=current.revision + 1,
+        revision=expected_revision + 1,
         updated_tick=tick,
     )
     if not updated:
@@ -411,8 +409,18 @@ def assign_grant_actor(
     """Bind one planned grant to the exact actor materialized for its role.
 
     Refuses a different actor for an already-assigned grant, so activation can
-    never redirect an authorized commission to another entity.
+    never redirect an authorized commission to another entity, and requires the
+    actor to be the exact actor the role binding names, so a grant can never
+    authorize an actor no package role owns.
     """
+    if not isinstance(npc_id, int) or isinstance(npc_id, bool) or npc_id <= 0:
+        raise SceneStoreError("npc_id must be a positive integer")
+    binding = get_role_binding(package.package_id, role_id)
+    if binding is None or binding.npc_id != npc_id:
+        raise SceneStoreError(
+            f"role {role_id!r} is not bound to actor {npc_id}; a grant cannot "
+            "authorize an unbound actor"
+        )
     existing = get_commission_grant(package.package_id, role_id, definition_key)
     if existing is None:
         return None
@@ -436,7 +444,20 @@ def set_grant_registered(
     *,
     tick: int = 0,
 ) -> bool:
-    """Record whether the grant's issuance is currently registered."""
+    """Record whether the grant's issuance is currently registered.
+
+    A grant is registered authority only once its exact actor is assigned: a
+    ``registered=True`` write on an unassigned (``npc_id`` zero) grant is
+    refused, so the planned-versus-activated boundary cannot be crossed by a
+    flag write alone.
+    """
+    if registered:
+        current = get_commission_grant(package.package_id, role_id, definition_key)
+        if current is None or current.npc_id <= 0:
+            raise SceneStoreError(
+                f"commission {definition_key!r} of role {role_id!r} cannot be "
+                "registered before its actor is assigned"
+            )
     return bool(
         StoryCommissionGrant.objects.filter(
             package=package, role_id=role_id, definition_key=definition_key
