@@ -216,7 +216,13 @@ def _protected_failure_changes(
     records: list[Any],
     defeated_ids: tuple[int, ...],
 ) -> tuple[dict[str, Any], list[tuple[Any, tuple[str, ...], tuple[str, ...]]]]:
-    """Compute exact protected-entity failures for one player's active quests."""
+    """Compute exact committed-protected-death failures for active quests.
+
+    The canonical reason is ``protected_actor_dead`` (escort-rendezvous design
+    §8): the failure is decided on the exact protected persistent identities a
+    committed death named, never on display keys or objective-target sets, and
+    the record's instance pin is released in the same commit.
+    """
     if not defeated_ids:
         return {}, []
     defeated_set = set(defeated_ids)
@@ -227,7 +233,7 @@ def _protected_failure_changes(
             continue
         if not (set(record.protected_entity_ids) & defeated_set):
             continue
-        replacements[record.quest_id] = fail_record(record, "protected_entity_defeated")
+        replacements[record.quest_id] = fail_record(record, "protected_actor_dead")
         pin_operations.extend(release_stage_binding(owner, record))
     return replacements, pin_operations
 

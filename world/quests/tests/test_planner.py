@@ -238,6 +238,9 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(after, stored)
         self.assertEqual(after["state"], "completed")
 
+    @covers_requirement(
+        "quest-failure-conditions::defeat-of-an-exact-protected-entity-fails-its-active-quests-atomically"
+    )
     def test_protected_npc_death_fails_escort_quest(self):
         record = accept(self.player, self.escort_quest.key)
         guard = self._npc("warden")
@@ -254,7 +257,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
-        self.assertEqual(stored["failure_reason"], "protected_entity_defeated")
+        self.assertEqual(stored["failure_reason"], "protected_actor_dead")
         self.assertEqual(stored["protected_entity_ids"], [])
         self.assertEqual(stored["stage_room_id"], None)
         self.assertEqual(room.db.pin_reasons, [])
@@ -297,7 +300,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
-        self.assertEqual(stored["failure_reason"], "protected_entity_defeated")
+        self.assertEqual(stored["failure_reason"], "protected_actor_dead")
         self.assertEqual(stored["objective_target_ids"], [])
         self.assertEqual(stored["protected_entity_ids"], [])
 
