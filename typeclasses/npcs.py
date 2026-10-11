@@ -119,9 +119,14 @@ class NPC(LivingEntity):
 
         def traverse():
             result = move(destination, *args, **kwargs)
-            if not result and self.location is not source:
-                raise RuntimeError("NPC relocation failed after changing location")
-            return result
+            # A falsy return is not a failure when the move really relocated
+            # the actor, mirroring ``DefaultExit.at_traverse`` (design D1: a
+            # plain move cannot distinguish success from a relocated falsy
+            # return). Report the settled relocation as success so a wilderness
+            # terrain entry, whose ``move_to`` returns falsy, is not rolled
+            # back; a move that did not change the location passes its own
+            # falsy refusal through unchanged.
+            return result or self.location is not source
 
         return settle_movement(self, source, traverse=traverse, destination=destination)
 
