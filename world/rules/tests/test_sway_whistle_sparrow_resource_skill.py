@@ -23,7 +23,7 @@ from world.rules.action import ActionResolver, RejectReason
 from world.rules.buffs import BUFF_DEFINITIONS, entity_active_buffs
 from world.rules.clock import AdvanceSource, WorldClock
 from world.rules.combat import Battlefield
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import _RULES, evaluate_combat_modifiers
 from world.rules.combat_session.lifecycle import engage
 from world.rules.combat_session.policies import _enemy_policy
 from world.rules.combat_session.records import read_session
@@ -34,7 +34,7 @@ from world.rules.tests.combat_fixtures import flee_edge
 from world.skills.registry import SKILL_REGISTRY
 
 # The representative the composition-coverage check derives for this group.
-REPRESENTATIVE_VARIANT = "flock_leader"
+REPRESENTATIVE_VARIANT = "cliff_stepper"
 REPRESENTATIVE_ROW = MONSTER_VARIANT_REGISTRY[REPRESENTATIVE_VARIANT]
 SKILL_KEY = REPRESENTATIVE_ROW.active_skill_keys[0]
 BEHAVIOUR_KEY = REPRESENTATIVE_ROW.behaviour_profile_key
@@ -52,6 +52,22 @@ def _mounted_buff_key(skill) -> str:
 
 
 BUFF_KEY = _mounted_buff_key(SKILL_REGISTRY[SKILL_KEY])
+
+
+def _linked_modifier_axis_and_delta(buff_key: str) -> tuple[str, int]:
+    """The single stat axis and contribution declared for this representative's mount."""
+    matching = [
+        rule for rule in _RULES if rule.when.get("buff_active") == buff_key
+    ]
+    if len(matching) != 1 or len(matching[0].then) != 1:
+        raise AssertionError(
+            f"expected exactly one single-axis modifier rule for buff {buff_key!r}, found {matching!r}"
+        )
+    axis, delta = next(iter(matching[0].then.items()))
+    return str(axis), int(delta)
+
+
+MODIFIER_AXIS, MODIFIER_DELTA = _linked_modifier_axis_and_delta(BUFF_KEY)
 
 
 def _buff_instances(entity):
@@ -91,7 +107,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             {player.key: player, pecker.key: pecker},
         )
         skill = SKILL_REGISTRY[SKILL_KEY]
-        baseline_accuracy = evaluate_combat_modifiers(player).get("accuracy", 0)
+        baseline_modifier = evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0)
         request = _enemy_policy(pecker, field, record)
         self.assertEqual(request.skill_key, SKILL_KEY)
         self.assertEqual(request.targets, [player])
@@ -108,7 +124,10 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
         self.assertNotIn(BUFF_KEY, entity_active_buffs(pecker))
         self.assertNotIn(BUFF_KEY, entity_active_buffs(control))
         self.assertEqual((control.traits.hp.current, control.traits.mp.current), controls)
-        self.assertLess(evaluate_combat_modifiers(player)["accuracy"], baseline_accuracy)
+        self.assertEqual(
+            evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0),
+            baseline_modifier + MODIFIER_DELTA,
+        )
         duration = BUFF_DEFINITIONS[BUFF_KEY].duration
         instance = _buff_instances(player)[0]
         self.assertEqual(instance.remaining_seconds, duration)
@@ -119,7 +138,7 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             age = max(1, duration // 2)
             clock.advance(age, AdvanceSource.COMMAND, (player,))
             self.assertEqual(_buff_instances(player)[0].remaining_seconds, duration - age)
-            modifier_before = evaluate_combat_modifiers(player)["accuracy"]
+            modifier_before = evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0)
             pecker.traits.mp.current = pecker.traits.mp.max
             pecker.traits.sp.current = pecker.traits.sp.max
             refresh_request = _enemy_policy(pecker, field, record)
@@ -129,10 +148,14 @@ class SwayWhistleSparrowResourceSkillSmokeTests(EvenniaTestCase):
             refreshed = _buff_instances(player)
             self.assertEqual(len(refreshed), 1)
             self.assertEqual(refreshed[0].remaining_seconds, duration)
-            self.assertEqual(evaluate_combat_modifiers(player)["accuracy"], modifier_before)
+            self.assertEqual(
+                evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0), modifier_before
+            )
         clock.advance(duration, AdvanceSource.COMMAND, (player,))
         self.assertNotIn(BUFF_KEY, entity_active_buffs(player))
-        self.assertEqual(evaluate_combat_modifiers(player).get("accuracy", 0), baseline_accuracy)
+        self.assertEqual(
+            evaluate_combat_modifiers(player).get(MODIFIER_AXIS, 0), baseline_modifier
+        )
 
         # SP-axis exhaustion: the ordinary attack takes over through the same
         # selection boundary, so the other payable axis is real evidence too.
