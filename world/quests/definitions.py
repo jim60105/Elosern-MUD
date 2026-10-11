@@ -51,6 +51,27 @@ class DestinationKind(StrEnum):
     BOUND_INSTANCE = "bound_instance"
 
 
+class EscortCompletion(StrEnum):
+    """The closed escort completion discriminator (escort-rendezvous §6).
+
+    An escort objective declares exactly one of these: ``DESTINATION`` (every
+    exact protected identity living at a validated locator) or ``RENDEZVOUS``
+    (exact protected and meeting identities living at the same authoritative
+    position, with any published typed relation satisfied). The quest
+    classification (``QuestType.ESCORT``) stays independent of this predicate.
+    """
+
+    DESTINATION = "destination"
+    RENDEZVOUS = "rendezvous"
+
+
+#: The closed typed-relationship vocabulary shared with the scene package's
+#: relationship contract. ``parent_child`` is directed (``from_role`` is the
+#: parent, ``to_role`` the child); a rendezvous relation must name declared
+#: role references and one of these kinds.
+RELATIONSHIP_KINDS: tuple[str, ...] = ("parent_child",)
+
+
 class QuestDefinitionError(ValueError):
     """A definition violates the closed runtime input contract."""
 
@@ -69,6 +90,11 @@ MAX_DEFINITION_PROSE_LENGTH = 240
 
 #: The combined bound of the two prose fields, for the same reason.
 MAX_DEFINITION_PROSE_TOTAL = 280
+
+#: The shared bound on a published scene-role reference (mirrors the scene
+#: package's own ``MAX_ID_LENGTH``), so an objective's role references cannot
+#: exceed the identifiers a validated package can declare.
+MAX_ROLE_REF_LENGTH = 64
 
 #: The CJK Unified Ideographs block: an authored player-facing prose field must
 #: contain at least one, so an ASCII placeholder cannot masquerade as zh-TW text.
@@ -139,6 +165,21 @@ class QuestObjective:
     site_key: str | None = field(
         default=None, metadata=ref("monster_sites", inverse="quest_objectives", nullable=True)
     )
+    #: The escort completion discriminator (escort-rendezvous §6). Legal only on
+    #: an ESCORT objective, which must declare exactly one mode.
+    completion: EscortCompletion | None = None
+    #: The exact published package roles this stage protects (escort-rendezvous
+    #: §3): resolved to the same live entity at acceptance and at every
+    #: completion evaluation. Nonempty on every ESCORT objective.
+    protected_role_refs: tuple[str, ...] = ()
+    #: The exact published package roles a rendezvous stage meets
+    #: (escort-rendezvous §6.2). Empty for destination mode; nonempty for
+    #: rendezvous mode.
+    meeting_role_refs: tuple[str, ...] = ()
+    #: The optional typed relation a rendezvous requires, as
+    #: ``(kind, from_role, to_role)`` with ``kind`` in :data:`RELATIONSHIP_KINDS`
+    #: and both endpoints declared role references. ``None`` when undeclared.
+    relation: tuple[str, str, str] | None = None
 
 
 @dataclass(frozen=True)
@@ -362,6 +403,134 @@ def _validate_destination(
         _reject(definition, f"unknown DestinationKind {destination.kind!r}")
 
 
+def _escort_fields_declared(objective: QuestObjective) -> tuple[str, ...]:
+    """The escort completion fields this objective declares, by name."""
+    declared: list[str] = []
+    if objective.completion is not None:
+        declared.append("completion")
+    if objective.protected_role_refs:
+        declared.append("protected_role_refs")
+    if objective.meeting_role_refs:
+        declared.append("meeting_role_refs")
+    if objective.relation is not None:
+        declared.append("relation")
+    return tuple(declared)
+
+
+def _validate_role_refs(
+    definition: QuestDefinition,
+    refs: object,
+    field_name: str,
+) -> None:
+    """Reject a malformed, empty, or duplicated published role reference tuple."""
+    if not isinstance(refs, tuple) or not refs:
+        _reject(
+            definition,
+            f"ESCORT objective requires a non-empty tuple in {field_name}",
+        )
+    seen: set[str] = set()
+    for ref_value in refs:
+        if not isinstance(ref_value, str) or not ref_value:
+            _reject(
+                definition,
+                f"{field_name} entries must be non-empty role references",
+            )
+        if len(ref_value) > MAX_ROLE_REF_LENGTH:
+            _reject(
+                definition,
+                f"{field_name} role reference {ref_value!r} exceeds the "
+                f"{MAX_ROLE_REF_LENGTH}-character bound",
+            )
+        if ref_value in seen:
+            _reject(
+                definition,
+                f"{field_name} contains duplicate role reference {ref_value!r}",
+            )
+        seen.add(ref_value)
+
+
+def _validate_relation(
+    definition: QuestDefinition,
+    relation: object,
+    declared_roles: frozenset[str],
+) -> None:
+    """Validate one optional rendezvous typed relation against declared roles."""
+    if relation is None:
+        return
+    if not isinstance(relation, tuple) or len(relation) != 3:
+        _reject(
+            definition,
+            "a rendezvous typed relation must be a (kind, from_role, to_role) tuple",
+        )
+    kind, from_role, to_role = relation
+    if not isinstance(kind, str) or kind not in RELATIONSHIP_KINDS:
+        _reject(definition, f"unknown rendezvous relation kind {kind!r}")
+    for endpoint, value in (("from_role", from_role), ("to_role", to_role)):
+        if not isinstance(value, str) or not value:
+            _reject(
+                definition,
+                f"rendezvous relation {endpoint} must be a non-empty role reference",
+            )
+        if value not in declared_roles:
+            _reject(
+                definition,
+                f"rendezvous relation {endpoint} {value!r} is not a declared "
+                "protected or meeting role reference",
+            )
+    if from_role == to_role:
+        _reject(
+            definition,
+            "a rendezvous typed relation must connect two distinct roles",
+        )
+
+
+def _validate_escort_completion(
+    definition: QuestDefinition,
+    objective: QuestObjective,
+) -> None:
+    """Validate the closed escort completion discriminator (escort-rendezvous §6)."""
+    _validate_role_refs(
+        definition, objective.protected_role_refs, "protected_role_refs"
+    )
+    completion = objective.completion
+    if not isinstance(completion, EscortCompletion):
+        _reject(
+            definition,
+            "ESCORT objective requires exactly one completion discriminator "
+            "(destination or rendezvous)",
+        )
+    declared_roles = frozenset(
+        (*objective.protected_role_refs, *objective.meeting_role_refs)
+    )
+    if completion is EscortCompletion.DESTINATION:
+        if objective.meeting_role_refs:
+            _reject(
+                definition,
+                "destination ESCORT objective cannot declare meeting role references",
+            )
+        if objective.relation is not None:
+            _reject(
+                definition,
+                "destination ESCORT objective cannot declare a typed relation",
+            )
+        _validate_destination(definition, objective.destination, ObjectiveKind.ESCORT)
+        return
+    if objective.destination is not None:
+        _reject(
+            definition,
+            "rendezvous ESCORT objective declares no destination locator",
+        )
+    _validate_role_refs(definition, objective.meeting_role_refs, "meeting_role_refs")
+    overlap = set(objective.protected_role_refs) & set(objective.meeting_role_refs)
+    if overlap:
+        _reject(
+            definition,
+            f"ESCORT role references {sorted(overlap)} appear as both protected "
+            "and meeting roles",
+        )
+    _validate_relation(definition, objective.relation, declared_roles)
+
+
 def _validate_objective(
     definition: QuestDefinition,
     objective: QuestObjective,
@@ -372,6 +541,14 @@ def _validate_objective(
         not isinstance(objective.quantity, int) or objective.quantity < 1
     ):
         _reject(definition, "objective quantity must be a positive integer")
+    if objective.kind is not ObjectiveKind.ESCORT and _escort_fields_declared(
+        objective
+    ):
+        _reject(
+            definition,
+            f"{objective.kind.value} objective cannot declare escort completion "
+            f"fields {list(_escort_fields_declared(objective))}",
+        )
     if objective.kind is ObjectiveKind.DEFEAT:
         if objective.destination is not None:
             _reject(definition, "DEFEAT objective cannot declare a destination")
@@ -459,7 +636,7 @@ def _validate_objective(
                 "ESCORT objective quantity must be exactly 1; arrival observation "
                 "cannot accumulate repeated visits",
             )
-        _validate_destination(definition, objective.destination, ObjectiveKind.ESCORT)
+        _validate_escort_completion(definition, objective)
     elif objective.kind is ObjectiveKind.ACQUIRE:
         if (
             objective.monster_tier is not None
@@ -507,6 +684,20 @@ def _validate_objective(
             _reject(definition, f"DELIVER objective references unknown item_key {item_key!r}")
     else:
         _reject(definition, f"unknown ObjectiveKind {objective.kind!r}")
+
+
+def validate_escort_predicate(
+    definition: QuestDefinition,
+    objective: QuestObjective,
+) -> None:
+    """Validate one escort objective's closed completion contract (public seam).
+
+    The scene-package boundary declares an exclusive outcome group's concrete
+    final result as the same closed predicate an ESCORT objective declares, so
+    it validates through this one seam rather than a second copy of the grammar.
+    Raises :class:`QuestDefinitionError` naming ``definition`` on any violation.
+    """
+    _validate_objective(definition, objective)
 
 
 def validate_definition(definition: QuestDefinition) -> None:

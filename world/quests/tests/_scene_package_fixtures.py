@@ -139,7 +139,7 @@ def package(**overrides) -> dict:
             },
         ],
         "dialogue": [dialogue("mother"), dialogue("daughter")],
-        "commission": {"role_id": "mother", "issuer_content_key": "story_mother"},
+        "commissions": [{"role_id": "mother", "issuer_content_key": "story_mother"}],
     }
     payload.update(overrides)
     return payload
@@ -148,6 +148,6 @@ def package(**overrides) -> dict:
 def guild_package(**overrides) -> dict:
     return package(
         quest=quest_payload(issuer=_issuer_key()),
-        commission=None,
+        commissions=[],
         **overrides,
     )

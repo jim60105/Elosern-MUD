@@ -77,7 +77,8 @@ class PackageProposalSchemaTests(EvenniaTest):
                 "knowledge",
                 "encounters",
                 "dialogue",
-                "commission",
+                "commissions",
+                "outcome_groups",
             },
         )
 
@@ -110,7 +111,7 @@ class PackageProposalPublicationTests(RegistryIsolationMixin, EvenniaTest):
     def test_an_escort_objective_stays_refused(self):
         escort = _package(
             quest=quest_payload(issuer="mother"),
-            commission=None,
+            commissions=[],
             roles=[role("mother")],
             relationships=[],
             knowledge=[],

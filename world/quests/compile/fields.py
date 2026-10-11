@@ -32,8 +32,10 @@ from world.quests.compile.contracts import (
 from world.quests.definitions import (
     KNOWN_GRID_MAP_KEYS,
     DestinationKind,
+    EscortCompletion,
     ObjectiveKind,
     QuestObjective,
+    RELATIONSHIP_KINDS,
     RoomLocator,
 )
 from world.rules.guild_offers import (
@@ -350,7 +352,7 @@ def _compile_objective(
             item_key=item_key,
         )
 
-    if kind in (ObjectiveKind.REACH, ObjectiveKind.ESCORT):
+    if kind is ObjectiveKind.REACH:
         if location is None:
             _reject(f"stage {stage_index} {kind.value} objective requires a destination")
         if quantity != 1:
@@ -364,4 +366,145 @@ def _compile_objective(
             destination=location,
         )
 
+    if kind is ObjectiveKind.ESCORT:
+        return _compile_escort_objective(stage_index, objective, location, quantity)
+
     _reject(f"stage {stage_index} unknown objective kind {kind_value!r}")  # pragma: no cover
+
+
+def _compile_role_ref_list(
+    stage_index: int, field_name: str, value: Any, *, required: bool
+) -> tuple[str, ...]:
+    """Compile one bounded list of published role references into a tuple."""
+    if not isinstance(value, list) or (required and not value):
+        _reject(
+            f"stage {stage_index} ESCORT objective requires a non-empty "
+            f"{field_name} array"
+        )
+    refs: list[str] = []
+    for position, entry in enumerate(value):
+        if not isinstance(entry, str) or not entry:
+            _reject(
+                f"stage {stage_index} {field_name}[{position}] must be a "
+                "non-empty role reference"
+            )
+        if entry in refs:
+            _reject(
+                f"stage {stage_index} {field_name} contains duplicate role "
+                f"reference {entry!r}"
+            )
+        refs.append(entry)
+    return tuple(refs)
+
+
+def _compile_relation(
+    stage_index: int, relation_payload: Any
+) -> tuple[str, str, str] | None:
+    """Compile one optional rendezvous typed relation into its frozen tuple."""
+    if relation_payload is None:
+        return None
+    relation = _require_mapping(
+        relation_payload, f"stage {stage_index}.objective.relation"
+    )
+    if set(relation) != {"kind", "from_role", "to_role"}:
+        _reject(
+            f"stage {stage_index} ESCORT relation must declare exactly kind, "
+            "from_role and to_role"
+        )
+    kind = relation.get("kind")
+    if kind not in RELATIONSHIP_KINDS:
+        _reject(f"stage {stage_index} unknown rendezvous relation kind {kind!r}")
+    from_role = relation.get("from_role")
+    to_role = relation.get("to_role")
+    for endpoint, value in (("from_role", from_role), ("to_role", to_role)):
+        if not isinstance(value, str) or not value:
+            _reject(
+                f"stage {stage_index} ESCORT relation {endpoint} must be a "
+                "non-empty role reference"
+            )
+    return (kind, from_role, to_role)
+
+
+def _compile_escort_objective(
+    stage_index: int,
+    objective: dict[str, Any],
+    location: RoomLocator | None,
+    quantity: int,
+) -> QuestObjective:
+    """Compile the closed escort completion contract (escort-rendezvous §6).
+
+    The quest classification stays separate from the objective predicate: the
+    payload declares exactly one ``completion`` discriminator, a nonempty
+    ``protected_role_refs`` set, and — for rendezvous — nonempty
+    ``meeting_role_refs`` with an optional typed ``relation``. Destination mode
+    carries its validated locator and no rendezvous fields; rendezvous mode
+    carries no destination locator. Every violation is named before mutation.
+    """
+    if quantity != 1:
+        _reject(
+            f"stage {stage_index} ESCORT objective quantity must be exactly 1; "
+            "arrival observation cannot accumulate repeated visits"
+        )
+    completion_value = objective.get("completion")
+    if not isinstance(completion_value, str) or completion_value not in {
+        completion.value for completion in EscortCompletion
+    }:
+        _reject(
+            f"stage {stage_index} ESCORT objective requires exactly one "
+            "completion discriminator (destination or rendezvous)"
+        )
+    completion = EscortCompletion(completion_value)
+    protected = _compile_role_ref_list(
+        stage_index,
+        "protected_role_refs",
+        objective.get("protected_role_refs"),
+        required=True,
+    )
+    if completion is EscortCompletion.DESTINATION:
+        if location is None:
+            _reject(
+                f"stage {stage_index} destination ESCORT objective requires a "
+                "destination locator"
+            )
+        if objective.get("meeting_role_refs"):
+            _reject(
+                f"stage {stage_index} destination ESCORT objective cannot "
+                "declare meeting_role_refs"
+            )
+        if objective.get("relation") is not None:
+            _reject(
+                f"stage {stage_index} destination ESCORT objective cannot "
+                "declare a typed relation"
+            )
+        return QuestObjective(
+            kind=ObjectiveKind.ESCORT,
+            quantity=quantity,
+            destination=location,
+            completion=completion,
+            protected_role_refs=protected,
+        )
+    if location is not None:
+        _reject(
+            f"stage {stage_index} rendezvous ESCORT objective declares no "
+            "destination locator"
+        )
+    meeting = _compile_role_ref_list(
+        stage_index,
+        "meeting_role_refs",
+        objective.get("meeting_role_refs"),
+        required=True,
+    )
+    overlap = set(protected) & set(meeting)
+    if overlap:
+        _reject(
+            f"stage {stage_index} ESCORT role references {sorted(overlap)} "
+            "appear as both protected and meeting roles"
+        )
+    return QuestObjective(
+        kind=ObjectiveKind.ESCORT,
+        quantity=quantity,
+        completion=completion,
+        protected_role_refs=protected,
+        meeting_role_refs=meeting,
+        relation=_compile_relation(stage_index, objective.get("relation")),
+    )

@@ -8,6 +8,7 @@ from world.quests.catalog import INTRODUCTORY_HUNT, register_catalog
 from world.quests.compile import SCENE_REQUIREMENT_REGISTRY
 from world.quests.definitions import (
     DestinationKind,
+    EscortCompletion,
     ObjectiveKind,
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
@@ -99,10 +100,30 @@ def reach(destination: RoomLocator | None = None, quantity=1) -> QuestObjective:
     )
 
 
-def escort(destination: RoomLocator | None = None) -> QuestObjective:
+def escort(
+    destination: RoomLocator | None = None,
+    *,
+    protected_role_refs: tuple[str, ...] = ("escortee",),
+    completion: EscortCompletion = EscortCompletion.DESTINATION,
+    meeting_role_refs: tuple[str, ...] = (),
+    relation: tuple[str, str, str] | None = None,
+) -> QuestObjective:
+    """Build one synthetic escort objective under the closed completion contract.
+
+    The default is a complete destination-mode escort with one exact protected
+    role reference; rendezvous mode passes ``completion=RENDEZVOUS`` and its
+    meeting roles. Passing ``destination=None`` with the default completion
+    still declares destination mode, so the missing-locator rejection stays
+    expressible.
+    """
     return QuestObjective(
         kind=ObjectiveKind.ESCORT,
+        quantity=1,
         destination=destination,
+        completion=completion,
+        protected_role_refs=protected_role_refs,
+        meeting_role_refs=meeting_role_refs,
+        relation=relation,
     )
 
 

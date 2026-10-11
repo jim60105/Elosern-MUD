@@ -19,6 +19,7 @@ from world.tests.synthetic_data import (
 )
 from world.quests.definitions import (
     DestinationKind,
+    EscortCompletion,
     MAX_DEFINITION_PROSE_LENGTH,
     MAX_DEFINITION_PROSE_TOTAL,
     ObjectiveKind,
@@ -1047,6 +1048,199 @@ class SiteClearOutDefinitionTests(QuestRegistryIsolation, unittest.TestCase):
         # Equal content is still a no-op when it is a fresh but equal value.
         register(quest("clear-out-idempotent", stages=(QuestStage(0, _clear_out()),)))
         self.assertIs(QUEST_DEFINITION_REGISTRY["clear-out-idempotent"], stored)
+
+
+class EscortCompletionContractTests(QuestRegistryIsolation, unittest.TestCase):
+    """The closed escort destination/rendezvous completion contract.
+
+    Pure synthetic validation: complete destination and rendezvous definitions
+    register and round-trip, and every missing, mixed, or ill-typed predicate is
+    a named refusal that leaves the registry unchanged.
+    """
+
+    def _objective(self, **overrides) -> QuestObjective:
+        base = {
+            "kind": ObjectiveKind.ESCORT,
+            "quantity": 1,
+            "destination": anchor_locator(),
+            "completion": EscortCompletion.DESTINATION,
+            "protected_role_refs": ("escortee",),
+        }
+        base.update(overrides)
+        return QuestObjective(**base)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_complete_destination_and_rendezvous_definitions_register(self):
+        destination = register(
+            quest(
+                "escort-destination",
+                quest_type=QuestType.ESCORT,
+                stages=(QuestStage(0, self._objective()),),
+            )
+        )
+        objective = destination.stages[0].objective
+        self.assertIs(objective.completion, EscortCompletion.DESTINATION)
+        self.assertEqual(objective.protected_role_refs, ("escortee",))
+        self.assertIsNotNone(objective.destination)
+
+        rendezvous = register(
+            quest(
+                "escort-rendezvous",
+                quest_type=QuestType.ESCORT,
+                stages=(
+                    QuestStage(
+                        0,
+                        self._objective(
+                            destination=None,
+                            completion=EscortCompletion.RENDEZVOUS,
+                            protected_role_refs=("daughter",),
+                            meeting_role_refs=("mother",),
+                            relation=("parent_child", "mother", "daughter"),
+                        ),
+                    ),
+                ),
+            )
+        )
+        objective = rendezvous.stages[0].objective
+        self.assertIs(objective.completion, EscortCompletion.RENDEZVOUS)
+        self.assertIsNone(objective.destination)
+        self.assertEqual(objective.meeting_role_refs, ("mother",))
+        self.assertEqual(objective.relation, ("parent_child", "mother", "daughter"))
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_missing_mixed_and_ill_typed_predicates_are_rejected(self):
+        invalid = (
+            (
+                "escort-no-discriminator",
+                self._objective(completion=None),
+            ),
+            ("escort-no-protected", self._objective(protected_role_refs=())),
+            (
+                "escort-mixed-modes",
+                self._objective(meeting_role_refs=("mother",)),
+            ),
+            (
+                "escort-destination-without-locator",
+                self._objective(destination=None),
+            ),
+            (
+                "escort-destination-with-relation",
+                self._objective(relation=("parent_child", "mother", "daughter")),
+            ),
+            (
+                "escort-rendezvous-with-locator",
+                self._objective(
+                    completion=EscortCompletion.RENDEZVOUS,
+                    protected_role_refs=("daughter",),
+                    meeting_role_refs=("mother",),
+                ),
+            ),
+            (
+                "escort-rendezvous-without-meeting",
+                self._objective(
+                    destination=None,
+                    completion=EscortCompletion.RENDEZVOUS,
+                ),
+            ),
+            (
+                "escort-overlapping-roles",
+                self._objective(
+                    destination=None,
+                    completion=EscortCompletion.RENDEZVOUS,
+                    protected_role_refs=("mother",),
+                    meeting_role_refs=("mother",),
+                ),
+            ),
+            (
+                "escort-duplicate-protected",
+                self._objective(protected_role_refs=("escortee", "escortee")),
+            ),
+            (
+                "escort-unknown-relation-kind",
+                self._objective(
+                    destination=None,
+                    completion=EscortCompletion.RENDEZVOUS,
+                    protected_role_refs=("daughter",),
+                    meeting_role_refs=("mother",),
+                    relation=("siblings", "mother", "daughter"),
+                ),
+            ),
+            (
+                "escort-relation-undeclared-role",
+                self._objective(
+                    destination=None,
+                    completion=EscortCompletion.RENDEZVOUS,
+                    protected_role_refs=("daughter",),
+                    meeting_role_refs=("mother",),
+                    relation=("parent_child", "mother", "stranger"),
+                ),
+            ),
+            (
+                "escort-self-relation",
+                self._objective(
+                    destination=None,
+                    completion=EscortCompletion.RENDEZVOUS,
+                    protected_role_refs=("daughter",),
+                    meeting_role_refs=("mother",),
+                    relation=("parent_child", "mother", "mother"),
+                ),
+            ),
+        )
+        for key, objective in invalid:
+            with self.subTest(key=key):
+                with self.assertRaises(QuestDefinitionError):
+                    register(
+                        quest(
+                            key,
+                            quest_type=QuestType.ESCORT,
+                            stages=(QuestStage(0, objective),),
+                        )
+                    )
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
+
+    @covers_requirement(
+        "quest-blueprint::quest-classifications-and-objective-mechanics-are-separate-closed-vocabularies"
+    )
+    def test_non_escort_objectives_cannot_declare_escort_fields(self):
+        invalid = (
+            (
+                "reach-with-completion",
+                QuestObjective(
+                    kind=ObjectiveKind.REACH,
+                    destination=anchor_locator(),
+                    completion=EscortCompletion.DESTINATION,
+                ),
+            ),
+            (
+                "acquire-with-protected-roles",
+                QuestObjective(
+                    kind=ObjectiveKind.ACQUIRE,
+                    quantity=1,
+                    item_key=next(iter(SYNTH_ITEMS)),
+                    protected_role_refs=("escortee",),
+                ),
+            ),
+            (
+                "defeat-with-relation",
+                QuestObjective(
+                    kind=ObjectiveKind.DEFEAT,
+                    quantity=1,
+                    monster_tier=next(iter(SYNTH_MONSTER_TIERS)),
+                    relation=("parent_child", "a", "b"),
+                ),
+            ),
+        )
+        for key, objective in invalid:
+            with self.subTest(key=key):
+                with self.assertRaisesRegex(
+                    QuestDefinitionError, "cannot declare escort completion fields"
+                ):
+                    register(quest(key, stages=(QuestStage(0, objective),)))
+                self.assertNotIn(key, QUEST_DEFINITION_REGISTRY)
 
 
 if __name__ == "__main__":

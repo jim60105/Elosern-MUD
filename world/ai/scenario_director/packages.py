@@ -29,6 +29,11 @@ OBJECTIVE_KINDS: tuple[str, ...] = (
 )
 RELATIONSHIP_KINDS: tuple[str, ...] = ("parent_child",)
 EFFECT_VERBS: tuple[str, ...] = ("offer_commission",)
+#: The closed escort completion discriminator. Duplicated here rather than
+#: imported because ``world/ai`` may not import the ``world.quests`` state
+#: writer package; a repository-wide drift test pins it equal to
+#: ``world.quests.definitions.EscortCompletion``.
+ESCORT_COMPLETIONS: tuple[str, ...] = ("destination", "rendezvous")
 
 MAX_ID_LENGTH = 64
 MAX_PROSE = 500
@@ -154,6 +159,44 @@ _PHASE = {
     },
 }
 
+_ESCORT_RESULT = {
+    "type": "object",
+    "required": ["completion", "protected_role_refs"],
+    "additionalProperties": False,
+    "properties": {
+        "completion": {"enum": list(ESCORT_COMPLETIONS)},
+        "protected_role_refs": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": MAX_ROLES,
+            "items": {"type": "string", "minLength": 1, "maxLength": MAX_ID_LENGTH},
+        },
+        "meeting_role_refs": {
+            "type": "array",
+            "maxItems": MAX_ROLES,
+            "items": {"type": "string", "minLength": 1, "maxLength": MAX_ID_LENGTH},
+        },
+        "relation": {
+            "type": ["object", "null"],
+            "required": ["kind", "from_role", "to_role"],
+            "additionalProperties": False,
+            "properties": {
+                "kind": {"enum": list(RELATIONSHIP_KINDS)},
+                "from_role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_ID_LENGTH,
+                },
+                "to_role": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": MAX_ID_LENGTH,
+                },
+            },
+        },
+    },
+}
+
 #: The canonical bounded scene-package payload contract.
 PACKAGE_PAYLOAD_SCHEMA: dict[str, Any] = {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -168,7 +211,7 @@ PACKAGE_PAYLOAD_SCHEMA: dict[str, Any] = {
         "knowledge",
         "encounters",
         "dialogue",
-        "commission",
+        "commissions",
     ],
     "additionalProperties": False,
     "properties": {
@@ -271,17 +314,59 @@ PACKAGE_PAYLOAD_SCHEMA: dict[str, Any] = {
                 },
             },
         },
-        "commission": {
-            "type": ["object", "null"],
-            "required": ["role_id", "issuer_content_key"],
-            "additionalProperties": False,
-            "properties": {
-                "role_id": {"type": "string", "minLength": 1, "maxLength": MAX_ID_LENGTH},
-                "issuer_content_key": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 60,
-                    "pattern": "^[^0-9][^:]*$",
+        #: The package's distinct role-issued commission declarations. Empty
+        #: for a guild-branch package; otherwise at least one entry, and the
+        #: quest's declared issuer role must be among them (escort design §7).
+        "commissions": {
+            "type": "array",
+            "maxItems": MAX_ROLES,
+            "items": {
+                "type": "object",
+                "required": ["role_id", "issuer_content_key"],
+                "additionalProperties": False,
+                "properties": {
+                    "role_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_ID_LENGTH,
+                    },
+                    "issuer_content_key": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 60,
+                        "pattern": "^[^0-9][^:]*$",
+                    },
+                },
+            },
+        },
+        #: The optional explicit exclusive outcome groups. A group's ``result``
+        #: is the concrete final escort predicate and ``alternatives`` the
+        #: distinct commission definition keys it obsoletes; story-thread
+        #: identity alone implies no exclusivity (escort design §7).
+        "outcome_groups": {
+            "type": "array",
+            "maxItems": MAX_ROLES,
+            "items": {
+                "type": "object",
+                "required": ["group_id", "result", "alternatives"],
+                "additionalProperties": False,
+                "properties": {
+                    "group_id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_ID_LENGTH,
+                    },
+                    "result": _ESCORT_RESULT,
+                    "alternatives": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": MAX_ROLES,
+                        "items": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": MAX_ID_LENGTH,
+                        },
+                    },
                 },
             },
         },

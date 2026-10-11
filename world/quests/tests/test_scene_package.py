@@ -43,7 +43,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
         definition = validate_scene_package(_package())
         self.assertTrue(definition.package_id.startswith("pkg_"))
         self.assertEqual(definition.role_ids(), frozenset({"mother", "daughter"}))
-        self.assertEqual(definition.commission.role_id, "mother")
+        self.assertEqual(
+            [commission.role_id for commission in definition.commissions], ["mother"]
+        )
         self.assertIsNone(definition.guild_branch)
 
     def test_unknown_encounter_role_is_rejected(self):
@@ -180,10 +182,10 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
     def test_a_guild_branch_package_registers_its_offer(self):
         package = _package(
             quest=_quest_payload(issuer=_issuer_key()),
-            commission=None,
+            commissions=[],
         )
         published = publish_scene_package(package, owner="tester")
-        self.assertIsNone(published.definition.commission)
+        self.assertEqual(published.definition.commissions, ())
         self.assertEqual(len(GUILD_OFFER_REGISTRY), 1)
         self.assertEqual(scene_store.list_commission_grants(published.package_id), [])
 

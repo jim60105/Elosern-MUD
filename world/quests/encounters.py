@@ -169,14 +169,14 @@ def _publish_definition_views_for(
         )
         return
     publish_definition_views(core.definition, core.stage_requirements)
-    assert definition.commission is not None
-    scene_store.ensure_commission_grant(
-        row,
-        definition.commission.role_id,
-        definition.commission.definition_key,
-        issuer_key=definition.commission.issuer_key,
-        tick=0,
-    )
+    for commission in definition.commissions:
+        scene_store.ensure_commission_grant(
+            row,
+            commission.role_id,
+            commission.definition_key,
+            issuer_key=commission.issuer_key,
+            tick=0,
+        )
 
 
 def lookup_story_role(package_id: str, role_id: str) -> StoryRoleLookup:
@@ -197,10 +197,11 @@ def lookup_story_role(package_id: str, role_id: str) -> StoryRoleLookup:
     if role_definition is None:
         raise SceneRoleNotFound(f"role {role_id!r} is not defined by package {package_id!r}")
     binding = scene_store.get_role_binding(package_id, role_id)
-    commission = row.payload.get("commission")
     issuer_key = None
-    if isinstance(commission, dict) and commission.get("role_id") == role_id:
-        issuer_key = symbolic_issuer_key(commission.get("issuer_content_key"))
+    for commission in row.payload.get("commissions") or []:
+        if isinstance(commission, dict) and commission.get("role_id") == role_id:
+            issuer_key = symbolic_issuer_key(commission.get("issuer_content_key"))
+            break
     return StoryRoleLookup(
         package_id=package_id,
         role_id=role_id,

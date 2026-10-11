@@ -123,6 +123,42 @@ def _validate_scene_bound_rules(
         )
 
 
+def _objective_canonical(objective: QuestObjective) -> dict[str, Any]:
+    """Serialize one objective into the canonical definition-digest shape.
+
+    The base shape (kind/quantity/selectors/destination) is always present, so
+    a non-escort objective contributes a byte-identical digest to the pre-change
+    output; the escort completion fields join it only when declared, so two
+    escort objectives differing in predicate, roles, or typed relation stay
+    distinguishable while every existing key is unchanged.
+    """
+    canonical: dict[str, Any] = {
+        "kind": objective.kind.value,
+        "quantity": objective.quantity,
+        "monster_tier": objective.monster_tier,
+        "destination": (
+            None
+            if objective.destination is None
+            else {
+                "kind": objective.destination.kind.value,
+                "anchor_key": objective.destination.anchor_key,
+                "xyz": objective.destination.xyz,
+            }
+        ),
+        "requires_bound_targets": objective.requires_bound_targets,
+        "item_key": objective.item_key,
+    }
+    if objective.completion is not None:
+        canonical["completion"] = objective.completion.value
+    if objective.protected_role_refs:
+        canonical["protected_role_refs"] = list(objective.protected_role_refs)
+    if objective.meeting_role_refs:
+        canonical["meeting_role_refs"] = list(objective.meeting_role_refs)
+    if objective.relation is not None:
+        canonical["relation"] = list(objective.relation)
+    return canonical
+
+
 @dataclass(frozen=True)
 class CompiledBlueprintCore:
     """The issuer-independent part of a compiled proposal.
@@ -288,22 +324,7 @@ def compile_blueprint_core(
         "stages": [
             {
                 "index": stage.index,
-                "objective": {
-                    "kind": stage.objective.kind.value,
-                    "quantity": stage.objective.quantity,
-                    "monster_tier": stage.objective.monster_tier,
-                    "destination": (
-                        None
-                        if stage.objective.destination is None
-                        else {
-                            "kind": stage.objective.destination.kind.value,
-                            "anchor_key": stage.objective.destination.anchor_key,
-                            "xyz": stage.objective.destination.xyz,
-                        }
-                    ),
-                    "requires_bound_targets": stage.objective.requires_bound_targets,
-                    "item_key": stage.objective.item_key,
-                },
+                "objective": _objective_canonical(stage.objective),
             }
             for stage in quest_stages
         ],

@@ -39,7 +39,16 @@ from world.quests.compile.fields import (
     _validate_scene_fields,
     _validate_strings,
 )
-from world.quests.definitions import DestinationKind, RoomLocator
+from world.quests.definitions import (
+    RELATIONSHIP_KINDS,
+    DestinationKind,
+    EscortCompletion,
+    ObjectiveKind,
+    QuestDefinitionError,
+    QuestObjective,
+    RoomLocator,
+    validate_escort_predicate,
+)
 from world.quests.phases import (
     REGISTERED_FACTS,
     condition_matches,
@@ -52,11 +61,13 @@ class ScenePackageError(QuestCompileError):
     """A scene-package payload violates the bounded package contract."""
 
 
-#: The closed typed-relationship vocabulary. ``parent_child`` is directed
-#: (from_role is the parent, to_role the child); declaring the reverse of an
-#: existing pair, or the same ordered pair twice, is an inconsistent reciprocal
-#: relation. A relationship never confers private knowledge.
-RELATIONSHIP_KINDS: tuple[str, ...] = ("parent_child",)
+#: The closed typed-relationship vocabulary is owned by the quest definitions
+#: module (``world.quests.definitions.RELATIONSHIP_KINDS``) and re-exported
+#: here so the scene-package contract and an escort rendezvous predicate cannot
+#: drift: ``parent_child`` is directed (from_role is the parent, to_role the
+#: child). Declaring the reverse of an existing pair, or the same ordered pair
+#: twice, is an inconsistent reciprocal relation. A relationship never confers
+#: private knowledge.
 
 #: The closed domain-effect vocabulary a scripted topic may name. Every verb
 #: resolves through the deterministic commission APIs at execution time; a label
@@ -153,6 +164,39 @@ class SymbolicIssuer:
 
 
 @dataclass(frozen=True)
+class OutcomeResultDefinition:
+    """One exclusive group's concrete final-result condition (design §7).
+
+    The same closed predicate an ESCORT objective declares, validated through
+    the shared quest-definition seam: a completion discriminator, exact
+    protected role references, and — for rendezvous — exact meeting role
+    references with an optional typed relation. Every reference names a role
+    this package defines, so the condition is executable, never prose.
+    """
+
+    completion: EscortCompletion
+    protected_role_refs: tuple[str, ...]
+    meeting_role_refs: tuple[str, ...]
+    relation: tuple[str, str, str] | None
+
+
+@dataclass(frozen=True)
+class OutcomeGroupDefinition:
+    """One explicit final-result group and the commissions it obsoletes.
+
+    ``alternative_definition_keys`` names the distinct commission definitions
+    that become obsolete once the result holds (design §7). Story-thread
+    identity alone implies no exclusivity; only an explicit declaration here
+    does. Each alternative keeps its own definition, issuer, record, protected
+    roles, deadline and registered reward.
+    """
+
+    group_id: str
+    result: OutcomeResultDefinition
+    alternative_definition_keys: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ScenePackageDefinition:
     """One fully validated scene package."""
 
@@ -164,7 +208,13 @@ class ScenePackageDefinition:
     knowledge: tuple[KnowledgeClaim, ...]
     encounters: tuple[EncounterDefinition, ...]
     dialogue: tuple[RoleDialogue, ...]
-    commission: SymbolicIssuer | None
+    #: Every distinct role-issued commission this package declares. Empty for a
+    #: guild-branch package; at least one entry otherwise, and the quest's
+    #: declared issuer role must be among them.
+    commissions: tuple[SymbolicIssuer, ...]
+    #: Every explicit exclusive outcome group this package declares, in payload
+    #: order. Absent from a package that declares no exclusivity.
+    outcome_groups: tuple[OutcomeGroupDefinition, ...]
     guild_branch: str | None
     quest: CompiledBlueprintCore
 
@@ -176,6 +226,22 @@ class ScenePackageDefinition:
 
     def role_dialogue(self, role_id: str) -> RoleDialogue | None:
         return next((d for d in self.dialogue if d.role_id == role_id), None)
+
+    def commission_for_role(self, role_id: str) -> SymbolicIssuer | None:
+        """The distinct commission declared for one role, or ``None``.
+
+        A role issues at most one commission per package, so the lookup is
+        unambiguous; a role with no declaration issues nothing.
+        """
+        return next(
+            (c for c in self.commissions if c.role_id == role_id),
+            None,
+        )
+
+    def outcome_group(self, group_id: str) -> OutcomeGroupDefinition | None:
+        return next(
+            (g for g in self.outcome_groups if g.group_id == group_id), None
+        )
 
     def role_ids(self) -> frozenset[str]:
         return frozenset(r.role_id for r in self.roles)
@@ -713,29 +779,210 @@ def _reject_overlapping_phases(role_id: str, phases: list[DialoguePhase]) -> Non
             )
 
 
-def _validate_commission(
-    entry: Any, roles: dict[str, RoleDefinition], definition_key: str
-) -> SymbolicIssuer | None:
-    if entry is None:
-        return None
-    entry = _require_mapping(entry, "package.commission")
-    if set(entry) != {"role_id", "issuer_content_key"}:
-        _reject_package(
-            "package.commission must declare exactly role_id and issuer_content_key"
+def _validate_commissions(
+    entries: Any, roles: dict[str, RoleDefinition], definition_key: str
+) -> tuple[SymbolicIssuer, ...]:
+    """Validate the package's distinct role-issued commission declarations.
+
+    Each entry declares one exact role and its authored issuer content key; two
+    entries may not name the same role (one role issues one commission identity
+    per package), and every issuer key must parse under the shared grammar. A
+    guild-branch package declares none. Identical structural validation as the
+    previous single-commission contract, extended to the declared set.
+    """
+    if entries is None:
+        return ()
+    if not isinstance(entries, list):
+        _reject_package("package.commissions must be an array")
+    commissions: list[SymbolicIssuer] = []
+    seen_roles: set[str] = set()
+    for position, entry in enumerate(entries):
+        entry = _require_mapping(entry, f"package.commissions[{position}]")
+        if set(entry) != {"role_id", "issuer_content_key"}:
+            _reject_package(
+                f"package.commissions[{position}] must declare exactly role_id "
+                "and issuer_content_key"
+            )
+        role_id = entry.get("role_id")
+        if not isinstance(role_id, str) or role_id not in roles:
+            _reject_package(
+                f"package.commissions[{position}] names unknown role {role_id!r}"
+            )
+        if role_id in seen_roles:
+            _reject_package(
+                f"package.commissions declares role {role_id!r} more than once"
+            )
+        seen_roles.add(role_id)
+        content_key = entry.get("issuer_content_key")
+        if not isinstance(content_key, str) or not content_key:
+            _reject_package(
+                f"package.commissions[{position}].issuer_content_key must be a "
+                "non-empty string"
+            )
+        try:
+            issuer_key = npc_issuer_key(content_key)
+        except IssuerKeyError as error:
+            _reject_package(
+                f"package.commissions[{position}] issuer key is invalid: {error}"
+            )
+        commissions.append(
+            SymbolicIssuer(
+                role_id=role_id, issuer_key=issuer_key, definition_key=definition_key
+            )
         )
-    role_id = entry.get("role_id")
-    if not isinstance(role_id, str) or role_id not in roles:
-        _reject_package(f"package.commission names unknown role {role_id!r}")
-    content_key = entry.get("issuer_content_key")
-    if not isinstance(content_key, str) or not content_key:
-        _reject_package("package.commission.issuer_content_key must be a non-empty string")
-    try:
-        issuer_key = npc_issuer_key(content_key)
-    except IssuerKeyError as error:
-        _reject_package(f"package.commission issuer key is invalid: {error}")
-    return SymbolicIssuer(
-        role_id=role_id, issuer_key=issuer_key, definition_key=definition_key
+    return tuple(commissions)
+
+
+def _validate_outcome_groups(
+    entries: Any,
+    role_ids: set[str],
+    definition: Any,
+) -> tuple[OutcomeGroupDefinition, ...]:
+    """Validate the package's explicit exclusive outcome groups (design §7).
+
+    Each group declares a bounded group id, a concrete final-result condition
+    validated through the shared escort-predicate seam, and the nonempty,
+    de-duplicated set of alternative commission definitions the result
+    obsoletes. The result's role references must be roles this package defines,
+    so the declared condition is executable against the bound actors; the
+    alternative list may reference any definition key, because each alternative
+    keeps its own package/definition/reward.
+    """
+    if entries is None:
+        return ()
+    if not isinstance(entries, list):
+        _reject_package("package.outcome_groups must be an array")
+    groups: list[OutcomeGroupDefinition] = []
+    seen_ids: set[str] = set()
+    for position, entry in enumerate(entries):
+        where = f"package.outcome_groups[{position}]"
+        entry = _require_mapping(entry, where)
+        if set(entry) != {"group_id", "result", "alternatives"}:
+            _reject_package(
+                f"{where} must declare exactly group_id, result and alternatives"
+            )
+        group_id = entry.get("group_id")
+        if not isinstance(group_id, str) or not group_id:
+            _reject_package(f"{where}.group_id must be a non-empty string")
+        if len(group_id) > MAX_ID_LENGTH:
+            _reject_package(
+                f"{where}.group_id exceeds the {MAX_ID_LENGTH}-character bound"
+            )
+        if group_id in seen_ids:
+            _reject_package(f"{where}.group_id {group_id!r} is declared twice")
+        seen_ids.add(group_id)
+        result = _validate_outcome_result(
+            _require_mapping(entry.get("result"), f"{where}.result"), role_ids, definition
+        )
+        alternatives = entry.get("alternatives")
+        if not isinstance(alternatives, list) or not alternatives:
+            _reject_package(f"{where}.alternatives must be a non-empty array")
+        keys: list[str] = []
+        for index, key in enumerate(alternatives):
+            if not isinstance(key, str) or not key:
+                _reject_package(
+                    f"{where}.alternatives[{index}] must be a non-empty "
+                    "definition key"
+                )
+            if len(key) > MAX_ID_LENGTH:
+                _reject_package(
+                    f"{where}.alternatives[{index}] exceeds the "
+                    f"{MAX_ID_LENGTH}-character bound"
+                )
+            if key in keys:
+                _reject_package(
+                    f"{where}.alternatives declares {key!r} more than once"
+                )
+            keys.append(key)
+        groups.append(
+            OutcomeGroupDefinition(
+                group_id=group_id,
+                result=result,
+                alternative_definition_keys=tuple(keys),
+            )
+        )
+    return tuple(groups)
+
+
+def _validate_outcome_result(
+    entry: dict[str, Any],
+    role_ids: set[str],
+    definition: Any,
+) -> OutcomeResultDefinition:
+    """Validate one concrete final-result condition through the shared seam."""
+    allowed = {"completion", "protected_role_refs", "meeting_role_refs", "relation"}
+    unknown = set(entry) - allowed
+    if unknown:
+        _reject_package(
+            f"outcome result declares unknown fields {sorted(unknown)}"
+        )
+    completion_value = entry.get("completion")
+    if not isinstance(completion_value, str) or completion_value not in {
+        completion.value for completion in EscortCompletion
+    }:
+        _reject_package(
+            "an outcome result requires exactly one completion discriminator "
+            "(destination or rendezvous)"
+        )
+    completion = EscortCompletion(completion_value)
+    protected = _result_role_refs(entry.get("protected_role_refs"), "protected_role_refs")
+    meeting = _result_role_refs(entry.get("meeting_role_refs"), "meeting_role_refs")
+    relation = entry.get("relation")
+    relation_tuple: tuple[str, str, str] | None = None
+    if relation is not None:
+        relation = _require_mapping(relation, "outcome result.relation")
+        if set(relation) != {"kind", "from_role", "to_role"}:
+            _reject_package(
+                "an outcome result relation must declare exactly kind, from_role "
+                "and to_role"
+            )
+        relation_tuple = (
+            relation.get("kind"),
+            relation.get("from_role"),
+            relation.get("to_role"),
+        )
+    referenced = set(protected) | set(meeting)
+    unknown_roles = referenced - role_ids
+    if unknown_roles:
+        _reject_package(
+            f"outcome result references undeclared package roles "
+            f"{sorted(unknown_roles)}"
+        )
+    predicate = QuestObjective(
+        kind=ObjectiveKind.ESCORT,
+        quantity=1,
+        completion=completion,
+        protected_role_refs=protected,
+        meeting_role_refs=meeting,
+        relation=relation_tuple,
     )
+    try:
+        validate_escort_predicate(definition, predicate)
+    except QuestDefinitionError as error:
+        _reject_package(f"outcome result is not a closed escort predicate: {error}")
+    return OutcomeResultDefinition(
+        completion=completion,
+        protected_role_refs=protected,
+        meeting_role_refs=meeting,
+        relation=relation_tuple,
+    )
+
+
+def _result_role_refs(value: Any, field_name: str) -> tuple[str, ...]:
+    """Decode one outcome-result role-reference list into a strict string tuple."""
+    if value is None:
+        return ()
+    if not isinstance(value, list):
+        _reject_package(f"outcome result {field_name} must be an array")
+    refs: list[str] = []
+    for position, entry in enumerate(value):
+        if not isinstance(entry, str) or not entry:
+            _reject_package(
+                f"outcome result {field_name}[{position}] must be a non-empty "
+                "role reference"
+            )
+        refs.append(entry)
+    return tuple(refs)
 
 
 def validate_scene_package(payload: Any) -> ScenePackageDefinition:
@@ -762,7 +1009,7 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
     write.
     """
     payload = _require_mapping(payload, "package payload")
-    if set(payload) != {
+    allowed_keys = {
         "display_name",
         "source_id",
         "quest",
@@ -771,11 +1018,20 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
         "knowledge",
         "encounters",
         "dialogue",
-        "commission",
-    }:
+        "commissions",
+        "outcome_groups",
+    }
+    unknown_keys = set(payload) - allowed_keys
+    if unknown_keys:
         _reject_package(
-            "package payload must declare exactly display_name, source_id, quest, "
-            "roles, relationships, knowledge, encounters, dialogue, commission"
+            f"package payload declares unknown keys {sorted(unknown_keys)}; allowed "
+            "keys are display_name, source_id, quest, roles, relationships, "
+            "knowledge, encounters, dialogue, commissions, outcome_groups"
+        )
+    missing_keys = (allowed_keys - {"outcome_groups"}) - set(payload)
+    if missing_keys:
+        _reject_package(
+            f"package payload is missing required keys {sorted(missing_keys)}"
         )
     _bounded_prose("package.display_name", payload.get("display_name"), 80, required=True)
     source_id = payload.get("source_id")
@@ -790,18 +1046,18 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
 
     quest_payload = _require_mapping(payload.get("quest"), "package.quest")
     issuer = quest_payload.get("issuer")
-    commission_entry = payload.get("commission")
+    commission_entries = payload.get("commissions")
     # The published package's own validated role set enables the single bounded
     # permanent-occupant exception; a standalone payload passes none.
     quest_core = compile_blueprint_core(quest_payload, package_roles=role_ids)
     definition_key = quest_core.definition.key
 
-    commission: SymbolicIssuer | None = None
+    commissions: tuple[SymbolicIssuer, ...] = ()
     guild_branch: str | None = None
     if isinstance(issuer, str) and issuer in GUILD_BRANCH_REGISTRY:
-        if commission_entry is not None:
+        if commission_entries:
             _reject_package(
-                "a guild-branch package must not also declare a symbolic commission"
+                "a guild-branch package must not also declare symbolic commissions"
             )
         guild_branch = issuer
     else:
@@ -814,17 +1070,23 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
             _reject_package(
                 f"issuer role {issuer!r} must be a conversable generated role"
             )
-        commission = _validate_commission(commission_entry, role_index, definition_key)
-        if commission is None or commission.role_id != issuer:
+        commissions = _validate_commissions(
+            commission_entries, role_index, definition_key
+        )
+        if issuer not in {commission.role_id for commission in commissions}:
             _reject_package(
-                "a symbolic package issuer requires a matching package.commission "
+                "a symbolic package issuer requires a matching package.commissions "
                 "declaration"
             )
         if quest_core.reward.merit != 0:
             _reject_package(
-                f"private commission {commission.issuer_key!r} cannot grant guild "
-                f"merit, got {quest_core.reward.merit}"
+                f"private commissions cannot grant guild merit, got "
+                f"{quest_core.reward.merit}"
             )
+
+    outcome_groups = _validate_outcome_groups(
+        payload.get("outcome_groups"), role_ids, quest_core.definition
+    )
 
     definition_keys = {definition_key}
     encounters = _validate_encounters(payload.get("encounters"), role_ids)
@@ -840,7 +1102,8 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
             "knowledge": payload.get("knowledge") or [],
             "encounters": payload["encounters"],
             "dialogue": payload["dialogue"],
-            "commission": commission_entry,
+            "commissions": commission_entries or [],
+            "outcome_groups": payload.get("outcome_groups") or [],
         }
     )
     return ScenePackageDefinition(
@@ -852,7 +1115,8 @@ def _validate_package_impl(payload: Any) -> ScenePackageDefinition:
         knowledge=knowledge,
         encounters=encounters,
         dialogue=dialogue,
-        commission=commission,
+        commissions=commissions,
+        outcome_groups=outcome_groups,
         guild_branch=guild_branch,
         quest=quest_core,
     )

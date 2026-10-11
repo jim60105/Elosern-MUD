@@ -255,17 +255,16 @@ def _provision_role(
     tick: int,
 ) -> str | None:
     """Provision the declared scoped commission for one freshly spawned issuer."""
-    commission = definition.commission
-    if commission is None or commission.role_id != role_id:
+    commission = definition.commission_for_role(role_id)
+    if commission is None:
         return None
     from world.rules.quest_issuance import provision_scoped_issuer
 
-    payload_commission = row.payload.get("commission")
-    content_key = (
-        payload_commission.get("issuer_content_key")
-        if isinstance(payload_commission, dict)
-        else None
-    )
+    content_key = None
+    for entry in row.payload.get("commissions") or []:
+        if isinstance(entry, dict) and entry.get("role_id") == role_id:
+            content_key = entry.get("issuer_content_key")
+            break
     actual = provision_scoped_issuer(actor, content_key=content_key)
     scene_store.assign_grant_actor(
         row, role_id, commission.definition_key, int(actor.pk), tick=tick
@@ -366,8 +365,7 @@ def _replay(
             grant.issuer_key
             for grant in scene_store.list_commission_grants(row.package_id)
             if grant.registered
-            and definition.commission is not None
-            and grant.role_id == definition.commission.role_id
+            and definition.commission_for_role(grant.role_id) is not None
         ),
         room_id=existing.room_id,
     )
