@@ -32,13 +32,13 @@ Include immediate healing as an unscaled baseline feature. Finishing, cost, wast
 
 ## 4. Calculable control and buffs
 
-Evaluate only modifiers with supported pure semantics: changes to resolved action availability, accuracy/damage output, defenses, or resource economy that affect a concrete eligible beneficiary within the next action opportunity. Reuse the existing modifier compiler and rulebook bounds in a hypothetical immutable projection; do not install a buff or call its handler.
+Evaluate only modifiers with supported pure semantics that change resolved action availability, accuracy/damage output, defenses, or resource economy for a concrete eligible beneficiary within the next action opportunity. Reuse the existing modifier compiler and rulebook bounds in a hypothetical immutable projection; do not install a buff or call its handler.
 
 The estimation horizon is one action opportunity for each affected participant, respecting the existing duration/tick timing. Expired effects, already equivalent/stronger non-stacking effects, participants with no remaining opportunity before expiry, and fully capped effects have zero marginal benefit. Reapplying an effect cannot receive its full value repeatedly.
 
 Action denial is the reduction in available legal action opportunities divided by baseline opportunities. Other supported buffs/control use the bounded change in estimated offensive health impact or prevented incoming health impact, normalized by the appropriate faction HP capacity. If the outcome depends on an unsupported reaction or condition, omit uncertain positive value and report the limitation. Unsupported harmful consequences exclude the candidate.
 
-A generic name such as stun, fear, or shield does not establish value. An estimator needs the existing definition's concrete modifiers and timing. Support/control implementation is complete only when synthetic real effects establish useful selection and committed resolution; a placeholder estimate is insufficient.
+A generic name such as stun, fear, or shield does not establish value. An estimator needs the existing definition's concrete modifiers and timing. Support/control completion requires synthetic real effects establishing useful selection and committed resolution, not merely a constant score.
 
 ## 5. Observed focus and threat
 

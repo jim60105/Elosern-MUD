@@ -16,7 +16,7 @@ Existing `legacy` behavior is an explicitly retained decision mode and rollback 
 
 ## 2. Evidence and corrections to the handoff
 
-The supplied [implementation handoff](../../../tmp/Elosern-MUD-Monster-AI-Implementation-Handoff.md) is the research and intent input. Current code was inspected at baseline commit `99a69d31`.
+The supplied `tmp/Elosern-MUD-Monster-AI-Implementation-Handoff.md` is the research and intent input. This temporary input is not required to understand the approved contracts below. Current code was inspected at baseline commit `99a69d31`.
 
 | Boundary | Current evidence | Design consequence |
 |---|---|---|
@@ -62,7 +62,7 @@ Let `i = intelligence / 100`. Immediate damage, useful healing, and archetype pr
 
 Selection uses stable softmax with initial temperature `T = 1.25 - 1.17 * i`. This is initial tuning, not a permanent balance assertion. Equal scores yield uniform sampling. Invalid scores or configuration fail explicitly. No intelligence value may bypass a mandatory target, resource, ownership, or cast gate.
 
-Archetype preferences remain distinct: simple attacks for `instinctive`, weak-prey/focus preferences for `pack_hunter`, direct pressure on strong enemies for `brute`, spell efficiency for `tactical_caster`, finishing and coverage for `apex_predator`, and single-target ambush preference for `ambush_predator`. These preferences never prescribe a variant's intelligence.
+Archetype preferences remain distinct. They favor simple attacks for `instinctive`, weak-prey/focus for `pack_hunter`, direct pressure on strong enemies for `brute`, spell efficiency for `tactical_caster`, finishing and coverage for `apex_predator`, and single-target ambush for `ambush_predator`. These preferences never prescribe a variant's intelligence.
 
 ## 7. Memory and transactional lifetime
 

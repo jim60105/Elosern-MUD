@@ -45,7 +45,7 @@ The session adapter must construct normal or overwhelm context before policy sel
 
 For `SINGLE`, expand each valid target independently. For enemy-only `AREA`, create the actual legal group or existing `all-enemies` shorthand once. For `SELF` and `NONE`, use their existing binding rather than inventing an external target. Use current preview semantics for mixed-audience skills; do not assume every effect's broad recipient roster is actually submitted.
 
-Mixed skills use a bounded set of semantically meaningful plans: the approved complete roster and the legal audience subsets supported by current target gates. At most one plan per distinct friendly/hostile audience combination is needed; do not enumerate arbitrary subsets. Self-bound effects are estimated on the actor regardless of external target omission. Reject plans that would apply an unsupported potentially harmful effect or whose audience effects cannot be represented consistently.
+Mixed skills use a bounded set of semantically meaningful plans comprising the approved complete roster and the legal audience subsets supported by current target gates. At most one plan per distinct friendly/hostile audience combination is needed; do not enumerate arbitrary subsets. Self-bound effects are estimated on the actor regardless of external target omission. Reject plans that would apply an unsupported potentially harmful effect or whose audience effects cannot be represented consistently.
 
 Deduplicate by canonical skill, scale, and sorted stable explicit target identifiers, expanding shorthands for identity comparison. Duplicate representations cannot increase sampling probability. Retain the correct runtime representation in the selected request.
 
@@ -53,13 +53,13 @@ Deduplicate by canonical skill, scale, and sorted stable explicit target identif
 
 Keep the legacy flee threshold and `FLEE_SKILL_KEY` unchanged and outside the scored attack pool.
 
-For hostile single-target damage, first restrict to applicable `lamb_seal` bearers. If the actor lacks any genuinely castable non-strike hostile single-target damage skill, remove displaced targets. Then take the first remaining target in the existing canonical order. Having a non-strike self-heal does not satisfy the alternative-attack condition. Area attacks and friendly support are not restricted by this single-target seal rule.
+For hostile single-target damage, first restrict to applicable `lamb_seal` bearers when any are present. If the actor lacks any genuinely castable non-strike hostile single-target damage skill, remove displaced targets. With an applicable seal, take the first remaining bearer in the existing canonical order; without a seal, retain the ordinary eligible target pool for utility comparison. A strike-only candidate must still exclude displaced targets even if another skill provides a legal non-strike alternative. Having a non-strike self-heal does not satisfy the alternative-attack condition. Area attacks and friendly support are not restricted by this single-target seal rule.
 
 A higher score cannot restore a removed target. Empty legal candidates return `None`. Do not force an attack or invoke legacy merely because utility found no legal candidates.
 
 ### Candidate budget
 
-The initial budget is 256 deduplicated proposed candidates, configurable as a positive bounded integer. Generate deterministically and allocate slots round-robin across skill/semantic target-plan families after mandatory restrictions. Do not fill the budget from lexically early skill names alone. Within a single-target family, use the archetype's declared target ordering and stable IDs for ties.
+The initial budget is 256 deduplicated proposed candidates, configurable as an integer in 1..4096. Generate deterministically and allocate slots round-robin across skill/semantic target-plan families after mandatory restrictions. Start the canonical family ring at an offset derived from the decision scope digest, without consuming selection or combat RNG. This avoids privileging lexically early families when even one proposal per family would exceed the budget. Within a single-target family, use the archetype's declared target ordering and stable IDs for ties.
 
 Report budget exhaustion and omitted family/target counts. The bound limits proposals examined, including rejected proposals, so invalid candidates cannot cause an unbounded loop. Evaluate each distinct skill's broad preview once and reuse it when validating its target plans. The budget does not impose a game participant limit.
 
@@ -71,7 +71,7 @@ Share reusable scalar arithmetic with combat settlement for base damage, effect 
 
 For supported ordinary damage, average the existing d100 outcome ranges analytically using rulebook values, with the actual hit-gate and multi-strike topology. Do not assume repeated strikes have independent hit gates if the resolver shares one. Track ordered per-target projections so later damage/healing effects see the projected remaining HP instead of independently claiming the full initial HP.
 
-For reactions, diversion, conditional effects, and multi-strike interactions that cannot be represented exactly, use an explicitly labeled conservative estimate: omit uncertain beneficial conditional effects, subtract known shielding/diversion limits, and award finishing credit only when a supported outcome model or guaranteed-on-hit lower bound establishes it. Report these limits. No full encounter prediction is claimed. Unknown potentially harmful outcomes exclude the candidate; unknown harmless benefits contribute zero and appear in diagnostics.
+For reactions, diversion, conditional effects, and multi-strike interactions that cannot be represented exactly, use an explicitly labeled conservative estimate. Omit uncertain beneficial conditional effects, subtract known shielding/diversion limits, and award finishing credit only when a supported outcome model or guaranteed-on-hit lower bound establishes it. Report these limits. No full encounter prediction is claimed. Unknown potentially harmful outcomes exclude the candidate; unknown harmless benefits contribute zero and appear in diagnostics.
 
 Conditional effects use their actual prerequisites. A failed-hit branch must not receive unconditional healing, drain recovery, or buff value. Damage drained from a target cannot credit more recovery than projected actual loss. Current costs are evaluated at the candidate's scale and proficiency using the same read-only cost rules as settlement.
 
