@@ -10,10 +10,6 @@ directly on its ordinary entry/step path and never routes through
 from dataclasses import replace
 from typing import Any
 
-from evennia.objects.models import ObjectDB
-
-from typeclasses.entities import LivingEntity
-
 from .definitions import DestinationKind, ObjectiveKind, QuestDefinition, RoomLocator
 from .runtime import (
     QuestRecord,
@@ -138,23 +134,6 @@ def observe_arrival_lore(
         )
 
 
-def _escort_ready(room: Any, protected_entity_ids: tuple[int, ...]) -> bool:
-    """Require at least one protected entity, all alive and present in ``room``."""
-    if not protected_entity_ids:
-        return False
-    for entity_id in protected_entity_ids:
-        entity = ObjectDB.objects.filter(id=entity_id).first()
-        if entity is None or not isinstance(entity, LivingEntity):
-            return False
-        if entity.location is not room:
-            return False
-        from world.rules.action import _stored_trait_value
-
-        if _stored_trait_value(entity.traits.hp) <= 0:
-            return False
-    return True
-
-
 def _companion_present(room: Any, player: Any) -> bool:
     """Whether at least one bound companion of ``player`` is in ``room``.
 
@@ -173,7 +152,7 @@ def _companion_present(room: Any, player: Any) -> bool:
 def _advance_arrival(
     player: Any, record: QuestRecord, definition: QuestDefinition
 ) -> QuestRecord:
-    """Advance one REACH / ESCORT stage by exactly one arrival event.
+    """Advance one REACH stage by exactly one arrival event.
 
     Progress is incremented by one and capped at the objective quantity: a
     single matching arrival can never jump to full completion, so even a
@@ -191,7 +170,7 @@ def _advance_arrival(
 
 
 def observe_room_entry(room: Any, obj: Any) -> None:
-    """Advance a player's active REACH / ESCORT stages satisfied by this room.
+    """Advance REACH stages; escort stages require final settled provenance.
 
     Arrival advances only when the player is the arriving object and at least
     one bound companion is present in the destination room -- already there or
@@ -221,11 +200,6 @@ def observe_room_entry(room: Any, obj: Any) -> None:
         objective = definition.stages[record.stage_index].objective
         if objective.kind is ObjectiveKind.REACH:
             satisfied = _reach_matches(room, objective.destination, record.stage_room_id)
-        elif objective.kind is ObjectiveKind.ESCORT:
-            satisfied = (
-                _reach_matches(room, objective.destination, record.stage_room_id)
-                and _escort_ready(room, record.protected_entity_ids)
-            )
         else:
             continue
         if not satisfied:

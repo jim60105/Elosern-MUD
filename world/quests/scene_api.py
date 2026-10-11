@@ -41,6 +41,11 @@ from .escort_lifecycle import (
     accept_escort_commission,
     release_escort_bindings,
 )
+from .escort_events import (
+    evaluate_escort_event,
+    exclusive_outcome_status,
+    resolve_exclusive_outcome,
+)
 
 __all__ = [
     "EncounterActivation",
@@ -64,4 +69,7 @@ __all__ = [
     "EscortOperationError",
     "accept_escort_commission",
     "release_escort_bindings",
+    "evaluate_escort_event",
+    "exclusive_outcome_status",
+    "resolve_exclusive_outcome",
 ]

@@ -150,6 +150,8 @@ def mark_group_resolved(
     row = get_or_create_group(
         owner_id=owner_id, package_id=package_id, group_id=group_id, tick=tick
     )
+    if row.resolved:
+        return row
     row.resolved = True
     row.resolution_source = str(resolution_source)
     row.winner_quest_id = str(winner_quest_id or "")
@@ -231,6 +233,13 @@ def list_owner_groups(owner_id: int) -> tuple[Any, ...]:
             "package_id", "group_id"
         )
     )
+
+
+def package_owner_ids(package_id: str) -> tuple[int, ...]:
+    """Read durable group reverse references after process restart."""
+    return tuple(ExclusiveOutcomeGroup.objects.filter(
+        package_id=package_id,
+    ).values_list("owner_id", flat=True).distinct())
 
 
 __all__ = [

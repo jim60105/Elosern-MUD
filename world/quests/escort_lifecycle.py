@@ -35,8 +35,8 @@ class EscortOperationError(QuestTransitionError):
 
 
 @contextmanager
-def escort_transaction(owner: Any, actors: tuple[Any, ...]):
-    """Enlist durable writes and compensate live control on an outer failure."""
+def escort_compensation(owner: Any, actors: tuple[Any, ...]):
+    """Enlist live surfaces in an originating owner's rollback boundary."""
     roster = party_ids(owner)
     metadata = deepcopy(owner.db.party_meta)
     members = {actor.pk: actor.db.party_member for actor in actors}
@@ -45,17 +45,23 @@ def escort_transaction(owner: Any, actors: tuple[Any, ...]):
         "quest_log", "wallet", "inventory", "guild_reward_claims", "dialogue_session",
     ))
     try:
-        with transaction.atomic():
-            list(ObjectDB.objects.select_for_update().filter(
-                id__in=sorted({owner.pk, *members})
-            ))
-            yield
+        yield
     except Exception:
         restore_attributes(owner, attrs)
         restore_membership_surfaces(owner, roster, members, metadata)
         for actor, control in controls:
             restore_party_control(owner, actor, control)
         raise
+
+
+@contextmanager
+def escort_transaction(owner: Any, actors: tuple[Any, ...]):
+    """Lock and commit a standalone operation with live-surface compensation."""
+    with escort_compensation(owner, actors), transaction.atomic():
+        list(ObjectDB.objects.select_for_update().filter(
+            id__in=sorted({owner.pk, *(actor.pk for actor in actors)})
+        ))
+        yield
 
 
 def _offer_context(owner, definition_key, issuer_key, actual_actor, expected_revision):

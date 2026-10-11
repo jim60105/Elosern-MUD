@@ -143,7 +143,11 @@ def settle_movement(
         wilderness_source_coordinates=wilderness_source_coordinates,
     )
     try:
-        with transaction.atomic():
+        from world.quests.escort_events import escort_event_boundary
+
+        with escort_event_boundary((
+            traversing_object, *(state.npc for state in snapshot.companions),
+        )), transaction.atomic():
             result = traverse()
     except Exception:
         _compensate_after_rollback(snapshot)
