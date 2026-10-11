@@ -112,8 +112,9 @@ All 32 MODIFIED effective ids are also covered (1-14 associations each; the thin
 `ciaran-village-commerce::the-village-s-hosts-are-its-own-people`, each 1). **Zero affected
 requirements have zero coverage.** Positive and negative halves are both present in the source: the
 registry tests carry valid add/rename/retire cases beside missing-required-profile, non-boolean,
-unknown-habitat and unknown-parent negatives; the bestiary checker carries the wording-only pass
-beside every named structural fault; the item/shop suites carry valid membership beside shelf,
+unknown-habitat and unknown-parent negatives; the keyed bestiary module carries the wording-only pass
+(`LiveBestiaryDocumentationTests`) beside every named structural fault
+(`BestiaryRelationshipFaultTests`); the item/shop suites carry valid membership beside shelf,
 keepsake and lineage faults (task 7.2 exercises them).
 
 Two recorded caveats, carried forward unresolved rather than smoothed over:
