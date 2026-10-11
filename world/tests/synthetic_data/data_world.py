@@ -306,7 +306,7 @@ SYNTH_ARCHETYPES: MappingProxyType[str, SceneArchetype] = MappingProxyType(
             SceneArchetype(
                 "t_synth_lodge",
                 "雲杉驛站",
-                "木構的合成驛站内，爐火映著曬乾的苔徑地圖與潮濕的行囊。",
+                "木構的合成驛站內，爐火映著曬乾的苔徑地圖與潮濕的行囊。",
             ),
         )
     }
