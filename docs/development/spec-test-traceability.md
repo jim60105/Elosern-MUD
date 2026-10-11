@@ -35,7 +35,7 @@ uv run --locked python -m tools.spec_traceability list
 1. **逐一重新掛載，不做全域替換。** 每個承載退役識別碼的標註，都要改指向它「實際上確實驗證」的一般需求；不得以機械式字串替換一次掃過去。修改（MODIFIED）的需求保留原識別碼，但其斷言必須重新審視。
 2. **標註是一項主張。** 僅在測試的輸入、動作與斷言確實建立該需求時才可重新掛載。一個測試若同時主張角色不同的多個需求，應予以拆分；不得附加無關、略過或無數斷言的測試。
 3. **角色決定可改寫的範圍。** 資料契約（registry-contract）可移除名冊與散文釘死，保留對現行註冊表／地點／規則書資料關係的驗證；合成機制（synthetic-mechanism）保留獨立已知結果，且不得讀取正式內容；代表性煙霧測試（representative-smoke）保留真實消費者邊界，不得以 mock 取代。
-4. **先記錄再修改。** 每個受影響的斷言，其角色、所選目標需求與依據，應在該變更的切換對照表中先登錄（例如本專案的 `openspec/changes/generalize-content-identity-contracts/cutover-matrix.md`），成為可稽核的移轉計畫，而非事後補述。
+4. **先記錄再修改。** 每個受影響的斷言，其角色、所選目標需求與依據，應在該變更的切換對照表中先登錄（例如本專案的 `openspec/changes/generalize-content-identity-contracts/cutover-matrix.md`），成為可稽核的移轉計畫，不做事後補述。
 5. **交付前掃描。** 完成後掃描 Python 與 JavaScript 標註，確認退役識別碼已無殘留，再以不啟用允許清單的既有檢查收尾。需求若只是「換句話說」而契約未變，不要建立新識別碼。
 
 ## 標註測試
@@ -128,7 +128,7 @@ uv run --locked coverage report --fail-under=80
 uv run --locked coverage xml -o coverage.xml
 ```
 
-Evennia 測試執行器擁有 `commands`、`server`、`typeclasses`、`world` 與 `web.webclient` 底下的套件區域測試。明確的瀏覽器探索單獨擁有 `web/tests/browser/`；最上層儲存庫契約仍由 `unittest discover -s tests -t .` 擁有。覆蓋率仍精確測量 `commands`、`server`、`typeclasses`、`web` 與 `world` 這五個第一方根目錄；僅有位於 `*/tests/*` 底下的模組可被排除。相依套件程式碼、OpenSpec 工件與儲存庫工具均位於已設定的原始碼根目錄之外。所有三個覆蓋率資料檔案在套用匯總 80% 硬性門檻（hard gate is 80%）或為 Codecov 產生 `coverage.xml` 之前必須完成合併。專案將 90%（targets 90%）作為文件記載的目標而非強制門檻。瀏覽器包裝器記錄其父層測試控管架構，不主張受管伺服器子行程的覆蓋率。
+Evennia 測試執行器擁有 `commands`、`server`、`typeclasses`、`world` 與 `web.webclient` 底下的套件區域測試。明確的瀏覽器探索單獨擁有 `web/tests/browser/`；最上層儲存庫契約仍由 `unittest discover -s tests -t .` 擁有。覆蓋率仍精確測量 `commands`、`server`、`typeclasses`、`web` 與 `world` 這五個第一方根目錄；僅有位於 `*/tests/*` 底下的模組可被排除。相依套件程式碼、OpenSpec 工件與儲存庫工具均位於已設定的原始碼根目錄之外。所有三個覆蓋率資料檔案在套用匯總 80% 硬性門檻（hard gate is 80%）或為 Codecov 產生 `coverage.xml` 之前必須完成合併。專案將 90%（targets 90%）作為文件記載的目標，不作為強制門檻。瀏覽器包裝器記錄其父層測試控管架構，不主張受管伺服器子行程的覆蓋率。
 
 專用的保留資料庫為 `server/db/evennia-test.sqlite3`。若資料庫遷移有所變更，可在重建時略過 `--keepdb` 並加上 `--noinput`。若保留狀態已損壞，僅刪除該檔案並重新執行乾淨設定；切勿刪除位於 `server/db/evennia.db3` 的開發者資料庫。
 

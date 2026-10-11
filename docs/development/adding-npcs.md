@@ -82,7 +82,7 @@ for declaration semantics.
 - **`key` 就是遊戲內顯示名。** 載入器以 `key` 建立 Evennia 物件，`display_name` 目前不被使用；要讓人物列顯示中文姓名，`key` 就寫中文。房間人物列與探索面板把 `key` 與 `title` 以全形空格組成「姓名　稱號」。
 - **`title` 對 NPC 必填**，規則是 `world/rules/npc_identity.validate_npc_title` 的單一 validator 契約：去首尾空白後 1–32 碼點、無任何空白（含 U+3000）、無控制字元、無 `|`。落庫的是驗證器回傳的正規形（已去空白）。
 - **`age`／`apparent_age` 各自獨立**，0–10000 整數（拒絕布林值）。常駐 host 與考官由 `NpcProfile` 作者宣告明確定案數值（`age` 與 `apparent_age` 必填），落庫與同步時優先使用 profile 定義的年齡；未指定 profile 或無作者年齡的路徑由 `ensure_npc_canonical_age` 獨立補 `NPC_DEFAULT_AGE`（18）。既有欄位值永不覆寫，重用與重啟時保留玩家編輯的 persona 與既有年齡。既有開發世界若需完整套用作者年齡，請依照 reset runbook 重設資料庫。
-- **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，而非僅欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
+- **`persona` 必須是完整的精簡 NPC 角色卡**：恰好 `identity{public,hidden}`、`appearance`、`personality`、`speech_style`、`life_story`、`habit`、`social_connection` 七欄，全為純文字（`identity.hidden` 與 `social_connection` 可空，其餘必填）；沒有 `background`。契約由 `world/lore/npc_card.py::normalize_card` 唯一執行（單欄 600、身分段 600、整卡 2000 碼點；身分段與整卡都以渲染後的區塊計算，含「性格：」等標籤與換行，不只是欄位文字）。判斷依據是傳給 `validate_character`／載入器的目標型別（`issubclass(typeclass, NPC)`，預設即 NPC），絕不看記錄內容；`PlayerCharacter` 目標的 `persona` 仍不透明、原樣落庫。落庫走 `world/rules/npc_persona.py::initialize_npc_persona`，寫入正規化後的卡與版本 1 中繼資料（來源 `{"kind": "import", "record": <key>}`），與整批同一筆交易。
 - **`disguised_stats` 非空時種族必須能用神之秘法**，同[新增角色模板指南](/development/adding-player-presets) §4 的不變式；`_check_disguised_stats_subset` 另要求偽裝鍵是 `stats` 子集。
 
 服務 NPC 再加選填的職業三欄：
@@ -163,7 +163,7 @@ ROWS = {
 
 ### Step 3.3 — 編輯審查紀錄與結構檢查
 
-出貨 NPC 的人物設定、角色卡、語音與劇本台詞都是作者文字，好壞不是測試能斷言的事。因此這裡不用「預期台詞」的 fixture，而是在 `docs/development/npc-editorial-review.md` 維護一份以實際來源為索引、帶日期的編輯審查帳本：伺服器實際推導出來的每一個來源（地點主人、對話表、常駐冒險者、同行夥伴、任務模板佔位者、匯入範例卡）都必須恰好有一筆紀錄，逐項寫下該來源實際擁有的面向，以及最後的處置。
+出貨 NPC 的人物設定、角色卡、語音與劇本台詞都是作者文字，好壞不是測試能斷言的事。因此這裡不用「預期台詞」的 fixture，專案改在 `docs/development/npc-editorial-review.md` 維護一份以實際來源為索引、帶日期的編輯審查帳本：伺服器實際推導出來的每一個來源（地點主人、對話表、常駐冒險者、同行夥伴、任務模板佔位者、匯入範例卡）都必須恰好有一筆紀錄，逐項寫下該來源實際擁有的面向，以及最後的處置。
 
 檢查由純函式 `world/lore/npc_editorial_review.py` 執行，並由 `world/lore/tests/test_npc_editorial_review.py` 驅動：它把帳本與 `derive_shipped_sources()` 推導出來的真實來源集合雙向比對。缺少紀錄、殘留已退役來源的紀錄、日期格式錯誤、面向數量不符、面向空白或處置空白，都會具名報錯。這份帳本只證明覆蓋，不判斷文字品質，也不保證審查在之後的內容改動後仍然新鮮。
 
