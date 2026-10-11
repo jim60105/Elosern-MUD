@@ -386,3 +386,9 @@
 - code: ridge_brace_defense
   label: 固埂蹬擊防禦提升
   severity: beneficial
+- code: rock_echo_stagger
+  label: 岩響角撞
+  severity: harmful
+- code: rock_echo_stagger_agility_flat
+  label: 岩響角撞敏捷下降
+  severity: harmful

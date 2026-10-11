@@ -488,3 +488,11 @@
   stacking: refresh
   polarity: buff
   modifiers: {}
+# 魔物資源技能（remaining-monster-resource-skills §7）：岩響角撞的命中干擾，
+# 短暫步伐不穩的 mount，agility_flat −3 資料在 combat_modifiers.yaml 的
+# rock_echo_stagger_agility_flat 列（martial_hamstring 的 agility_flat 先例）。
+- key: rock_echo_stagger
+  duration: 15
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
