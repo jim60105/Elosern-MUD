@@ -33,6 +33,8 @@ from world.lore.npc_editorial_review import (
     parse_npc_editorial_ledger,
     unparsed_ledger_rows,
 )
+from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.rules.npc_roster_validation import derive_shipped_sources
 
 LEDGER = (
@@ -48,13 +50,25 @@ def _live_sources() -> frozenset[tuple[str, str]]:
     return derive_shipped_sources(quest_templates=QUEST_TEMPLATE_POOL)
 
 
-def _shipped_dialogue_prose() -> list[str]:
-    """Every authored greeting and keyword response line, in registry order."""
-    prose: list[str] = []
+def _shipped_spoken_lines() -> list[str]:
+    """Every shipped spoken line, across all six source kinds.
+
+    Dialogue greetings and keyword responses, the profile voice lines of hosts
+    and persistent people, and the companion presets' offline greetings - every
+    authored surface that is a spoken line rather than a card field.
+    """
+    lines: list[str] = []
     for definition in DIALOGUE_ROWS.values():
-        prose.append(definition.greeting)
-        prose.extend(response.response for response in definition.responses)
-    return prose
+        lines.append(definition.greeting)
+        lines.extend(response.response for response in definition.responses)
+    for profile in NPC_PROFILE_REGISTRY.values():
+        for line in (profile.voice.greeting, profile.voice.misunderstood):
+            if line:
+                lines.append(line)
+    for preset in PLAYER_PRESET_REGISTRY.values():
+        if preset.persona.greeting:
+            lines.append(preset.persona.greeting)
+    return lines
 
 
 class LiveNpcEditorialLedgerTests(unittest.TestCase):
@@ -81,12 +95,15 @@ class LiveNpcEditorialLedgerTests(unittest.TestCase):
     )
     def test_the_ledger_is_not_an_expected_dialogue_fixture(self):
         text = LEDGER.read_text(encoding="utf-8")
-        prose = _shipped_dialogue_prose()
-        # Guard against a vacuous scan: every shipped line is far longer than
-        # the ledger's structural vocabulary, so a membership hit would be a
-        # real quotation rather than a coincidence.
-        self.assertGreater(min(len(line) for line in prose), len("service-semantics"))
-        for line in prose:
+        lines = _shipped_spoken_lines()
+        # Guard against a vacuous scan: the checked population is dominated by
+        # lines far longer than the ledger's structural vocabulary, so a
+        # membership hit would be a real quotation rather than a coincidence.
+        long_lines = [
+            line for line in lines if len(line) > len("service-semantics")
+        ]
+        self.assertGreaterEqual(len(long_lines), len(DIALOGUE_ROWS))
+        for line in lines:
             self.assertNotIn(line, text)
 
     @covers_requirement(
@@ -95,25 +112,36 @@ class LiveNpcEditorialLedgerTests(unittest.TestCase):
     def test_a_wording_only_edit_of_the_ledger_still_passes(self):
         text = LEDGER.read_text(encoding="utf-8")
         entries = parse_npc_editorial_ledger(text)
-        reworded = text.replace("accepted:", "reviewed and accepted:")
-        # The edit must be real -- the ledger's dispositions are freely
-        # editable, so rewording them can never fail the relationship check.
-        self.assertNotEqual(reworded, text)
-        changed = sum(
+        live = _live_sources()
+        # Both cell kinds are freely editable prose: a disposition-cell reword
+        # and a face-cell reword each leave the relationship check untouched.
+        edits = (
+            ("accepted:", "reviewed and accepted:"),
+            ("resolves under slice", "resolves cleanly under slice"),
+        )
+        for old, new in edits:
+            reworded = text.replace(old, new)
+            self.assertNotEqual(reworded, text)
+            self.assertEqual(
+                check_npc_editorial_ledger(
+                    live, parse_npc_editorial_ledger(reworded)
+                ),
+                (),
+            )
+            self.assertEqual(
+                len(parse_npc_editorial_ledger(reworded)), len(entries)
+            )
+        disposition_edit = text.replace(*edits[0])
+        hits = sum(
             1
-            for before, after in zip(text.splitlines(), reworded.splitlines())
+            for before, after in zip(
+                text.splitlines(), disposition_edit.splitlines()
+            )
             if before != after
         )
-        self.assertGreaterEqual(changed, len(DIALOGUE_ROWS))
-        self.assertEqual(
-            check_npc_editorial_ledger(
-                _live_sources(), parse_npc_editorial_ledger(reworded)
-            ),
-            (),
-        )
-        self.assertEqual(
-            len(parse_npc_editorial_ledger(reworded)), len(entries)
-        )
+        # Every row's overall disposition carries the reworded marker, so the
+        # edit reaches every kind rather than only one block.
+        self.assertGreaterEqual(hits, len(entries))
 
 
 class NpcEditorialLedgerFaultTests(unittest.TestCase):

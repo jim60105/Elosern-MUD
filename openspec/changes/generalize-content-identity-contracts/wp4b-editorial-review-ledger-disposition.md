@@ -65,14 +65,19 @@ authored surface is the card.
 ## 3. No expected dialogue fixture, and no freshness claim
 
 - The ledger records dates and dispositions only; it never quotes a shipped
-  greeting or response. `test_the_ledger_is_not_an_expected_dialogue_fixture`
-  takes every shipped greeting and keyword-response string, asserts the
-  shortest is longer than the ledger's structural vocabulary (so a membership
-  hit would be a real quotation rather than a coincidence), and asserts none of
-  them occurs in the ledger text.
-- `test_a_wording_only_edit_of_the_ledger_still_passes` rewrites every
-  disposition cell and asserts the relationship check still returns `()` and
-  the entry count is unchanged: the ledger's own prose is freely editable.
+  spoken line. `test_the_ledger_is_not_an_expected_dialogue_fixture` collects
+  every shipped spoken line across all six kinds - the 25 dialogue tables'
+  greetings and keyword responses, every host's and persistent person's
+  `voice.greeting`/`voice.misunderstood`, and every companion preset's offline
+  greeting - asserts the long-line population is at least the dialogue corpus
+  (so a membership hit would be a real quotation rather than a coincidence),
+  and asserts none of the lines occurs in the ledger text.
+- `test_a_wording_only_edit_of_the_ledger_still_passes` rewrites a
+  disposition-cell phrase and a face-cell phrase (separately) and asserts each
+  edit leaves the relationship check returning `()` with the entry count
+  unchanged; it also asserts the disposition edit changes at least one line per
+  entry, so the ledger's own prose is provably freely editable in both cell
+  kinds.
 - The module docstring, the ledger header and both guides state that the record
   proves coverage, never prose quality, and that it does not establish a review
   is still fresh after a later content edit.
@@ -84,19 +89,24 @@ authored surface is the card.
 ## 4. The six retired slice ids and their retargeting
 
 All six `npc-profile-registry` slice requirements are removed by the delta and
-none survives as an annotation. A scan over every tracked `.py`/`.md`/`.json`
-file finds them only in **historical records**, never in an annotation:
+none survives as an annotation. The scan is reproducible: a gitignore-off grep
+over the whole worktree for the six retired slugs
+(`altoria-lower-terrace-hosts-carry`, `altoria-middle-terrace-trade-hosts-carry`,
+`altoria-upper-terrace-hosts-carry`,
+`guild-branch-master-and-rank-examiners-carry`,
+`village-ciaran-first-home-hosts-carry`,
+`village-ciaran-second-home-hosts-carry`) matches exactly three files, all of
+them this change's own planning artifacts, and zero annotation sites:
 
-1. **This change's own planning artifacts** - `cutover-matrix.md` (Matrix A rows
-   47-52 and Matrix B rows for `test_npc_profile_slice_content.py`),
-   `scope-inventory.md` (the six "Current annotations" sections) and
-   `wp4-completeness-personnel-disposition.md` §6. Those are the retirement
-   records D3 requires.
-2. **Frozen prior-change design documents** under `docs/superpowers/specs/`
-   (e.g. `2026-10-03-npc-persona-content-ciaran-homes-b-design.md` names the
-   guild/examiner id verbatim) - authored before this change, explicitly
-   out of scope.
-3. **Zero annotation sites.**
+1. `cutover-matrix.md` - Matrix A rows 47-52 and the six Matrix B rows for
+   `world/lore/tests/test_npc_profile_slice_content.py`.
+2. `scope-inventory.md` - the six "Current annotations" sections.
+3. `wp4-completeness-personnel-disposition.md` §6.
+
+Those are the retirement records D3 requires, not live claims. In particular no
+file under `docs/` (including `docs/superpowers/specs/`, whose only
+`npc-persona-*` document is `2026-10-01-npc-persona-authoring-design.md`, which
+names change labels and not requirement ids) carries any of the six slugs.
 
 The retargeting itself is the two live requirement ids
 `npc-profile-registry::every-registry-derived-host-has-complete-individual-characterization`
@@ -144,8 +154,8 @@ legitimately share a label set. 4.5 records the rule in both guides.
 
 | Command | Observed result |
 | --- | --- |
-| `uv run --locked evennia test --settings test_settings.py --keepdb world.lore.tests.test_npc_editorial_review world.lore.tests.test_npc_profile_slice_content world.lore.tests.test_npc_profile_inventory world.lore.tests.test_dialogue_assembly world.rules.tests.test_npc_roster_validation` | `Ran 59 tests ... OK` |
-| `uv run --locked python -m tools.test_data_lint check` | `scanned=1252 flagged=98 universe=1219+38 quantity-pins=10 violations=0` |
+| `uv run --locked evennia test --settings test_settings.py --keepdb world.lore.tests.test_npc_editorial_review world.lore.tests.test_npc_profile_slice_content world.lore.tests.test_npc_profile_inventory world.lore.tests.test_dialogue_assembly world.rules.tests.test_npc_roster_validation` | `Ran 59 tests ... OK`, both before and after the post-implementation review fixes |
+| `uv run --locked python -m tools.test_data_lint check` | `scanned=1253 flagged=99 universe=1219+38 quantity-pins=10 violations=0` (the new test is flagged once it imports `NPC_PROFILE_REGISTRY`/`PLAYER_PRESET_REGISTRY`, and is exempt by its `contract` registration) |
 | `uv run --locked python -m tools.test_data_lint seed --dry-run` vs the committed ledger | contract sets differ only by the pre-existing `world/rules/tests/test_buffs.py` asymmetry (metadata-map Table C); **zero** reason diffs; debt differs only by the known wholesale-regeneration effect (dry-run folds the 322 flagged/seed-debt paths back into `debt`). The hand-edit masked nothing. |
 | `uv run --locked python -m tools.contract_gate` | observability `violations=0`, test-data `violations=0`, manifests OK, contracts `Ran 18 tests ... OK`; the gate fails only on traceability, for the two new ids' documented pre-sync `unknown-requirement-id` state. |
 | `uv run --locked python -m tools.spec_traceability check` | 81 -> 86 errors: the 8 NPC `dynamic-requirement-id` errors are gone (replaced by 8 `unknown-requirement-id` on the same literal sites) and 5 new `unknown-requirement-id` come from the new test; the only remaining `dynamic-requirement-id` sites are the 5 WP3 bestiary ones of §4. |
@@ -166,3 +176,31 @@ unaffected by this package.
   pre-sync `unknown-requirement-id` errors by applying/archiving the delta; run
   the integrated evidence gate.
 - **WP6 / WP5**: untouched.
+
+## 9. Independent review dispositions
+
+Two blocking rubber-duck critiques were run over this task, one on the plan and
+one on the finished diff. Both were folded in.
+
+- **Plan-stage critique, adopted:** literal decorator arguments (the WP4 defect
+  of §4); name the retired-id scan's method and its real buckets; keep the new
+  module free of any `world.*` import and any module-level mapping, so
+  `tools.test_data_lint`'s universe derivation never treats it as catalog data;
+  annotate the fault test as well as the coverage test; carry the ledger rule
+  into the test-data guide, not only the author guide. **Rejected:**
+  `import_example`'s face is `card`, not `card`/`greeting` - the shipped import
+  cards write a `persona` and no greeting field, so the card is their only
+  authored surface. **Deferred:** tightening `LEDGER_DATE` beyond
+  `^\d{4}-\d{2}-\d{2}$` (a real parse would reject `2026-13-45`, but
+  `world/lore/bestiary_documentation.py` uses the identical regex; the two
+  checks should move together).
+- **Post-implementation critique, adopted:** both blocking findings were
+  factual errors in this document's §4 - it had claimed a frozen design
+  document under `docs/superpowers/specs/` names a retired id verbatim. That
+  citation came from the plan-stage critique and is wrong: a gitignore-off
+  grep over the whole worktree matches only the three planning artifacts, and
+  no `docs/` file carries any of the six slugs. §4 now states the reproducible
+  scan and its actual result. Its two non-blocking gaps are closed too: the
+  no-fixture guard now spans every kind's spoken lines, and the wording test
+  rewrites a face cell as well as a disposition cell with a per-entry
+  changed-line floor. **Deferred:** only the `LEDGER_DATE` rigor noted above.
