@@ -45,6 +45,10 @@ Successful terminal victory/defeat, flee, forfeit, recovery and missing/deleted 
 - **WHEN** a terminal path fails before outer commit
 - **THEN** prior committed memory and configuration are retained
 
+#### Scenario: Rolled back terminal savepoint with successful outer commit
+- **WHEN** terminal work sets a cleanup token inside a savepoint, the savepoint rolls back, its exception is caught and a later action succeeds before outer commit
+- **THEN** all failed-savepoint publication controls and pending tuning cleanup are restored; failed termination cannot delete history/configuration or suppress successful observation publication, while genuinely committed termination still prevents recreation
+
 ### Requirement: Observation access follows current session membership
 Memory SHALL be isolated by session and stable actor identity. Battlefield reconstruction SHALL preserve committed history in process. Eligible projections SHALL use current live participation and faction. Restart SHALL clear history and use validated startup tuning without a durable sidecar.
 

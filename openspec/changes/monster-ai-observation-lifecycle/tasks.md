@@ -4,8 +4,8 @@
 
 - [ ] 1.1 Define compact observation records and bounded session rings; verify three-round/128-record expiry and bounded recipients without entity/intent references.
 - [ ] 1.2 Collect successful skill, item and upkeep outcomes immediately; verify later same-round providers and each overwhelm round see only already executed public outcomes.
-- [ ] 1.3 Implement outer-commit publication, savepoint checkpoints and generation sequencing; verify faults after writes, inner and outer rollback and stale callback ordering.
-- [ ] 1.4 Integrate commit-only terminal cleanup across settlement, flee, forfeit, recovery and missing participants; verify late publication cannot recreate memory and failed cleanup preserves prior state.
+- [ ] 1.3 Implement outer-commit publication, complete savepoint checkpoints and generation sequencing; verify faults after writes, inner/outer rollback and stale callback ordering. Verify checkpoints restore observations, terminal token, generation state and pending tuning cleanup after a caught savepoint failure.
+- [ ] 1.4 Integrate commit-only terminal cleanup across settlement, flee, forfeit, recovery and missing participants; verify late publication cannot recreate memory. Set a terminal token inside a savepoint, roll it back, catch the fault, settle another action and commit the outer transaction; verify successful observations publish and failed terminal work cannot delete configuration/history.
 - [ ] 1.5 Preserve history through reconstruction with current eligibility and clear it on restart; verify session isolation and no durable AI schema or record fields.
 - [ ] 1.6 Update docs/development/monster-ai.md with this slice's implemented authoring/runtime contracts and add its release changelog entry; verify documentation matches the exercised fixtures, uses the canonical player-facing term and adds no command documentation.
 
