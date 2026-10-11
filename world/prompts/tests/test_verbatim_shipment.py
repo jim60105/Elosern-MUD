@@ -73,6 +73,9 @@ class VerbatimShipmentTests(unittest.TestCase):
     )
     def test_every_shipped_key_substitutes_its_supplied_values_once(self):
         library = load_prompt_library(str(REPO_PROMPTS))
+        # Assert the shipped root is whole first so a token-set regression
+        # there reports its own named failure instead of a KeyError here.
+        self.assertEqual(library.unavailable, frozenset())
         for key, spec in PROMPT_SPECS.items():
             with self.subTest(key=key):
                 text = library.text(key)
