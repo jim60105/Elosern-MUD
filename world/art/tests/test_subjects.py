@@ -271,11 +271,18 @@ class PortraitPolicyTests(EvenniaTestCase):
 
 
 @synthetic_registries("archetypes", "monster_tiers", "subraces")
-class DescriptionTests(EvenniaTestCase):
+class DescriptionTests(PromptFixture):
     """Description composition resolves the archetype sentence, the monster
     visual species appearance text and the subrace label through the catalogs;
     every entity is built in the test bodies, so the class scope wraps each
-    test independently."""
+    test independently. The descriptions render over the test-owned art.yaml
+    fixture (the five character tokens), so an exclusion claim can never be
+    broken by framing the deployment later authors."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.write_file("art.yaml", _TEST_ART_YAML)
+        self.load()
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):
@@ -329,16 +336,17 @@ _APPEARANCE = {
 }
 
 
-# A test-owned art.yaml fixture. The composition claims below assert ordering,
-# emptiness, a bound, and determinism, so they author their own framing instead
-# of inheriting the deployment-authored shipped template, whose wording (for
-# example commit 858e52dc's appended ", standing, rim light on clothes,") must
-# never break them. The library seam itself stays covered by the shipped-root
-# logic tests in world/prompts/tests.
+# A test-owned art.yaml fixture. The composition claims in this module assert
+# exclusions, ordering, emptiness, a bound, and determinism, so they author
+# their own framing instead of inheriting the deployment-authored shipped
+# template, whose wording (for example commit 858e52dc's appended ", standing,
+# rim light on clothes,") must never break them. The library seam itself stays
+# covered by the shipped-root logic tests in world/prompts/tests.
 _TEST_ART_YAML = (
     "schema_version: 1\n"
     "prompts:\n"
     "  art.character_description: '{race}, {age} years old.{appearance}{equipment}{custom}'\n"
+    "  art.monster_description: '{description} ({display_name})'\n"
 )
 
 
@@ -495,7 +503,7 @@ class AppearanceDescriptionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.character_description: {race}, {age} years old. {oops}\n"
+            "  art.character_description: '{race}, {age} years old. {oops}'\n"
             "  art.monster_description: '{description} ({display_name})'\n",
         )
         self.load()

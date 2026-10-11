@@ -131,14 +131,15 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
 
     def _break_art(self):
-        # The duplicate art.character_description key alone rejects the file;
-        # every other art.* key is simply absent, so all of them are
-        # unavailable and the art fallback paths are what run.
+        # The duplicate art.character_description key alone rejects the file
+        # (both values are quoted so the YAML itself parses); every other art.*
+        # key is simply absent, so all of them are unavailable and the art
+        # fallback paths are what run.
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.character_description: {race}, {age} years old.\n"
-            "  art.character_description: {race}, {age} years old.\n",
+            "  art.character_description: '{race}, {age} years old.'\n"
+            "  art.character_description: '{race}, {age} years old.'\n",
         )
 
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer")
@@ -240,6 +241,10 @@ class BoundedFailureDegradeTests(PromptFixture):
         self._break_art()
         library = self.load()
         self.assertIn("art.character_description", library.errors)
+        self.assertIn(
+            "duplicate mapping key",
+            library.errors["art.character_description"].problem,
+        )
         self.assertIn("art.negative_prompt", library.errors)
 
         # The fallback producers resolve their subjects against the scene

@@ -435,7 +435,7 @@ class CompositionTests(PromptFixture):
         self.write_file(
             "art.yaml",
             "schema_version: 1\nprompts:\n"
-            "  art.character_description: {race}, {age} years old. {oops}\n"
+            "  art.character_description: '{race}, {age} years old. {oops}'\n"
             "  art.monster_description: '{description} ({display_name})'\n",
         )
         self.load()

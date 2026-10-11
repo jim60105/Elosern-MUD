@@ -234,6 +234,7 @@ class ValidLoadTests(unittest.TestCase):
     @covers_requirement("prompt-library::prompt-rendering-substitutes-only-allowlisted-placeholders-deterministically")
     def test_empty_persona_value_substitutes_without_error_or_literal_token(self):
         load_prompt_library(str(REPO_PROMPTS))
+        block = "性格：沉穩\n人生經歷：曾在邊境服役"
         text = render_prompt(
             "npc_dialogue.system",
             name="艾洛西亞",
@@ -244,7 +245,8 @@ class ValidLoadTests(unittest.TestCase):
         self.assertIn("艾洛西亞", text)
         self.assertNotIn("{name}", text)
         self.assertNotIn("{persona}", text)
-        self.assertNotIn("性格：", text)
+        # The test-owned block is what an empty persona value must not leak.
+        self.assertNotIn(block, text)
 
     @covers_requirement("prompt-library::the-npc-persona-frame-key-is-registered-with-exactly-the-block-placeholder")
     def test_npc_dialogue_persona_frame_key_loads_and_renders(self):
@@ -554,7 +556,10 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertIn("desc", portrait)
         self.assertNotIn("{description}", scene)
         self.assertNotIn("{description}", portrait)
-        self.assertNotIn("{", negative)
+        # The negative key declares no token, so rendering returns its text
+        # unchanged; a brace in that text is legal deployment wording (an SD
+        # emphasis group), not a placeholder.
+        self.assertEqual(negative, library.text("art.negative_prompt"))
         self.assertEqual(scene, render_prompt("art.scene_prompt", description="desc"))
         self.assertEqual(portrait, render_prompt("art.portrait_prompt", description="desc"))
 
@@ -574,10 +579,10 @@ class ArtGenerationPromptTests(PromptFixture):
         self.assertNotIn("art.scene_prompt", library.texts)
 
     def test_editing_an_art_template_changes_the_rendered_prompt_text(self):
-        self.load()
-        before = render_prompt("art.scene_prompt", description="desc")
-        self.write_file(
-            "art.yaml",
+        # Two test-owned revisions of the whole art file: the rendered text
+        # follows the loaded library (an admin edit of the mounted file is the
+        # same mechanism), and neither revision pins shipped wording.
+        first_revision = (
             "schema_version: 1\n"
             "prompts:\n"
             "  art.character_description: |-\n"
@@ -587,11 +592,20 @@ class ArtGenerationPromptTests(PromptFixture):
             "  art.portrait_prompt: |-\n"
             "    A portrait — {description} — painted.\n"
             "  art.scene_prompt: |-\n"
-            "    A wide scene — {description} — painted.\n",
+            "    A wide scene — {description} — painted.\n"
         )
+        second_revision = first_revision.replace(
+            "A wide scene — {description} — painted.",
+            "A tight scene — {description} — repainted.",
+        )
+        self.write_file("art.yaml", first_revision)
+        self.load()
+        before = render_prompt("art.scene_prompt", description="desc")
+        self.write_file("art.yaml", second_revision)
         library = self.load()
         after = render_prompt("art.scene_prompt", description="desc")
         self.assertNotEqual(before, after)
+        self.assertIn("desc", after)
         self.assertEqual(library.unavailable, frozenset())
 
     @covers_requirement(

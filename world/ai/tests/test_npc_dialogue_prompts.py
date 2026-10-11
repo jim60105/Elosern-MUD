@@ -81,7 +81,6 @@ class NPCDialoguePromptTests(unittest.TestCase):
         )
         content = system["content"]
         self.assertIn("艾洛希雅", content)
-        self.assertIn("伊洛瑟恩大陸", content)
         self.assertIn("正體中文", content)
         self.assertIn("speech", content)
         self.assertIn("intent", content)

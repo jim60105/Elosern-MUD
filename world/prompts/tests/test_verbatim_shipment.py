@@ -12,6 +12,7 @@ compare against the seam and never against a literal.
 
 from __future__ import annotations
 
+from collections import Counter
 import unittest
 
 from world.prompts.loader import (
@@ -80,17 +81,16 @@ class VerbatimShipmentTests(unittest.TestCase):
             with self.subTest(key=key):
                 text = library.text(key)
                 # One distinct, test-owned marker per allowlisted token: every
-                # token the template selects lands exactly as often as the
+                # token the template selects lands exactly as many times as the
                 # template spells it and leaves nothing unsubstituted, while an
                 # allowlisted token the template does not select stays inert.
+                occurrences = Counter(_PLACEHOLDER_RE.findall(text))
                 values = {token: f"<{token}>" for token in spec.allowed_placeholders}
                 rendered = render_prompt(key, **values)
-                for token in _PLACEHOLDER_RE.findall(text):
-                    self.assertEqual(rendered.count(f"<{token}>"), 1)
+                for token, count in occurrences.items():
+                    self.assertEqual(rendered.count(f"<{token}>"), count)
                     self.assertNotIn(f"{{{token}}}", rendered)
-                for token in set(spec.allowed_placeholders) - set(
-                    _PLACEHOLDER_RE.findall(text)
-                ):
+                for token in set(spec.allowed_placeholders) - set(occurrences):
                     self.assertNotIn(f"<{token}>", rendered)
                 self.assertEqual(render_prompt(key, **values), rendered)
 
