@@ -35,11 +35,11 @@ from world.art.service import (
 )
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore.monster_visuals import get_monster_visual_registry
 from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
-    SYNTH_MONSTER_TIERS,
     synthetic_registries,
 )
 
@@ -55,7 +55,7 @@ class ArtServiceTests(EvenniaTestCase):
         # subject set, which is exactly what startup synchronization reads:
         # run the whole class against the kit catalogs so the loops iterate
         # SYNTH_* rows instead of shipped content.
-        open_synthetic_scope(self, "archetypes", "monster_tiers")
+        open_synthetic_scope(self, "archetypes", "monster_species")
         super().setUp()
         self.player = create_object(PlayerCharacter, key="service-player")
         self.player.age = 22
@@ -74,10 +74,11 @@ class ArtServiceTests(EvenniaTestCase):
                 records[f"art:scene:{archetype}"].db.status,
                 (ArtAssetStatus.MISSING, ArtAssetStatus.PENDING),
             )
-        # ``gallery-monster-autogen``: a monster tier gets a gallery request,
-        # never a classic fixed-identity record.
-        for tier in SYNTH_MONSTER_TIERS:
-            self.assertNotIn(f"art:portrait:monster:{tier}", records)
+        # ``gallery-monster-autogen``: every registered VISUAL species gets a
+        # gallery request, never a classic fixed-identity record.
+        visual_registry = get_monster_visual_registry()
+        for visual_key in visual_registry:
+            self.assertNotIn(f"art:portrait:monster:{visual_key}", records)
         classic = {
             key: record
             for key, record in records.items()
@@ -93,7 +94,7 @@ class ArtServiceTests(EvenniaTestCase):
             if str(record.db.gallery_image_id or "")
             and record.db_key.startswith("art:portrait:monster:")
         ]
-        self.assertEqual(len(monster_jobs), len(SYNTH_MONSTER_TIERS))
+        self.assertEqual(len(monster_jobs), len(visual_registry))
 
     @covers_requirement("art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records")
     def test_startup_sync_leaves_pending_in_progress_and_done_records_untouched(self):

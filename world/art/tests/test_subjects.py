@@ -170,6 +170,9 @@ class RegistryResolutionTests(unittest.TestCase):
     """Resolution runs against the kit catalogs (built in test bodies only)."""
 
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
+    @covers_requirement(
+        "monster-visual-identity::threat-tiers-never-address-monster-imagery"
+    )
     def test_registered_archetypes_resolve(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         self.assertEqual(subject.full(), f"scene:{_SYNTH_SCENE}")

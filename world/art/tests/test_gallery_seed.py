@@ -34,6 +34,7 @@ from world.art.gallery import (
 )
 from world.art.gallery_seed import SEED_SYNC_EVENT, derive_image_id, sync_all
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore import monster_visuals
 
 from tools.spec_traceability import covers_requirement
 
@@ -54,6 +55,16 @@ _SECOND_BYTES = base64.b64decode(
 def _unique(kind_directory: str) -> str:
     """A fresh subject key per test so DB rows never collide."""
     return f"{kind_directory}_{uuid.uuid4().hex[:10]}"
+
+
+def _monster_key() -> str:
+    """A registered visual species key.
+
+    Seed admission is membership-checked, so a monster directory must name a
+    declared visual species rather than an arbitrary string. The key is read
+    from the authored declarations, never restated here.
+    """
+    return monster_visuals.BASELINE_VISUAL_ROWS[0].stable_key
 
 
 def _character(key):
@@ -291,7 +302,7 @@ class SyncIdempotencyTests(_TempRoots):
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_first_run_appends_one_card_per_file_and_the_second_copies_nothing(self):
         hero = _unique("character")
-        goblin = _unique("monster")
+        goblin = _monster_key()
         self.tree.image("character", hero, "a.png")
         self.tree.image("character", hero, "b.png")
         self.tree.image("monster", goblin, "g.png")
@@ -583,7 +594,7 @@ class ManifestSyncTests(_TempRoots):
 class MonsterCapTests(_TempRoots):
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_a_monster_subject_receives_only_the_candidate_card(self):
-        goblin = _unique("monster")
+        goblin = _monster_key()
         self.tree.image("monster", goblin, "z.png")
         self.tree.image("monster", goblin, "a.png")
         summary = sync_all()
@@ -596,7 +607,7 @@ class MonsterCapTests(_TempRoots):
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_a_monster_holding_any_card_is_never_touched(self):
-        goblin = _unique("monster")
+        goblin = _monster_key()
         subject = _monster(goblin)
         image_id = str(uuid.uuid4())
         append_card(
@@ -620,7 +631,7 @@ class MonsterCapTests(_TempRoots):
 
     @covers_requirement("art-gallery-seed-sync::seed-synchronization-is-idempotent-path-derived-and-additive")
     def test_a_steady_state_monster_re_run_is_quiet(self):
-        goblin = _unique("monster")
+        goblin = _monster_key()
         self.tree.image("monster", goblin, "a.png")
         sync_all()
         self.warn.reset_mock()
@@ -649,6 +660,20 @@ class MonsterCapTests(_TempRoots):
         self.assertEqual(summary["appended"], 1)
         self.assertEqual(summary["monster_cap_skipped"], 1)
         self.assertIn("monster_cap_skipped", self._reasons())
+
+    @covers_requirement(
+        "monster-visual-identity::threat-tiers-never-address-monster-imagery"
+    )
+    def test_a_tier_named_monster_directory_can_never_seed_a_card(self):
+        # A directory named after a retired tier is not a visual species, so
+        # seed admission refuses it even though a valid image sits inside:
+        # no card, no stored file, just the bounded skip diagnostic.
+        retired = sorted(monster_visuals.RESERVED_KEYS)[0]
+        self.tree.image("monster", retired, "a.png")
+        summary = sync_all()
+        self.assertEqual(summary["appended"], 0)
+        self.assertIn("invalid_subject_key_skipped", self._reasons())
+        self.assertEqual(cards_for(_monster(retired)), [])
 
 
 class GeneratedCardIsolationTests(_TempRoots):

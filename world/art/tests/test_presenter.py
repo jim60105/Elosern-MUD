@@ -453,7 +453,10 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIsNone(payload["subject_key"])
         self.assertIsNone(payload["url"])
 
-    def test_unknown_threat_tier_falls_back_to_placeholder(self):
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+    )
+    def test_an_unregistered_art_species_key_falls_back_to_placeholder(self):
         self.monster.art_species_key = "mythical"
         payload = resolve_entity(self.monster)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)

@@ -38,7 +38,7 @@ from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
-    SYNTH_MONSTER_TIERS,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -47,7 +47,7 @@ from world.tests.synthetic_data import (
 # scopes and resolve presentation text through these patched rows; identity
 # literals elsewhere in the file are file-local t_ strings.
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
-_SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+_SYNTH_SPECIES = sorted(SYNTH_MONSTER_SPECIES)[0]
 _SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
 _SYNTH_RACE_LABEL = SYNTH_SUBRACES[_SYNTH_SUBRACE].display_name_zh
 _SYNTH_WEAPON = "t_thorn_knife"
@@ -520,7 +520,7 @@ class CompositionTests(PromptFixture):
                     )
 
 
-@synthetic_registries("archetypes", "monster_tiers", "subraces")
+@synthetic_registries("archetypes", "monster_species", "subraces")
 class DescriptionDispatcherTests(PromptFixture):
     """The description_for boundary: explicit selection only for characters."""
 
@@ -553,7 +553,7 @@ class DescriptionDispatcherTests(PromptFixture):
     def test_scene_and_monster_dispatch_ignore_the_selection(self):
         self.load()
         scene = scene_subject_for(_SYNTH_SCENE)
-        monster = monster_subject_for(_SYNTH_TIER)
+        monster = monster_subject_for(_SYNTH_SPECIES)
         from world.art.subjects import monster_description, scene_description
 
         self.assertEqual(description_for(scene), scene_description(scene))

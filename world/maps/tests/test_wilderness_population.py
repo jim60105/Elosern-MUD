@@ -282,6 +282,9 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         return monster
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-identities-are-authored-independently-of-combat-profiles"
+    )
     def test_empty_coordinate_is_populated_once(self):
         # NEARBY_BAND_XY is inside the hunting band but unvisited so far: the first
         # ensure_population creates exactly one living monster there.
@@ -298,7 +301,18 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         )
         self.assertEqual(self.script.db.itemcoordinates[monster], NEARBY_BAND_XY)
         self.assertGreater(monster.traits.hp.current, 0)
+        # The label and the visual key come from ONE authored baseline row: a
+        # baseline monster carries an art-only identity and needs no combat
+        # species, profile or skill to be drawable.
+        rows = _live_registry(
+            ".".join(("world", "lore", "monster_visuals")), "BASELINE_VISUAL_ROWS"
+        )
+        row = next(r for r in rows if r.stable_key == monster.art_species_key)
+        self.assertEqual(row.display_label, monster.key)
+        self.assertTrue(row.is_baseline_art_only)
         self.assertIn(monster.art_species_key, ("slime", "goblin", "giant_rat"))
+        self.assertIsNone(monster.species_key)
+        self.assertIsNone(monster.variant_key)
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_repeated_calls_create_no_duplicates(self):

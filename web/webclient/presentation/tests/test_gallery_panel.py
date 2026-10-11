@@ -70,7 +70,7 @@ def official_row(identity="preset/t_gallery_preset/a.png", **changes):
 def payload():
     """File-local synthetic character wire fixture, independent of shipped content."""
     return {
-        "schema_version": 1, "available": True, "kind": "gallery",
+        "schema_version": 2, "available": True, "kind": "gallery",
         "subjects": [{"subject_key": "portrait:character:t_gallery", "kind": "portrait:character", "display_name": "測試角色", "is_puppet": True}],
         "selected": "portrait:character:t_gallery",
         "filters": {"all": 1, "defaults": 1, "bound": 0, "pending": 0, "failed": 0},
@@ -88,7 +88,7 @@ def payload():
             "armor": {"value": None, "display_name": "未裝備"},
             "accessories": {"value": [], "display_names": [], "equipped_count": 0},
         },
-        "capabilities": {"supports_bindings": True, "supports_field_selection": True, "supports_free_text": True, "max_cards": None},
+        "capabilities": {"supports_bindings": True, "supports_field_selection": True, "supports_free_text": True, "supports_personal_official_preferences": True, "max_cards": None},
         "binding_warnings": [], "error_state": None, "official_entries": [],
     }
 
@@ -106,7 +106,7 @@ class GalleryWireTests(unittest.TestCase):
         add("unknown top key", lambda p: p.update(extra=1))
         add("unknown nested key", lambda p: p["cards"][0].update(extra=1))
         add("wrong schema boolean", lambda p: p.update(schema_version=True))
-        add("integral numeric schema", lambda p: p.update(schema_version=1.0), True)
+        add("integral numeric schema", lambda p: p.update(schema_version=2.0), True)
         add("unknown selection", lambda p: p.update(selected="portrait:character:absent"))
         add("surrogate", lambda p: p["subjects"][0].update(display_name="\ud800"))
         add("name at cap", lambda p: p["subjects"][0].update(display_name="𠮷" * 64), True)
@@ -430,9 +430,13 @@ class GalleryPresenterTests(EvenniaTest):
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
         self.context = PresentationContext(self.actor, 1)
         self.registry = build_production_registry()
-        tiers = {"t_beast": SimpleNamespace(display_name_zh="測試魔物")}
-        for target in ("web.webclient.presentation.gallery.MONSTER_TIER_REGISTRY", "world.art.subjects.MONSTER_TIER_REGISTRY"):
-            patcher = patch(target, tiers)
+        visual_registry = {"t_beast": SimpleNamespace(display_label="測試魔物")}
+        for target in (
+            "web.webclient.presentation.gallery.get_monster_visual_registry",
+            "world.lore.monster_visuals.get_monster_visual_registry",
+            "world.art.subjects.get_monster_visual_registry",
+        ):
+            patcher = patch(target, return_value=visual_registry)
             patcher.start()
             self.addCleanup(patcher.stop)
 
@@ -456,7 +460,7 @@ class GalleryPresenterTests(EvenniaTest):
         return session
 
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_empty_available_and_mode_gate(self):
         before = api.GalleryRecord.objects.count()
@@ -531,7 +535,7 @@ class GalleryPresenterTests(EvenniaTest):
 
     @covers_requirement("webclient-oob-protocol::presenter-registration-and-execution-are-isolated-and-read-only")
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_repeated_render_preserves_duplicate_records_cards_jobs_and_files(self):
         self.card(1)
@@ -699,12 +703,13 @@ class OfficialEntryProjectionTests(EvenniaTest):
         ):
             patcher.start()
             self.addCleanup(patcher.stop)
-        tiers = {"t_beast": SimpleNamespace(display_name_zh="測試魔物")}
+        visual_registry = {"t_beast": SimpleNamespace(display_label="測試魔物")}
         for target in (
-            "web.webclient.presentation.gallery.MONSTER_TIER_REGISTRY",
-            "world.art.subjects.MONSTER_TIER_REGISTRY",
+            "web.webclient.presentation.gallery.get_monster_visual_registry",
+            "world.lore.monster_visuals.get_monster_visual_registry",
+            "world.art.subjects.get_monster_visual_registry",
         ):
-            patcher = patch(target, tiers)
+            patcher = patch(target, return_value=visual_registry)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.actor = create_object(PlayerCharacter, key="測試主角", location=self.room1)
@@ -746,7 +751,7 @@ class OfficialEntryProjectionTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     @covers_requirement(
         "webclient-gallery-panel::the-personal-selection-state-is-server-authored-in-the-panel-payload"
@@ -797,7 +802,7 @@ class OfficialEntryProjectionTests(EvenniaTest):
         self.assertIsNone(api.record_for(self.subject).db.default_image_id)
 
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     @covers_requirement(
         "webclient-gallery-panel::the-personal-selection-state-is-server-authored-in-the-panel-payload"
@@ -821,7 +826,7 @@ class OfficialEntryProjectionTests(EvenniaTest):
         self.assertEqual(gallery_presenter(context)["official_entries"], [])
 
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_an_over_budget_identity_is_skipped_with_one_diagnostic(self):
         # 180 code points fit the identity bound but push the fingerprinted URL
@@ -849,7 +854,7 @@ class OfficialEntryProjectionTests(EvenniaTest):
         )
 
     @covers_requirement(
-        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-1-presentation-panel"
+        "webclient-gallery-panel::the-gallery-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_building_the_panel_with_official_entries_mutates_nothing(self):
         identity = self._index("a.png")

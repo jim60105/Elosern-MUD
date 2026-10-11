@@ -1,7 +1,7 @@
 """Tests for the typed official content reference and its provenance rules.
 
 Pure ``unittest.TestCase`` wherever it can be: the resolver performs no I/O,
-reads exactly three entity attributes, and consults the live lore registries, so
+reads exactly four entity attributes, and consults the live lore registries, so
 the grammar, boundary, inference-trap, diagnostic, and monster contracts here
 run without a database or a catalog snapshot. Synthetic registries are injected
 through the module's own registry bindings (string-named ``patch.object``,
@@ -28,6 +28,7 @@ from world.art.gallery_fallback import (
     PRESET_PROVENANCE_ATTRIBUTE as FALLBACK_PRESET_ATTRIBUTE,
 )
 from world.art.official_refs import (
+    ART_SPECIES_PROVENANCE_ATTRIBUTE,
     MAX_UNRESOLVED_DIAGNOSTICS,
     NPC_PROFILE_PROVENANCE_ATTRIBUTE,
     OFFICIAL_CONTENT_KINDS,
@@ -45,6 +46,7 @@ from world.art.official_refs import (
     registered_content_key,
 )
 from world.art.subjects import is_valid_subject_key
+from world.lore import monster_visuals
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 MODULE_PATH = REPO_ROOT / "world" / "art" / "official_refs.py"
@@ -54,7 +56,7 @@ MODULE_PATH = REPO_ROOT / "world" / "art" / "official_refs.py"
 PRODUCTION_ROOTS = ("commands", "server", "typeclasses", "world", "web/webclient")
 
 # The exact direct project-import boundary the leaf module is allowed: the
-# shared stable-key predicate, the three immutable lore registries (the
+# shared stable-key predicate, the immutable lore registries (the visual
 # species registry is the monster kind's membership authority), and the
 # observability facade. Nothing else — no catalog module, no rules layer, no
 # typeclass, no transport.
@@ -62,6 +64,7 @@ EXPECTED_PROJECT_IMPORTS = frozenset(
     {
         "world.art.subjects",
         "world.lore.monster_species",
+        "world.lore.monster_visuals",
         "world.lore.npc_profiles",
         "world.lore.player_presets",
         "world.observability",
@@ -76,6 +79,7 @@ EXPECTED_PROJECT_IMPORTS = frozenset(
 DEPENDENCY_SOURCES = (
     "world/art/subjects.py",
     "world/lore/monster_species.py",
+    "world/lore/monster_visuals.py",
     "world/lore/npc_profiles",
     "world/lore/player_presets",
     "world/observability",
@@ -405,6 +409,7 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 PRESET_PROVENANCE_ATTRIBUTE,
                 NPC_PROFILE_PROVENANCE_ATTRIBUTE,
                 SPECIES_PROVENANCE_ATTRIBUTE,
+                ART_SPECIES_PROVENANCE_ATTRIBUTE,
             ],
         )
 
@@ -526,6 +531,7 @@ class ProvenanceResolutionTests(unittest.TestCase):
                 PRESET_PROVENANCE_ATTRIBUTE,
                 NPC_PROFILE_PROVENANCE_ATTRIBUTE,
                 SPECIES_PROVENANCE_ATTRIBUTE,
+                ART_SPECIES_PROVENANCE_ATTRIBUTE,
             ],
         )
         # The species arm reads its name and also answers nothing: an identity
@@ -587,24 +593,30 @@ class MonsterBoundaryTests(unittest.TestCase):
         self.addCleanup(official_refs._reported_unresolved.clear)
 
     @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+        "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
     )
-    def test_the_monster_kinds_membership_authority_is_the_species_registry(self):
+    def test_the_monster_kinds_membership_authority_is_the_visual_species_registry(self):
         # A value of the tier vocabulary is not a monster content key...
         self.assertFalse(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
         self.assertIsNone(official_content_reference(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
-        # ...and the species registry is the one authority that admits one.
+        # ...and the visual species registry — never a tier table and never a
+        # name heuristic — is the one live authority that admits one.
         with patch.object(
-            official_refs, "MONSTER_SPECIES_REGISTRY", {_SYNTH_SPECIES: object()}
+            monster_visuals,
+            "get_monster_visual_registry",
+            return_value={_SYNTH_SPECIES: object()},
         ):
             self.assertTrue(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES))
             self.assertEqual(
                 official_content_reference(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES),
                 OfficialContentReference(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES),
             )
+        # The read is live, not cached at import: dropping the registry
+        # withdraws the key again.
+        self.assertFalse(registered_content_key(OFFICIAL_KIND_MONSTER, _SYNTH_SPECIES))
 
     @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+        "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
     )
     def test_a_tier_bearing_monster_resolves_no_reference(self):
         entity = _RecordingEntity(npc_tier_key=_SYNTH_TIER)
@@ -622,7 +634,7 @@ class MonsterBoundaryTests(unittest.TestCase):
         self.assertEqual(_unresolved_events(logged), [])
 
     @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+        "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
     )
     def test_an_injected_species_provider_answers_only_the_entities_own_reference(self):
         # The seam's own contract: the provider is handed the ENTITY, so it can
@@ -648,7 +660,10 @@ class MonsterBoundaryTests(unittest.TestCase):
         self.assertNotEqual(wolf_reference, boar_reference)
 
     @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+        "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
+    )
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
     )
     def test_a_monster_with_no_stored_species_identity_resolves_no_reference(self):
         # Tier text and display text are the substitution candidates: neither

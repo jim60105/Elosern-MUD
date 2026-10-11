@@ -100,7 +100,7 @@ def _wait_appended_page_measured(page, scale, timeout=30000) -> None:
 
 
 _GALLERY_PANEL = {
-    "schema_version": 1,
+    "schema_version": 2,
     "available": True,
     "kind": "gallery",
     "subjects": [
@@ -117,6 +117,7 @@ _GALLERY_PANEL = {
         "supports_bindings": True,
         "supports_field_selection": True,
         "supports_free_text": True,
+        "supports_personal_official_preferences": True,
         "max_cards": None,
     },
     "cards": [],
