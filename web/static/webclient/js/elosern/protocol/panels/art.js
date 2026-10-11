@@ -265,8 +265,8 @@ function validateArtCatalogEntry(value) {
   return value;
 }
 
-// Exact gallery v1 mirror. Display labels and matching facts are server-owned.
-var GALLERY_SCHEMA_VERSION = 1;
+// Exact gallery v2 mirror. Display labels and matching facts are server-owned.
+var GALLERY_SCHEMA_VERSION = 2;
 var GALLERY_MAX_SUBJECTS = 24;
 var GALLERY_MAX_LABEL = 128;
 var GALLERY_MAX_NAME = 64;
@@ -547,9 +547,9 @@ function validateGalleryPanel(payload) {
   if (!subjects.has(payload.selected)) throw new Error("selected is not in rail");
   var capability = payload.capabilities;
   requireExactFields(capability, "capabilities", [
-    "supports_bindings", "supports_field_selection", "supports_free_text", "max_cards"
+    "supports_bindings", "supports_field_selection", "supports_free_text", "supports_personal_official_preferences", "max_cards"
   ], []);
-  ["supports_bindings", "supports_field_selection", "supports_free_text"].forEach(function (field) {
+  ["supports_bindings", "supports_field_selection", "supports_free_text", "supports_personal_official_preferences"].forEach(function (field) {
     requireBool(capability[field], field);
   });
   if (capability.max_cards !== null && capability.max_cards !== 1) throw new Error("invalid card cap");

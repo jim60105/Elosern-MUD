@@ -14,14 +14,14 @@ shared synthetic kit (``world.tests.synthetic_data``) or from a string-named
 test, and no shipped key, path, or catalog symbol appears — the reference's
 membership authority is exercised through the kit's own vocabulary.
 
-One structural note the tests below respect rather than assert away: the
+One structural note the tests below assert rather than assume away: a monster's
 personal art layer (``official-art-personalization``) is keyed by the runtime
-*subject*, and a monster's subject is its threat tier (``portrait:monster:<tier>``,
-the generic layer this change leaves untouched). Two individuals of one species
-therefore share one personal record whenever their variants carry the same tier.
-What this module asserts for them is what the reference layer owns: one shared
-read-only reference, identical presented bytes, and a stored personal choice
-that resolves only inside that individual's own reference.
+entity, so each individual of one visual species carries its own official
+selection and geometry while the species reference — and therefore the reusable
+cards and mounted bytes behind it — stays shared. What this module asserts for
+two same-species individuals is exactly that: one shared read-only reference,
+identical presented bytes, and personal choices that resolve only inside each
+individual's own reference.
 """
 
 import hashlib
@@ -45,6 +45,8 @@ from typeclasses.monsters import Monster
 from world.art import official, official_refs
 from world.art.gallery import (
     GalleryRecord,
+    append_card,
+    cards_for,
     official_preferences_for,
     set_official_geometry,
     set_official_selection,
@@ -64,6 +66,7 @@ from world.art.official_refs import (
 from world.art.presenter import (
     ORIGIN_OFFICIAL,
     PAYLOAD_OFFICIAL,
+    PLACEHOLDER_UNAVAILABLE,
     resolve_entity,
     resolve_subject,
 )
@@ -75,6 +78,7 @@ from world.art.subjects import (
     monster_subject_for,
     parse_subject,
 )
+from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 from world.tests.synthetic_data import (
     SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
@@ -106,6 +110,11 @@ VARIANT_ATTRIBUTE = "variant_key"
 # stored key rather than "whatever the catalog happens to hold".
 _OTHER_SPECIES = "t_synth_other_species"
 _UNREGISTERED_SPECIES = "t_synth_unregistered_species"
+
+# A registered ART-ONLY visual identity and a distinct complete species: two
+# monsters of one combat tier that must never share runtime state. The key is
+# read from the authored declarations rather than restated here.
+_ART_ONLY_KEY = BASELINE_VISUAL_ROWS[0].stable_key
 
 # The catalog's load-time geometry for a 4x4 test image (pixel-square).
 _OFFICIAL_RECT = {"x": 0.25, "y": 0.25, "w": 0.5, "h": 0.5}
@@ -260,6 +269,9 @@ class SpeciesReferenceTests(unittest.TestCase):
     @covers_requirement(
         "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
     )
+    @covers_requirement(
+        "monster-visual-identity::threat-tiers-never-address-monster-imagery"
+    )
     def test_a_tier_value_is_never_admitted_as_a_species_key(self):
         for tier in _SYNTH_TIERS:
             with self.subTest(tier=tier):
@@ -271,10 +283,9 @@ class SpeciesReferenceTests(unittest.TestCase):
                 self.assertEqual(len(events), 1)
                 self.assertEqual(events[0].kwargs["context"]["kind"], OFFICIAL_KIND_MONSTER)
                 self.assertEqual(events[0].kwargs["context"]["reason"], "unregistered_key")
-        # The tier vocabulary is real and still owns the generic subject layer.
-        self.assertEqual(
-            monster_subject_for(_SYNTH_TIER).full(), f"portrait:monster:{_SYNTH_TIER}"
-        )
+        # The tier vocabulary is never a monster visual subject.
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
     @covers_requirement(
         "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
@@ -304,7 +315,7 @@ class SpeciesReferenceTests(unittest.TestCase):
 
 
 class SpeciesSubjectVocabularyTests(unittest.TestCase):
-    """The art-subject layer stays tier-validated: a species key is not a subject key."""
+    """The art-subject layer is species-validated: a species key IS a subject key, a tier key is not."""
 
     def setUp(self):
         open_synthetic_scope(self, "monster_species", "monster_tiers")
@@ -312,18 +323,14 @@ class SpeciesSubjectVocabularyTests(unittest.TestCase):
     @covers_requirement(
         "art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries"
     )
-    def test_a_registered_species_key_is_never_a_monster_subject_key(self):
+    def test_a_registered_species_key_is_a_monster_subject_key_and_tier_is_rejected(self):
         for species_key in SYNTH_MONSTER_SPECIES:
             with self.subTest(species_key=species_key):
                 forged = parse_subject(f"portrait:monster:{species_key}")
                 self.assertEqual(forged.kind, ArtSubjectKind.MONSTER)
-                with self.assertRaises(ArtSubjectError):
-                    monster_subject_for(forged.key)
-        # The tier vocabulary still resolves, so the rejection is the registry
-        # validation and not a broken subject layer.
-        self.assertEqual(
-            monster_subject_for(_SYNTH_TIER).full(), f"portrait:monster:{_SYNTH_TIER}"
-        )
+                self.assertEqual(monster_subject_for(forged.key).full(), f"portrait:monster:{species_key}")
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
 
 class SpeciesPortraitChainTests(EvenniaTestCase):
@@ -384,8 +391,8 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         return monster
 
     def _subject(self) -> ArtSubject:
-        """The generic tier subject a monster presents through (unchanged layer)."""
-        return ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_TIER)
+        """The species subject a monster presents through."""
+        return ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)
 
     def _tree(self, root: Path) -> tuple:
         """A (path, sha256) listing of one source tree: byte-identity evidence."""
@@ -510,10 +517,14 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             current_catalog().fingerprint_for(other),
         ):
             with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, serialized)
+                # Forbidden official image identity is not present
+                self.assertNotIn(f"monster/{forbidden}/", serialized)
 
     @covers_requirement(
         "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
+    )
+    @covers_requirement(
+        "monster-visual-identity::threat-tiers-never-address-monster-imagery"
     )
     def test_a_tier_named_monster_directory_is_indexed_but_unreachable(self):
         # An operator error: a content directory named after a threat tier.
@@ -530,6 +541,9 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertNotIn(tier_identity, json.dumps(payload, sort_keys=True))
 
     # -- shared reference, personal layer beside it -----------------------
+    @covers_requirement(
+        "species-portrait-identity::monster-portraits-never-borrow-runtime-state-across-visual-species"
+    )
     def test_two_variants_of_one_species_share_the_image_beside_one_personal_layer(self):
         identity = self._index(
             _SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
@@ -554,28 +568,28 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
         self.assertEqual(first_payload["url"], current_catalog().url_for(identity))
 
-        # The personal layer sits beside the shared reference, keyed by the
-        # runtime SUBJECT (for a monster, its tier — the layer this change does
-        # not touch), so the override written for this subject governs both
-        # same-species individuals' payloads while the mounted source is never
-        # written.
+        # Personal overrides are entity-local for monsters: an override written on
+        # one monster does NOT leak to another individual of the same species.
         override = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25}
-        set_official_geometry(self._subject(), identity, face_rect=override)
+        set_official_geometry(self._subject(), identity, face_rect=override, entity=first)
         overridden = resolve_subject(self._subject(), entity=first)
         sibling = resolve_subject(self._subject(), entity=second)
         self.assertEqual(overridden["face_rect"], override)
         self.assertEqual(overridden["url"], first_payload["url"])
-        self.assertEqual(sibling["face_rect"], override)
+        self.assertNotEqual(sibling["face_rect"], override)
         self.assertEqual(self._tree(self.official_root), before)
 
+    @covers_requirement(
+        "species-portrait-identity::monster-portraits-never-borrow-runtime-state-across-visual-species"
+    )
     def test_a_stored_selection_outside_the_species_reference_is_ignored(self):
         self._index(_SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT))
         foreign_identity = self._index(_OTHER_SPECIES, name="b.png")
         monster = self._monster(species=_SYNTH_SPECIES)
-        set_official_selection(self._subject(), foreign_identity)
+        set_official_selection(self._subject(), foreign_identity, entity=monster)
         # The personal choice is retained verbatim...
         self.assertEqual(
-            official_preferences_for(self._subject()).selection, foreign_identity
+            official_preferences_for(self._subject(), entity=monster).selection, foreign_identity
         )
         # ...and never resolves outside the individual's own reference.
         self.assertIsNone(official_selection_for(self._subject(), monster))
@@ -597,7 +611,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             _SYNTH_SPECIES, name="b.png", face_rect=dict(_OFFICIAL_RECT)
         )
         monster = self._monster(species=_SYNTH_SPECIES)
-        set_official_selection(self._subject(), chosen_identity)
+        set_official_selection(self._subject(), chosen_identity, entity=monster)
         self.assertEqual(
             official_selection_for(self._subject(), monster)["identity"], chosen_identity
         )
@@ -605,6 +619,73 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(payload["url"], current_catalog().url_for(chosen_identity))
         self.assertNotEqual(payload["url"], current_catalog().url_for(default_identity))
+
+    @covers_requirement(
+        "species-portrait-identity::monster-portraits-never-borrow-runtime-state-across-visual-species"
+    )
+    def test_same_tier_species_never_borrow_each_others_runtime_card(self):
+        backed = self._monster(species=_SYNTH_SPECIES)
+        bystander = self._monster()
+        bystander.art_species_key = _ART_ONLY_KEY
+        # One combat tier, two distinct declared visual species.
+        self.assertEqual(backed.threat_tier, bystander.threat_tier)
+        subject = self._subject()
+        other_subject = monster_subject_for(_ART_ONLY_KEY)
+        self.assertNotEqual(subject, other_subject)
+        image_id = "00000000-0000-4000-8000-0000000000aa"
+        identity = f"gallery/monster/{_SYNTH_SPECIES}/{image_id}.png"
+        (self.store / identity).parent.mkdir(parents=True, exist_ok=True)
+        (self.store / identity).write_bytes(_png())
+        append_card(
+            subject,
+            image_id=image_id,
+            stored_identity=identity,
+            prompt=None,
+            seed=None,
+            checkpoint=None,
+            requested_fields=[],
+            binding=None,
+            image_size={"width": 4, "height": 4},
+            source="generated",
+        )
+        self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
+        self.assertEqual(cards_for(other_subject), [])
+        backed_payload = resolve_entity(backed)
+        bystander_payload = resolve_entity(bystander)
+        self.assertEqual(backed_payload["subject_key"], subject.full())
+        self.assertEqual(bystander_payload["subject_key"], other_subject.full())
+        self.assertIsNotNone(backed_payload["url"])
+        self.assertIsNone(bystander_payload["url"])
+        self.assertNotIn(identity, json.dumps(bystander_payload, sort_keys=True))
+
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+    )
+    def test_an_invalid_complete_species_never_borrows_a_valid_art_only_key(self):
+        monster = self._monster(species=_UNREGISTERED_SPECIES)
+        monster.art_species_key = _ART_ONLY_KEY
+        # The art-only key is a valid identity in its own right...
+        self.assertIsNotNone(monster_subject_for(_ART_ONLY_KEY))
+        # ...but a declared, unresolvable complete species does not fall back
+        # to it: the individual resolves no art identity at all.
+        payload = resolve_entity(monster)
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        self.assertIsNone(payload["subject_key"])
+        self.assertIsNone(payload["url"])
+
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+    )
+    def test_renaming_a_monster_never_changes_its_art_identity(self):
+        monster = self._monster()
+        monster.art_species_key = _ART_ONLY_KEY
+        before = resolve_entity(monster)
+        monster.key = "renamed-display-name"
+        after = resolve_entity(monster)
+        self.assertEqual(before["subject_key"], after["subject_key"])
+        self.assertEqual(
+            before["subject_key"], monster_subject_for(_ART_ONLY_KEY).full()
+        )
 
     # -- purity -----------------------------------------------------------
     @covers_requirement(

@@ -270,7 +270,7 @@ def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | No
     from world.art import official
     from world.art.official_refs import official_content_reference_for_entity
 
-    selection = official_preferences_for(subject).selection
+    selection = official_preferences_for(subject, entity=entity).selection
     if selection is None:
         return None
     reference = official_content_reference_for_entity(entity)

@@ -217,9 +217,18 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
         self.companion_subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_companion")
         self.monster_subject = ArtSubject(ArtSubjectKind.MONSTER, "t_beast")
-        tiers = {"t_beast": SimpleNamespace(display_name_zh="測試魔物", description="測試用魔物", example_monsters_zh=("測試獸",))}
-        for target in ("web.webclient.presentation.gallery.MONSTER_TIER_REGISTRY", "world.art.subjects.MONSTER_TIER_REGISTRY"):
-            patcher = patch(target, tiers)
+        visual_registry = {
+            "t_beast": SimpleNamespace(
+                display_label="測試魔物",
+                published_appearance_zh="一頭合成的測試魔物。",
+            )
+        }
+        for target in (
+            "web.webclient.presentation.gallery.get_monster_visual_registry",
+            "world.lore.monster_visuals.get_monster_visual_registry",
+            "world.art.subjects.get_monster_visual_registry",
+        ):
+            patcher = patch(target, return_value=visual_registry)
             patcher.start()
             self.addCleanup(patcher.stop)
         self.registry = build_production_registry()

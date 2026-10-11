@@ -45,6 +45,7 @@ from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 from world.rules.dialogue import GUILD_STAFF_DIALOGUE_KEY
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.tests.synthetic_data import SYNTH_ARCHETYPES
@@ -162,6 +163,9 @@ def _valid_payload(**overrides):
 
 T_BAZAAR = "t_synth_bazaar"
 T_BAZAAR_LABEL = SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh
+# Monster art membership is a registered VISUAL species key, resolved at
+# runtime from the authored baseline rows (never a threat-tier value).
+_MONSTER_VISUAL_KEY = BASELINE_VISUAL_ROWS[0].stable_key
 
 # A deterministic decodable 1x1 PNG: the official catalog admits an image from
 # its header alone, which is all this surface needs.
@@ -483,6 +487,7 @@ def _monster(key="art goblin", hp=100):
     monster = create_object(Monster, key=key)
     monster.threat_tier = "low"
     monster.apply_monster_tier("floor")
+    monster.art_species_key = _MONSTER_VISUAL_KEY
     monster.traits.hp.base = hp
     monster.traits.hp.current = hp
     return monster
@@ -653,7 +658,9 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertEqual(entry["context"]["name"], participant["display_name"])
             self.assertIn(entry["context"]["role"], ("隊友", "敵方"))
         monster_entry = payload["portrait_catalog"][str(monster.pk)]
-        self.assertEqual(monster_entry["subject_key"], "portrait:monster:low")
+        self.assertEqual(
+            monster_entry["subject_key"], f"portrait:monster:{_MONSTER_VISUAL_KEY}"
+        )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_exploration_catalog_contains_hosts_and_named_policy(self):

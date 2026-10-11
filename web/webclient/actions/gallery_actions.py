@@ -45,6 +45,7 @@ REJECTION_MESSAGES = {
     "invalid_prompt": "生成資料或補充提示詞格式錯誤。",
     "subject_ineligible": "角色資料不符合肖像生成條件。",
     "gallery_rejected": "無法更新這張肖像。",
+    "entity_required": "此肖像為物種共用，不支援個人偏好設定。",
     "stage_rejected": "無法儲存比例調整。",
 }
 _SUCCESS = {
@@ -440,6 +441,9 @@ def _mutate_official(action_id, payload):
         if action_id == "gallery.official.clear_selection":
             # Clearing touches only the subject's own record: no identity is
             # named, so no reference scope applies.
+            if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+                log_warn("gallery_action", context=context)
+                return _rejected("entity_required")
             already_clear = gallery_api.official_preferences_for(subject).selection is None
             gallery_api.clear_official_selection(subject)
         else:
@@ -447,7 +451,11 @@ def _mutate_official(action_id, payload):
             image = _official_target(subject, entity, identity)
             if image is None:
                 log_warn("gallery_action", context=context)
+                if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+                    return _rejected("entity_required")
                 return _rejected("unknown_official_image")
+            if parsed.kind is ArtSubjectKind.MONSTER and entity is None:
+                return _rejected("entity_required")
             if action_id == "gallery.official.select":
                 gallery_api.set_official_selection(subject, identity)
             elif action_id == "gallery.official.geometry.set":

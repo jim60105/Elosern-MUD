@@ -23,8 +23,8 @@ typed subject producers.
 - **THEN** exactly one gallery job record exists for a freshly minted image id, carrying the supplied binding and rect, and no card exists yet
 
 #### Scenario: A monster subject queues one job through the same seam
-- **WHEN** a gallery image is requested for a registered monster subject with no field selection, no free text, and no binding
-- **THEN** exactly one gallery job record exists for that subject, no age attribute is read, and the description is the registry-driven monster description
+- **WHEN** a gallery image is requested for a registered visual-species monster subject with no field selection, free text or binding
+- **THEN** exactly one gallery job is queued for that visual species, no age is read and the description contains only its public physical appearance
 
 #### Scenario: An invalid binding or rect never reaches the queue
 - **WHEN** a gallery image is requested with a malformed binding or an out-of-bounds face rectangle
@@ -76,6 +76,10 @@ typed subject producers.
 #### Scenario: The seam is failure-isolated on every gameplay path
 - **WHEN** the seam rejects on a gameplay path
 - **THEN** it behaves exactly like the existing ensure seams: every rejection raises BEFORE any record, file, or card is written, so a gameplay call site wrapped in the existing post-commit failure-isolation pattern never rolls back creation, import, spawn, or movement, and an art failure only logs a bounded diagnostic
+
+#### Scenario: Unknown visual subjects refuse all request shapes
+- **WHEN** a monster request names an unregistered key or threat tier, with otherwise valid empty fields
+- **THEN** it is rejected before prompt rendering, queue writing or card mutation
 
 ### Requirement: Generation while the image server is unreachable is a reported failure, never a gate
 `request_gallery_image` SHALL NOT consult the connectivity probe and SHALL NOT import

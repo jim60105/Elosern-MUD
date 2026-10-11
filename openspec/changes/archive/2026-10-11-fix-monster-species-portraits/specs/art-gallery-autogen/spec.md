@@ -69,10 +69,9 @@ The resulting card SHALL be unbound, displayed only as the subject's default.
 
 ### Requirement: Automatic generation is idempotent against the subject's gallery
 An automatic path SHALL request a generation only when the subject's gallery holds no card AND no
-gallery job for that subject is in flight AND — for an entity or a registered visual-species subject whose official content reference is
-eligible and already satisfied by a valid catalog entry in the startup official snapshot (see the
-`official-art-resolution` capability) — no official default resolves for it. A subject that already
-holds any card SHALL be left alone. The guard SHALL be the same one for every gallery-bearing kind.
+gallery job for that subject is in flight AND no official default resolves for it. A subject that
+already holds any card SHALL be left alone. The guard SHALL be the same one for every
+gallery-bearing kind.
 
 #### Scenario: Repeated recovery appends nothing
 - **WHEN** startup recovery runs on consecutive restarts for a subject that already holds one card

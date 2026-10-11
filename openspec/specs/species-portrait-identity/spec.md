@@ -16,9 +16,9 @@ joins only at the official reference layer, so the two identity layers can never
 ## Requirements
 
 ### Requirement: A species-backed individual resolves the species-keyed official content reference
-A monster whose persistent identity carries a registered `species_key` SHALL resolve its official
-content reference as the `monster` kind keyed by exactly that species key, derived solely from stored
-species provenance. Resolution SHALL be a pure read of stored identity plus the startup catalog
+A monster whose persistent identity carries a registered visual-species provenance SHALL resolve its official
+content reference as the `monster` kind keyed by exactly that visual species key, derived solely from stored
+visual provenance. Resolution SHALL be a pure read of stored identity plus the startup catalog
 snapshot.
 
 #### Scenario: Species key is the whole reference
@@ -30,8 +30,8 @@ snapshot.
 - **THEN** both resolve the same species reference, and their personal selections and geometry remain independent through the existing personalization machinery
 
 #### Scenario: Tier-only individuals resolve nothing new
-- **WHEN** a tier-only monster resolves
-- **THEN** no species reference exists and its presentation is exactly the current runtime/silhouette chain
+- **WHEN** a tier-built baseline individual carries valid explicit visual provenance
+- **THEN** its reference is monster/<visual-key>; without valid visual provenance it resolves no species subject and carries monster_anon
 
 #### Scenario: The reference is never derived from tier, name, or variant
 - **WHEN** a species-backed individual resolves its official reference
@@ -44,8 +44,8 @@ the existing runtime/silhouette/placeholder chain, and no code path SHALL presen
 official image, a different species' bytes, or a tier-derived stand-in in its place.
 
 #### Scenario: An unmapped species falls through, not sideways
-- **WHEN** a species-backed monster resolves while the catalog has no `monster/<its species_key>/` entries
-- **THEN** the chain proceeds exactly as it does today with runtime artwork or silhouette, and no other species' official bytes are reachable for it
+- **WHEN** a monster has registered visual provenance but its official package is absent
+- **THEN** only runtime artwork of that same visual species may resolve; without a valid species image monster_anon resolves, and no other species or threat-tier bytes are reachable
 
 #### Scenario: Tier aliases cannot satisfy the prerequisite
 - **WHEN** content or configuration attempts to name a threat tier where a species key is required
@@ -60,5 +60,20 @@ official image, a different species' bytes, or a tier-derived stand-in in its pl
 - **THEN** threat-tier values are never admitted as species keys anywhere — no alias table, no tier-to-species mapping exists
 
 #### Scenario: The generic tier subject keeps its current scope
-- **WHEN** the generic tier subject `portrait:monster:<tier>` serves presentation
-- **THEN** it keeps serving only the built-in silhouette/gallery generic layer it serves today
+- **WHEN** a retired portrait:monster:<tier> subject is encountered in stored state or a direct request
+- **THEN** it is rejected at every production, selection, resolution and media-admission boundary; no tier gallery layer remains
+
+### Requirement: Monster portraits never borrow runtime state across visual species
+A monster SHALL resolve reusable cards and valid classic identities only inside its declared visual species. Individual official selections and geometry SHALL remain entity-local. Missing, failed or invalid images SHALL retain truthful state and carry monster_anon for browser load failure.
+
+#### Scenario: Same-tier species do not share imagery
+- **WHEN** two monsters share a combat tier but declare different visual species, and only one species has a card
+- **THEN** only that species presents the card; the other presents its own official image or monster_anon
+
+#### Scenario: Same-species individuals keep independent official choices
+- **WHEN** two individuals of one species select different official images and geometry through entity-context preferences
+- **THEN** each presents its own selection and geometry, while source files and the species card remain shared and unchanged
+
+#### Scenario: Broken species images degrade without substitution
+- **WHEN** a valid species image fails admission or a browser image load fails
+- **THEN** presentation uses monster_anon without reaching another species, a tier image or the deprecated humanoid SVG

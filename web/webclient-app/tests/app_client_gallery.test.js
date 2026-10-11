@@ -54,7 +54,7 @@ describe("gallery application integration", () => {
 
     opener.element.focus();
     await opener.trigger("click");
-    await snapshot({ schema_version: 1, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
+    await snapshot({ schema_version: 2, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="gallery-panel"]').text()).toContain("圖庫資料暫時無法使用。");
   }, 20000);

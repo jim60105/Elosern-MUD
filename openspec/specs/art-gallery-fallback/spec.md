@@ -43,23 +43,22 @@ Each committed image SHALL be bounded in size and SHALL depict no sexualized con
   never be served
 
 ### Requirement: A fallback key resolves by declaration, then band, then deterministic hash
-`world/art/gallery_fallback.py` SHALL resolve a subject's fallback key by this ordered rule: (1) a
-fallback key explicitly declared by the subject's registry entry wins outright; (2) otherwise a
-monster subject resolves `monster_anon`; (3) otherwise the subject's stored sex and apparent age
-select one band, and the subject's full key is hashed deterministically into that band's ordered key
-pool. The resolution SHALL be a pure function of the subject key and the stored sex and apparent
-age.
+`world/art/gallery_fallback.py` SHALL resolve a subject's fallback key in order: (1) every monster
+entity or subject resolves `monster_anon`, including unresolved visual provenance; (2) a non-monster
+registry-declared fallback key wins; (3) otherwise stored sex and apparent age select a band, and
+the full key hashes deterministically into that band's ordered key pool. Resolution SHALL be a pure
+function of the subject key and the stored sex and apparent age.
 
 #### Scenario: A declared key wins over the band rule
-- **WHEN** a subject's registry entry declares a fallback key
+- **WHEN** a non-monster subject's registry entry declares a fallback key
 - **THEN** that key is resolved regardless of the subject's sex or apparent age
 
 #### Scenario: Sex and apparent age select the band
-- **WHEN** subjects with adult, child, and elder apparent ages and female and male sexes resolve without a declaration
+- **WHEN** non-monster subjects with adult, child, and elder apparent ages and female and male sexes resolve without a declaration
 - **THEN** each resolves the key its band declares for that sex
 
 #### Scenario: A sex outside the pair hashes deterministically inside its band
-- **WHEN** a subject whose sex is neither female nor male resolves without a declaration
+- **WHEN** a non-monster subject whose sex is neither female nor male resolves without a declaration
 - **THEN** its key is chosen from its band's pool by a hash of the subject key, and repeating the resolution yields the same key
 
 #### Scenario: Determinism survives a restart
@@ -67,13 +66,17 @@ age.
 - **THEN** the same fallback key, and therefore the same image, is resolved
 
 #### Scenario: Malformed sex or age fails closed to the adult band
-- **WHEN** a subject's stored sex or apparent age is missing or malformed
+- **WHEN** a non-monster subject's stored sex or apparent age is missing or malformed
 - **THEN** the adult band is used, no exception propagates, and a key is still resolved
 
 #### Scenario: A declaration is optional and existing entries stay valid
-- **WHEN** player presets and the NPC and monster registries declare, or do not declare, a fallback
+- **WHEN** player presets and the NPC registries declare, or do not declare, a fallback
   key
 - **THEN** declaring one is permitted (MAY) and every existing entry stays valid without one
+
+#### Scenario: Monsters always carry the authoritative monster fallback
+- **WHEN** a monster has absent or invalid visual provenance, no real image, or a failed image load
+- **THEN** its fallback is `monster_anon`, independent of sex, age and threat tier; no tier fallback declaration is read
 
 #### Scenario: A band pool may hold several keys
 - **WHEN** a band's ordered key pool holds more than one key
@@ -84,7 +87,7 @@ age.
 - **THEN** the pure resolution of subject key, stored sex, and apparent age yields the same key
 
 #### Scenario: Missing or malformed values fail closed rather than raising
-- **WHEN** a subject's stored sex or apparent-age value is missing or malformed
+- **WHEN** a non-monster subject's stored sex or apparent-age value is missing or malformed
 - **THEN** resolution SHALL fail closed to the adult band rather than raising
 
 ### Requirement: The fallback seam supplies a URL and a face rectangle and reports its use

@@ -2,7 +2,9 @@
 
 ## Purpose
 Defines the staff-only @art command surface — status listing with filters and gallery state, run to drain the queue, retry and requeue for regeneration, options, and health reporting — each bounded so output never leaks persona text, prompt content, absolute paths, or the store root. Guarantees players have no access to any art control.
+
 ## Requirements
+
 ### Requirement: @art status lists and filters records without leaking sensitive data
 `commands/art.py::CmdArtStatus` (`@art status [scene|portrait]`) SHALL list asset records filtered by
 subject kind, showing subject key, status, aspect ratio, attempt count, bounded error code, and —
@@ -131,6 +133,10 @@ request seam. It SHALL report both counts.
 - **WHEN** the seam declines an erroring subject for any reason other than a now-non-empty gallery
 - **THEN** that subject SHALL keep its recorded error
 
+#### Scenario: Retired tier jobs and gallery errors never retry
+- **WHEN** a retry pass encounters tier-keyed monster records or errors
+- **THEN** it cannot reactivate or convert them; valid scene, character and species retries retain their normal behavior
+
 ### Requirement: @art requeue accepts one validated full subject key and forces regeneration under the lock
 `commands/art.py::CmdArtRequeue` (`@art requeue <full-subject-key>`) SHALL parse and validate exactly
 one full subject key through the subject parser. An invalid key SHALL be rejected with a named error
@@ -152,15 +158,15 @@ only way an ordinary-lifecycle pass can force regeneration of that record.
 - **THEN** one gallery generation is requested, no classic asset record is created, and the existing cards are untouched until the new card is appended
 
 #### Scenario: A monster key requeue requests a gallery card honouring the cap
-- **WHEN** staff runs `@art requeue portrait:monster:<tier>` for a tier that already holds its one card
+- **WHEN** staff runs `@art requeue portrait:monster:<visual-key>` for a visual species that already holds its one card
 - **THEN** one gallery generation is requested, no classic asset record is created, and the settled card replaces the existing one under the declared maximum
 
 #### Scenario: A monster requeue never resets a classic record
-- **WHEN** staff runs `@art requeue portrait:monster:<tier>` for a tier that still has a pre-existing classic asset record
+- **WHEN** staff runs `@art requeue portrait:monster:<visual-key>` for a visual species that still has a pre-existing classic asset record
 - **THEN** a gallery generation is requested and that classic record's status is unchanged
 
 #### Scenario: A gallery-bearing key issues one request through the shared seam
-- **WHEN** the requeue key's subject kind declares a gallery — character and generic monster alike
+- **WHEN** the requeue key's subject kind declares a gallery — character and species-keyed monster alike
 - **THEN** the command SHALL instead issue exactly one gallery generation request for that subject
   through the shared request seam, appending a new card on success
 
@@ -181,6 +187,10 @@ only way an ordinary-lifecycle pass can force regeneration of that record.
 #### Scenario: Neither path creates a classic record for a gallery-bearing subject
 - **WHEN** either requeue path runs for a gallery-bearing subject
 - **THEN** neither path SHALL create a classic asset record for that subject
+
+#### Scenario: Retired monster tiers never requeue
+- **WHEN** staff supplies any threat-tier key as a monster requeue subject
+- **THEN** a named invalid-subject error is returned with no generation, record reset or conversion
 
 ### Requirement: Players have no access to any art control
 No `@art` subcommand SHALL be available to ordinary players, and no player-triggered retry or
@@ -283,4 +293,3 @@ policy.
 #### Scenario: The reachability line attests the probe ran just now
 - **WHEN** the server reachability section renders
 - **THEN** it reports that the check ran just now
-

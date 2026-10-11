@@ -32,9 +32,9 @@ is a member of the module's closed `CUTOUT_SUBJECT_KINDS` allowlist.
 
 #### Scenario: A monster portrait is stored transparent
 - **WHEN** the stage is enabled, the sd-webui double returns an opaque multi-pixel PNG,
-  and a classic `portrait:monster:<tier>` job generates successfully
+  and a classic `portrait:monster:<visual-key>` job for a registered visual species generates successfully
 - **THEN** the record settles `done`, the stored file at
-  `portrait/monster/<tier><extension>` decodes with an alpha channel carrying fully
+  `portrait/monster/<visual-key><extension>` decodes with an alpha channel carrying fully
   transparent pixels, and its bytes differ from the same job's disabled-stage output
 
 #### Scenario: A gallery portrait job is cut out on the same terms

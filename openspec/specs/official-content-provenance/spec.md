@@ -93,16 +93,16 @@ A dynamically generated NPC (no authored profile identity) SHALL resolve an offi
 - **WHEN** an allowed authored channel attaches a validated official reference to a generated NPC
 - **THEN** that reference resolves like any other provenance-derived reference
 
-### Requirement: Monster species references await the separate species catalog and forbid tier substitution
-Species-specific monster official artwork SHALL resolve only from a validated species/content reference. No such reference producer exists until the separate monster species catalog design lands; until that catalog's owner supplies it, monster subjects SHALL resolve official artwork through no path, presenting runtime artwork or the built-in monster silhouette as they do today, and every existing guarded seam SHALL remain intact.
+### Requirement: Monster species references use declared visual provenance and forbid tier substitution
+Species-specific monster official artwork SHALL resolve from validated stored complete-species provenance, or explicit baseline visual provenance only when complete-species provenance is absent. Both sources SHALL use the registered visual vocabulary; no display-name inference or threat-tier substitution is permitted.
 
 #### Scenario: Monsters resolve no official image before the catalog exists
-- **WHEN** any registered threat-tier monster is asked for an official content reference while `monster/` content directories are populated in the official root
-- **THEN** the resolver yields no reference for it — no tier-to-species or display-name-to-species mapping runs — and production code constructs no monster reference anywhere
+- **WHEN** a monster has registered complete-species or baseline visual provenance and its species directory is mounted
+- **THEN** the resolver returns exactly that monster visual reference; absent provenance resolves no reference and never uses tier or name matching
 
 #### Scenario: A threat tier never borrows a species image
-- **WHEN** the official root contains `monster/<key>/` directories and a monster of a registered tier whose own key textually equals one of those directory names is asked for a reference
-- **THEN** the resolver yields no reference, because no producer keyed by threat tier exists
+- **WHEN** a monster has only a threat tier and a display name textually equal to a catalog directory
+- **THEN** no visual reference is inferred; the monster presents monster_anon
 
 #### Scenario: Synthetic species references resolve when supplied
 - **WHEN** a test injects a species/content reference provider and asks the resolver for a monster carrying a validated species reference

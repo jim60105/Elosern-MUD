@@ -62,7 +62,8 @@ function confirmDelete() {
       <section class="gallery-section">
         <h4>目前狀態</h4>
         <p>{{ entry.is_current ? '目前預設' : '未設為預設' }}</p>
-        <p class="gallery-muted">官方圖片為唯讀；你可以選擇它，或調整自己的顯示方式。</p>
+        <template v-if="capabilities.supports_personal_official_preferences !== false">
+          <p class="gallery-muted">官方圖片為唯讀；你可以選擇它，或調整自己的顯示方式。</p>
         <button class="gallery-primary gallery-detail__default" :disabled="disabled || entry.is_current" @click="emit('official-select')">設為預設影像</button>
         <div class="gallery-actions">
           <button :disabled="disabled" @click="emit('official-face')">臉部框選</button>
@@ -70,6 +71,10 @@ function confirmDelete() {
           <button :disabled="disabled || !entry.is_current" @click="emit('official-clear')">清除選取</button>
           <button :disabled="disabled" @click="emit('official-geometry-clear')">清除個人調整</button>
         </div>
+        </template>
+        <template v-else>
+          <p class="gallery-muted">官方圖片為唯讀檢視。</p>
+        </template>
       </section>
     </template>
     <template v-else-if="card">

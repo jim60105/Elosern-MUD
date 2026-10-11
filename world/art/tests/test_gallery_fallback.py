@@ -70,6 +70,10 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
         "web/webclient-app/assets/redesign/sample-forest.webp",
         "web/webclient-app/assets/redesign/sample-guild.webp",
         "web/webclient-app/assets/redesign/sample-town.webp",
+        "web/static/favicon/web-app-manifest-192x192.png",
+        "web/static/favicon/apple-touch-icon.png",
+        "web/static/favicon/favicon-96x96.png",
+        "web/static/favicon/web-app-manifest-512x512.png",
     ]
 )
 
@@ -90,9 +94,10 @@ def _character(key):
     return ArtSubject(ArtSubjectKind.CHARACTER, key)
 
 
-# Subject keys here are resolver inputs, not shipped rows: monster keys are the
-# kit's synthetic tier keys (the band/constant rules never need a registered
-# tier; declaration tests register their own synthetic row).
+# Subject keys here are resolver inputs, not shipped rows: a monster key is an
+# arbitrary identity because EVERY monster subject resolves the constant
+# ``monster_anon``, so no registry membership or registry declaration of any
+# kind participates in the monster rung.
 def _monster(key="t_faint"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 
@@ -227,12 +232,6 @@ class RegistryDeclarationTests(unittest.TestCase):
                 fallback_key_for(_character("anyone"), entity),
                 "elder",
             )
-
-    @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
-    def test_a_monster_tier_declaration_wins_over_the_constant(self):
-        fake = SimpleNamespace(fallback_key="elder")
-        with patch.dict(_live_registry(monsters, "MONSTER", "TIER"), {"t_faint": fake}):
-            self.assertEqual(fallback_key_for(_monster("t_faint"), None), "elder")
 
     @covers_requirement("art-gallery-fallback::a-fallback-key-resolves-by-declaration-then-band-then-deterministic-hash")
     def test_an_invalid_declared_key_raises_at_construction_time(self):

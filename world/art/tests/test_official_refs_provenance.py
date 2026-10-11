@@ -269,7 +269,7 @@ class MonsterBoundaryTests(EvenniaTest):
         self.addCleanup(official.reset_catalog)
 
     @covers_requirement(
-        "official-content-provenance::monster-species-references-await-the-separate-species-catalog-and-forbid-tier-substitution"
+        "official-content-provenance::monster-species-references-use-declared-visual-provenance-and-forbid-tier-substitution"
     )
     def test_a_populated_matching_monster_directory_resolves_no_reference(self):
         with tempfile.TemporaryDirectory() as root:

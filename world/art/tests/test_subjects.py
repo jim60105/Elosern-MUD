@@ -170,11 +170,16 @@ class RegistryResolutionTests(unittest.TestCase):
     """Resolution runs against the kit catalogs (built in test bodies only)."""
 
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
+    @covers_requirement(
+        "monster-visual-identity::threat-tiers-never-address-monster-imagery"
+    )
     def test_registered_archetypes_resolve(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         self.assertEqual(subject.full(), f"scene:{_SYNTH_SCENE}")
-        monster = monster_subject_for(_SYNTH_TIER)
-        self.assertEqual(monster.full(), f"portrait:monster:{_SYNTH_TIER}")
+        monster = monster_subject_for("goblin")
+        self.assertEqual(monster.full(), "portrait:monster:goblin")
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
     def test_unknown_archetypes_are_rejected(self):
@@ -266,9 +271,10 @@ class PortraitPolicyTests(EvenniaTestCase):
 
 @synthetic_registries("archetypes", "monster_tiers", "subraces")
 class DescriptionTests(EvenniaTestCase):
-    """Description composition resolves the archetype sentence, tier text and
-    subrace label through the catalogs; every entity is built in the test
-    bodies, so the class scope wraps each test independently."""
+    """Description composition resolves the archetype sentence, the monster
+    visual species appearance text and the subrace label through the catalogs;
+    every entity is built in the test bodies, so the class scope wraps each
+    test independently."""
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):
@@ -289,7 +295,7 @@ class DescriptionTests(EvenniaTestCase):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_scene_and_monster_descriptions_are_registry_text(self):
         scene = scene_subject_for(_SYNTH_SCENE)
-        monster = monster_subject_for(_SYNTH_TIER)
+        monster = monster_subject_for("goblin")
         first = description_for(scene)
         second = description_for(scene)
         self.assertEqual(first, second)
@@ -297,7 +303,6 @@ class DescriptionTests(EvenniaTestCase):
         # against the kit row the scope patched in, never shipped prose.
         self.assertIn(SYNTH_ARCHETYPES[_SYNTH_SCENE].scene_sentence, first)
         monster_text = description_for(monster)
-        self.assertIn(SYNTH_MONSTER_TIERS[_SYNTH_TIER].description, monster_text)
         self.assertEqual(monster_text, monster_description(monster))
 
 

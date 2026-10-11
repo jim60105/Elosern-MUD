@@ -6,12 +6,13 @@ route. The vocabulary, extension, and size bound are the shared constants in
 ``world.art.fallback_keys`` (the same set the media route admits and the
 contract test locks). Resolution is ordered:
 
-1. a declared fallback key on the subject's registry entry wins outright —
-   monsters declare through ``MONSTER_TIER_REGISTRY`` (addressed directly by
-   the subject key), while preset-born players/companions and scene-spawned
-   NPCs carry their provenance key on the entity (``creation_preset_key`` /
+1. a declared fallback key on a NON-monster subject's registry entry wins
+   outright — preset-born players/companions and scene-spawned NPCs carry
+   their provenance key on the entity (``creation_preset_key`` /
    ``npc_tier_key``) because their portrait subject key is the entity pk,
-   not the registry key;
+   not the registry key. A monster subject declares nothing: its subject key
+   is a registered visual species, and no threat tier ever addresses monster
+   artwork;
 2. otherwise a monster subject resolves ``monster_anon``;
 3. otherwise the stored sex and apparent age select a band (child / adult /
    elder); ``female``/``male`` resolve that band's sex key directly and any
@@ -60,7 +61,6 @@ from world.art.subjects import (
     ArtSubjectKind,
     character_subject_for,
 )
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 
@@ -151,27 +151,6 @@ def _declared_key_for_entity(entity: Any) -> str | None:
                 return None
             return declared
     return None
-
-
-def _declared_key_for_subject_key(subject: ArtSubject) -> str | None:
-    """A declaration addressed directly by the subject's own registry key.
-
-    Only monsters have subject keys that ARE registry keys
-    (``portrait:monster:<threat-tier>``); character subject keys are entity
-    pks or authored stable keys, never preset/tier keys, so their
-    declarations resolve through entity provenance instead.
-    """
-    if subject.kind is not ArtSubjectKind.MONSTER:
-        return None
-    tier = MONSTER_TIER_REGISTRY.get(subject.key)
-    if tier is None:
-        return None
-    declared = tier.fallback_key
-    try:
-        validate_fallback_key(declared, f"monster tier {subject.key!r}")
-    except ValueError:  # observability: ignore R2: malformed late-declared key treated as undeclared, band rule decides
-        return None
-    return declared
 
 
 def _entity_for_character_subject(subject: ArtSubject) -> Any:
@@ -266,9 +245,7 @@ def fallback_key_for(subject: ArtSubject, entity: Any = None) -> str:
     constant come from the tier registry — and for an unrecoverable character
     subject, which then fails closed to the adult-band pool).
     """
-    declared = _declared_key_for_subject_key(subject)
-    if declared is None and subject.kind is not ArtSubjectKind.MONSTER:
-        declared = _declared_key_for_entity(entity)
+    declared = _declared_key_for_entity(entity) if subject.kind is not ArtSubjectKind.MONSTER else None
     if declared is not None:
         return declared
     if subject.kind is ArtSubjectKind.MONSTER:

@@ -35,6 +35,7 @@ from world.art.paths import resolved_under_root, resolved_under_store_root
 from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
+from world.lore.monster_visuals import is_registered_monster_visual_key
 
 # Only these exact store layouts are servable: the scene and portrait
 # directories with ANY of the four store extensions — the closed set of all
@@ -82,6 +83,8 @@ _GALLERY_KINDS = {
 
 
 def _referenced_by_done_record(identity: str) -> bool:
+    if identity.startswith("portrait/monster/") and not any(identity.startswith(f"portrait/monster/{k}.") for k in [k for k in (identity.split("/")[2].split(".")[0],) if is_registered_monster_visual_key(k)]):
+        return False
     for record in ArtAssetRecord.objects.all():
         if (
             record.db.status == ArtAssetStatus.DONE
@@ -102,6 +105,8 @@ def _referenced_by_gallery_card(identity: str, kind_text: str, subject_key: str)
     try:
         subject = ArtSubject(_GALLERY_KINDS[kind_text], subject_key)
     except (ArtSubjectError, KeyError):
+        return False
+    if subject.kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(subject.key):
         return False
     return any(card["stored_identity"] == identity for card in cards_for(subject))
 

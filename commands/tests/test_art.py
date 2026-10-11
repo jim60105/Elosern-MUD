@@ -22,15 +22,21 @@ from world.art.queue import claim, ensure, requeue, settle
 from world.art.queue import enqueue_gallery_job, is_gallery_job
 from world.art.sd_worker import SDError
 from world.art.store import ArtAssetRecord, ArtAssetStatus
-from world.art.subjects import ArtSubject, ArtSubjectKind, monster_subject_for
+from world.art.subjects import (
+    ArtSubject,
+    ArtSubjectError,
+    ArtSubjectKind,
+    monster_subject_for,
+)
 from world.lore.scene_archetypes import SceneArchetype
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_SPECIES,
     SYNTH_MONSTER_TIERS,
     synthetic_registries,
 )
 
-# Scope every class over the synthetic scene-archetype and monster-tier
+# Scope every class over the synthetic scene-archetype and monster-species
 # catalogs: the art layer keys subjects through those registries, so the
 # suite drives real validation against kit rows only. A third locally
 # authored archetype covers the three-scene queue case.
@@ -41,12 +47,15 @@ _EXTRA_ARCHETYPE = SceneArchetype(
 )
 _ART_SCOPE = synthetic_registries(
     "archetypes",
-    "monster_tiers",
+    "monster_species",
     extra={"archetypes": {_EXTRA_ARCHETYPE.key: _EXTRA_ARCHETYPE}},
 )
 _SCENE_KEY = next(iter(SYNTH_ARCHETYPES))
 _ALT_SCENE_KEY = "t_synth_ridge"
-_MONSTER_TIER = next(iter(SYNTH_MONSTER_TIERS))
+# Monster art membership is a registered VISUAL species key, never a threat
+# tier; the retired tier below belongs only to the refusal assertions.
+_MONSTER_KEY = next(iter(SYNTH_MONSTER_SPECIES))
+_RETIRED_TIER = next(iter(SYNTH_MONSTER_TIERS))
 
 from tools.spec_traceability import covers_requirement
 
@@ -92,12 +101,12 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     def test_portrait_filter_lists_portrait_records(self):
-        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_TIER)
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY)
         ensure(subject, "desc")
         output = self.call(CmdArtStatus(), "portrait")
-        self.assertIn(f"portrait:monster:{_MONSTER_TIER}", output)
+        self.assertIn(f"portrait:monster:{_MONSTER_KEY}", output)
         scene_output = self.call(CmdArtStatus(), "scene")
-        self.assertNotIn(f"portrait:monster:{_MONSTER_TIER}", scene_output)
+        self.assertNotIn(f"portrait:monster:{_MONSTER_KEY}", scene_output)
 
     @covers_requirement("art-staff-commands::art-status-lists-and-filters-records-without-leaking-sensitive-data")
     @covers_requirement("art-staff-commands::players-have-no-access-to-any-art-control")
@@ -307,19 +316,19 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # record's status and prior output stay untouched (no classic reset).
         from world.art import gallery as gallery_api
 
-        tier = _MONSTER_TIER
-        subject = monster_subject_for(tier)
+        key = _MONSTER_KEY
+        subject = monster_subject_for(key)
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
             subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.DONE,
-            output_identity=f"portrait/monster/{tier}.png",
+            output_identity=f"portrait/monster/{key}.png",
             error=None,
         )
         with patch("world.art.service.log_info"):
-            output = self.call(CmdArtRequeue(), f"portrait:monster:{tier}")
+            output = self.call(CmdArtRequeue(), f"portrait:monster:{key}")
         self.assertIn("已將", output)
         jobs = [
             record
@@ -328,13 +337,13 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         ]
         self.assertEqual(len(jobs), 1)
         self.assertTrue(
-            jobs[0].db_key.startswith(f"art:portrait:monster:{tier}:gen:")
+            jobs[0].db_key.startswith(f"art:portrait:monster:{key}:gen:")
         )
         classic = ArtAssetRecord.objects.filter(
-            db_key=f"art:portrait:monster:{tier}"
+            db_key=f"art:portrait:monster:{key}"
         ).first()
         self.assertEqual(classic.db.status, ArtAssetStatus.DONE)
-        self.assertEqual(classic.db.output_identity, f"portrait/monster/{tier}.png")
+        self.assertEqual(classic.db.output_identity, f"portrait/monster/{key}.png")
         self.assertEqual(gallery_api.cards_for(subject), [])
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
@@ -345,8 +354,8 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = _MONSTER_TIER
-        subject = monster_subject_for(tier)
+        key = _MONSTER_KEY
+        subject = monster_subject_for(key)
         kept = str(uuid.uuid4())
         tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(tempdir.cleanup)
@@ -357,7 +366,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
             gallery_api.append_card(
                 subject,
                 image_id=kept,
-                stored_identity=f"gallery/monster/{tier}/{kept}.png",
+                stored_identity=f"gallery/monster/{key}/{kept}.png",
                 prompt=None,
                 seed=None,
                 checkpoint=None,
@@ -367,7 +376,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
                 image_size={"width": 1000, "height": 1000},
             )
             with patch("world.art.service.log_info"):
-                output = self.call(CmdArtRequeue(), f"portrait:monster:{tier}")
+                output = self.call(CmdArtRequeue(), f"portrait:monster:{key}")
             self.assertIn("已將", output)
             from world.art.worker import drain_synchronous
 
@@ -386,9 +395,11 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
     @covers_requirement("art-staff-commands::art-requeue-accepts-one-validated-full-subject-key-and-forces-regeneration-under-the-lock")
     def test_requeue_unregistered_monster_key_is_rejected_with_no_record_change(self):
-        # An unregistered tier is a named error through the seam, and no
-        # gallery job or record appears.
-        output = self.call(CmdArtRequeue(), "portrait:monster:not_a_tier")
+        # A retired threat-tier value is NEVER monster art membership: the
+        # subject seam rejects it and no gallery job or record appears.
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_RETIRED_TIER)
+        output = self.call(CmdArtRequeue(), f"portrait:monster:{_RETIRED_TIER}")
         self.assertIn("無法重新排入", output)
         self.assertFalse(
             any(is_gallery_job(record) for record in ArtAssetRecord.objects.all())
@@ -405,8 +416,8 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = _MONSTER_TIER
-        subject = monster_subject_for(tier)
+        key = _MONSTER_KEY
+        subject = monster_subject_for(key)
         gallery_api.record_error(subject, "sd_connection_error")
         output = self.call(CmdArtRetry(), "")
         self.assertIn("重新請求 1 次圖庫生成", output)
@@ -417,7 +428,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         ]
         self.assertEqual(len(jobs), 1)
         self.assertTrue(
-            jobs[0].db_key.startswith(f"art:portrait:monster:{tier}:gen:")
+            jobs[0].db_key.startswith(f"art:portrait:monster:{key}:gen:")
         )
 
     @covers_requirement("art-staff-commands::art-retry-re-enqueues-failed-records")
@@ -429,14 +440,14 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
 
         from world.art import gallery as gallery_api
 
-        tier = _MONSTER_TIER
-        subject = monster_subject_for(tier)
+        key = _MONSTER_KEY
+        subject = monster_subject_for(key)
         gallery_api.record_error(subject, "sd_connection_error")
         image_id = str(uuid.uuid4())
         gallery_api.append_card(
             subject,
             image_id=image_id,
-            stored_identity=f"gallery/monster/{tier}/{image_id}.png",
+            stored_identity=f"gallery/monster/{key}/{image_id}.png",
             prompt=None,
             seed=None,
             checkpoint=None,
@@ -556,8 +567,8 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # gallery-bearing kind, so a legacy failed monster record is left
         # exactly as found (failed, output untouched, never re-ensqueued)
         # while a healthy scene failed record still re-enqueues normally.
-        tier = _MONSTER_TIER
-        subject = monster_subject_for(tier)
+        key = _MONSTER_KEY
+        subject = monster_subject_for(key)
         ensure(subject, "desc")
         claimed = claim(10)
         settle(
@@ -581,7 +592,7 @@ class ArtCommandTests(EvenniaCommandTestMixin, EvenniaTest):
         # Only the scene was re-enqueued.
         self.assertIn("已重新排入 1 個失敗記錄", output)
         monster_record = ArtAssetRecord.objects.filter(
-            db_key=f"art:portrait:monster:{tier}"
+            db_key=f"art:portrait:monster:{key}"
         ).first()
         self.assertEqual(monster_record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(
@@ -782,10 +793,10 @@ class ArtStatusSeedColumnTests(EvenniaCommandTestMixin, EvenniaTest):
         # A bare ``portrait``-prefixed classic record matches the startswith
         # filter — the pre-existing classic behaviour this change must not
         # alter.
-        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_TIER)
+        subject = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY)
         ensure(subject, "desc")
         output = self.call(CmdArtStatus(), "portrait")
-        self.assertIn(f"portrait:monster:{_MONSTER_TIER}", output)
+        self.assertIn(f"portrait:monster:{_MONSTER_KEY}", output)
 
 
 @_ART_SCOPE

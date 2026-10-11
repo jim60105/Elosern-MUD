@@ -10,7 +10,7 @@ decision.
 
 ### Requirement: population_for_coordinates is a pure, deterministic function over the bounded map
 `world/maps/wilderness_population.py` SHALL define a frozen `MonsterPopulation` dataclass carrying
-`tier: str` and `name_zh: str`, and a pure function `population_for_coordinates(x: int, y: int) ->
+`tier: str`, `name_zh: str` and `art_species_key: str`, and a pure function `population_for_coordinates(x: int, y: int) ->
 MonsterPopulation | None` that reads no database state, no network state, and no random or
 wall-clock input.
 
@@ -25,11 +25,8 @@ wall-clock input.
   tier's `example_monsters_zh`
 
 #### Scenario: The north-gate approach coordinate resolves to a literal, spec-pinned monster
-- **WHEN** `population_for_coordinates(60, 103)` is called (`capital_altoria`'s north-gate
-  approach cell, and the fixed `CAPITAL_ENTRY_XY` constant)
-- **THEN** it returns `MonsterPopulation(tier="low", name_zh="哥布林")` ;  the closed-form result of
-  `12,667,711 % 3 == 1` selecting index 1 of `("史萊姆", "哥布林", "巨鼠")`, pinning the formula and
-  the tier registry together against silent drift
+- **WHEN** the model selects the existing goblin example at a coordinate using its unchanged hash and selection order
+- **THEN** the population carries visual key goblin with its existing label and low tier; it creates no combat species profile and applies no coordinate special case
 
 #### Scenario: Higher-tier regions actually produce their tier
 - **WHEN** a representative coordinate in `northwest_highland_forest` is evaluated
@@ -66,6 +63,10 @@ wall-clock input.
 - **WHEN** valid authored regional density changes
 - **THEN** production checks preserve determinism, references and hunting placement invariants without a second density table; fixed synthetic density fixtures prove deterministic placement boundaries
 
+#### Scenario: Visual identity and label come from one authored population row
+- **WHEN** baseline population selects its example index
+- **THEN** the selected row supplies both the existing label and explicit visual key; no translated-name-to-species lookup runs
+
 ### Requirement: A hunting band around the capital's north gate always hosts a low-tier monster
 Every provider-valid coordinate within Chebyshev distance 3 of the `capital_altoria` entry's
 north-gate `approach_cell` `(60, 103)` — the cell a traveler lands on leaving the 北門 toward the
@@ -95,7 +96,7 @@ only on monsters bearing a matching marker.
 - **WHEN** `ensure_population` is called for a coordinate whose model returns a population and which
   has no marker-matching monster
 - **THEN** exactly one `Monster` is created, registered in `itemcoordinates` at that coordinate, with
-  matching `threat_tier`, matching `population_key`, and innate combat readiness
+  matching `threat_tier`, matching explicit `art_species_key`, matching `population_key`, and innate combat readiness
 
 #### Scenario: Repeated calls create no duplicates
 - **WHEN** `ensure_population` is called twice in succession for the same populated coordinate
@@ -113,10 +114,10 @@ only on monsters bearing a matching marker.
 - **THEN** exactly one living marker-matching `Monster` remains at the coordinate after the call
 
 #### Scenario: A matching monster that drifted from the model is reconciled
-- **WHEN** a living marker-matching `Monster` at a populated coordinate has a `threat_tier` (or key)
+- **WHEN** a living marker-matching `Monster` at a populated coordinate has a `threat_tier`, key or declared visual provenance
   that no longer matches the current model and `ensure_population` is called
-- **THEN** the drifted monster is deleted and replaced by one fresh `Monster` whose `threat_tier` and
-  key match the model
+- **THEN** the drifted monster is deleted and replaced by one fresh `Monster` whose `threat_tier`, key and
+  visual provenance match the model
 
 #### Scenario: A coordinate the model no longer populates is cleaned up
 - **WHEN** a marker-matching `Monster` is registered at a coordinate and `ensure_population` is called
@@ -143,13 +144,13 @@ only on monsters bearing a matching marker.
 
 #### Scenario: A created monster is fully configured
 - **WHEN** reconciliation creates a `Monster` for a populated coordinate
-- **THEN** it has `threat_tier` set to the model's tier, `apply_monster_tier("floor")` applied, its
+- **THEN** it has `threat_tier` set to the model's tier, `apply_monster_tier("floor")` applied, its explicit `art_species_key` persisted with no complete species or variant inferred, its
   `db.skills` left at the innate-only default, `db.population_key` set, is registered at
   `wilderness.db.itemcoordinates[monster] == coordinates`, and `.location` is set to the room
   currently active at that coordinate if one exists
 
 #### Scenario: An already-matching monster is left untouched
-- **WHEN** exactly one living marker-matching monster whose `threat_tier` and key still match the
+- **WHEN** exactly one living marker-matching monster whose `threat_tier`, key and visual provenance still match the
   model already exists at a populated coordinate
 - **THEN** reconciliation makes no change
 
@@ -166,7 +167,7 @@ only on monsters bearing a matching marker.
 
 #### Scenario: Uncovered coordinates keep the tier-example branch
 - **WHEN** the ambient species rules do not cover a coordinate's region
-- **THEN** the tier-example branch keeps its current behaviour for that coordinate
+- **THEN** the baseline branch keeps its population, tier, label order, readiness and numerical behavior for that coordinate while carrying explicit visual provenance
 
 #### Scenario: Created monsters are immediately combat-ready
 - **WHEN** a player engages a monster created by `ensure_population`

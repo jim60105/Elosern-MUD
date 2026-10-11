@@ -3,11 +3,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: A fallback key resolves by declaration, then band, then deterministic hash
-`world/art/gallery_fallback.py` SHALL resolve a subject's fallback key by this ordered rule: (1) every monster entity or subject resolves `monster_anon`, including unresolved visual provenance; (2) a non-monster
-fallback key explicitly declared by its registry entry wins; (3) otherwise the subject's stored sex and apparent age
-select one band, and the subject's full key is hashed deterministically into that band's ordered key
-pool. The resolution SHALL be a pure function of the subject key and the stored sex and apparent
-age.
+`world/art/gallery_fallback.py` SHALL resolve a subject's fallback key in order: (1) every monster
+entity or subject resolves `monster_anon`, including unresolved visual provenance; (2) a non-monster
+registry-declared fallback key wins; (3) otherwise stored sex and apparent age select a band, and
+the full key hashes deterministically into that band's ordered key pool. Resolution SHALL be a pure
+function of the subject key and the stored sex and apparent age.
 
 #### Scenario: A declared key wins over the band rule
 - **WHEN** a non-monster subject's registry entry declares a fallback key

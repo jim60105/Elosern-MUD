@@ -6,14 +6,18 @@ Define personalization of read-only official artwork: the entity-local explicit 
 ## Requirements
 
 ### Requirement: A personal official selection is an entity-local art preference
-An entity SHALL be able to explicitly select one official image — identified by its stable root-relative identity within its content reference — as a personal art preference stored on the entity's own art state. Setting an explicit runtime gallery default SHALL clear the personal official selection, and setting a personal official selection SHALL clear the explicit runtime default, so exactly one personal default governs.
+An entity SHALL be able to select one official image, identified by its stable root-relative
+identity within its content reference, as a personal art preference stored on its own art state.
+For characters, setting an explicit runtime default SHALL clear the personal selection, and vice
+versa. For monsters, the shared species card default SHALL stay separate from the entity-local
+choice, which SHALL win without changing another individual.
 
 #### Scenario: Explicit official selection presents ahead of the runtime default
 - **WHEN** a subject holds a gallery default card and explicitly selects a valid official image from its content reference
 - **THEN** the official image presents (official origin), the gallery default card still exists unchanged, and a matching equipment-bound card would still outrank both
 
 #### Scenario: Selections clear each other
-- **WHEN** a subject with a personal official selection sets a runtime gallery default, and another subject with a runtime default selects an official image
+- **WHEN** a character subject with a personal official selection sets a runtime gallery default, and another character subject with a runtime default selects an official image
 - **THEN** each ends with exactly one personal default and presents accordingly
 
 #### Scenario: Selection touches no shared state
@@ -28,6 +32,10 @@ An entity SHALL be able to explicitly select one official image — identified b
 #### Scenario: Selection side-effect limits
 - **WHEN** a personal official selection is set
 - **THEN** the selection SHALL NOT edit the mounted directory, SHALL NOT create or modify a gallery card, and SHALL NOT change any other entity's presentation
+
+#### Scenario: Species default edits do not clear an individual choice
+- **WHEN** a species gallery default changes while two same-species individuals hold distinct official choices
+- **THEN** both choices remain unchanged and present independently, and no other species preference changes
 
 ### Requirement: Stale official selections are retained but ignored for resolution
 When a personal official selection names an identity the catalog no longer resolves, image resolution SHALL ignore the selection and continue through the remaining chain (runtime default, classic, official default, silhouette) while RETAINING the preference; no resolution failure SHALL delete the preference or any image.

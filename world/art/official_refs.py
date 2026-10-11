@@ -93,6 +93,7 @@ from typing import Any
 from world.art.subjects import MAX_SUBJECT_KEY_LENGTH, is_valid_subject_key
 from world.lore.monster_species import MONSTER_SPECIES_REGISTRY
 from world.lore.npc_profiles import NPC_PROFILE_REGISTRY
+from world.lore.monster_visuals import is_registered_monster_visual_key
 from world.lore.player_presets import PLAYER_PRESET_REGISTRY
 from world.observability import log_warn
 
@@ -123,6 +124,7 @@ NPC_PROFILE_PROVENANCE_ATTRIBUTE = "npc_profile_key"
 # arm treats ``None`` as "no stored identity" (silent) and any other value as a
 # declared key, so a falsy non-``None`` default (an empty string) would make
 # every tier-only monster emit one bounded diagnostic per process.
+ART_SPECIES_PROVENANCE_ATTRIBUTE = "art_species_key"
 SPECIES_PROVENANCE_ATTRIBUTE = "species_key"
 
 # The one bounded diagnostic id for a declared-but-unresolvable reference.
@@ -230,7 +232,8 @@ def _registry_for(kind: str) -> Mapping[str, Any] | None:
     content vocabulary, so a threat tier is never a member of it.
     """
     if kind == OFFICIAL_KIND_MONSTER:
-        return MONSTER_SPECIES_REGISTRY
+        from world.lore.monster_visuals import get_monster_visual_registry
+        return get_monster_visual_registry()
     if kind == OFFICIAL_KIND_PRESET:
         return PLAYER_PRESET_REGISTRY
     if kind == OFFICIAL_KIND_NPC:
@@ -326,9 +329,14 @@ def _species_content_reference(entity: Any) -> OfficialContentReference | None:
     attributes = _entity_attributes(entity)
     if attributes is None:
         return None
-    declared = attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)
-    if declared is None:
+    species_val = attributes.get(SPECIES_PROVENANCE_ATTRIBUTE)
+    if species_val is not None:
+        declared = species_val
+    elif attributes.get(ART_SPECIES_PROVENANCE_ATTRIBUTE) is not None:
+        declared = attributes.get(ART_SPECIES_PROVENANCE_ATTRIBUTE)
+    else:
         return None
+
     return _declared_reference(OFFICIAL_KIND_MONSTER, declared, entity)
 
 
@@ -370,6 +378,7 @@ __all__ = [
     "OFFICIAL_KIND_NPC",
     "OFFICIAL_KIND_PRESET",
     "PRESET_PROVENANCE_ATTRIBUTE",
+    "ART_SPECIES_PROVENANCE_ATTRIBUTE",
     "SPECIES_PROVENANCE_ATTRIBUTE",
     "UNRESOLVED_REFERENCE_EVENT",
     "OfficialContentReference",

@@ -57,7 +57,6 @@ from world.art.subjects import (
     character_subject_for,
     monster_subject_for,
 )
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 
 # Placeholder kinds, exactly what the browser must show when no asset exists.
 PLACEHOLDER_MISSING = "missing"
@@ -196,7 +195,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
                 # reads — the chain's step-4 read and this payload's override
                 # read — so corrupt stored state is reported once per read,
                 # the same discipline the tolerant card read follows.
-                _official_payload(subject, resolved, official_preferences_for(subject)),
+                _official_payload(subject, resolved, official_preferences_for(subject, entity=entity)),
                 _silhouette_field(subject, entity, report=False),
                 origin=ORIGIN_OFFICIAL,
             )
@@ -237,7 +236,7 @@ def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
     if official is not None:
         if len(official["url"]) <= MAX_PORTRAIT_MEDIA_URL:
             return _carried(
-                _official_payload(subject, official, official_preferences_for(subject)),
+                _official_payload(subject, official, official_preferences_for(subject, entity=entity)),
                 _silhouette_field(subject, entity, report=False),
                 origin=ORIGIN_OFFICIAL,
             )
@@ -485,25 +484,33 @@ def resolve_character(entity) -> dict:
 def resolve_entity(entity) -> dict:
     """Resolve one present entity's portrait by kind (design D3).
 
-    A generic monster (``threat_tier`` resolving in ``MONSTER_TIER_REGISTRY``)
-    resolves ``portrait:monster:<threat_tier>`` through
-    ``monster_subject_for`` + ``resolve_subject`` with no canonical-age check.
+    A monster (entity of typeclass ``Monster``) resolves
+    ``portrait:monster:<visual_key>`` through ``monster_subject_for`` +
+    ``resolve_subject`` with no canonical-age check. Provenance is resolved
+    from ``species_key`` if present, else ``art_species_key``.
     A character resolves through :func:`resolve_character` (explicit named
     policy plus both canonical age fields). Anything else yields the
     unavailable placeholder. A rejected subject never returns a prompt, a
     subject key, or a URL.
     """
-    threat_tier = getattr(entity, "threat_tier", None)
-    if threat_tier in MONSTER_TIER_REGISTRY:
+    from typeclasses.monsters import Monster
+
+    if isinstance(entity, Monster):
+        visual_key = getattr(entity, "species_key", None)
+        if visual_key is None:
+            visual_key = getattr(entity, "art_species_key", None)
+        if visual_key is None:
+            return _placeholder_unavailable(
+                "無法提供", silhouette=_entity_silhouette(entity)
+            )
         try:
-            subject = monster_subject_for(threat_tier)
-        except ArtSubjectError:  # observability: ignore R2: unregistered tier -> specified unavailable placeholder
+            subject = monster_subject_for(visual_key)
+        except ArtSubjectError:  # observability: ignore R2: unregistered visual species -> specified unavailable placeholder
             return _placeholder_unavailable(
                 "無法提供", silhouette=_entity_silhouette(entity)
             )
         payload = resolve_subject(subject, entity=entity)
-        payload["subject_key"] = subject.full()
-        return payload
+        return dict(payload, subject_key=subject.full())
     return resolve_character(entity)
 
 

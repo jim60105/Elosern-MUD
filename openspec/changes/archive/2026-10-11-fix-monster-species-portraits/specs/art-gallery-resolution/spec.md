@@ -4,10 +4,10 @@
 
 ### Requirement: Monster subjects resolve through the chain without the binding steps
 The chain SHALL run the binding steps only for a subject kind whose capability declaration supports
-bindings. A kind that does not support them, which the monster portrait kind does not, SHALL resolve
-by skipping those steps: the entity-local official selection if valid, else the species default card, then a valid species classic asset record, then the species official-default
-step, then the fallback seam, then the placeholder. The skip SHALL be decided by reading the
-declaration, never by comparing the subject kind inline.
+bindings. A kind that does not SHALL resolve with those steps skipped: the entity-local official
+selection if valid, else the species default card, then a valid species classic asset record, then
+the species official-default step, then the fallback seam, then the placeholder. The skip SHALL come
+from the declaration, never an inline kind comparison.
 
 #### Scenario: A monster resolves its single card
 - **WHEN** a monster subject holds its one card

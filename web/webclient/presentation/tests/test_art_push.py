@@ -43,7 +43,15 @@ from world.art.queue import ensure, settle
 from world.art.signals import asset_completed
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.lore.monster_visuals import get_monster_visual_registry
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
+
+# Registered VISUAL species keys (never threat tiers), resolved at runtime
+# from the active visual registry. The bounded gallery rail lists the first
+# sorted keys, so these two are always selectable.
+_MONSTER_VISUAL_KEYS = tuple(sorted(get_monster_visual_registry()))
+_MONSTER_KEY_A = _MONSTER_VISUAL_KEYS[0]
+_MONSTER_KEY_B = _MONSTER_VISUAL_KEYS[1]
 
 
 class FakeSession:
@@ -395,9 +403,11 @@ class ArtPushPresenterTests(EvenniaTestCase):
         from world.art.queue import claim, settle_gallery_generated
         from world.art.service import request_gallery_image
 
-        monster_sub = ArtSubject(ArtSubjectKind.MONSTER, "low")
+        monster_sub = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_A)
         monster_key = monster_sub.full()
-        (self.root / "gallery/monster/low").mkdir(parents=True, exist_ok=True)
+        (self.root / f"gallery/monster/{_MONSTER_KEY_A}").mkdir(
+            parents=True, exist_ok=True
+        )
 
         session = self._make_session()
         session.ndb.gallery_selection = GallerySelection(
@@ -407,13 +417,13 @@ class ArtPushPresenterTests(EvenniaTestCase):
         image_id = request_gallery_image(monster_sub, fields=[], custom_prompt="")
         claimed = claim(10)
         job = next(j for j in claimed if j.db.gallery_image_id == image_id)
-        img_path = self.root / f"gallery/monster/low/{image_id}.png"
+        img_path = self.root / f"gallery/monster/{_MONSTER_KEY_A}/{image_id}.png"
         img_path.parent.mkdir(parents=True, exist_ok=True)
         img_path.write_bytes(b"monster")
         settle_gallery_generated(
             job.key,
             generation_token=job.db.generation_token,
-            output_identity=f"gallery/monster/low/{image_id}.png",
+            output_identity=f"gallery/monster/{_MONSTER_KEY_A}/{image_id}.png",
             tmp_path=str(img_path),
             prompt={"positive": "m", "negative": ""},
             seed=1,
@@ -566,9 +576,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_changed_selection_cannot_be_restored_by_late_completion(self):
-        # Use registered monster tiers low and mid
-        sub_a = ArtSubject(ArtSubjectKind.MONSTER, "low")
-        sub_b = ArtSubject(ArtSubjectKind.MONSTER, "mid")
+        # Use two registered visual species keys
+        sub_a = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_A)
+        sub_b = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_B)
         session = self._make_session()
         # Select A then B
         from web.webclient.presentation.gallery_selection import select_gallery_subject, gallery_selection_snapshot
@@ -589,9 +599,11 @@ class ArtPushPresenterTests(EvenniaTestCase):
     def test_failed_gallery_settlement_removes_pending_row_truthfully(self):
         from world.art.queue import claim, settle_gallery_failed
         from world.art.service import request_gallery_image
-        monster_sub = ArtSubject(ArtSubjectKind.MONSTER, "mid")
+        monster_sub = ArtSubject(ArtSubjectKind.MONSTER, _MONSTER_KEY_B)
         monster_key = monster_sub.full()
-        (self.root / "gallery/monster/mid").mkdir(parents=True, exist_ok=True)
+        (self.root / f"gallery/monster/{_MONSTER_KEY_B}").mkdir(
+            parents=True, exist_ok=True
+        )
 
         session = self._make_session()
         session.ndb.gallery_selection = GallerySelection(

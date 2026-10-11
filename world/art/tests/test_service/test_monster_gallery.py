@@ -23,7 +23,6 @@ from world.art.service import requeue_gallery_subject
 from world.art.service import prune_gallery_orphans
 from world.art.subjects import (
     ArtSubjectError,
-    monster_description,
     monster_subject_for,
     scene_subject_for,
 )
@@ -74,7 +73,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         )
         self.art_settings.enable()
         self.addCleanup(self.art_settings.disable)
-        self.tier = _SYNTH_TIERS[0]
+        self.tier = "goblin"
         self.subject = monster_subject_for(self.tier)
 
     def _gallery_jobs(self):
@@ -208,7 +207,7 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
     )
     def test_a_character_key_colliding_with_a_monster_tier_never_crosses_kinds(self):
         # A named character may LEGALLY carry the same stable key text as a
-        # registered monster tier. Resolution is through the subject's own
+        # registered monster visual species. Resolution is through the subject's own
         # kind producer, so re-driving either subject can only ever touch its
         # own kind's job — never the identically-named other subject.
         from evennia.utils.create import create_object
@@ -292,11 +291,11 @@ class MonsterGalleryGenerationTests(EvenniaTestCase):
         )
 
 class MonsterStartupSyncTests(EvenniaTestCase):
-    """Startup synchronization routes every monster tier through the gallery.
+    """Startup synchronization routes every monster visual species through the gallery.
 
-    Change ``gallery-monster-autogen``: the tier loop shares ONE guarded
+    Change ``gallery-monster-autogen``: the species loop shares ONE guarded
     helper with every character path, the classic generic-monster record is
-    retired from production, every failure is bounded per tier, and the
+    retired from production, every failure is bounded per species, and the
     startup step order (prune → seed → sync) guarantees a seed card occupies
     the gallery before the automatic pass reads it.
     """
@@ -319,7 +318,8 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         )
         self.art_settings.enable()
         self.addCleanup(self.art_settings.disable)
-        self.tiers = _SYNTH_TIERS
+        from world.lore.monster_visuals import get_monster_visual_registry
+        self.tiers = sorted(get_monster_visual_registry().keys())
 
     def _job_keys(self):
         return sorted(
@@ -328,11 +328,11 @@ class MonsterStartupSyncTests(EvenniaTestCase):
             if str(record.db.gallery_image_id or "")
         )
 
-    def _monster_job_keys(self, tier):
+    def _monster_job_keys(self, visual_key):
         return [
             key
             for key in self._job_keys()
-            if key.startswith(f"art:portrait:monster:{tier}:gen:")
+            if key.startswith(f"art:portrait:monster:{visual_key}:gen:")
         ]
 
     def _classic_keys(self):

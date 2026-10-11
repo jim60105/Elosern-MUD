@@ -362,6 +362,7 @@ class ResolveEntityTests(EvenniaTestCase):
         }
         self.monster = create_object(Monster, key="entity-wolf")
         self.monster.threat_tier = _SYNTH_TIER
+        self.monster.art_species_key = "goblin"
         self.monster.apply_monster_tier("floor")
 
     def tearDown(self):
@@ -415,7 +416,7 @@ class ResolveEntityTests(EvenniaTestCase):
     def test_generic_monster_resolves_its_archetype_subject(self):
         with patch("world.observability.log_info"):
             payload = resolve_entity(self.monster)
-        self.assertEqual(payload["subject_key"], f"portrait:monster:{_SYNTH_TIER}")
+        self.assertEqual(payload["subject_key"], "portrait:monster:goblin")
         # Filled seam: an artless monster resolves the monster_anon default as
         # its decorative silhouette.
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
@@ -452,8 +453,11 @@ class ResolveEntityTests(EvenniaTestCase):
         self.assertIsNone(payload["subject_key"])
         self.assertIsNone(payload["url"])
 
-    def test_unknown_threat_tier_falls_back_to_placeholder(self):
-        self.monster.threat_tier = "mythical"
+    @covers_requirement(
+        "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
+    )
+    def test_an_unregistered_art_species_key_falls_back_to_placeholder(self):
+        self.monster.art_species_key = "mythical"
         payload = resolve_entity(self.monster)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
         self.assertIsNone(payload["subject_key"])

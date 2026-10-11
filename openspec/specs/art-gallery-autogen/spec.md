@@ -15,7 +15,7 @@ flag that establishes the named policy without requesting anything.
 
 ### Requirement: Automatic character portraits produce exactly one unbound default card
 Every automatic portrait path — player creation, validated import, named-NPC spawn, startup recovery,
-and generic-monster startup synchronization — SHALL route through the gallery generation request,
+and species-keyed-monster startup synchronization — SHALL route through the gallery generation request,
 not the subject-keyed asset `ensure`, requesting exactly one image from the subject's standard
 deterministic description with no free text, no binding, and `face_rect=None`.
 The resulting card SHALL be unbound, displayed only as the subject's default.
@@ -25,15 +25,15 @@ The resulting card SHALL be unbound, displayed only as the subject's default.
 - **THEN** the character's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and no classic asset record exists for the subject
 
 #### Scenario: A registered monster tier produces one unbound default card
-- **WHEN** startup synchronization runs for a registered monster tier with an empty gallery and its job is drained
-- **THEN** that tier's gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no classic asset record for the tier
+- **WHEN** startup synchronization runs for a registered monster visual species with an empty gallery and its job is drained
+- **THEN** that species' gallery holds exactly one unbound card carrying the fitted default square for its image, that card is the default, and startup wrote no classic asset record for any retired tier
 
 #### Scenario: The age gate still rejects before any record or prompt
 - **WHEN** an automatic path runs for a character whose `age` or `apparent_age` is missing or non-integer
 - **THEN** nothing is queued, no prompt is rendered, no card is appended, and the named diagnostic is logged
 
 #### Scenario: A kind without the age precondition reads no age attribute
-- **WHEN** an automatic path runs for a registered monster tier
+- **WHEN** an automatic path runs for a registered monster visual species
 - **THEN** no canonical-age check runs, no age attribute is read, and the request proceeds
 
 #### Scenario: A rolled-back transaction produces nothing
@@ -79,17 +79,16 @@ The resulting card SHALL be unbound, displayed only as the subject's default.
 
 ### Requirement: Automatic generation is idempotent against the subject's gallery
 An automatic path SHALL request a generation only when the subject's gallery holds no card AND no
-gallery job for that subject is in flight AND — for an entity whose official content reference is
-eligible and already satisfied by a valid catalog entry in the startup official snapshot (see the
-`official-art-resolution` capability) — no official default resolves for it. A subject that already
-holds any card SHALL be left alone. The guard SHALL be the same one for every gallery-bearing kind.
+gallery job for that subject is in flight AND no official default resolves for it. A subject that
+already holds any card SHALL be left alone. The guard SHALL be the same one for every
+gallery-bearing kind.
 
 #### Scenario: Repeated recovery appends nothing
 - **WHEN** startup recovery runs on consecutive restarts for a subject that already holds one card
 - **THEN** no additional generation is requested and the gallery still holds one card
 
 #### Scenario: Repeated startup synchronization never replaces a monster card
-- **WHEN** startup synchronization runs on consecutive restarts for a monster tier that already holds its one card
+- **WHEN** startup synchronization runs on consecutive restarts for a monster visual species that already holds its one card
 - **THEN** no generation is requested, the existing card is not replaced, and its stored file is untouched
 
 #### Scenario: A seed-synced subject is not auto-generated
@@ -126,7 +125,7 @@ holds any card SHALL be left alone. The guard SHALL be the same one for every ga
 
 #### Scenario: One rule protects every gallery-bearing kind
 - **WHEN** the guard is applied per kind
-- **THEN** a monster tier is protected by exactly the rule a character subject is — which is also what
+- **THEN** a monster visual species is protected by exactly the rule a character subject is — which is also what
   keeps a capped kind from replacing its one card on every restart
 
 #### Scenario: A suppressed request leaves nothing and is not revived later
@@ -134,6 +133,10 @@ holds any card SHALL be left alone. The guard SHALL be the same one for every ga
 - **THEN** it leaves no record and enqueues nothing; the entity presents the official default through
   the presentation chain, and updating the official directory later does not retroactively enqueue the
   suppressed subject
+
+#### Scenario: Species startup suppression needs no spawned monster
+- **WHEN** a registered visual species has a valid official default and no live individual exists
+- **THEN** startup queues no automatic card for that species, and later individuals present that species official artwork
 
 ### Requirement: Player creation may skip the automatic portrait
 `world/rules/character_creation.py::finalize_player_portrait` SHALL accept an explicit skip flag,

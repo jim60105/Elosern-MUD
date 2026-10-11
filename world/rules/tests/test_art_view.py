@@ -24,7 +24,11 @@ from world.rules.art_view import (
     build_art_view,
     portrait_catalog_key,
 )
-from world.tests.synthetic_data import SYNTH_ARCHETYPES, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_ARCHETYPES,
+    SYNTH_MONSTER_TIERS,
+    synthetic_registries,
+)
 
 # Scene-archetype validation resolves against the kit's synthetic archetype
 # catalog (a class-scope swap): the view must echo exactly the archetype the
@@ -60,6 +64,21 @@ def _entity(pk, name="entity", threat_tier=None, portrait_policy=None, dialogue=
     )
 
 
+def _monster(pk, name="monster"):
+    """One real ``Monster`` typeclass instance (no database required).
+
+    Lightweight enough for these pure classification tests: the explicit
+    ``typeclasses.monsters.Monster`` typeclass is the only art-membership
+    authority, so a real instance is what ``_classify_subject`` checks.
+    """
+    from typeclasses.monsters import Monster
+
+    monster = Monster()
+    monster.db_key = name
+    monster.pk = pk
+    return monster
+
+
 def _room(contents, scene_archetype=None):
     return SimpleNamespace(contents=contents, scene_archetype=scene_archetype)
 
@@ -83,9 +102,12 @@ class ArtViewSelectionTests(unittest.TestCase):
         self.actor = _actor(self.room)
 
     def test_combat_mode_uses_shared_roster_order(self):
-        player = _entity(1, name="hero")
-        goblin = _entity(2, name="goblin", threat_tier="low")
-        wolf = _entity(3, name="wolf", threat_tier="low")
+        # A retired threat-tier value is NEVER monster art membership: the
+        # stub carrying one still classifies as ``none``.
+        retired_tier = next(iter(SYNTH_MONSTER_TIERS))
+        player = _entity(1, name="hero", threat_tier=retired_tier)
+        goblin = _monster(2, name="goblin")
+        wolf = _monster(3, name="wolf")
         entities = {1: player, 2: goblin, 3: wolf}
         record = {
             "session_id": "hostile:1:0",

@@ -38,20 +38,20 @@ startup scan.
 - **THEN** a typed validation error is raised and the record's `default_image_id` is unchanged
 
 #### Scenario: The first official preference creates a card-less record
-- **WHEN** a personal official selection is written for a subject that has never been written
-- **THEN** the record is created with `cards: []`, `default_image_id: None`, and the selection set — and a runtime default-card rule is otherwise unchanged
+- **WHEN** a character writes its first official preference or a monster writes one through a valid entity context
+- **THEN** the character retains its cardless-record behavior; the monster stores only entity-local preference state and creates no species record or card
 
 #### Scenario: Clearing an unset preference creates nothing
-- **WHEN** a clear-selection or clear-override request arrives for a subject with no record
-- **THEN** the write is a no-op and no record exists afterward
+- **WHEN** a character or monster clears an unset official preference
+- **THEN** the clear is a no-op and creates no record or entity preference state
 
 #### Scenario: The record holds no live object reference
 - **WHEN** a gallery record is persisted and re-read
 - **THEN** it carries only serialized state and no live object reference
 
 #### Scenario: Record creation follows the documented lazy triggers
-- **WHEN** record creation is exercised
-- **THEN** a record is created on the first card append, the first recorded generation error, the first explicit default set, or the first explicit official-preference write (a personal official selection or geometry override) — never by a startup scan, so a subject with no record is a legal state that yields an empty card list and unset preferences
+- **WHEN** gallery record creation is exercised
+- **THEN** card append, recorded generation error and explicit card default retain their existing triggers; personal official writes create a character record only, while monster personal writes stay entity-local; startup and presentation never manufacture a record
 
 #### Scenario: An explicit default set names an existing card
 - **WHEN** an explicit default set is submitted
@@ -541,15 +541,11 @@ A gallery card SHALL own one `stage` mapping with exactly `scale`, `x`, `y`. Val
 - **THEN** combat, resolution, appraisal and integer-copper money state remain unchanged
 
 ### Requirement: Gallery records carry entity-local official-art preferences as first-class fields
-`world/art/gallery.py` SHALL extend each subject's `GalleryRecord` with personal official-art
-preference state — the explicitly selected official image identity (nullable) and a bounded map of
-per-identity geometry overrides (face rectangle and stage triple) — written ONLY through
-`world/art/gallery.py`'s public API under the existing `gallery_lock` discipline, exactly like card
-mutations.
+Character subjects SHALL retain official preferences in their own gallery record. Monster official preferences SHALL be stored on the individual entity, separate from reusable species cards, through the existing public preference writer and gallery lock. Both stores SHALL carry a nullable official selection and bounded identity-keyed geometry overrides with the same tolerant validation and no file writes.
 
 #### Scenario: Preference writes obey the sole writer
-- **WHEN** the production modules are inspected for writes to official-art preference fields
-- **THEN** only `world/art/gallery.py` mutates them, every write ran under `gallery_lock`, and no other module writes the record
+- **WHEN** production modules write official preference state
+- **THEN** only the existing gallery preference owner writes it under its lock; monster entity attributes and character records obey the same writer discipline
 
 #### Scenario: Preferences stay out of the card rules
 - **WHEN** preference state is stored alongside cards
@@ -570,3 +566,6 @@ mutations.
 #### Scenario: A malformed preference degrades to absent
 - **WHEN** a stored preference fails validation on read
 - **THEN** it reads as absent, one `gallery_card_invalid`-style bounded diagnostic names the subject, and the record's valid fields still read
+#### Scenario: Species cards cannot carry another entity personal choice
+- **WHEN** two monsters of one visual species have different official selections and geometry
+- **THEN** their species record contains reusable cards only, and each entity retains its own independent preferences

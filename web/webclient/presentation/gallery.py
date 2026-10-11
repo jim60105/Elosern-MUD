@@ -18,8 +18,8 @@ from world.art.subjects import (
     ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
     monster_subject_for, parse_subject,
 )
+from world.lore.monster_visuals import get_monster_visual_registry
 from world.lore.items import ITEM_REGISTRY
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.observability import log_warn
 from world.rules.party import live_companions
 
@@ -30,7 +30,7 @@ from .protocol import (
 )
 from .registry import PanelUnavailableError
 
-GALLERY_SCHEMA_VERSION = 1
+GALLERY_SCHEMA_VERSION = 2
 GALLERY_MAX_SUBJECTS = 24
 GALLERY_MAX_LABEL = 128
 GALLERY_MAX_NAME = 64
@@ -51,7 +51,10 @@ OFFICIAL_ROW_FIELDS = ("identity", "url", "face_rect", "is_current", "is_catalog
 SLOT_LABELS = {"weapon_main": "主手", "weapon_off": "副手", "armor": "防具", "accessories": "飾品"}
 SLOTS = gallery_api.SLOT_ORDER
 FIELDS = GALLERY_PROMPT_FIELDS
-CAPABILITY_FIELDS = ("supports_bindings", "supports_field_selection", "supports_free_text", "max_cards")
+CAPABILITY_FIELDS = (
+    "supports_bindings", "supports_field_selection", "supports_free_text",
+    "supports_personal_official_preferences", "max_cards"
+)
 CARD_FIELDS = {
     "image_id", "status", "label", "url", "face_rect", "stage", "is_default", "chips",
     "requested_fields", "binding_present", "created_at",
@@ -333,7 +336,10 @@ def gallery_subjects(actor):
         }, subject, entity)
     rail = [entry(puppet, actor, is_puppet=True)]
     seen = {puppet.full()}
-    monsters = [entry(monster_subject_for(key), name=tier.display_name_zh) for key, tier in MONSTER_TIER_REGISTRY.items()]
+    visual_registry = get_monster_visual_registry()
+    # Reserve up to 23 stable-key visual species after the puppet
+    species_keys = sorted(visual_registry.keys())[:min(len(visual_registry), GALLERY_MAX_SUBJECTS - 1)]
+    monsters = [entry(monster_subject_for(key), name=visual_registry[key].display_label) for key in species_keys]
     remaining = max(0, GALLERY_MAX_SUBJECTS - 1 - len(monsters))
     companions = live_companions(actor)
     companion_ids = {entity.pk for entity in companions}
@@ -499,6 +505,6 @@ def gallery_presenter(context: PresentationContext):
         "filters": _filters(rows), "cards": rows,
         "official_entries": _official_entries(subject, entity),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
-        "capabilities": {field: getattr(capability, field) for field in CAPABILITY_FIELDS},
+        "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,
     })
