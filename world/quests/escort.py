@@ -48,6 +48,28 @@ class EscortPredicateError(ValueError):
     """An escort predicate was asked about a definition it cannot evaluate."""
 
 
+def valid_reason_pairs(
+    owner: Any, pairs: Iterable[Any], *, member_id: int
+) -> tuple[tuple[str, str], ...]:
+    """Read-only validity boundary for canonical party temporary sources."""
+    from .runtime import QuestDataError, QuestState, read_records
+
+    try:
+        records = {record.quest_id: record for record in read_records(owner)}
+    except QuestDataError:  # observability: ignore R2: corrupt quest state grants no temporary membership
+        return ()
+    valid = []
+    for record_id, role_id in pairs:
+        record = records.get(record_id)
+        if (
+            record is not None and record.state is QuestState.IN_PROGRESS
+            and (role_id, int(member_id)) in record.protected_roles
+            and (record_id, role_id) not in valid
+        ):
+            valid.append((record_id, role_id))
+    return tuple(valid)
+
+
 @dataclass(frozen=True)
 class PositionKey:
     """The authoritative position identity of one actor.

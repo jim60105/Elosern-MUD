@@ -25,8 +25,8 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`talk`](/game/command-reference?id=talk) | 與 NPC 交談；對公會職員說「回報」可交回完成任務。 |
-| [`invite`](/game/command-reference?id=invite) | 邀請眼前的 NPC 加入你的隊伍。 |
-| [`leave`](/game/command-reference?id=leave) | 解散一名同伴。 |
+| [`invite`](/game/command-reference?id=invite) | 邀請眼前的 NPC 成為一般同伴；護送同行者仍可接受邀請。 |
+| [`leave`](/game/command-reference?id=leave) | 移除一般同伴身分；有效護送委託仍保留同行關係。 |
 | [`possess`](/game/command-reference?id=possess) | 附身至同伴身上行動。 |
 | [`unpossess`](/game/command-reference?id=unpossess) | 結束附身並歸位。 |
 | [`說`](/game/command-reference?id=說) | 在房間內說話。 |

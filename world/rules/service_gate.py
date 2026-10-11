@@ -229,4 +229,9 @@ def schedule_silenced(npc: Any) -> bool:
     """
     if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
         return True
+    from world.rules.party import bound_owner_of, reasons_for
+
+    owner = bound_owner_of(npc)
+    if owner is not None and reasons_for(npc, owner):
+        return True
     return off_anchor_place_service(npc) is not None

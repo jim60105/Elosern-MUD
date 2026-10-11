@@ -214,6 +214,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.companion = self.character(NPC, "t_gallery_companion")
         self.companion.db.party_member = self.actor.pk
         self.actor.db.party = [self.companion.pk]
+        self.actor.db.party_meta = {str(self.companion.pk): {"general": True, "reasons": []}}
         self.subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_actor")
         self.companion_subject = ArtSubject(ArtSubjectKind.CHARACTER, "t_gallery_companion")
         self.monster_subject = ArtSubject(ArtSubjectKind.MONSTER, "t_beast")

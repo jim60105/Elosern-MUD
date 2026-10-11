@@ -663,7 +663,11 @@ def _party_invite_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以邀請的對象。")
-    if is_companion(npc, actor):
+    from world.rules.party import has_general_membership
+
+    if has_general_membership(npc, actor) or (
+        npc.db.party_member is not None and npc.db.party_member != actor.pk
+    ):
         from world.rules.party import ALREADY_COMPANION_MESSAGE
 
         return _rejected("already_companion", ALREADY_COMPANION_MESSAGE)

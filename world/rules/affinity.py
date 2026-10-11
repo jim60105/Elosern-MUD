@@ -216,9 +216,9 @@ def run_auto_leave_recheck(npc: Any, player: Any) -> str | None:
     unreachable.
     """
     from world.rules.affinity_config import get_config
-    from world.rules.party import AUTO_LEAVE_MESSAGE, is_companion, leave_party
+    from world.rules.party import AUTO_LEAVE_MESSAGE, is_companion, leave_party, reasons_for
 
-    if not is_companion(npc, player):
+    if not is_companion(npc, player) or reasons_for(npc, player):
         return None
     if npc.relations.affinity_for(player) >= get_config().invite_threshold:
         return None
@@ -268,8 +268,11 @@ def apply_affinity_change(
         # When a possessed companion's affinity will drop below the invite threshold,
         # release possession FIRST, before opening the affinity atomic block.
         # If the release fails, it aborts before any affinity write occurs.
-        from world.rules.party import is_companion
-        if is_companion(npc, player) and new_value < get_config().invite_threshold:
+        from world.rules.party import is_companion, reasons_for
+        if (
+            is_companion(npc, player) and not reasons_for(npc, player)
+            and new_value < get_config().invite_threshold
+        ):
             from world.rules.possession import release_for_party_change
             release_for_party_change(npc, player)
         with transaction.atomic():

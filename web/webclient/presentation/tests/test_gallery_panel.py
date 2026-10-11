@@ -482,6 +482,7 @@ class GalleryPresenterTests(EvenniaTest):
         companion.db.portrait_policy = {"mode": "named", "stable_key": "t_companion"}
         companion.db.party_member = self.actor.pk
         self.actor.db.party = [companion.pk]
+        self.actor.db.party_meta = {str(companion.pk): {"general": True, "reasons": []}}
         corrupt = create_object(NPC, key="損壞資料")
         corrupt.db.portrait_policy = {"mode": "named", "stable_key": "bad/key"}
         rail = gallery_subjects(self.actor)
