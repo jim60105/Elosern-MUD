@@ -21,10 +21,13 @@
 | 地點登錄表服務主人 | `world/lore/settlements/places.py` 的 `host_*` 欄位，由 `world/rules/guild_economy.py::sync_service_content` 於啟動冪等建立 | 永久服務主人（店主、公會主管、店主兼對話、管事） | `NPC`（啟動同步建立，永不手動匯入） |
 | 任務場景具現化 | `world/quests/scene_builder.py` 依 `world/lore/npc_tiers.py::NPC_TIER_REGISTRY` 的角色階級生成 | 任務階段場景人物 | `scene_npc` 原型（白名單限定） |
 | 同行夥伴 | `world/rules/starting_companions.py::build_starting_companion` | 預設卡 `starting_companions` 宣告的夥伴 | `LLMNPC`（`invite` 只收 `LLMNPC`） |
+| 已發表場景包相遇 | `world/quests/encounters.py::publish_scene_package` 發表不可變的場景包，`world/quests/encounter_activation.py::activate_scene_encounter` 在玩家實際所在的房間具現化 | 驗收任務前即可遇見的具名故事角色；任務完成、失敗或放棄後仍保留身分、人格與記憶 | `scene_llm_npc` 原型（白名單限定，型別為 `LLMNPC`） |
 
-四條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
+五條正式路徑在建立時皆會初始化完整的精簡角色卡（Compact Card），寫入版本 1 的人物設定與來源中繼資料。若透過 Evennia 建造者指令（`create` 或 `spawn`）建立 `NPC`，則會繞過所有初始化程式；這類非出貨來源物件未持有角色卡，在遊戲內的人物設定編輯器入口會顯示停用狀態（`npc_persona.unavailable`）。
 
-依據設計文件 `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §13c 條款（KISS 原則），未使用的離線人物設定套件（Offline Persona Bundles）子系統已完整移除，不維護離線套件選擇器或相容別名；若未來有經正式核准之重啟需求，可由 Git 歷史紀錄復原。現行所有生產環境 NPC 皆透過上述四條完整卡片路徑建立。
+已發表場景包的持久化屬於 `world/quests`：它是一個正式的 Django app（`world.quests.apps.QuestsConfig`，列於 `server/conf/settings.py` 的 `INSTALLED_APPS`），擁有不可變的 `ScenePackage` 已發表定義，以及角色綁定、相遇啟動、對話階段與委託授權等執行期資料表。資料庫唯一鍵是其契約的一部分：一個（場景包，角色）只綁定一個實際角色，一個（場景包，場景，玩家）只有一個啟動身分，因此重啟不會產生第二個角色。新增或調整資料表時，在 `world/quests/migrations/` 宣告遷移；已發表的 payload 永不改寫。
+
+依據設計文件 `docs/superpowers/specs/2026-10-01-npc-persona-authoring-design.md` §13c 條款（KISS 原則），未使用的離線人物設定套件（Offline Persona Bundles）子系統已完整移除，不維護離線套件選擇器或相容別名；若未來有經正式核准之重啟需求，可由 Git 歷史紀錄復原。現行所有生產環境 NPC 皆透過上述五條完整卡片路徑建立。
 
 對話行為是另一個正交的決定：
 
@@ -32,6 +35,7 @@
 |---|---|---|
 | 劇本對話（`talk` 關鍵詞查表） | NPC 帶 `ScriptedDialogue` 元件，`dialogue_key` 指向 `world/lore/dialogue/` 已登錄的表 | 未知關鍵詞回覆無理解行；查得到的表永遠可用，完全離線可玩 |
 | 生成對話（guarded LLM） | 型別是 `LLMNPC`；`at_talked_to` 走 `world/ai/npc_dialogue.py` 護欄管線 | 護欄降級時改說 `resolve_greeting(npc)` 的離線問候語（執行個體欄位優先，次為劇本／Profile）或沉默 |
+| 生成階段對話（已發表場景包） | 角色帶 `ScriptedDialogue`，`dialogue_key` 形如 `scene_role:<package id>:<role id>`；`world/rules/dialogue.py` 的共享解析器讀取該角色「目前允許」的階段定義 | 固定問候語、主題與離線回覆完全離線可用；階段一改變，舊主題與已開啟的對話窗立即失效並刷新為當前階段 |
 
 匯入器預設建 `NPC`（純劇本對話／無對話）。生成對話人物必須顯式傳 `typeclass=LLMNPC`。
 

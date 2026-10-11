@@ -517,7 +517,9 @@ def _validate_defeat_selector(parsed: Any) -> list[str]:
     return errors
 
 
-def _validate_scene_bound_rules(parsed: Any) -> list[str]:
+def _validate_scene_bound_rules(
+    parsed: Any, *, package_roles: frozenset[str] = frozenset()
+) -> list[str]:
     """Enforce the shared scene-bound rules the compiler also enforces (D5).
 
     Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
@@ -525,6 +527,12 @@ def _validate_scene_bound_rules(parsed: Any) -> list[str]:
     refused entirely until a protected-entity binding flow exists; a
     bound-target DEFEAT quantity must not exceed its ``npc_req`` count; and
     ``anchor_near`` must name a placed anchor.
+
+    ``package_roles`` mirrors the compiler's single bounded exception
+    (quest-scene-encounters §5.1): the *published package's own* validated role
+    set lifts the instance-only rule for its roles on objectives that need no
+    stage binding. The registered blueprint path passes none, so a standalone
+    proposal keeps the blanket rejection, and ESCORT stays refused either way.
     """
     errors: list[str] = []
     for index, stage in enumerate(_stages(parsed)):
@@ -541,11 +549,36 @@ def _validate_scene_bound_rules(parsed: Any) -> list[str]:
                 f"stage {index} declares an ESCORT objective, which cannot be "
                 "published until a protected-entity binding flow exists"
             )
-        if has_npc and layer != "instance":
+        roles = {
+            entry.get("role") for entry in npc_req if isinstance(entry, dict)
+        }
+        package_owned = (
+            bool(package_roles)
+            and bool(roles)
+            and all(isinstance(role, str) and role in package_roles for role in roles)
+        )
+        # Mirrors the compiler's ``requires_bound_targets``: only a
+        # reach/acquire objective or a monster-tier DEFEAT completes without a
+        # stage binding, so any other (including a future) kind keeps the
+        # instance-only requirement.
+        kind = objective.get("kind") if isinstance(objective, dict) else None
+        has_monster_tier = (
+            isinstance(objective, dict) and objective.get("monster_tier") is not None
+        )
+        needs_stage_binding = not (
+            kind in ("reach_location", "acquire")
+            or (kind == "defeat" and has_monster_tier)
+        )
+        if (
+            has_npc
+            and layer != "instance"
+            and not (package_owned and not needs_stage_binding)
+        ):
             errors.append(
                 f"stage {index} declares NPC requirements outside an "
-                "instance-layer destination; occupant-bearing scenes must be "
-                "instances"
+                "instance-layer destination; occupant-bearing scenes must be instances "
+                "unless every occupant role is a validated package role on an "
+                "objective that needs no stage binding"
             )
         if (
             isinstance(objective, dict)

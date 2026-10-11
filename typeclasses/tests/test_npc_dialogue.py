@@ -22,12 +22,13 @@ from django.test import override_settings
 from twisted.internet import defer
 
 from evennia.utils.create import create_account, create_object
+from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.accounts import Account
 from typeclasses.components import ScriptedDialogue
-from typeclasses.npcs import LLMNPC, STALE_PERSONA, DialogueExchangeResult
+from typeclasses.npcs import LLMNPC, STALE_PERSONA, STALE_PHASE, DialogueExchangeResult
 from world.ai import guardrail
 from world.ai.fake_client import FakeLLMClient
 from world.ai.npc_dialogue import (
@@ -1253,6 +1254,115 @@ class DialogueVersionGateTests(EvenniaTest):
                 "version_to": 2,
                 "path": "custom_path",
             },
+        )
+
+
+class DialoguePhaseFreshnessTests(EvenniaTest):
+    """A story-phase change mid-flight rejects the whole obsolete exchange (4.3)."""
+
+    def setUp(self):
+        super().setUp()
+        from typeclasses.rooms import AnchorRoom
+
+        from world.quests import scene_store
+        from world.quests.encounter_activation import activate_scene_encounter
+        from world.quests.encounters import publish_scene_package
+        from world.quests.tests._compile_helpers import _anchor_key
+        from world.quests.tests._fixtures import register_catalog_once
+        from world.quests.tests._scene_package_fixtures import (
+            package as package_payload,
+        )
+
+        register_catalog_once()
+        _reset_all()
+        register_npc_dialogue()
+        self.room = create_object(AnchorRoom, key="南門")
+        self.room.db.anchor_key = _anchor_key()
+        self.player = create_object(PlayerCharacter, key="訪客")
+        self.player.move_to(self.room, quiet=True)
+        self.published = publish_scene_package(package_payload(), owner="tester")
+        activate_scene_encounter(
+            self.player, self.published.package_id, "south_gate", room=self.room, tick=5
+        )
+        binding = scene_store.get_role_binding(self.published.package_id, "daughter")
+        self.npc = ObjectDB.objects.filter(id=binding.npc_id).first()
+        self.package_id = self.published.package_id
+
+    def _advance_phase(self):
+        from world.quests.story_dialogue import transition_story_dialogue
+
+        return transition_story_dialogue(
+            self.package_id,
+            "daughter",
+            expected_revision=0,
+            provenance={"closure": True},
+            tick=6,
+        )
+
+    def _current_greeting(self):
+        from world.quests import scene_store
+        from world.quests.scene_package import validate_scene_package
+
+        row = scene_store.read_package(self.package_id)
+        definition = validate_scene_package(row.payload)
+        runtime = scene_store.get_dialogue_phase(self.package_id, "daughter")
+        phase = next(
+            item
+            for item in definition.role_dialogue("daughter").phases
+            if item.phase_id == runtime.selected_phase
+        )
+        return phase.greeting
+
+    @covers_requirement(
+        "npc-dialogue::generated-free-form-dialogue-includes-only-permitted-current-phase-context",
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work",
+    )
+    def test_run_npc_exchange_marks_a_phase_change_as_stale(self):
+        def _advance(_descriptor):
+            self._advance_phase()
+            return True
+
+        client = FakeLLMClient()
+        client.add_response(_advance, _reply_text(speech="我會記住你的心意。"))
+        result = await_result(self.npc.run_npc_exchange("你好", self.player, client))
+        self.assertTrue(result.stale_phase)
+        self.assertFalse(result.stale_persona)
+        self.assertFalse(result.degraded)
+        self.assertIsNone(result.reply)
+        self.assertEqual(
+            pair_view(self.npc, self.player)[0], [f"{self.player.key}: 你好"]
+        )
+
+    @covers_requirement(
+        "npc-dialogue::generated-free-form-dialogue-includes-only-permitted-current-phase-context",
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work",
+    )
+    def test_at_talked_to_delivers_no_speech_and_refreshes_the_current_phase(self):
+        from world.rules.dialogue import clear_dialogue_session, open_or_refresh_dialogue
+        from world.rules.player_messages import STALE_PHASE_NOTE
+
+        clear_dialogue_session(self.player)
+        open_or_refresh_dialogue(self.player, self.npc, "舊台詞")
+
+        def _advance(_descriptor):
+            self._advance_phase()
+            return True
+
+        client = FakeLLMClient()
+        client.add_response(_advance, _reply_text(speech="我會記住你的心意。"))
+        with patch.object(self.player, "msg") as msg:
+            outcome = await_result(self.npc.at_talked_to("你好", self.player, client))
+        self.assertIs(outcome, STALE_PHASE)
+        texts = " ".join(str(call.args[0]) for call in msg.call_args_list if call.args)
+        self.assertNotIn("我會記住你的心意。", texts)
+        self.assertIn(STALE_PHASE_NOTE, texts)
+        # The live session now carries the NEW phase's fixed greeting.
+        self.assertEqual(self.player.db.dialogue_session["line"], greeting_for(self.npc))
+        self.assertEqual(
+            self.player.db.dialogue_session["line"], self._current_greeting()
+        )
+        self.assertEqual(
+            pair_view(self.npc, self.player)[0], [f"{self.player.key}: 你好"]
         )
 
 

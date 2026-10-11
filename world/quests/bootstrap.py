@@ -29,6 +29,45 @@ def restore_generated_quests() -> None:
         register_restored_quest(payload_to_registrations(payload))
 
 
+def restore_scene_packages() -> None:
+    """Republish the durable scene packages' definition views and live issuances.
+
+    Runs after :func:`restore_generated_quests` so an activated package
+    commission can register against an already-registered definition. Package
+    definitions and spawn requirements are re-registered first (an equal
+    registration is a no-op); only then are the grants whose issuance was
+    actually activated re-registered, so a merely planned symbolic declaration
+    never becomes runtime authority across a restart (design §5.1).
+    """
+    from world.rules.quest_issuance import Settlement
+
+    from . import scene_store
+    from .compile import publish_activated_commission
+    from .encounters import _publish_definition_views_for
+    from .scene_package import validate_scene_package
+
+    for row in scene_store.list_packages():
+        if row.status != scene_store.PACKAGE_STATUS_PUBLISHED:
+            continue
+        definition = validate_scene_package(row.payload)
+        _publish_definition_views_for(row, definition)
+        for grant in scene_store.list_commission_grants(row.package_id):
+            if not grant.registered:
+                continue
+            if grant.npc_id <= 0:
+                raise scene_store.SceneStoreError(
+                    f"commission {grant.definition_key!r} of role "
+                    f"{grant.role_id!r} is marked registered without its assigned "
+                    "actor; refusing to fabricate runtime authority"
+                )
+            publish_activated_commission(
+                grant.definition_key,
+                grant.issuer_key,
+                definition.quest.reward,
+                Settlement.AUTO,
+            )
+
+
 def sync_quest_runtime() -> None:
     """Restore generated content, register catalog content, the action planner,
     and deadline settlement.
@@ -37,6 +76,7 @@ def sync_quest_runtime() -> None:
     overwrite the clock source, and equal definition registrations are no-ops.
     """
     restore_generated_quests()
+    restore_scene_packages()
     register_catalog()
     register_event_effect_planner("quest", quest_event_effect_planner)
     register_event_source(

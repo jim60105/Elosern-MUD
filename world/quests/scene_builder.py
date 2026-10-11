@@ -23,13 +23,10 @@ from typing import Any
 
 from django.db import transaction
 
-from world.observability import log_info, log_warn
+from world.observability import log_warn
 from evennia.objects.models import ObjectDB
-from evennia.prototypes.spawner import spawn
 
 from typeclasses.entities import LivingEntity
-from typeclasses.monsters import Monster
-from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, GridRoom, InstanceRoom
 from world.lore.anchor_placement import ANCHOR_PLACEMENT_REGISTRY
 from world.lore.anchors import ANCHOR_REGISTRY
@@ -37,57 +34,33 @@ from world.lore.npc_tiers import NPC_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.maps.instance import register_owned_entity, spawn_instance_room
 from world.quests.binding import bind_stage_runtime
-from world.quests.characterization import characterize_errors, race_lifespan_upper_bound
-from world.lore.npc_card import NpcCard, NpcCardError
-from world.rules.npc_identity import validate_npc_name, validate_npc_title
-from world.rules.npc_persona import NpcPersonaStorageError, initialize_npc_persona
 from world.quests.compile import scene_requirements_for
 from world.quests.definitions import DestinationKind, ObjectiveKind, RoomLocator
+from world.quests import scene_store
+from world.quests.materializer import (
+    SCENE_OCCUPANT_PROTOTYPE_WHITELIST,
+    RoleSpawn,
+    SceneBuilderError,
+    SceneBuilderLocationError,
+    SceneBuilderNoRequirements,
+    SceneBuilderNotActive,
+    SceneBuilderRoleUnavailable,
+    SceneBuilderSpawnError,
+    schedule_occupant_portraits as _schedule_occupant_portraits,
+    scene_name as _materializer_scene_name,
+    spawn_monster as _spawn_monster,
+    spawn_role_actor,
+    validate_characterization as _validate_characterization,
+    validate_occupant_parent as _validate_occupant_parent,
+)
 from world.quests.runtime import (
     QuestState,
     definition_for,
     find_record,
     read_records,
 )
-from world.rules.progression import apply_lineage_auto_seed
-from world.rules.traits import (
-    build_initial_traits,
-    trait_config_for_values,
-)
-
-SCENE_OCCUPANT_PROTOTYPE_WHITELIST: tuple[str, ...] = ("scene_npc", "scene_monster")
 
 RETURN_EXIT_KEY = "返回"
-_FALLBACK_SCENE_NAME = "任務場景"
-
-# The plain authored default age for a portrait-bearing occupant whose
-# blueprint declared no ages (design D3). It is race-agnostic and always
-# within the zero-to-lifespan validation range for every race (0..80 human,
-# 0..1200 elf), so subject-age eligibility provably passes: the check requires
-# canonical integer ages, and the portrait description needs them too. A
-# race-aware midpoint was rejected because it would make a default-age elf a
-# thousand-year elder.
-PORTRAIT_DEFAULT_AGE = 25
-
-
-class SceneBuilderError(RuntimeError):
-    """Base class for deterministic scene-materialization rejections."""
-
-
-class SceneBuilderNotActive(SceneBuilderError):
-    """The referenced quest record is unknown, inactive, or stage-mismatched."""
-
-
-class SceneBuilderNoRequirements(SceneBuilderError):
-    """The current stage has no registered spawn requirements (hand-written quest)."""
-
-
-class SceneBuilderLocationError(SceneBuilderError):
-    """The caller is not at a valid origin for the stage's destination."""
-
-
-class SceneBuilderSpawnError(SceneBuilderError):
-    """A scene key failed to resolve or the spawner produced an invalid object."""
 
 
 @dataclass(frozen=True)
@@ -99,29 +72,9 @@ class SceneMaterialization:
     flavor_context: dict[str, str] | None = None
 
 
-def _validate_occupant_parent(prototype: dict) -> None:
-    """Reject any occupant prototype outside the whitelist, and reject an
-    explicit ``typeclass`` override so the whitelist gates the actual spawned
-    type, not merely the claimed parentage (mirrors ``world.maps.instance``)."""
-    parent = prototype.get("prototype_parent")
-    if parent not in SCENE_OCCUPANT_PROTOTYPE_WHITELIST:
-        raise SceneBuilderSpawnError(
-            f"prototype_parent {parent!r} is not in "
-            "SCENE_OCCUPANT_PROTOTYPE_WHITELIST"
-        )
-    typeclass = prototype.get("typeclass")
-    if typeclass is not None:
-        raise SceneBuilderSpawnError(
-            "a scene-occupant prototype must not override the typeclass; "
-            "the whitelist gates the spawned type"
-        )
-
-
 def _scene_name(archetype_key: str | None) -> str:
-    if archetype_key is None:
-        return _FALLBACK_SCENE_NAME
-    archetype = SCENE_ARCHETYPE_REGISTRY.get(archetype_key)
-    return _FALLBACK_SCENE_NAME if archetype is None else archetype.display_name_zh
+    """Return one scene archetype's display name through the shared materializer."""
+    return _materializer_scene_name(archetype_key)
 
 
 def _scene_exit_key(archetype_key: str | None) -> str:
@@ -144,76 +97,16 @@ def _revalidate_keys(requirement: Any) -> None:
     for position, (role, tier_key, _disposition) in enumerate(requirement.npc_reqs):
         if tier_key not in NPC_TIER_REGISTRY:
             raise SceneBuilderSpawnError(f"unknown NPC tier {tier_key!r}")
-        _revalidate_characterization(requirement, role, tier_key, position)
-
-
-def _revalidate_characterization(
-    requirement: Any,
-    role: str,
-    tier_key: str,
-    position: int,
-) -> None:
-    """Re-validate one occupant's characterization through the shared helper.
-
-    The compile boundary already validated the accepted blueprint, but a
-    forged ``StageSpawnRequirement`` could bypass it and write a negative or
-    non-integer canonical age (a permanently portrait-ineligible NPC), a
-    malformed policy, or an occupant WITHOUT the authored identity. Every
-    occupant MUST carry a characterization with a valid ``display_name``,
-    ``title``, and complete compact ``persona`` card: re-running the same
-    shared rules here keeps the age-bounds rule, the authored-identity
-    invariant, and the card contract hard floors on every spawn path
-    (design D6).
-    A missing or field-incomplete characterization raises
-    ``SceneBuilderSpawnError`` and rolls the whole materialization back before
-    any state change.
-    """
-    characterizations = getattr(requirement, "characterizations", ())
-    if position >= len(characterizations):
-        raise SceneBuilderSpawnError(
-            f"occupant {role!r} carries no characterization; authored identity "
-            "is required on every spawn path"
+        characterizations = getattr(requirement, "characterizations", ())
+        characterization = (
+            characterizations[position]
+            if position < len(characterizations)
+            else None
         )
-    characterization = characterizations[position]
-    if characterization is None:
-        raise SceneBuilderSpawnError(
-            f"occupant {role!r} carries a null characterization; authored "
-            "identity is required on every spawn path"
-        )
-    entry: dict[str, Any] = {}
-    if characterization.display_name is not None:
-        entry["display_name"] = characterization.display_name
-    if characterization.title is not None:
-        entry["title"] = characterization.title
-    if characterization.age is not None:
-        entry["age"] = characterization.age
-    if characterization.apparent_age is not None:
-        entry["apparent_age"] = characterization.apparent_age
-    if characterization.portrait_stable_key is not None:
-        entry["portrait"] = {"stable_key": characterization.portrait_stable_key}
-    if characterization.persona is not None:
-        entry["persona"] = _card_record(characterization.persona)
-    for message in characterize_errors(
-        entry,
-        lifespan_upper_bound=race_lifespan_upper_bound(tier_key),
-    ):
-        raise SceneBuilderSpawnError(
-            f"invalid characterization for occupant {role!r}: {message}"
-        )
-
-
-def _card_record(persona: Any) -> Any:
-    """Return the record form of a carried card without trusting its type.
-
-    Only a genuine frozen ``NpcCard`` is converted through ``to_record()``; a
-    forged requirement may hold any object in this slot, which is passed on
-    unchanged so the card contract rejects it by name. Revalidation and the
-    persona write both read through this one function, so what is validated
-    is exactly what is stored.
-    """
-    if isinstance(persona, NpcCard):
-        return persona.to_record()
-    return persona
+        # The one shared characterization gate (world.quests.materializer): a
+        # forged requirement cannot bypass the age-bounds rule, the authored
+        # identity invariant, or the compact-card contract on any spawn path.
+        _validate_characterization(characterization, role, tier_key)
 
 
 def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom:
@@ -236,166 +129,6 @@ def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom
     return room
 
 
-def _apply_characterization(
-    npc: NPC,
-    requirement: Any,
-    position: int,
-    quest_key: str,
-) -> None:
-    """Apply one compiled occupant's characterization per-field (design D1).
-
-    Each carried field applies independently: ``display_name`` sets the display
-    name; the paired ages set the canonical ``age``/``apparent_age``
-    attributes; a portrait ``stable_key`` materializes the full named policy
-    dict (design D2) and, when the ages are absent, the deterministic default
-    age ``PORTRAIT_DEFAULT_AGE`` so subject-age eligibility always has
-    canonical inputs (design D3). An occupant without a portrait policy never
-    receives the default or a policy (design D4). The policy is written only
-    after the ages, so a policy-bearing occupant always carries canonical
-    integer ages. The occupant's compact card is written through the
-    deterministic persona initializer with ``generated_quest`` provenance
-    (npc-persona-generated-quest-cards D5), inside the caller's atomic
-    materialization; any initializer failure is raised as
-    ``SceneBuilderSpawnError`` and rolls the whole stage spawn back.
-    """
-    characterizations = getattr(requirement, "characterizations", ())
-    if position >= len(characterizations):
-        return
-    characterization = characterizations[position]
-    if characterization is None:
-        return
-    if characterization.display_name is not None:
-        # Store the validator's normalized (stripped) form, matching the key
-        # the spawner used (producer contract shared with the import loader).
-        npc.db.display_name = validate_npc_name(characterization.display_name)
-    if characterization.title is not None:
-        # Store the validator's normalized (stripped) form, the same producer
-        # contract the import loader follows (change 2).
-        npc.npc_title = validate_npc_title(characterization.title)
-    if characterization.age is not None and characterization.apparent_age is not None:
-        npc.db.age = characterization.age
-        npc.db.apparent_age = characterization.apparent_age
-    if characterization.portrait_stable_key is not None:
-        if npc.db.age is None:
-            npc.db.age = PORTRAIT_DEFAULT_AGE
-        if npc.db.apparent_age is None:
-            npc.db.apparent_age = PORTRAIT_DEFAULT_AGE
-        npc.db.portrait_policy = {
-            "mode": "named",
-            "stable_key": characterization.portrait_stable_key,
-        }
-    try:
-        # No authored official-content provenance is recorded here
-        # (official-content-provenance). A generated quest occupant is
-        # instantiated from the closed compiled-characterization contract
-        # (display name, title, age pair, optional stable portrait key, persona
-        # card, combat traits), which names no profile identity, and its
-        # persona provenance below is ``generated_quest``. Taking a profile key
-        # from a generated proposal would make the model an authored channel,
-        # which the dynamic-NPC rule forbids, so no ``npc_profile_key`` write
-        # exists on this path and none is inferred from the display name, the
-        # entity key, the tier, or the role.
-        initialize_npc_persona(
-            npc,
-            _card_record(characterization.persona),
-            {
-                "kind": "generated_quest",
-                "quest": quest_key,
-                "stage": requirement.index,
-                "occupant": position,
-            },
-        )
-    except (NpcCardError, NpcPersonaStorageError) as error:
-        raise SceneBuilderSpawnError(
-            f"occupant {position} persona initialization failed: {error}"
-        ) from error
-    if characterization.combat_traits:
-        from world.rules.traits import set_combat_traits
-
-        set_combat_traits(npc, characterization.combat_traits)
-
-
-def _spawn_npc(
-    room: InstanceRoom,
-    requirement: Any,
-    role: str,
-    tier_key: str,
-    disposition: str | None,
-    position: int,
-    quest_key: str,
-) -> NPC:
-    tier = NPC_TIER_REGISTRY[tier_key]
-    # The tier's four bands (three physical + magic_power) drive the whole
-    # stat block; the deleted race-level magic fields have no caller (D-A2).
-    config = trait_config_for_values(
-        build_initial_traits(tier.race_key, tier=tier.static_tier_key)
-    )
-
-    # The authored display name IS the entity key (design §3.2, D2): every
-    # accepted characterization carries it (revalidation above fails closed),
-    # persisted in the validator's normalized form so surrounding whitespace
-    # can never leak into the entity key.
-    characterizations = getattr(requirement, "characterizations", ())
-    characterization = characterizations[position]
-    prototype = {
-        "prototype_parent": "scene_npc",
-        "key": validate_npc_name(characterization.display_name),
-        "location": room,
-    }
-    _validate_occupant_parent(prototype)
-    spawned = spawn(prototype)
-    if not spawned:
-        raise SceneBuilderSpawnError(
-            "spawner.spawn() returned no object for a scene NPC"
-        )
-    npc = spawned[0]
-    if not isinstance(npc, NPC):
-        raise SceneBuilderSpawnError(
-            f"spawned object {npc!r} is not an NPC; rejecting it"
-        )
-    npc.race = tier.race_key
-    # Registry provenance (gallery-builtin-fallbacks): the spawned NPC carries
-    # its role-tier key so the built-in gallery fallback can find the tier's
-    # declared fallback key even when the portrait subject key is the entity
-    # pk (a characterization without a stable portrait key).
-    npc.db.npc_tier_key = tier_key
-    npc._apply_trait_config(config)
-    npc.db.disposition = disposition
-    _apply_characterization(npc, requirement, position, quest_key)
-    # The shared lineage auto-seed (use-driven-skill-lineage DC6): a spawned
-    # NPC that owns a deep skill gets its prerequisite chain closed and each
-    # unsatisfied edge seeded to exactly the required proficiency, so its
-    # skills are usable on spawn. No-op for a skill-less prototype.
-    apply_lineage_auto_seed(npc)
-    return npc
-
-
-def _spawn_monster(
-    room: InstanceRoom,
-    requirement: Any,
-    tier_key: str,
-    position: int,
-) -> Monster:
-    prototype = {
-        "prototype_parent": "scene_monster",
-        "key": f"{_scene_name(requirement.archetype)}的魔物",
-        "location": room,
-    }
-    _validate_occupant_parent(prototype)
-    spawned = spawn(prototype)
-    if not spawned:
-        raise SceneBuilderSpawnError(
-            "spawner.spawn() returned no object for a scene monster"
-        )
-    monster = spawned[0]
-    if not isinstance(monster, Monster):
-        raise SceneBuilderSpawnError(
-            f"spawned object {monster!r} is not a Monster; rejecting it"
-        )
-    monster.threat_tier = tier_key
-    monster.apply_monster_tier("floor")
-    return monster
-
 
 def _spawn_occupants(
     room: InstanceRoom,
@@ -403,46 +136,51 @@ def _spawn_occupants(
     objective: Any,
     quest_key: str,
 ) -> tuple[Any, ...]:
+    """Spawn one actor per occupant role through the shared materializer.
+
+    Every occupant is built by ``world.quests.materializer.spawn_role_actor``
+    (design §5.3): the whitelisted prototype, the registry-derived traits, the
+    characterization and persona card, the named portrait policy, and the
+    lineage auto-seed are applied by the one shared construction path, so the
+    accepted-stage and pre-acceptance encounter boundaries cannot drift.
+    Monsters go through the shared whitelisted monster path. Occupants are
+    registered as owned and their portrait ensures are scheduled through the
+    shared helper inside the caller's atomic materialization.
+    """
     occupants: list[Any] = []
+    characterizations = getattr(requirement, "characterizations", ())
     for position, (role, tier_key, disposition) in enumerate(requirement.npc_reqs):
+        characterization = (
+            characterizations[position]
+            if position < len(characterizations)
+            else None
+        )
         occupants.append(
-            _spawn_npc(
-                room, requirement, role, tier_key, disposition, position, quest_key
+            spawn_role_actor(
+                room,
+                RoleSpawn(
+                    role=role,
+                    tier=tier_key,
+                    disposition=disposition,
+                    characterization=characterization,
+                ),
+                {
+                    "kind": "generated_quest",
+                    "quest": quest_key,
+                    "stage": requirement.index,
+                    "occupant": position,
+                },
             )
         )
     if objective.kind is ObjectiveKind.DEFEAT and objective.monster_tier is not None:
-        for position in range(objective.quantity):
+        for _position in range(objective.quantity):
             occupants.append(
-                _spawn_monster(room, requirement, objective.monster_tier, position)
+                _spawn_monster(room, requirement.archetype, objective.monster_tier)
             )
     for occupant in occupants:
         register_owned_entity(room, occupant)
     _schedule_occupant_portraits(occupants)
     return tuple(occupants)
-
-
-def _schedule_occupant_portraits(occupants: tuple[Any, ...] | list[Any]) -> None:
-    """Schedule the portrait ensure for occupants carrying an explicit named policy.
-
-    Runs inside the outer atomic materialization, so ``transaction.on_commit``
-    fires only after the spawn transaction commits and an art failure can never
-    roll back a materialized scene (design D9). Today's role-based occupants
-    carry no policy and schedule nothing.
-    """
-    named = [
-        occupant
-        for occupant in occupants
-        if getattr(occupant, "db", None) is not None
-        and occupant.db.portrait_policy is not None
-        and hasattr(occupant.db.portrait_policy, "get")
-        and occupant.db.portrait_policy.get("mode") == "named"
-    ]
-    if not named:
-        return
-    from world.art.service import schedule_occupant_portrait
-
-    for occupant in named:
-        schedule_occupant_portrait(occupant)
 
 
 def _bind_stage(
@@ -633,6 +371,77 @@ def _materialize_instance(actor, record, definition, requirement, origin_room):
         raise
 
 
+def _materialize_permanent(record, definition, requirement, room) -> SceneMaterialization:
+    """Locate a permanent destination, adopting validated package-owned occupants.
+
+    A stage without ``npc_reqs`` is located only, exactly as before, and never
+    grants escort progress. A stage whose ``npc_reqs`` are validated package-owned
+    roles (a published package declares this definition) adopts their exact role
+    bindings in the **existing** room: no room or exit is created, the shared
+    room description is never rewritten, and a previously bound actor stays at
+    its actual location instead of being teleported back to the stage's origin.
+
+    The role work runs through one transaction with the same shared helper the
+    pre-acceptance activation boundary uses, so a role's actor is created at
+    most once across both paths. A required actor that is missing, dead or
+    departed raises :class:`SceneBuilderRoleUnavailable` naming the reason; it is
+    never repaired or replaced. Repeat materialization is idempotent: the same
+    bindings are revalidated and no actor is recreated.
+    """
+    if not requirement.npc_reqs:
+        return SceneMaterialization(room, record)
+    from world.quests.encounter_activation import (
+        EncounterUnavailable,
+        ensure_package_role,
+        evict_created_actors,
+    )
+    from world.quests.scene_package import validated_package
+
+    package_row = scene_store.package_for_definition(definition.key)
+    if package_row is None:
+        raise SceneBuilderSpawnError(
+            f"stage {requirement.index} of quest {record.quest_id!r} declares "
+            "occupants at a permanent destination, but no published package owns "
+            "this definition"
+        )
+    package_definition = validated_package(package_row.package_id, package_row.payload)
+    if package_definition is None:
+        raise SceneBuilderSpawnError(
+            f"package {package_row.package_id!r} no longer validates; refusing to "
+            "materialize its occupants"
+        )
+    tick = int(getattr(record, "accepted_tick", 0) or 0)
+    created_pks: list[int] = []
+    try:
+        with transaction.atomic():
+            for role, _tier, _disposition in requirement.npc_reqs:
+                try:
+                    ensure_package_role(
+                        package_row,
+                        package_definition,
+                        role,
+                        room,
+                        provenance={
+                            "kind": "accepted_stage",
+                            "quest": record.quest_id,
+                            "stage": requirement.index,
+                            "role": role,
+                        },
+                        created_pks=created_pks,
+                        tick=tick,
+                    )
+                except EncounterUnavailable as error:
+                    raise SceneBuilderRoleUnavailable(
+                        f"required role {role!r} is unavailable: {error.reason}"
+                    ) from error
+    except Exception:
+        # The rows roll back; the idmapper would otherwise keep a cached actor
+        # whose row is gone, exactly as the activation boundary compensates.
+        evict_created_actors(created_pks)
+        raise
+    return SceneMaterialization(room, record)
+
+
 def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMaterialization:
     """Materialize the actor's current active stage's scene requirements.
 
@@ -640,11 +449,15 @@ def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMateria
     a plain exit pair, sets the scene metadata, spawns lore-statted occupants,
     registers them as owned entities, and binds room and entity identities
     through ``bind_stage_runtime`` -- all inside one outer ``transaction.atomic()``.
-    For a permanent ``anchor``/``grid`` destination it only locates the existing
-    room and never spawns or binds. An already-bound current stage returns the
-    existing binding and spawns nothing. Named ``SceneBuilderError`` variants
-    reject unknown/inactive quests, stages without spawn requirements, and
-    mismatched origins with no state change.
+    For a permanent ``anchor``/``grid`` destination it locates the existing room
+    and never creates a room, an exit or a stage binding: a stage without
+    ``npc_reqs`` is located only, while a stage whose ``npc_reqs`` are validated
+    package-owned roles adopts those exact role bindings in that same room
+    without rewriting its description or teleporting a bound actor. An
+    already-bound current stage returns the existing binding and spawns nothing.
+    Named ``SceneBuilderError`` variants reject unknown/inactive quests, stages
+    without spawn requirements, mismatched origins and unavailable package roles
+    with no state change.
     """
     records = read_records(actor)
     record = find_record(records, quest_id)
@@ -669,7 +482,7 @@ def materialize_stage(actor, quest_id: str, *, origin_room=None) -> SceneMateria
         return _materialize_instance(actor, record, definition, requirement, origin_room)
     if requirement.location.kind in (DestinationKind.ANCHOR, DestinationKind.GRID):
         room = _locate_permanent(requirement.location)
-        return SceneMaterialization(room, record)
+        return _materialize_permanent(record, definition, requirement, room)
     raise SceneBuilderSpawnError(
         f"unsupported destination kind {requirement.location.kind.value}"
     )

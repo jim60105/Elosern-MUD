@@ -46,6 +46,10 @@ from world.ai.guardrail import (
 from world.ai.immutable import (
     reject_mutable_containers as _reject_mutable_containers,
 )
+from world.ai.scenario_director.packages import (
+    PACKAGE_PAYLOAD_SCHEMA,
+    package_schema_errors,
+)
 from world.ai.schemas import ChatRequestDescriptor
 from world.ai.schemas.registry import (
     DuplicateSchemaError,

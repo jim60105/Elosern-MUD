@@ -67,12 +67,17 @@ class DialogueExchangeResult:
     degraded: bool
     reply: Any | None
     stale_persona: bool = False
+    stale_phase: bool = False
     submission_id: str = ""
     snapshot_id: str = ""
 
 
 # Sentinel returned by at_talked_to when a mid-flight persona edit discards the reply.
 STALE_PERSONA = object()
+
+# Sentinel returned by at_talked_to when the role's story phase moved mid-flight:
+# the obsolete exchange is rejected whole and the current phase is refreshed.
+STALE_PHASE = object()
 
 
 class NPC(LivingEntity):
@@ -475,8 +480,13 @@ class LLMNPC(NPC):
 
         from world.narrative.dialogue import build_dialogue_context, submit_turn
         from world.rules.npc_persona import current_persona_version
+        from world.rules.dialogue import dialogue_phase_revision
 
         captured_version = current_persona_version(self)
+        # A generated role's story phase participates in freshness exactly like
+        # its persona: the revision is captured with the context and compared
+        # before anything is delivered or recorded (quest-scene-encounters 4.3).
+        captured_phase = dialogue_phase_revision(self)
         submission_id = ""
         snapshot_id = ""
 
@@ -509,6 +519,23 @@ class LLMNPC(NPC):
                 thinking_defer.cancel()
 
         current_version = current_persona_version(self)
+        current_phase = dialogue_phase_revision(self)
+        if captured_phase is not None and current_phase != captured_phase:
+            log_info(
+                "npc_dialogue_stale_phase",
+                context={
+                    "npc": str(getattr(self, "pk", self)),
+                    "char": str(getattr(character, "pk", character)),
+                    "revision_from": captured_phase,
+                    "revision_to": current_phase,
+                    "path": path,
+                },
+            )
+            # A phase change supersedes the speech-kept behavior: no speech, no
+            # intent, and no exchange or memory append.
+            return DialogueExchangeResult(degraded=False, reply=None, stale_phase=True,
+                                          submission_id=submission_id, snapshot_id=snapshot_id)
+
         if current_version != captured_version:
             log_info(
                 "npc_dialogue_stale_persona",
@@ -609,6 +636,18 @@ class LLMNPC(NPC):
         result = yield self.run_npc_exchange(
             speech, character, client, reactor=reactor, identity_detail=True, path=path
         )
+        if result.stale_phase:
+            # The role's story phase moved while the reply was pending: deliver
+            # no speech, record no exchange and apply no intent, and refresh the
+            # current phase through the session's sole writer instead.
+            from world.rules.dialogue import refresh_dialogue_phase
+            from world.rules.player_messages import STALE_PHASE_NOTE
+
+            refresh_dialogue_phase(character, self)
+            if notify_stale:
+                character.msg(STALE_PHASE_NOTE)
+            return STALE_PHASE
+
         if result.stale_persona:
             if notify_stale:
                 from world.rules.player_messages import STALE_PERSONA_NOTE

@@ -454,11 +454,32 @@ drift.
 - **THEN** it is accepted only as an empty list
 
 ### Requirement: The deterministic compile boundary translates validated proposals into the runtime type
-`world/quests/compile.py` SHALL provide `compile_quest_blueprint(validated_payload) -> CompiledQuest`
-that re-validates the proposal against the lore registries and maps it onto the closed immutable
-runtime type: a `QuestDefinition` (with `QuestType`, contiguous stages, objective kinds, destinations,
-and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. It SHALL raise a named
-`QuestCompileError` on any invalid payload before any mutation.
+
+The deterministic compile boundary SHALL revalidate proposals against shared schema and immutable lore constraints before mutation and produce the runtime definitions, rewards, issuance declarations and scene requirements. Every guardrail-checked constraint SHALL remain re-checked, invalid proposals SHALL raise named errors before writes, and ESCORT publication SHALL remain refused. Registration SHALL stay strict, atomic, conflict-rejecting and idempotent.
+
+#### Scenario: Symbolic issuer planning creates no commission
+- **WHEN** a package declares a validated role-issued commission whose actor is unmaterialized
+- **THEN** the package can be published without accepting or registering a quest, creating an actor, or treating the role ID as an authorized issuer key
+
+#### Scenario: Existing unauthorized issuer is still rejected
+- **WHEN** a proposal explicitly names an ordinary NPC as runtime issuer without issuing authority
+- **THEN** compilation rejects it without package or registry changes
+
+#### Scenario: Whole package validation rejects invalid references
+- **WHEN** a package names an ambiguous or unknown place, inconsistent relationship, absent role, missing phase, unsupported effect, or injected mechanical data
+- **THEN** publication fails with the named offending reference and no nearest-place substitution or partial writes
+
+#### Scenario: Existing compiler behavior remains deterministic
+- **WHEN** equal ordinary blueprints are compiled and registered twice, or equal stages are issued by two authorized carriers
+- **THEN** equal content has equal keys and one requirements entry, repeat registration is a no-op, and each carrier retains its separate issuance
+
+#### Scenario: Conflict rolls back registration
+- **WHEN** publication encounters conflicting definition, requirements, or issuance content
+- **THEN** no partial registry or durable payload change remains
+
+#### Scenario: Unsupported mechanics remain rejected
+- **WHEN** a proposal declares an unsupported destination, invalid quantity/reward/tier, nonempty unsupported failure conditions, or an ESCORT stage without its protected-role production flow
+- **THEN** it fails before writes despite having valid scene dialogue
 
 #### Scenario: A valid blueprint compiles to a registrable definition
 - **WHEN** a validated blueprint passes through `compile_quest_blueprint`
@@ -559,7 +580,7 @@ and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. It SHA
 
 #### Scenario: The definition key digests runtime content plus scene requirements
 - **WHEN** a `QuestDefinition.key` is generated
-- **THEN** it is a stable content digest over the canonical runtime definition serialization plus the canonical serialization of the compiled per-stage spawn requirements, so two blueprints with identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`, or `npc_reqs`, or any carried characterization field — the required `display_name` and `title`, the optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal content always yields an equal key
+- **THEN** it is a stable content digest over the canonical runtime definition serialization plus the canonical serialization of the compiled per-stage spawn requirements, so two blueprints with identical runtime stages but different scene requirements (archetype, `anchor_near`, `scene_sentence`, or `npc_reqs`, or any carried characterization field; the required `display_name` and `title`, the optional paired `age`/`apparent_age`, or portrait `stable_key`) always yield different keys and equal content always yields an equal key
 
 #### Scenario: Registration publishes definition, issuance, and requirements atomically
 - **WHEN** `register_generated_quest(...)` runs
@@ -579,7 +600,7 @@ and deadline) plus a `QuestReward`, an issuer key, and a settlement mode. It SHA
 
 #### Scenario: AI dicts never enter the registry directly
 - **WHEN** a raw AI-shaped dict is offered for registration
-- **THEN** `register_quest_definition` still rejects it — the compile boundary is the sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly
+- **THEN** `register_quest_definition` still rejects it; the compile boundary is the sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly
 
 ### Requirement: Scene-bound proposal stages are validated before publication
 The `scenario_director` guardrail semantic validators and the deterministic compiler SHALL both
@@ -711,3 +732,11 @@ A beat-scoped ScenarioDirector entry point SHALL accept a validated quest beat a
 #### Scenario: Generic degradation still works
 - **WHEN** the generic non-beat entry point runs with disabled generation
 - **THEN** it draws a compatible authored template as before
+
+### Requirement: Scene package proposals share the canonical bounded contract
+
+Generated package schemas and deterministic compilation SHALL derive from the same canonical bounded payload contract for reusable roles, encounters, phase dialogue, quest requirements, and symbolic issuer declarations. Proposal generation SHALL remain data-only and SHALL NOT mutate persistent state, lore registries, or supply executable conditions, typeclass paths, or mechanical magnitudes. Immutable published payloads SHALL round-trip through durable storage without persona or reference drift.
+
+#### Scenario: Canonical package round-trip preserves references
+- **WHEN** a schema-valid synthetic package is compiled, published, and reloaded
+- **THEN** its normalized role references, dialogue definitions, quest requirements and source identity remain unchanged and independently revalidate

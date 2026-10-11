@@ -90,6 +90,12 @@ PROVENANCE_KINDS: frozenset[str] = frozenset({
     "companion",
     "import",
     "generated_quest",
+    # A named story role materialized by a pre-acceptance scene encounter
+    # (quest-scene-encounters): the package, scene and role that produced it.
+    "scene_encounter",
+    # A named story role adopted by an accepted quest stage at a permanent
+    # destination (quest-scene-encounters 2.4): quest, stage and role.
+    "accepted_stage",
 })
 
 # Maximum length for an identifier string in provenance (never prose)
@@ -407,5 +413,19 @@ def validate_provenance(provenance: Any) -> dict[str, Any]:
         validated["quest"] = _check_id_str(provenance.get("quest"), "quest")
         validated["stage"] = _check_int(provenance.get("stage"), "stage")
         validated["occupant"] = _check_int(provenance.get("occupant"), "occupant")
+
+    elif kind == "scene_encounter":
+        if set(provenance.keys()) != {"kind", "package", "scene", "role"}:
+            raise NpcCardError("invalid_provenance", "scene_encounter")
+        validated["package"] = _check_id_str(provenance.get("package"), "package")
+        validated["scene"] = _check_id_str(provenance.get("scene"), "scene")
+        validated["role"] = _check_id_str(provenance.get("role"), "role")
+
+    elif kind == "accepted_stage":
+        if set(provenance.keys()) != {"kind", "quest", "stage", "role"}:
+            raise NpcCardError("invalid_provenance", "accepted_stage")
+        validated["quest"] = _check_id_str(provenance.get("quest"), "quest")
+        validated["stage"] = _check_int(provenance.get("stage"), "stage")
+        validated["role"] = _check_id_str(provenance.get("role"), "role")
 
     return validated

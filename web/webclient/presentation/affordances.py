@@ -29,7 +29,10 @@ from web.webclient.actions.exploration_actions import (
     validate_wait_payload,
 )
 from web.webclient.actions.node_ids import node_id_for_location
-from world.rules.dialogue import DIALOGUE_TABLE, dialogue_key_for, is_dialogue_host
+from world.rules.dialogue import (
+    dialogue_topic_keywords,
+    is_dialogue_host,
+)
 from world.rules.npc_schedules import interaction_reason
 from world.rules.party import is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
@@ -280,10 +283,14 @@ def _present_npc(actor: Any, npc_id: int) -> Any | None:
 
 
 def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
-    """One ``explore.talk_scripted`` entry per authored keyword of a host."""
-    dialogue_key = dialogue_key_for(npc)
-    definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
-    if definition is None:
+    """One ``explore.talk_scripted`` entry per current topic of a host.
+
+    The topics come from the shared authored/generated resolver, so a generated
+    role's current permitted phase exposes the same keyword identities as an
+    authored table row.
+    """
+    keywords = dialogue_topic_keywords(npc)
+    if not keywords:
         return []
     npc_id = int(npc.pk)
     entries: list[AffordanceView] = []
@@ -295,14 +302,14 @@ def _scripted_entries(npc: Any, *, actor: Any = None) -> list[AffordanceView]:
     possessed = actor is not None and is_possessed_actor(actor)
     disabled_reason = (REASON_POSSESSED_TALK, POSSESSED_REFUSAL_MESSAGES[REASON_POSSESSED_TALK]) if possessed else None
 
-    for response in definition.responses[:MAX_SCRIPTED_KEYWORDS]:
+    for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]:
         params = validate_talk_scripted_payload(
-            {"npc_id": npc_id, "keyword_id": response.keyword}
+            {"npc_id": npc_id, "keyword_id": keyword}
         )
         entries.append(
             AffordanceView(
                 action_id="explore.talk_scripted",
-                label=_bounded_label(response.keyword),
+                label=_bounded_label(keyword),
                 params=params,
                 freeform=False,
                 navigation=False,
@@ -318,15 +325,13 @@ def _scripted_keyword_descriptors(npc: Any) -> list[dict[str, str]]:
 
     The keyword pool is a version-1 panel serialization detail: the panel's
     nested ``keywords`` list is bounded by ``MAX_SCRIPTED_KEYWORDS``
-    independently of the vocabulary's per-target affordance budget.
+    independently of the vocabulary's per-target affordance budget. It is read
+    from the same shared resolver as the affordances and the ``talk`` paths.
     """
-    dialogue_key = dialogue_key_for(npc)
-    definition = DIALOGUE_TABLE.get(dialogue_key) if dialogue_key is not None else None
-    if definition is None:
-        return []
+    keywords = dialogue_topic_keywords(npc)
     return [
-        {"keyword_id": response.keyword, "label": response.keyword}
-        for response in definition.responses[:MAX_SCRIPTED_KEYWORDS]
+        {"keyword_id": keyword, "label": keyword}
+        for keyword in keywords[:MAX_SCRIPTED_KEYWORDS]
     ]
 
 

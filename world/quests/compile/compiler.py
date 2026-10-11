@@ -11,6 +11,7 @@ package), and reads the same lore registries the guardrail validators read,
 so the two sides cannot drift.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
 from world.lore.guild import GUILD_BRANCH_REGISTRY, GUILD_RANK_REGISTRY
@@ -65,6 +66,8 @@ def _validate_scene_bound_rules(
     location: RoomLocator | None,
     objective: QuestObjective,
     npc_reqs: tuple[tuple[str, str, str | None], ...],
+    *,
+    package_roles: frozenset[str] = frozenset(),
 ) -> None:
     """Enforce the shared scene-bound rules the guardrail also checks (D5).
 
@@ -77,6 +80,15 @@ def _validate_scene_bound_rules(
     leave the quest structurally uncompletable. A bound-target DEFEAT must
     declare a quantity no greater than its ``npc_req`` count so the objective
     is always satisfiable by defeating the bound targets.
+
+    The instance-only rule has exactly one bounded exception (design §5.1):
+    ``package_roles`` is a *published package's own* validated role set, never a
+    caller flag. It lifts the rule only when every declared occupant role is one
+    of those package-owned roles AND the objective needs no stage binding -- a
+    bound-target DEFEAT can only bind an instance room, so at a permanent
+    destination it would be left uncompletable. A standalone payload (the
+    direct compile path) passes no ``package_roles`` and keeps the blanket
+    rejection unchanged, and ESCORT stays refused on both paths.
     """
     if objective.kind is ObjectiveKind.ESCORT:
         _reject(
@@ -84,12 +96,21 @@ def _validate_scene_bound_rules(
             "published until a protected-entity binding flow exists"
         )
     has_occupants = bool(npc_reqs)
+    roles = {entry[0] for entry in npc_reqs}
+    package_owned = (
+        bool(package_roles) and bool(roles) and roles.issubset(package_roles)
+    )
+    # Derived from the objective's own binding requirement, so a future
+    # bound-target objective kind cannot slip through the exception.
+    needs_stage_binding = objective.requires_bound_targets
     if has_occupants and not (
         location is not None and location.kind is DestinationKind.BOUND_INSTANCE
-    ):
+    ) and not (package_owned and not needs_stage_binding):
         _reject(
             f"stage {stage_index} declares NPC requirements outside an "
-            "instance-layer destination; occupant-bearing scenes must be instances"
+            "instance-layer destination; occupant-bearing scenes must be instances "
+            "unless every occupant role is a validated package role on an "
+            "objective that needs no stage binding"
         )
     if (
         objective.kind is ObjectiveKind.DEFEAT
@@ -102,8 +123,30 @@ def _validate_scene_bound_rules(
         )
 
 
-def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
-    """Re-validate a validated proposal payload and map it onto the runtime type.
+@dataclass(frozen=True)
+class CompiledBlueprintCore:
+    """The issuer-independent part of a compiled proposal.
+
+    The definition, the reward, the per-stage spawn requirements, and the rank
+    are shared by the strict direct compile path (which resolves one concrete
+    issuance) and the scene-package path (whose issuance may stay a validated
+    symbolic role declaration until activation). Splitting them here keeps one
+    definition/stage compiler rather than growing a second one.
+    """
+
+    definition: QuestDefinition
+    reward: QuestReward
+    stage_requirements: tuple[StageSpawnRequirement, ...]
+    rank: str
+    issuer: Any
+
+
+def compile_blueprint_core(
+    validated_payload: Any,
+    *,
+    package_roles: frozenset[str] = frozenset(),
+) -> CompiledBlueprintCore:
+    """Re-validate a validated proposal payload into its issuer-independent core.
 
     Accepts the JSON-safe mapping produced by the proposal's ``to_payload()``
     contract (never a proposal object). Every constraint the guardrail semantic
@@ -112,6 +155,11 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
     is re-checked here against the same ``world.lore`` registries, plus the
     runtime's own definition rules, and ``QuestCompileError`` names the failing
     field before any mutation.
+
+    ``package_roles`` is the published package's own validated role set when the
+    caller is the scene-package boundary; it enables the single bounded
+    permanent-occupant exception documented on
+    :func:`_validate_scene_bound_rules` and is never a free-form caller flag.
     """
     payload = _require_mapping(validated_payload, "payload")
 
@@ -148,7 +196,6 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
         _reject(f"unknown quest rank {rank!r}")
 
     reward = _validate_reward(rank, payload.get("reward"))
-    descriptor = _compile_issuance(payload.get("issuer"), reward)
 
     stages_payload = payload.get("stages")
     if not isinstance(stages_payload, list) or not stages_payload:
@@ -212,7 +259,9 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
             location,
             bool(npc_reqs),
         )
-        _validate_scene_bound_rules(position, location, objective, npc_reqs)
+        _validate_scene_bound_rules(
+            position, location, objective, npc_reqs, package_roles=package_roles
+        )
         quest_stages.append(QuestStage(index=index, objective=objective))
         stage_requirements.append(
             StageSpawnRequirement(
@@ -278,11 +327,30 @@ def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
     except QuestDefinitionError as error:
         raise QuestCompileError(str(error)) from error
 
-    return CompiledQuest(
+    return CompiledBlueprintCore(
         definition=definition,
         reward=reward,
-        issuance=descriptor,
         stage_requirements=tuple(stage_requirements),
+        rank=rank,
+        issuer=payload.get("issuer"),
+    )
+
+
+def compile_quest_blueprint(validated_payload: Any) -> CompiledQuest:
+    """Re-validate a validated proposal payload and map it onto the runtime type.
+
+    The strict direct path: the issuer-independent core is compiled and the
+    declared issuer is resolved to exactly one concrete issuance. A
+    character-namespaced key must name a carrier authorized to issue today, so
+    this path never publishes a merely planned symbolic commission.
+    """
+    core = compile_blueprint_core(validated_payload)
+    descriptor = _compile_issuance(core.issuer, core.reward)
+    return CompiledQuest(
+        definition=core.definition,
+        reward=core.reward,
+        issuance=descriptor,
+        stage_requirements=core.stage_requirements,
     )
 
 

@@ -22,8 +22,14 @@ from dataclasses import replace
 from unittest.mock import Mock, patch
 
 from django.db import transaction
+from evennia.objects.models import ObjectDB
+from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from typeclasses.characters import PlayerCharacter
+from typeclasses.rooms import AnchorRoom
+from world.quests.encounter_activation import activate_scene_encounter
+from world.quests.encounters import publish_scene_package
 from world.quests.runtime import (
     QuestState,
     abandon_quest,
@@ -36,7 +42,16 @@ from world.quests.transitions import (
     pending_effects_for_transition,
 )
 
-from ._fixtures import TEST_ISSUER_KEY, QuestRegistryIsolation, accept, quest, register
+from ._compile_helpers import _anchor_key
+from ._fixtures import (
+    TEST_ISSUER_KEY,
+    QuestRegistryIsolation,
+    RegistryIsolationMixin,
+    accept,
+    quest,
+    register,
+)
+from ._scene_package_fixtures import package as _scene_package
 
 from tools.spec_traceability import covers_requirement
 
@@ -305,3 +320,82 @@ class RestoreFailureEventTests(unittest.TestCase):
         self.assertIn("entity", kwargs["context"])
         # The swallow keeps its best-effort degradation.
         entity.attributes.reset_cache.assert_called_once()
+
+
+class SceneOperationEventTests(RegistryIsolationMixin, EvenniaTest):
+    """Publication, activation and unavailability emit owned scene traces.
+
+    ``quest-scene-encounters`` requires stable English operation events for
+    publication, activation and failures, carrying the available business
+    identities and naming the failure reason without prose or credentials in
+    the identifier.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="場景觀測者")
+        self.room = create_object(AnchorRoom, key="場景觀測南門")
+        self.room.db.anchor_key = _anchor_key()
+
+    def _events(self, logger):
+        return [
+            (call.args[0], call.kwargs["context"])
+            for call in logger.call_args_list
+            if call.args
+        ]
+
+    @covers_requirement(
+        "quest-scene-encounters::scene-lifecycle-boundaries-emit-owned-operation-traces"
+    )
+    def test_publication_and_activation_emit_their_available_identities(self):
+        with patch("world.quests.encounters.log_info") as published:
+            package = publish_scene_package(_scene_package(), owner="observer", tick=4)
+        events = self._events(published)
+        self.assertEqual([event for event, _ in events], ["scene_package_published"])
+        self.assertEqual(events[0][1]["package"], package.package_id)
+        self.assertEqual(events[0][1]["owner"], "observer")
+
+        with patch("world.quests.encounter_activation.log_info") as activated:
+            result = activate_scene_encounter(
+                self.player, package.package_id, "south_gate", room=self.room, tick=5
+            )
+        self.assertTrue(result.activated)
+        events = self._events(activated)
+        self.assertEqual([event for event, _ in events], ["scene_encounter_activated"])
+        context = events[0][1]
+        self.assertEqual(context["package"], package.package_id)
+        self.assertEqual(context["scene"], "south_gate")
+        self.assertEqual(context["char"], str(self.player.pk))
+        self.assertEqual(context["room"], str(self.room.pk))
+        self.assertEqual(context["tick"], "5")
+        self.assertEqual(context["roles"], "daughter")
+
+    @covers_requirement(
+        "quest-scene-encounters::scene-lifecycle-boundaries-emit-owned-operation-traces"
+    )
+    def test_a_failed_activation_names_its_reason_without_prose(self):
+        package = publish_scene_package(_scene_package(), owner="observer")
+        first = activate_scene_encounter(
+            self.player, package.package_id, "south_gate", room=self.room, tick=5
+        )
+        ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first().delete()
+
+        with patch("world.quests.encounter_activation.log_warn") as warned:
+            result = activate_scene_encounter(
+                self.player, package.package_id, "south_gate", room=self.room, tick=6
+            )
+
+        self.assertFalse(result.activated)
+        self.assertEqual(result.reason, "actor_missing")
+        events = self._events(warned)
+        self.assertEqual([event for event, _ in events], ["scene_encounter_unavailable"])
+        event_id, context = events[0]
+        # The identifier is a stable ASCII token: never player prose, a
+        # credential, or the localized reason text.
+        self.assertTrue(event_id.isascii())
+        self.assertNotIn(" ", event_id)
+        self.assertEqual(context["package"], package.package_id)
+        self.assertEqual(context["scene"], "south_gate")
+        self.assertEqual(context["char"], str(self.player.pk))
+        self.assertEqual(context["reason"], "actor_missing")
+        self.assertEqual(context["tick"], "6")

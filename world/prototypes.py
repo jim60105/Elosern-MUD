@@ -74,3 +74,13 @@ SCENE_MONSTER = {
     "prototype_key": "scene_monster",
     "desc": "A scene monster (scene-builder).",
 }
+
+# The conversable generated-role path (quest-scene-encounters): a validated
+# named role that speaks through the scripted-dialogue capability and the
+# free-form LLM seam. It is whitelisted exactly like ``scene_npc`` so unrelated
+# monsters and non-conversable prototypes are never globally converted.
+SCENE_LLM_NPC = {
+    "typeclass": "typeclasses.npcs.LLMNPC",
+    "prototype_key": "scene_llm_npc",
+    "desc": "A conversable generated scene role (quest-scene-encounters).",
+}

@@ -260,7 +260,6 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 - **WHEN** the extracted intent is `reveal_lore` with an unknown category or an unresolvable key
 - **THEN** the intent is discarded, the speech is preserved, and no codex record changes
 
-
 #### Scenario: Counter intent below merit finds absent host attendance
 - **WHEN** validated local counter intent asks exact-next rank for a below-threshold member with absent host
 - **THEN** schedule information is returned without changing resources, exam state or affinity, and speech is retained
@@ -304,7 +303,15 @@ The `npc_dialogue` output contract SHALL restrict `intent.kind` to exactly the e
 
 ### Requirement: NPC dialogue degrades to greeting or silence offline
 
-When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `generate_npc_reply` SHALL resolve to `None`, and the caller SHALL render that as the NPC's authored greeting when one is available, or as silence when it is not; the game SHALL remain fully playable with the LLM entirely offline, and no dialogue call SHALL change state or open a network connection.
+Disabled, unreachable, or exhausted generative dialogue SHALL return its existing degraded marker without unintended game mutations. Authored hosts SHALL retain literal per-instance greeting override, table greeting, profile greeting, then silence precedence. Generated hosts SHALL answer from their current permitted phase through the shared resolver. Offline play SHALL keep fixed greetings, scripted topics and authorized deterministic commission interactions available without network calls.
+
+#### Scenario: Generated conversation remains playable offline
+- **WHEN** profiles are disabled and a generated conversational role is opened or addressed
+- **THEN** fixed greeting/topics and current phase offline response remain available without a network request
+
+#### Scenario: Authored fallback precedence is preserved
+- **WHEN** an authored NPC has an override, table, and profile greeting, or has none of them
+- **THEN** the override renders literally first, subsequent defaults retain their order, and no available greeting yields silence
 
 #### Scenario: Offline dialogue falls back to the authored greeting
 - **WHEN** the LLM is offline and the NPC has an authored greeting
@@ -386,19 +393,27 @@ When the `npc_dialogue` layer is disabled, unreachable, or retry-exhausted, `gen
 
 ### Requirement: Async dialogue intents revalidate context at completion
 
-When an async NPC exchange completes, the system SHALL revalidate that the player and the NPC are still co-located and that the NPC is still interactable before applying the reply's intent; a stale completion SHALL display the speech but discard the intent with a clear message.
+Async exchanges SHALL revalidate co-location and interactability before applying intents. For separated context with an unchanged revision, existing speech-kept/intent-discarded behavior SHALL remain. Every generated-phase exchange SHALL capture its current phase revision; a revision mismatch SHALL supersede speech-kept behavior and reject speech, intent, and dialogue/memory append together, refreshing the current phase. Stale-persona rejection SHALL remain independent and unchanged.
+
+#### Scenario: Presence-only invalidation preserves existing behavior
+- **WHEN** the actor leaves during an exchange whose source phase revision is unchanged
+- **THEN** speech follows existing separated-context handling and no intent is applied
+
+#### Scenario: Phase revision rejects the entire obsolete exchange
+- **WHEN** a generated role's phase changes while a reply is pending
+- **THEN** settlement delivers no speech, applies no intent, appends no obsolete exchange or memory, and refreshes current phase content
 
 #### Scenario: Intent is dropped after separation
-- **WHEN** an async reply completes after the player or NPC left the room
-- **THEN** the speech is shown and no intent (give/take item, adjust relation, reveal lore) is applied
+- **WHEN** an async reply completes after separation and its captured phase revision remains current
+- **THEN** speech follows existing handling and no intent is applied; a phase mismatch instead rejects the entire exchange
 
 #### Scenario: Intent is dropped when the NPC becomes busy
-- **WHEN** an async reply completes after the NPC entered a `busy`/`resting` schedule state
-- **THEN** the speech is shown and no intent is applied
+- **WHEN** an async reply completes after the NPC becomes busy/resting and its captured phase revision remains current
+- **THEN** speech follows existing handling and no intent is applied; a phase mismatch instead rejects the entire exchange
 
 #### Scenario: Co-located interactive completion applies the intent
-- **WHEN** an async reply completes while both parties remain co-located and the NPC is interactable
-- **THEN** the intent applies through its existing per-kind validation
+- **WHEN** an async reply completes with both parties co-located, the NPC interactable and captured phase revision current
+- **THEN** its intent applies through existing per-kind validation and generated commission scope checks
 
 ### Requirement: The generative dialogue layer preserves the transport and single-writer boundaries
 
@@ -471,3 +486,11 @@ NPC generation SHALL receive owner-permitted cognition and a durable player/NPC 
 #### Scenario: Unrelated question does not force recall
 - **WHEN** the same owner asks about an unrelated topic
 - **THEN** the protection episode is absent from recalled context
+
+### Requirement: Generated free-form dialogue includes only permitted current phase context
+
+Generated prompts SHALL combine baseline persona, permitted current-phase context, owner-permitted memories and append-only pair history under existing budgets. Phase revision SHALL participate in freshness without replacing persona/history or granting private knowledge. Speech SHALL confer no committed outcome; free-form effects SHALL share scripted topic authorization.
+
+#### Scenario: Phase context changes without persona or memory replacement
+- **WHEN** a role's supported committed observation selects a new phase and a new prompt is captured
+- **THEN** its current permitted situation changes, its baseline persona and prior turns remain, and another owner's hidden facts stay absent

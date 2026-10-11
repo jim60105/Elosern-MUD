@@ -39,6 +39,7 @@ from world.rules.guild_offers import (
 from world.rules.quest_issuance import (
     QUEST_ISSUANCE_REGISTRY,
     QuestIssuance,
+    Settlement,
     parse_issuer_key,
     register_quest_issuance,
 )
@@ -214,3 +215,66 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
                 definition.key, compiled.issuance.issuer_key
             )
         raise
+
+
+def publish_definition_views(
+    definition: QuestDefinition,
+    requirements: tuple[StageSpawnRequirement, ...],
+) -> None:
+    """Publish one package's compiled definition and spawn requirements only.
+
+    The package boundary's publication step (design §5.1): a validated package
+    makes its definition and per-stage spawn requirements resolvable through the
+    existing runtime views, while its commission declaration stays symbolic and
+    unregistered. No issuance is written here, so publication can never
+    fabricate private-commission authority for an actor that does not exist yet
+    (the strict direct path keeps resolving its concrete issuance through
+    ``_publish_registration``). Preflight rejects conflicting content before any
+    write and a defensive post-preflight failure rolls every entry back, so a
+    generated definition is never left registered without its requirements.
+    """
+    definition_current = QUEST_DEFINITION_REGISTRY.get(definition.key)
+    requirement_current = SCENE_REQUIREMENT_REGISTRY.get(definition.key)
+    if definition_current is not None and definition_current != definition:
+        _reject(f"conflicting definition already registered under {definition.key!r}")
+    if requirement_current is not None and requirement_current != requirements:
+        _reject(
+            f"conflicting spawn requirements already registered under "
+            f"{definition.key!r}"
+        )
+    definition_added = definition_current is None
+    requirement_added = requirement_current is None
+    try:
+        register_quest_definition(definition)
+        SCENE_REQUIREMENT_REGISTRY[definition.key] = requirements
+    except Exception:
+        if definition_added:
+            QUEST_DEFINITION_REGISTRY.pop(definition.key, None)
+        if requirement_added:
+            SCENE_REQUIREMENT_REGISTRY.pop(definition.key, None)
+        raise
+
+
+def publish_activated_commission(
+    definition_key: str,
+    issuer_key: str,
+    reward: QuestReward,
+    settlement: Settlement,
+) -> None:
+    """Register one activated package commission under its exact actual key.
+
+    Called by the encounter boundary after the rules-owned issuer provisioning
+    has made ``issuer_key`` resolve to the exact bound actor. The definition and
+    requirements are already registered by ``publish_definition_views`` at
+    publication, so this writes only the private issuance through its sole
+    writer; ``QuestIssuance``'s constructor enforces the namespace, zero-merit
+    and known-definition rules exactly as the direct path does.
+    """
+    register_quest_issuance(
+        QuestIssuance(
+            definition_key=definition_key,
+            issuer_key=issuer_key,
+            reward=reward,
+            settlement=settlement,
+        )
+    )
