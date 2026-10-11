@@ -238,3 +238,9 @@
 - id: rock_echo_stagger_agility_flat
   when: {buff_active: rock_echo_stagger}
   then: {agility_flat: -3}
+
+# 魔物資源技能（remaining-monster-resource-skills §8）：霧鬃山貓鬃風佯撲的命中干擾，
+# buff 列為 mount，−5 資料在此（grain_rattle_accuracy / earth_dust_veil 的 accuracy 先例）。
+- id: mane_misdirection_accuracy
+  when: {buff_active: mane_misdirection}
+  then: {accuracy: -5}

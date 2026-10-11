@@ -392,3 +392,9 @@
 - code: rock_echo_stagger_agility_flat
   label: 岩響角撞敏捷下降
   severity: harmful
+- code: mane_misdirection
+  label: 鬃風佯撲
+  severity: harmful
+- code: mane_misdirection_accuracy
+  label: 鬃風佯撲命中下降
+  severity: harmful

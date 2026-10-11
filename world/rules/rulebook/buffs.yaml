@@ -496,3 +496,12 @@
   stacking: refresh
   polarity: debuff
   modifiers: {}
+
+# 魔物資源技能（remaining-monster-resource-skills §8）：霧鬃山貓鬃風佯撲的命中干擾，
+# buff 列為 mount，accuracy −5 資料在 combat_modifiers.yaml 的
+# mane_misdirection_accuracy 列（grain_rattle_accuracy / earth_dust_veil 的 accuracy 先例）。
+- key: mane_misdirection
+  duration: 15
+  stacking: refresh
+  polarity: debuff
+  modifiers: {}
