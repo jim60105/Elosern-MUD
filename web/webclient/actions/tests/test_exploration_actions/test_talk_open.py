@@ -62,7 +62,7 @@ class TalkOpenAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.location = self.room1
         self.destination = create_object(Room, key="目的地", location=None)
 
-    def _scripted_host(self, key: str = "客棧老板娘", dialogue_key: str = _T_DIALOGUE) -> NPC:
+    def _scripted_host(self, key: str = "客棧老闆娘", dialogue_key: str = _T_DIALOGUE) -> NPC:
         host = create_object(NPC, key=key, location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=dialogue_key))
         return host

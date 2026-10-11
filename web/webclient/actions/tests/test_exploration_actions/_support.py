@@ -107,7 +107,7 @@ def _live(module: str, attribute: str):
 #: The kit lodgekeeper table's authored keyword/response fragments.
 _T_LODGE_KEYWORD = "住宿"
 _T_LODGE_LINE = "雲杉驛站一晚十八銅"
-_T_LODGE_GREETING = "櫃檯後的老板娘"
+_T_LODGE_GREETING = "櫃檯後的老闆娘"
 
 #: A staff-shaped authored table keyed by the PRODUCTION guild-staff key
 #: (imported constant, not a literal): the turnin special case keys off that

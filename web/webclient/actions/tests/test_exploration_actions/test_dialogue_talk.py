@@ -138,7 +138,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
     # ------------------------------------------------------------------
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_scripted_host_answers_with_the_authored_line(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": _T_LODGE_KEYWORD}
@@ -148,7 +148,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     def test_scripted_host_no_state_answer(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "補貨"}
@@ -185,7 +185,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     def test_unregistered_keyword_rejects_without_writing(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         result = _talk_scripted_adapter(
             self.player, {"npc_id": int(host.pk), "keyword_id": "不存在的話題"}
@@ -196,7 +196,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-scripted-invokes-the-deterministic-dialogue-api-with-keyword-buttons")
     def test_no_longer_present_npc_rejects_before_any_dialogue_api(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.location = create_object(Room, key="別處", location=None)
         with patch(
@@ -220,7 +220,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
 
     def test_talk_response_failure_and_silence_are_rejected(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         with patch(
             "web.webclient.actions.exploration_actions.run_scripted_talk",
@@ -277,7 +277,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-exploration-menu::explore-talk-freeform-runs-the-guarded-dialogue-seam-through-an-injected-client")
     def test_freeform_offline_degrade_yields_greeting_and_no_client_call(self):
-        npc = create_object(LLMNPC, key="客棧老板娘", location=self.room1)
+        npc = create_object(LLMNPC, key="客棧老闆娘", location=self.room1)
         npc.components.add(ScriptedDialogue.create(npc, dialogue_key=_T_DIALOGUE))
         client = FakeLLMClient()
         with override_settings(LLM_PROFILES=_raw(npc_dialogue={"enabled": False})):
@@ -432,7 +432,7 @@ class ExplorationActionAdapterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("npc-schedule-runtime::schedule-state-gates-npc-directed-interactions-at-every-host-resolving-surface")
     def test_busy_host_rejects_scripted_talk_without_a_transaction(self):
-        host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         host.components.add(ScriptedDialogue.create(host, dialogue_key=_T_DIALOGUE))
         host.db.schedule_state = "busy"
         with patch(

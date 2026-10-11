@@ -67,7 +67,7 @@ class DialogueLeaveAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.race = "human"
         self.player.apply_race_baseline()
         self.player.location = self.room1
-        self.host = create_object(NPC, key="客棧老板娘", location=self.room1)
+        self.host = create_object(NPC, key="客棧老闆娘", location=self.room1)
         self.host.components.add(
             ScriptedDialogue.create(self.host, dialogue_key=_T_DIALOGUE)
         )
