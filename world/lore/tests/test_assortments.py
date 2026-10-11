@@ -108,6 +108,14 @@ class AssortmentRegistryTests(unittest.TestCase):
         # and the policy come from the registries, so the next good added to
         # a shelf either satisfies its purpose or fails load -- no approved
         # item list decides this.
+        # This is where the sample-city-altoria requirement's merchandise
+        # scenarios now live: "Specialist shops do not narrow what the capital
+        # sells", "The accessory-slot partition ... follows explicit
+        # registry-owned shop-purpose and eligible-slot declarations", "An
+        # omitted accessory good is a gap; a non-accessory good is a leak" and
+        # "The partition is stated as a set equality, not a hand-listed
+        # inventory" (the grid/interior half of that requirement keeps its
+        # assertions in world/maps/tests/test_service_interiors.py).
         for definition in ASSORTMENT_REGISTRY.values():
             for item_key in definition.item_keys:
                 with self.subTest(assortment=definition.key, item=item_key):

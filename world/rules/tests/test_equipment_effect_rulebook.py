@@ -1043,6 +1043,29 @@ class ChurchDoctrineTests(unittest.TestCase):
             validate_church_doctrine(registry, broken)
         self.assertIn("t_synth_vestment", str(caught.exception))
 
+    @covers_requirement(
+        "equipment-effects::church-of-light-equipment-obeys-its-canon-doctrine"
+    )
+    def test_a_role_without_a_loaded_entry_is_refused(self):
+        # Defence in depth: the loader's bijection already guarantees every
+        # roled equipment item has an entry, so this branch is only reachable
+        # by a direct call -- and it still fails closed by name.
+        registry = {
+            item_key: definition
+            for item_key, definition in ITEM_REGISTRY.items()
+            if definition.equipment_slot is not None
+        }
+        rules = {
+            key: rule
+            for key, rule in EQUIPMENT_EFFECT_RULES.items()
+            if key is not EquipmentModifierKey.SISTER_VESTMENTS
+        }
+        with self.assertRaises(EquipmentEffectsRulebookError) as caught:
+            validate_church_doctrine(registry, rules)
+        message = str(caught.exception)
+        self.assertIn("sister_vestments", message)
+        self.assertIn("no loaded effect entry", message)
+
 
 class ShippedAdjustmentProseContractTests(unittest.TestCase):
     """The shipped roster's authored prose renders exactly as composed.

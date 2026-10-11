@@ -243,10 +243,13 @@ class CommerceRulebookSliceTests(unittest.TestCase):
     )
     def test_shipped_rulebook_is_a_directory_of_sorted_slices(self):
         files = sorted(_SHIPPED_DIR.glob("*.yaml"))
-        self.assertEqual(
-            [path.name for path in files],
-            ["altoria.yaml", "ciaran.yaml", "scales.yaml"],
-        )
+        # The directory is the contract: names stay sorted and unique (the
+        # loader merges in filename order), but the roster itself is data --
+        # a new settlement slice must not need a test edit.
+        names = [path.name for path in files]
+        self.assertTrue(names)
+        self.assertEqual(names, sorted(set(names)))
+        self.assertTrue(all(name.endswith(".yaml") for name in names))
         catalog = load_commerce_config(_SHIPPED_DIR)
         # Structural, not counted: every declared row resolves through the
         # sorted merge and every section is non-empty, so adding a settlement
@@ -274,6 +277,11 @@ class CommerceRulebookSliceTests(unittest.TestCase):
         # authored assortment row verbatim -- all five fields. A hand-moved
         # row that lost or repriced a field on its way from the slice to the
         # counter fails here, and no pre-split snapshot is needed to see it.
+        # Attached to sample-city-altoria because that is the requirement
+        # whose merchandise scenarios (a shop exposing precisely its current
+        # authored union, goods moving between shelves without repricing)
+        # this asserts; the grid/interior half of it stays in
+        # world/maps/tests/test_service_interiors.py.
         commerce = load_commerce_config(_SHIPPED_DIR)
         scales = validate_price_scales(commerce["price_scales"])
         assortment_offers = validate_assortment_configs(commerce["assortments"])

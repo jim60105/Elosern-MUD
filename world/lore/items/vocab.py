@@ -83,21 +83,6 @@ class LiturgicalRole(StrEnum):
     SANCTUARY_DEVICE = "sanctuary_device"
 
 
-class LiturgicalRole(StrEnum):
-    """Closed Church-of-Light liturgical-role vocabulary.
-
-    A role is immutable item lore belonging to the equipment record itself,
-    never to its effect entry: a rulebook edit may tune magnitudes but can
-    never move an item between doctrine sub-sets or borrow another role's
-    exemption (``church-of-light-equipment-obeys-its-canon-doctrine``). An
-    item declaring a role must be equipment, so the role always has a worn
-    identity to validate against.
-    """
-
-    VESTMENT_OR_EMBLEM = "vestment_or_emblem"
-    SANCTUARY_DEVICE = "sanctuary_device"
-
-
 class EquipmentModifierKey(StrEnum):
     """Closed vocabulary of equipment-effect modifier keys.
 

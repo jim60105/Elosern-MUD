@@ -308,6 +308,7 @@ class ShopTradeTests(ShopRegistryIsolation, EvenniaCommandTestMixin, EvenniaTest
                     list(self.player.db.quest_log or []),
                     dict(parse_merchant_stock(self.merchant)),
                     self.merchant_npc.relations.has_record(self.player),
+                    self.merchant_npc.relations.affinity_for(self.player),
                 )
 
             before = snapshot()

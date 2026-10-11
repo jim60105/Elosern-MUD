@@ -415,7 +415,15 @@ def _resolve_shop_offers(
     # the same hidden listing the assortment check exists to stop, and
     # ``offered`` is exactly the resolved key set all three routes produce.
     for item_key in sorted(offered):
-        if ITEM_REGISTRY[item_key].price_table_key == KEEPSAKE_BAND_KEY:
+        # ``offered`` is registry-validated on every shipping path, but a
+        # caller may hand this function its own offer mapping, so the gate
+        # stays in this module's error family instead of raising KeyError.
+        definition = ITEM_REGISTRY.get(item_key)
+        if definition is None:
+            raise _commerce_error(
+                f"{what} resolves {item_key!r} which is not a registered item"
+            )
+        if definition.price_table_key == KEEPSAKE_BAND_KEY:
             raise _commerce_error(
                 f"{what} resolves keepsake-band item {item_key!r}: the "
                 f"{KEEPSAKE_BAND_KEY!r} band is never traded on any shelf route"
