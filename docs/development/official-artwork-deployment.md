@@ -36,6 +36,9 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   must be present (the game resolves that path, not the directory's default or
   manifest choice). It is optional: without it the dream stage renders its
   prose on the flat background instead of an illustration.
+  The dream scene fills the viewport below the navigation header, covering
+  the underlying game's bottom controls rather than reserving the drawer
+  workspace's bottom inset.
 - A content directory MAY carry a `manifest.json` with an optional `default`
   filename, a `face_rect`, and a `stage` placement. Without a valid explicit
   default, the first image in deterministic filename order is used; a missing

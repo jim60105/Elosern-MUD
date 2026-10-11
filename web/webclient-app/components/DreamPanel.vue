@@ -544,7 +544,8 @@ function onKeydown(event) {
   --dream-band-w: 66.667%;
   --dream-glass: linear-gradient(180deg, rgba(16, 18, 22, 0.86), rgba(11, 13, 16, 0.93));
   --dream-halo: 0 calc(10px * var(--ui-scale)) calc(36px * var(--ui-scale)) calc(-14px * var(--ui-scale)) rgba(255, 250, 238, 0.6);
-  position: fixed; isolation: isolate; inset: var(--header-h) 0 var(--workspace-bottom); z-index: var(--z-surface-modal);
+  /* The dream replaces the stage, including its bottom control strip. */
+  position: fixed; isolation: isolate; inset: var(--header-h) 0 0; z-index: var(--z-surface-modal);
   overflow: hidden; background: #dcdcda; color: var(--paper-100); font-family: var(--f-sans);
 }
 .dream-scene:focus { box-shadow: none; outline: none; }

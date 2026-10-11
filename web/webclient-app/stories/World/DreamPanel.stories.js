@@ -88,7 +88,7 @@ const render = (args) => ({
       note.value = "已發布合成六次上限，自由文字關閉，離開操作仍可使用。";
     }
     function reset() { Object.assign(state, fixture()); intent.value = null; note.value = "已重新發布初始零秒睡眠夢境。"; }
-    return () => h("main", { style: "--workspace-bottom: 16px; color: var(--paper-100);" }, [
+    return () => h("main", { style: "color: var(--paper-100);" }, [
       h(DreamPanel, { state, store }, { storyTools: () => [
       h("details", { style: "font-family: var(--f-sans); font-size: var(--text-sm); color: var(--paper-500);" }, [
       h("summary", "分鏡測試工具（僅供展示）"),
