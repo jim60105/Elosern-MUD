@@ -57,7 +57,7 @@ These were settled during design. Do not relitigate them inside a change.
 | D12 | **Guild advancement requires cumulative merit plus a nonlethal combat examination; shops use finite stock and clock-driven restocking.** Every registrant starts at F, regardless of displayed power. | Preserves the world's stated merit-plus-exam progression, gives Phase 4 a real combat milestone, and makes the reserved caravan/shop clock stages meaningful. |
 | D13 | **The browser WebClient is the first-class graphical client; Telnet remains fully playable as text.** | The project already uses Evennia's WebSocket extension points; the view layer is a Vue 3 SPA (Vite + Pinia) on the same Evennia extension points. A second Mudlet/Lua UI would duplicate distribution and compatibility work. |
 | D14 | **Finite ordinary player choices use server-authored, versioned OOB menus.** Free-form values remain text. | Players should not memorize skill, target, Exit, quest, or shop keys; the browser must not parse prose or duplicate rules to discover them. |
-| D15 | **Portrait art is a separate subject type.** Players and explicitly named NPCs have unique portraits; generic monsters share one by archetype. | Preserves D10's scene reuse while bounding portrait GPU/storage cost and giving important characters identity. |
+| D15 | **Portrait art is a separate subject type.** Players and explicitly named NPCs have unique portraits; reusable monster art is keyed by registered visual species, never threat tier; personal choices remain entity-local. | Preserves D10's scene reuse while bounding portrait GPU/storage cost, avoiding cross-species image leakage, and giving important characters identity. |
 | D16 | **The local minimap remembers visited nodes and may render coordinate-free Exit graphs.** Instance/interior rooms gain no invented coordinates, world-map membership, or pathfinding. | A truthful local navigation aid can cover every current room type without weakening the four-layer map model. |
 
 ---
@@ -869,7 +869,7 @@ a placeholder.
 > **Amended 2026-08-02 (approved Browser-First MUD WebClient Suite).** Scene behavior above remains
 > unchanged and D10 still forbids per-room scene images. The art queue additionally accepts portrait
 > subjects under a separate namespace: players and explicitly named NPCs have stable unique portrait
-> keys, while generic monsters share a portrait by bestiary archetype. Both canonical age attributes
+> keys, while reusable monster art is keyed by declared visual species (never threat tier), personal choices remain entity-local, and unresolvable/imageless monsters degrade to `monster_anon`. Both canonical age attributes
 > are validated (present, integer) before portrait enqueue. Scene and portrait jobs share the same
 > serialized external worker boundary.
 > Queue writes are owned by `world/art/service.py` and occur through startup synchronization, successful

@@ -21,7 +21,6 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from world.art.subjects import ArtSubjectError, character_subject_for
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.combat_session import is_in_active_session
 from world.rules.combat_view import MAX_DISPLAY_NAME_CODE_POINTS, combat_participants
@@ -117,19 +116,14 @@ def _role_for(entity: Any, *, party: frozenset[int] | None = None) -> str:
 def _classify_subject(entity: Any) -> str:
     """Classify one present entity's portrait subject decision.
 
-    Classification is explicit and registry-backed: a monster whose
-    ``threat_tier`` resolves in ``MONSTER_TIER_REGISTRY`` is a generic monster;
+    Classification is explicit: an entity of typeclass ``Monster`` is a monster;
     a character carrying an explicit named ``portrait_policy`` is a named
     character; anything else is ``none``. It is never inferred from display
     name, key shape, or LLM authorship.
-
-    ``monster`` here means the generic tier subject only. A species-backed
-    individual classifies the same way (its tier still resolves) and resolves
-    its species image identity separately, at the official content reference
-    layer — this classification never sees a species key.
     """
-    threat_tier = getattr(entity, "threat_tier", None)
-    if threat_tier in MONSTER_TIER_REGISTRY:
+    from typeclasses.monsters import Monster
+
+    if isinstance(entity, Monster):
         return SUBJECT_MONSTER
     try:
         subject = character_subject_for(entity)

@@ -32,7 +32,8 @@ from world.art import gallery_kinds
 from world.art.paths import resolved_under_store_root
 from world.art.sd_worker import prompt_digest
 from world.art.store import ArtAssetRecord, ArtAssetStatus, status_rank
-from world.art.subjects import ArtSubject, parse_subject
+from world.art.subjects import ArtSubject, ArtSubjectKind, parse_subject
+from world.lore.monster_visuals import is_registered_monster_visual_key
 from world.prompts.loader import PromptLibraryError
 
 # The single shared serialization lock for every scene and portrait operation.
@@ -288,6 +289,8 @@ def claim(limit: int) -> list[ArtAssetRecord]:
             for record in _all_records()
             if record.db.status == ArtAssetStatus.PENDING
         ]
+        # Filter out retired monster subjects that do not match registered visual species
+        pending = [r for r in pending if not (r.db.kind == ArtSubjectKind.MONSTER.value and not is_registered_monster_visual_key(r.db.subject_key))]
         pending.sort(key=lambda record: record.db.enqueued_at or 0.0)
         claimed = pending[: max(limit, 0)]
         now = time.time()
@@ -545,6 +548,9 @@ def settle_gallery_generated(
     with queue_lock:
         record = _record_by_db_key(job_key)
         if record is None or not is_gallery_job(record):
+            _remove_tmp(tmp_path)
+            return None
+        if record.db.kind == ArtSubjectKind.MONSTER.value and not is_registered_monster_visual_key(record.db.subject_key):
             _remove_tmp(tmp_path)
             return None
         if (

@@ -629,9 +629,9 @@ class SubjectKeyResolverTests(EvenniaTestCase):
         "art-gallery-model::one-public-read-only-seam-resolves-a-serialized-subject-key-to-subject-and-entity"
     )
     def test_a_registered_monster_tier_key_resolves_through_the_producer(self):
-        tier_key = sorted(SYNTH_MONSTER_TIERS)[0]
-        subject, entity = resolve_gallery_subject_by_key(f"portrait:monster:{tier_key}")
-        self.assertEqual(subject, monster_subject_for(tier_key))
+        visual_key = "goblin"
+        subject, entity = resolve_gallery_subject_by_key(f"portrait:monster:{visual_key}")
+        self.assertEqual(subject, monster_subject_for(visual_key))
         self.assertIsNone(entity)
 
     @covers_requirement(

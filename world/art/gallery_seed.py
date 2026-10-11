@@ -101,6 +101,7 @@ from world.art.no_follow import (
 )
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
+from world.lore.monster_visuals import is_registered_monster_visual_key
 from world.observability import log_info, log_warn
 
 # Event name (design §9): skip, per-entry diagnostic, and summary all share it
@@ -369,6 +370,11 @@ def _sync_subject(
     """Synchronize one ``<kind-dir>/<subject-key>/`` folder; never raises."""
     try:
         subject = ArtSubject(kind, subject_name)
+        if kind is ArtSubjectKind.MONSTER and not is_registered_monster_visual_key(subject_name):
+            diagnostics.emit(
+                "invalid_subject_key_skipped", kind=kind_directory, entry=subject_name
+            )
+            return
     except ArtSubjectError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
         diagnostics.emit(
             "invalid_subject_key_skipped", kind=kind_directory, entry=subject_name

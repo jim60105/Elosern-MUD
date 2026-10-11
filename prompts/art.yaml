@@ -7,7 +7,7 @@ prompts:
   # owns which sections exist and in which order they are composed.
   art.character_description: |-
     {race}, {age} years old.{appearance}{equipment}{custom}
-  art.monster_description: "{description} ({display_name}；例如：{examples})"
+  art.monster_description: "{description}"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the
   # surrounding text is authored per the image-prompt-builder-nl skill.

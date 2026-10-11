@@ -8,8 +8,6 @@ species/variant identity plus the approved bestiary narrative.
 
 from dataclasses import dataclass
 
-from world.art.fallback_keys import validate_fallback_key
-
 @dataclass(frozen=True)
 class MonsterStaticBand:
     """Independent monster axes; None is an open upper authoring bound."""
@@ -29,11 +27,6 @@ class MonsterTier:
     hp_band: tuple[int, int | None]
     example_monsters_zh: tuple[str, ...]
     description: str
-    # The OPTIONAL built-in gallery fallback key (gallery-builtin-fallbacks).
-    # A threat tier MAY claim one key of the closed vocabulary for its
-    # generic-monster subject; the unset default means the subject resolves
-    # ``monster_anon`` by rule. Validated at registry construction below.
-    fallback_key: str | None = None
 
 
 def _static_band(attack, agility, defense) -> MonsterStaticBand:
@@ -70,16 +63,3 @@ MONSTER_TIER_REGISTRY: dict[str, MonsterTier] = {
         "Open-ended legendary threats; 3000 HP and 150 physical stats are references.",
     ),
 }
-
-
-def _validate_monster_fallback_keys(registry: dict[str, MonsterTier]) -> None:
-    """Reject a declared fallback key outside the closed vocabulary.
-
-    Runs at registry construction (import) time so an authored typo fails
-    loudly at import rather than silently resolving to a nonexistent image.
-    """
-    for tier in registry.values():
-        validate_fallback_key(tier.fallback_key, f"monster tier {tier.key!r}")
-
-
-_validate_monster_fallback_keys(MONSTER_TIER_REGISTRY)

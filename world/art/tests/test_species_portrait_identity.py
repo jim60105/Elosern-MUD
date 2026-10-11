@@ -271,10 +271,9 @@ class SpeciesReferenceTests(unittest.TestCase):
                 self.assertEqual(len(events), 1)
                 self.assertEqual(events[0].kwargs["context"]["kind"], OFFICIAL_KIND_MONSTER)
                 self.assertEqual(events[0].kwargs["context"]["reason"], "unregistered_key")
-        # The tier vocabulary is real and still owns the generic subject layer.
-        self.assertEqual(
-            monster_subject_for(_SYNTH_TIER).full(), f"portrait:monster:{_SYNTH_TIER}"
-        )
+        # The tier vocabulary is never a monster visual subject.
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
     @covers_requirement(
         "species-portrait-identity::a-species-backed-individual-resolves-the-species-keyed-official-content-reference"
@@ -304,7 +303,7 @@ class SpeciesReferenceTests(unittest.TestCase):
 
 
 class SpeciesSubjectVocabularyTests(unittest.TestCase):
-    """The art-subject layer stays tier-validated: a species key is not a subject key."""
+    """The art-subject layer is species-validated: a species key IS a subject key, a tier key is not."""
 
     def setUp(self):
         open_synthetic_scope(self, "monster_species", "monster_tiers")
@@ -312,18 +311,14 @@ class SpeciesSubjectVocabularyTests(unittest.TestCase):
     @covers_requirement(
         "art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries"
     )
-    def test_a_registered_species_key_is_never_a_monster_subject_key(self):
+    def test_a_registered_species_key_is_a_monster_subject_key_and_tier_is_rejected(self):
         for species_key in SYNTH_MONSTER_SPECIES:
             with self.subTest(species_key=species_key):
                 forged = parse_subject(f"portrait:monster:{species_key}")
                 self.assertEqual(forged.kind, ArtSubjectKind.MONSTER)
-                with self.assertRaises(ArtSubjectError):
-                    monster_subject_for(forged.key)
-        # The tier vocabulary still resolves, so the rejection is the registry
-        # validation and not a broken subject layer.
-        self.assertEqual(
-            monster_subject_for(_SYNTH_TIER).full(), f"portrait:monster:{_SYNTH_TIER}"
-        )
+                self.assertEqual(monster_subject_for(forged.key).full(), f"portrait:monster:{species_key}")
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
 
 class SpeciesPortraitChainTests(EvenniaTestCase):
@@ -384,8 +379,8 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         return monster
 
     def _subject(self) -> ArtSubject:
-        """The generic tier subject a monster presents through (unchanged layer)."""
-        return ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_TIER)
+        """The species subject a monster presents through."""
+        return ArtSubject(ArtSubjectKind.MONSTER, _SYNTH_SPECIES)
 
     def _tree(self, root: Path) -> tuple:
         """A (path, sha256) listing of one source tree: byte-identity evidence."""
@@ -510,7 +505,8 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             current_catalog().fingerprint_for(other),
         ):
             with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, serialized)
+                # Forbidden official image identity is not present
+                self.assertNotIn(f"monster/{forbidden}/", serialized)
 
     @covers_requirement(
         "species-portrait-identity::tier-substitution-for-a-missing-official-species-image-is-prohibited-with-honest-fall-through"
@@ -554,28 +550,25 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
         self.assertEqual(first_payload["url"], current_catalog().url_for(identity))
 
-        # The personal layer sits beside the shared reference, keyed by the
-        # runtime SUBJECT (for a monster, its tier — the layer this change does
-        # not touch), so the override written for this subject governs both
-        # same-species individuals' payloads while the mounted source is never
-        # written.
+        # Personal overrides are entity-local for monsters: an override written on
+        # one monster does NOT leak to another individual of the same species.
         override = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25}
-        set_official_geometry(self._subject(), identity, face_rect=override)
+        set_official_geometry(self._subject(), identity, face_rect=override, entity=first)
         overridden = resolve_subject(self._subject(), entity=first)
         sibling = resolve_subject(self._subject(), entity=second)
         self.assertEqual(overridden["face_rect"], override)
         self.assertEqual(overridden["url"], first_payload["url"])
-        self.assertEqual(sibling["face_rect"], override)
+        self.assertNotEqual(sibling["face_rect"], override)
         self.assertEqual(self._tree(self.official_root), before)
 
     def test_a_stored_selection_outside_the_species_reference_is_ignored(self):
         self._index(_SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT))
         foreign_identity = self._index(_OTHER_SPECIES, name="b.png")
         monster = self._monster(species=_SYNTH_SPECIES)
-        set_official_selection(self._subject(), foreign_identity)
+        set_official_selection(self._subject(), foreign_identity, entity=monster)
         # The personal choice is retained verbatim...
         self.assertEqual(
-            official_preferences_for(self._subject()).selection, foreign_identity
+            official_preferences_for(self._subject(), entity=monster).selection, foreign_identity
         )
         # ...and never resolves outside the individual's own reference.
         self.assertIsNone(official_selection_for(self._subject(), monster))
@@ -597,7 +590,7 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             _SYNTH_SPECIES, name="b.png", face_rect=dict(_OFFICIAL_RECT)
         )
         monster = self._monster(species=_SYNTH_SPECIES)
-        set_official_selection(self._subject(), chosen_identity)
+        set_official_selection(self._subject(), chosen_identity, entity=monster)
         self.assertEqual(
             official_selection_for(self._subject(), monster)["identity"], chosen_identity
         )

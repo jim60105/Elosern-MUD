@@ -92,8 +92,8 @@ from world.art.subjects import (
     monster_subject_for,
     scene_subject_for,
 )
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.lore.monster_visuals import get_monster_visual_registry
 
 
 def _gallery_auto_generation_pending(subject) -> bool:
@@ -451,13 +451,12 @@ def _sync_registry_subjects() -> None:
             queue_ensure(subject, description_for(subject))
         except ArtSubjectError as error:
             log_warn("art_startup_sync_skipped", context={"kind": "scene", "key": archetype}, exc=error)
-    for tier in MONSTER_TIER_REGISTRY:
+    for visual_key in get_monster_visual_registry():
         try:
-            subject = monster_subject_for(tier)
+            subject = monster_subject_for(visual_key)
             _ensure_gallery_subject(subject)
         except Exception as error:  # noqa: BLE001 - bounded per tier, never aborts startup
-            log_warn("art_startup_sync_skipped", context={"kind": "monster", "key": tier}, exc=error)
-
+            log_warn("art_startup_sync_skipped", context={"kind": "monster", "key": visual_key}, exc=error)
 
 def _recover_named_portraits() -> None:
     """Rescan living characters with an explicit named policy and ensure them.

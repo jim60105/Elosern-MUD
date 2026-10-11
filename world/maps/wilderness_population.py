@@ -46,6 +46,7 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.lore.wilderness_entry import WILDERNESS_ENTRY_REGISTRY
 from world.rules.monster_individual import construct_species_individual
 from world.maps.wilderness_provider import region_for_coordinates
+from world.lore.monster_visuals import BASELINE_VISUAL_ROWS
 
 # D-2 / wilderness-anchor-footprint: the entry coordinate is the capital's
 # EAST-GATE approach cell -- the exterior cell a traveler lands on leaving 東門
@@ -81,6 +82,14 @@ _REGION_DENSITY = MappingProxyType({
     "central_mountains": 8,
 })
 
+# D1: baseline visual keys corresponding to (low, mid, high, calamity) bands
+_TIER_VISUAL_ROWS = MappingProxyType({
+    "low": BASELINE_VISUAL_ROWS[0:3],
+    "mid": BASELINE_VISUAL_ROWS[3:6],
+    "high": BASELINE_VISUAL_ROWS[6:9],
+    "calamity": BASELINE_VISUAL_ROWS[9:12],
+})
+
 _HUNTING_BAND_DISTANCE = 3
 _HASH_MULTIPLIER_X = 92821
 _HASH_MULTIPLIER_Y = 68917
@@ -91,6 +100,7 @@ class MonsterPopulation:
     """One deterministic monster the wilderness hosts at a coordinate."""
 
     tier: str
+    art_species_key: str
     name_zh: str
     combat_traits: tuple[str, ...] = ()
 
@@ -124,7 +134,12 @@ def population_for_coordinates(x: int, y: int) -> MonsterPopulation | None:
         if _coordinate_hash(x, y) % 10 >= _REGION_DENSITY[region]:
             return None
     examples = MONSTER_TIER_REGISTRY[tier].example_monsters_zh
-    return MonsterPopulation(tier, examples[_coordinate_hash(x, y) % len(examples)])
+    visual_rows = _TIER_VISUAL_ROWS[tier]
+    idx = _coordinate_hash(x, y) % len(examples)
+    selected_visual = visual_rows[idx]
+    return MonsterPopulation(
+        tier=tier, art_species_key=selected_visual.stable_key, name_zh=examples[idx]
+    )
 
 
 def _population_key(x: int, y: int) -> str:
@@ -253,6 +268,7 @@ def _spawn(wilderness, coordinates: tuple[int, int], expected: MonsterPopulation
     x, y = coordinates
     monster = create_object(Monster, key=expected.name_zh)
     monster.threat_tier = expected.tier
+    monster.art_species_key = expected.art_species_key
     monster.apply_monster_tier("floor")
     if expected.combat_traits:
         from world.rules.traits import set_combat_traits
@@ -384,6 +400,7 @@ def _matches_expected(monster: Monster, expected: MonsterPopulation) -> bool:
     return (
         _stored_hp(monster) > 0
         and monster.threat_tier == expected.tier
+        and getattr(monster, "art_species_key", None) == expected.art_species_key
         and monster.key == expected.name_zh
         and get_combat_traits(monster) == frozenset(expected.combat_traits)
     )

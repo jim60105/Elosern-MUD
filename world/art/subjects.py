@@ -16,7 +16,10 @@ from enum import StrEnum
 import re
 import unicodedata
 
-from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.monster_visuals import (
+    get_monster_visual_registry,
+    is_registered_monster_visual_key,
+)
 from world.lore.races import SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
@@ -207,20 +210,16 @@ def scene_subject_for(archetype: str) -> ArtSubject:
 
 
 def monster_subject_for(archetype: str) -> ArtSubject:
-    """Resolve and re-validate one generic-monster subject from the bestiary.
-
-    The archetype is a threat tier and this tier-validated subject is the
-    built-in silhouette/gallery layer's ONLY monster subject vocabulary: a
-    species key is never a *registered* monster archetype here (the shared
-    parser is grammar-only; this registry re-validation is what refuses it),
-    because a species-backed individual's species image identity lives
-    exclusively in the official content reference layer
-    (``world.art.official_refs``), beside this one rather than inside it.
-    """
-    if archetype not in MONSTER_TIER_REGISTRY:
-        raise ArtSubjectError(f"unknown monster archetype {archetype!r}")
+    """Resolve and re-validate one monster subject from registered visual species."""
+    if not is_registered_monster_visual_key(archetype):
+        raise ArtSubjectError(f"unknown monster visual species {archetype!r}")
     _validate_subject_key(archetype)
     return ArtSubject(ArtSubjectKind.MONSTER, archetype)
+
+
+def monster_visual_key_for(archetype: str) -> str:
+    """Helper returning the validated visual species key or raising ArtSubjectError."""
+    return monster_subject_for(archetype).key
 
 
 def character_subject_for(entity) -> ArtSubject | None:
@@ -349,18 +348,16 @@ def scene_description(subject: ArtSubject) -> str:
 
 
 def monster_description(subject: ArtSubject) -> str:
-    """The deterministic bestiary description for a generic-monster subject."""
-    tier = MONSTER_TIER_REGISTRY[subject.key]
-    examples = "、".join(tier.example_monsters_zh)
+    """The deterministic description for a monster visual species."""
+    registry = get_monster_visual_registry()
+    visual = registry[subject.key]
     try:
         return render_prompt(
             "art.monster_description",
-            description=tier.description,
-            display_name=tier.display_name_zh,
-            examples=examples,
+            description=visual.published_appearance_zh,
         )
     except PromptUnavailableError:
-        return tier.description
+        return visual.published_appearance_zh
 
 
 def description_for(

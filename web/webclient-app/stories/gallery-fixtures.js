@@ -12,7 +12,7 @@ const card = (index, changes = {}) => ({
   ...changes,
 });
 export const GALLERY_SAMPLE = {
-  schema_version: 1, available: true, kind: "gallery",
+  schema_version: 2, available: true, kind: "gallery",
   subjects: [
     { subject_key: "portrait:character:7001", kind: "portrait:character", display_name: "夜行者", is_puppet: true },
     { subject_key: "portrait:character:7002", kind: "portrait:character", display_name: "旅伴", is_puppet: false },
@@ -20,7 +20,7 @@ export const GALLERY_SAMPLE = {
   ],
   selected: "portrait:character:7001",
   filters: { all: 8, defaults: 1, bound: 3, pending: 1, failed: 1 },
-  capabilities: { supports_bindings: true, supports_field_selection: true, supports_free_text: true, max_cards: null },
+  capabilities: { supports_bindings: true, supports_field_selection: true, supports_free_text: true, supports_personal_official_preferences: true, max_cards: null },
   cards: [
     card(0, { is_default: true, binding_present: true, chips: ["主手", "防具", "預設臉框", "目前預設"] }),
     card(1, { binding_present: true, chips: ["飾品", "預設臉框"] }),
@@ -74,7 +74,7 @@ export const GALLERY_EMPTY = {
 };
 export const GALLERY_MONSTER = {
   ...GALLERY_EMPTY, selected: "portrait:monster:synthetic_beast", official_entries: [],
-  capabilities: { supports_bindings: false, supports_field_selection: false, supports_free_text: false, max_cards: 1 },
+  capabilities: { supports_bindings: false, supports_field_selection: false, supports_free_text: false, supports_personal_official_preferences: false, max_cards: 1 },
   equipment_summary: null,
 };
 

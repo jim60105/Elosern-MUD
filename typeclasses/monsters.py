@@ -80,6 +80,7 @@ class Monster(LivingEntity):
     variant_key: str | None = _GuardedIdentityKey(
         guard_individual_variant_key_write, default=None, autocreate=False
     )
+    art_species_key: str | None = AttributeProperty(default=None, autocreate=False)
     threat_tier: str | None = _VariantResolvedThreatTier(
         default=None, autocreate=False
     )

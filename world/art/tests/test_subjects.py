@@ -173,8 +173,10 @@ class RegistryResolutionTests(unittest.TestCase):
     def test_registered_archetypes_resolve(self):
         subject = scene_subject_for(_SYNTH_SCENE)
         self.assertEqual(subject.full(), f"scene:{_SYNTH_SCENE}")
-        monster = monster_subject_for(_SYNTH_TIER)
-        self.assertEqual(monster.full(), f"portrait:monster:{_SYNTH_TIER}")
+        monster = monster_subject_for("goblin")
+        self.assertEqual(monster.full(), "portrait:monster:goblin")
+        with self.assertRaises(ArtSubjectError):
+            monster_subject_for(_SYNTH_TIER)
 
     @covers_requirement("art-subject-model::scene-and-generic-monster-subjects-resolve-from-immutable-registries")
     def test_unknown_archetypes_are_rejected(self):
@@ -289,7 +291,7 @@ class DescriptionTests(EvenniaTestCase):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_scene_and_monster_descriptions_are_registry_text(self):
         scene = scene_subject_for(_SYNTH_SCENE)
-        monster = monster_subject_for(_SYNTH_TIER)
+        monster = monster_subject_for("goblin")
         first = description_for(scene)
         second = description_for(scene)
         self.assertEqual(first, second)
@@ -297,7 +299,6 @@ class DescriptionTests(EvenniaTestCase):
         # against the kit row the scope patched in, never shipped prose.
         self.assertIn(SYNTH_ARCHETYPES[_SYNTH_SCENE].scene_sentence, first)
         monster_text = description_for(monster)
-        self.assertIn(SYNTH_MONSTER_TIERS[_SYNTH_TIER].description, monster_text)
         self.assertEqual(monster_text, monster_description(monster))
 
 

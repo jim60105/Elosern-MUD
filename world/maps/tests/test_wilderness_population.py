@@ -298,6 +298,7 @@ class WildernessPopulationSpawnTests(EvenniaTest):
         )
         self.assertEqual(self.script.db.itemcoordinates[monster], NEARBY_BAND_XY)
         self.assertGreater(monster.traits.hp.current, 0)
+        self.assertIn(monster.art_species_key, ("slime", "goblin", "giant_rat"))
 
     @covers_requirement("wilderness-monster-population::ensure-population-idempotently-places-and-respawns-monsters-at-a-coordinate")
     def test_repeated_calls_create_no_duplicates(self):
