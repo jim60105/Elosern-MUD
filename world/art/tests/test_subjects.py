@@ -268,9 +268,10 @@ class PortraitPolicyTests(EvenniaTestCase):
 
 @synthetic_registries("archetypes", "monster_tiers", "subraces")
 class DescriptionTests(EvenniaTestCase):
-    """Description composition resolves the archetype sentence, tier text and
-    subrace label through the catalogs; every entity is built in the test
-    bodies, so the class scope wraps each test independently."""
+    """Description composition resolves the archetype sentence, the monster
+    visual species appearance text and the subrace label through the catalogs;
+    every entity is built in the test bodies, so the class scope wraps each
+    test independently."""
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_character_description_contains_only_allowed_stable_data(self):

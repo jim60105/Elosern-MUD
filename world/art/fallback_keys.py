@@ -9,9 +9,9 @@ nothing — because both sides of the contract need the exact same constants:
 * ``world/art/gallery_fallback.py`` (the resolver) and ``web/art_media.py``
   (the serving route) consume the closed set so a key can never resolve to a
   missing image and a stray file can never be served;
-* the lore registries (player presets, NPC tiers, monster tiers) validate an
-  OPTIONAL declared fallback key at registry construction time, and lore must
-  never import the rest of ``world.art`` — this module is the only
+* the lore registries (player presets, NPC tiers) validate an OPTIONAL
+  declared fallback key at registry construction time, and lore must never
+  import the rest of ``world.art`` — this module is the only
   ``world.art`` surface lore is allowed to touch, precisely because it is
   side-effect-free data with zero imports.
 

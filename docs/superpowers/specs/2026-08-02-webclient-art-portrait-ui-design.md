@@ -52,6 +52,27 @@ forward-declared fake hook.
 > 23f acceptance covers catalog selection, no-focus, and combat focus; the end-to-end "exploration
 > speaker" journey is completed by 23d against the same opaque present-entity catalog-key contract,
 > with focus remaining entirely client-local.
+>
+> **Amended 2026-10-11 (change `fix-monster-species-portraits`).** Reusable monster art is keyed by a
+> registered visual species, never by a threat tier, superseding four statements above:
+> 1. **§2 (reuse goal).** "Reuse one portrait for generic monsters of one bestiary archetype" becomes
+>    one reusable portrait per registered visual species. The vocabulary is authored in
+>    `world/lore/monster_visuals.py`: every complete combat species contributes its public physical
+>    appearance through a pure adapter, and every baseline wilderness population row contributes an
+>    art-only declaration (stable key, display label, physical category) so a baseline monster is
+>    drawable without fabricating a combat species. A threat tier keeps its combat/balance meaning
+>    and never addresses imagery, so no archetype band is a portrait identity.
+> 2. **§3.1 (monster row).** The generic-monster subject is `portrait:monster:<visual-species-key>`
+>    and its source of truth is the registered visual-species vocabulary, not the bestiary archetype
+>    registry. The key grammar is unchanged; only the membership authority moves.
+> 3. **§3.3 (monster description).** A monster description is the selected visual species' public
+>    physical appearance — or the authored baseline physical category — with no threat-tier rank and
+>    no multi-species examples.
+> 4. **§5 (enqueue seams).** Startup synchronization iterates the registered visual species rather
+>    than the tier table, and the "immutable archetype descriptions" sentence reads as the selected
+>    visual species' public physical appearance. Personal official selections and geometry stay
+>    entity-local, and the world gallery lists one rail row per registered visual species in
+>    stable-key order. §7's illustrative worker payload is amended in place to name such a key.
 
 ---
 
@@ -190,9 +211,9 @@ The prior scene-only conceptual input is replaced with:
 ```json
 {
   "kind": "portrait",
-  "key": "portrait:monster:gray_wolf",
-  "description": "A gray-wolf monster archetype in the approved visual style.",
-  "out_path": "server/.art/portrait/monster/gray_wolf.png",
+  "key": "portrait:monster:goblin",
+  "description": "The registered goblin visual species' public physical appearance.",
+  "out_path": "server/.art/portrait/monster/goblin.png",
   "aspect_ratio": "3:4"
 }
 ```

@@ -94,9 +94,10 @@ def _character(key):
     return ArtSubject(ArtSubjectKind.CHARACTER, key)
 
 
-# Subject keys here are resolver inputs, not shipped rows: monster keys are the
-# kit's synthetic tier keys (the band/constant rules never need a registered
-# tier; declaration tests register their own synthetic row).
+# Subject keys here are resolver inputs, not shipped rows: a monster key is an
+# arbitrary identity because EVERY monster subject resolves the constant
+# ``monster_anon``, so no registry membership or registry declaration of any
+# kind participates in the monster rung.
 def _monster(key="t_faint"):
     return ArtSubject(ArtSubjectKind.MONSTER, key)
 

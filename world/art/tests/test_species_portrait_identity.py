@@ -14,14 +14,14 @@ shared synthetic kit (``world.tests.synthetic_data``) or from a string-named
 test, and no shipped key, path, or catalog symbol appears — the reference's
 membership authority is exercised through the kit's own vocabulary.
 
-One structural note the tests below respect rather than assert away: the
+One structural note the tests below assert rather than assume away: a monster's
 personal art layer (``official-art-personalization``) is keyed by the runtime
-*subject*, and a monster's subject is its threat tier (``portrait:monster:<tier>``,
-the generic layer this change leaves untouched). Two individuals of one species
-therefore share one personal record whenever their variants carry the same tier.
-What this module asserts for them is what the reference layer owns: one shared
-read-only reference, identical presented bytes, and a stored personal choice
-that resolves only inside that individual's own reference.
+entity, so each individual of one visual species carries its own official
+selection and geometry while the species reference — and therefore the reusable
+cards and mounted bytes behind it — stays shared. What this module asserts for
+two same-species individuals is exactly that: one shared read-only reference,
+identical presented bytes, and personal choices that resolve only inside each
+individual's own reference.
 """
 
 import hashlib

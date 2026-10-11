@@ -47,7 +47,8 @@ gallery-bearing subject by its typed full key.
 Change ``gallery-monster-autogen`` lands that routing: ``_ensure_gallery_subject``
 (formerly ``_ensure_character_portrait``) is the ONE automatic-ensure helper
 for EVERY gallery-bearing kind, and startup synchronization routes every
-monster tier through it instead of the classic subject-keyed ``ensure``. The
+registered monster visual species through it instead of the classic
+subject-keyed ``ensure``. The
 classic generic-monster record is retired from production: the scene kind
 becomes the only classic-record producer on any path — ``@art retry``'s
 classic arm likewise skips every gallery-bearing kind, so a legacy monster
@@ -195,7 +196,8 @@ def _ensure_gallery_subject(entity_or_subject) -> bool:
     The ONE automatic-ensure helper for every gallery-bearing kind (change
     ``gallery-monster-autogen``), serving either a gameplay entity (a
     character, derived through its typed producer) or an already-derived
-    ``ArtSubject`` (a registry-backed subject such as a monster tier).
+    ``ArtSubject`` (a registry-backed subject such as a monster visual
+    species).
     Returns True when a gallery generation was requested, False when the
     gallery guard suppressed the automatic path. The subject kind's
     declaration — age precondition, field selection, default rect — drives
@@ -287,8 +289,8 @@ def _resolve_gallery_subject(subject: ArtSubject) -> tuple[ArtSubject, object]:
 
     Resolution is ALWAYS through the subject's OWN kind producer — never a
     scan across kinds, because a character stable key may legally equal a
-    monster tier key and a kind-order scan could then re-drive the wrong
-    subject (``gallery-monster-generation``, design: collision safety). The
+    monster visual species key and a kind-order scan could then re-drive the
+    wrong subject (``gallery-monster-generation``, design: collision safety). The
     entity is returned for kinds that declare the age precondition and is
     ``None`` for registry-backed kinds. An unresolvable subject — no living
     character, an unregistered registry entry, a kind with no gallery — is a
@@ -438,8 +440,8 @@ def _sync_registry_subjects() -> None:
 
     The scene kind declares no gallery and stays on the classic
     subject-keyed ``ensure`` — the only classic-record producer left (change
-    ``gallery-monster-autogen``). Every monster tier routes through the
-    shared automatic-ensure helper under the same gallery guard every
+    ``gallery-monster-autogen``). Every registered monster visual species
+    routes through the shared automatic-ensure helper under the same gallery guard every
     character path uses, and startup never writes a classic record for it;
     a pre-existing classic monster record is left in place and keeps
     resolving through the display chain's classic step. Every failure is
@@ -496,7 +498,7 @@ def art_sync_all() -> None:
     """Idempotent startup synchronization plus named-policy recovery.
 
     Routes every ``SCENE_ARCHETYPE_REGISTRY`` entry through the classic
-    ensure and every ``MONSTER_TIER_REGISTRY`` entry through the shared
+    ensure and every registered monster visual species through the shared
     gallery automatic-ensure helper, then rescans living characters carrying
     an explicit named portrait policy. Every record write flows through the
     queue under the shared lock; a failure is bounded and never aborts
@@ -522,8 +524,8 @@ def request_gallery_image(entity_or_subject, *, fields=(), custom_prompt="", bin
     subject kind (change ``gallery-monster-generation``). Accepts either a
     gameplay entity — derived through the existing typed producer for its
     kind — or an already-derived :class:`ArtSubject` (a registry-backed
-    subject such as a monster tier is re-validated through its kind's typed
-    producer, never trusted from the caller's key alone). EVERY precondition
+    subject such as a monster visual species is re-validated through its
+    kind's typed producer, never trusted from the caller's key alone). EVERY precondition
     is read from the subject kind's capability declaration instead of being
     hard-coded to the character shape: the canonical-age check applies only
     where the kind declares it; a field selection, free text, or binding is

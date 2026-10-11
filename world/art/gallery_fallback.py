@@ -6,12 +6,13 @@ route. The vocabulary, extension, and size bound are the shared constants in
 ``world.art.fallback_keys`` (the same set the media route admits and the
 contract test locks). Resolution is ordered:
 
-1. a declared fallback key on the subject's registry entry wins outright —
-   monsters declare through ``MONSTER_TIER_REGISTRY`` (addressed directly by
-   the subject key), while preset-born players/companions and scene-spawned
-   NPCs carry their provenance key on the entity (``creation_preset_key`` /
+1. a declared fallback key on a NON-monster subject's registry entry wins
+   outright — preset-born players/companions and scene-spawned NPCs carry
+   their provenance key on the entity (``creation_preset_key`` /
    ``npc_tier_key``) because their portrait subject key is the entity pk,
-   not the registry key;
+   not the registry key. A monster subject declares nothing: its subject key
+   is a registered visual species, and no threat tier ever addresses monster
+   artwork;
 2. otherwise a monster subject resolves ``monster_anon``;
 3. otherwise the stored sex and apparent age select a band (child / adult /
    elder); ``female``/``male`` resolve that band's sex key directly and any

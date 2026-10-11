@@ -265,7 +265,7 @@ function validateArtCatalogEntry(value) {
   return value;
 }
 
-// Exact gallery v1 mirror. Display labels and matching facts are server-owned.
+// Exact gallery v2 mirror. Display labels and matching facts are server-owned.
 var GALLERY_SCHEMA_VERSION = 2;
 var GALLERY_MAX_SUBJECTS = 24;
 var GALLERY_MAX_LABEL = 128;
