@@ -25,6 +25,11 @@ from world.rules.event_log import EventEntry, EventLog
 
 UPKEEP_SKILL_KEY = "combat_upkeep"
 
+#: Actor key for a source-less casualty: the tick's cached source is absent or
+#: deleted, so no entity can be credited with the kill. Distinct from every
+#: object key, so no planner can resolve it back to a real actor (escort §8).
+CASUALTY_ACTOR_KEY = "system:casualty"
+
 
 def _resolve_source(battlefield: Any, source_pk: int | None) -> Any | None:
     """Resolve a tick's cached source dbref to a live entity, or ``None``.
@@ -54,6 +59,68 @@ def _floor_hp(entity: Any) -> None:
             trait.value = 1
 
 
+def _stage_casualties(
+    battlefield: Any,
+    losses: dict[int, tuple[Any, float, float]],
+    defeated_ids: set[int],
+) -> list[PendingEffect]:
+    """Stage the quest effects of unattributed lethal crossings (escort §8).
+
+    A tick whose cached source is absent or already deleted still crosses real
+    HP, so the target's committed death must reach the quest planner even
+    though no actor can be credited with the kill. The synthesized log carries
+    one ``target_defeated`` entry per crossing and the planner resolves the
+    casualty through the same protected-death owner the action path uses; no
+    actor is invented, so ordinary kill-credit behavior is unchanged. One
+    system-attributed commit stages every effect.
+    """
+    if not losses:
+        return ()
+    entries: list[EventEntry] = []
+    for entity, before, applied in losses.values():
+        dbref = getattr(entity, "pk", None)
+        if dbref is None or dbref in defeated_ids:
+            continue
+        defeated_ids.add(dbref)
+        data: dict[str, Any] = {"target_id": int(dbref)}
+        data["monster_tier"] = getattr(entity, "threat_tier", None)
+        species_key = getattr(entity, "species_key", None)
+        if species_key is not None:
+            data["species_key"] = species_key
+            data["variant_key"] = getattr(entity, "variant_key", None)
+        entries.append(
+            EventEntry(
+                kind="target_defeated",
+                actor=CASUALTY_ACTOR_KEY,
+                target=str(entity.key),
+                data=data,
+                text_template=_ENTRY_TEMPLATES["target_defeated"],
+            )
+        )
+    if not entries:
+        return ()
+    log = EventLog(
+        actor=CASUALTY_ACTOR_KEY,
+        skill_key=UPKEEP_SKILL_KEY,
+        targets=tuple(sorted({entry.target for entry in entries})),
+        entries=tuple(entries),
+        time_cost_seconds=0,
+    )
+    request = SimpleNamespace(
+        actor=None,
+        context=SimpleNamespace(battlefield=battlefield),
+    )
+    staged: list[PendingEffect] = []
+    for planner in _EVENT_EFFECT_PLANNERS.values():
+        for effect in planner(request, log):
+            if not isinstance(effect, PendingEffect):
+                raise TypeError(
+                    "event-effect planner returned a non-PendingEffect value"
+                )
+            staged.append(effect)
+    return staged
+
+
 def settle_upkeep(
     battlefield: Any,
     records_by_key: dict[str, tuple[TickRecord, ...]],
@@ -67,17 +134,20 @@ def settle_upkeep(
     attributed record it emits a ``damage`` entry reporting the actually
     applied amount (``min(-delta, hp_before)``) and, on a lethal crossing,
     exactly one ``target_defeated`` entry per target (dbref-deduplicated,
-    same shape as the action pipeline's). Protected (``nonlethal_keys``)
-    crossings floor HP at 1 and mark the target knocked out instead;
-    simulated rounds tag defeat entries ``simulated`` and stage no credit.
-    Unattributed ticks (absent or unresolvable ``source_pk``) cross HP
-    silently with no entries or quest effects. Every staged mutation commits
-    through one ``_commit`` call; a planner or commit failure aborts the
-    round and the session restore rolls back every surface.
+    # same shape as the action pipeline's). Protected (``nonlethal_keys``)
+    # crossings floor HP at 1 and mark the target knocked out instead;
+    # simulated rounds tag defeat entries ``simulated`` and stage no credit.
+    # Unattributed ticks (absent or unresolvable ``source_pk``) grant no kill
+    # credit, but a real HP crossing still reaches the quest planner as a
+    # source-less casualty so a protected entity's committed death fails its
+    # escort (escort §8). Every staged mutation commits
+    # through one ``_commit`` call; a planner or commit failure aborts the
+    # round and the session restore rolls back every surface.
     """
     pending: list[PendingEffect] = []
     logs: list[EventLog] = []
     defeated_ids: set[int] = set()
+    unattributed_losses: dict[int, Any] = {}
     projected: dict[int, float] = {}
     per_source: dict[int, list[EventEntry]] = {}
     per_source_targets: dict[int, list[str]] = {}
@@ -90,6 +160,9 @@ def settle_upkeep(
         for record in records:
             source = _resolve_source(battlefield, record.source_pk)
             if source is None:
+                applied = min(-record.delta, record.hp_before)
+                if applied > 0 and record.hp_before > 0 and key not in nonlethal_keys:
+                    unattributed_losses[id(entity)] = (entity, record.hp_before, applied)
                 continue
             # Group by the validated source dbref, never the display key:
             # Evennia keys are not unique, so same-named casters must keep
@@ -172,6 +245,7 @@ def settle_upkeep(
                         "event-effect planner returned a non-PendingEffect value"
                     )
                 pending.append(effect)
+    pending.extend(_stage_casualties(battlefield, unattributed_losses, defeated_ids))
     if pending:
         _commit(
             # System-attributed commit: no character performed these effects.

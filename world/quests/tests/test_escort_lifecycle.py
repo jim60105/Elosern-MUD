@@ -5,16 +5,22 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.quests import scene_store
 from world.quests.definitions import EscortCompletion, QuestStage, QuestType
 from world.quests.escort_lifecycle import EscortOperationError, accept_escort_commission
+from world.quests.planner import quest_event_effect_planner
 from world.quests.runtime import accept_quest, abandon_quest, read_records
 from world.rules.party import is_companion, join_party, party_size, reasons_for
 from world.rules.quest_issuance import (
     QuestIssuance, Settlement, provision_scoped_issuer, register_quest_issuance,
 )
 from world.rules.guild_offers import QuestReward
+from world.rules.action import _EVENT_EFFECT_PLANNERS, register_event_effect_planner
+from world.rules.buffs import tick_buffs
+from world.rules.combat import Battlefield
+from world.rules.upkeep import settle_upkeep
 
 from ._fixtures import QuestRegistryIsolation, escort, quest, register
 
@@ -166,3 +172,76 @@ class EscortExclusiveOutcomeTests(EscortLifecycleTests):
         self.assertEqual(self.owner.db.wallet, before + 1)
         self.owner.attributes.reset_cache()
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+
+
+class EscortCasualtyTests(EscortLifecycleTests):
+    """Lawful committed death fails an escort without kill-credit attribution."""
+
+    def setUp(self):
+        super().setUp()
+        register_event_effect_planner("quest", quest_event_effect_planner)
+
+    def tearDown(self):
+        _EVENT_EFFECT_PLANNERS.pop("quest", None)
+        super().tearDown()
+
+    def _field(self, *entities):
+        teams, roster = {}, {}
+        for index, entity in enumerate(entities):
+            team = "party" if index == 0 else "foes"
+            teams.setdefault(team, set()).add(entity.key)
+            roster[entity.key] = entity
+        return Battlefield(
+            {team: frozenset(members) for team, members in teams.items()}, roster,
+        )
+
+    def test_environmental_lethal_tick_fails_the_escort(self):
+        from world.rules.buffs import apply_buff
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        monster = create_object(Monster, key="environmental source", location=self.room1)
+        field = self._field(self.owner, monster, self.protected)
+        self.protected.traits.hp.base = 3
+        self.protected.traits.hp.current = 3
+        apply_buff(self.protected, "poisoned")
+        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        self.assertEqual(self.protected.traits.hp.current, 0)
+        settle_upkeep(field, records)
+        failed = read_records(self.owner)[0]
+        self.assertEqual(failed.quest_id, record.quest_id)
+        self.assertEqual(failed.state.value, "failed")
+        self.assertEqual(failed.failure_reason, "protected_actor_dead")
+        self.assertEqual(reasons_for(self.protected, self.owner), ())
+
+    def test_deleted_source_lethal_tick_still_fails_the_escort(self):
+        from world.rules.buffs import apply_buff
+
+        accept_quest(self.owner, self.definition.key, self.issuer_key)
+        source = create_object(Monster, key="doomed source", location=self.room1)
+        self.protected.traits.hp.base = 3
+        self.protected.traits.hp.current = 3
+        apply_buff(self.protected, "poisoned", source_pk=int(source.pk))
+        source.delete()
+        field = self._field(self.owner, self.protected)
+        records = {self.protected.key: tick_buffs(self.protected, 10)}
+        settle_upkeep(field, records)
+        failed = read_records(self.owner)[0]
+        self.assertEqual(failed.state.value, "failed")
+        self.assertEqual(failed.failure_reason, "protected_actor_dead")
+
+    def test_source_less_monster_kill_still_grants_no_quest_progress(self):
+        from world.rules.buffs import apply_buff
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        monster = create_object(Monster, key="unattributed target", location=self.room1)
+        monster.threat_tier = "low"
+        monster.apply_monster_tier("floor")
+        monster.traits.hp.base = 3
+        monster.traits.hp.current = 3
+        apply_buff(monster, "poisoned")
+        field = self._field(self.owner, monster)
+        records = {monster.key: tick_buffs(monster, 10)}
+        settle_upkeep(field, records)
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "in_progress")
