@@ -8,11 +8,20 @@ consume, with the only-writers boundary and stale-host rules pinned here.
 ## Requirements
 
 ### Requirement: The dialogue session is deterministic-core-only character state
-The dialogue session SHALL be persistent JSON-safe state on the character (`db.dialogue_session`)
-naming the host NPC's database identity, the latest server-authored line, and an update marker.
-Its ONLY writers SHALL be the deterministic dialogue-session helpers: the `explore.talk_open`,
-`explore.talk_scripted`, and `explore.talk_freeform` adapter success paths, the `talk`
-text-command path, the `explore.dialogue_leave` adapter success path, and the clear seams.
+
+The dialogue session SHALL remain persistent JSON-safe character state naming the host identity, latest line and update marker. Deterministic open, settlement, refresh and cleanup helpers SHALL remain its sole writers, with a phase transition invoking only the refresh helper. Open SHALL show the current greeting or fallback without a model call. Existing clearing seams SHALL remain, presenters SHALL stay read-only, and refresh SHALL preserve history while invalidating obsolete choices.
+
+#### Scenario: Opening a generated host records its fixed line
+- **WHEN** a present generated host is opened with models disabled
+- **THEN** its current fixed greeting is recorded in the existing session and displayed with its scripted topics without another choice interface
+
+#### Scenario: Phase change refreshes through the sole writer
+- **WHEN** a supported committed phase transition changes a live session's role dialogue
+- **THEN** the existing deterministic refresh records the current greeting and update marker, preserves history and publishes a newer surface that rejects old choice capabilities
+
+#### Scenario: Cleanup clears the live session
+- **WHEN** the player moves, combat starts, or the session host departs or despawns
+- **THEN** the existing cleanup clears the session and no stale host is presented
 
 #### Scenario: Talking through any surface opens the session
 - **WHEN** the same scripted exchange is delivered via the WS action and via the `talk` command
@@ -50,12 +59,12 @@ text-command path, the `explore.dialogue_leave` adapter success path, and the cl
 - **THEN** it is one of: a successful `settle_movement` of the character, an `engage` involving the actor, and NPC leave-room, despawn, or leave-party cleanup naming the session NPC
 
 #### Scenario: The talk_open success path writes only the session opening
-- **WHEN** `explore.talk_open` succeeds
-- **THEN** it SHALL open the session with the host's authored greeting or, for a host without one, the fixed server-authored fallback line, and SHALL write nothing else
+- **WHEN** conversation open succeeds
+- **THEN** it writes only the session with the shared resolver's current fixed greeting or existing fallback and does not call a model
 
 #### Scenario: No other layer touches a session directly
-- **WHEN** a presenter, AI layer, client payload, or any `ui_action` other than these adapters encounters a session
-- **THEN** none SHALL open, refresh, or clear a session directly
+- **WHEN** a presenter, generative layer or client encounters a session
+- **THEN** it performs no direct session writes; deterministic phase transitions invoke only the existing sole-writer refresh helper
 
 #### Scenario: A session whose host no longer resolves is treated as not live
 - **WHEN** a session's NPC identity no longer resolves to a present, interactable NPC in the character's location
@@ -66,12 +75,16 @@ text-command path, the `explore.dialogue_leave` adapter success path, and the cl
 - **THEN** the scripted table path SHALL fully drive open, refresh, line, and choices
 
 ### Requirement: The dialogue panel is an exact read-only version-2 presentation panel
-The presentation registry SHALL register a `dialogue` panel at schema version 2. Its available
-form SHALL contain exactly `schema_version`, `available`, `kind`, `host`, `bond_stage`, `line`,
-and `choices`. The panel SHALL be available exactly when the viewer's live dialogue session
-resolves; the presenter SHALL be read-only — it SHALL NOT open, refresh, clear, or mutate any
-session, affinity, memory, art, or world state — and SHALL emit no live object or filesystem
-reference.
+
+The version-2 dialogue panel SHALL retain exactly its schema fields: host identity, display name, nullable catalog portrait, nullable bond stage, recorded line and choices. Availability SHALL require a live session, else expose no host, line or choices. Choices SHALL be at most four ordered keyword-identity/label descriptors from the shared resolver. Presenters SHALL never mutate state or emit live references; empty definitions SHALL produce no topics and no action-option card substituted.
+
+#### Scenario: Generated choices obey existing panel bounds
+- **WHEN** a generated current phase exposes more than four permitted topics
+- **THEN** the existing panel renders its first four in declared order with existing descriptor fields and rejects schema drift
+
+#### Scenario: Reopening after closure shows current everyday topics
+- **WHEN** a supported committed closure transition removes the commission topic and the player reopens the conversation
+- **THEN** the same panel shows everyday greeting/topics and no obsolete commission capability
 
 #### Scenario: A live scripted session serializes the host triple and table choices
 - **WHEN** a viewer with a live dialogue session against a bonded table host receives a snapshot
@@ -125,12 +138,12 @@ reference.
 - **THEN** it SHALL be the session's latest server-authored reply line bounded by the shared narrative-line bound
 
 #### Scenario: Choices follow the panel-owned four-descriptor table bound
-- **WHEN** a dialogue payload renders `choices`
-- **THEN** they SHALL be an ordered list of at most four `{keyword_id, label}` descriptors — the panel-owned presentation bound, independent of the interact target descriptor's own sixteen-keyword keyword-pool bound — derived from the host's dialogue table in table order (the same prefix the interact affordance truncation takes), the same vocabulary owner the interact target descriptor uses, empty when the host's table is empty
+- **WHEN** a dialogue payload renders choices
+- **THEN** it emits at most four ordered {keyword_id, label} descriptors from the shared permitted current-definition resolver, retains the existing vocabulary and independent keyword-pool bound, and emits no choices for an empty definition
 
 #### Scenario: The portrait reference is the shared catalog key or null
 - **WHEN** a dialogue payload renders `portrait_ref`
-- **THEN** it SHALL be the opaque `webclient-art-panel` portrait-catalog key for the host when the host is present in the art view the `art` panel is built from for the same viewer — including an entry that resolves to a placeholder card — and SHALL be `null` only when the host is absent from that view or the art view cannot be built
+- **THEN** it SHALL be the opaque `webclient-art-panel` portrait-catalog key for the host when the host is present in the art view the `art` panel is built from for the same viewer; including an entry that resolves to a placeholder card; and SHALL be `null` only when the host is absent from that view or the art view cannot be built
 
 #### Scenario: Only the server derives the catalog key and the wire form is bounded
 - **WHEN** `portrait_ref` is produced and serialized

@@ -11,12 +11,19 @@ causes no state change.
 
 ### Requirement: Scripted dialogue hosts answer authored talk lines
 
-An NPC carrying a `ScriptedDialogue` component SHALL answer known keywords with
-the authored response and unknown keywords with the no-understanding line. Answering causes
-no state change except that a known-keyword answer SHALL grant +1 affinity
-(`talk` source) with the host through the sole-writer affinity API (`world/rules/affinity.py`),
-applied by the deterministic talk writer in the same transaction as the answer; unknown keywords
-and no-keyword paths SHALL NOT write any state.
+Scripted hosts SHALL answer known permitted keywords with their fixed responses and unknown keywords with the no-understanding line. Authored known-keyword affinity SHALL remain, while unknown/no-keyword paths SHALL change no state beyond an opened session. Generated greetings and informational topics SHALL run without a model, and their registered effect declarations SHALL be rechecked for presence, knowledge, phase and commission scope; stale or unauthorized choices SHALL apply no effect.
+
+#### Scenario: Informational generated topic works offline
+- **WHEN** model services are disabled and a player opens a generated conversation and selects an informational topic
+- **THEN** its fixed current greeting and response are displayed without a model call or item/progress award inferred from prose
+
+#### Scenario: Commission topic rechecks authority
+- **WHEN** a player selects a current validated commission topic while present with the scoped issuer
+- **THEN** the existing deterministic quest APIs execute the allowed interaction, while a stale phase, missing knowledge, absent actor, or out-of-scope commission causes no effect
+
+#### Scenario: Authored unknown keyword remains read-only
+- **WHEN** an authored host receives an unknown keyword
+- **THEN** it returns its existing no-understanding line without affinity or other mutation
 
 #### Scenario: Guild staff answers a known keyword
 - **WHEN** the player talks to the guild master with a keyword such as 公會 or 任務
@@ -24,9 +31,8 @@ and no-keyword paths SHALL NOT write any state.
   affinity value rises by 1, and no other state changes
 
 #### Scenario: No-keyword talk presents the host's greeting
-- **WHEN** the player runs `talk <guild-master>` without a keyword
-- **THEN** the guild master presents its authored greeting teaching the guild
-  commands, and no state changes (including no affinity change)
+- **WHEN** the player talks to an authored guild host without a keyword
+- **THEN** its existing in-character greeting explains the world-side guild service without command or UI names, and no affinity changes
 
 #### Scenario: An author-set offline greeting overrides the table greeting
 - **WHEN** an author has saved a non-empty offline-greeting field on a table-backed host and the player runs `talk <host>` without a keyword
@@ -142,7 +148,7 @@ and no-keyword paths SHALL NOT write any state.
 #### Scenario: The entry path consults schedule state before answering
 - **WHEN** the scripted-talk entry path is invoked on a host
 - **THEN** it first consults `world/rules/npc_schedules.py::interaction_reason(npc, "talk")`, and a
-  non-`None` result presents that stable rejection line and writes no state — the +1 affinity and
+  non-`None` result presents that stable rejection line and writes no state; the +1 affinity and
   turn-in paths are both bypassed for the blocked interaction
 
 ### Requirement: Editable offline greeting text is literal at every speech output boundary
@@ -177,12 +183,16 @@ A non-empty per-instance offline greeting SHALL be plain text on all no-keyword 
 - **THEN** known keywords and misunderstanding replies remain authored-only
 
 ### Requirement: Dialogue tables are immutable, keyed, and registry-backed
-The dialogue-table registry SHALL be keyed by `dialogue_key` and SHALL hold only
-frozen `DialogueDefinition` values composed of an optional `greeting` and a
-tuple of frozen `KeywordResponse` values. A `dialogue_key` with no registered table SHALL resolve to the
-no-understanding line for keywords and to no greeting. The `guild_staff`
-definition SHALL include the `回報` keyword, whose authored response serves as
-the register-first fallback for unregistered players.
+
+Authored dialogue tables SHALL remain immutable keyed frozen definitions with greetings and ordered keyword responses. One shared resolver SHALL serve authored rows and validated generated current-phase definitions without mutating the authored registry; greetings, keyword responses, topic affordances, action validation and text SHALL consume it. Missing definitions SHALL retain the no-greeting/no-understanding fallback, and authored guild topics SHALL keep their bounded in-character vocabulary.
+
+#### Scenario: Authored table behavior remains unchanged
+- **WHEN** an authored guild host is queried through the resolver
+- **THEN** its ordered existing greeting and topics remain available and the table is unchanged
+
+#### Scenario: Generated topics use the existing conversation vocabulary
+- **WHEN** a generated conversable host's current phase is queried by text, presentation, and action-validation consumers
+- **THEN** they resolve the same permitted greeting, ordered topic identities and fixed responses without a model call or runtime registry mutation
 
 #### Scenario: guild_staff definition registers and answers command guidance
 - **WHEN** the `guild_staff` dialogue definition is registered and queried
@@ -207,9 +217,9 @@ the register-first fallback for unregistered players.
 #### Scenario: guild_staff prose is in-world only
 - **WHEN** the `guild_staff` greeting and keyword responses are authored
 - **THEN** they are spoken in character, telling in the host's own in-world voice what the guild
-  counter is for — registering as an adventurer, taking commissions from the board, reporting
+  counter is for; registering as an adventurer, taking commissions from the board, reporting
   finished work back at the counter with the commission's number, giving up a commission, and
-  asking where one stands in rank — and never name a command, a game mechanic, or an interface
+  asking where one stands in rank; and never name a command, a game mechanic, or an interface
   element
 
 #### Scenario: Command discoverability lives outside the dialogue table

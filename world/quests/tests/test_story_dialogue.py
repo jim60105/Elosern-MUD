@@ -9,6 +9,7 @@ narrative owner.
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom
 from world.quests import scene_store
@@ -38,6 +39,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
             self.player, self.package_id, "south_gate", room=self.room, tick=5
         )
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_a_committed_closure_selects_the_everyday_phase(self):
         result = transition_story_dialogue(
             self.package_id,
@@ -53,6 +57,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(runtime.selected_phase, "everyday")
         self.assertEqual(runtime.revision, 1)
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_a_stale_expected_revision_is_refused_without_a_write(self):
         transition_story_dialogue(
             self.package_id,
@@ -73,6 +80,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(runtime.selected_phase, "everyday")
         self.assertEqual(runtime.revision, 1)
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_reselecting_the_current_phase_is_a_no_op(self):
         result = transition_story_dialogue(
             self.package_id,
@@ -85,6 +95,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(result.phase_id, "searching")
         self.assertEqual(result.revision, 0)
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_a_guarded_reunion_observation_is_refused(self):
         with self.assertRaises(PhaseConditionError):
             transition_story_dialogue(
@@ -95,6 +108,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
                 tick=7,
             )
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_truthful_information_transfer_records_permitted_knowledge(self):
         from world.narrative.memory import get_owner_memories
 
@@ -112,6 +128,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
             )
         )
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_transferring_a_roles_own_claim_is_a_no_op(self):
         self.assertFalse(
             transfer_story_knowledge(
@@ -119,6 +138,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
             )
         )
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
     def test_an_unknown_claim_is_refused(self):
         with self.assertRaises(StoryDialogueError):
             transfer_story_knowledge(

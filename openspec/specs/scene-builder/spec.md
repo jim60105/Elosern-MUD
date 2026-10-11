@@ -8,10 +8,20 @@ composition root that posts generated quests to the guild board, the instance-la
 and the minimal commands that trigger generation and scene entry. The materializer is deterministic
 (it spawns and binds, so it lives in `world/quests/`), atomic, and idempotent; permanent layers are
 located only and never accumulate spawned entities.
+
 ## Requirements
 
 ### Requirement: SceneBuilder is the deterministic requirements-to-spawn materialization layer
-`world/quests/scene_builder.py` SHALL be a deterministic module that imports no `world.ai` module and no live transport, consumes a stage's spawn requirements only as plain validated data (`StageSpawnRequirement` via `scene_requirements_for(definition_key)`), and changes game state only through the deterministic lifecycle APIs: `world.maps.instance.spawn_instance_room`, Evennia prototype spawning, `world.maps.instance.register_owned_entity`, and `world.quests.binding.bind_stage_runtime`.
+
+The scene materializer SHALL consume validated stage and package requirements as plain data without generative imports or live transport, reusing the whitelisted prototype, characterization and binding construction. Room lifecycle SHALL stay maps-owned, role/stage bindings quest-owned, component initialization rules-owned, and knowledge/events narrative-owned. Conversable generated roles SHALL use the whitelisted generative-NPC path; unrelated monsters and other prototypes SHALL stay unchanged.
+
+#### Scenario: Generated conversational role uses shared construction
+- **WHEN** an encounter materializes a validated named conversable role
+- **THEN** its registry-derived traits, validated persona and ages, portrait identity, scripted topics, and free-form seam are initialized through the shared deterministic path without a model call
+
+#### Scenario: Construction rejects mechanical injection
+- **WHEN** a role supplies a numeric trait/reward magnitude, an arbitrary typeclass path, or an age outside 0..10000 or applicable race bounds
+- **THEN** validation rejects it before spawning and leaves lore registries unchanged
 
 #### Scenario: The module stays inside the deterministic-path ban
 - **WHEN** the repository-wide deterministic-path contract scans `world/quests/`
@@ -95,7 +105,28 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
 - **THEN** it shares the lineage auto-seed helper — prerequisite proficiency seeded to exactly the edge values for owned deep skills, with explicit assignments winning
 
 ### Requirement: Materializing a stage spawns the destination, sets scene metadata, and binds one stage atomically and idempotently
-`world/quests/scene_builder.py::materialize_stage(actor, quest_id, *, origin_room=None)` SHALL, for an `instance`-layer destination, spawn one `InstanceRoom`, set scene metadata, spawn occupants, and bind room and entity identities through `bind_stage_runtime` inside one outer `transaction.atomic()`; for a permanent `anchor`/`grid` destination it SHALL only locate the existing room, never spawning occupants or binding.
+
+Accepted-stage materialization SHALL resolve the actor's in-progress stage and reject unknown, inactive, terminal, requirement-less or wrong-origin requests. Instance destinations SHALL create one whitelisted room and exit pair, materialize and own occupants, and bind objective targets atomically. Permanent destinations SHALL reuse their validated room and permit only package-owned occupants and exact role bindings. Failures SHALL roll back every write; ESCORT publication SHALL stay guarded.
+
+#### Scenario: Validated permanent occupants replace the blanket restriction
+- **WHEN** a validated package stage requiring a named role materializes at a permanent destination
+- **THEN** the existing room is reused, its description is unchanged, and exactly one package-owned role binding exists
+
+#### Scenario: Instance stage preserves ordinary construction
+- **WHEN** a valid accepted instance stage with disposable occupants is materialized
+- **THEN** one room and bidirectional exit pair with scene metadata and owned occupants are committed with the objective binding, and repeat materialization creates nothing
+
+#### Scenario: Stage and encounter eligibility remain separate
+- **WHEN** accepted-stage materialization is attempted without an in-progress quest
+- **THEN** it rejects without writes, while independently eligible pre-acceptance encounters use their separate lifecycle boundary
+
+#### Scenario: Escort remains guarded
+- **WHEN** an ESCORT definition is proposed before a protected-role production binding path exists
+- **THEN** publication rejects it and entering a destination grants no escort progress
+
+#### Scenario: Binding failure rolls back the scene
+- **WHEN** failure occurs after instance creation, occupant writes, or binding
+- **THEN** no partial objects or stale binding remain after reload and no move or presentation occurs
 
 #### Scenario: An instance scene is spawned, described, and bound
 - **WHEN** a current `BOUND_INSTANCE` stage with `npc_reqs` is materialized from a caller's room
@@ -104,10 +135,8 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
   the stage is bound to the room and objective targets in one atomic operation
 
 #### Scenario: A permanent-layer scene is located without spawning or binding
-- **WHEN** a current stage with a permanent `anchor`/`grid` destination (including an ESCORT stage)
-  is materialized
-- **THEN** the existing room is located, and no room, exit, occupant, or quest binding is created, so
-  permanent rooms are never polluted by scene entities and an ESCORT never auto-completes on entry
+- **WHEN** a current permanent anchor/grid stage without validated package-owned occupants is materialized, including any legacy ESCORT stage still guarded from publication
+- **THEN** it locates the existing room without spawning or binding and never grants escort progress
 
 #### Scenario: DEFEAT occupants map to the objective-target binding set
 - **WHEN** a DEFEAT stage materializes its occupants
@@ -146,7 +175,7 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
 - **THEN** the room's `scene_archetype`, `named`, and scene description (the requirement's `scene_sentence` or the archetype registry's) are set
 
 #### Scenario: Occupants are spawned per requirement and owned
-- **WHEN** an instance stage carrying `npc_req` entries — or a monster-tier DEFEAT stage — is materialized
+- **WHEN** an instance stage carrying `npc_req` entries; or a monster-tier DEFEAT stage; is materialized
 - **THEN** one NPC is spawned per `npc_req` entry and `objective.quantity` monsters are spawned for a monster-tier DEFEAT stage, and every occupant is registered as an owned entity
 
 #### Scenario: An ESCORT stage never spawns or binds its protected entities
@@ -154,8 +183,8 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
 - **THEN** it is treated as a permanent destination located only, the SceneBuilder never spawns or binds the escort's protected entities, and an ESCORT can never auto-complete on entry
 
 #### Scenario: Occupant-bearing scenes are instance-layer by publication rule
-- **WHEN** a quest definition is published
-- **THEN** occupant-bearing scenes are enforced to be instance-layer, so a permanent layer never accumulates spawned scene entities and needs no scene cleanup
+- **WHEN** an occupant-bearing definition is published
+- **THEN** disposable ordinary scenes remain instance-owned, while permanent occupants require the replacement validated package ownership, exact binding and retention contracts; unsupported ESCORT publication stays rejected
 
 #### Scenario: The atomic scope covers every instance write
 - **WHEN** an instance materialization runs
@@ -166,8 +195,8 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
 - **THEN** the player's move into the scene happens only after the materialization commits
 
 #### Scenario: The idempotent return is validated
-- **WHEN** a repeated `materialize_stage` call for an already-bound current stage returns the existing binding
-- **THEN** the returned binding is validated to still be an `InstanceRoom`
+- **WHEN** repeated current-stage materialization returns an existing binding
+- **THEN** its room and exact actor availability are revalidated against the declared instance or permanent destination without actor recreation
 
 ### Requirement: The composition root posts one generated quest to the guild board and degrades offline
 `server/ai_director_service.py::request_generated_quest(client=None, *, context)` SHALL bridge the director's guarded proposal to the deterministic compile boundary: it SHALL call `generate_quest_blueprint` with the injected client, compile the accepted blueprint through `compile_quest_blueprint`, and publish it through `register_generated_quest` so the offer appears on the guild board.

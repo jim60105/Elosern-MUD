@@ -11,6 +11,7 @@ import unittest
 
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from world.quests import scene_store
 from world.quests.bootstrap import restore_scene_packages
 from world.quests.compile import SCENE_REQUIREMENT_REGISTRY, scene_requirements_for
@@ -59,6 +60,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("no_such_anchor", str(caught.exception))
 
+    @covers_requirement(
+        "persistent-story-roles::reusable-roles-bind-exact-actor-identities"
+    )
     def test_a_name_based_existing_npc_reference_is_rejected(self):
         package = _package()
         package["roles"][1]["existing_npc"] = {"kind": "key", "value": "測試住民daughter"}
@@ -82,6 +86,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("provenance", str(caught.exception))
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_overlapping_phase_selection_is_rejected(self):
         package = _package()
         dialogue = package["dialogue"][0]
@@ -91,6 +98,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("overlap", str(caught.exception))
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_a_guarded_reunion_observation_is_rejected(self):
         package = _package()
         package["dialogue"][0]["phases"][1]["conditions"] = [{"reunion": True}]
@@ -98,6 +108,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("reunion", str(caught.exception))
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_a_missing_default_phase_is_rejected(self):
         package = _package()
         package["dialogue"][0]["phases"][0]["conditions"] = [{"separation": True}]
@@ -121,6 +134,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
 class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
     """Publication persists an immutable package and registers its views."""
 
+    @covers_requirement(
+        "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
+    )
     def test_publication_registers_definition_and_requirements_without_issuance(self):
         published = publish_scene_package(_package(), owner="tester", tick=7)
         self.assertTrue(published.created)
@@ -133,6 +149,9 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(row.owner_id, "tester")
         self.assertEqual(row.created_tick, 7)
 
+    @covers_requirement(
+        "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
+    )
     def test_replaying_the_same_source_returns_the_stored_package(self):
         first = publish_scene_package(_package(), owner="tester")
         second = publish_scene_package(_package(), owner="tester")
@@ -140,6 +159,9 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(second.package_id, first.package_id)
         self.assertEqual(len(scene_store.list_packages()), 1)
 
+    @covers_requirement(
+        "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
+    )
     def test_a_differing_payload_for_one_source_conflicts(self):
         publish_scene_package(_package(), owner="tester")
         changed = _package(display_name="另一場相遇")
@@ -165,6 +187,9 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(len(GUILD_OFFER_REGISTRY), 1)
         self.assertEqual(scene_store.list_commission_grants(published.package_id), [])
 
+    @covers_requirement(
+        "persistent-story-roles::reusable-roles-bind-exact-actor-identities"
+    )
     def test_an_exact_existing_npc_pk_reference_is_accepted(self):
         from evennia.utils.create import create_object
 
@@ -248,6 +273,9 @@ class ScenePackageRestoreTests(RegistryIsolationMixin, EvenniaTestCase):
 class ScenePackageCancellationTests(RegistryIsolationMixin, EvenniaTestCase):
     """Cancellation retires an unactivated definition without rewriting it."""
 
+    @covers_requirement(
+        "persistent-story-roles::named-role-retention-survives-quest-termination"
+    )
     def test_cancellation_transitions_once(self):
         published = publish_scene_package(_package(), owner="tester")
         self.assertTrue(scene_store.cancel_package(published.package_id))
@@ -256,6 +284,9 @@ class ScenePackageCancellationTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertEqual(row.status, scene_store.PACKAGE_STATUS_CANCELLED)
         self.assertEqual(row.payload, _package())
 
+    @covers_requirement(
+        "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
+    )
     def test_payload_rewrite_is_still_refused(self):
         from world.quests.models import ScenePackage
 
@@ -317,6 +348,9 @@ class SceneStoreRuntimeContractTests(RegistryIsolationMixin, EvenniaTestCase):
 class ScenePackageAmbiguityTests(EvenniaTestCase):
     """Static phase selection is unambiguous or the package is refused."""
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_intersecting_non_default_phases_are_rejected(self):
         package = _package()
         package["dialogue"][0]["phases"].append(
@@ -326,6 +360,9 @@ class ScenePackageAmbiguityTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("overlap", str(caught.exception))
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_a_contradictory_condition_is_rejected(self):
         package = _package()
         package["dialogue"][0]["phases"][1]["conditions"] = [
@@ -336,6 +373,9 @@ class ScenePackageAmbiguityTests(EvenniaTestCase):
             validate_scene_package(package)
         self.assertIn("unsatisfiable", str(caught.exception))
 
+    @covers_requirement(
+        "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
+    )
     def test_an_unhashable_role_reference_is_rejected(self):
         package = _package()
         package["relationships"] = [

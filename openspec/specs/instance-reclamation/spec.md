@@ -7,7 +7,6 @@ stage at server start.
 
 ## Requirements
 
-
 ### Requirement: default_ttl_seconds is declared rulebook data
 `world/rules/rulebook/instance.yaml` SHALL declare `default_ttl_seconds: 345600` (4 in-game days at
 `hours_per_day: 24` / `seconds_per_hour: 3600`, matching `clock.yaml`'s own calendar constants).
@@ -39,8 +38,16 @@ function SHALL inspect or interpret the content of `reason` beyond membership te
 - **THEN** no exception is raised, and `room.db.pin_reasons` is unchanged
 
 ### Requirement: register_owned_entity marks an entity for despawn, not relocation, on reclaim
-`world/maps/instance.py::register_owned_entity(room, entity)` SHALL append `entity` to
-`room.db.owned_entities` if not already present.
+
+Instance disposable ownership SHALL remain idempotent per entity and mark ordinary owned occupants for despawn on reclamation. A published retained named role SHALL also carry a validated permanent retention locator and exact package-role identity. That retention declaration SHALL take precedence over disposable ownership at reclaim and SHALL never reset living state or grant party/follow or quest mutation authority.
+
+#### Scenario: Disposable ownership remains idempotent
+- **WHEN** an ordinary disposable occupant is registered twice as owned
+- **THEN** it occurs once in ownership and remains eligible for ordinary despawn
+
+#### Scenario: Retention declaration overrides disposable cleanup
+- **WHEN** a retained named role is still inside its due reclaimable instance
+- **THEN** its validated retention contract selects transfer rather than actor deletion
 
 #### Scenario: Registering adds an entity exactly once
 - **WHEN** `register_owned_entity(room, npc)` is called twice with the same `npc`
@@ -140,33 +147,46 @@ SHALL NOT despawn or relocate any entity; only the reclaim path (below) does.
 - **THEN** the room is reclaimed (deleted), not promoted
 
 ### Requirement: reclaim_due_instances despawns owned entities and relocates unowned ones before reclaiming a room
-Immediately before `reclaim_due_instances()` deletes a room routed to reclamation (not promotion), it
-SHALL, for every `typeclasses.entities.LivingEntity` instance still in that room's `contents`: delete
-it if it appears in `room.db.owned_entities`; otherwise relocate it to `settings.DEFAULT_HOME` (via
-the same lookup `DefaultObject.clear_contents()` itself uses) without deleting it. Only after this
-step SHALL `room.delete()` be called.
+
+Before deleting a room routed to reclamation (not promotion), `reclaim_due_instances()` SHALL transfer each retained named actor a published package declares that is still inside to its validated permanent retention destination, drop its ephemeral ownership, delete owned living occupants and relocate unowned ones to their default home. Transfers SHALL preserve exact identity, persona, phase, memory and living state, never cloning or resurrecting; a failure SHALL prevent destructive reclamation.
+
+#### Scenario: Retained role survives instance reclaim
+- **WHEN** a due unpinned non-promotable instance contains a retained role and a disposable occupant
+- **THEN** the same retained actor is moved to its declared permanent destination with history and state preserved, the disposable occupant is removed, and the room is reclaimed together
+
+#### Scenario: Transfer failure keeps the room intact
+- **WHEN** a retention destination is unavailable or a movement/cleanup write fails
+- **THEN** the room and actors survive without partial movement, ownership loss or destructive deletion and a named error is recorded
+
+#### Scenario: Outside actors and unrelated occupants are preserved
+- **WHEN** a retained actor already left the instance while an ordinary unowned occupant remains
+- **THEN** the retained actor's location is unchanged and the unowned occupant follows existing default-home relocation
+
+#### Scenario: Promotion and safety gates remain non-destructive
+- **WHEN** a due room is pinned, contains a player, refuses deletion, or qualifies for promotion
+- **THEN** no retained or disposable actor is destructively cleared by that routing decision
 
 #### Scenario: An NPC-bearing due room is eventually reclaimed, not permanently deferred
 - **WHEN** a due, unpinned `InstanceRoom` contains only an `NPC` (no `PlayerCharacter`), and is not
   both `named` and `interacted`
 - **THEN** `reclaim_due_instances()` reclaims the room in that same call: the room no longer exists in
   the database afterward, and the returned list includes a `ScheduledEvent` of kind
-  `"instance_reclaimed"` for it — this is the direct test the original, uncorrected design lacked
+  `"instance_reclaimed"` for it; this is the direct test the original, uncorrected design lacked
 
 #### Scenario: A registered (owned) NPC is despawned when its room reclaims
-- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains an `NPC` previously passed to
+- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains an ordinary disposable `NPC` previously passed to
   `register_owned_entity(room, npc)`
 - **THEN** after reclamation, that `NPC` no longer exists in the database (it was deleted, not merely
   relocated)
 
 #### Scenario: An unregistered NPC or Monster is relocated, never destroyed, when its room reclaims
-- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains an `NPC` or `Monster` that was
+- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains an ordinary non-retained `NPC` or `Monster` that was
   never passed to `register_owned_entity()`
 - **THEN** after reclamation, that entity still exists in the database, relocated to
   `settings.DEFAULT_HOME` rather than destroyed
 
 #### Scenario: Entity clearing happens before the room's own deletion, not after
-- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains both a registered and an
+- **WHEN** a due, unpinned, non-promotable `InstanceRoom` contains both an ordinary disposable registered and an
   unregistered `NPC`
 - **THEN** both entities have already left the room's `contents` (one deleted, one relocated) by the
   time `room.delete()` is called, so the room's own `at_object_delete()` `PlayerCharacter`-only check
@@ -177,33 +197,31 @@ step SHALL `room.delete()` be called.
   safety net (simulated by a stub `InstanceRoom.at_object_delete()` returning `False`), and the room
   contains a registered and an unregistered `NPC` and a non-empty `owned_entities`
 - **THEN** the call emits a `ScheduledEvent` of kind `"instance_reclaim_deferred"`, the room still
-  exists, and both `NPC`s are still present in its `contents` with `owned_entities` unchanged — the
+  exists, and both `NPC`s are still present in its `contents` with `owned_entities` unchanged; the
   safety net is consulted before any entity is despawned or relocated, so no partial state survives a
   refused delete
 
 #### Scenario: Routing depends only on ownership, never on entity type
-- **WHEN** the despawn-vs-relocate routing rule is applied to entities of any type
-- **THEN** the requirement SHALL hold regardless of whether the entity is an `NPC` or `Monster` —
-  the routing rule depends only on `owned_entities` membership, never on entity type
+- **WHEN** an ordinary non-retained living occupant is routed for cleanup
+- **THEN** owned membership selects deletion and unowned membership selects relocation regardless of NPC or Monster type; retained exact roles use their validated transfer contract first
 
 #### Scenario: Entity clearing consults the typeclass safety net first
 - **WHEN** the entity-clearing step is about to run for a room
 - **THEN** it SHALL only ever run for a room the typeclass safety net would accept: the step SHALL
   first consult `InstanceRoom.at_object_delete()` (D-1), and if that returns `False`, SHALL emit
-  `"instance_reclaim_deferred"` with no entity despawned or relocated — a deferred room therefore
+  `"instance_reclaim_deferred"` with no entity despawned or relocated; a deferred room therefore
   keeps its contents and its `owned_entities` registry intact, so the retry is side-effect-free
 
 #### Scenario: The pre-check replaces the rolling-back-transaction draft
 - **WHEN** this requirement's history is consulted
 - **THEN** the safety-net pre-check replaces an earlier draft that cleared entities and then
-  attempted deletion inside a rolling-back transaction — a design Evennia's idmapper does not
+  attempted deletion inside a rolling-back transaction; a design Evennia's idmapper does not
   reliably support, and which could leave an owned NPC data-lost on the refused-delete path
   (rubber-duck review)
 
 #### Scenario: The rubber-duck-demanded resolution is eventual reclaim with one of two NPC outcomes
-- **WHEN** a due room containing only an NPC (no `PlayerCharacter`, no pin) reaches reclamation
-- **THEN** it is not merely deferred forever — it is **actually and eventually reclaimed**, with
-  its NPC handled by exactly one of the two specified outcomes below
+- **WHEN** a due NPC-only room has no player or pin and all required retention transfers can commit
+- **THEN** reclamation proceeds with disposable owned NPCs deleted, ordinary unowned NPCs relocated, and retained roles transferred through their validated contract
 
 ### Requirement: reclaim_due_instances deletes rooms that are due, unblocked, and not promotable
 For every due `InstanceRoom` with no `PlayerCharacter` present, no active pin, that is not both

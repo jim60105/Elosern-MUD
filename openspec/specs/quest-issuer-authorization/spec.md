@@ -7,11 +7,23 @@ Defines who may issue a private commission: the authority is carried exclusively
 
 ### Requirement: Authority to issue a private commission is authored, never inferred
 
-The right to issue a private commission SHALL be carried exclusively by the `QuestIssuer` component
-declared in `typeclasses/components.py` and registered in the closed profession component
-vocabulary. No other property of an entity — its display name, its typeclass, its other components,
-its location, its schedule, its dialogue authorship, or the mere fact that it has a database
-identity — SHALL confer that authority.
+Private commission authority SHALL reside exclusively in the registered `QuestIssuer` component; only an authored import declaration or an explicitly validated generated package issuer declaration MAY provision it, through rules-owned helpers. No other property SHALL confer that authority. Provisioning SHALL grant only the validated scope to the exact bound actor, keep the component shape and two-form key grammar, and register strictly only after actual authorization.
+
+#### Scenario: Ordinary NPC has no authority
+- **WHEN** an NPC without QuestIssuer, including a merchant or scripted host, is resolved or asks to offer a commission
+- **THEN** no issuer key or commission authority is granted by its other properties
+
+#### Scenario: Generated issuer receives only declared scope
+- **WHEN** activation provisions an explicitly validated issuer role and registers its commission
+- **THEN** the exact bound actor receives the declared scope through deterministic helpers and its existing grammar-valid actual key is used for strict registration
+
+#### Scenario: Undeclared commission is refused
+- **WHEN** a generated issuer attempts an effect outside its validated commission scope or a forged symbolic role is submitted as runtime authority
+- **THEN** authorization rejects it and no quest is accepted or registered
+
+#### Scenario: Provisioning and registration roll back together
+- **WHEN** activation fails after provisioning or registration
+- **THEN** reload and process-local views expose neither partial authority nor a stale commission
 
 #### Scenario: An ordinary NPC cannot issue a commission
 - **WHEN** issuer resolution is attempted for an NPC carrying no `QuestIssuer` component
@@ -20,7 +32,7 @@ identity — SHALL confer that authority.
 #### Scenario: A merchant without the component is still not a commissioner
 - **WHEN** issuer resolution is attempted for an NPC carrying `Merchant` and `ScriptedDialogue` but
   not `QuestIssuer`
-- **THEN** it resolves to nothing — carrying other service components confers no issuing authority
+- **THEN** it resolves to nothing; carrying other service components confers no issuing authority
 
 #### Scenario: No property short of the component confers authority
 - **WHEN** an entity's display name, typeclass, other components, location, schedule, dialogue

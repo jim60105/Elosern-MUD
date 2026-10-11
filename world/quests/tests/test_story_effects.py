@@ -11,6 +11,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.rooms import AnchorRoom
 from world.quests import scene_store
@@ -153,6 +154,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(outcome.reason, "out_of_scope")
         self.assertEqual(read_records(self.player), [])
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work"
+    )
     def test_a_keyword_outside_the_current_phase_is_refused_as_stale(self):
         outcome = apply_story_effect(
             self.mother,
@@ -177,6 +181,9 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.reason, "absent")
 
+    @covers_requirement(
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work"
+    )
     def test_a_phase_change_hides_the_previous_topics(self):
         transition_story_dialogue(
             self.published.package_id,

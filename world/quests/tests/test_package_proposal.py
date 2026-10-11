@@ -8,6 +8,7 @@ commission, round-trips immutably, and an ESCORT objective stays refused.
 
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from world.ai.scenario_director.packages import (
     PACKAGE_PAYLOAD_SCHEMA,
     package_schema_errors,
@@ -27,9 +28,15 @@ from world.quests.tests._scene_package_fixtures import (
 
 
 class PackageProposalSchemaTests(EvenniaTest):
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
     def test_a_valid_synthetic_package_passes_the_canonical_schema(self):
         self.assertEqual(package_schema_errors(_package()), ())
 
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
     def test_an_unknown_top_level_key_is_a_structural_failure(self):
         package = _package()
         package["permissions"] = []
@@ -37,6 +44,9 @@ class PackageProposalSchemaTests(EvenniaTest):
         self.assertTrue(errors)
         self.assertIn("Additional properties are not allowed", errors[0])
 
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
     def test_an_out_of_vocabulary_effect_verb_is_a_structural_failure(self):
         package = _package()
         package["dialogue"][0]["phases"][0]["topics"] = [
@@ -51,6 +61,9 @@ class PackageProposalSchemaTests(EvenniaTest):
         self.assertTrue(errors)
         self.assertIn("effect_verb", errors[0])
 
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
     def test_the_schema_declares_the_closed_top_level_contract(self):
         self.assertFalse(PACKAGE_PAYLOAD_SCHEMA["additionalProperties"])
         self.assertEqual(
@@ -70,6 +83,9 @@ class PackageProposalSchemaTests(EvenniaTest):
 
 
 class PackageProposalPublicationTests(RegistryIsolationMixin, EvenniaTest):
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract"
+    )
     def test_symbolic_publication_creates_no_actor_acceptance_or_authority(self):
         from typeclasses.npcs import NPC
 
@@ -80,6 +96,10 @@ class PackageProposalPublicationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(len(grants), 1)
         self.assertFalse(grants[0].registered)
 
+    @covers_requirement(
+        "scenario-director::scene-package-proposals-share-the-canonical-bounded-contract",
+        "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings",
+    )
     def test_a_published_payload_round_trips_immutably(self):
         published = publish_scene_package(_package(), owner="director")
         row = scene_store.read_package(published.package_id)

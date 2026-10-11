@@ -1313,6 +1313,10 @@ class DialoguePhaseFreshnessTests(EvenniaTest):
         )
         return phase.greeting
 
+    @covers_requirement(
+        "npc-dialogue::generated-free-form-dialogue-includes-only-permitted-current-phase-context",
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work",
+    )
     def test_run_npc_exchange_marks_a_phase_change_as_stale(self):
         def _advance(_descriptor):
             self._advance_phase()
@@ -1329,6 +1333,10 @@ class DialoguePhaseFreshnessTests(EvenniaTest):
             pair_view(self.npc, self.player)[0], [f"{self.player.key}: 你好"]
         )
 
+    @covers_requirement(
+        "npc-dialogue::generated-free-form-dialogue-includes-only-permitted-current-phase-context",
+        "story-phase-dialogue::phase-revision-invalidates-pending-dialogue-work",
+    )
     def test_at_talked_to_delivers_no_speech_and_refreshes_the_current_phase(self):
         from world.rules.dialogue import clear_dialogue_session, open_or_refresh_dialogue
         from world.rules.player_messages import STALE_PHASE_NOTE

@@ -12,6 +12,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.components import QuestIssuer
 from typeclasses.rooms import AnchorRoom, InstanceRoom
@@ -47,6 +48,9 @@ class EncounterActivationTestBase(RegistryIsolationMixin, EvenniaTestCase):
 
 
 class EncounterActivationTests(EncounterActivationTestBase):
+    @covers_requirement(
+        "quest-scene-encounters::encounter-activation-is-independent-of-quest-acceptance"
+    )
     def test_activation_binds_exact_roles_without_accepting_a_quest(self):
         result = self._activate()
         self.assertTrue(result.activated)
@@ -58,6 +62,10 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(read_records(self.player), [])
         self.assertEqual(self.room.db.desc, None)
 
+    @covers_requirement(
+        "quest-scene-encounters::encounter-activation-is-independent-of-quest-acceptance",
+        "persistent-story-roles::reusable-roles-bind-exact-actor-identities",
+    )
     def test_either_encounter_activates_first_and_both_preserve_the_relationship(self):
         first = self._activate("south_gate")
         second = self._activate("market")
@@ -68,6 +76,10 @@ class EncounterActivationTests(EncounterActivationTestBase):
         )
         self.assertEqual(read_records(self.player), [])
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors",
+        "persistent-story-roles::reusable-roles-bind-exact-actor-identities",
+    )
     def test_repeat_activation_reuses_the_committed_identity(self):
         first = self._activate()
         second = self._activate()
@@ -80,6 +92,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
             1,
         )
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors"
+    )
     def test_a_wrong_locator_is_named_and_writes_nothing(self):
         other = create_object(AnchorRoom, key="別處")
         other.db.anchor_key = "not_the_encounter_anchor"
@@ -93,6 +108,10 @@ class EncounterActivationTests(EncounterActivationTestBase):
             )
         )
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors",
+        "persistent-story-roles::named-role-retention-survives-quest-termination",
+    )
     def test_a_missing_bound_actor_is_named_without_a_repair_actor(self):
         first = self._activate()
         npc = ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first()
@@ -107,6 +126,10 @@ class EncounterActivationTests(EncounterActivationTestBase):
             "actor_missing",
         )
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors",
+        "persistent-story-roles::named-role-retention-survives-quest-termination",
+    )
     def test_a_dead_bound_actor_is_named(self):
         first = self._activate()
         npc = ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first()
@@ -116,6 +139,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertFalse(result.activated)
         self.assertEqual(result.reason, "actor_dead")
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors"
+    )
     def test_cancellation_prevents_activation(self):
         self.assertTrue(
             cancel_scene_encounter(
@@ -162,6 +188,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertTrue(facts["unresolved"])
         self.assertFalse(facts["closure"])
 
+    @covers_requirement(
+        "quest-scene-encounters::repeated-activation-never-repairs-missing-actors"
+    )
     def test_an_instance_encounter_materializes_one_room_and_reuses_it(self):
         from typeclasses.rooms import Room
 
@@ -185,6 +214,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         actor = ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first()
         self.assertEqual(actor.location.pk, first.room_id)
 
+    @covers_requirement(
+        "quest-scene-encounters::activation-commits-one-durable-identity-or-no-partial-scene"
+    )
     def test_a_failed_instance_activation_leaves_no_room_behind(self):
         from typeclasses.rooms import Room
 
@@ -208,6 +240,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertTrue(result.activated)
         self.assertEqual(InstanceRoom.objects.all().count(), 1)
 
+    @covers_requirement(
+        "quest-scene-encounters::activation-commits-one-durable-identity-or-no-partial-scene"
+    )
     def test_a_failure_after_creation_rolls_back_and_reuses_the_identity(self):
         with patch(
             "world.quests.scene_store.mark_encounter_activated",
@@ -225,6 +260,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
             ObjectDB.objects.filter(db_key="測試住民daughter").count(), 1
         )
 
+    @covers_requirement(
+        "quest-scene-encounters::activation-commits-one-durable-identity-or-no-partial-scene"
+    )
     def test_a_failure_after_component_configuration_rolls_back(self):
         with patch(
             "world.rules.quest_issuance.provision_scoped_issuer",
@@ -236,6 +274,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(scene_store.list_role_bindings(self.published.package_id), [])
         self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
 
+    @covers_requirement(
+        "quest-scene-encounters::activation-commits-one-durable-identity-or-no-partial-scene"
+    )
     def test_a_failure_after_commission_registration_rolls_back(self):
         with patch(
             "world.quests.compile.registration.register_quest_issuance",

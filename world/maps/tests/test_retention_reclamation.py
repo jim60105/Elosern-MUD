@@ -11,6 +11,7 @@ from evennia.utils.create import create_object
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, InstanceRoom
 from world.maps.instance import reclaim_due_instances, register_owned_entity
@@ -37,6 +38,9 @@ class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
             row, "daughter", int(self.actor.pk), provenance={"kind": "test"}, tick=1
         )
 
+    @covers_requirement(
+        "persistent-story-roles::named-role-retention-survives-quest-termination"
+    )
     def test_a_retained_role_is_transferred_instead_of_deleted(self):
         destination = create_object(AnchorRoom, key="南門")
         destination.db.anchor_key = _anchor_key()
@@ -74,6 +78,9 @@ class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
         self.assertEqual(self.actor.location.pk, self.room.pk)
         self.assertIn(self.actor, list(self.room.db.owned_entities or []))
 
+    @covers_requirement(
+        "persistent-story-roles::named-role-retention-survives-quest-termination"
+    )
     def test_a_disposable_occupant_is_still_deleted_alongside_a_retained_role(self):
         destination = create_object(AnchorRoom, key="南門")
         destination.db.anchor_key = _anchor_key()
