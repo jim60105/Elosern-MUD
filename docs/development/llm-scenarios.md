@@ -290,6 +290,24 @@ LLM 必須輸出 JSON 格式：
 
 變更紀錄：啟用真實的任務種子發布，加入無填充產生與來源重驗證，並保留一般的離線行為。玩家指令與瀏覽器動作都沒有變更。
 
+### Deterministic escort acceptance
+
+`accept_quest` dispatches definitions containing an ESCORT objective to
+`scene_api.accept_escort_commission`. The quest owner revalidates the activated
+commission grant, scoped issuer, current offer phase/revision, exact published
+protected-role bindings, living state, physical presence and membership owner.
+Temporary membership uses the existing roster's record/role reasons, not a
+second roster or the four-member general quota. Exclusive-group acceptances
+allocate their sequence under the durable group owner.
+
+Terminal replacement releases only that record's sources through
+`scene_api.release_escort_bindings`. General or other valid temporary sources
+preserve possession; actual last-source release performs verified handback.
+An outer write failure restores roster metadata, back-references, control
+mirrors, puppet locks and the live puppet. Presentation synchronization uses a
+fresh sequence, never a retired epoch. Generated escort publication remains
+closed until the real-owner smoke proves the full movement/result/payment path.
+
 ## 相關延伸閱讀
 
 * 深入探索各情境的語意驗證器與天梯實作：[護欄天梯與語意驗證機制](/development/llm-guardrails)

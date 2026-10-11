@@ -35,6 +35,7 @@ from ._fixtures import (
     escort,
     quest,
     register,
+    stage_active_record,
 )
 
 
@@ -284,7 +285,7 @@ class BindingTests(QuestRegistryIsolation, EvenniaTest):
     def test_escort_binding_stores_only_protected_identities(self):
         room = self._room("escort-room")
         npc = self._npc("escort-npc")
-        record = accept(self.player, self.escort_def.key)
+        record = stage_active_record(self.player, self.escort_def.key)
         bound = bind_stage_runtime(
             self.player,
             record.quest_id,

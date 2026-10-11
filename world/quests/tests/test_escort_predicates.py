@@ -35,7 +35,7 @@ from world.quests.runtime import QuestState
 
 from ._fixtures import (
     QuestRegistryIsolation,
-    accept,
+    stage_active_record,
     anchor_locator,
     bound_instance_locator,
     escort,
@@ -93,7 +93,7 @@ class EscortPredicateTests(QuestRegistryIsolation, EvenniaTest):
         return npc
 
     def _bind(self, definition, pairs):
-        record = accept(self.player, definition.key)
+        record = stage_active_record(self.player, definition.key)
         return replace(record, protected_roles=tuple(pairs))
 
     def _destination_record(self, npc):
@@ -156,7 +156,7 @@ class EscortPredicateTests(QuestRegistryIsolation, EvenniaTest):
         instance = create_object(InstanceRoom, key="綁定場景")
         guarded.move_to(instance, quiet=True)
         bound = replace(
-            accept(self.player, instance_def.key),
+            stage_active_record(self.player, instance_def.key),
             protected_roles=(("escortee", guarded.pk),),
             stage_room_id=instance.pk,
         )

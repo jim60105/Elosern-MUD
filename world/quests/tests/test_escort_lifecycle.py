@@ -1,0 +1,116 @@
+"""Synthetic definitions exercise actual escort acceptance and source owners."""
+
+from unittest.mock import patch
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from typeclasses.npcs import NPC
+from world.quests import scene_store
+from world.quests.definitions import EscortCompletion, QuestStage, QuestType
+from world.quests.escort_lifecycle import EscortOperationError, accept_escort_commission
+from world.quests.runtime import accept_quest, abandon_quest, read_records
+from world.rules.party import is_companion, join_party, party_size, reasons_for
+from world.rules.quest_issuance import (
+    QuestIssuance, Settlement, provision_scoped_issuer, register_quest_issuance,
+)
+from world.rules.guild_offers import QuestReward
+
+from ._fixtures import QuestRegistryIsolation, escort, quest, register
+
+
+class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
+    def setUp(self):
+        super().setUp()
+        self.owner = self.char1
+        self.protected = create_object(NPC, key="protected participant", location=self.room1)
+        self.issuer = create_object(NPC, key="commission issuer", location=self.room1)
+        self.meeting = create_object(NPC, key="meeting participant", location=self.room2)
+        for actor in (self.protected, self.issuer, self.meeting):
+            actor.race = "human"
+            actor.apply_race_baseline()
+        self.definition = register(quest(
+            "synthetic_bound_escort", quest_type=QuestType.ESCORT,
+            stages=(QuestStage(0, escort(
+                completion=EscortCompletion.RENDEZVOUS,
+                protected_role_refs=("protected",), meeting_role_refs=("meeting",),
+            )),),
+        ))
+        self.issuer_key = provision_scoped_issuer(self.issuer, content_key="synthetic_bound_issuer")
+        register_quest_issuance(QuestIssuance(
+            definition_key=self.definition.key, issuer_key=self.issuer_key,
+            reward=QuestReward(copper=1, items=(), merit=0), settlement=Settlement.AUTO,
+        ))
+        # Store construction is the upstream supported synthetic setup, not a
+        # successful generated validation mock. All publication guards stay shut.
+        self.package, _ = scene_store.publish_package(
+            package_id="synthetic_bound_package", source_id=None, owner_id="fixture",
+            payload={
+                "roles": [{"role_id": role} for role in ("issuer", "protected", "meeting")],
+                "commissions": [{"role_id": "issuer", "issuer_content_key": "synthetic_bound_issuer"}],
+                "dialogue": [{"role_id": "issuer", "phases": [{
+                    "phase_id": "offer", "topics": [{"keyword": "escort",
+                        "effect_verb": "offer_commission", "effect_reference": self.definition.key}],
+                }]}], "outcome_groups": [],
+            },
+        )
+        for role, actor in (("issuer", self.issuer), ("protected", self.protected), ("meeting", self.meeting)):
+            scene_store.bind_role(self.package, role, actor.pk)
+        scene_store.ensure_commission_grant(
+            self.package, "issuer", self.definition.key, issuer_key=self.issuer_key,
+        )
+        scene_store.assign_grant_actor(self.package, "issuer", self.definition.key, self.issuer.pk)
+        scene_store.set_grant_registered(self.package, "issuer", self.definition.key, True)
+        scene_store.set_dialogue_phase(self.package, "issuer", "offer")
+
+    def test_acceptance_returns_exact_persisted_binding_beyond_general_quota(self):
+        for _ in range(4):
+            join_party(create_object(NPC, key="general member", location=self.room1), self.owner)
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        self.assertEqual(record.protected_roles, (("protected", self.protected.pk),))
+        self.assertEqual(record.protected_entity_ids, (self.protected.pk,))
+        self.assertTrue(is_companion(self.protected, self.owner))
+        self.assertEqual(party_size(self.owner), 4)
+        self.owner.attributes.reset_cache()
+        self.protected.attributes.reset_cache()
+        self.assertEqual(read_records(self.owner)[0], record)
+        self.assertEqual(reasons_for(self.protected, self.owner), ((record.quest_id, "protected"),))
+
+    def test_current_offer_revision_presence_and_foreign_ownership_refuse(self):
+        for setup, reason in (
+            (lambda: None, "offer_stale"),
+            (lambda: setattr(self.protected, "location", self.room2), "role_not_co_located"),
+            (lambda: setattr(self.protected.db, "party_member", self.char2.pk), "membership_owned_elsewhere"),
+        ):
+            with self.subTest(reason=reason):
+                self.protected.location = self.room1
+                self.protected.db.party_member = None
+                setup()
+                with self.assertRaises(EscortOperationError) as failure:
+                    accept_escort_commission(
+                        self.owner, self.definition.key, self.issuer_key,
+                        expected_revision=1 if reason == "offer_stale" else 0,
+                    )
+                self.assertEqual(failure.exception.reason, reason)
+                self.assertEqual(read_records(self.owner), [])
+
+    def test_source_write_fault_restores_acceptance_and_paired_cache(self):
+        with patch("world.quests.escort_lifecycle.add_temporary_source", side_effect=RuntimeError("source fault")):
+            with self.assertRaises(EscortOperationError) as failure:
+                accept_quest(self.owner, self.definition.key, self.issuer_key)
+        self.assertEqual(failure.exception.reason, "acceptance_write_failed")
+        for reload in (False, True):
+            if reload:
+                self.owner.attributes.reset_cache()
+                self.protected.attributes.reset_cache()
+            self.assertEqual(read_records(self.owner), [])
+            self.assertFalse(is_companion(self.protected, self.owner))
+            self.assertIsNone(self.protected.db.party_member)
+
+    def test_abandonment_releases_only_record_source_and_keeps_general_member(self):
+        join_party(self.protected, self.owner)
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        failed = abandon_quest(self.owner, record.quest_id)
+        self.assertEqual(failed.failure_reason, "abandoned")
+        self.assertEqual(reasons_for(self.protected, self.owner), ())
+        self.assertTrue(is_companion(self.protected, self.owner))

@@ -159,8 +159,7 @@ class QuestRecord:
     #: redelivered defeat event for a counted identity advances nothing.
     counted_defeat_ids: tuple[int, ...] = ()
     #: The published package identity this record was accepted under, or
-    #: ``None`` for an ordinary record. ``package_id``, ``group_id`` and
-    #: ``acceptance_sequence`` are set together or not at all.
+    #: ``None`` for an ordinary record. An escort may have no exclusive group.
     package_id: str | None = None
     #: The explicit exclusive outcome group this record competes in, or ``None``.
     group_id: str | None = None
@@ -452,15 +451,13 @@ def validate_record_runtime(record: QuestRecord) -> None:
             f"is outside definition {record.definition_key!r}"
         )
     group_fields = (
-        record.package_id is not None,
         record.group_id is not None,
         record.acceptance_sequence is not None,
     )
-    if any(group_fields) and not all(group_fields):
+    if any(group_fields) and (not all(group_fields) or record.package_id is None):
         raise QuestDataError(
             f"quest {record.quest_id!r} declares an incomplete exclusive-group "
-            "identity; package_id, group_id and acceptance_sequence are set "
-            "together or not at all"
+            "identity; group_id and acceptance_sequence require package_id"
         )
     if record.group_id is not None and record.group_id == "":  # pragma: no cover - guarded by the reader
         raise QuestDataError(f"quest {record.quest_id!r} has an empty group id")
@@ -840,7 +837,10 @@ def _emit_site_targets_unavailable(
     log_warn("hunt_site_targets_unavailable", context=context)
 
 
-def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecord:
+def accept_quest(
+    actor: Any, definition_key: str, issuer_key: str, *,
+    actual_actor: Any = None, expected_revision: int | None = None,
+) -> QuestRecord:
     """Create one deterministic stage-zero active record for ``definition_key``.
 
     The record is only created under a registered issuance: the issuer key
@@ -870,6 +870,15 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
     definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
     if definition is None:
         raise QuestNotFound(f"unknown definition {definition_key!r}")
+    from .definitions import ObjectiveKind
+
+    if any(stage.objective.kind is ObjectiveKind.ESCORT for stage in definition.stages):
+        from .escort_lifecycle import accept_escort_commission
+
+        return accept_escort_commission(
+            actor, definition_key, issuer_key, actual_actor=actual_actor,
+            expected_revision=expected_revision,
+        )
     current = read_records(actor)
     if any(
         record.definition_key == definition_key
