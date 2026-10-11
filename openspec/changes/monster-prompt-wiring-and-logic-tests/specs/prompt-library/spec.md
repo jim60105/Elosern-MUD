@@ -52,9 +52,10 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
 
 #### Scenario: Determinism is two renders, not a wording pin
 - **WHEN** a prompt-library test renders a shipped key twice with identical values
-- **THEN** it asserts the two renders are byte-identical and that supplied values appear with no
-  unsubstituted `{token}` remaining, and it never compares the output to a literal shipped-template
-  sentence
+- **THEN** it asserts the two renders are byte-identical and that every token the template actually
+  selects is substituted exactly as many times as the template spells it, with no unsubstituted
+  `{token}` remaining — a declared token the template does not select is inert and is never
+  required to appear — and it never compares the output to a literal shipped-template sentence
 
 #### Scenario: Verbatim shipment pins retire for every prompt file
 - **WHEN** the prompt suite is inspected for byte-for-byte comparisons of rendered shipped-library
@@ -73,16 +74,21 @@ SHALL NOT compare rendered output against literal shipped `prompts/*.yaml` wordi
 #### Scenario: Placeholder parity is guarded for both art description keys
 - **WHEN** the shipped `art.character_description` and `art.monster_description` templates are
   compared against their `PROMPT_SPECS` allowlists
-- **THEN** each template's `{token}` set equals its allowlist exactly, so a token added to one side
-  without the other fails the parity test rather than crashing at render time
+- **THEN** each template's `{token}` set is a subset of its allowlist (a shipped token outside the
+  allowlist is already a load-time unknown-placeholder error) and each allowlist carries exactly
+  its contract's tokens — the character key's five tokens, and the monster key's `description` plus
+  `display_name`, never `examples` — so a token added to the allowlist without the contract fails
+  the parity test, a shipped template that selects a subset of its declared tokens stays legal, and
+  no declared token can be missing at render time
 
 #### Scenario: A wording-only shipped edit breaks no test
 - **WHEN** a deployment retunes a shipped template's framing wording inside its existing token
   skeleton — appending pose, lighting, or LoRA/quality tags as a prompt-authoring edit does — and
   the prompt suite plus the description-composition suites run against that wording
 - **THEN** every test stays green, because no test compares rendered shipped-library output to
-  literal framing text; only a change to a template's token set breaks a test, through the
-  token-parity or unknown-placeholder load-error check
+  literal framing text; only adding an undeclared `{token}` to a template breaks a test, through
+  the unknown-placeholder load error, while adding an allowlisted token or dropping a declared one
+  stays green because a key renders with the tokens it declares
 
 #### Scenario: Brace pass-through is exercised on test-owned fixtures
 - **WHEN** the loader's brace pass-through contract (a `{{token}}` or a JSON example brace such as
