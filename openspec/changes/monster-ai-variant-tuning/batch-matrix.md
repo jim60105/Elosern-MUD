@@ -37,3 +37,13 @@ All changes can share .github/evennia-shards.json and release documentation; the
 ## Deliberately unchanged contracts
 
 Monster flee thresholds, FLEE_SKILL_KEY and flee priority remain outside scoring. Non-monster delegated policy remains unchanged. Current effect definitions, base stats, initiative, resolver authority, true-trait arithmetic and transaction journals remain the existing product contracts. AI proposals amend legacy-specific main requirements through change-local deltas only. No durable memory, individual GM override, intelligence inheritance or entity trait copy is added.
+
+## Startup-only mode transition
+
+Every migration-plan reference to a new session means a session using configuration already loaded and validated at process startup. A fresh mode edit on disk requires restart before production rollback smoke. Terminating a session does not reload tuning, and this batch authorizes no hot reload.
+
+## Batch critique disposition
+
+The single blocking rubber-duck review covered all ten complete artifact sets and approved designs. It identified two blocking planning defects. Staged activation now requires restart to load an edited rollback mode and tests that a new session cannot reload disk edits. Observation lifecycle now checkpoints all publication controls, including terminal tokens and pending tuning cleanup, and tests a caught terminal savepoint failure followed by successful outer commit.
+
+The review also identified an undefined threat-participation mapping. Coordination now uses the existing highest_effective_power strategy for utility threat participation, averages static-power and observed-threat ranks and verifies a paired nonparticipating lowest_hp profile. No new configuration field is added. These corrections preserve full approved scope; they do not constitute implementation evidence or a second independent review.
