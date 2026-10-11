@@ -6,8 +6,8 @@ prompts:
   # contributes nothing and the sentence stays byte-identical. The template
   # owns which sections exist and in which order they are composed.
   art.character_description: |-
-    {race}, {age} years old.{appearance}{equipment}{custom}
-  art.monster_description: "{description}"
+    {race}, {age} years old.{appearance}{equipment}{custom}, standing, rim light on clothes,
+  art.monster_description: "{description}, <lora:animals-lora-p3:0.5>, fantasy wild monster, creature, creature focus, monster,"
   # Positive prompt template for scene subjects. {description} is the
   # deterministic scene sentence from the scene-archetype registry; the
   # surrounding text is authored per the image-prompt-builder-nl skill.
@@ -25,7 +25,7 @@ prompts:
   # is the deterministic character/monster description; the surrounding text is
   # authored per the image-prompt-builder-nl skill.
   art.portrait_prompt: >-
-    masterpiece, very aesthetic, best quality, {description}, facing viewer, looking at viewer, clean lineart, RPG character illustration, simple black background, rim light on clothes, solo, full body, standing, pose, fantasy, medieval fantasy, (official art),
+    masterpiece, very aesthetic, best quality, {description}, facing viewer, looking at viewer, clean lineart, RPG character illustration, simple black background, solo, full body, pose, fantasy, medieval fantasy, (official art),
   # Shared negative prompt for every art generation request. Plain text with no
   # placeholders.
   art.negative_prompt: "worst quality, low quality, score_1, score_2, score_3, blurry, jpeg artifacts, sepia, watermark, signature"
