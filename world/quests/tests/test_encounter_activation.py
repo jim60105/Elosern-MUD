@@ -178,3 +178,27 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(
             ObjectDB.objects.filter(db_key="測試住民daughter").count(), 1
         )
+
+    def test_a_failure_after_component_configuration_rolls_back(self):
+        with patch(
+            "world.rules.quest_issuance.provision_scoped_issuer",
+            side_effect=RuntimeError("injected configuration failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self._activate("market")
+        self.assertEqual(ObjectDB.objects.filter(db_key="測試住民mother").count(), 0)
+        self.assertEqual(scene_store.list_role_bindings(self.published.package_id), [])
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
+
+    def test_a_failure_after_commission_registration_rolls_back(self):
+        with patch(
+            "world.quests.compile.registration.register_quest_issuance",
+            side_effect=RuntimeError("injected registration failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self._activate("market")
+        self.assertEqual(QUEST_ISSUANCE_REGISTRY, {})
+        self.assertEqual(scene_store.list_role_bindings(self.published.package_id), [])
+        grant = scene_store.list_commission_grants(self.published.package_id)[0]
+        self.assertFalse(grant.registered)
+        self.assertEqual(grant.npc_id, 0)

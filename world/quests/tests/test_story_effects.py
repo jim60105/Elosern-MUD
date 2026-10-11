@@ -87,10 +87,20 @@ class GeneratedDialogueResolutionTests(RegistryIsolationMixin, EvenniaTest):
         return ObjectDB.objects.filter(id=binding.npc_id).first()
 
     def test_generated_topics_and_greeting_resolve_through_the_shared_seam(self):
+        from web.webclient.presentation.affordances import (
+            _scripted_keyword_descriptors,
+        )
+
         self.assertTrue(opens_dialogue(self.mother))
         self.assertEqual(
             dialogue_topic_keywords(self.mother),
             (INFORMATION_KEYWORD, COMMISSION_KEYWORD),
+        )
+        # The actual presentation consumer (the version-2 panel's descriptor
+        # source) reads the same generated topics in the same order.
+        self.assertEqual(
+            [row["keyword_id"] for row in _scripted_keyword_descriptors(self.mother)],
+            [INFORMATION_KEYWORD, COMMISSION_KEYWORD],
         )
         self.assertEqual(greeting_for(self.mother), f"{LONG_PROSE}searching")
         self.assertEqual(

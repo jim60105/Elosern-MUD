@@ -19,6 +19,7 @@ from world.quests.tests._compile_helpers import _anchor_key
 from world.quests.tests._fixtures import RegistryIsolationMixin
 from world.quests.tests._scene_package_fixtures import package as _package
 from world.rules.clock import ScheduledEvent
+from world.rules.npc_persona import read_npc_persona
 
 
 class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
@@ -38,6 +39,9 @@ class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
     def test_a_retained_role_is_transferred_instead_of_deleted(self):
         destination = create_object(AnchorRoom, key="南門")
         destination.db.anchor_key = _anchor_key()
+        row = scene_store.read_package(self.published.package_id)
+        scene_store.set_dialogue_phase(row, "daughter", "searching")
+        before_persona = read_npc_persona(self.actor)
         events = reclaim_due_instances(0, 100)
         self.assertFalse(InstanceRoom.objects.filter(id=self.room.id).exists())
         self.assertIn(
@@ -46,6 +50,17 @@ class RetainedRoleReclamationTests(RegistryIsolationMixin, EvenniaTest):
         )
         self.actor.refresh_from_db()
         self.assertEqual(self.actor.location.pk, destination.pk)
+        # Identity, persona and committed phase survive the transfer: nothing is
+        # cloned, resurrected or reset.
+        self.assertEqual(read_npc_persona(self.actor), before_persona)
+        self.assertEqual(
+            scene_store.get_dialogue_phase(self.published.package_id, "daughter").selected_phase,
+            "searching",
+        )
+        self.assertEqual(
+            scene_store.get_role_binding(self.published.package_id, "daughter").npc_id,
+            int(self.actor.pk),
+        )
 
     def test_an_unavailable_destination_keeps_the_room_and_the_actor(self):
         events = reclaim_due_instances(0, 100)
