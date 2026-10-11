@@ -486,10 +486,10 @@ def activate_scene_encounter(
                 row, scene_id, int(player.pk), activation_tick=tick, tick=tick
             )
     except EncounterUnavailable as error:  # observability: ignore R2: the named unavailability is emitted as scene_encounter_unavailable by _unavailable() and returned to the caller
-        _evict_created(created_pks)
+        evict_created_actors(created_pks)
         return _unavailable(package_id, scene_id, player, error.reason, tick=tick)
     except Exception:
-        _evict_created(created_pks)
+        evict_created_actors(created_pks)
         raise
 
     actors = [
@@ -552,12 +552,13 @@ def cancel_scene_encounter(
     return True
 
 
-def _evict_created(created_pks: list[int]) -> None:
+def evict_created_actors(created_pks: list[int]) -> None:
     """Evict the Evennia caches of actors a rolled-back activation created.
 
     Django rolls the rows back; the idmapper would otherwise keep a cached
     instance for a primary key whose row no longer exists, so a later read could
-    observe a phantom actor.
+    observe a phantom actor. Shared by every caller that materializes package
+    roles inside a transaction.
     """
     if created_pks:
         flush_cache()
@@ -570,4 +571,6 @@ __all__ = [
     "activate_scene_encounter",
     "cancel_scene_encounter",
     "committed_observations",
+    "ensure_package_role",
+    "evict_created_actors",
 ]

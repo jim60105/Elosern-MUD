@@ -102,6 +102,29 @@ class PermanentPackageOccupantTests(RegistryIsolationMixin, EvenniaTest):
         self.assertIn("actor_missing", str(caught.exception))
         self.assertEqual(ObjectDB.objects.filter(db_typeclass_path=LLM_NPC_PATH).count(), 0)
 
+    def test_a_later_missing_role_rolls_back_the_earlier_adoption(self):
+        payload = _permanent_occupant_package("synthetic-two-role-source")
+        payload["quest"]["stages"][0]["npc_req"] = [
+            _npc_req("mother"),
+            _npc_req("daughter"),
+        ]
+        published = publish_scene_package(payload, owner="tester")
+        record = accept(self.player, published.definition_key)
+        materialize_stage(self.player, record.quest_id)
+        retained = scene_store.get_role_binding(published.package_id, "mother")
+        gone = scene_store.get_role_binding(published.package_id, "daughter")
+        ObjectDB.objects.filter(id=gone.npc_id).first().delete()
+        with self.assertRaises(SceneBuilderRoleUnavailable) as caught:
+            materialize_stage(self.player, record.quest_id)
+        self.assertIn("actor_missing", str(caught.exception))
+        # The first role keeps its exact actor; only the missing one is reported.
+        self.assertEqual(
+            scene_store.get_role_binding(published.package_id, "mother").npc_id,
+            retained.npc_id,
+        )
+        self.assertTrue(ObjectDB.objects.filter(id=retained.npc_id).exists())
+        self.assertEqual(ObjectDB.objects.filter(db_typeclass_path=LLM_NPC_PATH).count(), 1)
+
     def test_a_permanent_stage_without_occupants_is_located_only(self):
         payload = _package()
         payload["source_id"] = "synthetic-locate-only-source"
@@ -144,3 +167,16 @@ class PermanentOccupantGuardTests(RegistryIsolationMixin, EvenniaTest):
         self.assertTrue(
             _validate_scene_bound_rules(payload, package_roles=frozenset({"mother"}))
         )
+
+    def test_deliver_is_not_a_compilable_objective_kind(self):
+        from world.quests.compile.contracts import _OBJECTIVE_KIND_BY_VALUE
+
+        # The bounded exception's safety rests on only reach/acquire and
+        # monster-tier DEFEAT completing without a stage binding: pin the
+        # vocabulary so a future bound-target kind cannot pass silently.
+        self.assertNotIn("deliver", _OBJECTIVE_KIND_BY_VALUE)
+        payload = _permanent_occupant_package("synthetic-deliver-source")
+        payload["quest"]["stages"][0]["objective"] = {"kind": "deliver", "quantity": 1}
+        with self.assertRaises(ScenePackageError) as caught:
+            validate_scene_package(payload)
+        self.assertIn("unknown objective kind", str(caught.exception))

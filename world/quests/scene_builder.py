@@ -393,6 +393,7 @@ def _materialize_permanent(record, definition, requirement, room) -> SceneMateri
     from world.quests.encounter_activation import (
         EncounterUnavailable,
         ensure_package_role,
+        evict_created_actors,
     )
     from world.quests.scene_package import validated_package
 
@@ -410,26 +411,34 @@ def _materialize_permanent(record, definition, requirement, room) -> SceneMateri
             "materialize its occupants"
         )
     tick = int(getattr(record, "accepted_tick", 0) or 0)
-    with transaction.atomic():
-        for role, _tier, _disposition in requirement.npc_reqs:
-            try:
-                ensure_package_role(
-                    package_row,
-                    package_definition,
-                    role,
-                    room,
-                    provenance={
-                        "kind": "accepted_stage",
-                        "quest": record.quest_id,
-                        "stage": requirement.index,
-                        "role": role,
-                    },
-                    tick=tick,
-                )
-            except EncounterUnavailable as error:
-                raise SceneBuilderRoleUnavailable(
-                    f"required role {role!r} is unavailable: {error.reason}"
-                ) from error
+    created_pks: list[int] = []
+    try:
+        with transaction.atomic():
+            for role, _tier, _disposition in requirement.npc_reqs:
+                try:
+                    ensure_package_role(
+                        package_row,
+                        package_definition,
+                        role,
+                        room,
+                        provenance={
+                            "kind": "accepted_stage",
+                            "quest": record.quest_id,
+                            "stage": requirement.index,
+                            "role": role,
+                        },
+                        created_pks=created_pks,
+                        tick=tick,
+                    )
+                except EncounterUnavailable as error:
+                    raise SceneBuilderRoleUnavailable(
+                        f"required role {role!r} is unavailable: {error.reason}"
+                    ) from error
+    except Exception:
+        # The rows roll back; the idmapper would otherwise keep a cached actor
+        # whose row is gone, exactly as the activation boundary compensates.
+        evict_created_actors(created_pks)
+        raise
     return SceneMaterialization(room, record)
 
 

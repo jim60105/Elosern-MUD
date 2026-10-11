@@ -100,9 +100,9 @@ def _validate_scene_bound_rules(
     package_owned = (
         bool(package_roles) and bool(roles) and roles.issubset(package_roles)
     )
-    needs_stage_binding = (
-        objective.kind is ObjectiveKind.DEFEAT and objective.requires_bound_targets
-    )
+    # Derived from the objective's own binding requirement, so a future
+    # bound-target objective kind cannot slip through the exception.
+    needs_stage_binding = objective.requires_bound_targets
     if has_occupants and not (
         location is not None and location.kind is DestinationKind.BOUND_INSTANCE
     ) and not (package_owned and not needs_stage_binding):

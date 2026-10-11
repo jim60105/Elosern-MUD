@@ -557,10 +557,17 @@ def _validate_scene_bound_rules(
             and bool(roles)
             and all(isinstance(role, str) and role in package_roles for role in roles)
         )
-        needs_stage_binding = (
-            isinstance(objective, dict)
-            and objective.get("kind") == "defeat"
-            and objective.get("monster_tier") is None
+        # Mirrors the compiler's ``requires_bound_targets``: only a
+        # reach/acquire objective or a monster-tier DEFEAT completes without a
+        # stage binding, so any other (including a future) kind keeps the
+        # instance-only requirement.
+        kind = objective.get("kind") if isinstance(objective, dict) else None
+        has_monster_tier = (
+            isinstance(objective, dict) and objective.get("monster_tier") is not None
+        )
+        needs_stage_binding = not (
+            kind in ("reach_location", "acquire")
+            or (kind == "defeat" and has_monster_tier)
         )
         if (
             has_npc
