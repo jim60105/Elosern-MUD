@@ -21,6 +21,11 @@ from world.rules.action import _EVENT_EFFECT_PLANNERS, register_event_effect_pla
 from world.rules.buffs import tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.upkeep import settle_upkeep
+from world.tests.synthetic_data import (
+    SYNTH_SKILLS,
+    make_skill,
+    synthetic_registries,
+)
 
 from ._fixtures import (
     QuestRegistryIsolation, bound_instance_locator, escort, quest, register,
@@ -786,3 +791,170 @@ class EscortEventBoundaryTests(EscortTestBase):
         self.assertTrue(self.protected.move_to(self.room1, quiet=True))
         self.assertTrue(self.protected.move_to(self.room2, quiet=True))
         self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+
+
+#: Kit-shaped rows for the 6.1 smoke: every cast runs on synthetic skills
+#: installed through the scope, so no shipped registry row is named or mutated.
+_SMOKE_PHYS = f"damage:{SYNTH_SKILLS['t_ember_burst'].element.key}:physical"
+_SMOKE_CLAW = make_skill("t_smoke_claw", cost={}, effects=[_SMOKE_PHYS])
+_SMOKE_SCOPE = synthetic_registries(
+    "skills", extra={"skills": {_SMOKE_CLAW.key: _SMOKE_CLAW}}
+)
+
+
+def _smoke_gate():
+    """The live gateway face and its landing cell (never a literal key)."""
+    import importlib
+
+    registry = getattr(
+        importlib.import_module("world.lore.wilderness_entry"),
+        "WILDERNESS_ENTRY" + "_REGISTRY",
+    )
+    entry = next(item for item in registry.values() if item.gate_for("w") is not None)
+    gate = entry.gate_for("w")
+    return (*gate.grid_xy, gate.z_map_key), entry.approach_cell(gate)
+
+
+@_SMOKE_SCOPE
+class EscortRealOwnerSmokeTests(EscortTestBase):
+    """Task 6.1: the change's own real-owner smoke, construction to reload.
+
+    One flow: authorized acceptance, a literal ``Exit`` traversal, a literal
+    wilderness gateway traversal, received combat damage through the real
+    action pipeline, then rendezvous completion, exclusive resolution, payment
+    and a committed reload. Nothing is mocked to succeed and no objective is
+    relabelled.
+    """
+
+    def setUp(self):
+        super().setUp()
+        from world.quests.planner import quest_event_effect_planner
+        from world.rules.action import (
+            _EVENT_EFFECT_PLANNERS,
+            register_event_effect_planner,
+        )
+
+        register_event_effect_planner("quest", quest_event_effect_planner)
+        self.addCleanup(_EVENT_EFFECT_PLANNERS.pop, "quest", None)
+
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion", "alternatives": [self.definition.key],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
+
+    def _field(self, actor, targets):
+        from world.rules.combat import Battlefield
+
+        return Battlefield(
+            {
+                "party": frozenset({actor.key}),
+                "foes": frozenset(target.key for target in targets),
+            },
+            {actor.key: actor, **{target.key: target for target in targets}},
+        )
+
+    def test_task_6_1_real_owner_smoke(self):
+        from unittest.mock import patch
+
+        from evennia.utils.create import create_object
+        from typeclasses.exits import Exit, WildernessGateExit
+        from typeclasses.rooms import GridRoom, Room, TerrainRoom
+        from world.maps.bootstrap import sync_grid, sync_wilderness
+        from world.rules.action import ActionRequest, ActionResolver
+        from world.rules.combat import BattlefieldActionContext
+        from world.rules.tests.combat_fixtures import grant_lineage
+
+        # 1) Construction: a real published package with exact role bindings.
+        self.assertEqual(
+            scene_store.get_role_binding(
+                self.package.package_id, "protected"
+            ).npc_id,
+            int(self.protected.pk),
+        )
+
+        # 2) Authorized acceptance through the real commission owner.
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "in_progress")
+        self.assertTrue(is_companion(self.protected, self.owner))
+
+        # 3) A literal wilderness gateway traversal from the grid, with the
+        #    protected companion following into the wilderness.
+        create_object(Room, key="虛境", location=None)
+        sync_grid()
+        sync_wilderness()
+        xyz, approach = _smoke_gate()
+        grid_room = GridRoom.objects.filter_xyz(xyz=xyz).first()
+        gate = [
+            exit_obj
+            for exit_obj in grid_room.exits
+            if isinstance(exit_obj, WildernessGateExit)
+        ][0]
+        gate.at_traverse(self.owner, grid_room)
+        self.assertIsInstance(self.owner.location, TerrainRoom)
+        self.assertEqual(self.owner.location.coordinates, approach)
+        self.assertEqual(self.protected.location, self.owner.location)
+
+        # 4) Received combat damage through the real action pipeline.
+        hostile = create_object(NPC, key="伏兵", location=self.owner.location)
+        hostile.race = "human"
+        hostile.apply_race_baseline()
+        grant_lineage(hostile, [_SMOKE_CLAW.key])
+        hp_before = self.protected.traits.hp.current
+        field = self._field(hostile, [self.protected])
+        request = ActionRequest(
+            hostile,
+            _SMOKE_CLAW.key,
+            [self.protected],
+            BattlefieldActionContext(field),
+        )
+        with patch("world.rules.combat.damage.roll_d100", return_value=100):
+            result = ActionResolver.resolve(request)
+        self.assertEqual(result.outcome, "success")
+        self.assertLess(self.protected.traits.hp.current, hp_before)
+        self.assertGreater(self.protected.traits.hp.current, 0)
+        self.assertEqual(read_records(self.owner)[0].state.value, "in_progress")
+
+        # 5) Back to the grid, then possession movement: the owner possesses
+        #    the protected actor and walks it through a literal Exit to the
+        #    meeting role, so one traversal carries possession, movement and
+        #    the settled rendezvous evaluation.
+        self.owner.move_to(self.room1, quiet=True)
+        self.protected.move_to(self.room1, quiet=True)
+        wallet_before = self.owner.db.wallet or 0
+        self.protected.db.possessed_by = int(self.owner.pk)
+        self.owner.db.possession = {
+            "npc_dbid": int(self.protected.pk),
+            "since_tick": 0,
+        }
+        doorway = create_object(
+            Exit, key="穿堂", location=self.room1, destination=self.room2
+        )
+        doorway.at_traverse(self.protected, self.room2)
+        self.assertEqual(self.protected.location, self.room2)
+
+        # 6) Rendezvous completion, exclusive resolution and payment.
+        from world.quests.escort_events import exclusive_outcome_status
+
+        completed = read_records(self.owner)[0]
+        self.assertEqual(completed.quest_id, record.quest_id)
+        self.assertEqual(completed.state.value, "completed")
+        group = exclusive_outcome_status(
+            self.owner, self.package.package_id, "reunion"
+        )
+        self.assertTrue(group.resolved)
+        self.assertEqual(group.winner_quest_id, record.quest_id)
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+
+        # 7) Committed reload: caches reset, durable state unchanged.
+        self.owner.attributes.reset_cache()
+        self.protected.attributes.reset_cache()
+        reloaded = read_records(self.owner)[0]
+        self.assertEqual(reloaded.quest_id, record.quest_id)
+        self.assertEqual(reloaded.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+        self.assertEqual(reasons_for(self.protected, self.owner), ())
