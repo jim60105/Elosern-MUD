@@ -320,6 +320,46 @@ class RecoveryTests(DreamDispatchTestCase):
         ))
 
 
+class PersistenceTests(DreamDispatchTestCase):
+    """The work row is the authoritative state across a process boundary."""
+
+    def test_saved_reload_preserves_state_stage_token_and_checkpoints(self):
+        draft = self._draft()
+        request = self._confirm(draft)
+        work = dispatch.find_by_submission(request.submission_key)
+        _, token = dispatch.claim(work, process="p1", tick=100)
+        dispatch.checkpoint_story(
+            work,
+            token,
+            checkpoint={"snapshot_id": "kept", "scene_required": True, "proposal": {}},
+            tick=100,
+        )
+
+        # A fresh ORM instance from a fresh query is what a restarted process
+        # sees: identity, state, stage, fence and checkpoint all survive.
+        reloaded = dispatch.find_by_submission(request.submission_key)
+        self.assertNotEqual(reloaded.pk, None)
+        self.assertEqual(reloaded.dispatch_id, work.dispatch_id)
+        self.assertEqual(reloaded.state, dispatch.STATE_GENERATING_SCENE)
+        self.assertEqual(reloaded.stage, dispatch.STAGE_SCENE)
+        self.assertEqual(reloaded.execution_token, token)
+        self.assertEqual(reloaded.claimed_by, "p1")
+        self.assertEqual(reloaded.story_checkpoint["snapshot_id"], "kept")
+        self.assertEqual(reloaded.request_version, int(request.version))
+        self.assertEqual(reloaded.source_key, request.submission_key)
+
+    def test_startup_creates_no_work_for_a_request_without_one(self):
+        draft = self._draft()
+        request = self._confirm(draft)
+        work = dispatch.find_by_submission(request.submission_key)
+        # Simulate a durable request that carries no work record at all.
+        work.delete()
+        self.assertEqual(dispatch.recover_interrupted(), [])
+        self.assertEqual(dispatch.next_considered(), [])
+        # No legacy scanner turned the historical request into new work.
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+
+
 class RequirementsContractTests(DreamDispatchTestCase):
     def test_bounded_requirements_are_normalized_and_versioned(self):
         direction = new_story_direction(

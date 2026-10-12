@@ -529,6 +529,15 @@ def at_server_start():
     # (fix-startup-session-restore-order D1).
     _startup_step("restore_persisted_sessions", restore_persisted_sessions)
     _startup_step("sync_wilderness", sync_wilderness)
+    # Connected owners' published encounters are synchronized at their actual
+    # current positions, including a publication whose fan-out was lost while
+    # nobody was connected (dream-story-dispatch §7). Tolerant: a scene store
+    # failure can never abort the deterministic startup.
+    _startup_step(
+        "sync_connected_encounters",
+        lambda: _late("world.quests.encounter_dispatch", "sync_connected_owners"),
+        fail_loud=False,
+    )
 
     # Prompt library: validate every YAML prompt file and mark broken keys
     # unavailable. Failures are bounded per key and logged; server startup

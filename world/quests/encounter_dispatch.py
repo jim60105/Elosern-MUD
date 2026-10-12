@@ -275,3 +275,33 @@ def activate_for_move(actor: Any, *, tick: int | None = None) -> tuple[Any, ...]
     return activate_pending_encounters(
         actor, room=getattr(actor, "location", None), tick=int(tick)
     )
+
+
+def puppeted_characters() -> list[Any]:
+    """Every currently puppeted character, in session order."""
+    import evennia
+
+    characters: list[Any] = []
+    for session in evennia.SESSION_HANDLER.get_sessions(include_unloggedin=False):
+        puppet = getattr(session, "puppet", None)
+        if puppet is not None:
+            characters.append(puppet)
+    return characters
+
+
+def sync_connected_owners(
+    *, tick: int | None = None, characters: Any = None
+) -> tuple[Any, ...]:
+    """Reconnect/startup synchronization for every connected owner.
+
+    Reads the saved owner through the current controlled actor's actual
+    position and activates whatever the owner's published packages declare
+    there -- including a publication whose fan-out was lost while nobody was
+    connected. It activates nothing for an owner with no connected session, and
+    it never invents an appearance for an offline owner.
+    """
+    connected = list(characters) if characters is not None else puppeted_characters()
+    activated: list[Any] = []
+    for character in connected:
+        activated.extend(activate_for_move(character, tick=tick))
+    return tuple(activated)

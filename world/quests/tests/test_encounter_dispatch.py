@@ -20,6 +20,7 @@ from world.quests.encounter_dispatch import (
     activate_pending_encounters,
     pending_encounters,
     resolve_exploring_owner,
+    sync_connected_owners,
 )
 from world.quests.encounters import publish_scene_package
 from world.quests.escort_events import escort_event_boundary
@@ -161,6 +162,29 @@ class ActivationTests(EncounterDispatchTestBase):
         stray = create_object(NPC, key="無主者", location=self.room)
         self.assertIsNone(resolve_exploring_owner(stray))
         self.assertEqual(activate_pending_encounters(stray, room=self.room, tick=5), ())
+
+
+class StatusSyncTests(EncounterDispatchTestBase):
+    """Reconnect and startup synchronize the owner's actual current position."""
+
+    def test_startup_syncs_every_connected_owner(self):
+        self.player.location = self.room
+        activated = sync_connected_owners(tick=13, characters=[self.player])
+        self.assertEqual(
+            {activation.scene_id for activation in activated}, {"south_gate", "market"}
+        )
+        row = scene_store.get_encounter(self.package_id, "south_gate", self.player.pk)
+        self.assertEqual(row.state, scene_store.ENCOUNTER_ACTIVATED)
+
+    def test_startup_sync_activates_nothing_for_an_unrelated_position(self):
+        self.player.location = self.elsewhere
+        self.assertEqual(
+            sync_connected_owners(tick=13, characters=[self.player]), ()
+        )
+        self.assertEqual(scene_store.list_role_bindings(self.package_id), [])
+
+    def test_startup_sync_with_no_connected_owner_activates_nothing(self):
+        self.assertEqual(sync_connected_owners(tick=13, characters=[]), ())
 
 
 class MoveHookTests(EncounterDispatchTestBase):

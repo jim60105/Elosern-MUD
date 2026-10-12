@@ -140,6 +140,20 @@ class PlayerCharacter(LivingEntity):
 
         activate_for_move(self)
 
+    def at_post_puppet(self, **kwargs) -> None:
+        """Synchronize the returning owner's eligible encounters.
+
+        A login, a reconnect and a possession handback all land here: only the
+        saved owner's published encounters at the actor's actual current
+        position activate, so a package that committed while the player was
+        disconnected is reached without a re-entry, and a package that has
+        nothing declared at this position activates nothing.
+        """
+        super().at_post_puppet(**kwargs)
+        from world.quests.encounter_dispatch import activate_for_move
+
+        activate_for_move(self)
+
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""
         loc_before = self.location
