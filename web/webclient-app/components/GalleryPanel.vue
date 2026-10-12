@@ -221,7 +221,11 @@ function selectSubject(subject) {
             </div>
           </button>
         </div>
-        <p v-if="!visibleCards.length" class="gallery-panel__empty">此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。</p>
+        <!-- The paragraph may only claim missing artwork when the committed
+             read model has no official rows either: official entries are this
+             subject's available artwork regardless of which card subset the
+             selected filter shows, and they render separately below. -->
+        <p v-if="!visibleCards.length && !officialEntries.length" class="gallery-panel__empty">此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。</p>
         <!-- The official read model: shared read-only artwork of this
              subject's content reference. Selectable and previewable, never a
              card, and never counted by the filter tabs above; the operations

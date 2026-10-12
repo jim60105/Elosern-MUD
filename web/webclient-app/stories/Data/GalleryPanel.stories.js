@@ -10,6 +10,13 @@ export const Monster = { args: { model: galleryStoryModel(GALLERY_MONSTER) } };
 export const Unavailable = { args: { model: { schema_version: 1, available: false, reason: { code: "gallery_unavailable", message: "目前無法讀取肖像圖庫。" } } } };
 export const Locked = { args: { model: galleryStoryModel(), disabled: true } };
 
+// The two empty-guidance frames the storyboard publishes explicitly: three
+// committed official rows with no card rows at all, and no official rows with
+// no card rows at all. Both reuse the committed fixtures and route through
+// galleryStoryModel, so the offline build serves committed local artwork and
+// needs no game, AI, or image service.
+const OFFICIAL_ONLY = { ...GALLERY_EMPTY, official_entries: GALLERY_SAMPLE.official_entries };
+
 // Explicit fixture publications, not a second runtime service. The operator
 // chooses success/rejection so every state is deterministic and inspectable.
 export const Storyboard = {
@@ -91,6 +98,8 @@ export const Storyboard = {
           h("button", { disabled: !waiting.value, onClick: () => publish(true) }, "發布成功"),
           h("button", { disabled: !waiting.value, onClick: () => publish(false) }, "發布拒絕"),
           h("button", { onClick: () => { model.value = galleryStoryModel(); revision.value++; } }, "發布初始圖庫"),
+          h("button", { onClick: () => { model.value = galleryStoryModel(OFFICIAL_ONLY); revision.value++; } }, "發布官方三列"),
+          h("button", { onClick: () => { model.value = galleryStoryModel(GALLERY_EMPTY); revision.value++; } }, "發布無官方空圖庫"),
           h("span", { role: "status" }, log.value),
           h("details", [h("summary", "檢視操作意圖"), h("pre", { style: "position:absolute;top:50px;right:0;background:#111;padding:16px;max-width:480px;max-height:200px;overflow:auto" }, JSON.stringify(last.value, null, 2))]),
         ]),
