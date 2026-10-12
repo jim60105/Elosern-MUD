@@ -165,9 +165,10 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         )
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
-    def test_an_incomplete_escort_is_refused_by_its_contract(self):
-        # An ESCORT stage with no completion discriminator is refused by its own
-        # complete-contract validation before any registry mutation.
+    def test_a_directly_forged_compiled_escort_is_refused_by_its_contract(self):
+        # A compiled escort constructed directly (bypassing the compiler) with a
+        # missing discriminator is refused by its own complete-contract
+        # validation before any registry mutation.
         from ._fixtures import anchor_locator
         from world.quests.definitions import QuestDefinitionError, QuestType
 
@@ -205,6 +206,42 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         self.assertNotIn(
             (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
         )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_directly_forged_rendezvous_without_meeting_roles_is_refused(self):
+        from world.quests.definitions import EscortCompletion, QuestDefinitionError, QuestType
+
+        definition = QuestDefinition(
+            key="escort_forged_rendezvous",
+            display_name="護衛偽造",
+            quest_type=QuestType.ESCORT,
+            rank="F",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ESCORT,
+                        completion=EscortCompletion.RENDEZVOUS,
+                        protected_role_refs=("escortee",),
+                    ),
+                ),
+            ),
+        )
+        compiled = CompiledQuest(
+            definition=definition,
+            reward=QuestReward(copper=50, items=(), merit=25),
+            issuance=IssuanceDescriptor(
+                issuer_key="guild:guild_branch_altoria",
+                settlement=Settlement.COUNTER,
+            ),
+            stage_requirements=(),
+        )
+        with self.assertRaisesRegex(
+            (QuestCompileError, QuestDefinitionError),
+            "meeting_role_refs",
+        ):
+            register_generated_quest(compiled)
+        self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
 
 class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase):
     def setUp(self):
