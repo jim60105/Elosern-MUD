@@ -194,6 +194,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # (webclient-scene-overview-component), built and
                 # story-documented before C8b mounts them.
                 "Action/SceneOverview",
+                "Action/ExitCompass",
                 "Action/DockVerbPopover",
                 # The dialogue stage actor (webclient-dialogue-stage-actors), the
                 # standing portrait that wraps Core/ReferenceArtwork on the stage.

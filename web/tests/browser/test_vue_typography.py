@@ -192,7 +192,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
 
     @covers_requirement("webclient-vue-application::the-monospace-type-role-is-a-self-hosted-sliced-jim-mono-tc-face")
     def test_keycaps_and_command_input_keep_monospace(self):
-        self.story("core-appshell--populated-hud", ".vitals")
+        self.story("core-appshell--combat-hud", "kbd")
         self.assertIn("monospace", self.page.locator("kbd").first.evaluate("e => getComputedStyle(e).fontFamily"))
         self.assertBundledFace(self.rendered_fonts("kbd"), "Jim Mono TC")
         self.page.get_by_role("button", name="指令列", exact=True).click()

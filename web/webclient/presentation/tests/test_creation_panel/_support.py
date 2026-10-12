@@ -43,7 +43,7 @@ _T_CREATION_SCOPE = (
 # the world/rules/tests character-creation suite).  The shipped keys ride
 # along so rule-layer helpers that resolve a shipped race mid-test keep
 # working; only the kit race is added.
-_T_AFFINITY_BOUNDS = {_T_RACE: 2}
+_T_AFFINITY_BOUNDS = {_T_RACE: 2, "t_starlit": 2}
 
 
 # The wire contract's trio as committed on master, captured at import time
