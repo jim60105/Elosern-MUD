@@ -9,6 +9,7 @@ const base = {
   stage_progress: 0, objective_quantity: 1, objective_note: null,
   deadline_line: null, rationale: null, flavor: null, tracked: false,
   issuer: guild, settlement: "counter", reward_claimed: false, track: QUEST_LOG_TRACK,
+  terminal_reason: null, abandon: null,
 };
 export const QUEST_LOG_PANEL_SAMPLE = Object.freeze({
   schema_version: 2, available: true,

@@ -120,7 +120,8 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertFalse(has_general_membership(another, self.player))
 
     def test_leave_refuses_to_silently_detach_a_temporary_only_member(self):
-        from commands.leave import CmdLeave, _ESCORT_ONLY_MESSAGE
+        from commands.leave import CmdLeave
+        from world.rules.party import ESCORT_BOUND_MESSAGE
 
         npc = create_object(NPC, key="護衛對象", location=self.room)
         source = self._source(npc)
@@ -130,7 +131,25 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         with patch.object(self.player, "msg") as msg:
             command.func()
         msg.assert_called_once_with(
-            _ESCORT_ONLY_MESSAGE.format(quests=source.quest_id)
+            ESCORT_BOUND_MESSAGE.format(quests=source.quest_id)
+        )
+        self.assertTrue(is_companion(npc, self.player))
+        self.assertEqual(
+            reasons_for(npc, self.player), ((source.quest_id, "escortee"),)
+        )
+
+    def test_the_webclient_leave_adapter_refuses_a_temporary_only_member(self):
+        from web.webclient.actions.exploration_actions import _party_leave_adapter
+        from world.rules.party import ESCORT_BOUND_MESSAGE, REASON_ESCORT_BOUND
+
+        npc = create_object(NPC, key="護衛對象", location=self.room)
+        source = self._source(npc)
+        result = _party_leave_adapter(self.player, {"npc_id": int(npc.pk)})
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], REASON_ESCORT_BOUND)
+        self.assertEqual(
+            result["message"],
+            ESCORT_BOUND_MESSAGE.format(quests=source.quest_id),
         )
         self.assertTrue(is_companion(npc, self.player))
         self.assertEqual(

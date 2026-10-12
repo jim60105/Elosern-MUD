@@ -3,16 +3,26 @@
 // ---------------------------------------------------------------------------
 // webclient-align-05-party-hud: party panel fixtures.
 // ---------------------------------------------------------------------------
+// Every fixture companion is a general member; membership metadata and the
+// separate general quota are part of the extended version-2 party payload.
+const withMembership = (rows) =>
+  rows.map((row) => ({
+    ...row,
+    membership: row.membership ?? { general: true, temporary_commissions: [] },
+  }));
+
 export const PARTY_PANEL_EMPTY_SAMPLE = {
   schema_version: 2,
   available: true,
+  general_quota: { used: 0, limit: 4 },
   slots: [],
 };
 
 export const PARTY_PANEL_SAMPLE = {
   schema_version: 2,
   available: true,
-  slots: [
+  general_quota: { used: 2, limit: 4 },
+  slots: withMembership([
     {
       identity: 101,
       display_name: "蕾娜",
@@ -29,13 +39,14 @@ export const PARTY_PANEL_SAMPLE = {
       hp_maximum: 160,
       bond_stage: "信賴",
     },
-  ],
+  ]),
 };
 
 export const PARTY_PANEL_FULL_SAMPLE = {
   schema_version: 2,
   available: true,
-  slots: [
+  general_quota: { used: 4, limit: 4 },
+  slots: withMembership([
     {
       identity: 101,
       display_name: "蕾娜",
@@ -68,7 +79,7 @@ export const PARTY_PANEL_FULL_SAMPLE = {
       hp_maximum: 110,
       bond_stage: "初識",
     },
-  ],
+  ]),
 };
 
 // Existing bundled fixture art only; production never constructs these refs.

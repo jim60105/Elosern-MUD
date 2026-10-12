@@ -39,6 +39,12 @@ REASON_ALREADY_COMPANION = "already_companion"
 REASON_PARTY_FULL = "party_full"
 REASON_HANDBACK_FIRST = "handback_first"
 REASON_NOT_PROTECTED_BINDING = "not_protected_binding"
+#: A temporary-only member's companionship is a live escort commission, not a
+#: general dismissal: detaching it silently would abandon the quest without the
+#: player's chosen commission. Both the ``leave`` command and the webclient
+#: ``explore.party_leave`` adapter refuse with this stable reason and name the
+#: affected commissions, pointing at the existing quest-abandonment path.
+REASON_ESCORT_BOUND = "escort_bound"
 
 # Fixed player-facing party lines shared by the ``invite``/``leave`` commands
 # and the webclient ``explore.party_invite``/``explore.party_leave`` adapters,
@@ -49,6 +55,9 @@ ALREADY_COMPANION_MESSAGE = "她已經是你的同伴了。"
 PARTY_FULL_MESSAGE = "你的隊伍已經滿了（最多 4 人）。"
 NOT_DIALOGUE_MESSAGE = "對方無法回應你的邀請。"
 HANDBACK_FIRST_MESSAGE = "請先歸位再解散同伴。"
+ESCORT_BOUND_MESSAGE = (
+    "她仍與你的護送委託同行；請先放棄對應的委託（{quests}）才能解除同行關係。"
+)
 NOT_COMPANION_MESSAGE = "她不是你的同伴。"
 LEAVE_DISMISSED_MESSAGE = "你解散了與她的隊伍。"
 AUTO_LEAVE_MESSAGE = "她與你的羈絆淡去，隊伍解散了。"

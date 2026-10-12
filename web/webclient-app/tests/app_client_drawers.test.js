@@ -543,7 +543,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: { schema_version: 2, available: true, slots: [
+            party: { schema_version: 2, available: true, general_quota: { used: 1, limit: 4 }, slots: [
               {
                 identity: 101,
                 display_name: "蕾娜",
@@ -551,6 +551,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
                 hp_current: 180,
                 hp_maximum: 220,
                 bond_stage: "親睦",
+                membership: { general: true, temporary_commissions: [] },
               },
             ] },
           },
@@ -603,7 +604,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 2,
           mode: "creation",
           panels: {
-            party: { schema_version: 2, available: true, slots: [] },
+            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
           },
         }),
       ],
@@ -626,7 +627,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           mode: "exploration",
           panels: {
             status: fx.statusPanel(),
-            party: { schema_version: 2, available: true, slots: [
+            party: { schema_version: 2, available: true, general_quota: { used: 1, limit: 4 }, slots: [
               {
                 identity: 101,
                 display_name: "蕾娜",
@@ -634,6 +635,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
                 hp_current: 180,
                 hp_maximum: 220,
                 bond_stage: "親睦",
+                membership: { general: true, temporary_commissions: [] },
               },
             ] },
           },
@@ -961,7 +963,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: { schema_version: 2, available: true, slots: [] },
+            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
             status: fx.statusPanel(),
           },
         }),
@@ -989,7 +991,7 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
           revision: 1,
           mode: "exploration",
           panels: {
-            party: { schema_version: 2, available: true, slots: [] },
+            party: { schema_version: 2, available: true, general_quota: { used: 0, limit: 4 }, slots: [] },
             status: fx.statusPanel(),
             character: fx.characterPanel ? fx.characterPanel() : CHARACTER_PANEL_SAMPLE,
           },
