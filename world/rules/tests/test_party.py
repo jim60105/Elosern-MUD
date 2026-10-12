@@ -120,7 +120,9 @@ class MembershipOwnershipContractTests(unittest.TestCase):
                         for target in node.targets:
                             if ast.unparse(target).startswith(attribute):
                                 offenders.append(f"{relative}: assigns {attribute}")
-                    if re.search(rf"\b{attribute}\s*=\s*", source) is not None:
+                    # A real assignment only: ``==`` is a read comparison, not
+                    # one of the single-writer assignments this contract bans.
+                    if re.search(rf"\b{attribute}\s*=(?!=)\s*", source) is not None:
                         offenders.append(f"{relative}: assigns {attribute}")
         self.assertEqual(offenders, [])
 
