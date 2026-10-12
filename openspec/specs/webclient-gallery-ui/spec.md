@@ -449,6 +449,25 @@ compose no official fact locally.
 
 - **WHEN** the card filter tabs compute their counts
 - **THEN** official rows SHALL NOT be counted by the card filter tabs
+
 #### Scenario: Species previews preserve generation while declining personal writes
 - **WHEN** a registered visual-species gallery row carries supports_personal_official_preferences false
 - **THEN** its runtime generation, shared default selection and placement controls remain available according to existing capabilities, and official images are previewable with no personal selection or geometry controls
+
+#### Scenario: Official-only artwork suppresses empty-card guidance
+- **WHEN** an available committed gallery panel has three `official_entries` and zero visible card rows
+- **THEN** the three official rows remain available and no `gallery-panel__empty` paragraph is rendered inside the cards area
+- **AND** the decision uses only the committed official-entry list length, without a new payload field or client-composed official fact
+
+#### Scenario: Empty filters with official rows do not claim missing artwork
+- **WHEN** committed `official_entries` is non-empty and the player selects any card filter with zero matching visible card rows, including all, defaults, bound, pending or failed
+- **THEN** `gallery-panel__empty` is absent on that tab, the separate official rows remain visible, and committed card filter counts remain unchanged
+
+#### Scenario: Empty-card guidance remains unchanged without official entries
+- **WHEN** the selected card filter has zero visible card rows and committed `official_entries` is an empty list
+- **THEN** the existing paragraph remains inside the cards area with class `gallery-panel__empty` and text `此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。`
+- **AND** this holds for an empty subject and a filter with no matches on a subject that has other card rows
+
+#### Scenario: Committed official-entry replacement updates guidance
+- **WHEN** zero visible card rows remain and a committed panel replacement changes `official_entries` from non-empty to empty or from empty to non-empty
+- **THEN** the existing guidance appears or disappears respectively from that committed list alone, without an action dispatch or local official-entry inference

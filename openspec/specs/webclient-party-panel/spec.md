@@ -69,14 +69,28 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 - **THEN** `display_name` is the canonical name truncated to that bound
 
 #### Scenario: portrait_ref is the art panel's opaque reference format
-- **WHEN** a companion's gallery record has a default card
-- **THEN** `portrait_ref` is the opaque string key of the companion NPC's default gallery portrait
-  — an ASCII decimal string of 1–32 characters that resolves through the art panel's
-  `portrait_catalog`, emitted by the same reference format the art panel presenter uses
+- **WHEN** the existing art resolution chain yields a real image for a companion's named portrait subject, through a matching equipment-bound card, personal official selection, record default card, classic runtime asset or mounted official default
+- **THEN** `portrait_ref` is the companion's opaque ASCII decimal catalog key of 1–32 characters, in the same format used by the art panel
+- **AND** for the companion present in the same snapshot's art view, that key resolves in `art.portrait_catalog` to the chain-selected image; an official image has `origin: official` and its admitted `/art/official/...` URL
 
 #### Scenario: A missing portrait is null, not fabricated
-- **WHEN** the companion has no gallery record or no default card
-- **THEN** `portrait_ref` is `null` and the client renders its truthful initial-letter placeholder
+- **WHEN** the companion has no named portrait subject or the complete art chain yields no real runtime or official image, including an absent or unresolvable personal official selection and no mounted official default
+- **THEN** `portrait_ref` is `null` and the client renders its truthful initial-letter placeholder, even if decorative silhouette fallback artwork is available
+
+#### Scenario: Personal official selection works without runtime cards
+- **WHEN** a present named companion has a resolving retained personal official selection, no runtime card and no classic runtime asset
+- **THEN** its non-null `portrait_ref` resolves in the same snapshot's `art.portrait_catalog` to that selected official image with `origin: official` and its `/art/official/...` URL
+- **AND** no runtime default card is required and official artwork is never appended to the card list
+
+#### Scenario: Mounted official default works without a gallery record
+- **WHEN** a present preset-born named companion has a mounted official content-directory default and no gallery record or classic runtime asset
+- **THEN** its non-null `portrait_ref` resolves in the same snapshot's `art.portrait_catalog` to that official default with `origin: official` and its `/art/official/...` URL
+- **AND** the gallery record remains absent
+
+#### Scenario: Equipment matching retains chain precedence
+- **WHEN** a companion has a matching equipment-bound runtime card and a resolving personal official selection
+- **THEN** its `portrait_ref` resolves to the runtime card with `origin: runtime`
+- **AND** precedence remains equipment-bound matching card > personal official selection > record default card > classic runtime asset > mounted official default > null, subject to the chain's existing eligibility and validation rules
 
 #### Scenario: HP fields come from the true traits
 - **WHEN** a slot row is serialized
@@ -92,10 +106,9 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
   and emits no live object or filesystem reference
 
 #### Scenario: Portrait resolution never writes or invents
-- **WHEN** the presenter resolves `portrait_ref`
-- **THEN** it reads each companion's gallery record (`world.art.gallery.record_for` with
-  `create=False`) and its default card, never creating a record, queueing generation, or inventing
-  a URL
+- **WHEN** the presenter resolves `portrait_ref` through the existing runtime and official art chain
+- **THEN** any gallery record read is non-creating, and resolution never creates a record, queues generation, writes attributes or files, walks the official filesystem per render, or invents a URL
+- **AND** official steps read the admitted startup catalog snapshot, official files remain read-only, and personal default mutual clearing and art-chain semantics remain unchanged
 
 #### Scenario: A possessed NPC presents the bound owner's party
 - **WHEN** the session actor is a possessed NPC
