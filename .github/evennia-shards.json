@@ -264,6 +264,7 @@
         "world.narrative.tests.test_quest_beats",
         "world.narrative.tests.test_dream_surface",
         "world.narrative.tests.test_dream_dispatch",
+        "world.narrative.tests.test_dream_dispatch_runner",
         "world.ai",
         "world.lore"
       ]
