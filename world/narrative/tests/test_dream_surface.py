@@ -497,6 +497,72 @@ class DreamSurfaceTests(EvenniaTest):
                     official_art.reset_catalog()
 
 
+    def test_collaborator_requirements_reach_the_surface_and_the_text_line(self):
+        # The collaborator's bounded proposal is readable on both surfaces
+        # before anything is frozen, and the text transport names it too.
+        self.enter()
+        payload = {
+            "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
+            "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
+            "phase": prospective_state(0).level,
+            "requirements": [
+                {"kind": "place", "text": "南門"},
+                {"kind": "new_character", "text": "一個女孩"},
+                {"kind": "private_commission", "text": "帶她找媽媽"},
+            ],
+        }
+        client = FakeLLMClient()
+        client.add_response(
+            lambda descriptor: True, json.dumps(payload, ensure_ascii=False)
+        )
+        result = self.request("say", message="鐘聲", client=client)
+        self.assertEqual(result.result["outcome"], "success")
+        state = service.dream_state(self.actor)
+        self.assertEqual(
+            [row["text"] for row in state["requirements"]],
+            ["南門", "一個女孩", "帶她找媽媽"],
+        )
+        self.assertIsNone(state["requirement_version"])
+        rendered = render_state(state)
+        self.assertIn("南門", rendered)
+        self.assertIn("帶她找媽媽", rendered)
+
+    def test_confirmation_requires_the_shown_requirement_version(self):
+        # A proposed requirement set becomes reviewable only when the version
+        # that carries it is persisted, and confirmation must echo exactly that
+        # version: a blank or stale review is refused, never silently frozen.
+        self.enter()
+        requirements = [
+            {"kind": "place", "text": "南門"},
+            {"kind": "new_character", "text": "一個女孩"},
+            {"kind": "private_commission", "text": "帶她找媽媽"},
+        ]
+        direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩，幫她找媽媽。",
+            "requirements": requirements,
+            "requirement_version": None,
+        }
+        self.assertEqual(
+            self.request("draft", direction=direction).result["outcome"], "success"
+        )
+        shown = service.dream_state(self.actor)["requirement_version"]
+        self.assertTrue(shown)
+        self.assertEqual(
+            self.request("confirm", direction=direction).result["code"],
+            "stale_requirements",
+        )
+        self.assertFalse(CreativeRequest.objects.exists())
+        confirmed = self.request(
+            "confirm", direction={**direction, "requirement_version": shown}
+        )
+        self.assertEqual(confirmed.result["outcome"], "success")
+        stored = CreativeRequest.objects.get()
+        self.assertEqual(stored.direction["requirements"], requirements)
+        self.assertEqual(stored.direction["requirement_version"], shown)
+
+
 def _synthetic_webp():
     """A real, decodable WebP for the catalog's header-admission probe."""
     from io import BytesIO

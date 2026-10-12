@@ -380,6 +380,31 @@ def reviewed_version_matches(submitted: Any, *, draft: AuthoringDraft) -> bool:
     )
 
 
+def _without_requirement_version(direction: Mapping[str, Any]) -> dict[str, Any]:
+    """One direction without its shown-version identity, for content comparison."""
+    return {key: value for key, value in direction.items() if key != "requirement_version"}
+
+
+def _stamped_direction(
+    direction: dict[str, Any], draft_id: str, revision: int
+) -> dict[str, Any]:
+    """Attach the shown-version identity a requirement-bearing direction needs.
+
+    A direction with no requirements is returned exactly as it is, so every
+    existing draft path keeps its byte-for-byte behaviour. A direction that
+    does carry requirements leaves ``save_draft`` already reviewable: its
+    identity names the version being written, which is what confirmation
+    compares. Nothing here can freeze requirements a player never saw, because
+    the identity is stamped by the store that persists the version.
+    """
+    if not direction.get("requirements"):
+        return direction
+    return {
+        **direction,
+        "requirement_version": requirement_version_for(draft_id, revision),
+    }
+
+
 def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
     """Deterministically validate a desired direction for one owner.
 
@@ -563,13 +588,18 @@ def save_draft(
         if existing is not None:
             if existing.owner_id != clean_owner:
                 raise AuthoringAccessError("This authoring draft is not yours.")
-            changed = existing.direction != frozen_direction or (
+            # Content comparison ignores the shown-version identity, so an
+            # identical re-save stays the documented no-op even when the
+            # direction carries reviewed requirements.
+            changed = _without_requirement_version(
+                existing.direction or {}
+            ) != _without_requirement_version(frozen_direction) or (
                 frozen_sources is not None and existing.sources != frozen_sources
             )
             if not changed:
                 return existing
             revision = int(existing.revision) + 1
-            existing.direction = frozen_direction
+            existing.direction = _stamped_direction(frozen_direction, handle, revision)
             if frozen_sources is not None:
                 existing.sources = frozen_sources
             existing.revision = revision
@@ -588,7 +618,7 @@ def save_draft(
         draft = AuthoringDraft.objects.create(
             draft_id=handle,
             owner_id=clean_owner,
-            direction=frozen_direction,
+            direction=_stamped_direction(frozen_direction, handle, 1),
             sources=frozen_sources or [],
             revision=1,
             confirmed_revision=None,

@@ -67,6 +67,18 @@ from world.prompts.loader import PromptUnavailableError, render_prompt
 MAX_SCENE_CHARS = 900
 MAX_DIALOGUE_CHARS = 500
 
+# Bounded shown experience requirements the collaborator may propose alongside
+# the direction. The vocabulary is the one the deterministic authoring contract
+# freezes; a repository-wide drift test pins the two equal, because ``world/ai``
+# may not import the ``world.narrative`` authoring writer.
+REQUIREMENT_KINDS: tuple[str, ...] = (
+    "place",
+    "new_character",
+    "private_commission",
+)
+MAX_REQUIREMENTS = 8
+MAX_REQUIREMENT_TEXT = 200
+
 # Bounded prompt context: the caller-supplied adventure summary and the
 # confirmed creative preferences are capped deterministically so a long history
 # cannot produce an unbounded request.
@@ -128,6 +140,27 @@ DREAM_EXCHANGE_SCHEMA: dict[str, Any] = {
             "maxLength": MAX_DIALOGUE_CHARS,
         },
         "phase": {"type": "string", "enum": list(AROUSAL_LEVELS)},
+        # The bounded experience requirements the direction needs in order to
+        # be executable: an explicitly named place, a required new character or
+        # a requested private commission. Optional, so an exchange that
+        # proposes none stays exactly as valid as it was before.
+        "requirements": {
+            "type": "array",
+            "maxItems": MAX_REQUIREMENTS,
+            "items": {
+                "type": "object",
+                "required": ["kind", "text"],
+                "additionalProperties": False,
+                "properties": {
+                    "kind": {"type": "string", "enum": list(REQUIREMENT_KINDS)},
+                    "text": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": MAX_REQUIREMENT_TEXT,
+                    },
+                },
+            },
+        },
     },
 }
 
@@ -149,6 +182,7 @@ class DreamExchange:
     phase: str
     completed: int
     mode: str
+    requirements: tuple[dict[str, str], ...] = ()
 
 
 _DREAM_DEGRADED = object()
@@ -266,6 +300,31 @@ _HOOKS = GuardrailHooks(
 )
 
 
+def _requirement_rows(value: Any) -> tuple[dict[str, str], ...]:
+    """Normalize a proposed requirement array into bounded frozen rows.
+
+    The output schema already bounds and closed-validates this field; this is
+    the defensive second reading, so a malformed row can only be dropped and
+    never reach the deterministic authoring contract.
+    """
+    if not isinstance(value, (list, tuple)):
+        return ()
+    rows: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        kind = item.get("kind")
+        text = item.get("text")
+        if not isinstance(kind, str) or kind not in REQUIREMENT_KINDS:
+            continue
+        if not isinstance(text, str) or not text.strip():
+            continue
+        rows.append({"kind": kind, "text": text.strip()[:MAX_REQUIREMENT_TEXT]})
+        if len(rows) >= MAX_REQUIREMENTS:
+            break
+    return tuple(rows)
+
+
 def _cap_string(value: str, limit: int) -> str:
     if len(value) <= limit:
         return value
@@ -339,6 +398,15 @@ def build_dream_prompt(
             "" if player_message is None else str(player_message),
             MAX_RENDERED_INPUT_CHARS,
         ),
+        # The closed, bounded shape of the experience requirements the
+        # collaborator may propose with the direction. The deterministic
+        # authoring contract freezes exactly these fields, so the model is told
+        # the vocabulary rather than inventing one.
+        "requirement_contract": {
+            "kinds": list(REQUIREMENT_KINDS),
+            "max_items": MAX_REQUIREMENTS,
+            "max_text": MAX_REQUIREMENT_TEXT,
+        },
     }
     preferences = _bounded_preferences(brief)
     if preferences is not None:
@@ -478,4 +546,5 @@ def generate_dream_exchange(
         phase=parsed["phase"],
         completed=state.completed,
         mode=mode,
+        requirements=_requirement_rows(parsed.get("requirements")),
     )

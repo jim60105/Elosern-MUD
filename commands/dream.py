@@ -17,6 +17,10 @@ def render_state(state):
     if state["can_input"]:
         parts.append("dream say <想說的話>")
     if state["can_confirm"]:
+        requirements = state.get("requirements") or []
+        if requirements:
+            parts.append("這個方向的可執行需求：" + "、".join(
+                str(row.get("text", "")) for row in requirements if row.get("text")))
         parts.append("dream confirm [故事方向] ／ dream draft [故事方向]")
         if state["thread_choices"]:
             parts.append("可調整的故事線：" + "、".join(

@@ -114,6 +114,9 @@ def store_response(actor, response):
     value = association(actor)
     value["scene"] = response.scene
     value["dialogue"] = response.dialogue
+    value["requirements"] = [
+        dict(row) for row in (getattr(response, "requirements", ()) or ())
+    ]
     value["failure"] = False
     actor.db.dream_surface = value
 
@@ -160,6 +163,13 @@ def dream_state(actor):
         "dialogue": value.get("dialogue", ""),
         "direction_parts": [displayed_direction[offset:offset + 2000]
                             for offset in range(0, len(displayed_direction), 2000)],
+        # The readable bounded experience requirements for the version being
+        # confirmed, plus the reviewable identity of the persisted shown
+        # version. A persisted draft's frozen rows win over the collaborator's
+        # latest proposal, because that is the version confirmation compares.
+        "requirements": (draft_direction or {}).get("requirements")
+        or list(value.get("requirements") or []),
+        "requirement_version": (draft_direction or {}).get("requirement_version"),
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
         "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",
         "ending_phase": ending.phase if ending else "",

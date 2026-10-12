@@ -415,6 +415,23 @@ class RequirementsContractTests(DreamDispatchTestCase):
 class ShownRequirementTests(DreamDispatchTestCase):
     """Only what the surface actually showed can be frozen at confirmation."""
 
+    def test_the_collaborator_vocabulary_is_the_authoring_contract(self):
+        # ``world/ai`` may not import the authoring writer, so the two closed
+        # vocabularies are pinned equal here instead: a drift would let the
+        # collaborator propose a requirement kind that confirmation can never
+        # freeze, silently turning every such direction into a stale review.
+        from world.ai import dream as collaborator
+        from world.narrative import authoring
+
+        self.assertEqual(
+            tuple(sorted(collaborator.REQUIREMENT_KINDS)),
+            tuple(sorted(authoring.REQUIREMENT_KINDS)),
+        )
+        self.assertEqual(collaborator.MAX_REQUIREMENTS, authoring.MAX_REQUIREMENTS)
+        self.assertEqual(
+            collaborator.MAX_REQUIREMENT_TEXT, authoring.MAX_REQUIREMENT_TEXT
+        )
+
     def _requirement_draft(self):
         return save_draft(
             owner_id=self.owner_id,
@@ -426,7 +443,12 @@ class ShownRequirementTests(DreamDispatchTestCase):
 
     def test_stamping_records_the_shown_version_without_advancing_it(self):
         draft = self._requirement_draft()
-        self.assertIsNone((draft.direction or {}).get("requirement_version"))
+        # Persisting the version already stamped its identity: a requirement
+        # set that was written is one a player can be shown and review.
+        self.assertEqual(
+            draft.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 1),
+        )
         stamped = stamp_shown_requirements(draft)
         self.assertEqual(int(stamped.revision), 1)
         self.assertEqual(
@@ -441,10 +463,70 @@ class ShownRequirementTests(DreamDispatchTestCase):
             stamped.direction["requirement_version"],
         )
 
+    def test_stamping_fills_a_record_written_before_the_contract(self):
+        # Defence in depth for a stored requirement set whose identity is
+        # absent: re-presenting it fills the identity in place, still without
+        # advancing the version.
+        draft = self._requirement_draft()
+        draft.direction = {**draft.direction, "requirement_version": None}
+        draft.save(update_fields=["direction"])
+        filled = stamp_shown_requirements(draft)
+        self.assertEqual(int(filled.revision), 1)
+        self.assertEqual(
+            filled.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 1),
+        )
+
     def test_stamping_leaves_a_requirement_free_draft_untouched(self):
         draft = self._draft()
         self.assertIs(stamp_shown_requirements(draft), draft)
         self.assertIsNone(draft.direction.get("requirement_version"))
+
+    def test_saving_a_requirement_bearing_draft_stamps_it_and_stays_idempotent(self):
+        direction = new_story_direction(
+            requirements=[{"kind": "place", "text": "南門"}]
+        )
+        draft = save_draft(owner_id=self.owner_id, direction=direction, tick=100)
+        self.assertEqual(
+            draft.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 1),
+        )
+        self.assertTrue(
+            validate_direction(draft.direction, owner_id=self.owner_id).valid
+        )
+        # An identical re-save stays the documented no-op, identity included.
+        again = save_draft(
+            owner_id=self.owner_id,
+            direction=direction,
+            tick=100,
+            draft_id=draft.draft_id,
+        )
+        self.assertEqual(int(again.revision), 1)
+        self.assertEqual(
+            again.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 1),
+        )
+        # A real edit is a genuinely new, separately reviewed version.
+        edited = save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(
+                requirements=[{"kind": "place", "text": "北門"}]
+            ),
+            tick=100,
+            draft_id=draft.draft_id,
+        )
+        self.assertEqual(int(edited.revision), 2)
+        self.assertEqual(
+            edited.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 2),
+        )
+        # And that version confirms through the real confirmation transaction.
+        with self.captureOnCommitCallbacks(execute=True):
+            request = confirm_draft(
+                draft_id=draft.draft_id, owner_id=self.owner_id, tick=100
+            )
+        self.assertEqual(int(request.version), 2)
+        self.assertEqual(DreamDispatch.objects.count(), 1)
 
     def test_review_match_requires_the_exact_shown_version(self):
         draft = stamp_shown_requirements(self._requirement_draft())
@@ -494,17 +576,31 @@ class ShownRequirementTests(DreamDispatchTestCase):
 
 
 class UnreviewedRequirementsTests(DreamDispatchTestCase):
-    def test_confirmation_refuses_stale_requirements(self):
+    def test_confirmation_refuses_a_stored_requirement_set_without_a_review(self):
         draft = self._draft()
-        stale = new_story_direction(
+        # The store always stamps a version it persists, so the only way a
+        # requirement-bearing record lacks a review is a row written before
+        # this contract existed; confirmation must refuse it, never freeze it.
+        draft.direction = new_story_direction(
             requirements=[{"kind": "place", "text": "南門"}],
-            requirement_version=requirement_version_for(draft.draft_id, 99),
+            requirement_version="other-draft:v9",
         )
-        save_draft(owner_id=self.owner_id, direction=stale, tick=100, draft_id=draft.draft_id)
+        draft.save(update_fields=["direction"])
         with self.assertRaises(DirectionValidationError) as failure:
             with self.captureOnCommitCallbacks(execute=True):
                 confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
         self.assertIn("stale_requirements", failure.exception.reason_codes)
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+        # A requirement set with no review identity at all is refused one gate
+        # earlier, as malformed rather than as stale.
+        draft.direction = new_story_direction(
+            requirements=[{"kind": "place", "text": "南門"}],
+            requirement_version=None,
+        )
+        draft.save(update_fields=["direction"])
+        with self.assertRaises(DirectionValidationError) as malformed:
+            confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+        self.assertIn("malformed_requirements", malformed.exception.reason_codes)
         self.assertEqual(DreamDispatch.objects.count(), 0)
 
     def test_confirmation_accepts_the_shown_requirements(self):
