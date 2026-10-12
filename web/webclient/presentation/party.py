@@ -20,6 +20,16 @@ unavailable branch. Creation-pending and no-location puppets raise
 :class:`PanelUnavailableError` and receive the registry-owned shared
 unavailable form.
 
+``portrait_ref`` is the art catalog key of the companion's OWN resolved
+image, answered by the art presenter's complete read-only chain
+(``world.art.presenter.resolve_entity``: equipment-bound card, personal
+official selection, record default card, classic runtime asset, mounted
+official default). One chain owner keeps this row and the art panel's catalog
+entry for the same entity in agreement, so a companion whose only artwork is
+mounted official content presents it, while a silhouette-only or genuinely
+portraitless companion stays a truthful ``null`` and the client renders its
+initial-letter placeholder.
+
 Bounds note: both HP fields accept zero and no ``hp_current <= hp_maximum``
 cross-field rule is asserted — traits are truth, bounds only (the delta spec
 overrides the proposal's "positive" wording; the combat participant row keeps
@@ -42,8 +52,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.art.gallery import cards_for, record_for
-from world.art.subjects import ArtSubjectError, character_subject_for
+from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME, resolve_entity
 from world.rules.action import stored_gauge_pair
 from world.rules.art_view import portrait_catalog_key
 from world.rules.npc_identity import npc_display_name
@@ -235,17 +244,24 @@ def validate_party(payload: Any) -> dict[str, Any]:
 
 
 def _resolve_portrait_ref(npc: Any) -> str | None:
-    """Read the canonical named gallery's default, never create or generate."""
-    try:
-        subject = character_subject_for(npc)
-    except ArtSubjectError:  # observability: ignore R2: malformed policy has the existing truthful no-portrait fallback
+    """Read the art chain's own real image, never create or generate.
+
+    Eligibility is delegated to the single read-only chain owner
+    (``world.art.presenter.resolve_entity``), so the row agrees with the art
+    panel's catalog entry for the same entity instead of re-deriving the
+    precedence here: an equipment-bound matching card, then the personal
+    official selection, then the record's default card, then a classic
+    runtime asset, then the mounted official default. Only a payload carrying
+    its OWN media URL under a ``runtime`` or ``official`` origin is a real
+    portrait; a resolution of steps 1-6 (including a malformed or missing
+    named subject, an unresolvable retained selection, and the canonical-age
+    eligibility check) leaves the truthful ``None``, and the decorative
+    silhouette a placeholder row carries can never satisfy this gate.
+    """
+    payload = resolve_entity(npc)
+    if payload.get("url") is None:
         return None
-    if subject is None:
-        return None
-    record = record_for(subject, create=False)
-    if record is None or not record.db.default_image_id:
-        return None
-    if not any(card["image_id"] == record.db.default_image_id for card in cards_for(subject)):
+    if payload.get("origin") not in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL):
         return None
     return portrait_catalog_key(npc.pk)
 
