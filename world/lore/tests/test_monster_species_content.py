@@ -11,9 +11,7 @@ separation only; the keyed bestiary documentation relationship lives in
 ``test_bestiary_documentation.py`` and never compares a prose sentence.
 """
 
-import ast
 import dataclasses
-import pathlib
 import unittest
 from unittest.mock import patch
 
@@ -40,10 +38,14 @@ from world.rules.traits import (
     NUMERIC_SOURCE_APPROVED_PROFILE,
     NUMERIC_SOURCE_INTERIM_TIER_BAND,
 )
+from world.skills.handler import INNATE_SKILL_KEYS
 from world.skills.registry import SKILL_REGISTRY
-
-REPO_ROOT = pathlib.Path(__file__).resolve().parents[3]
-BEHAVIOUR_SELECTION_MODULE = REPO_ROOT / "world" / "rules" / "monster_behaviour.py"
+from world.tests.synthetic_data import (
+    make_monster_species,
+    make_monster_tier,
+    make_monster_variant,
+    synthetic_registries,
+)
 
 
 def _tier_band_bases(tier_key: str) -> dict[str, int]:
@@ -379,6 +381,53 @@ class ShippedProfileConstructionTests(EvenniaTestCase):
                     else:
                         self.assertIsNone(actual.db.behaviour_tree)
 
+    @covers_requirement(
+        "monster-species-registry::narrative-and-executable-monster-configurations-remain-separate"
+    )
+    def test_narrated_ability_prose_grants_no_ownership_or_effect(self):
+        # The behaviour-selection path legitimately resolves species/variant
+        # identity to select authorized tuning, so this seam is established by
+        # construction instead of by scanning that module: a row whose prose
+        # names a registered skill it never declares still owns none of it.
+        narrated = next(
+            key for key in sorted(SKILL_REGISTRY) if key not in INNATE_SKILL_KEYS
+        )
+        species_key = "t_prose_species"
+        variant_key = "t_prose_variant"
+        tier_key = "t_prose_tier"
+        variant = make_monster_variant(
+            variant_key,
+            species_key=species_key,
+            threat_tier=tier_key,
+            description_zh=f"合成敘述：能施展 {narrated} 的力量。",
+            active_skill_keys=(),
+            passive_skill_keys=(),
+            combat_profile=None,
+            danger_grade=None,
+            profile_required=False,
+        )
+        self.assertIn(narrated, variant.description_zh)
+        with (
+            synthetic_registries(
+                "monster_tiers",
+                "monster_species",
+                "monster_variants",
+                extra={
+                    "monster_tiers": {tier_key: make_monster_tier(tier_key)},
+                    "monster_species": {
+                        species_key: make_monster_species(
+                            species_key, default_variant_key=variant_key
+                        )
+                    },
+                    "monster_variants": {variant_key: variant},
+                },
+            ),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            individual = construct_species_individual(species_key, variant_key)
+            self.assertIsNone(individual.db.skills)
+            self.assertNotIn(narrated, individual.skills.owned_keys())
+
 
 class SharedStableKeyContractTests(unittest.TestCase):
     def test_every_shipped_key_satisfies_the_shared_contract(self):
@@ -466,38 +515,6 @@ class AbilitySeamNegativeTests(unittest.TestCase):
             with self.subTest(cls=cls.__name__):
                 names = {field.name for field in dataclasses.fields(cls)}
                 self.assertEqual(names & FORBIDDEN_SEAM_FIELDS, set())
-
-    @covers_requirement(
-        "monster-species-registry::narrative-and-executable-monster-configurations-remain-separate"
-    )
-    def test_the_behaviour_selection_path_reads_no_species_identity(self):
-        # Nothing in the existing behaviour-selection path reads species or
-        # variant identity, so a variant's ability narrative cannot unlock an
-        # effect. The scan is parsed (not textual), so commentary alone never
-        # trips it, and a real identity read would.
-        tree = ast.parse(BEHAVIOUR_SELECTION_MODULE.read_text(encoding="utf-8"))
-        referenced: set[str] = set()
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Name):
-                referenced.add(node.id)
-            elif isinstance(node, ast.Attribute):
-                referenced.add(node.attr)
-            elif isinstance(node, ast.Import):
-                for alias in node.names:
-                    referenced |= set(alias.name.split("."))
-            elif isinstance(node, ast.ImportFrom):
-                referenced |= set((node.module or "").split("."))
-                referenced |= {alias.name for alias in node.names}
-        for forbidden in (
-            "MONSTER_SPECIES_REGISTRY",
-            "MONSTER_VARIANT_REGISTRY",
-            "monster_species",
-            "species_key",
-            "variant_key",
-        ):
-            with self.subTest(forbidden=forbidden):
-                self.assertNotIn(forbidden, referenced)
-
 
 if __name__ == "__main__":
     unittest.main()

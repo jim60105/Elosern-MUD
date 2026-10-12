@@ -16,6 +16,7 @@ Package layers (dependency direction one-way, low to high):
 - :mod:`~world.rules.combat_session.targeting` -- ``aN``/``eN`` token resolution
 - :mod:`~world.rules.combat_session.battlefield` -- reconstruction + policy
 - :mod:`~world.rules.combat_session.lifecycle` -- engage/persist/clear
+- :mod:`~world.rules.combat_session.ai_tuning` -- in-process per-session monster AI tuning
 - :mod:`~world.rules.combat_session.policies` -- round action providers
 - :mod:`~world.rules.combat_session.snapshot` -- round rollback snapshots
 - :mod:`~world.rules.combat_session.scans` -- post-round affinity scans

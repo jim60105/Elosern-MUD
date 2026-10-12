@@ -4,34 +4,61 @@ tier_default_archetype:
   high: brute             # See design.md D-1/D-2/D-3: 雙頭龍, 魔法生物, 巨魔.
   calamity: apex_predator # See design.md D-1/D-2/D-3: 古龍, 魔神, 災獸.
 
+# The hard ceiling on deduplicated proposals one utility decision may examine
+# (monster-ai-attack-design section 4). Authored here, never in Python.
+candidate_budget: 256
+
+# Explicit per-variant intelligence: the ONLY source of a monster's 智慧
+# (monster-ai-design section 1). No tier, species, danger grade, ordinary or
+# stronger rank, stat, or archetype supplies one, and a variant needs a value
+# only while its effective decision mode is utility.
+variant_intelligence: {}
+
+# Optional per-variant mode override; an absent entry uses the resolved
+# archetype's decision_mode. Every production variant stays legacy until
+# monster-ai-staged-activation flips a named set.
+variant_decision_mode: {}
+
 archetypes:
   instinctive:
     target_strategy: lowest_hp
     skill_choice: first_owned
     prefer_area_when_multiple_enemies: false
     flee_hp_fraction: 0.35
+    decision_mode: legacy
+    utility_weights: {damage: 1.0, kill: 0.4, heal: 0.7, control: 0.2, focus: 0.1, cost: 0.2, waste: 0.2, preference: 0.6}
   pack_hunter:
     target_strategy: lowest_hp
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
     flee_hp_fraction: 0.20
+    decision_mode: legacy
+    utility_weights: {damage: 1.0, kill: 1.6, heal: 0.8, control: 0.5, focus: 1.2, cost: 0.35, waste: 0.5, preference: 0.4}
   brute:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: false
     flee_hp_fraction: 0.10
+    decision_mode: legacy
+    utility_weights: {damage: 1.4, kill: 0.8, heal: 0.5, control: 0.2, focus: 0.2, cost: 0.1, waste: 0.2, preference: 0.5}
   tactical_caster:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
     flee_hp_fraction: 0.25
+    decision_mode: legacy
+    utility_weights: {damage: 0.9, kill: 1.2, heal: 1.4, control: 1.0, focus: 0.6, cost: 0.7, waste: 0.8, preference: 0.3}
   apex_predator:
     target_strategy: highest_effective_power
     skill_choice: highest_expected_damage
     prefer_area_when_multiple_enemies: true
     flee_hp_fraction: null
+    decision_mode: legacy
+    utility_weights: {damage: 1.2, kill: 1.8, heal: 0.8, control: 0.8, focus: 0.8, cost: 0.4, waste: 0.6, preference: 0.3}
   ambush_predator:
     target_strategy: lowest_hp
     skill_choice: first_owned
     prefer_area_when_multiple_enemies: false
     flee_hp_fraction: 0.20
+    decision_mode: legacy
+    utility_weights: {damage: 1.2, kill: 1.6, heal: 0.6, control: 0.4, focus: 0.4, cost: 0.3, waste: 0.5, preference: 0.6}

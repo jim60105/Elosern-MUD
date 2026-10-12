@@ -10,9 +10,10 @@ from typing import Any
 from world.rules import combat
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield
+from world.rules.combat_session.ai_tuning import record_session_ai_tuning
+from world.rules.combat_session.battlefield import _context_for
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.monster_behaviour import monster_behaviour_policy
-from world.rules.combat_session.battlefield import _context_for
 
 BASIC_ATTACK_KEY = "basic_attack"
 
@@ -64,7 +65,13 @@ def _enemy_policy(
     ``threat_tier``) still acts through its profile skills. The request context
     is rebuilt from the session record, so examination opponents fight with
     ordinary lethal semantics inside the simulated battle.
+
+    The decision boundary is also where one monster's immutable, startup-
+    validated AI tuning is recorded for its session (nothing durable, nothing
+    per-entity): the recording is what a terminal cleanup or a restarted
+    process later replaces.
     """
+    record_session_ai_tuning(record.session_id, entity)
     request = monster_behaviour_policy(entity, battlefield)
     if request is None:
         return None

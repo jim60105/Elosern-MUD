@@ -14,6 +14,7 @@ from typeclasses.monsters import Monster
 from world.observability import log_info
 from world.rules.action import _stored_trait_value
 from world.rules.combat import Battlefield
+from world.rules.combat_session.ai_tuning import discard_session_ai_tuning
 from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.records import (
@@ -33,6 +34,23 @@ def _persist(actor: Any, record: CombatSessionRecord) -> None:
     actor.db.active_combat = to_storage(record)
 
 
+def _terminal_session_id(actor: Any, record: CombatSessionRecord | None) -> str | None:
+    """The session id still recoverable at terminal cleanup, if any is.
+
+    The durable record carries it while it is still stored, so cleanup reaches
+    the recorded AI tuning even on the unparseable-payload path, where no valid
+    record was parsed and only the raw storage remains.
+    """
+    if record is not None:
+        return record.session_id
+    stored = actor.db.active_combat
+    if isinstance(stored, dict):
+        candidate = stored.get("session_id")
+        if isinstance(candidate, str):
+            return candidate
+    return None
+
+
 def clear_session(
     actor: Any,
     battlefield: Battlefield | None = None,
@@ -45,11 +63,18 @@ def clear_session(
     release surviving companions and monsters from skip safety, and the
     participant scan purges even a deleted participant's stale key, so no
     registration of the session survives settlement.
+
+    The session's recorded in-process AI tuning is dropped here as well, so no
+    completed session stays observable and a long-lived process does not
+    accumulate one record per session it has ever run.
     """
     from world.rules.skip_safety import unregister_participants
 
+    session_id = _terminal_session_id(actor, record)
     actor.db.active_combat = None
     actor.ndb.action_context = None
+    if session_id is not None:
+        discard_session_ai_tuning(session_id)
     unregister_active_battlefield(actor)
     if battlefield is not None:
         for key in list(battlefield.roster):
