@@ -164,7 +164,18 @@ class VueGalleryUiEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         # 'sends only the edited stage triple for an official identity' pin
         # every affordance dispatching its committed action with exactly the
         # edited component; 'never dispatches an untouched official geometry
-        # save' pins that a save without an edit crosses no wire.
+        # save' pins that a save without an edit crosses no wire;
+        # 'suppresses the paragraph when committed official rows replace every
+        # card' and 'suppresses the paragraph on every card filter with no
+        # visible rows while official rows exist' pin that committed official
+        # rows alone drop the empty-card guidance on every tab, while 'keeps
+        # the unchanged paragraph inside the cards area without official rows',
+        # 'keeps the paragraph for a subject with no cards and no official
+        # rows' and 'keeps the paragraph for an empty filtered subset without
+        # official rows' pin its unchanged text, class and cards-area location
+        # when the committed official list is empty, and 'follows a committed
+        # official-entry replacement in both directions without a dispatch'
+        # pins the reactive, dispatch-free toggle.
         _assert_vitest_passes(
             _run_vitest_once(GALLERY_COMPONENTS), "gallery official rows"
         )
