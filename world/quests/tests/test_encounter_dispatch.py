@@ -242,6 +242,57 @@ class ActivationTests(EncounterDispatchTestBase):
             self.package_id,
         )
 
+    def test_each_activation_announces_the_owner_package_scene_and_room(self):
+        """Owns the activation half of the observability delta's added
+        correlated-boundary-event requirement; its canonical id is attached
+        when that delta syncs at archive."""
+        info: list[tuple[str, dict]] = []
+
+        def record(event, *, context=None, exc=None):
+            info.append((event, dict(context or {})))
+
+        with patch(
+            "world.quests.encounter_dispatch.log_info", side_effect=record
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                activations = activate_pending_encounters(
+                    self.player, room=self.room, tick=5
+                )
+        self.assertEqual(len(info), len(activations))
+        for (event, context), activation in zip(
+            sorted(info, key=lambda item: item[1]["scene"]),
+            sorted(activations, key=lambda item: item.scene_id),
+        ):
+            self.assertEqual(event, "scene_encounter_activated_from_boundary")
+            self.assertEqual(context["char"], str(self.player.pk))
+            self.assertEqual(context["package"], self.package_id)
+            self.assertEqual(context["scene"], activation.scene_id)
+            self.assertEqual(context["room"], str(self.room.pk))
+            self.assertEqual(context["tick"], "5")
+
+    def test_a_failed_scene_is_reported_as_a_bounded_diagnostic(self):
+        warn: list[tuple[str, dict]] = []
+
+        def record(event, *, context=None, exc=None):
+            warn.append((event, dict(context or {})))
+
+        with patch(
+            "world.quests.encounter_dispatch.activate_scene_encounter",
+            side_effect=RuntimeError("store exploded"),
+        ), patch("world.quests.encounter_dispatch.log_warn", side_effect=record):
+            self.assertEqual(
+                activate_pending_encounters(self.player, room=self.room, tick=5), ()
+            )
+        self.assertEqual(
+            [event for event, _ in warn],
+            ["scene_encounter_activation_failed", "scene_encounter_activation_failed"],
+        )
+        for _, context in warn:
+            self.assertEqual(context["char"], str(self.player.pk))
+            self.assertEqual(context["package"], self.package_id)
+            self.assertIn(context["scene"], {"south_gate", "market"})
+            self.assertEqual(context["tick"], "5")
+
     def test_instance_layer_encounter_activates_from_the_origin_room(self):
         from typeclasses.rooms import InstanceRoom
 

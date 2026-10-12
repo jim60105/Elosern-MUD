@@ -10,6 +10,10 @@ model") that must be proved rather than asserted.
 
 from __future__ import annotations
 
+import json
+from unittest.mock import patch
+
+from django.db import transaction
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -829,3 +833,175 @@ class UnreviewedRequirementsTests(DreamDispatchTestCase):
             draft_id=draft.draft_id, owner_id=self.owner_id, tick=100
         ).version), 2)
         self.assertEqual(DreamDispatch.objects.count(), 1)
+
+
+class DispatchEventTests(DreamDispatchTestCase):
+    """Boundary events carry business identity, never player prose.
+
+    Owns the dispatch half of the ``observability-logging`` delta's added
+    "Dream dispatch and activation emit correlated boundary events": the
+    canonical requirement id is attached when that delta syncs at archive.
+    """
+
+    def _capture(self, action):
+        """Run ``action`` with the module's facade bindings captured."""
+        info: list[tuple[str, dict]] = []
+        warn: list[tuple[str, dict]] = []
+
+        def recorder(bucket):
+            def record(event, *, context=None, exc=None):
+                bucket.append((event, dict(context or {})))
+
+            return record
+
+        with patch.object(dispatch, "log_info", side_effect=recorder(info)), patch.object(
+            dispatch, "log_warn", side_effect=recorder(warn)
+        ), self.captureOnCommitCallbacks(execute=True):
+            result = action()
+        return result, info, warn
+
+    def _only(self, info, event):
+        self.assertEqual([name for name, _ in info], [event])
+        return dict(info)[event]
+
+    def test_confirmation_claim_wait_and_failure_name_the_same_work(self):
+        draft = self._draft()
+        request, info, warn = self._capture(
+            lambda: confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+        )
+        work = dispatch.find_by_submission(request.submission_key)
+        self.assertEqual(warn, [])
+        confirmed = self._only(info, "dream_dispatch_confirmed")
+        self.assertEqual(confirmed["dispatch"], work.dispatch_id)
+        self.assertEqual(confirmed["request"], request.submission_key)
+        self.assertEqual(confirmed["owner"], self.owner_id)
+        self.assertEqual(confirmed["version"], int(request.version))
+        self.assertEqual(confirmed["work_state"], dispatch.STATE_QUEUED)
+        self.assertEqual(confirmed["tick"], 100)
+
+        claimed_result, info, _ = self._capture(
+            lambda: dispatch.claim(work, process="p1", tick=101)
+        )
+        claimed, token = claimed_result
+        self.assertTrue(token)
+        claim_event = self._only(info, "dream_dispatch_claimed")
+        self.assertEqual(claim_event["dispatch"], work.dispatch_id)
+        self.assertEqual(claim_event["owner"], self.owner_id)
+        self.assertEqual(claim_event["stage"], dispatch.STAGE_STORY)
+        self.assertEqual(claim_event["process"], "p1")
+        self.assertEqual(claim_event["attempt"], 1)
+        self.assertEqual(claim_event["tick"], 101)
+
+        _, info, _ = self._capture(
+            lambda: dispatch.mark_waiting(
+                claimed, dispatch.REASON_NO_CAPABILITY, tick=102, process="p1"
+            )
+        )
+        waiting = self._only(info, "dream_dispatch_waiting")
+        self.assertEqual(waiting["dispatch"], work.dispatch_id)
+        self.assertEqual(waiting["reason"], dispatch.REASON_NO_CAPABILITY)
+        self.assertEqual(waiting["stage"], dispatch.STAGE_STORY)
+        self.assertEqual(waiting["work_state"], dispatch.STATE_WAITING_SERVICE)
+
+        # Reconsideration re-arms the same work, and the failure that follows
+        # keeps the same durable identity.
+        dispatch.consider_waiting(process="p2")
+        claimed_result, info, _ = self._capture(
+            lambda: dispatch.claim(dispatch.find_work(work.dispatch_id), process="p2", tick=103)
+        )
+        claimed, token = claimed_result
+        self.assertEqual(self._only(info, "dream_dispatch_claimed")["attempt"], 2)
+        _, info, _ = self._capture(
+            lambda: dispatch.mark_failed(
+                claimed, token, dispatch.REASON_EXECUTION_FAILED, tick=104, process="p2"
+            )
+        )
+        failed = self._only(info, "dream_dispatch_failed")
+        self.assertEqual(failed["dispatch"], work.dispatch_id)
+        self.assertEqual(failed["owner"], self.owner_id)
+        self.assertEqual(failed["reason"], dispatch.REASON_EXECUTION_FAILED)
+        self.assertEqual(failed["work_state"], dispatch.STATE_FAILED)
+
+    def test_publication_and_recovery_events_carry_their_references(self):
+        draft = self._draft()
+        request = self._confirm(draft)
+        work = dispatch.find_by_submission(request.submission_key)
+        claimed, token = dispatch.claim(work, process="p1", tick=101)
+        _, info, _ = self._capture(
+            lambda: dispatch.mark_arranged(
+                claimed,
+                token,
+                decision_id="decision:synthetic",
+                thread_id="thread:synthetic",
+                beat_id="beat:synthetic",
+                package_id="package:synthetic",
+                tick=110,
+                process="p1",
+            )
+        )
+        published = self._only(info, "dream_dispatch_published")
+        self.assertEqual(published["dispatch"], work.dispatch_id)
+        self.assertEqual(published["owner"], self.owner_id)
+        self.assertEqual(published["decision"], "decision:synthetic")
+        self.assertEqual(published["thread_id"], "thread:synthetic")
+        self.assertEqual(published["beat_id"], "beat:synthetic")
+        self.assertEqual(published["package"], "package:synthetic")
+        self.assertEqual(published["work_state"], dispatch.STATE_ARRANGED)
+
+        # A second work left claimed by a previous process is recoverable: the
+        # recovery event reports the invalidated claim, not a replay.
+        other = confirm_draft(
+            draft_id=self._draft(summary="合成第二版方向：在北門遇見一個商人。").draft_id,
+            owner_id=self.owner_id,
+            tick=100,
+        )
+        claimed, _ = dispatch.claim(
+            dispatch.find_by_submission(other.submission_key), process="p1", tick=101
+        )
+        recovered, info, _ = self._capture(
+            lambda: dispatch.recover_interrupted(process="p2", tick=120)
+        )
+        self.assertEqual(recovered, [claimed.dispatch_id])
+        recovery = self._only(info, "dream_dispatch_recovered")
+        self.assertEqual(recovery["dispatch"], claimed.dispatch_id)
+        self.assertEqual(recovery["owner"], self.owner_id)
+        self.assertEqual(recovery["work_state"], dispatch.STATE_QUEUED)
+        self.assertEqual(recovery["previous_token"], True)
+        self.assertEqual(recovery["process"], "p2")
+
+    def test_a_rolled_back_confirmation_announces_nothing(self):
+        draft = self._draft()
+        info: list[tuple[str, dict]] = []
+
+        def record(event, *, context=None, exc=None):
+            info.append((event, dict(context or {})))
+
+        with patch.object(dispatch, "log_info", side_effect=record):
+            with transaction.atomic():
+                with self.captureOnCommitCallbacks(execute=False) as callbacks:
+                    confirm_draft(
+                        draft_id=draft.draft_id, owner_id=self.owner_id, tick=100
+                    )
+                self.assertNotEqual(callbacks, [])
+                transaction.set_rollback(True)
+        self.assertEqual(info, [])
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+
+    def test_dispatch_events_never_carry_the_direction_summary(self):
+        draft = self._draft()
+        summary = draft.direction["summary"]
+        request, info, warn = self._capture(
+            lambda: confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+        )
+        work = dispatch.find_by_submission(request.submission_key)
+        _, more, _ = self._capture(
+            lambda: dispatch.mark_waiting(work, dispatch.REASON_NO_CAPABILITY, tick=101)
+        )
+        self.assertTrue(info and more)
+        for event, context in (*info, *more, *warn):
+            serialized = json.dumps(context, ensure_ascii=False)
+            self.assertNotIn(summary, serialized, event)
+            for key, value in context.items():
+                self.assertIsInstance(value, (str, int, bool), f"{event}.{key}")
+                if isinstance(value, str):
+                    self.assertLessEqual(len(value), 128, f"{event}.{key}")
