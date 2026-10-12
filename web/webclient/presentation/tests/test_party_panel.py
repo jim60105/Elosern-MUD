@@ -333,6 +333,78 @@ class PartyPresenterTests(EvenniaTest):
         self.assertIn(key, panels["art"]["portrait_catalog"])
         return slots[0], panels["art"]["portrait_catalog"][key]
 
+    def _read_only_render_case(
+        self, art, subject, companion, expected_url, expected_origin
+    ):
+        """Render three snapshots under every tripwire and prove nothing moved.
+
+        A registry-isolated presenter failure would be swallowed into an
+        unavailable panel, so the tripwires are asserted never called directly
+        AND the repeated snapshots are asserted to carry the resolved
+        portrait: the render phase provably ran and provably stayed read-only.
+        Both gallery-record read bindings are spied on — the chain module
+        imports its own alias, and a creating read consolidates records rather
+        than only creating one — so a creating read can never hide behind a
+        record that already exists.
+        """
+        tripwires: dict[str, object] = {}
+        with ExitStack() as stack:
+            for label, target in _RENDER_TRIPWIRES:
+                tripwires[label] = stack.enter_context(
+                    patch(target, side_effect=AssertionError(label))
+                )
+            reads = [
+                stack.enter_context(patch(target, wraps=record_for))
+                for target in (
+                    "world.art.gallery.record_for",
+                    "world.art.gallery_match.record_for",
+                )
+            ]
+            before = self._presentation_state(art, subject, companion)
+            panels = [self._panels() for _ in range(3)]
+            after = self._presentation_state(art, subject, companion)
+
+        for label, tripwire in tripwires.items():
+            self.assertFalse(tripwire.called, f"render attempted a {label}")
+        self.assertTrue(any(spy.called for spy in reads), "no gallery read happened")
+        for spy in reads:
+            for call in spy.call_args_list:
+                self.assertFalse(call.kwargs.get("create", False), call)
+        for snapshot in panels:
+            slot, entry = self._slot_and_entry(snapshot, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], expected_origin)
+            self.assertEqual(entry["url"], expected_url)
+        self.assertEqual(before, after)
+
+    def _presentation_state(self, art, subject, companion):
+        """Gallery records, asset/queue rows, attributes and both trees."""
+        record = record_for(subject, create=False)
+        return {
+            "gallery_keys": sorted(GalleryRecord.objects.values_list("db_key", flat=True)),
+            "gallery_cards": deepcopy(record.db.cards) if record is not None else None,
+            "gallery_default": record.db.default_image_id if record is not None else None,
+            "gallery_selection": (
+                record.db.official_selection if record is not None else None
+            ),
+            "assets": sorted(
+                (
+                    asset.db_key,
+                    asset.db.status,
+                    asset.db.output_identity or "",
+                    asset.db.prior_output_identity or "",
+                )
+                for asset in ArtAssetRecord.objects.all()
+            ),
+            "attributes": [
+                (attribute.key, deepcopy(attribute.value))
+                for attribute in sorted(
+                    companion.attributes.all(), key=lambda attribute: attribute.key
+                )
+            ],
+            "trees": art.tree(),
+        }
+
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
@@ -793,66 +865,58 @@ class PartyPresenterTests(EvenniaTest):
             companion = self._official_companion()
             subject = character_subject_for(companion)
             set_official_selection(subject, selected)
-            expected_url = art.url(selected)
+            self._read_only_render_case(
+                art, subject, companion, art.url(selected), ORIGIN_OFFICIAL
+            )
 
-            tripwires: dict[str, object] = {}
-            with ExitStack() as stack:
-                for label, target in _RENDER_TRIPWIRES:
-                    tripwires[label] = stack.enter_context(
-                        patch(target, side_effect=AssertionError(label))
-                    )
-                # A non-creating read is the legal gallery read; a creating one
-                # would take the ``_create_record`` tripwire above.
-                reads = stack.enter_context(
-                    patch("world.art.gallery.record_for", wraps=record_for)
-                )
-                before = self._presentation_state(art, subject, companion)
-                panels = [self._panels() for _ in range(3)]
-                after = self._presentation_state(art, subject, companion)
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_repeated_runtime_default_presentation_writes_nothing(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            image_id = "eeeeeeee-5555-4555-8555-555555555555"
+            identity = f"gallery/character/{_COMPANION_KEY}/{image_id}.png"
+            art.write_store_file(identity)
+            append_card(
+                subject,
+                image_id=image_id,
+                stored_identity=identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="seed",
+                created_at=100,
+                image_size={"width": 768, "height": 1024},
+            )
+            # The record-default branch reads the gallery record through the
+            # chain module's own alias, so this fixture is the one that
+            # exercises that read under the tripwires.
+            self._read_only_render_case(
+                art, subject, companion, f"/art/{identity}", ORIGIN_RUNTIME
+            )
 
-            # A registry-isolated presenter failure would be swallowed into an
-            # unavailable panel, so the tripwires are asserted directly AND the
-            # repeated snapshots are asserted to carry the resolved portrait:
-            # the render phase provably ran and provably stayed read-only.
-            for label, tripwire in tripwires.items():
-                self.assertFalse(tripwire.called, f"render attempted a {label}")
-            self.assertTrue(reads.called, "no non-creating gallery read happened")
-            for call in reads.call_args_list:
-                self.assertFalse(call.kwargs.get("create", False), call)
-            for snapshot in panels:
-                slot, entry = self._slot_and_entry(snapshot, companion)
-                self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-                self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
-                self.assertEqual(entry["url"], expected_url)
-            self.assertEqual(before, after)
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_repeated_mounted_default_presentation_creates_no_record(self):
+        with _official_art_scope() as art:
+            identity = art.mount("hero.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            self.assertIsNone(record_for(subject, create=False))
 
-    def _presentation_state(self, art, subject, companion):
-        """Gallery records, asset/queue rows, attributes and both trees."""
-        record = record_for(subject, create=False)
-        return {
-            "gallery_keys": sorted(GalleryRecord.objects.values_list("db_key", flat=True)),
-            "gallery_cards": deepcopy(record.db.cards) if record is not None else None,
-            "gallery_default": record.db.default_image_id if record is not None else None,
-            "gallery_selection": (
-                record.db.official_selection if record is not None else None
-            ),
-            "assets": sorted(
-                (
-                    asset.db_key,
-                    asset.db.status,
-                    asset.db.output_identity or "",
-                    asset.db.prior_output_identity or "",
-                )
-                for asset in ArtAssetRecord.objects.all()
-            ),
-            "attributes": [
-                (attribute.key, deepcopy(attribute.value))
-                for attribute in sorted(
-                    companion.attributes.all(), key=lambda attribute: attribute.key
-                )
-            ],
-            "trees": art.tree(),
-        }
+            self._read_only_render_case(
+                art, subject, companion, art.url(identity), ORIGIN_OFFICIAL
+            )
+
+            # Repeated presentation of the mounted default still creates
+            # nothing: the record is absent after three armed renders.
+            self.assertIsNone(record_for(subject, create=False))
 
 
 class PartyValidatorTests(unittest.TestCase):
