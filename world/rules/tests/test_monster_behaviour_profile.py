@@ -73,6 +73,7 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                     self.assertGreaterEqual(weight, 0)
             self.assertIn(values["decision_mode"], {"legacy", "utility"})
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_all_six_archetypes_stay_available_with_all_legacy_production_modes(self):
         self.assertEqual(set(MONSTER_AI_TUNING.behaviour_profiles), _SIX_ARCHETYPES)
         self.assertEqual(set(BEHAVIOUR_PROFILES), _SIX_ARCHETYPES)

@@ -292,6 +292,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
     def _profiles(self, rulebook):
         return _load_behaviour_profiles(rulebook, tiers=TIER_KEYS)
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_each_mandatory_legacy_field_is_required(self):
         for field in MANDATORY_FIELDS:
             with self.subTest(field=field):
@@ -301,6 +302,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 with self.assertRaises(MonsterBehaviourConfigError):
                     self._profiles(_rulebook(archetypes=complete))
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_unknown_archetype_and_top_level_fields_are_rejected(self):
         complete = _archetypes()
         complete[ARCHETYPE]["surprise"] = 1
@@ -326,6 +328,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 variants=_VARIANT_ROWS,
             )
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_weights_must_be_the_complete_named_schema(self):
         malformed = {
             "incomplete": {k: v for k, v in WEIGHTS.items() if k != "waste"},
@@ -345,6 +348,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 with self.assertRaises(MonsterBehaviourConfigError):
                     self._profiles(rulebook)
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_decision_mode_and_budget_are_strictly_typed(self):
         for mode in ("berserk", True, 1, None, ["legacy"]):
             with self.subTest(mode=mode):
@@ -366,6 +370,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
             with self.subTest(budget=budget):
                 self.assertEqual(_tuning(budget=budget).candidate_budget, budget)
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_tier_default_mapping_must_cover_exactly_the_tier_registry(self):
         cases = {
             "missing": {TIER: ARCHETYPE},
@@ -381,6 +386,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
                 with self.assertRaises(MonsterBehaviourConfigError):
                     self._profiles(_rulebook(defaults=defaults))
 
+    @covers_requirement("monster-behaviour-profile::variant-intelligence-is-explicit-and-independent")
     def test_variant_maps_require_registered_pairs_and_integers(self):
         orphaned = {**_VARIANT_ROWS, ORPHAN: _ORPHAN_ROW}
         malformed_intelligence = {
@@ -411,6 +417,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(modes={ORPHAN: "utility"}, variants=orphaned)
 
+    @covers_requirement("monster-behaviour-profile::variant-intelligence-is-explicit-and-independent")
     def test_utility_activation_coverage_requires_intelligence(self):
         utility_archetypes = _archetypes(patrol={"mode": "utility"})
         with self.assertRaises(MonsterBehaviourConfigError):
@@ -435,6 +442,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(intelligence={ORDINARY: 10, STRONGER: False})
 
+    @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
     def test_a_variant_referencing_an_unknown_archetype_is_rejected(self):
         broken = dict(_VARIANT_ROWS)
         broken[ORDINARY] = make_monster_variant(
@@ -511,6 +519,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
             )
         self.assertRegex(tuning.fingerprint, r"^[0-9a-f]{64}$")
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_fingerprint_is_reproducible_and_moves_with_every_input(self):
         base = _tuning().fingerprint
         self.assertEqual(base, _tuning().fingerprint)
@@ -608,6 +617,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
     def _resolve(self, monster, **kwargs):
         return resolve_monster_ai(monster, tuning=_tuning(**kwargs))
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
     def test_a_variant_override_wins_over_the_archetype_mode(self):
         paired = self._resolve(
             FakeAIMonster("t_ai_u", species_key=SPECIES, variant_key=ORDINARY),
@@ -626,6 +638,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
         self.assertIs(overridden.mode, DecisionMode.LEGACY)
         self.assertEqual(overridden.archetype_key, ARCHETYPE)
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
     def test_a_repaired_pair_is_never_trusted(self):
         # The mode map names ORDINARY, but the stored variant key now belongs
         # to another species: the override must not apply.
@@ -658,6 +673,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
         self.assertIs(invalid.invalid_reason, InvalidDecisionReason.INVALID_BINDING)
         self.assertIsNone(invalid.mode)
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
     def test_utility_without_a_pair_or_intelligence_is_typed_invalid(self):
         unpaired = self._resolve(
             FakeAIMonster("t_ai_tier_only"),
@@ -688,6 +706,7 @@ class MonsterAIDecisionTests(unittest.TestCase):
         self.assertIs(legacy.mode, DecisionMode.LEGACY)
         self.assertNotEqual(legacy, unvalued)
 
+    @covers_requirement("monster-behaviour-profile::variant-intelligence-is-explicit-and-independent")
     def test_independent_variants_keep_their_own_intelligence(self):
         authored = {"intelligence": {ORDINARY: 80, STRONGER: 20}}
         ordinary = self._resolve(
@@ -707,6 +726,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
         self.assertEqual(stronger.intelligence, 20)
         self.assertEqual(stronger.archetype_key, OTHER_ARCHETYPE)
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
     def test_tier_only_and_unregistered_monsters_stay_legacy(self):
         tier_only = self._resolve(FakeAIMonster("t_ai_tier_only"))
         self.assertIs(tier_only.mode, DecisionMode.LEGACY)
@@ -720,6 +742,9 @@ class MonsterAIDecisionTests(unittest.TestCase):
         self.assertIs(unregistered.mode, DecisionMode.LEGACY)
         self.assertIsNone(unregistered.variant_key)
 
+    @covers_requirement(
+        "monster-behaviour-profile::mode-selection-honors-actual-variant-and-behavior-binding"
+    )
     def test_a_non_monster_has_no_monster_resolution(self):
         classified = FakeAIMonster("t_ai_plain")
         del classified.threat_tier
@@ -749,6 +774,7 @@ class SessionAITuningTests(unittest.TestCase):
         clear_session_ai_tuning()
         self.addCleanup(clear_session_ai_tuning)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_recording_is_keyed_by_session_and_actor(self):
         tuning = _tuning()
         first = FakeAIMonster("t_ai_first", species_key=SPECIES, variant_key=ORDINARY)
@@ -774,6 +800,7 @@ class SessionAITuningTests(unittest.TestCase):
             recorded["t_ai_first"] = recorded["key:t_ai_first"]
         self.assertEqual(len(session_ai_tuning(SESSION)), 2)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_an_active_session_keeps_the_tuning_the_process_loaded(self):
         startup = behaviour.MONSTER_AI_TUNING
         monster = FakeAIMonster(
@@ -802,6 +829,7 @@ class SessionAITuningTests(unittest.TestCase):
             startup.fingerprint,
         )
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_a_restarted_process_reconstructs_with_the_new_startup_tuning(self):
         monster = FakeAIMonster(
             "t_ai_restart", species_key=SPECIES, variant_key=ORDINARY
@@ -815,6 +843,7 @@ class SessionAITuningTests(unittest.TestCase):
         self.assertEqual(recorded.tuning_fingerprint, restarted.fingerprint)
         self.assertIs(recorded.mode, DecisionMode.LEGACY)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_recording_re_resolves_a_repaired_binding(self):
         tuning = _tuning()
         monster = FakeAIMonster(
@@ -826,6 +855,7 @@ class SessionAITuningTests(unittest.TestCase):
         recorded = session_ai_tuning(SESSION)["key:t_ai_drift"]
         self.assertIs(recorded.invalid_reason, InvalidDecisionReason.INVALID_BINDING)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_a_non_monster_is_not_recorded(self):
         class Plain:
             key = "t_ai_plain"
@@ -892,6 +922,7 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
             session_id, self.monster, tuning=self.tuning
         )
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_recording_resolves_the_constructed_monster_and_stores_nothing(self):
         attributes_before = {
             str(item.key): item.value for item in self.monster.attributes.all()
@@ -917,6 +948,7 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
             {field.name for field in type(self.monster)._meta.get_fields()},
         )
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_the_production_enemy_policy_records_the_same_tuning(self):
         record = CombatSessionRecord(
             session_id=SESSION,
@@ -949,6 +981,7 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
         )
         self.assertEqual(self.monster.db.behaviour_tree, 7)
 
+    @covers_requirement("monster-behaviour-profile::session-tuning-has-a-reproducible-lifetime")
     def test_terminal_cleanup_drops_only_its_own_session(self):
         record = CombatSessionRecord(
             session_id=SESSION,
