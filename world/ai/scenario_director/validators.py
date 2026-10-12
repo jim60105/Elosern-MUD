@@ -456,10 +456,25 @@ def _validate_monster_tier_known(parsed: Any) -> list[str]:
 
 
 def _validate_issuer_known(parsed: Any) -> list[str]:
+    """The issuer is a registered guild branch, or a role the payload declares.
+
+    An ordinary quest proposal must name a registered branch. An extended beat
+    blueprint declares its own symbolic roles, so its issuer names one of them:
+    the deterministic publication boundary still performs the strict
+    actual-entity checks, and planning never routes a private commission to a
+    guild (dream-story-dispatch §5).
+    """
     issuer = parsed.get("issuer") if isinstance(parsed, dict) else None
-    if not isinstance(issuer, str) or issuer not in GUILD_BRANCH_REGISTRY:
+    if not isinstance(issuer, str):
         return [f"issuer branch {issuer!r} is not in GUILD_BRANCH_REGISTRY"]
-    return []
+    if issuer in GUILD_BRANCH_REGISTRY:
+        return []
+    roles = parsed.get("roles") if isinstance(parsed, dict) else None
+    if isinstance(roles, list) and any(
+        isinstance(entry, dict) and entry.get("role_id") == issuer for entry in roles
+    ):
+        return []
+    return [f"issuer branch {issuer!r} is not in GUILD_BRANCH_REGISTRY"]
 
 
 def _validate_stage_indices_contiguous(parsed: Any) -> list[str]:

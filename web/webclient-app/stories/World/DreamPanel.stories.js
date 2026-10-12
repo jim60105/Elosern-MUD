@@ -12,6 +12,7 @@ function fixture(overrides = {}) {
     scene: "", dialogue: "",
     scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
     direction_parts: [], draft_preferences: null,
+    requirements: [], requirement_version: null,
     thread_choices: [{ id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" }],
     track: { version: 1, completed: 0, pleasure: 0, ordinal: 0, level: "平靜", climax_phase: "未達", converging: false },
     sleep: { tick_from: 100, tick_to: 100, seconds: 0, requested_seconds: 0, event_kinds: [] },
@@ -124,6 +125,14 @@ export const Pending = { render, args: { ...conversing, pending: true, can_input
 export const Failed = { render, args: { ...conversing, failure: true } };
 export const Drafted = { render, args: { ...conversing, direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
   draft_preferences: { kind: "thread_direction", thread_id: thread.id, themes: ["重逢", "信任"], atmosphere: ["靜謐"], exclusions: ["暴力"] } } };
+const requirements = [
+  { kind: "place", text: "北境的雪原" },
+  { kind: "new_character", text: "失散的騎士" },
+  { kind: "private_commission", text: "替她找回失散的同伴" },
+];
+export const RequirementsProposed = { render, args: { ...conversing, requirements } };
+export const RequirementsShown = { render, args: { ...conversing, requirements,
+  requirement_version: "synthetic-storyboard-dream:v2" } };
 export const AtCap = { render, args: { ...conversing, completed: 6, remaining: 0, can_input: false,
   direction_parts: ["讓雪原上的重逢，成為我醒來後的第一段故事。"],
   dialogue: "「……帶著它醒來吧。」",

@@ -17,6 +17,23 @@ def render_state(state):
     if state["can_input"]:
         parts.append("dream say <想說的話>")
     if state["can_confirm"]:
+        requirements = state.get("requirements") or []
+        if requirements:
+            # The reviewed version travels with the rows: a confirmation must
+            # echo the version it actually read, and the text transport is a
+            # surface like any other, so it names the same identity the panel
+            # does. A row set without one has not been persisted yet, and the
+            # text says so instead of implying a review that never happened.
+            listed = "、".join(
+                str(row.get("text", "")) for row in requirements if row.get("text")
+            )
+            version = state.get("requirement_version")
+            suffix = (
+                f"（已檢視的版本：{version}）"
+                if version
+                else "（尚未檢視：先 dream draft 記下，才會保存這些需求）"
+            )
+            parts.append(f"這個方向的可執行需求：{listed}{suffix}")
         parts.append("dream confirm [故事方向] ／ dream draft [故事方向]")
         if state["thread_choices"]:
             parts.append("可調整的故事線：" + "、".join(

@@ -145,7 +145,27 @@ class DreamPromptTests(unittest.TestCase):
         )
         payload = json.loads(user["content"])
         self.assertEqual(
-            set(payload), {"player_message", "preferences", "adventure_summary"}
+            set(payload),
+            {
+                "player_message",
+                "preferences",
+                "adventure_summary",
+                "requirement_contract",
+            },
+        )
+        # The one added key is only the closed requirement vocabulary the
+        # deterministic authoring contract freezes: it is not a story fact, a
+        # hidden field or an owner identity, so the permitted-context tripwire
+        # above stays exact while the collaborator learns what it may propose.
+        from world.ai import dream as dream_module
+
+        self.assertEqual(
+            payload["requirement_contract"],
+            {
+                "kinds": list(dream_module.REQUIREMENT_KINDS),
+                "max_items": dream_module.MAX_REQUIREMENTS,
+                "max_text": dream_module.MAX_REQUIREMENT_TEXT,
+            },
         )
         # No StoryDirector/system/hidden fields and no owner identities.
         lowered = user["content"]

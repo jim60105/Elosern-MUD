@@ -37,6 +37,7 @@ from world.lore.guild import GUILD_RANK_REGISTRY
 from world.prompts.loader import PromptUnavailableError
 
 from world.ai.scenario_director.blueprints import QuestBlueprint
+from world.ai.scenario_director.packages import PACKAGE_PAYLOAD_SCHEMA
 from world.ai.scenario_director.validators import (
     _HOOKS,
     _SCENARIO_DIRECTOR_DEGRADED,
@@ -238,3 +239,101 @@ def generate_beat_quest_blueprint(client: Any, *, context: dict[str, Any]):
         # observability: ignore R2: malformed proposals are a no-content outcome
         return None
     return blueprint if _fits_context(blueprint, context) else None
+
+
+#: The blueprint's own top-level keys, mirrored from the published contract.
+BLUEPRINT_KEYS = ("name", "quest_type", "rank", "issuer", "stages", "reward", "failure")
+#: The package sections one extended beat blueprint carries alongside them.
+PACKAGE_SECTION_KEYS = (
+    "roles",
+    "relationships",
+    "knowledge",
+    "encounters",
+    "dialogue",
+    "commissions",
+    "outcome_groups",
+)
+
+#: The extended beat-scoped proposal contract: the QuestBlueprint fields plus the
+#: package sections the deterministic core reshuffles into a scene package. It is
+#: composed from the two upstream schemas rather than restated, so the blueprint
+#: fields and every package section keep exactly one definition.
+EXTENDED_BLUEPRINT_SCHEMA: dict[str, Any] = {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "ExtendedQuestBlueprint",
+    "type": "object",
+    "required": [
+        *SCENARIO_DIRECTOR_OUTPUT_SCHEMA["required"],
+        "roles",
+        "relationships",
+        "knowledge",
+        "encounters",
+        "dialogue",
+        "commissions",
+    ],
+    "additionalProperties": False,
+    "properties": {
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 80},
+        **SCENARIO_DIRECTOR_OUTPUT_SCHEMA["properties"],
+        **{
+            key: PACKAGE_PAYLOAD_SCHEMA["properties"][key]
+            for key in PACKAGE_SECTION_KEYS
+        },
+    },
+}
+
+
+@defer.inlineCallbacks
+def generate_beat_scene_blueprint(client: Any, *, context: dict[str, Any]):
+    """Propose one extended beat blueprint for a confirmed scene, or no content.
+
+    This is the beat-scoped scene route: the answer must satisfy
+    :data:`EXTENDED_BLUEPRINT_SCHEMA` -- the QuestBlueprint contract plus the
+    package sections a scene package needs -- so the deterministic core can
+    reshuffle it into the package payload and publish it. Every degrade trigger
+    (disabled profile, transport failure, exhausted retries, a structurally
+    incomplete answer, or an embedded quest that does not fit the request)
+    resolves to ``None``: this route never draws authored filler.
+    """
+    from world.ai.scenario_director.blueprints import MAX_TOTAL_SIZE
+
+    if client is None:
+        raise ScenarioDirectorClientRequiredError(
+            "beat scene generation requires a client"
+        )
+    _require_registered()
+    frame = json.dumps(context, ensure_ascii=False, sort_keys=True)
+    if len(frame) > MAX_TOTAL_SIZE:
+        return None
+    try:
+        system, _generic_user = build_scenario_prompt(context)
+    except PromptUnavailableError:
+        return None
+    # The generic note cap is too small for the permissioned beat snapshot.
+    # Preserve the entire bounded immutable frame or refuse, never truncate it.
+    user = {"role": "user", "content": frame}
+    descriptor = ChatRequestDescriptor(
+        messages=(system, user),
+        schema_id="scenario_director",
+        output_schema=EXTENDED_BLUEPRINT_SCHEMA,
+    )
+    text = yield guarded_call("scenario_director", client, descriptor)
+    if text is _SCENARIO_DIRECTOR_DEGRADED:
+        return None
+    try:
+        payload = json.loads(text)
+    except (TypeError, ValueError):
+        # observability: ignore R2: malformed proposals are a no-content outcome
+        return None
+    if not isinstance(payload, dict) or any(
+        key not in payload for key in BLUEPRINT_KEYS
+    ):
+        return None
+    try:
+        blueprint = QuestBlueprint.from_payload(
+            {key: payload[key] for key in BLUEPRINT_KEYS}
+        )
+    except (TypeError, ValueError, KeyError):
+        # observability: ignore R2: an unreadable embedded quest is a no-content outcome
+        return None
+    return payload if _fits_context(blueprint, context) else None

@@ -748,7 +748,7 @@ carry `world.rules.namegen` on its documented read-only-rule allowlist alongside
 
 ### Requirement: Beat-scoped blueprint generation does not substitute template filler
 
-A beat-scoped ScenarioDirector entry point SHALL accept a validated quest beat and permitted immutable narrative context, use the existing client/profile/guardrail/schema and semantic validators, and return a context-fitting QuestBlueprint proposal or a no-content outcome. Disabled transport, exhausted validation and context misfit SHALL NOT substitute a generic template. The existing generate_quest_blueprint entry point SHALL retain its generic authored-template degradation contract.
+Beat-scoped ScenarioDirector SHALL accept validated beat/confirmed requirements and permitted immutable planning context, use injected clients and existing guarded validation, and return a context-fitting complete supported blueprint or no-content reason. Disabled transport, exhaustion and misfit SHALL NOT substitute a generic template. The generic generate_quest_blueprint entry point SHALL retain authored-template degradation.
 
 #### Scenario: Beat misfit does not draw template
 - **WHEN** a schema-valid beat blueprint fails its narrative/rank/issuer/anchor fitness gate
@@ -784,3 +784,19 @@ The shared schema/proposal/payload/compiler/restore contract SHALL preserve exac
 #### Scenario: Complete canonical generated escort payloads preserve all executable references contract
 - **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
 - **THEN** The shared versioned blueprint schema, immutable proposal type, canonical payload, compiler and durable restore SHALL carry exact package/commission/protected/meeting role references, closed completion fields, typed relations and explicit exclusive final-result group membership. Quantity one, contiguous stages, registry-derived mechanics/rewards, age bounds, namespaced issuer authority, zero private merit and empty unsupported failure conditions SHALL remain enforced. Symbolic issuer roles SHALL remain planning declarations until authorized actor activation. Distinct alternatives SHALL retain separate definition/issuance/reward references. The content digest SHALL include all new runtime-critical fields; equal content SHALL remain idempotent and conflicting registration SHALL remain atomic. `compile_quest_blueprint` and generated registration SHALL independently reject incomplete or forged executable escort contracts before writes.
+
+### Requirement: Confirmed scene requirements demand a complete upstream blueprint
+
+Scene blueprints SHALL satisfy shown confirmed capabilities through the upstream package schema, including independent encounters, reusable roles, permitted initial knowledge/relationships, complete phase dialogue, validated locators, distinct commissions and needed protected-role/completion/group declarations. Generated code, arbitrary predicates, numbers and authority claims SHALL remain forbidden; mechanics SHALL remain registry-derived.
+
+#### Scenario: Motivating blueprint contains executable alternatives
+- **WHEN** ScenarioDirector answers the south-gate girl-and-mother request requiring private escort
+- **THEN** the canonical payload includes independently eligible girl/mother encounters and distinct role-issued commissions with protected-role references, explicit rendezvous completion and declared exclusive group, passing the upstream package and escort validators
+
+#### Scenario: Symbolic roles have no invented authority
+- **WHEN** a generated scene declares a new issuer role
+- **THEN** planning uses validated role scope without adding that symbolic role to existing authorized participants or fabricating a runtime issuer key
+
+#### Scenario: Insufficient or unsafe blueprint
+- **WHEN** output omits a confirmed requirement, uses an ambiguous locator, injects numeric mechanics or supplies arbitrary conditions
+- **THEN** validation yields bounded diagnostics/retries and ultimately no-content without publishing or substituting prose

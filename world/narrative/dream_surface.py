@@ -11,7 +11,7 @@ from evennia.utils.dbserialize import deserialize
 
 from world.art import official
 from world.narrative import dream_session as lifecycle
-from world.narrative.authoring import draft_is_confirmed, get_draft
+from world.narrative.authoring import REQUIREMENT_FIELDS, draft_is_confirmed, get_draft
 from world.narrative.dream_track import render_ending, track_state
 from world.narrative.models import StoryThread
 from world.narrative.threads import TERMINAL_THREAD_STATES, thread_accessible
@@ -114,6 +114,9 @@ def store_response(actor, response):
     value = association(actor)
     value["scene"] = response.scene
     value["dialogue"] = response.dialogue
+    value["requirements"] = [
+        dict(row) for row in (getattr(response, "requirements", ()) or ())
+    ]
     value["failure"] = False
     actor.db.dream_surface = value
 
@@ -122,6 +125,25 @@ def store_failure(actor):
     value = association(actor)
     value["failure"] = True
     actor.db.dream_surface = value
+
+
+def reset_cache(actor):
+    """Drop the actor's in-process association cache after a rolled-back action.
+
+    A failed confirmation rolls its Attribute writes back in the database, but
+    the in-process Attribute cache would otherwise keep serving the aborted
+    value to the next read and to the panel. The idmapper cache holds the
+    Attribute instances themselves, so the flush is what makes the next read
+    authoritative -- the same discipline ``evict_created_actors`` applies to
+    actors a rolled-back activation created. Safely callable on any actor: an
+    object without the Attribute handler is simply skipped.
+    """
+    attributes = getattr(actor, "attributes", None)
+    if attributes is not None:
+        attributes.reset_cache()
+    from evennia.utils.idmapper.models import flush_cache
+
+    flush_cache()
 
 
 def dream_state(actor):
@@ -153,13 +175,25 @@ def dream_state(actor):
         "pending": bool(session.pending_submission_id), "open": opened,
         "confirmed": confirmed, "failure": bool(value.get("failure")),
         "thread_choices": threads,
+        # The shown requirement rows and their identity are published once, as
+        # the top-level keys below; carrying them a second time inside the
+        # preference projection would only grow the payload every client must
+        # validate before it can render the stage.
         "draft_preferences": {key: item for key, item in (draft_direction or {}).items()
-                              if key != "summary"} if draft_direction else None,
+                              if key not in ("summary", *REQUIREMENT_FIELDS)}
+        if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
         "scene_art": scene_art_url(),
         "dialogue": value.get("dialogue", ""),
         "direction_parts": [displayed_direction[offset:offset + 2000]
                             for offset in range(0, len(displayed_direction), 2000)],
+        # The readable bounded experience requirements for the version being
+        # confirmed, plus the reviewable identity of the persisted shown
+        # version. A persisted draft's frozen rows win over the collaborator's
+        # latest proposal, because that is the version confirmation compares.
+        "requirements": (draft_direction or {}).get("requirements")
+        or list(value.get("requirements") or []),
+        "requirement_version": (draft_direction or {}).get("requirement_version"),
         "track": asdict(track_state(view.completed)), "sleep": dict(value["sleep"]),
         "ending": (f"{ending.phase}，女神的高潮餘韻漸漸平息，雲海的夢境淡去，你醒了。" if ending and ending.climax_reached else "雲海的夢境漸漸淡去，你醒了。") if ending else "",
         "ending_phase": ending.phase if ending else "",

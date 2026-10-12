@@ -10,7 +10,17 @@ from twisted.internet import defer
 from web.webclient.presentation.protocol import check_json_safety, json_byte_size, ProtocolValidationError
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
-from world.narrative.authoring import AuthoringError, DIRECTION_KEYS, MAX_SUMMARY_CHARACTERS, collaborator_creative_brief, get_draft, validate_direction
+from world.narrative.authoring import (
+    REASON_MESSAGES,
+    AuthoringError,
+    DIRECTION_KEYS,
+    MAX_DIRECTION_BYTES,
+    MAX_SUMMARY_CHARACTERS,
+    collaborator_creative_brief,
+    get_draft,
+    reviewed_version_matches,
+    validate_direction,
+)
 from world.observability import log_info, log_warn
 
 enter_after_sleep = surface.enter_after_sleep
@@ -27,6 +37,16 @@ def _controlled(actor, session):
 
 def _result(outcome, code, message):
     return {"outcome": outcome, "code": code, "message": message, "affected_panels": ("dream",)}
+
+
+def _direction_refusal(error: AuthoringError) -> str:
+    """One bounded player-facing line for a refused direction payload."""
+    messages = [
+        getattr(reason, "message", "") for reason in getattr(error, "reasons", ())
+    ]
+    return "；".join(message for message in messages if message) or (
+        "夢境方向的內容不完整或超出限制。"
+    )
 
 
 def _refresh(actor, session):
@@ -63,8 +83,12 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                     if (set(direction) - DIRECTION_KEYS or not isinstance(direction.get("summary", ""), str)
                             or len(direction.get("summary", "")) > MAX_SUMMARY_CHARACTERS):
                         return _result("rejected", "invalid_direction_shape", "故事方向需使用已知欄位，摘要上限為 2000 字。")
-                    if json_byte_size(direction) > 8192:
-                        return _result("rejected", "direction_too_large", "故事方向 JSON 上限為 8192 位元組。")
+                    # The transport bound is the store's own bound: a direction
+                    # that carries the maximum summary and the maximum bounded
+                    # requirements is legal (authoring accepts it), so the
+                    # ingress must not refuse it with a tighter cap.
+                    if json_byte_size(direction) > MAX_DIRECTION_BYTES:
+                        return _result("rejected", "direction_too_large", f"故事方向 JSON 上限為 {MAX_DIRECTION_BYTES} 位元組。")
                     payload = direction
                 elif direction.strip():
                     if len(direction.strip()) > MAX_SUMMARY_CHARACTERS:
@@ -75,12 +99,38 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                                else {"kind": "new_story", "summary": saved.get("direction", "")})
                 summary = str(payload.get("summary", ""))
                 if action == "draft":
-                    lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    try:
+                        lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    except AuthoringError as error:
+                        # A malformed shown requirement set is refused without a
+                        # durable write: the store owns the row shape, and
+                        # nothing malformed may reach the published panel.
+                        log_warn(
+                            "dream_surface_rejected",
+                            context={**boundary, "reason": "invalid_direction"},
+                        )
+                        return _result(
+                            "rejected", "invalid_direction", _direction_refusal(error)
+                        )
                     surface.store_direction(actor, summary)
                     surface.bump_revision_if_unchanged(actor, revision)
                 elif action == "confirm":
                     if not summary.strip():
                         return _result("rejected", "empty_direction", "請先提出要確認的故事方向。")
+                    # Bounded shown experience requirements: a submission may
+                    # only freeze what the surface actually showed for this
+                    # draft version. Deterministic equality, no model call.
+                    shown = get_draft(current.draft_id, owner) if current.draft_id else None
+                    if shown is not None and not reviewed_version_matches(payload, draft=shown):
+                        log_warn(
+                            "dream_surface_rejected",
+                            context={**boundary, "reason": "stale_requirements"},
+                        )
+                        return _result(
+                            "rejected",
+                            "stale_requirements",
+                            REASON_MESSAGES["stale_requirements"],
+                        )
                     validation = validate_direction(payload, owner_id=owner)
                     if not validation.valid:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
@@ -88,7 +138,18 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                         surface.bump_revision_if_unchanged(actor, revision)
                         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_direction", "reason_codes": validation.reason_codes})
                         return _result("rejected", "invalid_direction", "；".join(reason.message for reason in validation.reasons))
+                    # A truthful receipt through ordinary output: the durable
+                    # work record, not the notice, is the evidence, and a
+                    # confirmation never claims an arrangement.
+                    from world.narrative import dispatch_status
+
                     lifecycle.confirm_session(session_id, owner, direction=payload, tick=tick)
+                    # Delivered only once the confirmation has committed, so a
+                    # rolled-back confirmation never produced a receipt. The
+                    # durable work record, not this notice, is the evidence.
+                    transaction.on_commit(
+                        lambda: dispatch_status.deliver_status(actor)
+                    )
                 else:
                     if not current.draft_id and summary.strip() and current.state == lifecycle.STATE_OPEN:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
@@ -105,6 +166,10 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
         return _result("rejected", error.code, text)
     except (lifecycle.DreamSessionError, AuthoringError, ProtocolValidationError) as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_state_or_direction"}, exc=error)
+        # The refused action's Attribute and session writes rolled back with the
+        # transaction; drop the in-process cache so the next read (and the
+        # panel) serves the authoritative row instead of the aborted value.
+        surface.reset_cache(actor)
         return _result("rejected", "dream_refused", "目前無法接受這個操作，請確認故事方向與夢境狀態。")
 
     _refresh(actor, session)

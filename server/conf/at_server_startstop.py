@@ -64,6 +64,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "register_monster_sites",
     "restore_persisted_sessions",
     "sync_wilderness",
+    "sync_connected_encounters",
     "load_prompt_library",
     "register_narrator_layer",
     "register_npc_dialogue_layer",
@@ -83,6 +84,7 @@ STARTUP_STEP_ORDER: tuple[str, ...] = (
     "connect_art_push",
     "narrative_projection_init",
     "narrative_correspondence_projection_init",
+    "start_dream_dispatch_pump",
     "saves_restore_report",
     "llm_transcript_prune",
 )
@@ -529,6 +531,15 @@ def at_server_start():
     # (fix-startup-session-restore-order D1).
     _startup_step("restore_persisted_sessions", restore_persisted_sessions)
     _startup_step("sync_wilderness", sync_wilderness)
+    # Connected owners' published encounters are synchronized at their actual
+    # current positions, including a publication whose fan-out was lost while
+    # nobody was connected (dream-story-dispatch §7). Tolerant: a scene store
+    # failure can never abort the deterministic startup.
+    _startup_step(
+        "sync_connected_encounters",
+        lambda: _late("world.quests.encounter_dispatch", "sync_connected_owners"),
+        fail_loud=False,
+    )
 
     # Prompt library: validate every YAML prompt file and mark broken keys
     # unavailable. Failures are bounded per key and logged; server startup
@@ -668,6 +679,16 @@ def at_server_start():
         tolerant_on=_ALL_ERRORS,
         degrade_level="error",
     )
+    # The background dispatch pump starts last among the world steps: both
+    # director layers are registered and persisted sessions are restored, so a
+    # resumed claim can prepare a context and reach a connected owner. Tolerant,
+    # like every other optional service step: a pump failure never aborts
+    # startup, and the work records stay claimable for the next start.
+    _startup_step(
+        "start_dream_dispatch_pump",
+        lambda: _late("server.dream_dispatch_service", "start_pump"),
+        fail_loud=False,
+    )
     # World saves (gm-portal-s5-saves): translate the pre-start restore tool's
     # RESTORE_RESULT.json into save_restored / save_restore_failed once, then
     # finish automatic-save retention deferred while a restore was pending.
@@ -692,12 +713,29 @@ def at_server_start():
     )
 
 
+def _stop_dream_dispatch_pump() -> None:
+    """Stop the dispatch pump and fence its claims; never abort a shutdown.
+
+    This is what makes "shutdown stops new claims and invalidates unfinished
+    callback ownership" true: the pump unregisters its hint, refuses further
+    passes and clears every outstanding execution token, so a late model
+    callback can no longer write work, publication or dialogue.
+    """
+    try:
+        from server.dream_dispatch_service import stop_pump
+
+        stop_pump()
+    except Exception as error:
+        # observability: ignore R2: a shutdown hook must never mask the stop it was called for
+        log_warn("dream_dispatch_pump_stop_failed", context={}, exc=error)
+
+
 def at_server_stop():
     """
     This is called just before the server is shut down, regardless
     of it is for a reload, reset or shutdown.
     """
-    pass
+    _stop_dream_dispatch_pump()
 
 
 def at_server_reload_start():
@@ -711,7 +749,7 @@ def at_server_reload_stop():
     """
     This is called only time the server stops before a reload.
     """
-    pass
+    _stop_dream_dispatch_pump()
 
 
 def at_server_cold_start():

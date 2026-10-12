@@ -2,6 +2,13 @@
 
 var core = require("../core.js");
 var MAX_SCENE_ART_URL = 256; // mirrors world.art.presenter MAX_PORTRAIT_MEDIA_URL
+// Mirrors world.narrative.authoring's bounded shown-requirement contract: the
+// readable planning rows a confirmation may freeze, and the identity of the
+// persisted version they were shown at.
+var MAX_REQUIREMENTS = 8;
+var MAX_REQUIREMENT_TEXT = 200;
+var MAX_REQUIREMENT_VERSION = 128;
+var REQUIREMENT_KINDS = ["place", "new_character", "private_commission"];
 
 function validateDreamPanel(payload) {
   core.requireExactFields(payload, "dream", ["schema_version", "available", "state"], []);
@@ -12,6 +19,7 @@ function validateDreamPanel(payload) {
     "session_id", "revision", "completed", "remaining", "can_input", "can_confirm",
     "can_draft", "can_awaken", "pending", "open", "confirmed", "failure", "opening",
     "scene", "scene_art", "dialogue", "direction_parts", "thread_choices", "draft_preferences", "track", "sleep", "ending", "ending_phase",
+    "requirements", "requirement_version",
   ], []);
   if (typeof state.session_id !== "string" || !state.session_id.length || state.session_id.length > 64) throw new Error("invalid dream identity");
   core.requireInt(state.revision, "dream revision", 1, Number.MAX_SAFE_INTEGER);
@@ -35,6 +43,18 @@ function validateDreamPanel(payload) {
         typeof thread.label !== "string" || !thread.label.trim() || Array.from(thread.label).length > 160) throw new Error("invalid dream thread choice");
   });
   if (state.draft_preferences !== null && !core.isPlainObject(state.draft_preferences)) throw new Error("invalid draft preferences");
+  if (!Array.isArray(state.requirements) || state.requirements.length > MAX_REQUIREMENTS) throw new Error("invalid dream requirements");
+  state.requirements.forEach(function (row) {
+    core.requireExactFields(row, "dream requirement", ["kind", "text"], []);
+    if (REQUIREMENT_KINDS.indexOf(row.kind) < 0 ||
+        typeof row.text !== "string" || !row.text.trim() ||
+        Array.from(row.text).length > MAX_REQUIREMENT_TEXT) throw new Error("invalid dream requirement");
+  });
+  // A row set without an identity is a proposal the server has not persisted
+  // yet, which is a published shape: only the identity's own shape is checked.
+  if (state.requirement_version !== null &&
+      (typeof state.requirement_version !== "string" || !state.requirement_version.length ||
+       state.requirement_version.length > MAX_REQUIREMENT_VERSION)) throw new Error("invalid dream requirement version");
   core.requireExactFields(state.track, "dream track", ["version", "completed", "pleasure", "level", "ordinal", "climax_phase", "converging"], []);
   core.requireInt(state.track.version, "track version", 1, Number.MAX_SAFE_INTEGER);
   core.requireInt(state.track.completed, "track count", 0, 6);

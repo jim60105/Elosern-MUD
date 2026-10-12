@@ -114,6 +114,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
+    @covers_requirement(
+        "npc-dialogue::story-participation-does-not-disclose-private-dispatch-planning"
+    )
     def test_truthful_information_transfer_records_permitted_knowledge(self):
         from world.narrative.memory import get_owner_memories
 
@@ -202,6 +205,9 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
     @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
+    @covers_requirement(
+        "npc-dialogue::story-participation-does-not-disclose-private-dispatch-planning"
+    )
     def test_result_knowledge_stays_private_to_the_participant(self):
         from world.narrative.memory import get_owner_memories
         from world.quests import outcome_store

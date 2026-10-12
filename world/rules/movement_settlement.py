@@ -149,6 +149,20 @@ def settle_movement(
             traversing_object, *(state.npc for state in snapshot.companions),
         )), transaction.atomic():
             result = traverse()
+            # A published encounter whose declared locator covers the settled
+            # position activates here, inside the owning movement transaction
+            # and before the boundary's trailing final escort/outcome
+            # evaluation, so a meeting role exists before the shared evaluator
+            # observes the resulting position (dream-story-dispatch §7). The
+            # pass never raises: a refused encounter store can never cancel a
+            # completed move.
+            from world.quests.encounter_dispatch import activate_pending_encounters
+
+            activate_pending_encounters(
+                traversing_object,
+                room=getattr(traversing_object, "location", None),
+                tick=int(get_world_clock().tick),
+            )
     except Exception:
         _compensate_after_rollback(snapshot)
         raise

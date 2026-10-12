@@ -3,6 +3,10 @@
 import json
 from dataclasses import dataclass
 
+from world.ai.scenario_director.generation import (
+    BLUEPRINT_KEYS,
+    PACKAGE_SECTION_KEYS,
+)
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.observability import log_info, log_warn
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
@@ -16,6 +20,92 @@ class PreparedQuestBeat:
     context_json: str
     blueprint_json: str
     issuer_id: str
+
+
+# The frozen requirement kinds that demand an executable arrangement: a named
+# place, a required new character or a requested private commission. A confirmed
+# direction carrying any of them cannot be answered by prose alone.
+SCENE_REQUIREMENT_KINDS = frozenset({"place", "new_character", "private_commission"})
+#: Marks a planning context whose package declares its own symbolic role issuers.
+SCENE_PACKAGE_MARKER = "scene_package"
+
+
+def confirmed_requirements(invocation):
+    """The confirmed direction's frozen executable requirements, in order."""
+    from world.narrative.attention import SOURCE_REQUEST
+    from world.narrative.models import CreativeRequest
+
+    if invocation.source.kind != SOURCE_REQUEST:
+        return ()
+    request = CreativeRequest.objects.filter(
+        submission_key=invocation.source.ref
+    ).first()
+    if request is None:
+        return ()
+    rows = (request.direction or {}).get("requirements") or []
+    return tuple(
+        dict(row)
+        for row in rows
+        if isinstance(row, dict) and row.get("kind") in SCENE_REQUIREMENT_KINDS
+    )
+
+
+def declares_executable_requirements(invocation) -> bool:
+    """Whether the confirmed direction demands a real executable arrangement."""
+    return bool(confirmed_requirements(invocation))
+
+
+def is_scene_package(payload) -> bool:
+    """Whether one prepared payload is a scene package rather than a bare quest.
+
+    The scene route is identified by the package's own structural sections, so a
+    quest-only blueprint keeps its existing compile path untouched.
+    """
+    return (
+        isinstance(payload, dict)
+        and isinstance(payload.get("quest"), dict)
+        and isinstance(payload.get("roles"), list)
+        and isinstance(payload.get("encounters"), list)
+    )
+
+
+def to_scene_package(payload):
+    """Reshuffle one extended beat blueprint into the package payload contract.
+
+    Pure and content-preserving: the embedded quest keeps exactly the blueprint
+    fields and every declared package section moves under its own key, so a
+    single proposal reaches the upstream publication boundary without inventing
+    or dropping anything. A payload that is already a package returns unchanged;
+    ``None`` means the payload is neither shape, and the caller then keeps the
+    legacy quest-only compile path.
+    """
+    #: Sections the upstream package schema requires; a legacy quest-only
+    #: blueprint carries none of them and must keep its compile path.
+    required_sections = (
+        "roles",
+        "relationships",
+        "knowledge",
+        "encounters",
+        "dialogue",
+        "commissions",
+    )
+    if not isinstance(payload, dict):
+        return None
+    if is_scene_package(payload):
+        return dict(payload)
+    if any(key not in payload for key in (*BLUEPRINT_KEYS, *required_sections)):
+        return None
+    package: dict = {
+        "display_name": str(payload.get("display_name") or payload.get("name") or ""),
+        # Publication supplies the durable source identity itself; the package
+        # schema accepts a null one, and an extended blueprint carries none.
+        "source_id": None,
+        "quest": {key: payload[key] for key in BLUEPRINT_KEYS},
+    }
+    for key in PACKAGE_SECTION_KEYS:
+        if key in payload:
+            package[key] = payload[key]
+    return package
 
 
 def quest_context(invocation, proposal):
@@ -41,6 +131,13 @@ def quest_context(invocation, proposal):
             if not issuer_key:
                 return None
             issuer_id = str(issuer.pk)
+        elif declares_executable_requirements(invocation):
+            # The confirmed direction demands a privately issued escort: the
+            # package declares its own symbolic roles and role-issued
+            # commissions, so the planning context names no guild branch and
+            # requires no rank. Strict actual-entity checks belong to
+            # materialization and registration, never to planning.
+            issuer_key = ""
         else:
             registration = parse_guild_registration(owner)
             if registration is None or owner.guild_rank is None:
@@ -52,7 +149,6 @@ def quest_context(invocation, proposal):
     location = owner.location
     context = {
         "allowed_rank": rank,
-        "issuer_branch": issuer_key,
         "anchor": getattr(location, "anchor_key", None),
         "note": json.dumps({
             "quest_seed": proposal.summary,
@@ -61,6 +157,16 @@ def quest_context(invocation, proposal):
             "instruction": "Propose future objectives only; never assert acceptance or completion.",
         }, ensure_ascii=False),
     }
+    if issuer_key:
+        context["issuer_branch"] = issuer_key
+    else:
+        # A symbolic scene: the frozen requirements travel with the planning
+        # context so the proposal can answer them, and the marker tells the
+        # ScenarioDirector route that its own role declarations are the authority.
+        context[SCENE_PACKAGE_MARKER] = True
+        context["requirements"] = [
+            dict(row) for row in confirmed_requirements(invocation)
+        ]
     return context, issuer_id
 
 
@@ -75,8 +181,15 @@ def publish_quest_beat(prepared, invocation, proposal, beat, thread, now_tick):
     captured = json.loads(prepared.context_json)
     if current is None or current != (captured, prepared.issuer_id):
         raise _EffectRejected(OUTCOME_STALE)
+    payload = json.loads(prepared.blueprint_json)
+    package = to_scene_package(payload)
+    if package is not None:
+        # A complete scene package: publication goes through the quest owner's
+        # package boundary, not the quest-only compile path.
+        _publish_scene_package(invocation, package, beat, thread, now_tick)
+        return
     try:
-        compiled = compile_quest_blueprint(json.loads(prepared.blueprint_json))
+        compiled = compile_quest_blueprint(payload)
         rank = GUILD_RANK_REGISTRY.get(captured["allowed_rank"])
         quest_rank = GUILD_RANK_REGISTRY.get(compiled.definition.rank)
         expected_issuer = captured["issuer_branch"]
@@ -117,3 +230,76 @@ def publish_quest_beat(prepared, invocation, proposal, beat, thread, now_tick):
         "beat_id": beat.beat_id, "quest": compiled.definition.key,
         "snapshot_id": invocation.snapshot_id, "owner": invocation.owner_id,
     }))
+
+
+def _publish_scene_package(invocation, payload, beat, thread, now_tick):
+    """Publish one validated scene package and link it to the settled beat.
+
+    The publication joins the caller's transaction -- settlement wraps this call
+    in its savepoint and its registration/cache scope -- so the accepted
+    decision, the thread linkage, the scheduled beat, the published package and
+    the work's publication references commit together or not at all. Nothing
+    here activates a role, accepts a commission, advances a quest or rewards the
+    player: publication is an arrangement, not evidence of gameplay completion.
+
+    The symbolic commission stays a validated planning declaration until the
+    role is materialized and provisioned at activation, so no runtime issuer key
+    is invented here.
+    """
+    from django.db import transaction
+
+    from world.narrative.director import OUTCOME_NO_CONTENT, _EffectRejected
+    from world.narrative.threads import record_thread_development
+    from world.quests.compile.contracts import QuestCompileError
+    from world.quests.encounters import publish_scene_package
+    from world.quests.scene_package import ScenePackageError
+
+    try:
+        published = publish_scene_package(
+            payload,
+            owner=str(invocation.owner_id),
+            source_id=beat.execution_ref,
+            tick=int(now_tick),
+        )
+    except (ScenePackageError, QuestCompileError, ValueError) as error:
+        # Compiler diagnostics may quote proposal fields. Keep the operational
+        # exception type, never its prose-bearing message or chained payload.
+        safe_error = type(error)("scene package rejected")
+        log_warn(
+            "quest_beat_publication_rejected",
+            context={
+                "beat_id": beat.beat_id,
+                "snapshot_id": invocation.snapshot_id,
+                "owner": invocation.owner_id,
+            },
+            exc=safe_error,
+        )
+        raise _EffectRejected(OUTCOME_NO_CONTENT) from error
+    beat.payload = {
+        **beat.payload,
+        "quest": {
+            "package_id": published.package_id,
+            "definition_key": published.definition_key,
+            # A symbolic role-issued commission: the real issuer key appears only
+            # when its role is materialized and provisioned at activation.
+            "issuer_key": "",
+            "symbolic": True,
+            "snapshot_id": invocation.snapshot_id,
+            "blueprint": payload,
+        },
+    }
+    record_thread_development(
+        thread_id=thread.thread_id, tick=int(now_tick), actor_id=invocation.owner_id
+    )
+    transaction.on_commit(
+        lambda: log_info(
+            "quest_beat_published",
+            context={
+                "beat_id": beat.beat_id,
+                "package": published.package_id,
+                "quest": published.definition_key,
+                "snapshot_id": invocation.snapshot_id,
+                "owner": invocation.owner_id,
+            },
+        )
+    )

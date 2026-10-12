@@ -190,6 +190,9 @@ class DreamSurfaceTests(EvenniaTest):
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
         "dream-sleep-surface::dream-departure-never-settles-sleep-again",
     )
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
+    )
     def test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke(self):
         command = CmdSleep()
         command.caller = self.actor
@@ -244,6 +247,9 @@ class DreamSurfaceTests(EvenniaTest):
     @covers_requirement(
         "dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening",
         "dream-sleep-surface::dream-departure-never-settles-sleep-again",
+    )
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
     )
     def test_model_failure_draft_and_awaken_preserve_committed_sleep(self):
         self.enter(tick_from=90, tick_to=100, requested_seconds=10)
@@ -495,6 +501,227 @@ class DreamSurfaceTests(EvenniaTest):
                     self.assertTrue(surface.scene_art_url())
                 finally:
                     official_art.reset_catalog()
+
+
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
+    )
+    def test_collaborator_requirements_reach_the_surface_and_the_text_line(self):
+        # The collaborator's bounded proposal is readable on both surfaces
+        # before anything is frozen, and the text transport names it too.
+        self.enter()
+        payload = {
+            "scene": "合成場景：雲海王座之前，親密的身影與漫過腳踝的積水一同隨呼吸起伏。",
+            "dialogue": "我們繼續商談尋找鐘聲的故事方向。",
+            "phase": prospective_state(0).level,
+            "requirements": [
+                {"kind": "place", "text": "南門"},
+                {"kind": "new_character", "text": "一個女孩"},
+                {"kind": "private_commission", "text": "帶她找媽媽"},
+            ],
+        }
+        client = FakeLLMClient()
+        client.add_response(
+            lambda descriptor: True, json.dumps(payload, ensure_ascii=False)
+        )
+        result = self.request("say", message="鐘聲", client=client)
+        self.assertEqual(result.result["outcome"], "success")
+        state = service.dream_state(self.actor)
+        self.assertEqual(
+            [row["text"] for row in state["requirements"]],
+            ["南門", "一個女孩", "帶她找媽媽"],
+        )
+        self.assertIsNone(state["requirement_version"])
+        rendered = render_state(state)
+        self.assertIn("南門", rendered)
+        self.assertIn("帶她找媽媽", rendered)
+        # Nothing was persisted yet, so the text line says exactly that instead
+        # of implying a review that has not happened.
+        self.assertIn("尚未檢視", rendered)
+
+    @covers_requirement(
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements"
+    )
+    def test_the_text_line_names_the_reviewed_version_once_it_is_persisted(self):
+        self.enter()
+        direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩。",
+            "requirements": [{"kind": "place", "text": "南門"}],
+        }
+        self.assertEqual(
+            self.request("draft", direction=dict(direction)).result["outcome"],
+            "success",
+        )
+        state = service.dream_state(self.actor)
+        shown = state["requirement_version"]
+        self.assertTrue(shown)
+        # The rows are published once, as top-level keys: the quoted preference
+        # projection no longer repeats what the stage already renders.
+        self.assertNotIn("requirements", state["draft_preferences"])
+        self.assertNotIn("requirement_version", state["draft_preferences"])
+        rendered = render_state(state)
+        self.assertIn("已檢視的版本", rendered)
+        self.assertIn(shown, rendered)
+        # A typed plain-text direction carries no reviewed version, so it is
+        # refused as a stale review; the argument-less confirmation echoes the
+        # stored draft and succeeds.
+        typed = self.request("confirm", direction="在南門遇見一個女孩。")
+        self.assertEqual(typed.result["code"], "stale_requirements")
+        self.assertFalse(CreativeRequest.objects.exists())
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request("confirm")
+        self.assertEqual(confirmed.result["outcome"], "success")
+
+    def test_a_failed_confirmation_rolls_back_work_and_compensates_the_surface(self):
+        # The delta's own failure scenario: the work record fails inside the
+        # confirmation transaction, so the request, the work, the session
+        # closure and the surface write must all roll back together, and the
+        # in-process Attribute cache must not keep serving the aborted value.
+        from world.narrative.authoring import AuthoringError
+        from world.narrative.models import DreamDispatch
+
+        self.enter()
+        before = surface.association(self.actor)
+
+        def explode(*args, **kwargs):
+            surface.store_direction(self.actor, "不該留下的內容")
+            raise AuthoringError("synthetic work failure")
+
+        with patch.object(service.lifecycle, "confirm_session", side_effect=explode):
+            result = self.request(
+                "confirm", direction={"kind": "new_story", "summary": "合成方向"}
+            )
+        self.assertEqual(result.result["code"], "dream_refused")
+        self.assertFalse(CreativeRequest.objects.exists())
+        self.assertFalse(DreamDispatch.objects.exists())
+        self.assertTrue(service.dream_state(self.actor)["open"])
+        self.assertEqual(surface.association(self.actor), before)
+
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch",
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces",
+    )
+    def test_confirmation_requires_the_shown_requirement_version(self):
+        # A proposed requirement set becomes reviewable only when the version
+        # that carries it is persisted, and confirmation must echo exactly that
+        # version: a blank or stale review is refused, never silently frozen.
+        self.enter()
+        requirements = [
+            {"kind": "place", "text": "南門"},
+            {"kind": "new_character", "text": "一個女孩"},
+            {"kind": "private_commission", "text": "帶她找媽媽"},
+        ]
+        direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩，幫她找媽媽。",
+            "requirements": requirements,
+            "requirement_version": None,
+        }
+        self.assertEqual(
+            self.request("draft", direction=direction).result["outcome"], "success"
+        )
+        shown = service.dream_state(self.actor)["requirement_version"]
+        self.assertTrue(shown)
+        self.assertEqual(
+            self.request("confirm", direction=direction).result["code"],
+            "stale_requirements",
+        )
+        self.assertFalse(CreativeRequest.objects.exists())
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request(
+                "confirm", direction={**direction, "requirement_version": shown}
+            )
+        self.assertEqual(confirmed.result["outcome"], "success")
+        # The receipt is truthful: it reports preparation, never an arrangement
+        # or an existing encounter, and it travels as ordinary output.
+        receipts = [call.args[0] for call in self.actor.msg.call_args_list]
+        self.assertTrue(any("正在準備中" in line for line in receipts), receipts)
+        self.assertFalse(any("已有可執行的安排" in line for line in receipts), receipts)
+        stored = CreativeRequest.objects.get()
+        self.assertEqual(stored.direction["requirements"], requirements)
+        self.assertEqual(stored.direction["requirement_version"], shown)
+
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
+    )
+    def test_an_edited_summary_cannot_freeze_the_shown_requirement_version(self):
+        # The review is bound to the version the player actually read: echoing
+        # the shown rows and identity under a different summary freezes
+        # requirements that were never presented for that direction, so the
+        # confirmation is refused deterministically on the server, not only by
+        # whatever client happens to ask.
+        self.enter()
+        requirements = [
+            {"kind": "place", "text": "南門"},
+            {"kind": "new_character", "text": "一個女孩"},
+            {"kind": "private_commission", "text": "帶她找媽媽"},
+        ]
+        shown_direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩，幫她找媽媽。",
+            "requirements": requirements,
+        }
+        self.assertEqual(
+            self.request("draft", direction=dict(shown_direction)).result["outcome"],
+            "success",
+        )
+        shown = service.dream_state(self.actor)["requirement_version"]
+        self.assertTrue(shown)
+
+        edited = {
+            **shown_direction,
+            "summary": "改寫後的念頭：我想在碼頭等一艘船。",
+            "requirement_version": shown,
+        }
+        refused = self.request("confirm", direction=edited)
+        self.assertEqual(refused.result["code"], "stale_requirements")
+        self.assertFalse(CreativeRequest.objects.exists())
+        # The shown version survived the refusal untouched, and the very same
+        # rows confirm under the summary they were shown with.
+        self.assertEqual(service.dream_state(self.actor)["requirement_version"], shown)
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request(
+                "confirm", direction={**shown_direction, "requirement_version": shown}
+            )
+        self.assertEqual(confirmed.result["outcome"], "success")
+
+    def test_a_malformed_requirement_set_never_reaches_a_draft_or_the_panel(self):
+        # The panel state is strict on both sides: rows the validator would
+        # refuse must never be persisted, or the published payload could not be
+        # rendered by any client at all.
+        from world.narrative.authoring import REASON_MESSAGES
+        from world.narrative.models import AuthoringDraft
+
+        self.enter()
+        for rows in (
+            [{"kind": "explode", "text": "南門"}],
+            [{"kind": "place", "text": "南門", "extra": "x"}],
+            [{"kind": "place", "text": ""}],
+        ):
+            with self.subTest(rows=rows):
+                refused = self.request(
+                    "draft",
+                    direction={
+                        "kind": "new_story",
+                        "summary": "在南門遇見一個女孩。",
+                        "requirements": rows,
+                    },
+                )
+                self.assertEqual(refused.result["code"], "invalid_direction")
+                self.assertEqual(
+                    refused.result["message"], REASON_MESSAGES["malformed_requirements"]
+                )
+        self.assertEqual(AuthoringDraft.objects.count(), 0)
+        state = service.dream_state(self.actor)
+        self.assertEqual(state["requirements"], [])
+        self.assertIsNone(state["requirement_version"])
 
 
 def _synthetic_webp():

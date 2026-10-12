@@ -68,6 +68,17 @@ MAX_SOURCES = 16
 MAX_SOURCE_KIND_CHARACTERS = 32
 MAX_SOURCE_REF_CHARACTERS = 255
 
+# Bounded shown experience requirements: the readable planning fields the draft
+# presents before confirmation. They are plain structured planning data, never
+# an executable effect, and the frozen version identity that identifies the
+# shown draft/version is what makes "reviewed" checkable deterministically.
+MAX_REQUIREMENTS = 8
+MAX_REQUIREMENT_TEXT = 200
+MAX_REQUIREMENT_VERSION_LENGTH = 128
+REQUIREMENT_KEYS = frozenset({"kind", "text"})
+REQUIREMENT_KINDS = frozenset({"place", "new_character", "private_commission"})
+REQUIREMENT_FIELDS = frozenset({"requirements", "requirement_version"})
+
 VALID_DIRECTION_KINDS = frozenset({"new_story", "thread_direction"})
 REWRITE_ASPECTS = frozenset({"history", "personality", "outcome"})
 DIRECTION_KEYS = frozenset(
@@ -82,6 +93,8 @@ DIRECTION_KEYS = frozenset(
         "thread_id",
         "effects",
         "revisions",
+        "requirements",
+        "requirement_version",
     }
 )
 TEXT_LIST_FIELDS = ("themes", "atmosphere", "emphasis", "exclusions")
@@ -101,6 +114,8 @@ REASON_MESSAGES: dict[str, str] = {
     "established_personality_rewrite": "既有的性格無法被改寫，只能描寫新的反應與關係。",
     "deterministic_outcome_rewrite": "既定的結果無法被改寫。",
     "unauthorized_effects": "夢境僅能描述故事方向，不能給予線索、物品、任務進度、屬性、技能、增益或圖鑑解鎖。",
+    "malformed_requirements": "夢境方向的經驗需求不完整或超出限制。",
+    "stale_requirements": "經驗需求尚未隨這次修改重新檢視，請先確認目前版本的內容。",
 }
 REWRITE_REASON_CODES = {
     "history": "committed_history_rewrite",
@@ -266,6 +281,151 @@ def _history_reference_exists(ref: str) -> bool:
     return bool(separator) and prefix == "mem" and pk.isdigit()
 
 
+def requirement_version_for(draft_id: Any, revision: Any) -> str:
+    """The identity of one shown draft version: what a review is bound to.
+
+    Deterministic and offline: the same shown version always yields the same
+    identity, so confirmation compares the submitted identity with the persisted
+    one by plain equality and never asks a model to approve what was shown.
+    """
+    return f"{_clean_draft_id(draft_id)}:v{int(revision)}"
+
+
+def _validate_requirements(value: Any) -> Optional[list[dict[str, str]]]:
+    """Return the normalized bounded requirement rows, or None when malformed."""
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > MAX_REQUIREMENTS:
+        return None
+    rows: list[dict[str, str]] = []
+    for item in value:
+        if not isinstance(item, Mapping) or set(item) != REQUIREMENT_KEYS:
+            return None
+        kind = item.get("kind")
+        text = item.get("text")
+        if not isinstance(kind, str) or kind not in REQUIREMENT_KINDS:
+            return None
+        if not isinstance(text, str) or not text.strip():
+            return None
+        clean = text.strip()
+        if len(clean) > MAX_REQUIREMENT_TEXT:
+            return None
+        rows.append({"kind": kind, "text": clean})
+    return rows
+
+
+def requirements_reviewed(direction: Any) -> bool:
+    """Whether one direction carries shown experience requirements."""
+    if not isinstance(direction, Mapping):
+        return False
+    return bool(direction.get("requirements"))
+
+
+def confirm_requirements_match(direction: Mapping[str, Any], *, draft: Any) -> bool:
+    """Deterministic equality between a submitted review and the shown version.
+
+    A direction with no requirements is confirmable without any review identity;
+    a direction that carries requirements is confirmable only when its
+    ``requirement_version`` is exactly the persisted draft version it was shown
+    at. This never consults a model.
+    """
+    rows = direction.get("requirements") or []
+    if not rows:
+        return True
+    return str(direction.get("requirement_version") or "") == requirement_version_for(
+        draft.draft_id, draft.revision
+    )
+
+
+def stamp_shown_requirements(draft: AuthoringDraft) -> AuthoringDraft:
+    """Record the shown-version identity on a requirement-bearing draft in place.
+
+    The identity describes the draft's *current* revision, so writing it never
+    advances the revision (that is what makes a re-presented draft stable and
+    idempotent) and a draft with no requirements is left exactly as it is. This
+    is the one writer that turns a proposed requirement set into a *shown*,
+    reviewable version; nothing here can freeze requirements a player never saw.
+    """
+    direction = dict(draft.direction or {})
+    if not direction.get("requirements"):
+        return draft
+    identity = requirement_version_for(draft.draft_id, draft.revision)
+    if direction.get("requirement_version") == identity:
+        return draft
+    direction["requirement_version"] = identity
+    draft.direction = direction
+    draft.save(update_fields=["direction", "updated_at"])
+    return draft
+
+
+def reviewed_version_matches(submitted: Any, *, draft: AuthoringDraft) -> bool:
+    """Whether one submitted confirmation reviewed the draft version that was shown.
+
+    Deterministic and offline: a submission carrying no requirements is accepted
+    only when the shown draft carries none either (requirements the player never
+    saw can never be frozen), and a submission carrying requirements must equal
+    the shown version's identity and rows exactly *and* describe the direction
+    that version was shown for. No model is consulted.
+
+    The summary binding is what makes "reviewed version" mean the version a
+    player actually read: an edited summary is a different direction whose
+    requirements were never presented, so echoing the older rows and identity
+    cannot freeze them under the newly stamped revision. Preserving that edit as
+    a draft is unaffected -- this gate is only consulted on a confirmation.
+    """
+    rows = submitted.get("requirements") if isinstance(submitted, Mapping) else None
+    rows = rows or []
+    shown = (draft.direction or {}).get("requirements") or []
+    if not rows:
+        return not shown
+    if not shown or not isinstance(rows, list) or len(rows) != len(shown):
+        return False
+    if str((submitted or {}).get("summary", "")).strip() != str(
+        (draft.direction or {}).get("summary", "")
+    ).strip():
+        return False
+    return (
+        str((submitted or {}).get("requirement_version") or "")
+        == str((draft.direction or {}).get("requirement_version") or "")
+        and list(rows) == list(shown)
+    )
+
+
+def _without_requirement_version(direction: Mapping[str, Any]) -> dict[str, Any]:
+    """One direction without its shown-version identity, for content comparison."""
+    return {key: value for key, value in direction.items() if key != "requirement_version"}
+
+
+def _stamped_direction(
+    direction: dict[str, Any], draft_id: str, revision: int
+) -> dict[str, Any]:
+    """Attach the shown-version identity a requirement-bearing direction needs.
+
+    A direction with no requirements is returned exactly as it is, so every
+    existing draft path keeps its byte-for-byte behaviour. A direction that
+    does carry requirements leaves ``save_draft`` already reviewable: its
+    identity names the version being written, which is what confirmation
+    compares. Nothing here can freeze requirements a player never saw, because
+    the identity is stamped by the store that persists the version.
+    """
+    if not direction.get("requirements"):
+        return direction
+    return {
+        **direction,
+        "requirement_version": requirement_version_for(draft_id, revision),
+    }
+
+
+def stale_requirements_error() -> DirectionValidationError:
+    """The typed refusal for a requirement set that was never reviewed here.
+
+    Shared by every confirmation entry path, so a caller that bypasses the
+    surface gate cannot freeze -- or silently drop -- requirements the player
+    never saw.
+    """
+    return DirectionValidationError(_reasons("stale_requirements"))
+
+
 def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
     """Deterministically validate a desired direction for one owner.
 
@@ -328,6 +488,25 @@ def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
             return _invalid("malformed_direction")
         revisions.append({"aspect": aspect, "ref": ref})
 
+    requirements = _validate_requirements(direction.get("requirements"))
+    if requirements is None:
+        return _invalid("malformed_requirements")
+    raw_version = direction.get("requirement_version")
+    if raw_version is None:
+        requirement_version: Optional[str] = None
+    elif (
+        isinstance(raw_version, str)
+        and raw_version.strip()
+        and len(raw_version.strip()) <= MAX_REQUIREMENT_VERSION_LENGTH
+    ):
+        requirement_version = raw_version.strip()
+    else:
+        return _invalid("malformed_requirements")
+    if requirements and requirement_version is None:
+        return _invalid("malformed_requirements")
+    if not requirements:
+        requirement_version = None
+
     canonical_thread_id: Optional[str] = None
     if kind == "thread_direction":
         thread = find_thread(thread_id)
@@ -358,6 +537,8 @@ def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
         "thread_id": canonical_thread_id,
         "effects": [],
         "revisions": revisions,
+        "requirements": requirements,
+        "requirement_version": requirement_version,
     }
     normalized.update(theme_lists)
     return DirectionValidation(valid=True, reasons=(), direction=normalized)
@@ -420,6 +601,21 @@ def save_draft(
     frozen_direction = _json_copy(
         dict(direction), label="direction", max_bytes=MAX_DIRECTION_BYTES
     )
+    # The shown experience requirements are structured planning data every
+    # consumer renders and echoes back, so the one store that persists them also
+    # owns their shape: a malformed row is refused here rather than surviving
+    # into a published draft that no client can validate, and the rows are
+    # stored normalized so confirmation compares canonical values.
+    if "requirements" in frozen_direction:
+        normalized_requirements = _validate_requirements(
+            frozen_direction.get("requirements")
+        )
+        if normalized_requirements is None:
+            raise DirectionValidationError(_reasons("malformed_requirements"))
+        frozen_direction = {
+            **frozen_direction,
+            "requirements": normalized_requirements,
+        }
     frozen_sources = None if sources is None else _normalize_sources(sources)
     handle = _clean_draft_id(draft_id) if draft_id is not None else uuid4().hex
 
@@ -428,13 +624,18 @@ def save_draft(
         if existing is not None:
             if existing.owner_id != clean_owner:
                 raise AuthoringAccessError("This authoring draft is not yours.")
-            changed = existing.direction != frozen_direction or (
+            # Content comparison ignores the shown-version identity, so an
+            # identical re-save stays the documented no-op even when the
+            # direction carries reviewed requirements.
+            changed = _without_requirement_version(
+                existing.direction or {}
+            ) != _without_requirement_version(frozen_direction) or (
                 frozen_sources is not None and existing.sources != frozen_sources
             )
             if not changed:
                 return existing
             revision = int(existing.revision) + 1
-            existing.direction = frozen_direction
+            existing.direction = _stamped_direction(frozen_direction, handle, revision)
             if frozen_sources is not None:
                 existing.sources = frozen_sources
             existing.revision = revision
@@ -453,7 +654,7 @@ def save_draft(
         draft = AuthoringDraft.objects.create(
             draft_id=handle,
             owner_id=clean_owner,
-            direction=frozen_direction,
+            direction=_stamped_direction(frozen_direction, handle, 1),
             sources=frozen_sources or [],
             revision=1,
             confirmed_revision=None,
@@ -512,6 +713,22 @@ def confirm_draft(*, draft_id: Any, owner_id: Any, tick: int = 0) -> CreativeReq
         )
         raise DirectionValidationError(validation.reasons)
 
+    if not confirm_requirements_match(validation.direction, draft=draft):
+        # A requirement set that was never shown at this version cannot be
+        # frozen silently. The refusal is deterministic, so it needs no stored
+        # reason: the draft's own content reproduces it.
+        log_warn(
+            "narrative_authoring_validation_rejected",
+            context={
+                "draft_id": draft.draft_id,
+                "owner": clean_owner,
+                "revision": version,
+                "reasons": ["stale_requirements"],
+                "tick": int(tick),
+            },
+        )
+        raise DirectionValidationError(_reasons("stale_requirements"))
+
     submission_key = submission_key_for(draft.draft_id, version)
     with transaction.atomic():
         # Kept for backends that support row locking; SQLite ignores it, and the
@@ -560,6 +777,14 @@ def confirm_draft(*, draft_id: Any, owner_id: Any, tick: int = 0) -> CreativeReq
                     "tick": int(tick),
                 },
             )
+        # The handoff is part of the confirmation transaction: the request, its
+        # one work record and the confirmed draft version commit or roll back
+        # together, so there is no confirmed request without work. The pump
+        # notification is registered after commit and is only a wake-up hint.
+        from world.narrative import dispatch as dispatch_work
+
+        dispatch_work.create_or_get_work(request, tick=tick)
+        transaction.on_commit(dispatch_work.notify_pump)
         return request
 
 
