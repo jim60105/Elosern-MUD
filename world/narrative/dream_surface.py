@@ -11,7 +11,7 @@ from evennia.utils.dbserialize import deserialize
 
 from world.art import official
 from world.narrative import dream_session as lifecycle
-from world.narrative.authoring import draft_is_confirmed, get_draft
+from world.narrative.authoring import REQUIREMENT_FIELDS, draft_is_confirmed, get_draft
 from world.narrative.dream_track import render_ending, track_state
 from world.narrative.models import StoryThread
 from world.narrative.threads import TERMINAL_THREAD_STATES, thread_accessible
@@ -175,8 +175,13 @@ def dream_state(actor):
         "pending": bool(session.pending_submission_id), "open": opened,
         "confirmed": confirmed, "failure": bool(value.get("failure")),
         "thread_choices": threads,
+        # The shown requirement rows and their identity are published once, as
+        # the top-level keys below; carrying them a second time inside the
+        # preference projection would only grow the payload every client must
+        # validate before it can render the stage.
         "draft_preferences": {key: item for key, item in (draft_direction or {}).items()
-                              if key != "summary"} if draft_direction else None,
+                              if key not in ("summary", *REQUIREMENT_FIELDS)}
+        if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
         "scene_art": scene_art_url(),
         "dialogue": value.get("dialogue", ""),

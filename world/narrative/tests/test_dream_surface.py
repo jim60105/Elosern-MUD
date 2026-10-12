@@ -526,6 +526,41 @@ class DreamSurfaceTests(EvenniaTest):
         rendered = render_state(state)
         self.assertIn("南門", rendered)
         self.assertIn("帶她找媽媽", rendered)
+        # Nothing was persisted yet, so the text line says exactly that instead
+        # of implying a review that has not happened.
+        self.assertIn("尚未檢視", rendered)
+
+    def test_the_text_line_names_the_reviewed_version_once_it_is_persisted(self):
+        self.enter()
+        direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩。",
+            "requirements": [{"kind": "place", "text": "南門"}],
+        }
+        self.assertEqual(
+            self.request("draft", direction=dict(direction)).result["outcome"],
+            "success",
+        )
+        state = service.dream_state(self.actor)
+        shown = state["requirement_version"]
+        self.assertTrue(shown)
+        # The rows are published once, as top-level keys: the quoted preference
+        # projection no longer repeats what the stage already renders.
+        self.assertNotIn("requirements", state["draft_preferences"])
+        self.assertNotIn("requirement_version", state["draft_preferences"])
+        rendered = render_state(state)
+        self.assertIn("已檢視的版本", rendered)
+        self.assertIn(shown, rendered)
+        # A typed plain-text direction carries no reviewed version, so it is
+        # refused as a stale review; the argument-less confirmation echoes the
+        # stored draft and succeeds.
+        typed = self.request("confirm", direction="在南門遇見一個女孩。")
+        self.assertEqual(typed.result["code"], "stale_requirements")
+        self.assertFalse(CreativeRequest.objects.exists())
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request("confirm")
+        self.assertEqual(confirmed.result["outcome"], "success")
 
     def test_a_failed_confirmation_rolls_back_work_and_compensates_the_surface(self):
         # The delta's own failure scenario: the work record fails inside the

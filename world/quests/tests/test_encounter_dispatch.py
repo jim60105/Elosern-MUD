@@ -392,12 +392,41 @@ class SettledTraversalOrderingTests(EncounterDispatchTestBase):
         self.assertEqual(self.player.location.pk, self.room.pk)
         binding = scene_store.get_role_binding(self.package_id, "daughter")
         self.assertIsNotNone(binding)
-        # A repeat observation cannot advance a second stage or duplicate the
-        # resolution: the same identical pass leaves the binding untouched.
-        self.assertEqual(
-            scene_store.get_role_binding(self.package_id, "daughter").npc_id,
-            binding.npc_id,
+        first_pass = len(observed)
+        # A replayed traversal cannot materialize a second role or duplicate the
+        # resolution: walk out and back in through the same boundary and observe
+        # that each settled receipt still sees the one existing binding.
+        back = create_object(
+            Exit, key="門二", location=self.room, destination=self.elsewhere
         )
+        with patch.object(
+            escort_events, "evaluate_escort_event", side_effect=observe
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                back.at_traverse(self.player, self.elsewhere)
+            with self.captureOnCommitCallbacks(execute=True):
+                exit_obj.at_traverse(self.player, self.room)
+        self.assertEqual(self.player.location.pk, self.room.pk)
+        # Every settled receipt that did evaluate saw the one existing role; the
+        # replay consumed no further transition eligibility.
+        self.assertEqual(set(observed), {True})
+        again = scene_store.get_role_binding(self.package_id, "daughter")
+        self.assertEqual(again.npc_id, binding.npc_id)
+        daughters = [
+            row
+            for row in scene_store.list_role_bindings(self.package_id)
+            if row.role_id == "daughter"
+        ]
+        self.assertEqual(len(daughters), 1)
+        self.assertEqual(
+            scene_store.get_encounter(
+                self.package_id, "south_gate", self.player.pk
+            ).state,
+            scene_store.ENCOUNTER_ACTIVATED,
+        )
+        from world.quests.runtime import read_records
+
+        self.assertEqual(read_records(self.player), [])
 
 
 class PrerequisiteTriggerTests(EncounterDispatchTestBase):
