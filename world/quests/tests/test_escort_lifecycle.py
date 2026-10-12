@@ -21,6 +21,8 @@ from world.rules.action import _EVENT_EFFECT_PLANNERS, register_event_effect_pla
 from world.rules.buffs import tick_buffs
 from world.rules.combat import Battlefield
 from world.rules.upkeep import settle_upkeep
+from world.quests.compile import compile_quest_blueprint
+from world.quests.tests._compile_helpers import _defeat_payload
 from world.tests.synthetic_data import (
     SYNTH_SKILLS,
     make_skill,
@@ -958,3 +960,158 @@ class EscortRealOwnerSmokeTests(EscortTestBase):
         self.assertEqual(self.owner.db.wallet, wallet_before + 1)
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
         self.assertEqual(reasons_for(self.protected, self.owner), ())
+
+
+def _generated_escort_payload():
+    """A compilable complete rendezvous-escort proposal for the real chain."""
+    payload = _defeat_payload()
+    payload["name"] = "護衛重逢"
+    payload["quest_type"] = "護衛"
+    payload["stages"][0]["objective"] = {
+        "kind": "escort",
+        "quantity": 1,
+        "completion": "rendezvous",
+        "protected_role_refs": ["protected"],
+        "meeting_role_refs": ["meeting"],
+    }
+    # A rendezvous declares no destination locator.
+    payload["stages"][0]["location_req"] = None
+    return payload
+
+
+#: The compiled definition key is deterministic, so the package fixture can
+#: publish a commission that offers it before the generated registration runs.
+_GENERATED_ESCORT_KEY = compile_quest_blueprint(
+    _generated_escort_payload()
+).definition.key
+
+
+class EscortGeneratedPublicationTests(
+    EscortFixtureMixin, QuestRegistryIsolation, EvenniaTest
+):
+    """Task 6.2: a generated escort publishes, is accepted, completes and pays.
+
+    The flow starts from a scripted proposal and runs the real chain - the
+    guardrail semantic validators, the deterministic compile boundary and the
+    generated registration - then accepts the published definition through the
+    real acceptance owner with its package bindings and party sources, and
+    resolves it in each encounter order through to payment and a committed
+    reload. Nothing is mocked to succeed and no objective is relabelled.
+    """
+
+    def offer_topics(self):
+        return [
+            *super().offer_topics(),
+            {
+                "keyword": "escort",
+                "effect_verb": "offer_commission",
+                "effect_reference": _GENERATED_ESCORT_KEY,
+            },
+        ]
+
+    def outcome_groups(self):
+        # The published package indexes the owner for the definition, so a
+        # meeting-role move is attributable exactly as a protected-role move is
+        # (escort-rendezvous §5).
+        return [{
+            "group_id": "reunion",
+            "alternatives": [_GENERATED_ESCORT_KEY],
+            "result": {
+                "completion": "rendezvous",
+                "protected_role_refs": ["protected"],
+                "meeting_role_refs": ["meeting"],
+            },
+        }]
+
+    def _publish_generated(self):
+        """Run the real generative chain and return the registered definition."""
+        import json
+
+        from server.ai_director_service import request_generated_quest
+        from world.ai.fake_client import FakeLLMClient
+        from world.ai import guardrail, scenario_director
+        from world.ai.schemas.registry import _OUTPUT_SCHEMAS
+
+        # Install the director layer idempotently, and remove it again so this
+        # suite never leaks the registration into another module's process.
+        guardrail._semantic_validators.pop("scenario_director", None)
+        guardrail._degrade_fallbacks.pop("scenario_director", None)
+        _OUTPUT_SCHEMAS.pop("scenario_director", None)
+        scenario_director.register_scenario_director()
+        self.addCleanup(guardrail._semantic_validators.pop, "scenario_director", None)
+        self.addCleanup(guardrail._degrade_fallbacks.pop, "scenario_director", None)
+        self.addCleanup(_OUTPUT_SCHEMAS.pop, "scenario_director", None)
+
+        payload = _generated_escort_payload()
+        client = FakeLLMClient()
+        client.add_response(
+            lambda descriptor: True, json.dumps(payload, ensure_ascii=False)
+        )
+        from django.test import override_settings
+        from world.ai.profiles import default_profiles
+
+        # The director layer must be enabled for the injected client to be used
+        # (an environment-resolved profile may disable it), so this call pins
+        # the local-first defaults the scripts expect.
+        with override_settings(LLM_PROFILES=default_profiles()):
+            deferred = request_generated_quest(
+                client,
+                context={
+                    "requested_type": payload["quest_type"],
+                    "allowed_rank": payload["rank"],
+                    "issuer_branch": payload["issuer"],
+                    "anchor": None,
+                },
+            )
+            result = deferred.result
+            deferred.addErrback(lambda failure: None)
+        if hasattr(result, "raiseException"):
+            result.raiseException()
+        return result
+
+    def setUp(self):
+        super().setUp()
+        compiled = self._publish_generated()
+        self.assertEqual(compiled.definition.key, _GENERATED_ESCORT_KEY)
+        # The published package's own commission issues the definition: the
+        # scoped issuer's issuance plus its registered grant.
+        register_quest_issuance(QuestIssuance(
+            definition_key=_GENERATED_ESCORT_KEY, issuer_key=self.issuer_key,
+            reward=QuestReward(copper=1, items=(), merit=0),
+            settlement=Settlement.AUTO,
+        ))
+        scene_store.ensure_commission_grant(
+            self.package, "issuer", _GENERATED_ESCORT_KEY, issuer_key=self.issuer_key,
+        )
+        scene_store.assign_grant_actor(
+            self.package, "issuer", _GENERATED_ESCORT_KEY, self.issuer.pk,
+        )
+        scene_store.set_grant_registered(
+            self.package, "issuer", _GENERATED_ESCORT_KEY, True,
+        )
+
+    def _assert_paid_and_reloaded(self, record, wallet_before):
+        stored = read_records(self.owner)[0]
+        self.assertEqual(stored.quest_id, record.quest_id)
+        self.assertEqual(stored.state.value, "completed")
+        self.assertEqual(self.owner.db.wallet, wallet_before + 1)
+        self.owner.attributes.reset_cache()
+        self.protected.attributes.reset_cache()
+        self.assertEqual(read_records(self.owner)[0].state.value, "completed")
+        self.assertEqual(
+            list(self.owner.db.guild_reward_claims), [record.quest_id]
+        )
+        self.assertEqual(reasons_for(self.protected, self.owner), ())
+
+    def test_protected_first_order(self):
+        record = accept_quest(self.owner, _GENERATED_ESCORT_KEY, self.issuer_key)
+        self.assertEqual(read_records(self.owner)[0].state.value, "in_progress")
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        self._assert_paid_and_reloaded(record, wallet_before)
+
+    def test_meeting_first_order(self):
+        record = accept_quest(self.owner, _GENERATED_ESCORT_KEY, self.issuer_key)
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.meeting.move_to(self.room1, quiet=True))
+        self._assert_paid_and_reloaded(record, wallet_before)

@@ -128,6 +128,41 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                             "quantity": {"type": "integer", "minimum": 1},
                             "monster_tier": {"type": ["string", "null"]},
                             "item_key": {"type": ["string", "null"]},
+                            # The escort contract (escort-rendezvous §6); every
+                            # other kind leaves all four unset.
+                            "completion": {
+                                "type": ["string", "null"],
+                                "enum": [*ESCORT_COMPLETIONS, None],
+                            },
+                            "protected_role_refs": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "meeting_role_refs": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "relation": {
+                                "anyOf": [
+                                    {"type": "null"},
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "kind",
+                                            "from_role",
+                                            "to_role",
+                                        ],
+                                        "properties": {
+                                            "kind": {
+                                                "type": "string",
+                                                "enum": list(RELATIONSHIP_KINDS),
+                                            },
+                                            "from_role": {"type": "string"},
+                                            "to_role": {"type": "string"},
+                                        },
+                                    },
+                                ]
+                            },
                         },
                     },
                     "location_req": {
@@ -726,7 +761,18 @@ def _validate_objective_selectors(parsed: Any) -> list[str]:
             if objective.get("monster_tier") is not None:
                 errors.append(f"stage {index} ACQUIRE cannot declare a monster_tier")
         elif kind in ("reach_location", "escort"):
-            if stage.get("location_req") is None:
+            # A destination escort (like a reach objective) needs a locator; a
+            # rendezvous escort declares no destination at all
+            # (escort-rendezvous §6).
+            rendezvous_escort = (
+                kind == "escort" and objective.get("completion") == "rendezvous"
+            )
+            if rendezvous_escort and stage.get("location_req") is not None:
+                errors.append(
+                    f"stage {index} rendezvous ESCORT declares no location_req "
+                    "destination"
+                )
+            elif not rendezvous_escort and stage.get("location_req") is None:
                 errors.append(
                     f"stage {index} {kind} requires a location_req destination"
                 )

@@ -462,6 +462,8 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         # closed contract is accepted by the semantic validators.
         good = _payload()
         good["quest_type"] = "護衛"
+        # A rendezvous declares no destination locator.
+        good["stages"][0]["location_req"] = None
         good["stages"][0]["objective"] = {
             "kind": "escort",
             "quantity": 1,
