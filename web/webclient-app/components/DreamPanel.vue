@@ -33,6 +33,14 @@ const tagFields = [
   { key: "emphasis", label: "想多描寫的部分" },
   { key: "exclusions", label: "不想出現的內容", exclude: true },
 ];
+// The shown experience requirements are server-authored planning data: the
+// sheet renders their readable meaning and echoes the exact rows and version
+// identity back, so a confirmation can only freeze what was displayed.
+const REQUIREMENT_LABELS = {
+  place: "指定的地點",
+  new_character: "需要的新角色",
+  private_commission: "私人委託",
+};
 
 const stage = ref(null);
 const page = ref(null);
@@ -83,6 +91,21 @@ const tagsSnapshot = () => JSON.stringify(tagFields.map(({ key }) => tags[key]))
 const directionDirty = computed(() => direction.value.trim() !== synced.direction.trim() || thread.value !== synced.thread
   || tagsSnapshot() !== synced.tags);
 const dirty = computed(() => !!message.value.trim() || directionDirty.value);
+const shownRequirements = computed(() => (Array.isArray(props.state.requirements) ? props.state.requirements : []));
+const shownVersion = computed(() => props.state.requirement_version || null);
+const summaryReviewed = computed(() => summary.value === synced.direction.trim());
+// Requirements belong to the version they were published with. An edited
+// summary is a direction they were never shown for, and rows without a
+// persisted version were never reviewed at all, so confirmation waits for a
+// fresh 記下 (which re-versions them) instead of freezing them silently.
+const requirementsStale = computed(() => shownRequirements.value.length > 0
+  && (!shownVersion.value || !summaryReviewed.value));
+const requirementNote = computed(() => {
+  if (!shownRequirements.value.length) return "";
+  if (!shownVersion.value) return "尚未檢視：記下念頭後才會連同版本一起保存。";
+  if (!summaryReviewed.value) return "已改寫：這些是上一個版本的需求，請先記下念頭再確認。";
+  return "已檢視的版本，確認時會一併寫入。";
+});
 const atCap = computed(() => props.state.remaining === 0);
 const ordinal = computed(() => Math.max(0, Math.min(GAUGE_STEPS - 1, props.state.track.ordinal)));
 const knownThread = computed(() => props.state.thread_choices.find((choice) => choice.id === thread.value));
@@ -230,7 +253,14 @@ watch(() => JSON.stringify([props.state.session_id, props.state.draft_preference
 function directionPayload() {
   const values = Object.fromEntries(tagFields.flatMap(({ key }) => tags[key].length ? [[key, [...tags[key]]]] : []));
   if (!summary.value && !thread.value && !Object.keys(values).length) return "";
-  return { ...values, kind: thread.value ? "thread_direction" : "new_story", thread_id: thread.value || null, summary: summary.value };
+  return {
+    ...values,
+    kind: thread.value ? "thread_direction" : "new_story",
+    thread_id: thread.value || null,
+    summary: summary.value,
+    requirements: shownRequirements.value.map((row) => ({ kind: row.kind, text: row.text })),
+    requirement_version: shownVersion.value,
+  };
 }
 function dispatch(action, extra = {}) {
   return props.store.dispatchAction("dream." + action,
@@ -247,6 +277,12 @@ async function confirm() {
   refusal.value = "";
   if (!summary.value || summaryTooLong.value) {
     refusal.value = summaryTooLong.value ? "念頭最多 2000 字，請再精簡一些。" : "念頭還是空的。寫下一句想帶走的話，或直接醒來。";
+    if (!sheetOpen.value) await openSheet();
+    summaryInput.value?.focus();
+    return;
+  }
+  if (requirementsStale.value) {
+    refusal.value = "這個版本的可執行需求還沒重新檢視：先「記下念頭」，再帶著新的版本醒來。";
     if (!sheetOpen.value) await openSheet();
     summaryInput.value?.focus();
     return;
@@ -481,6 +517,16 @@ function onKeydown(event) {
           </div>
           <p v-if="refusal" class="dream-field__error" role="alert">{{ refusal }}</p>
 
+          <section v-if="shownRequirements.length" class="dream-requirements" aria-labelledby="dream-requirements-title" data-testid="dream-requirements">
+            <h4 id="dream-requirements-title">這個方向的可執行需求</h4>
+            <ul class="dream-requirements__list">
+              <li v-for="(row, index) in shownRequirements" :key="index">
+                <span class="dream-requirements__kind">{{ REQUIREMENT_LABELS[row.kind] || row.kind }}</span>{{ row.text }}
+              </li>
+            </ul>
+            <small class="dream-requirements__note" :class="{ 'dream-requirements__note--stale': requirementsStale }">{{ requirementNote }}</small>
+          </section>
+
           <fieldset class="dream-threads">
             <legend>這個念頭屬於……</legend>
             <input v-if="state.thread_choices.length > 8" v-model="threadFilter" class="dream-threads__filter" type="search" placeholder="搜尋故事線" aria-label="搜尋故事線" />
@@ -692,7 +738,7 @@ function onKeydown(event) {
 .dream-sheet__head p { margin-top: var(--sp-1); color: var(--paper-400); font-size: var(--text-sm); }
 .dream-sheet__body { display: grid; align-content: start; gap: var(--sp-4); min-height: 0; overflow-y: auto; padding: var(--sp-5) var(--sp-6); }
 .dream-field { display: grid; gap: var(--sp-2); }
-.dream-field__label, .dream-threads legend, .dream-tags h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
+.dream-field__label, .dream-threads legend, .dream-tags h4, .dream-requirements h4 { color: var(--gold-400); font-size: var(--text-sm); font-weight: 500; letter-spacing: 0.06em; }
 .dream-field__label em { margin-left: var(--sp-2); color: var(--paper-500); font-size: var(--text-xs); font-style: normal; }
 .dream-sheet textarea, .dream-sheet input[type="search"], .dream-tags__box { box-sizing: border-box; width: 100%; border: 1px solid var(--ink-600); border-radius: var(--radius-sm); background: var(--ink-900); color: var(--paper-50); }
 .dream-sheet textarea { padding: var(--sp-3); font-family: var(--f-serif); font-size: var(--text-md); line-height: 1.6; resize: vertical; }
@@ -722,6 +768,11 @@ function onKeydown(event) {
 .dream-tags__chip { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 0 var(--sp-1) 0 var(--sp-3); border: 1px solid var(--ink-600); border-radius: var(--radius-pill); background: var(--ink-780); color: var(--paper-100); font-size: var(--text-sm); }
 .dream-tags__row--exclude .dream-tags__chip { border-color: var(--seal-700); color: var(--seal-400); }
 .dream-tags__chip button { padding: 0 var(--sp-1); border: 0; background: none; color: inherit; font: inherit; cursor: pointer; }
+.dream-requirements { display: grid; gap: var(--sp-2); padding-top: var(--sp-4); border-top: 1px solid var(--band-edge-dim); }
+.dream-requirements__list { display: grid; gap: var(--sp-1); margin: 0; padding: 0; list-style: none; color: var(--paper-100); font-size: var(--text-sm); }
+.dream-requirements__kind { margin-right: var(--sp-2); color: var(--paper-400); font-size: var(--text-xs); }
+.dream-requirements__note { color: var(--paper-500); font-size: var(--text-xs); }
+.dream-requirements__note--stale { color: var(--seal-400); }
 .dream-sheet__foot { display: grid; gap: var(--sp-2); padding: var(--sp-4) var(--sp-6) var(--sp-5); border-top: 1px solid var(--band-edge-dim); }
 .dream-sheet__foot p { color: var(--paper-500); font-size: var(--text-xs); }
 .dream-sheet__foot div { display: flex; justify-content: flex-end; gap: var(--sp-2); }

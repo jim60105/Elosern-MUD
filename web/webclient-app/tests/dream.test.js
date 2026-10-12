@@ -13,6 +13,7 @@ function state(overrides = {}) {
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
     scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
     direction_parts: [], thread_choices: [], draft_preferences: null,
+    requirements: [], requirement_version: null,
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
     sleep: { tick_from: 17, tick_to: 17, requested_seconds: 0, seconds: 0, event_kinds: [] },
     ending: "", ending_phase: "", ...overrides };
@@ -201,7 +202,7 @@ describe("server-authored dream surface", () => {
     await sheet.find("textarea").setValue("合成新方向");
     await wrapper.setProps({ state: state({ revision: 7, remaining: 4, completed: 2 }) });
     await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
-    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 7, direction: { kind: "new_story", thread_id: null, summary: "合成新方向" } }, null);
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 7, direction: { kind: "new_story", thread_id: null, summary: "合成新方向", requirements: [], requirement_version: null } }, null);
   });
   it("edits preference chips and saves a draft that keeps the dream open", async () => {
     const { wrapper, store } = fixture(state({ direction_parts: ["合成方向"] }));
@@ -224,7 +225,7 @@ describe("server-authored dream surface", () => {
     expect(wrapper.findAll(".dream-tags__chip")).toHaveLength(1);
     await wrapper.findAll(".dream-sheet__foot button")[0].trigger("click");
     expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", { session_id: "synthetic-dream", revision: 2,
-      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"] } }, null);
+      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"], requirements: [], requirement_version: null } }, null);
     await flushPromises();
     expect(wrapper.find("[data-testid='dream-sheet']").exists()).toBe(false);
     // The toast waits for the committed draft; a refusal republishes none.
@@ -280,7 +281,7 @@ describe("server-authored dream surface", () => {
     await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
     expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
       session_id: "synthetic-dream", revision: 8,
-      direction: { kind: "thread_direction", thread_id: "synthetic-thread", summary: "伺服器保存的故事方向", themes: ["鐘聲"], exclusions: ["暴力"] },
+      direction: { kind: "thread_direction", thread_id: "synthetic-thread", summary: "伺服器保存的故事方向", themes: ["鐘聲"], exclusions: ["暴力"], requirements: [], requirement_version: null },
     }, null);
   });
   it("keeps an unsent direction edit when an exchange republishes the authored direction", async () => {
@@ -317,7 +318,7 @@ describe("dream stage review coverage", () => {
     expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.awaken", { session_id: "synthetic-dream", revision: 2 }, null);
     await row(wrapper, "confirm").trigger("click");
     expect(store.dispatchAction).toHaveBeenLastCalledWith("dream.confirm", { session_id: "synthetic-dream", revision: 2,
-      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"] } }, null);
+      direction: { kind: "new_story", thread_id: null, summary: "合成方向", themes: ["重逢"], requirements: [], requirement_version: null } }, null);
   });
   it("types a live reveal at full motion and completes, then advances, on activation", async () => {
     vi.useFakeTimers();
@@ -451,5 +452,130 @@ describe("dream stage review coverage", () => {
     await reply(wrapper).setValue("新打的字");
     await wrapper.setProps({ state: state({ revision: 6, failure: true, direction_parts: ["合成方向"], thread_choices: threads }) });
     expect(reply(wrapper).element.value).toBe("新打的字");
+  });
+});
+
+const REQUIREMENTS = [
+  { kind: "place", text: "合成南門" },
+  { kind: "new_character", text: "合成女孩" },
+  { kind: "private_commission", text: "合成委託" },
+];
+const SHOWN = state({
+  direction_parts: ["合成方向"],
+  requirements: REQUIREMENTS,
+  requirement_version: "t_dream_session:v1",
+});
+
+describe("shown experience requirements", () => {
+  it("renders the readable requirements and their reviewed version in the sheet", async () => {
+    const { wrapper } = fixture(SHOWN);
+    const sheet = await openSheet(wrapper);
+    const section = sheet.find("[data-testid='dream-requirements']");
+    expect(section.text()).toContain("這個方向的可執行需求");
+    expect(section.findAll("li").map((row) => row.text())).toEqual([
+      "指定的地點合成南門",
+      "需要的新角色合成女孩",
+      "私人委託合成委託",
+    ]);
+    expect(section.find(".dream-requirements__note").text()).toBe("已檢視的版本，確認時會一併寫入。");
+    expect(section.find(".dream-requirements__note--stale").exists()).toBe(false);
+    wrapper.unmount();
+    // A version-less proposal is displayed, and marked as not yet reviewed.
+    const { wrapper: proposed } = fixture(state({ direction_parts: ["合成方向"], requirements: REQUIREMENTS }));
+    const proposedSheet = await openSheet(proposed);
+    const proposedSection = proposedSheet.find("[data-testid='dream-requirements']");
+    expect(proposedSection.find(".dream-requirements__note--stale").text()).toBe("尚未檢視：記下念頭後才會連同版本一起保存。");
+    proposed.unmount();
+    // Without shown rows the section is absent entirely.
+    const { wrapper: plain } = fixture(state({ direction_parts: ["合成方向"], requirements: [] }));
+    const plainSheet = await openSheet(plain);
+    expect(plainSheet.find("[data-testid='dream-requirements']").exists()).toBe(false);
+  });
+  it("sends the exact shown rows and version from both sheet buttons", async () => {
+    const { wrapper, store } = fixture(SHOWN);
+    const sheet = await openSheet(wrapper);
+    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
+      session_id: "synthetic-dream",
+      revision: 2,
+      direction: {
+        kind: "new_story",
+        thread_id: null,
+        summary: "合成方向",
+        requirements: REQUIREMENTS,
+        requirement_version: "t_dream_session:v1",
+      },
+    }, null);
+    store.dispatchAction.mockClear();
+    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
+      session_id: "synthetic-dream",
+      revision: 2,
+      direction: {
+        kind: "new_story",
+        thread_id: null,
+        summary: "合成方向",
+        requirements: REQUIREMENTS,
+        requirement_version: "t_dream_session:v1",
+      },
+    }, null);
+  });
+  it("refuses to confirm a summary the shown rows were never displayed for", async () => {
+    const { wrapper, store } = fixture(SHOWN);
+    const sheet = await openSheet(wrapper);
+    await sheet.find("textarea").setValue("合成改寫");
+    expect(sheet.find(".dream-requirements__note--stale").text()).toBe("已改寫：這些是上一個版本的需求，請先記下念頭再確認。");
+    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    expect(sheet.find("[role='alert']").text()).toContain("還沒重新檢視");
+    // 記下 still re-versions the edited summary together with the shown rows.
+    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
+      session_id: "synthetic-dream",
+      revision: 2,
+      direction: {
+        kind: "new_story",
+        thread_id: null,
+        summary: "合成改寫",
+        requirements: REQUIREMENTS,
+        requirement_version: "t_dream_session:v1",
+      },
+    }, null);
+  });
+  it("refuses a confirmation while the shown rows carry no persisted version", async () => {
+    const { wrapper, store } = fixture(state({ direction_parts: ["合成方向"], requirements: REQUIREMENTS }));
+    const sheet = await openSheet(wrapper);
+    await sheet.findAll(".dream-sheet__foot button")[1].trigger("click");
+    expect(store.dispatchAction).not.toHaveBeenCalled();
+    expect(sheet.find("[role='alert']").text()).toContain("還沒重新檢視");
+    await sheet.findAll(".dream-sheet__foot button")[0].trigger("click");
+    expect(store.dispatchAction).toHaveBeenCalledWith("dream.draft", {
+      session_id: "synthetic-dream",
+      revision: 2,
+      direction: {
+        kind: "new_story",
+        thread_id: null,
+        summary: "合成方向",
+        requirements: REQUIREMENTS,
+        requirement_version: null,
+      },
+    }, null);
+    wrapper.unmount();
+    // An edited summary with no shown rows keeps today's one-step confirmation.
+    const { wrapper: plain, store: plainStore } = fixture();
+    const plainSheet = await openSheet(plain);
+    await plainSheet.find("textarea").setValue("合成新方向");
+    await plainSheet.findAll(".dream-sheet__foot button")[1].trigger("click");
+    expect(plainStore.dispatchAction).toHaveBeenCalledWith("dream.confirm", {
+      session_id: "synthetic-dream",
+      revision: 2,
+      direction: {
+        kind: "new_story",
+        thread_id: null,
+        summary: "合成新方向",
+        requirements: [],
+        requirement_version: null,
+      },
+    }, null);
   });
 });
