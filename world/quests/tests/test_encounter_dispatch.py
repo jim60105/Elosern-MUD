@@ -351,6 +351,55 @@ class ActivationTests(EncounterDispatchTestBase):
         self.assertEqual(activate_pending_encounters(stray, room=self.room, tick=5), ())
 
 
+class SettledTraversalOrderingTests(EncounterDispatchTestBase):
+    """The meeting role exists before the receipt's final evaluation runs.
+
+    A settled traversal activates the published encounters its new position
+    reaches inside the movement receipt, and the receipt's trailing escort/
+    outcome evaluation must then observe the materialized role: the ordering is
+    the whole point of activating there rather than after the receipt.
+    """
+
+    def test_a_settled_traversal_materializes_the_role_before_the_final_evaluation(self):
+        import world.quests.escort_events as escort_events
+        from typeclasses.exits import Exit
+
+        self.player.location = self.elsewhere
+        exit_obj = create_object(
+            Exit, key="門", location=self.elsewhere, destination=self.room
+        )
+        observed: list[bool] = []
+        real_evaluation = escort_events.evaluate_escort_event
+
+        def observe(*args, **kwargs):
+            observed.append(
+                scene_store.get_role_binding(self.package_id, "daughter") is not None
+            )
+            return real_evaluation(*args, **kwargs)
+
+        with patch.object(
+            escort_events, "evaluate_escort_event", side_effect=observe
+        ):
+            with self.captureOnCommitCallbacks(execute=True):
+                # The plain-exit lineage returns ``None`` on both branches; the
+                # settled location is the success signal.
+                exit_obj.at_traverse(self.player, self.room)
+        self.assertEqual(self.player.location.pk, self.room.pk)
+        # The receipt evaluated once, and by then the declared meeting role was
+        # already real at the encountered place.
+        self.assertTrue(observed, "the settled receipt ran its final evaluation")
+        self.assertEqual(set(observed), {True})
+        self.assertEqual(self.player.location.pk, self.room.pk)
+        binding = scene_store.get_role_binding(self.package_id, "daughter")
+        self.assertIsNotNone(binding)
+        # A repeat observation cannot advance a second stage or duplicate the
+        # resolution: the same identical pass leaves the binding untouched.
+        self.assertEqual(
+            scene_store.get_role_binding(self.package_id, "daughter").npc_id,
+            binding.npc_id,
+        )
+
+
 class PrerequisiteTriggerTests(EncounterDispatchTestBase):
     """A committed phase moves a declared prerequisite and re-evaluates it."""
 
