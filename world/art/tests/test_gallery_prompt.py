@@ -39,6 +39,7 @@ from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_ITEMS,
     SYNTH_MONSTER_SPECIES,
+    SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -49,7 +50,8 @@ from world.tests.synthetic_data import (
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
 _SYNTH_SPECIES = sorted(SYNTH_MONSTER_SPECIES)[0]
 _SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
-_SYNTH_RACE_LABEL = SYNTH_SUBRACES[_SYNTH_SUBRACE].display_name_zh
+# The prompt names the RACE, never the project-invented subrace label.
+_SYNTH_RACE_LABEL = SYNTH_RACES[SYNTH_SUBRACES[_SYNTH_SUBRACE].race_key].display_name_zh
 _SYNTH_WEAPON = "t_thorn_knife"
 _SYNTH_OFFHAND = "t_iron_fang"
 _SYNTH_ARMOR = "t_wayfarer_pass"
@@ -57,7 +59,7 @@ _SYNTH_TRINKET = "t_huskapple"
 _SYNTH_TRINKET_B = "t_ember_spray"
 
 
-_APPEARANCE_TEXT = {"feature": "a silver ear piercing", "height": "tall"}
+_APPEARANCE_TEXT = {"overview": "a sharp-eyed scout", "height": "tall"}
 
 
 # A test-owned art.yaml fixture. The composition claims below assert field
@@ -205,7 +207,7 @@ class CustomPromptBoundTests(unittest.TestCase):
                     validate_custom_prompt(bad)
 
 
-@synthetic_registries("items", "subraces")
+@synthetic_registries("items", "races", "subraces")
 class EquipmentFragmentTests(unittest.TestCase):
     """Registry-owned visual text, slot order, tolerant reads, zero writes
     (all entities are built in test bodies, so the class scope covers)."""
@@ -294,7 +296,7 @@ class EquipmentFragmentTests(unittest.TestCase):
         self.assertEqual(stored["weapon_main"], _SYNTH_WEAPON)
 
 
-@synthetic_registries("items", "subraces")
+@synthetic_registries("items", "races", "subraces")
 class CompositionTests(PromptFixture):
     """Selection-aware character_description over the shipped template,
     wearing patched kit gear."""
@@ -330,8 +332,9 @@ class CompositionTests(PromptFixture):
         self.load()
         text = character_description(_entity({"appearance": _APPEARANCE_TEXT}), 24, fields=("appearance",))
         self.assertTrue(text.startswith(self._BASE.format(age=24)))
-        self.assertIn("a silver ear piercing", text)
-        self.assertIn("tall", text)
+        self.assertIn("a sharp-eyed scout", text)
+        # Body numbers are not renderable visual truth.
+        self.assertNotIn("tall", text)
 
     @covers_requirement(
         "art-gallery-prompt-fields::equipment-fields-contribute-registry-owned-visual-text-and-nothing-else"
@@ -369,7 +372,7 @@ class CompositionTests(PromptFixture):
             entity, 24, fields=("appearance", "armor"), custom_prompt=custom
         )
         self.assertTrue(text.endswith("\n" + custom))
-        self.assertLess(text.index("外觀："), text.index(custom))
+        self.assertLess(text.index("a sharp-eyed scout"), text.index(custom))
         self.assertLess(text.index(SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh), text.index(custom))
 
     @covers_requirement(
@@ -420,13 +423,15 @@ class CompositionTests(PromptFixture):
         )
         self.load()
         entity = _entity(
-            {"appearance": {"feature": "quiet eyes"}},
+            {"appearance": {"overview": "quiet eyes"}},
             equipment={"armor": _SYNTH_ARMOR},
         )
         text = character_description(entity, 24, fields=("appearance", "armor"), custom_prompt="雨")
         armor_line = SYNTH_ITEMS[_SYNTH_ARMOR].presentation.summary_zh
         self.assertTrue(text.startswith(f"{_SYNTH_RACE_LABEL}, 24 years old."))
-        self.assertIn(f"|\n外觀：\nfeature：quiet eyes|\n{armor_line}|\n雨", text)
+        # The appearance fragment carries only the authored value: no
+        # section label, no sub-key label.
+        self.assertIn(f"|\nquiet eyes|\n{armor_line}|\n雨", text)
 
     @covers_requirement(
         "art-gallery-prompt-fields::the-prompt-library-remains-the-sole-source-of-the-composed-template"
@@ -538,7 +543,7 @@ class CompositionTests(PromptFixture):
                     )
 
 
-@synthetic_registries("archetypes", "monster_species", "subraces")
+@synthetic_registries("archetypes", "monster_species", "races", "subraces")
 class DescriptionDispatcherTests(PromptFixture):
     """The description_for boundary: explicit selection only for characters."""
 

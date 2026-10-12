@@ -33,6 +33,7 @@ from tools.spec_traceability import covers_requirement
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_MONSTER_TIERS,
+    SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -43,7 +44,8 @@ from world.tests.synthetic_data import (
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
 _SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
 _SYNTH_SUBRACE = sorted(SYNTH_SUBRACES)[0]
-_SYNTH_RACE_LABEL = SYNTH_SUBRACES[_SYNTH_SUBRACE].display_name_zh
+# The prompt names the RACE, never the project-invented subrace label.
+_SYNTH_RACE_LABEL = SYNTH_RACES[SYNTH_SUBRACES[_SYNTH_SUBRACE].race_key].display_name_zh
 
 
 class SubjectParsingTests(unittest.TestCase):
@@ -270,10 +272,10 @@ class PortraitPolicyTests(EvenniaTestCase):
                     character_subject_for(self._character(bad))
 
 
-@synthetic_registries("archetypes", "monster_tiers", "subraces")
+@synthetic_registries("archetypes", "monster_tiers", "races", "subraces")
 class DescriptionTests(PromptFixture):
     """Description composition resolves the archetype sentence, the monster
-    visual species appearance text and the subrace label through the catalogs;
+    visual species appearance text and the race label through the catalogs;
     every entity is built in the test bodies, so the class scope wraps each
     test independently. The descriptions render over the test-owned art.yaml
     fixture (the five character tokens), so an exclusion claim can never be
@@ -334,6 +336,10 @@ _APPEARANCE = {
     "attire": "a hooded cloak",
     "feature": "a silver ear piercing",
 }
+# The image-usable subset: body numbers and setting clothing/accessories
+# never reach a render (the equipment slots own clothing).
+_APPEARANCE_PROMPTED = ("style", "overview")
+_APPEARANCE_EXCLUDED = ("height", "weight", "measurement", "attire", "feature")
 
 
 # A test-owned art.yaml fixture. The composition claims in this module assert
@@ -350,7 +356,7 @@ _TEST_ART_YAML = (
 )
 
 
-@synthetic_registries("subraces")
+@synthetic_registries("races", "subraces")
 class AppearanceDescriptionTests(PromptFixture):
     """The admitted persona ``appearance`` block in character descriptions
     (portrait-prompt-appearance): ordering, exclusion, determinism, emptiness.
@@ -392,15 +398,17 @@ class AppearanceDescriptionTests(PromptFixture):
         }
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
-    def test_full_persona_contributes_every_appearance_subkey_and_nothing_else(self):
+    def test_full_persona_contributes_only_image_usable_appearance_subkeys(self):
         self.load()
         text = character_description(_persona_entity(self._full_persona()), 31, fields=self._APPEARANCE_ONLY)
         self.assertNotIn("艾琳", text)
         self.assertIn(_SYNTH_RACE_LABEL, text)
         self.assertIn("31", text)
-        for value in _APPEARANCE.values():
-            self.assertIn(value, text)
-        for excluded in (
+        for key in _APPEARANCE_PROMPTED:
+            self.assertIn(_APPEARANCE[key], text)
+        for key in _APPEARANCE_EXCLUDED:
+            self.assertNotIn(_APPEARANCE[key], text)
+        for value in (
             "guarded beneath a warm smile",
             "hums old road songs",
             "raised in the border caravans",
@@ -410,7 +418,26 @@ class AppearanceDescriptionTests(PromptFixture):
             "貝莎",
             "apprenticed smith",
         ):
-            self.assertNotIn(excluded, text)
+            self.assertNotIn(value, text)
+
+    @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
+    def test_body_measure_and_attire_subkeys_never_reach_the_prompt(self):
+        # A persona whose ONLY appearance data is non-renderable body data
+        # and setting clothing contributes no appearance section at all.
+        self.load()
+        persona = {
+            "appearance": {
+                "height": "tall",
+                "weight": "slender",
+                "measurement": "narrow-shouldered",
+                "attire": "a hooded cloak",
+                "feature": "a silver ear piercing",
+            }
+        }
+        self.assertEqual(
+            character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY),
+            f"{_SYNTH_RACE_LABEL}, 31 years old.",
+        )
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_hidden_identity_layer_never_reaches_the_prompt(self):
@@ -420,7 +447,7 @@ class AppearanceDescriptionTests(PromptFixture):
         text = character_description(_persona_entity(persona), 31, fields=self._APPEARANCE_ONLY)
         self.assertNotIn("流放的王室信使", text)
         self.assertNotIn("村落的偵察員", text)
-        self.assertIn("a silver ear piercing", text)
+        self.assertIn(_APPEARANCE["overview"], text)
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_description_is_byte_identical_with_declared_subkey_order(self):
@@ -430,23 +457,15 @@ class AppearanceDescriptionTests(PromptFixture):
         second = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         self.assertEqual(first, second)
         # The contracted shape: base sentence, then the labeled appearance
-        # block in _SUBKEY_ORDER order (unknown sub-keys would follow in
-        # insertion order).
+        # values only — no section label, no sub-key labels — in the
+        # declared prompt sub-key order.
         self.assertEqual(
             first,
             f"{_SYNTH_RACE_LABEL}, 31 years old.\n"
-            "外觀：\n"
-            "height：tall\n"
-            "weight：slender\n"
-            "measurement：narrow-shouldered\n"
-            "style：travel-worn leather\n"
-            "overview：a sharp-eyed scout\n"
-            "attire：a hooded cloak\n"
-            "feature：a silver ear piercing",
+            "travel-worn leather\n"
+            "a sharp-eyed scout",
         )
-        positions = [first.index(_APPEARANCE[key]) for key in (
-            "height", "weight", "measurement", "style", "overview", "attire", "feature"
-        )]
+        positions = [first.index(_APPEARANCE[key]) for key in _APPEARANCE_PROMPTED]
         self.assertEqual(positions, sorted(positions))
         self.assertEqual(len(set(positions)), len(positions))
 
@@ -481,7 +500,7 @@ class AppearanceDescriptionTests(PromptFixture):
         text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
         for value in (87, 154, 43, 106):
             self.assertNotIn(str(value), text)
-        self.assertIn("a silver ear piercing", text)
+        self.assertIn(_APPEARANCE["overview"], text)
 
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_overlong_appearance_is_capped_to_the_persona_field_bound(self):
@@ -533,7 +552,7 @@ class AppearanceDescriptionTests(PromptFixture):
         # appearance render must degrade to the appearance-free base, never
         # raise and never lose the portrait.
         self.load()
-        entity = _persona_entity({"appearance": {"feature": "a silver ear piercing"}})
+        entity = _persona_entity({"appearance": {"overview": "a sharp-eyed scout"}})
         real = subjects.render_prompt
         calls = []
 
@@ -546,7 +565,7 @@ class AppearanceDescriptionTests(PromptFixture):
 
         with patch.object(subjects, "render_prompt", stub):
             text = character_description(entity, 31, fields=self._APPEARANCE_ONLY)
-        self.assertEqual(calls, ["", "\n外觀：\nfeature：a silver ear piercing"])
+        self.assertEqual(calls, ["", "\na sharp-eyed scout"])
         self.assertEqual(
             text, f"{_SYNTH_RACE_LABEL}, 31 years old."
         )
@@ -554,7 +573,7 @@ class AppearanceDescriptionTests(PromptFixture):
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_apparent_age_is_rendered_without_the_canonical_age(self):
         self.load()
-        entity = _persona_entity({"appearance": {"feature": "a silver ear piercing"}})
+        entity = _persona_entity({"appearance": {"overview": "a sharp-eyed scout"}})
         entity.db.age = 240
         entity.db.apparent_age = 31
         text = description_for(

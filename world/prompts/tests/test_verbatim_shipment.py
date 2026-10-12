@@ -28,6 +28,7 @@ from tools.spec_traceability import covers_requirement
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -196,7 +197,7 @@ class LibrarySourceTests(unittest.TestCase):
             ),
         )
 
-    @synthetic_registries("archetypes", "subraces")
+    @synthetic_registries("archetypes", "races", "subraces")
     @covers_requirement("art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_art_descriptions_render_from_the_library_solely(self):
         from unittest.mock import Mock
@@ -211,7 +212,7 @@ class LibrarySourceTests(unittest.TestCase):
         from world.lore.monster_visuals import get_monster_visual_registry
 
         # The description producers resolve their subjects against the scene
-        # archetype / subrace catalogs, so the kit rows stand in: the
+        # archetype / race catalogs, so the kit rows stand in: the
         # source-of-truth claim compares each consumer against the library
         # render from the same inputs, never against literal text.
         synth_scene = sorted(SYNTH_ARCHETYPES)[0]
@@ -228,7 +229,7 @@ class LibrarySourceTests(unittest.TestCase):
         character.db.race = "t_duskmari"
         character.db.subrace = synth_subrace
         character.key = "艾琳"
-        label = SYNTH_SUBRACES[synth_subrace].display_name_zh
+        label = SYNTH_RACES[SYNTH_SUBRACES[synth_subrace].race_key].display_name_zh
         self.assertEqual(
             character_description(character, 24, fields=("appearance",)),
             render_prompt(

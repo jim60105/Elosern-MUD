@@ -34,6 +34,7 @@ from world.prompts.tests.fixtures import PromptFixture
 
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
+    SYNTH_RACES,
     SYNTH_SUBRACES,
     synthetic_registries,
 )
@@ -224,7 +225,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         )
         self.assertEqual(LLMNPC._thinking_text(npc), "")
 
-    @synthetic_registries("archetypes", "subraces")
+    @synthetic_registries("archetypes", "races", "subraces")
     @covers_requirement("prompt-library::the-loader-validates-every-prompt-key-and-bounds-failures-to-the-affected-layer", "art-subject-model::subject-descriptions-are-deterministic-and-exclude-non-physical-truth")
     def test_broken_art_file_degrades_to_deterministic_fallback_descriptions(self):
         from unittest.mock import Mock
@@ -248,7 +249,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         self.assertIn("art.negative_prompt", library.errors)
 
         # The fallback producers resolve their subjects against the scene
-        # archetype / subrace catalogs, so the kit rows stand in — the degrade
+        # archetype / race catalogs, so the kit rows stand in — the degrade
         # claim is about the registry-driven fallback text, not the shipped
         # archetype/lore prose.
         synth_scene = sorted(SYNTH_ARCHETYPES)[0]
@@ -267,7 +268,7 @@ class BoundedFailureDegradeTests(PromptFixture):
         character.key = "艾琳"
         text = character_description(character, 24, fields=("appearance",))
         self.assertNotIn("艾琳", text)
-        self.assertIn(SYNTH_SUBRACES[synth_subrace].display_name_zh, text)
+        self.assertIn(SYNTH_RACES[SYNTH_SUBRACES[synth_subrace].race_key].display_name_zh, text)
         self.assertIn("24", text)
 
         # The monster half rides a registered visual species (a threat-tier key

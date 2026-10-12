@@ -13,6 +13,8 @@ database key shape, or LLM authorship (design D2, focused design §3.3).
 
 from dataclasses import dataclass
 from enum import StrEnum
+from collections.abc import Mapping
+from types import SimpleNamespace
 import re
 import unicodedata
 
@@ -20,10 +22,10 @@ from world.lore.monster_visuals import (
     get_monster_visual_registry,
     is_registered_monster_visual_key,
 )
-from world.lore.races import SUBRACE_REGISTRY
+from world.lore.races import RACE_REGISTRY, SUBRACE_REGISTRY
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.prompts.loader import PromptUnavailableError, render_prompt
-from world.rules.persona import PersonaStore
+from world.rules.persona import _FIELD_LABELS, PersonaStore
 from world.art.gallery_prompt import (
     equipment_fragment,
     validate_custom_prompt,
@@ -249,31 +251,84 @@ def character_subject_for(entity) -> ArtSubject | None:
 
 
 def _race_label(entity) -> str:
+    """The prompt-facing RACE label, never the project-invented subrace name.
+
+    Image backends recognize 人類／獸人／精靈, not authored subrace labels
+    like 基亞蘭. A subrace resolves to its parent race's display name; a
+    bare race key resolves directly; an unregistered key falls back to the
+    stored string exactly as before.
+    """
     subrace_key = entity.db.subrace
     if subrace_key:
         subrace = SUBRACE_REGISTRY.get(subrace_key)
         if subrace is not None:
-            return subrace.display_name_zh
+            profile = RACE_REGISTRY.get(subrace.race_key)
+            if profile is not None:
+                return profile.display_name_zh
+    profile = RACE_REGISTRY.get(str(entity.db.race))
+    if profile is not None:
+        return profile.display_name_zh
     return str(entity.db.race or "unknown race")
 
 
+# The persona appearance sub-keys that carry renderable visual truth: style
+# and overview prose name hair, eyes, skin, and species traits an image
+# backend can draw. height/weight/measurement are numeric body data no
+# prompt consumes, and attire/feature describe setting clothing and
+# accessories that would fight the equipment-slot fragment (the equipped
+# combination is the only clothing source for a render), so they never enter
+# the prompt.
+# The declared composition order mirrors persona.py::_SUBKEY_ORDER.
+APPEARANCE_PROMPT_SUBKEYS: tuple[str, ...] = ("style", "overview")
+
+# The store renders the appearance block under this section label; the
+# fragment strips it (and every sub-key label) back off, so the label is
+# imported from its persona.py owner rather than restated here.
+_APPEARANCE_SECTION_LABEL = _FIELD_LABELS["appearance"]
+
+
 def _appearance_fragment(entity) -> str:
-    """The persona ``appearance`` block as one bounded prompt fragment.
+    """The persona ``appearance`` prose as one bounded, label-free fragment.
 
     Reads exactly the one ``appearance`` field through the read-only
     ``PersonaStore`` — personality, life_story, habit, background, identity
-    (public or hidden), and social_connection are never touched — and reuses
-    the store's shipped guarantees: ``_SUBKEY_ORDER`` declared sub-key order
-    with the insertion-order tail, empty/numeric-value skipping, the per-field
-    600-character cap, and a never-raising non-mapping record that renders as
-    the empty string. The labeled block (``外觀：`` plus one line per sub-key)
-    is appended after the base sentence, so a character with no appearance
-    data contributes nothing.
+    (public or hidden), and social_connection are never touched — and keeps
+    only the ``APPEARANCE_PROMPT_SUBKEYS`` image-usable sub-keys. A compact
+    NPC card's one-paragraph text appearance carries no sub-keys to filter,
+    so it passes through whole. A prompt is a bag of visual descriptors, not
+    a data sheet: neither the section label nor any sub-key label enters the
+    render, only the authored values — one kept value per line, in the
+    store's declared ``_SUBKEY_ORDER`` so output is stable across storage
+    iteration order. Each value keeps the store's shipped per-field cap.
+    Scalar shapes and empty prose contribute nothing, and a character whose
+    only appearance data is body numbers or setting clothing contributes an
+    empty fragment.
     """
-    block = PersonaStore(entity).flatten(("appearance",))
-    if block is None:
+    appearance = PersonaStore(entity).get("appearance")
+    if isinstance(appearance, str):
+        values = (appearance,) if appearance else ()
+    elif isinstance(appearance, Mapping):
+        values = tuple(
+            appearance[key]
+            for key in APPEARANCE_PROMPT_SUBKEYS
+            if key in appearance
+        )
+    else:
         return ""
-    return "\n" + block
+    lines: list[str] = []
+    for value in values:
+        if not isinstance(value, str) or not value:
+            continue
+        holder = SimpleNamespace(db=SimpleNamespace(persona={"appearance": value}))
+        block = PersonaStore(holder).flatten(("appearance",))
+        if block is None:
+            continue
+        # The store renders label + capped value; the prompt carries only
+        # the capped value — no key, no label.
+        lines.append(block[len(_APPEARANCE_SECTION_LABEL):])
+    if not lines:
+        return ""
+    return "\n" + "\n".join(lines)
 
 
 def character_description(entity, apparent_age: int, *, fields, custom_prompt: str = "") -> str:
