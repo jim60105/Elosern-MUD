@@ -489,29 +489,27 @@ ART_SD_PROBE_CACHE_SECONDS = _env_int_bounded(
 
 # Master switch for the local CPU background-removal stage (rembg). Deliberately
 # defaults to False (design D2): the code defaults — and therefore the effective
-# settings under server/conf/test_settings.py — stay free of the ~1 GB first-use
-# model download and the multi-second CPU pass per portrait. An operator turns
+# settings under server/conf/test_settings.py — stay free of any model
+# acquisition and of the multi-second CPU pass per portrait. An operator turns
 # the stage on with one line in .env and restarts.
+#
+# LICENSING: the stage has exactly ONE model — the locked rembg default
+# `bria-rmbg`, i.e. BRIA RMBG-2.0 — which the standard container image bakes in.
+# Its BRIA licence is free for non-commercial use; commercial use and every
+# redistribution of the weight require the applicable rights from BRIA, and the
+# image publisher and the operator own that compliance. There is no
+# model-selection knob and no permissively licensed substitute: the weights are
+# a property of the locked dependency, not of this project.
 ART_REMBG_ENABLED = _env_bool("ART_REMBG_ENABLED", False)
 
-# Closed, case-insensitive choice set for the removal model (design D9).
-# LICENSING: the default `bria-rmbg` wraps BRIA's RMBG-2.0 weights, which are
-# BRIA-licensed — free for non-commercial use, commercial use requires a
-# licence from BRIA. `isnet-anime` (~176 MB) is the permissively licensed
-# drop-in alternative: one variable change plus `@art requeue`, no code change.
-# An unknown name fails settings import here rather than failing every portrait
-# job at runtime inside rembg's session factory.
-ART_REMBG_MODEL = _env_choice(
-    "ART_REMBG_MODEL",
-    ("bria-rmbg", "isnet-anime", "isnet-general-use", "u2net", "u2netp"),
-    "bria-rmbg",
-)
-
-# When False, the backend verifies the model artifact already exists under
-# ART_REMBG_MODEL_DIR before importing rembg and raises the bounded
+# When False, the backend verifies the sole `bria-rmbg` artifact already exists
+# under ART_REMBG_MODEL_DIR before importing rembg and raises the bounded
 # `art_cutout_unavailable` immediately when absent: the supported air-gapped
-# configuration (pre-seed the volume from a trusted machine, disable runtime
-# downloads — the fetch then becomes structurally impossible).
+# configuration (pre-seed a bare-metal or secret_settings-overridden model
+# directory from a trusted machine — the fetch then becomes structurally
+# impossible). True (the default) keeps acquisition on first use for such a
+# directory when the artifact is missing. The standard image bakes the weight,
+# so it acquires nothing with either value; the switch is not a model choice.
 ART_REMBG_DOWNLOAD_ENABLED = _env_bool("ART_REMBG_DOWNLOAD_ENABLED", True)
 
 # Per-item lease allowance charged when the stage is enabled (design D6): a
@@ -525,8 +523,8 @@ ART_REMBG_ALLOWANCE_SECONDS = _env_int_bounded(
 
 # Cap on the ONNX session's intra/inter-op thread count. 0 leaves ONNX
 # Runtime's own default in place. Non-zero reaches the session through
-# OMP_NUM_THREADS (the only mechanism the locked rembg 2.0.69 offers — its
-# new_session() builds its own SessionOptions); this is a deliberate
+# OMP_NUM_THREADS (the mechanism this backend uses — rembg's new_session()
+# builds its own SessionOptions unless a caller supplies one); this is a deliberate
 # PROCESS-GLOBAL environment setting (see world/art/cutout.py).
 ART_REMBG_THREADS = _env_int_bounded("ART_REMBG_THREADS", 0, low=0, high=256)
 
@@ -538,12 +536,15 @@ ART_REMBG_THREADS = _env_int_bounded("ART_REMBG_THREADS", 0, low=0, high=256)
 # arbitrary code at engine startup (settings-environment-overrides).
 ART_REMBG_BACKEND = "world.art.cutout.RembgCutoutBackend"
 
-# Model cache directory. Deliberately NOT environment-overridable (same
-# rationale as ART_STORE_ROOT): a mistyped value would silently relocate the
-# ~1 GB model artifact off its persistent volume (compose mounts
-# evennia-rembg:/app/server/.rembg; the image's HOME=/tmp tmpfs makes rembg's
-# library default re-download on every container start). secret_settings.py
-# remains the escape hatch for a nonstandard layout.
+# Model directory holding the sole `bria-rmbg` artifact. Deliberately NOT
+# environment-overridable (same rationale as ART_STORE_ROOT): a mistyped value
+# would silently relocate the weight away from the image's baked path or a
+# bare-metal cache. The standard image bakes the weight here at build time and
+# declares no volume for it, so an old rembg volume can never mask it; the
+# image's HOME=/tmp tmpfs means rembg's own library default would re-download on
+# every container start. secret_settings.py remains the escape hatch for a
+# nonstandard layout — a custom mount over this path must supply the default
+# weight itself.
 ART_REMBG_MODEL_DIR = os.path.join(GAME_DIR, "server", ".rembg")
 
 ###############################################################################
@@ -562,7 +563,9 @@ ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
 # machine with scripts/fetch-translate-model.sh, disable runtime downloads —
 # the fetch then becomes structurally impossible). True (the default) lets the
 # backend fetch the Argos Open Tech package on first use into the pinned
-# volume, exactly mirroring ART_REMBG_DOWNLOAD_ENABLED.
+# volume — the same boolean policy as ART_REMBG_DOWNLOAD_ENABLED, whose own
+# weight the standard image already ships, so only a bare-metal or
+# secret_settings-overridden directory ever acquires it.
 ART_TRANSLATE_DOWNLOAD_ENABLED = _env_bool("ART_TRANSLATE_DOWNLOAD_ENABLED", True)
 
 # Cap on the CTranslate2 intra-op thread count. 0 (the default) leaves the

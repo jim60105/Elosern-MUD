@@ -14,9 +14,9 @@ developer guide as the documentation of record.
 `server/conf/settings.py` SHALL derive the initial value of every deployment-tunable setting it
 declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT`
-groups from a same-named environment variable — except `ART_SD_BASE_URL`, which reads
-`SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec — using typed conversion at
-settings import.
+groups from a same-named environment variable, with typed conversion, except `ART_SD_BASE_URL`,
+which reads `SD_WEBUI_BASE_URL` (`internal-art-worker`). No `ART_REMBG_MODEL` setting or
+model-choice validation SHALL exist.
 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
@@ -24,8 +24,8 @@ settings import.
 - **THEN** every `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`, `ELOSERN_VUE_CLIENT`, and
   `MAX_NR_CHARACTERS` setting equals its documented default (including
   `ART_SD_PROBE_TIMEOUT_MS=5000`, `ART_SD_PROBE_CACHE_SECONDS=300`,
-  `ART_REMBG_ENABLED=False`, `ART_REMBG_MODEL="bria-rmbg"`,
-  `ART_REMBG_DOWNLOAD_ENABLED=True`, `ART_REMBG_ALLOWANCE_SECONDS=120`,
+  `ART_REMBG_ENABLED=False`, `ART_REMBG_DOWNLOAD_ENABLED=True`,
+  `ART_REMBG_ALLOWANCE_SECONDS=120`,
   `ART_REMBG_THREADS=0`, `ART_TRANSLATE_ENABLED=False`,
   `ART_TRANSLATE_DOWNLOAD_ENABLED=True`, `ART_TRANSLATE_THREADS=0`,
   `DEFEAT_ADULT_SCENES=True`, `HTTP_USER_AGENT=elosern-mud/1.0`, and `MAX_NR_CHARACTERS=5`), and the server starts
@@ -37,15 +37,15 @@ settings import.
 
 #### Scenario: The removal knobs coerce to their typed values
 - **WHEN** the settings module is imported with `ART_REMBG_ENABLED=on`,
-  `ART_REMBG_MODEL=ISNET-ANIME`, `ART_REMBG_DOWNLOAD_ENABLED=off`,
-  `ART_REMBG_ALLOWANCE_SECONDS=300`, and `ART_REMBG_THREADS=8`
-- **THEN** the effective settings are `True`, the canonical lowercase `"isnet-anime"`,
-  `False`, `300`, and `8`
+  `ART_REMBG_DOWNLOAD_ENABLED=off`, `ART_REMBG_ALLOWANCE_SECONDS=300`, and
+  `ART_REMBG_THREADS=8`
+- **THEN** the effective settings are `True`, `False`, `300`, and `8`
+- **AND** no model choice is part of this typed override surface
 
 #### Scenario: Out-of-range removal knobs fail settings load
 - **WHEN** the settings module is imported with `ART_REMBG_ALLOWANCE_SECONDS=5`, then
   separately with `=2000`, then separately with `ART_REMBG_THREADS=-1`, then separately with
-  `ART_REMBG_MODEL=segment-anything`, then separately with `ART_REMBG_ENABLED=maybe`
+  `ART_REMBG_ENABLED=maybe`
 - **THEN** each import raises the named settings error identifying the variable, quoting the
   raw value, and stating the violated rule, and no value falls back silently
 
@@ -120,7 +120,7 @@ settings import.
 
 #### Scenario: The env-backed set is exactly the documented names
 - **WHEN** the env-backed set is checked against `server/conf/settings.py`
-- **THEN** it is exactly `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, `ART_SD_CFG_SCALE`, `ART_SD_SAMPLER`, `ART_SD_SCHEDULER`, `ART_SD_CHECKPOINT`, `ART_SD_STYLES`, `ART_SD_MODULES`, `ART_SD_SCENE_WIDTH`, `ART_SD_SCENE_HEIGHT`, `ART_SD_PORTRAIT_WIDTH`, `ART_SD_PORTRAIT_HEIGHT`, `ART_SD_MAX_RESPONSE_BYTES`, `ART_SD_MAX_IMAGE_DIMENSIONS`, `ART_SD_MAX_IMAGE_PIXELS`, `ART_SD_PREPIN_SAMPLES_FORMAT`, `ART_SD_OUTPUT_FORMAT`, `ART_SD_OUTPUT_QUALITY`, `ART_SD_SERVER_RETAIN_IMAGES`, `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`, `ART_REMBG_ENABLED`, `ART_REMBG_MODEL`, `ART_REMBG_DOWNLOAD_ENABLED`, `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`, `ART_TRANSLATE_DOWNLOAD_ENABLED`, `ART_TRANSLATE_THREADS`, `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`, `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT` — each from a variable of the same name — plus `ART_SD_BASE_URL` from `SD_WEBUI_BASE_URL`
+- **THEN** it is exactly `ART_SD_TIMEOUT_SECONDS`, `ART_SD_STEPS`, `ART_SD_CFG_SCALE`, `ART_SD_SAMPLER`, `ART_SD_SCHEDULER`, `ART_SD_CHECKPOINT`, `ART_SD_STYLES`, `ART_SD_MODULES`, `ART_SD_SCENE_WIDTH`, `ART_SD_SCENE_HEIGHT`, `ART_SD_PORTRAIT_WIDTH`, `ART_SD_PORTRAIT_HEIGHT`, `ART_SD_MAX_RESPONSE_BYTES`, `ART_SD_MAX_IMAGE_DIMENSIONS`, `ART_SD_MAX_IMAGE_PIXELS`, `ART_SD_PREPIN_SAMPLES_FORMAT`, `ART_SD_OUTPUT_FORMAT`, `ART_SD_OUTPUT_QUALITY`, `ART_SD_SERVER_RETAIN_IMAGES`, `ART_SD_PRESERVE_GENERATION_METADATA`, `ART_SD_PROBE_TIMEOUT_MS`, `ART_SD_PROBE_CACHE_SECONDS`, `ART_REMBG_ENABLED`, `ART_REMBG_DOWNLOAD_ENABLED`, `ART_REMBG_ALLOWANCE_SECONDS`, `ART_REMBG_THREADS`, `ART_TRANSLATE_ENABLED`, `ART_TRANSLATE_DOWNLOAD_ENABLED`, `ART_TRANSLATE_THREADS`, `ART_SCHEDULER_ENABLED`, `ART_SCHEDULER_INTERVAL_SECONDS`, `ART_SCHEDULER_LIMIT`, `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT` — each from a variable of the same name — plus `ART_SD_BASE_URL` from `SD_WEBUI_BASE_URL`
 - **AND** no other setting in these groups SHALL read the environment; `ART_SD_CLIENT`, `ART_REMBG_BACKEND`, `ART_REMBG_MODEL_DIR`, `ART_TRANSLATE_BACKEND`, `ART_TRANSLATE_MODEL_DIR`, the derived `ART_SD_OUTPUT_EXTENSION`, and the auth pair `ART_SD_USERNAME`/`ART_SD_PASSWORD` in particular SHALL NOT (see their own requirements)
 
 #### Scenario: The exact-set statement's provenance is recorded
@@ -146,7 +146,6 @@ settings import.
 #### Scenario: Choice knobs accept only closed-set membership
 - **WHEN** a choice knob is coerced at settings import
 - **THEN** `ART_SD_OUTPUT_FORMAT` requires case-insensitive membership in the closed set `png|webp|jpeg|avif`
-- **AND** `ART_REMBG_MODEL` requires case-insensitive membership in the closed set `bria-rmbg|isnet-anime|isnet-general-use|u2net|u2netp` (default `bria-rmbg`)
 
 #### Scenario: Free-text knobs carry their empty and default semantics
 - **WHEN** a free-text knob is coerced at settings import
@@ -166,6 +165,18 @@ settings import.
 - **WHEN** the test settings bootstrap `server/conf/test_settings.py` runs
 - **THEN** it SHALL remove every env-backed variable name from `os.environ` before importing the production settings, so a test run's effective settings never depend on a developer's or CI runner's inherited shell environment
 - **AND** after the settings import, the test settings SHALL additionally pin `ART_TRANSLATE_DOWNLOAD_ENABLED = False`, so every test run sits on the translation air-gapped track regardless of the knob's code default — a test can never trigger a model download even when the shipped backend resolves against an unseeded directory
+
+#### Scenario: The removed model variable is inert
+- **WHEN** production settings load with the former `ART_REMBG_MODEL` environment name
+  set to a previously accepted model and separately an unknown value
+- **THEN** the project defines no corresponding setting and reads no such environment
+  name, and neither value causes model-choice validation or changes cutout selection
+
+#### Scenario: The test bootstrap and inventory drop the removed name
+- **WHEN** the production environment-reader inventory, test-settings sanitation list,
+  and settings test case tables are inspected
+- **THEN** `ART_REMBG_MODEL` is absent from their supported knob/default/coercion/rejection
+  entries, and the remaining rembg knobs keep their existing types and defaults
 
 ### Requirement: Invalid environment values fail settings load with a named error
 An environment variable that is present but cannot be coerced to its setting's declared type or
@@ -293,7 +304,7 @@ override paths.
 - **WHEN** settings resolve the art-store and model-directory knobs
 - **THEN** `ART_TRANSLATE_MODEL_DIR` SHALL remain code-only under the persistent-volume rule, so a mistyped value cannot silently relocate the translation model artifact off its volume and turn every translation into a bounded unavailable
 - **AND** `ART_STORE_ROOT` SHALL likewise remain code-only so a mistyped value cannot silently relocate generated art off the persistent volume
-- **AND** `ART_REMBG_MODEL_DIR` SHALL remain code-only under the same rule so a mistyped value cannot silently relocate the ~1 GB background-removal model artifact off its persistent volume
+- **AND** `ART_REMBG_MODEL_DIR` SHALL remain code-only so a mistyped environment variable cannot silently relocate the background-removal artifact away from the baked image path or a bare-metal cache; `secret_settings.py` retains the explicit directory override
 
 #### Scenario: Credentials never read the environment except the LLM key
 - **WHEN** settings resolve the auth pair and secret surface
@@ -346,6 +357,24 @@ entry.
 - **WHEN** the developer guide's credential section is inspected
 - **THEN** the guide SHALL state the scoped `LLM_API_KEY` credential exception: its environment-delivery leak vectors (process listings via `/proc/<pid>/environ`, `podman compose config`, `docker inspect`) and its mitigations (compose `env_file:` instead of inline `environment:` entries — keeping the key out of the compose file and the rendered `compose config` output, while noting the key still lands in the container's process environment; or declining the exception and keeping the key in `secret_settings.py`, which keeps it out of the environment entirely)
 - **AND** the guide SHALL keep every other credential under the standing prohibition
+
+#### Scenario: The model-choice configuration and licence escape hatch are removed
+- **WHEN** `.env.example`, the developer settings guide, and the GM prompt settings table
+  are inspected
+- **THEN** none advertises `ART_REMBG_MODEL` as a setting, supported environment variable,
+  or example, and no ISNet replacement/requeue procedure is offered
+- **AND** the remaining rembg knobs retain their documented types and defaults
+
+#### Scenario: Model delivery documentation matches container and bare-metal behavior
+- **WHEN** the rembg operator documentation and settings comments are inspected
+- **THEN** they describe the sole default BRIA RMBG-2.0 weight and applicable publisher
+  and operator licence responsibilities, build-time download and approximately 1.02 GB
+  image payload, offline use of a transferred complete image without a rembg volume,
+  and default-weight pre-seeding for bare-metal or custom model directories
+- **AND** they state that `ART_REMBG_DOWNLOAD_ENABLED` governs missing-artifact runtime
+  acquisition only, and a custom mount that masks the baked path must supply the weight
+- **AND** translation-model acquisition retains its existing independent policy without
+  claiming that rembg still requires a first-use container download
 
 ### Requirement: The output extension is derived, never configured
 

@@ -106,12 +106,12 @@ is a member of the module's closed `CUTOUT_SUBJECT_KINDS` allowlist.
 
 ### Requirement: The background-removal backend is an injectable, CPU-only seam
 
-`world/art/cutout.py` SHALL expose the backend through the settings `ART_REMBG_BACKEND`
-dotted path (default `world.art.cutout.RembgCutoutBackend`), resolved exactly like
-`ART_SD_CLIENT` is resolved by `resolve_sd_client()`, and SHALL expose a module-level
-`remove_background(png_bytes) -> bytes` entry point that returns PNG bytes carrying an
-alpha channel. `remove_background` SHALL validate the backend's return value before
-returning it and SHALL raise `art_cutout_error` on any invalid return.
+`world/art/cutout.py` SHALL expose the backend via the `ART_REMBG_BACKEND` setting (default
+`world.art.cutout.RembgCutoutBackend`), resolved like `resolve_sd_client()`, and a
+module-level `remove_background(png_bytes) -> bytes` returning alpha-carrying PNG bytes.
+`remove_background` SHALL validate that return, raising `art_cutout_error` on an invalid
+one. The real backend SHALL use rembg's default `bria-rmbg`, take no model-selection
+parameter, and reuse one session per process.
 
 #### Scenario: The configured backend is the one that runs
 - **WHEN** `ART_REMBG_BACKEND` names the fake and an enabled portrait job runs
@@ -155,15 +155,16 @@ returning it and SHALL raise `art_cutout_error` on any invalid return.
 
 #### Scenario: One session per configured model, shared behind a module-level lock
 - **WHEN** concurrent or repeated jobs run against the real backend
-- **THEN** at most one inference session is built per configured model per process,
-  cached at module level behind a lock, so the ~3 s session build is reused exactly once
+- **THEN** at most one default-model inference session is built per process, cached at
+  module level behind a lock and shared by every real-backend instance
+- **AND** inference calls do not hold the session-construction lock
 
 #### Scenario: FakeCutoutBackend is deterministic and dependency-free
 - **WHEN** `world/art/fake_cutout.py`'s `FakeCutoutBackend` is used
 - **THEN** it exposes the same interface, records every call, replays scripted failures,
-  and returns a real PNG whose alpha channel is zeroed over a fixed region — never a
-  passthrough of its input — without importing `rembg`, reading a model file, or opening
-  a socket
+  and returns a real PNG whose alpha channel is zeroed over a fixed region without
+  importing `rembg`, reading a model file, or opening a socket
+- **AND** it never returns its input unchanged
 - **AND** tests and the browser harness inject the fake through `ART_REMBG_BACKEND`, so
   no unit, integration, or browser test ever loads an ONNX model or reaches the network
 
@@ -194,6 +195,12 @@ returning it and SHALL raise `art_cutout_error` on any invalid return.
 - **WHEN** `ART_REMBG_THREADS` is non-zero
 - **THEN** it is applied as the session's ONNX intra-op thread count; zero leaves ONNX
   Runtime's own default in place
+
+#### Scenario: The default model is selected without a model argument
+- **WHEN** the real backend constructs its session with the session factory patched
+- **THEN** no positional model name or model-name keyword is supplied, the CPU execution
+  provider remains the sole requested provider, and the locked library default is `bria-rmbg`
+- **AND** no `ART_REMBG_MODEL` setting or override is consulted
 
 ### Requirement: A background-removal failure is a bounded, terminal, non-degrading job failure
 
@@ -267,68 +274,81 @@ stage never retries and the engine never stores a degraded artifact.
   indistinguishable from a stored cutout — and the failure is made visible and retryable
   through the existing `@art retry` path instead
 
-### Requirement: The model artifact is cached in a code-only persistent directory under an explicit download policy
+### Requirement: The default removal model has a code-only home and an explicit runtime download policy
 
-`ART_REMBG_MODEL_DIR` SHALL default to `<GAME_DIR>/server/.rembg` and SHALL NOT read any
-environment variable; `secret_settings.py` remains its only override path. The backend
-SHALL create the directory when absent and SHALL point `rembg`'s model home at it.
-`ART_REMBG_MODEL` SHALL be a closed, case-insensitive choice set containing exactly
-`bria-rmbg`, `isnet-anime`, `isnet-general-use`, `u2net`, and `u2netp`, defaulting to
-`bria-rmbg`. `ART_REMBG_DOWNLOAD_ENABLED` SHALL default to true.
+`ART_REMBG_MODEL_DIR` SHALL default to `<GAME_DIR>/server/.rembg` without an environment
+reader; `secret_settings.py` remains its only override path. The backend SHALL use this
+home for the sole `bria-rmbg` artifact. `ART_REMBG_DOWNLOAD_ENABLED` SHALL default to true
+and govern missing-artifact runtime acquisition only. The standard image SHALL supply
+the artifact before runtime and SHALL require no model download with either switch value.
 
 #### Scenario: The model home follows the setting, not the home directory
-- **WHEN** the real backend prepares a session with the `rembg` session factory patched
+- **WHEN** the real backend prepares a session with the rembg session factory patched
 - **THEN** the model-home environment variables it sets equal `ART_REMBG_MODEL_DIR`, that
   directory exists, and no path under `$HOME` was used
 
-#### Scenario: A model name outside the closed set fails the boot
-- **WHEN** the settings module is imported with `ART_REMBG_MODEL=segment-anything`
-- **THEN** the import raises `ImproperlyConfigured` naming `ART_REMBG_MODEL`, quoting the
-  value, and listing the accepted set, and no value falls back silently
+#### Scenario: The former model variable has no effect
+- **WHEN** settings are imported with `ART_REMBG_MODEL=ISNET-ANIME`, then separately
+  `ART_REMBG_MODEL=segment-anything`, then separately without that variable
+- **THEN** each import succeeds without a model-choice validation error, the project
+  defines no `ART_REMBG_MODEL` setting, and the real backend still uses `bria-rmbg`
 
 #### Scenario: An environment model-directory variable is ignored
-- **WHEN** the settings module is imported with `ART_REMBG_MODEL_DIR` set in the
-  environment
+- **WHEN** the settings module is imported with `ART_REMBG_MODEL_DIR` set in the environment
 - **THEN** the effective value remains the `server/.rembg` path under `GAME_DIR` and no
   environment read for that name occurs
 
-#### Scenario: Downloads disabled with no cached model fails fast
-- **WHEN** `ART_REMBG_DOWNLOAD_ENABLED` is false, no model artifact exists under
+#### Scenario: Downloads disabled with no default artifact fails fast
+- **WHEN** `ART_REMBG_DOWNLOAD_ENABLED` is false, no default-model artifact exists under
   `ART_REMBG_MODEL_DIR`, and a portrait job runs with the real backend
-- **THEN** the job settles `failed` with `art_cutout_unavailable`, no `rembg` import was
+- **THEN** the job settles `failed` with `art_cutout_unavailable`, no rembg import was
   performed, and no network access was attempted
 
-#### Scenario: The code-only rationale matches ART_STORE_ROOT
+#### Scenario: Unrelated model artifacts cannot satisfy readiness
+- **WHEN** downloads are disabled and the model home contains only isnet or u2net weights
+- **THEN** the default model is unavailable and the backend fails before importing rembg
+  or attempting network access
+
+#### Scenario: The code-only model directory cannot silently relocate the weight
 - **WHEN** `ART_REMBG_MODEL_DIR` resolves its effective value
-- **THEN** no environment variable is read — a mistyped value would silently relocate a
-  ~1 GB artifact off the persistent volume, the same rationale that keeps
-  `ART_STORE_ROOT` code-only
+- **THEN** no environment variable is read, so a mistyped variable cannot silently
+  relocate the default weight away from the baked image path or a bare-metal cache
 
 #### Scenario: The backend redirects rembg's model home off tmpfs HOME
-- **WHEN** the backend prepares `rembg`
-- **THEN** it sets the model-home environment variables `rembg` reads before the lazy
-  `rembg` import, so the default `~/.rembg/models` location — which the container image
-  maps onto a `tmpfs` `HOME` — is never used
+- **WHEN** the backend prepares rembg
+- **THEN** it sets the model-home variables before the lazy import, so the library's
+  default location under `$HOME` is never used
 
-#### Scenario: An out-of-set model fails boot, not every portrait job
-- **WHEN** `ART_REMBG_MODEL` is set outside the closed set
-- **THEN** settings import fails with the named error rather than every portrait job
-  failing at runtime
-
-#### Scenario: The model swap is licensing-driven and documented
-- **WHEN** operators need to replace the BRIA-licensed `bria-rmbg` weight with a
-  permissively licensed alternative
-- **THEN** one environment variable and a requeue suffice, with no code change
-- **AND** the settings comment and the operator documentation state that commercial use
-  of `bria-rmbg` requires a licence from BRIA
+#### Scenario: The sole model's licensing responsibility is documented
+- **WHEN** the settings comments, `.env.example`, and operator documentation are inspected
+- **THEN** they identify `bria-rmbg` as BRIA RMBG-2.0, state its BRIA licensing and
+  non-commercial free/commercial-licence distinction, and assign applicable use and
+  redistribution licence compliance to the image publisher and operator
+- **AND** they advertise no model-selection knob or permissively licensed replacement path
 
 #### Scenario: Downloads disabled verifies the cache before the session
 - **WHEN** `ART_REMBG_DOWNLOAD_ENABLED` is false
-- **THEN** the backend verifies the configured model's artifact is already present under
-  `ART_REMBG_MODEL_DIR` before building a session and raises `art_cutout_unavailable`
-  immediately when it is absent — performing no `rembg` import, no network access, and no
-  unbounded wait — so an air-gapped or pre-seeded deployment gets a fast bounded failure
-  instead of a download attempt
+- **THEN** the backend verifies the default-model artifact under `ART_REMBG_MODEL_DIR`
+  before building a session and raises `art_cutout_unavailable` immediately when absent,
+  performing no rembg import, network access, or unbounded wait
+
+#### Scenario: A pre-seeded default artifact permits offline bare-metal use
+- **WHEN** downloads are disabled and `bria-rmbg.onnx` is present in the model home's
+  `models/bria-rmbg/` directory or rembg's supported flat layout
+- **THEN** the real backend proceeds to construct the default CPU session without a fetch
+- **AND** an unloadable artifact still surfaces the bounded `art_cutout_unavailable` code
+
+#### Scenario: Enabled downloads retain non-container acquisition
+- **WHEN** downloads are enabled on a bare-metal or explicitly overridden writable home
+  without the default artifact
+- **THEN** the existing rembg acquisition path downloads the default artifact into
+  that home, and acquisition failures remain `art_cutout_unavailable`
+
+#### Scenario: The standard image needs no runtime acquisition
+- **WHEN** the standard image runs its first enabled portrait cutout with runtime model
+  network access unavailable, with downloads disabled and separately enabled
+- **THEN** the backend reads the baked default weight and performs no model download
+- **AND** no startup copy or rembg volume initialization is required
 
 ### Requirement: An output format that cannot carry alpha is refused at boot
 
@@ -375,12 +395,12 @@ derived `ART_SD_OUTPUT_EXTENSION`, so every override path is covered by the one 
 
 ### Requirement: The background-removal stage emits boundary events
 
-`world/art/worker.py` SHALL emit exactly one `world.observability` facade event per
-applied cutout attempt: `art_cutout_done` at info level on success and
-`art_cutout_failed` at warn level carrying the exception with `exc=` on failure. No
-event SHALL be emitted for a subject the stage skipped. Production modules SHALL use
-named facade imports so tests patch the caller module's binding, and
-`tools/observability_freeze.json` SHALL gain no entry.
+`world/art/worker.py` SHALL emit exactly one `world.observability` facade event per applied
+cutout attempt: `art_cutout_done` at info level on success and `art_cutout_failed` at warn
+level carrying the exception with `exc=`. No event SHALL be emitted for a skipped subject.
+Production modules SHALL use named facade imports so tests patch the caller module's
+binding, and `tools/observability_freeze.json` SHALL gain no entry. The `model` context value
+SHALL be the fixed `bria-rmbg` identity.
 
 #### Scenario: A successful cutout leaves one info event
 - **WHEN** an enabled portrait job's cutout succeeds
@@ -402,7 +422,7 @@ named facade imports so tests patch the caller module's binding, and
 - **WHEN** either boundary event is emitted
 - **THEN** its context dict carries the `job` key, the full `subject`, the `image_id`
   (the gallery image id for a gallery job, empty for a classic record), and the
-  configured `model`
+  fixed `model` value `bria-rmbg`
 - **AND** `art_cutout_done` additionally carries the elapsed duration and
   `art_cutout_failed` additionally carries the bounded `code`
 

@@ -38,8 +38,13 @@ server/conf/secret_settings.py
 
 # The translation model cache is an operator-seeded named volume at runtime
 # (art-prompt-translation): a locally seeded directory is never baked into the
-# image, matching how .rembg's runtime-fetched cache is excluded.
+# image, matching how the removal weight's directory is excluded.
 server/.translate/
+
+# The background-removal model directory: the image acquires the sole
+# `bria-rmbg` weight during its own build, so a locally seeded bare-metal
+# directory (any model, any layout) never enters the build context.
+server/.rembg/
 
 # The seed-art folder is bind-mounted read-only at runtime (gallery-seed-sync);
 # bulk seed images are never baked into the image.

@@ -6,10 +6,9 @@
 `server/conf/settings.py` SHALL derive the initial value of every deployment-tunable setting it
 declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT`
-groups from a same-named environment variable; except `ART_SD_BASE_URL`, which reads
-`SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec; using typed conversion at
-settings import. `ART_REMBG_MODEL` SHALL be removed from the settings and environment
-inventory, with no replacement model-selection parameter or choice validation.
+groups from a same-named environment variable, with typed conversion, except `ART_SD_BASE_URL`,
+which reads `SD_WEBUI_BASE_URL` (`internal-art-worker`). No `ART_REMBG_MODEL` setting or
+model-choice validation SHALL exist.
 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
@@ -174,7 +173,7 @@ inventory, with no replacement model-selection parameter or choice validation.
 `ART_SD_CLIENT` SHALL NOT read any environment variable: it is an import-executing dotted path,
 and an environment-controlled seam would let any inherited process environment import arbitrary
 code at engine startup. `ART_REMBG_BACKEND` and `ART_TRANSLATE_BACKEND` SHALL likewise never
-read the environment; the rule is a class rule about import-executing dotted paths, not a list
+read the environment — the rule is a class rule about import-executing dotted paths, not a list
 that stops at two. All of these settings SHALL keep their settings/`secret_settings.py`
 override paths.
 

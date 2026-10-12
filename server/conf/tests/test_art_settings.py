@@ -75,10 +75,15 @@ class ArtSettingsTests(unittest.TestCase):
         # the test defaults are exactly the documented code defaults, so no
         # test ever loads the optional rembg stack by accident.
         self.assertIs(settings.ART_REMBG_ENABLED, False)
-        self.assertEqual(settings.ART_REMBG_MODEL, "bria-rmbg")
         self.assertIs(settings.ART_REMBG_DOWNLOAD_ENABLED, True)
         self.assertEqual(settings.ART_REMBG_ALLOWANCE_SECONDS, 120)
         self.assertEqual(settings.ART_REMBG_THREADS, 0)
+
+    def test_the_retired_model_choice_setting_is_gone(self):
+        # arm of rembg-default-baked-model: the sole removal model is the locked
+        # rembg default (`bria-rmbg`), so the closed choice set, its environment
+        # reader, and its validation no longer exist as a setting.
+        self.assertFalse(hasattr(settings, "ART_REMBG_MODEL"))
 
     def test_background_removal_seam_and_model_dir_are_code_only(self):
         self.assertEqual(
@@ -130,6 +135,31 @@ class ArtSettingsTests(unittest.TestCase):
             settings.ART_OFFICIAL_ROOT,
             os.path.join(settings.GAME_DIR, "art-official"),
         )
+
+
+class RemovedModelVariableTests(_SubprocessSettingsTests):
+    """The retired ``ART_REMBG_MODEL`` environment name (rembg-default-baked-model).
+
+    Proved in a bare subprocess, like every other import-time settings
+    behaviour: a formerly accepted value and a formerly rejected one must both
+    import cleanly, and the settings module must define no such setting — so a
+    stale export in an operator's shell or CI runner is inert rather than a
+    model-choice validation error.
+    """
+
+    @covers_requirement(
+        "settings-environment-overrides::deployment-settings-accept-typed-environment-overrides"
+    )
+    def test_a_formerly_valid_and_a_formerly_rejected_value_are_both_inert(self):
+        code = (
+            "import server.conf.settings as s\n"
+            "print('ABSENT', not hasattr(s, 'ART_REMBG_MODEL'))\n"
+        )
+        for raw in ("ISNET-ANIME", "segment-anything"):
+            with self.subTest(ART_REMBG_MODEL=raw):
+                result = self._run(code, ART_REMBG_MODEL=raw)
+                self.assertEqual(result.returncode, 0, msg=result.stderr)
+                self.assertIn("ABSENT True", result.stdout)
 
 
 class ArtOfficialRootOverrideTests(_SubprocessSettingsTests):

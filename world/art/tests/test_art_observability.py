@@ -362,6 +362,41 @@ class CutoutEventTests(EvenniaTest):
 
     @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
     @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
+    def test_a_successful_gallery_cutout_emits_one_stage_event(self):
+        from world.art.queue import enqueue_gallery_job
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, "42")
+        image_id = "bbbbbbbb-2222-4222-8222-222222222222"
+        job = enqueue_gallery_job(
+            subject,
+            "desc",
+            image_id=image_id,
+            binding=None,
+            face_rect=None,
+            requested_fields=[],
+        )
+        with self._cutout(FakeCutoutBackend()):
+            with self._client(self._opaque_client()):
+                with patch("world.art.worker.log_info") as info:
+                    drain_synchronous(10)
+        done = _events(info, "art_cutout_done")
+        self.assertEqual(len(done), 1)
+        context = done[0].kwargs["context"]
+        # The gallery path carries the same fixed model identity and the
+        # REQUESTED image id (the spent job record is deleted by the settle).
+        self.assertEqual(context["job"], str(job.db_key))
+        self.assertEqual(context["subject"], subject.full())
+        self.assertEqual(context["image_id"], image_id)
+        self.assertEqual(context["model"], "bria-rmbg")
+        self.assertIsInstance(context["duration_ms"], int)
+        gallery_settles = _events(info, "gallery_settle")
+        self.assertEqual(
+            gallery_settles[0].kwargs["context"]["status"], ArtAssetStatus.DONE
+        )
+        self.assertEqual(_events(info, "art_cutout_failed"), [])
+
+    @covers_requirement("art-queue-worker::worker-claim-and-settle-emit-boundary-events")
+    @covers_requirement("art-portrait-cutout::the-background-removal-stage-emits-boundary-events")
     def test_a_failing_gallery_cutout_emits_the_gallery_terminal_event(self):
         from world.art.cutout import CutoutError
         from world.art.queue import enqueue_gallery_job
@@ -388,6 +423,7 @@ class CutoutEventTests(EvenniaTest):
         # The spent job record is deleted by the settle, so the event context
         # is compared against the REQUESTED image id captured before the drain.
         self.assertEqual(failed[0].kwargs["context"]["image_id"], image_id)
+        self.assertEqual(failed[0].kwargs["context"]["model"], "bria-rmbg")
         self.assertEqual(failed[0].kwargs["context"]["code"], "art_cutout_error")
         gallery_settles = _events(info, "gallery_settle")
         self.assertEqual(len(gallery_settles), 1)

@@ -3,7 +3,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: Multi-stage Containerfile
-The project SHALL provide a Podman-focused multi-stage `Containerfile` with a downloader stage that verifies the init binary, a builder stage, an application-layout stage that prepares the runtime tree and permissions, and a final stage that carries only the resulting virtual environment, init binary, application code, and the build-acquired default background-removal model. Model acquisition SHALL occur after locked dependency installation and before application-source copying, so application-only rebuilds can reuse the model layer.
+The project SHALL provide a Podman-focused multi-stage `Containerfile` with a
+downloader stage that verifies the init binary, a builder stage, an
+application-layout stage that prepares the runtime tree and permissions, and a
+final stage carrying only the resulting virtual environment, init binary,
+application code, and the build-acquired default removal model. Model acquisition
+SHALL follow locked dependency installation and precede application-source copying.
 
 #### Scenario: Builder artifacts do not reach the runtime image
 - **WHEN** the image is built with `podman build` from the `Containerfile`

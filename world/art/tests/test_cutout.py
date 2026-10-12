@@ -14,12 +14,15 @@ archive sync published — the follow-up that tasks 6.11 deferred.
 
 from __future__ import annotations
 
+import ast
 import builtins
 import importlib
 import io
 import os
 import sys
 import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -292,16 +295,15 @@ class _RembgBackendCase(unittest.TestCase):
         }
         for name in ("U2NET_HOME", "REMBG_HOME", "OMP_NUM_THREADS"):
             os.environ.pop(name, None)
-        # The session cache is keyed by model only — valid under restart-bound
-        # production settings; tests must clear it so overrides never reuse a
-        # session built for a previous configuration.
-        self._cache_snapshot = dict(cutout._sessions)
-        cutout._sessions.clear()
+        # There is exactly ONE session slot per process — valid under
+        # restart-bound production settings; tests must clear it so overrides
+        # never reuse a session built for a previous configuration.
+        self._session_snapshot = cutout._session
+        cutout._session = None
         self.addCleanup(self._restore)
 
     def _restore(self):
-        cutout._sessions.clear()
-        cutout._sessions.update(self._cache_snapshot)
+        cutout._session = self._session_snapshot
         for name, value in self._env_snapshot.items():
             if value is None:
                 os.environ.pop(name, None)
@@ -323,8 +325,8 @@ class RembgSessionTests(_RembgBackendCase):
     def _patched_new_session(self, sessions):
         recorded = {}
 
-        def _factory(model_name, *args, **kwargs):
-            recorded.setdefault("calls", []).append((model_name, args, kwargs))
+        def _factory(*args, **kwargs):
+            recorded.setdefault("calls", []).append((args, kwargs))
             session = object()
             sessions.append(session)
             return session
@@ -334,24 +336,97 @@ class RembgSessionTests(_RembgBackendCase):
     @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
     def test_only_the_cpu_provider_is_requested_and_the_session_is_built_once(self):
         sessions: list = []
+        lock_held_during_inference: list = []
         factory, recorded = self._patched_new_session(sessions)
+
+        def _remove(data, session):
+            # Inference must never run inside the construction lock (design D7).
+            lock_held_during_inference.append(cutout._session_lock.locked())
+            return b"\x89PNGout"
+
         with mock.patch("rembg.new_session", side_effect=factory):
             backend = self._backend()
-            with mock.patch("rembg.remove", side_effect=lambda data, session: b"\x89PNGout"):
+            with mock.patch("rembg.remove", side_effect=_remove):
                 first = backend.remove_background(b"a")
                 second = backend.remove_background(b"b")
                 third = backend.remove_background(b"c")
         self.assertEqual(first, b"\x89PNGout")
         self.assertEqual(second, first)
         self.assertEqual(third, first)
-        self.assertEqual(len(recorded["calls"]), 1, "one session per model")
-        self.assertEqual(recorded["calls"][0][0], "bria-rmbg")
-        self.assertEqual(
-            recorded["calls"][0][2].get("providers"), ["CPUExecutionProvider"]
-        )
-        self.assertIs(sessions[0], cutout._sessions["bria-rmbg"])
+        self.assertEqual(len(recorded["calls"]), 1, "one session per process")
+        args, kwargs = recorded["calls"][0]
+        # The default model is the LOCKED library default: no positional model
+        # name and no model_name keyword, so no ART_REMBG_MODEL can reach it.
+        self.assertEqual(args, ())
+        self.assertNotIn("model_name", kwargs)
+        self.assertEqual(kwargs.get("providers"), ["CPUExecutionProvider"])
+        self.assertIs(sessions[0], cutout._session)
+        self.assertEqual(lock_held_during_inference, [False, False, False])
 
-    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
+    def test_the_locked_package_default_is_the_sole_model(self):
+        # A LIGHTWEIGHT contract on the locked dependency, read as SOURCE (the
+        # module is never imported here: importing rembg pulls in onnxruntime).
+        # The backend passes no model name, so the factory's own default is the
+        # model that runs; a lock bump changing it fails here and demands a
+        # deliberate revision of this contract.
+        spec = importlib.util.find_spec("rembg")
+        self.assertIsNotNone(spec, "the optional rembg stack must be installed")
+        factory_source = (
+            Path(spec.origin).parent / "session_factory.py"
+        ).read_text(encoding="utf-8")
+        default = None
+        for node in ast.walk(ast.parse(factory_source)):
+            if isinstance(node, ast.FunctionDef) and node.name == "new_session":
+                for argument, default_node in zip(
+                    node.args.args[-len(node.args.defaults):],
+                    node.args.defaults,
+                ):
+                    if argument.arg == "model_name":
+                        default = default_node.value
+        self.assertEqual(default, "bria-rmbg")
+        self.assertEqual(cutout.REMBG_MODEL_NAME, default)
+
+    @covers_requirement("art-portrait-cutout::the-background-removal-backend-is-an-injectable-cpu-only-seam")
+    def test_concurrent_first_calls_build_exactly_one_session(self):
+        sessions: list = []
+        factory_calls: list = []
+        barrier = threading.Barrier(8)
+
+        def _factory(*args, **kwargs):
+            factory_calls.append((args, kwargs))
+            # Hold the construction lock long enough for the other threads to
+            # pile up behind it: the check-lock-re-check must still build once.
+            time.sleep(0.05)
+            session = object()
+            sessions.append(session)
+            return session
+
+        backend = self._backend()
+        results: list = []
+        errors: list = []
+
+        def _claim():
+            barrier.wait()
+            try:
+                results.append(backend._session())
+            except BaseException as error:  # noqa: BLE001 - recorded, then asserted
+                errors.append(error)
+
+        with mock.patch("rembg.new_session", side_effect=_factory):
+            workers = [threading.Thread(target=_claim) for _ in range(8)]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join(timeout=10)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(len(factory_calls), 1, factory_calls)
+        self.assertEqual(len(sessions), 1)
+        self.assertEqual(len(results), 8)
+        self.assertTrue(all(result is sessions[0] for result in results))
+
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
     def test_a_non_zero_thread_cap_reaches_omp_num_threads(self):
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
@@ -372,7 +447,7 @@ class RembgSessionTests(_RembgBackendCase):
             backend._session()
         self.assertIsNone(os.environ.get("OMP_NUM_THREADS"))
 
-    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
     def test_downloads_disabled_without_an_artifact_fails_before_importing_rembg(self):
         backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
         with mock.patch.dict(sys.modules, {"rembg": None}):
@@ -380,27 +455,61 @@ class RembgSessionTests(_RembgBackendCase):
                 backend._session()
         self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
-    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
-    def test_downloads_disabled_with_a_preseeded_artifact_builds_the_session(self):
-        (self.model_dir / "models" / "isnet-anime").mkdir(parents=True)
-        (self.model_dir / "models" / "isnet-anime" / "isnet-anime.onnx").write_bytes(b"model")
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
+    def test_downloads_disabled_with_the_canonical_default_artifact_builds_the_session(self):
+        # The canonical nested layout 2.0.84 writes, pre-seeded by an operator.
+        canonical = self.model_dir / "models" / "bria-rmbg"
+        canonical.mkdir(parents=True)
+        (canonical / "bria-rmbg.onnx").write_bytes(b"model")
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
         with mock.patch("rembg.new_session", side_effect=factory):
-            backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False, ART_REMBG_MODEL="isnet-anime")
+            backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
             backend._session()
-        self.assertEqual(recorded["calls"][0][0], "isnet-anime")
+        self.assertEqual(len(recorded["calls"]), 1)
+        self.assertEqual(recorded["calls"][0][0], ())
+        self.assertNotIn("model_name", recorded["calls"][0][1])
 
-    @covers_requirement("art-portrait-cutout::the-model-artifact-is-cached-in-a-code-only-persistent-directory-under-an-explicit-download-policy")
-    def test_downloads_disabled_accepts_the_flat_legacy_layout(self):
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
+    def test_downloads_disabled_accepts_the_flat_supported_layout(self):
+        # The upstream-supported flat layout of older releases.
         self.model_dir.mkdir(parents=True, exist_ok=True)
-        (self.model_dir / "u2net.onnx").write_bytes(b"model")
+        (self.model_dir / "bria-rmbg.onnx").write_bytes(b"model")
         sessions: list = []
         factory, recorded = self._patched_new_session(sessions)
         with mock.patch("rembg.new_session", side_effect=factory):
-            backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False, ART_REMBG_MODEL="u2net")
+            backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
             backend._session()
-        self.assertEqual(recorded["calls"][0][0], "u2net")
+        self.assertEqual(len(recorded["calls"]), 1)
+
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
+    def test_downloads_disabled_rejects_a_home_holding_only_another_model(self):
+        # Only another model's artifact is present: readiness for the default
+        # model is unmet, and the failure is bounded BEFORE the optional import.
+        other = self.model_dir / "models" / "isnet-anime"
+        other.mkdir(parents=True)
+        (other / "isnet-anime.onnx").write_bytes(b"model")
+        backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
+        with mock.patch.dict(sys.modules, {"rembg": None}):
+            with self.assertRaises(CutoutError) as caught:
+                backend._session()
+        self.assertEqual(caught.exception.code, "art_cutout_unavailable")
+        self.assertIn("bria-rmbg", str(caught.exception))
+
+    @covers_requirement("art-portrait-cutout::the-default-removal-model-has-a-code-only-home-and-an-explicit-runtime-download-policy")
+    def test_an_unloadable_default_artifact_is_bounded(self):
+        # A present-but-unusable default weight still surfaces the bounded
+        # unavailable code rather than escaping as an ONNX error.
+        canonical = self.model_dir / "models" / "bria-rmbg"
+        canonical.mkdir(parents=True)
+        (canonical / "bria-rmbg.onnx").write_bytes(b"not an onnx graph")
+        with mock.patch(
+            "rembg.new_session", side_effect=ValueError("unloadable artifact")
+        ):
+            backend = self._backend(ART_REMBG_DOWNLOAD_ENABLED=False)
+            with self.assertRaises(CutoutError) as caught:
+                backend._session()
+        self.assertEqual(caught.exception.code, "art_cutout_unavailable")
 
     @covers_requirement("art-portrait-cutout::a-background-removal-failure-is-a-bounded-terminal-non-degrading-job-failure")
     def test_a_failing_session_factory_is_art_cutout_unavailable(self):

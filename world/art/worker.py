@@ -30,7 +30,12 @@ from django.conf import settings
 from twisted.internet import threads
 
 from world.art import gallery_kinds
-from world.art.cutout import CutoutError, applies_to, remove_background
+from world.art.cutout import (
+    REMBG_MODEL_NAME,
+    CutoutError,
+    applies_to,
+    remove_background,
+)
 from world.art.formats import encode
 from world.art.paths import resolved_under_store_root
 from world.art.queue import (
@@ -230,7 +235,7 @@ def _settle_one(
                     "job": job_key,
                     "subject": subject.full(),
                     "image_id": image_id,
-                    "model": str(settings.ART_REMBG_MODEL),
+                    "model": REMBG_MODEL_NAME,
                     "code": error.code,
                 },
                 exc=error,
@@ -242,7 +247,7 @@ def _settle_one(
                 "job": job_key,
                 "subject": subject.full(),
                 "image_id": image_id,
-                "model": str(settings.ART_REMBG_MODEL),
+                "model": REMBG_MODEL_NAME,
                 "duration_ms": int((time.monotonic() - started) * 1000),
             },
         )

@@ -47,6 +47,19 @@ COPY --chown=root:0 pyproject.toml uv.lock ./
 RUN --mount=type=cache,id=uv-$TARGETARCH$TARGETVARIANT,sharing=locked,target=/root/.cache/uv \
     uv sync --locked --no-dev --no-install-project
 
+# The sole background-removal weight — the locked rembg default `bria-rmbg`
+# (BRIA RMBG-2.0) — is acquired HERE, in the reusable locked-dependency layer:
+# the runtime container must never fetch a model, and no volume may hide it.
+# The fetch runs BEFORE any application source is copied, so a code-only rebuild
+# reuses this layer. Upstream checksum verification stays enabled (no
+# MODEL_CHECKSUM_DISABLED, no error suppression) and both model-home variables
+# point at a plain stage output directory; a failed download, a checksum
+# mismatch, or an absent/empty artifact fails the build. No inference session is
+# constructed and no model-selection argument exists.
+RUN U2NET_HOME=/rembg REMBG_HOME=/rembg \
+    /venv/bin/python -c "from rembg.sessions.bria_rmbg import BriaRmBgSession; BriaRmBgSession.download_models()" && \
+    test -s /rembg/models/bria-rmbg/bria-rmbg.onnx
+
 ########################################
 # Vue dist build stage (webclient-vue-01-foundation)
 ########################################
@@ -100,6 +113,12 @@ COPY --chown=root:0 --from=vue-dist /build/web/static/gm/dist/ /app/web/static/g
 # The project version source: the GM session API reads [project].version
 # from the game root (gm-portal-s1-foundation).
 COPY --chown=root:0 pyproject.toml /app/pyproject.toml
+# The build-acquired default removal weight. It lands as ordinary image-stage
+# content (never a cache mount) and is normalized to root:0 / 0755 / 0644 by the
+# RUN below, so the default non-root user and an arbitrary UID with GID 0 can
+# READ it. No VOLUME is declared for this path and compose mounts nothing over
+# it, so an old rembg named volume can neither mask nor migrate the weight.
+COPY --chown=root:0 --from=builder /rembg/ /app/server/.rembg/
 
 RUN find /app -type d -exec chmod 0755 {} + && \
     find /app -type f -exec chmod 0644 {} + && \
@@ -109,7 +128,6 @@ RUN find /app -type d -exec chmod 0755 {} + && \
     install -d -m 775 -o root -g 0 /app/server/.static && \
     install -d -m 775 -o root -g 0 /app/server/.media && \
     install -d -m 775 -o root -g 0 /app/server/.art && \
-    install -d -m 775 -o root -g 0 /app/server/.rembg && \
     install -d -m 775 -o root -g 0 /app/server/.translate && \
     chmod 1775 /app/server
 
@@ -134,7 +152,7 @@ ENV PATH="/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /app
-VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/server/.art", "/app/server/.rembg", "/app/server/.translate"]
+VOLUME ["/app/server/db", "/app/server/logs", "/app/server/.static", "/app/server/.media", "/app/server/.art", "/app/server/.translate"]
 EXPOSE 4000 4001 4002
 USER $UID
 STOPSIGNAL SIGINT
