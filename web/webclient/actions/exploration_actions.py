@@ -634,6 +634,15 @@ def _talk_freeform_adapter(actor: Any, payload: dict[str, Any], session: Any = N
 
     def _on_failure(failure: Any) -> dict[str, Any]:
         failure.trap(Exception)
+        # The seam's exception is presented as the generic refusal, but it is
+        # an operational failure (a locked database, a broken writer): it must
+        # leave a named facade event with the chain, like every other
+        # dialogue_failed producer in this module.
+        log_error(
+            "freeform_dialogue_failed",
+            context={"char": actor.pk, "npc": npc.pk},
+            exc=failure.value,
+        )
         return _rejected("dialogue_failed", "交談失敗，請稍後再試。")
 
     deferred.addCallbacks(_on_success, _on_failure)
