@@ -583,6 +583,40 @@ class RequirementsContractTests(DreamDispatchTestCase):
         self.assertEqual(first, requirement_version_for(draft.draft_id, 1))
         self.assertNotEqual(first, requirement_version_for(draft.draft_id, 2))
 
+    def test_the_store_refuses_malformed_rows_and_stores_normalized_ones(self):
+        # The store is the one writer of a shown requirement set, and every
+        # client renders and echoes those rows back: a malformed row must never
+        # be persisted, because no valid panel payload could carry it.
+        from world.narrative.models import AuthoringDraft
+
+        for rows in (
+            [{"kind": "explode", "text": "南門"}],
+            [{"kind": "place", "text": "南門", "extra": "x"}],
+            [{"kind": "place", "text": "長" * 201}],
+            [{"kind": "place"}],
+            [{"kind": "place", "text": "南門"}] * 9,
+        ):
+            with self.subTest(rows=rows):
+                with self.assertRaises(DirectionValidationError) as failure:
+                    save_draft(
+                        owner_id=self.owner_id,
+                        direction=new_story_direction(requirements=rows),
+                        tick=100,
+                    )
+                self.assertIn("malformed_requirements", failure.exception.reason_codes)
+        self.assertEqual(AuthoringDraft.objects.count(), 0)
+
+        draft = save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(
+                requirements=[{"kind": "place", "text": "  南門  "}]
+            ),
+            tick=100,
+        )
+        self.assertEqual(
+            draft.direction["requirements"], [{"kind": "place", "text": "南門"}]
+        )
+
 
 class ShownRequirementTests(DreamDispatchTestCase):
     """Only what the surface actually showed can be frozen at confirmation."""
@@ -704,32 +738,41 @@ class ShownRequirementTests(DreamDispatchTestCase):
         draft = stamp_shown_requirements(self._requirement_draft())
         rows = draft.direction["requirements"]
         identity = draft.direction["requirement_version"]
+        shown_summary = draft.direction["summary"]
         self.assertTrue(
             reviewed_version_matches(
-                {"requirements": rows, "requirement_version": identity}, draft=draft
-            )
-        )
-        # A different identity, different rows, or a submission that reviewed
-        # nothing all refuse; so does requirements the server never showed.
-        self.assertFalse(
-            reviewed_version_matches(
-                {"requirements": rows, "requirement_version": "other:v9"}, draft=draft
-            )
-        )
-        self.assertFalse(
-            reviewed_version_matches(
                 {
-                    "requirements": [{"kind": "place", "text": "北門"}],
+                    "summary": shown_summary,
+                    "requirements": rows,
                     "requirement_version": identity,
                 },
                 draft=draft,
             )
         )
-        self.assertFalse(
-            reviewed_version_matches(
-                {"kind": "new_story", "summary": "改了摘要"}, draft=draft
-            )
-        )
+        # A different identity, different rows, a different direction (the
+        # review is bound to the version that was shown, summary included), or a
+        # submission that reviewed nothing all refuse; so does requirements the
+        # server never showed.
+        for rejected in (
+            {
+                "summary": shown_summary,
+                "requirements": rows,
+                "requirement_version": "other:v9",
+            },
+            {
+                "summary": shown_summary,
+                "requirements": [{"kind": "place", "text": "北門"}],
+                "requirement_version": identity,
+            },
+            {
+                "summary": "改了摘要",
+                "requirements": rows,
+                "requirement_version": identity,
+            },
+            {"kind": "new_story", "summary": "改了摘要"},
+        ):
+            with self.subTest(rejected=rejected):
+                self.assertFalse(reviewed_version_matches(rejected, draft=draft))
         plain = self._draft()
         self.assertTrue(
             reviewed_version_matches(

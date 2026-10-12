@@ -14,6 +14,7 @@ from world.narrative.authoring import (
     REASON_MESSAGES,
     AuthoringError,
     DIRECTION_KEYS,
+    MAX_DIRECTION_BYTES,
     MAX_SUMMARY_CHARACTERS,
     collaborator_creative_brief,
     get_draft,
@@ -36,6 +37,16 @@ def _controlled(actor, session):
 
 def _result(outcome, code, message):
     return {"outcome": outcome, "code": code, "message": message, "affected_panels": ("dream",)}
+
+
+def _direction_refusal(error: AuthoringError) -> str:
+    """One bounded player-facing line for a refused direction payload."""
+    messages = [
+        getattr(reason, "message", "") for reason in getattr(error, "reasons", ())
+    ]
+    return "；".join(message for message in messages if message) or (
+        "夢境方向的內容不完整或超出限制。"
+    )
 
 
 def _refresh(actor, session):
@@ -72,8 +83,12 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                     if (set(direction) - DIRECTION_KEYS or not isinstance(direction.get("summary", ""), str)
                             or len(direction.get("summary", "")) > MAX_SUMMARY_CHARACTERS):
                         return _result("rejected", "invalid_direction_shape", "故事方向需使用已知欄位，摘要上限為 2000 字。")
-                    if json_byte_size(direction) > 8192:
-                        return _result("rejected", "direction_too_large", "故事方向 JSON 上限為 8192 位元組。")
+                    # The transport bound is the store's own bound: a direction
+                    # that carries the maximum summary and the maximum bounded
+                    # requirements is legal (authoring accepts it), so the
+                    # ingress must not refuse it with a tighter cap.
+                    if json_byte_size(direction) > MAX_DIRECTION_BYTES:
+                        return _result("rejected", "direction_too_large", f"故事方向 JSON 上限為 {MAX_DIRECTION_BYTES} 位元組。")
                     payload = direction
                 elif direction.strip():
                     if len(direction.strip()) > MAX_SUMMARY_CHARACTERS:
@@ -84,7 +99,19 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                                else {"kind": "new_story", "summary": saved.get("direction", "")})
                 summary = str(payload.get("summary", ""))
                 if action == "draft":
-                    lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    try:
+                        lifecycle.preserve_draft(session_id, owner, payload, tick=tick)
+                    except AuthoringError as error:
+                        # A malformed shown requirement set is refused without a
+                        # durable write: the store owns the row shape, and
+                        # nothing malformed may reach the published panel.
+                        log_warn(
+                            "dream_surface_rejected",
+                            context={**boundary, "reason": "invalid_direction"},
+                        )
+                        return _result(
+                            "rejected", "invalid_direction", _direction_refusal(error)
+                        )
                     surface.store_direction(actor, summary)
                     surface.bump_revision_if_unchanged(actor, revision)
                 elif action == "confirm":

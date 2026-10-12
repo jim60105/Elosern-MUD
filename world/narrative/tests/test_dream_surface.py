@@ -593,6 +593,79 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(stored.direction["requirements"], requirements)
         self.assertEqual(stored.direction["requirement_version"], shown)
 
+    def test_an_edited_summary_cannot_freeze_the_shown_requirement_version(self):
+        # The review is bound to the version the player actually read: echoing
+        # the shown rows and identity under a different summary freezes
+        # requirements that were never presented for that direction, so the
+        # confirmation is refused deterministically on the server, not only by
+        # whatever client happens to ask.
+        self.enter()
+        requirements = [
+            {"kind": "place", "text": "南門"},
+            {"kind": "new_character", "text": "一個女孩"},
+            {"kind": "private_commission", "text": "帶她找媽媽"},
+        ]
+        shown_direction = {
+            "kind": "new_story",
+            "thread_id": None,
+            "summary": "在南門遇見一個女孩，幫她找媽媽。",
+            "requirements": requirements,
+        }
+        self.assertEqual(
+            self.request("draft", direction=dict(shown_direction)).result["outcome"],
+            "success",
+        )
+        shown = service.dream_state(self.actor)["requirement_version"]
+        self.assertTrue(shown)
+
+        edited = {
+            **shown_direction,
+            "summary": "改寫後的念頭：我想在碼頭等一艘船。",
+            "requirement_version": shown,
+        }
+        refused = self.request("confirm", direction=edited)
+        self.assertEqual(refused.result["code"], "stale_requirements")
+        self.assertFalse(CreativeRequest.objects.exists())
+        # The shown version survived the refusal untouched, and the very same
+        # rows confirm under the summary they were shown with.
+        self.assertEqual(service.dream_state(self.actor)["requirement_version"], shown)
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request(
+                "confirm", direction={**shown_direction, "requirement_version": shown}
+            )
+        self.assertEqual(confirmed.result["outcome"], "success")
+
+    def test_a_malformed_requirement_set_never_reaches_a_draft_or_the_panel(self):
+        # The panel state is strict on both sides: rows the validator would
+        # refuse must never be persisted, or the published payload could not be
+        # rendered by any client at all.
+        from world.narrative.authoring import REASON_MESSAGES
+        from world.narrative.models import AuthoringDraft
+
+        self.enter()
+        for rows in (
+            [{"kind": "explode", "text": "南門"}],
+            [{"kind": "place", "text": "南門", "extra": "x"}],
+            [{"kind": "place", "text": ""}],
+        ):
+            with self.subTest(rows=rows):
+                refused = self.request(
+                    "draft",
+                    direction={
+                        "kind": "new_story",
+                        "summary": "在南門遇見一個女孩。",
+                        "requirements": rows,
+                    },
+                )
+                self.assertEqual(refused.result["code"], "invalid_direction")
+                self.assertEqual(
+                    refused.result["message"], REASON_MESSAGES["malformed_requirements"]
+                )
+        self.assertEqual(AuthoringDraft.objects.count(), 0)
+        state = service.dream_state(self.actor)
+        self.assertEqual(state["requirements"], [])
+        self.assertIsNone(state["requirement_version"])
+
 
 def _synthetic_webp():
     """A real, decodable WebP for the catalog's header-admission probe."""

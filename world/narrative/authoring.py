@@ -364,7 +364,14 @@ def reviewed_version_matches(submitted: Any, *, draft: AuthoringDraft) -> bool:
     Deterministic and offline: a submission carrying no requirements is accepted
     only when the shown draft carries none either (requirements the player never
     saw can never be frozen), and a submission carrying requirements must equal
-    the shown version's identity and rows exactly. No model is consulted.
+    the shown version's identity and rows exactly *and* describe the direction
+    that version was shown for. No model is consulted.
+
+    The summary binding is what makes "reviewed version" mean the version a
+    player actually read: an edited summary is a different direction whose
+    requirements were never presented, so echoing the older rows and identity
+    cannot freeze them under the newly stamped revision. Preserving that edit as
+    a draft is unaffected -- this gate is only consulted on a confirmation.
     """
     rows = submitted.get("requirements") if isinstance(submitted, Mapping) else None
     rows = rows or []
@@ -372,6 +379,10 @@ def reviewed_version_matches(submitted: Any, *, draft: AuthoringDraft) -> bool:
     if not rows:
         return not shown
     if not shown or not isinstance(rows, list) or len(rows) != len(shown):
+        return False
+    if str((submitted or {}).get("summary", "")).strip() != str(
+        (draft.direction or {}).get("summary", "")
+    ).strip():
         return False
     return (
         str((submitted or {}).get("requirement_version") or "")
@@ -590,6 +601,21 @@ def save_draft(
     frozen_direction = _json_copy(
         dict(direction), label="direction", max_bytes=MAX_DIRECTION_BYTES
     )
+    # The shown experience requirements are structured planning data every
+    # consumer renders and echoes back, so the one store that persists them also
+    # owns their shape: a malformed row is refused here rather than surviving
+    # into a published draft that no client can validate, and the rows are
+    # stored normalized so confirmation compares canonical values.
+    if "requirements" in frozen_direction:
+        normalized_requirements = _validate_requirements(
+            frozen_direction.get("requirements")
+        )
+        if normalized_requirements is None:
+            raise DirectionValidationError(_reasons("malformed_requirements"))
+        frozen_direction = {
+            **frozen_direction,
+            "requirements": normalized_requirements,
+        }
     frozen_sources = None if sources is None else _normalize_sources(sources)
     handle = _clean_draft_id(draft_id) if draft_id is not None else uuid4().hex
 
