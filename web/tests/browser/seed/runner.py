@@ -330,6 +330,36 @@ def main() -> None:
             else {SHIPPED_COMBAT_LADDER_SKILL: SHIPPED_COMBAT_LADDER_LEVEL}
         ),
     )
+    if synth and os.environ.get("ELOSERN_BROWSER_COMBAT_SEAL") == "1":
+        # Disabled-row journey seed: persist a synthetic examination seal
+        # that excludes exactly the identity-ELIGIBLE martial combat-panel
+        # disabled role, so the combat dock shows it disabled with the seal
+        # reason (an identity-INELIGIBLE row would be hidden outright, not
+        # disabled). The record mirrors the persisted shape
+        # ``activate_exam_restriction`` writes: empty ceilings are no-ops for
+        # every reader, and the seal is opt-in per class because an active
+        # restriction also locks ordinary equipment toggles (the inventory
+        # journeys boot without it).
+        from web.browser_support.browser_fixtures_data import (
+            SYNTH_COMBAT_SEALED_SKILL_KEY,
+        )
+
+        character.db.guild_exam_restriction = {
+            "host_id": character.pk,
+            "exam_id": "browser-seed",
+            "target_rank": "browser-seed",
+            "allowed_skills": [
+                key
+                for key in character.skills.owned_keys()
+                if key != SYNTH_COMBAT_SEALED_SKILL_KEY
+            ],
+            "ceilings": {},
+            "neutral_ceilings": {},
+            "accessory": None,
+            "previous_equipment": dict(character.db.equipment or {}),
+            "previous_inventory": list(character.db.inventory or []),
+        }
+        character.save()
     # A persistent buff gives the status panel a deterministic
     # applied-modifier condition for viewport assertions.
     from world.rules.buffs import apply_buff

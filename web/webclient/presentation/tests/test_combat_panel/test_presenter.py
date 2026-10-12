@@ -399,11 +399,17 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         # catalog-complete payload still fits the OOB envelope limits. Own
         # exactly the presentation bound's worth of active skills —
         # generated kit-row twins filling the scoped catalog up to MAX_SKILLS
-        # — and measure the serialized panel: it must build without a
-        # presentation error and stay at or below MAX_CANONICAL_JSON_BYTES
-        # with every array within MAX_LIST_ITEMS.
+        # that qualify under the presenter's identity filter — and measure
+        # the serialized panel: it must build without a presentation error
+        # and stay at or below MAX_CANONICAL_JSON_BYTES with every array
+        # within MAX_LIST_ITEMS. Identity-ineligible rows (the kit
+        # divine-arts twin and the shipped divine trees, which the human
+        # fixture race cannot qualify for) are excluded from player
+        # catalogs by skill-identity-eligibility, so they ride neither the
+        # ownership list nor the flattened-panel count.
         from world.rules.combat_view import MAX_SKILLS
         from world.skills.registry import SkillKind
+        from world.skills.eligibility import skill_identity_eligible
 
         registry = getattr(
             importlib.import_module("world.skills.registry"), "SKILL" + "_REGISTRY"
@@ -420,7 +426,15 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 key
                 for key, skill in registry.items()
                 if skill.kind is SkillKind.ACTIVE
+                and skill_identity_eligible(self.player, skill)
             )
+            ineligible = [
+                key
+                for key, skill in registry.items()
+                if skill.kind is SkillKind.ACTIVE
+                and not skill_identity_eligible(self.player, skill)
+            ]
+            self.assertTrue(ineligible)
             self.player.db.skills = {"active": all_active, "passive": []}
             engage(self.player, self.monster)
             payload = self.registry.render(
@@ -430,6 +444,8 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         flattened = self._flatten_skills(payload)
         self.assertGreater(len(flattened), 32)
         self.assertEqual(len(flattened), len(all_active))
+        presented = {skill["key"] for skill in flattened}
+        self.assertFalse(presented & set(ineligible))
 
         def _walk_arrays(value):
             if isinstance(value, list):

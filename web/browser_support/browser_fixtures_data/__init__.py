@@ -164,6 +164,7 @@ from web.browser_support.browser_fixtures_data.combat_fixtures import (
     SYNTH_COMBAT_LADDER_SKILL,
     SYNTH_COMBAT_MONSTERS,
     SYNTH_COMBAT_PASSIVE_SKILLS,
+    SYNTH_COMBAT_SEALED_SKILL_KEY,
     combat_journey_values,
 )
 

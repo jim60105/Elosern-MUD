@@ -30,7 +30,14 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def setUp(self) -> None:
         from .harness import ManagedServer
 
-        self.server = ManagedServer()
+        from . import fixtures
+
+        runtime = fixtures.create_runtime()
+        # Opt this class's isolated seed into the synthetic examination seal
+        # that makes the disabled combat-skill role visible-with-reason
+        # (seed/runner.py; other combat classes boot without the seal).
+        runtime.env["ELOSERN_BROWSER_COMBAT_SEAL"] = "1"
+        self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url

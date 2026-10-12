@@ -21,10 +21,14 @@ from web.browser_support.browser_fixtures_data.grafting import (
 #: is the panel's intra-group row order: the borrowed-element group carries
 #: the deep canopy cast ``t_ember_comet`` first (``grant_lineage`` closes its
 #: prereq ``t_ember_burst`` in BEHIND it, the shipped fire tree's exact
-#: two-row shape), the utility group carries the race-gate-disabled row
-#: (a ``confer_skill_partial`` carrier requiring divine arts, which the kit's
-#: only race lacks) BEFORE the NONE-shape cast carrier so the
-#: disabled row is the frame's first focus in both modes.
+#: two-row shape). The disabled self role is ``t_cinder_cleave``: an
+#: identity-ELIGIBLE martial row the seed seals with a synthetic examination
+#: restriction (``guild_exam_restriction`` excludes exactly this key), which
+#: the combat menu exposes as disabled with the seal reason. Rows that are
+#: identity-INELIGIBLE for the fixture race (divine-arts rows under the kit's
+#: non-divine race) are hidden from player catalogs outright by
+#: skill-identity-eligibility, so they can never serve as a visible-disabled
+#: row.
 SYNTH_COMBAT_ACTIVE_SKILLS = (
     "t_ember_comet",
     "t_glowmire_bloom",
@@ -38,6 +42,10 @@ SYNTH_COMBAT_LADDER_SKILL = "t_glowmire_bloom"
 SYNTH_COMBAT_LADDER_LEVEL = 10
 #: Kit debuff with a deterministic applied-modifier row (status panel).
 SYNTH_COMBAT_DEBUFF_KEY = "t_ash_burn"
+#: The kit martial row the combat seed seals with a synthetic examination
+#: restriction, so the disabled-reason journey exercises the ordinary
+#: availability gate (exam seal) on an identity-eligible row.
+SYNTH_COMBAT_SEALED_SKILL_KEY = "t_cinder_cleave"
 #: (object key, hp) pairs for the two living synth combat monsters.
 SYNTH_COMBAT_MONSTERS = (("燼殼工蟲", 200), ("燼殼兵蟲", 200))
 
@@ -60,11 +68,12 @@ def combat_journey_values() -> dict:
     - ``none_key``: the owned NONE-shape active the NONE-payload journey
       submits (enhancement in shipped mode; utility under the kit install).
     - ``none_category``: the ``SkillCategory`` value ``none_key`` lives in.
-    - ``self_disabled_key``: the active the race gate disables for the
-      fixture character (a divine-arts row the fixture race cannot cast), so
-      the menu exposes it disabled with its reason.
+    - ``self_disabled_key``: the active the fixture cannot cast, so the menu
+      exposes it disabled with its reason — under the kit install the
+      examination-sealed identity-eligible martial row, in shipped mode a
+      divine-arts row the fixture race cannot cast.
     - ``self_disabled_category``: the ``SkillCategory`` value
-      ``self_disabled_key`` lives in (the utility group under the kit
+      ``self_disabled_key`` lives in (the martial-arts group under the kit
       install; the divine-mystery category in shipped mode).
     - ``spell_element`` / ``ladder_element``: the ELEMENT_REGISTRY keys the
       sub-groups of the elemental category are named after (the spell borrows
@@ -91,8 +100,8 @@ def combat_journey_values() -> dict:
             "ladder_key": "t_glowmire_bloom",
             "none_key": "t_cinder_breath",
             "none_category": "utility",
-            "self_disabled_key": "t_rock_quietus",
-            "self_disabled_category": "utility",
+            "self_disabled_key": SYNTH_COMBAT_SEALED_SKILL_KEY,
+            "self_disabled_category": "martial_arts",
             "spell_element": "fire",
             "ladder_element": "t_glowmire",
             # The kit install registers t_glowmire first; the borrowed shipped

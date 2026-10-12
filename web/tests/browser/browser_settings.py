@@ -44,10 +44,17 @@ SERVERNAME = "Elosern Browser Test"
 # Account capacity: matches production default so multi-character fixtures can create characters
 MAX_NR_CHARACTERS = 5
 
+# The quest-owned normalized scene-package store (quest-scene-encounters)
+# needs the same database registration as production settings; without it
+# the harness database has no quests_* tables, sync_quest_runtime fails at
+# boot, and the guild catalog's lazy load then rejects the shipped
+# quest_rewards rows against the unpopulated definition registry.
+INSTALLED_APPS = list(INSTALLED_APPS) + [
+    "world.narrative.apps.NarrativeConfig",
+    "world.quests.apps.QuestsConfig",
+]
 # The production settings register the project-authored trait types that the
 # combat/sexual handlers require; without them any materialization of a
-
-INSTALLED_APPS = list(INSTALLED_APPS) + ["world.narrative.apps.NarrativeConfig"]
 # project trait (for example ``SexualState``'s ``ordered_level``) fails.
 TRAIT_CLASS_PATHS = [
     "world.rules.sexual_state.OrderedLevelTrait",
