@@ -7,7 +7,7 @@ Compiles validated quest-seed beats through the existing quest proposal/compiler
 
 ### Requirement: Quest-seed beats compile only through existing owners
 
-A validated quest-seed beat SHALL pass its permitted immutable narrative context to ScenarioDirector and produce a QuestBlueprint proposal. Existing deterministic quest compilation, issuance authorization, registration, SceneBuilder and runtime SHALL remain authoritative. Prose SHALL NOT complete objectives, fabricate past actions or accept a quest remotely.
+Validated quest-seed beats SHALL pass permitted immutable context to ScenarioDirector for a QuestBlueprint. New scene roles/issuers SHALL remain symbolic declarations until strict materialization/registration. Scene compilation SHALL consume publish_scene_package and lookup_story_role without inventing participants or guild authority. Quest/map/rules owners SHALL remain authoritative. Prose SHALL NOT complete objectives, fabricate past actions or accept a quest.
 
 #### Scenario: Valid quest beat compiles
 - **WHEN** a validated beat generates a supported context-fitting blueprint
@@ -21,13 +21,21 @@ A validated quest-seed beat SHALL pass its permitted immutable narrative context
 - **WHEN** relevant state changes between blueprint generation and publication
 - **THEN** revalidation rejects without partial quest/beat publication
 
+#### Scenario: New private commissioner without guild rank
+- **WHEN** the confirmed arrangement declares a new girl role as private escort issuer for an unregistered player
+- **THEN** package planning validates symbolic role scope and activation performs upstream strict actual-entity issuer checks, without guild redirection or rank requirement
+
+#### Scenario: Publication remains separate from appearance
+- **WHEN** a complete scene package publishes
+- **THEN** no untriggered role, accepted commission, objective progress or reward exists from publication alone
+
 ### Requirement: Beat-context failure creates no template replacement
 
-On disabled/unreachable/exhausted/misfitting quest-beat generation the beat path SHALL create no quest or replacement filler and retain its thread/source provenance. Existing generic template-pool quest generation SHALL remain playable offline. Accepted repeated beat compilation SHALL be idempotent across restart.
+Disabled, unreachable, exhausted or misfitting quest-beat generation SHALL publish no quest/filler and retain thread/source provenance. Required disabled capabilities SHALL wait before stage dispatch; exhausted/misfitting execution SHALL fail durably. Generic non-beat authored-template generation SHALL remain playable offline. Accepted repeated compilation SHALL retain one recoverable source-linked publication across restart.
 
 #### Scenario: Offline beat generation
-- **WHEN** all profiles are disabled and a quest-seed beat is compiled
-- **THEN** no template substitution or partial quest is published
+- **WHEN** all profiles are disabled and a quest-seed beat requires scene generation
+- **THEN** dispatch waits without a template substitution, model call or partial quest
 
 #### Scenario: Generic offline quest remains
 - **WHEN** a generic non-beat quest request runs offline
@@ -36,3 +44,7 @@ On disabled/unreachable/exhausted/misfitting quest-beat generation the beat path
 #### Scenario: Restart repeats publication
 - **WHEN** the same accepted quest-seed source is handled after restart
 - **THEN** one linked publication exists with recoverable blueprint/snapshot identity
+
+#### Scenario: Exhausted scene generation
+- **WHEN** an enabled scene stage exhausts its existing transport/schema retries
+- **THEN** work fails with a reason and no fallback quest, NPC or linked partial beat appears

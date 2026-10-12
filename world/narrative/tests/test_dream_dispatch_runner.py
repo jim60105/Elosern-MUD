@@ -118,6 +118,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
 
     # -- the happy path ----------------------------------------------------
 
+    @covers_requirement(
+        "dream-story-dispatch::publication-commits-narrative-and-executable-references-together"
+    )
     def test_a_queued_executable_direction_runs_to_one_publication(self):
         request, work = self._queued_work()
         client = self._client()
@@ -157,6 +160,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
 
     # -- the refusal and failure paths -------------------------------------
 
+    @covers_requirement(
+        "npc-dialogue::story-participation-does-not-disclose-private-dispatch-planning"
+    )
     def test_prose_cannot_answer_an_executable_direction(self):
         _request, work = self._queued_work()
         client = self._client(story_kind="clue")
@@ -185,6 +191,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(self._run(client).outcome, "no_work")
         self.assertEqual(len(client.calls), calls)
 
+    @covers_requirement(
+        "dream-story-dispatch::publication-commits-narrative-and-executable-references-together"
+    )
     def test_a_publication_failure_leaves_no_orphan(self):
         _request, work = self._queued_work()
         client = self._client()
@@ -217,6 +226,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
 
     # -- waiting, deferral and recovery -----------------------------------
 
+    @covers_requirement(
+        "dream-story-dispatch::one-server-owned-pump-processes-eligible-work-in-confirmation-order"
+    )
     def test_a_disabled_capability_waits_without_blocking_other_work(self):
         _first, first_work = self._queued_work()
         _second, second_work = self._queued_work()
@@ -287,6 +299,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(settled.state, dispatch.STATE_ARRANGED)
         self.assertIsNotNone(scene_store.read_package(settled.package_id))
 
+    @covers_requirement(
+        "dream-story-dispatch::saved-checkpoints-and-fenced-execution-govern-restart"
+    )
     def test_an_interrupted_claim_is_fenced_and_resumes_under_one_source(self):
         _request, work = self._queued_work()
         client = self._client()
@@ -412,6 +427,10 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         )
         self.assertEqual(self.owner.location.pk, elsewhere_in_place.pk)
 
+    @covers_requirement(
+        "dream-story-dispatch::saved-checkpoints-and-fenced-execution-govern-restart",
+        "dream-story-dispatch::publication-commits-narrative-and-executable-references-together",
+    )
     def test_a_committed_publication_survives_a_restart_without_a_second_package(self):
         """A crash after commit but before the notice changes nothing on restart."""
         request, work = self._queued_work()

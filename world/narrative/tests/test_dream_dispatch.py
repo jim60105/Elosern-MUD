@@ -85,6 +85,9 @@ class DreamDispatchTestCase(EvenniaTest):
 
 
 class WorkIdentityTests(DreamDispatchTestCase):
+    @covers_requirement(
+        "dream-story-dispatch::each-confirmed-version-has-one-durable-work-identity"
+    )
     def test_one_work_record_per_confirmed_version(self):
         draft = self._draft()
         request = self._confirm(draft)
@@ -113,6 +116,9 @@ class WorkIdentityTests(DreamDispatchTestCase):
         keys = {work.submission_key for work in DreamDispatch.objects.all()}
         self.assertEqual(keys, {request.submission_key, second.submission_key})
 
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch"
+    )
     def test_confirmation_hint_fires_only_after_commit(self):
         draft = self._draft()
         with self.captureOnCommitCallbacks(execute=True):
@@ -123,6 +129,9 @@ class WorkIdentityTests(DreamDispatchTestCase):
         # It fires exactly once, on commit.
         self.assertEqual(self.hints, ["hint"])
 
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch"
+    )
     def test_lost_hint_leaves_queued_work_discoverable(self):
         dispatch.register_pump(None)
         draft = self._draft()
@@ -135,6 +144,9 @@ class WorkIdentityTests(DreamDispatchTestCase):
         considered = dispatch.next_considered()
         self.assertEqual([work.submission_key for work in considered], [request.submission_key])
 
+    @covers_requirement(
+        "dream-story-dispatch::one-server-owned-pump-processes-eligible-work-in-confirmation-order"
+    )
     def test_confirmation_never_advances_the_clock(self):
         before = int(get_world_clock().tick)
         draft = self._draft()
@@ -193,6 +205,9 @@ class ClaimAndFenceTests(DreamDispatchTestCase):
         self.work.refresh_from_db()
         self.assertEqual(self.work.stage, dispatch.STAGE_PUBLISH)
 
+    @covers_requirement(
+        "dream-story-dispatch::saved-checkpoints-and-fenced-execution-govern-restart"
+    )
     def test_stale_token_cannot_checkpoint_or_settle(self):
         _, first = dispatch.claim(self.work, process="p1")
         _, second = dispatch.claim(self.work, process="p1")
@@ -214,6 +229,9 @@ class ClaimAndFenceTests(DreamDispatchTestCase):
             )
         )
 
+    @covers_requirement(
+        "dream-story-dispatch::dispatch-states-distinguish-waiting-from-terminal-failure-and-durable-success"
+    )
     def test_arranged_requires_durable_references_and_is_terminal(self):
         _, token = dispatch.claim(self.work, process="p1")
         dispatch.checkpoint_story(
@@ -237,6 +255,9 @@ class ClaimAndFenceTests(DreamDispatchTestCase):
         self.assertEqual(dispatch.claim(self.work, process="p1"), None)
         self.assertEqual(dispatch.next_considered(), [])
 
+    @covers_requirement(
+        "dream-story-dispatch::dispatch-states-distinguish-waiting-from-terminal-failure-and-durable-success"
+    )
     def test_terminal_failure_is_not_rerolled(self):
         _, token = dispatch.claim(self.work, process="p1")
         self.assertTrue(
@@ -249,12 +270,18 @@ class ClaimAndFenceTests(DreamDispatchTestCase):
         # A later pump pass cannot silently regenerate the same source.
         self.assertEqual(dispatch.next_considered(), [])
 
+    @covers_requirement(
+        "dream-story-dispatch::dispatch-states-distinguish-waiting-from-terminal-failure-and-durable-success"
+    )
     def test_unknown_reason_is_bounded_to_a_known_code(self):
         _, token = dispatch.claim(self.work, process="p1")
         self.assertTrue(dispatch.mark_failed(self.work, token, "<script>"))
         self.work.refresh_from_db()
         self.assertEqual(self.work.reason_code, dispatch.REASON_EXECUTION_FAILED)
 
+    @covers_requirement(
+        "dream-story-dispatch::one-server-owned-pump-processes-eligible-work-in-confirmation-order"
+    )
     def test_waiting_does_not_block_other_eligible_work(self):
         other_draft = save_draft(
             owner_id=self.owner_id,
@@ -297,6 +324,9 @@ class RecoveryTests(DreamDispatchTestCase):
         self.work.refresh_from_db()
         self.assertIsNone(self.work.story_checkpoint)
 
+    @covers_requirement(
+        "dream-story-dispatch::saved-checkpoints-and-fenced-execution-govern-restart"
+    )
     def test_recovery_reuses_saved_checkpoints(self):
         _, token = dispatch.claim(self.work, process="previous-process")
         dispatch.checkpoint_story(
@@ -318,6 +348,9 @@ class RecoveryTests(DreamDispatchTestCase):
         self.assertEqual(self.work.state, dispatch.STATE_GENERATING_STORY)
         self.assertEqual(self.work.execution_token, token)
 
+    @covers_requirement(
+        "dream-story-dispatch::saved-checkpoints-and-fenced-execution-govern-restart"
+    )
     def test_shutdown_invalidates_unfinished_callback_ownership(self):
         _, token = dispatch.claim(self.work, process=dispatch.process_identity())
         self.assertEqual(dispatch.fence_all(), 1)
@@ -383,6 +416,9 @@ class PersistenceTests(DreamDispatchTestCase):
             )
         self.assertEqual(DreamDispatch.objects.count(), 1)
 
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch"
+    )
     def test_session_confirmation_commits_request_work_and_closure_together(self):
         # The delta's "work persistence fails" scenario on the session path: a
         # closure that fails after the request was written must leave no
@@ -416,6 +452,9 @@ class PersistenceTests(DreamDispatchTestCase):
         )
         self.assertEqual(self.hints, [])
 
+    @covers_requirement(
+        "dream-story-dispatch::each-confirmed-version-has-one-durable-work-identity"
+    )
     def test_saved_reload_preserves_state_stage_token_and_checkpoints(self):
         draft = self._draft()
         request = self._confirm(draft)
@@ -441,6 +480,9 @@ class PersistenceTests(DreamDispatchTestCase):
         self.assertEqual(reloaded.request_version, int(request.version))
         self.assertEqual(reloaded.source_key, request.submission_key)
 
+    @covers_requirement(
+        "dream-story-dispatch::fresh-initialization-excludes-historical-reconciliation"
+    )
     def test_startup_creates_no_work_for_a_request_without_one(self):
         draft = self._draft()
         request = self._confirm(draft)
@@ -476,6 +518,9 @@ class StatusMessageTests(DreamDispatchTestCase):
         self.assertEqual(dispatch_status.status_message(None), "")
         self.assertEqual(dispatch_status.owner_message(self.owner_id), "")
 
+    @covers_requirement(
+        "dream-story-dispatch::status-feedback-follows-the-current-legal-owner-mapping"
+    )
     def test_preparing_waiting_and_arranged_are_distinct(self):
         from world.narrative import dispatch_status
 
@@ -495,6 +540,9 @@ class StatusMessageTests(DreamDispatchTestCase):
         self.assertIn("服務", waiting)
         self.assertIn("安排", arranged)
 
+    @covers_requirement(
+        "dream-story-dispatch::status-feedback-follows-the-current-legal-owner-mapping"
+    )
     def test_each_terminal_reason_has_its_own_actionable_message(self):
         from world.narrative import dispatch_status
 
@@ -523,6 +571,9 @@ class StatusMessageTests(DreamDispatchTestCase):
             dispatch_status.MESSAGE_FAILED,
         )
 
+    @covers_requirement(
+        "dream-story-dispatch::status-feedback-follows-the-current-legal-owner-mapping"
+    )
     def test_delivery_uses_the_current_actor_and_reports_nothing_when_empty(self):
         from unittest.mock import Mock
 
@@ -541,6 +592,9 @@ class StatusMessageTests(DreamDispatchTestCase):
 
 
 class RequirementsContractTests(DreamDispatchTestCase):
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements"
+    )
     def test_bounded_requirements_are_normalized_and_versioned(self):
         direction = new_story_direction(
             requirements=[
@@ -750,6 +804,9 @@ class ShownRequirementTests(DreamDispatchTestCase):
         self.assertEqual(int(request.version), 2)
         self.assertEqual(DreamDispatch.objects.count(), 1)
 
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements"
+    )
     def test_review_match_requires_the_exact_shown_version(self):
         draft = stamp_shown_requirements(self._requirement_draft())
         rows = draft.direction["requirements"]
@@ -807,6 +864,9 @@ class ShownRequirementTests(DreamDispatchTestCase):
 
 
 class UnreviewedRequirementsTests(DreamDispatchTestCase):
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements"
+    )
     def test_confirmation_refuses_a_stored_requirement_set_without_a_review(self):
         draft = self._draft()
         # The store always stamps a version it persists, so the only way a
@@ -876,6 +936,9 @@ class DispatchEventTests(DreamDispatchTestCase):
         self.assertEqual([name for name, _ in info], [event])
         return dict(info)[event]
 
+    @covers_requirement(
+        "observability-logging::dream-dispatch-and-activation-emit-correlated-boundary-events"
+    )
     def test_confirmation_claim_wait_and_failure_name_the_same_work(self):
         draft = self._draft()
         request, info, warn = self._capture(
@@ -934,6 +997,9 @@ class DispatchEventTests(DreamDispatchTestCase):
         self.assertEqual(failed["reason"], dispatch.REASON_EXECUTION_FAILED)
         self.assertEqual(failed["work_state"], dispatch.STATE_FAILED)
 
+    @covers_requirement(
+        "observability-logging::dream-dispatch-and-activation-emit-correlated-boundary-events"
+    )
     def test_publication_and_recovery_events_carry_their_references(self):
         draft = self._draft()
         request = self._confirm(draft)

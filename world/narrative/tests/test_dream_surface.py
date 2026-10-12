@@ -190,6 +190,9 @@ class DreamSurfaceTests(EvenniaTest):
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
         "dream-sleep-surface::dream-departure-never-settles-sleep-again",
     )
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
+    )
     def test_recorded_changed_path_sleep_exchange_draft_confirm_awaken_smoke(self):
         command = CmdSleep()
         command.caller = self.actor
@@ -244,6 +247,9 @@ class DreamSurfaceTests(EvenniaTest):
     @covers_requirement(
         "dream-session-lifecycle::failures-preserve-progress-and-permit-offline-awakening",
         "dream-sleep-surface::dream-departure-never-settles-sleep-again",
+    )
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
     )
     def test_model_failure_draft_and_awaken_preserve_committed_sleep(self):
         self.enter(tick_from=90, tick_to=100, requested_seconds=10)
@@ -497,6 +503,10 @@ class DreamSurfaceTests(EvenniaTest):
                     official_art.reset_catalog()
 
 
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
+    )
     def test_collaborator_requirements_reach_the_surface_and_the_text_line(self):
         # The collaborator's bounded proposal is readable on both surfaces
         # before anything is frozen, and the text transport names it too.
@@ -530,6 +540,9 @@ class DreamSurfaceTests(EvenniaTest):
         # of implying a review that has not happened.
         self.assertIn("尚未檢視", rendered)
 
+    @covers_requirement(
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements"
+    )
     def test_the_text_line_names_the_reviewed_version_once_it_is_persisted(self):
         self.enter()
         direction = {
@@ -587,6 +600,10 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertTrue(service.dream_state(self.actor)["open"])
         self.assertEqual(surface.association(self.actor), before)
 
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch",
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces",
+    )
     def test_confirmation_requires_the_shown_requirement_version(self):
         # A proposed requirement set becomes reviewable only when the version
         # that carries it is persisted, and confirmation must echo exactly that
@@ -629,6 +646,10 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(stored.direction["requirement_version"], shown)
 
     @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "webclient-dream-stage::dream-confirmation-displays-the-frozen-experience-requirements",
+    )
     def test_an_edited_summary_cannot_freeze_the_shown_requirement_version(self):
         # The review is bound to the version the player actually read: echoing
         # the shown rows and identity under a different summary freezes

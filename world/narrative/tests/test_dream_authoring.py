@@ -128,6 +128,10 @@ class DreamAuthoringPrivacyTests(DreamAuthoringTestCase):
         "dream-authoring::creative-discussion-remains-private-authoring-data",
         "narrative-memory::cognition-is-owner-scoped-and-provenance-preserving",
     )
+    @covers_requirement(
+        "dream-authoring::confirmation-freezes-visible-bounded-experience-requirements",
+        "npc-dialogue::story-participation-does-not-disclose-private-dispatch-planning",
+    )
     def test_draft_and_request_stay_private_and_produce_no_cognition(self):
         before = self.character_attribute_snapshot()
         direction = new_story_direction()

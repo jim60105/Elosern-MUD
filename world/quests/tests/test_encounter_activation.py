@@ -200,6 +200,9 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(runtime.revision, 0)
         self.assertTrue(result.activated)
 
+    @covers_requirement(
+        "npc-dialogue::story-participation-does-not-disclose-private-dispatch-planning"
+    )
     def test_committed_observations_report_the_pre_closure_state(self):
         self._activate()
         facts = committed_observations(self.published.package_id)

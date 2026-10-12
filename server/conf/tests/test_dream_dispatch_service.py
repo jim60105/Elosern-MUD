@@ -11,6 +11,8 @@ from unittest.mock import patch
 from evennia.utils.test_resources import EvenniaTest
 from twisted.internet import defer
 
+from tools.spec_traceability import covers_requirement
+
 from server import dream_dispatch_service as pump
 from world.narrative import dispatch
 
@@ -38,6 +40,9 @@ class DreamDispatchPumpTests(EvenniaTest):
         self.assertTrue(pump.stop_pump())
         self.assertFalse(dispatch.pump_registered())
 
+    @covers_requirement(
+        "dream-story-dispatch::one-server-owned-pump-processes-eligible-work-in-confirmation-order"
+    )
     def test_only_one_pass_runs_at_a_time(self):
         passes = []
         first = defer.Deferred()

@@ -146,6 +146,10 @@ class DreamDispatchSmokeTests(CompileRegistryIsolation, StoryDirectorBeatsTestCa
 
     # -- the smoke ---------------------------------------------------------
 
+    @covers_requirement(
+        "dream-session-lifecycle::valid-confirmation-closes-the-session-without-awaiting-dispatch",
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint",
+    )
     def test_one_confirmed_direction_becomes_one_activated_scene(self):
         responses = self._responses()
         _TransportlessClient.responses = responses
@@ -259,6 +263,9 @@ class DreamDispatchSmokeTests(CompileRegistryIsolation, StoryDirectorBeatsTestCa
         self.assertIsNotNone(materialized)
         self.assertEqual(materialized.location.pk, self.owner.location.pk)
 
+    @covers_requirement(
+        "dream-sleep-surface::confirmed-dream-handoff-returns-to-playable-waking-surfaces"
+    )
     def test_the_smoke_needs_no_model_for_the_deterministic_half(self):
         responses = self._responses()
         _TransportlessClient.responses = responses

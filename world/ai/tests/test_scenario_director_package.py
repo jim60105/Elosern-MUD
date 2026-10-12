@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from django.test import override_settings
 
+from tools.spec_traceability import covers_requirement
+
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.scenario_director import (
@@ -46,6 +48,9 @@ def await_result(deferred):
 class ExtendedBlueprintContractTests(TestCase):
     """The extended contract is composed from both upstream schemas."""
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_the_extended_contract_keeps_the_blueprint_and_adds_the_sections(self):
         self.assertEqual(
             set(EXTENDED_BLUEPRINT_SCHEMA["properties"]),
@@ -69,6 +74,9 @@ class ExtendedBlueprintContractTests(TestCase):
             BLUEPRINT_KEYS, tuple(SCENARIO_DIRECTOR_OUTPUT_SCHEMA["required"])
         )
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_the_sections_are_the_upstream_package_sections(self):
         for key in PACKAGE_SECTION_KEYS:
             self.assertIs(
@@ -94,6 +102,9 @@ class BeatSceneRouteTests(TestCase):
         self.assertTrue(result.result.check(ScenarioDirectorClientRequiredError))
         result.addErrback(lambda failure: None)
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_the_call_declares_the_extended_contract_inline(self):
         client = FakeLLMClient()
         client.add_response(
@@ -111,6 +122,9 @@ class BeatSceneRouteTests(TestCase):
         self.assertIs(client.calls[0].output_schema, EXTENDED_BLUEPRINT_SCHEMA)
         self.assertEqual(client.calls[0].schema_id, "scenario_director")
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_a_disabled_profile_resolves_to_none_without_a_template_draw(self):
         client = FakeLLMClient()
         with override_settings(

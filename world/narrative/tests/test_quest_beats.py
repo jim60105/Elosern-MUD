@@ -115,6 +115,9 @@ class ScenePackageBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase
                 extended[key] = self.package_payload[key]
         return extended
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_an_extended_blueprint_generates_and_publishes_one_package(self):
         # The whole route, end to end: the scenario layer proposes an extended
         # blueprint, the deterministic core reshuffles it, and settlement
@@ -208,6 +211,9 @@ class ScenePackageBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase
         self.assertEqual(replay.beat.beat_id, first.beat.beat_id)
         self.assertEqual(len(scene_store.list_packages()), before)
 
+    @covers_requirement(
+        "scenario-director::confirmed-scene-requirements-demand-a-complete-upstream-blueprint"
+    )
     def test_an_invalid_package_publishes_nothing_and_fails_the_beat(self):
         from world.quests import scene_store
 

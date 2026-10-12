@@ -11,6 +11,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import AnchorRoom, Room
@@ -43,6 +44,9 @@ class EncounterDispatchTestBase(RegistryIsolationMixin, EvenniaTestCase):
 
 
 class EligibilityTests(EncounterDispatchTestBase):
+    @covers_requirement(
+        "story-encounter-activation::independent-encounters-retain-actual-actor-identity"
+    )
     def test_both_declared_encounters_are_eligible_at_the_anchor(self):
         eligible = pending_encounters(self.player, room=self.room)
         self.assertEqual(
@@ -54,6 +58,9 @@ class EligibilityTests(EncounterDispatchTestBase):
     def test_a_non_matching_position_is_not_eligible(self):
         self.assertEqual(pending_encounters(self.player, room=self.elsewhere), ())
 
+    @covers_requirement(
+        "story-encounter-activation::independent-encounters-retain-actual-actor-identity"
+    )
     def test_lookup_is_scoped_to_the_owning_player(self):
         other = create_object(PlayerCharacter, key="他人")
         self.assertEqual(pending_encounters(other, room=self.room), ())
@@ -70,6 +77,9 @@ class EligibilityTests(EncounterDispatchTestBase):
 
 
 class ActivationTests(EncounterDispatchTestBase):
+    @covers_requirement(
+        "webclient-dialogue-session::encounter-updates-expose-only-committed-visible-interaction-targets"
+    )
     def test_activation_refreshes_the_owner_projections_after_commit(self):
         from unittest.mock import patch
 
@@ -85,6 +95,9 @@ class ActivationTests(EncounterDispatchTestBase):
         refresh.assert_called_once()
         self.assertIs(refresh.call_args.args[0], self.player)
 
+    @covers_requirement(
+        "webclient-dialogue-session::encounter-updates-expose-only-committed-visible-interaction-targets"
+    )
     def test_a_refused_activation_refreshes_no_projection(self):
         from unittest.mock import patch
 
@@ -136,6 +149,9 @@ class ActivationTests(EncounterDispatchTestBase):
         schedule.assert_called_once_with(self.player, watchers=watchers)
         refresh.assert_called_once_with(session, self.player)
 
+    @covers_requirement(
+        "webclient-dialogue-session::encounter-updates-expose-only-committed-visible-interaction-targets"
+    )
     def test_an_offline_or_non_player_owner_refreshes_no_projection(self):
         from typeclasses.characters import (
             _schedule_projection_refresh_after_activation,
@@ -187,6 +203,9 @@ class ActivationTests(EncounterDispatchTestBase):
         self.assertTrue(activations)
         self.assertIn(key, QUEST_DEFINITION_REGISTRY)
 
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary"
+    )
     def test_post_publication_activation_at_the_current_position(self):
         activations = activate_pending_encounters(self.player, room=self.room, tick=5)
         self.assertEqual(
@@ -293,6 +312,9 @@ class ActivationTests(EncounterDispatchTestBase):
             self.assertIn(context["scene"], {"south_gate", "market"})
             self.assertEqual(context["tick"], "5")
 
+    @covers_requirement(
+        "webclient-dialogue-session::encounter-updates-expose-only-committed-visible-interaction-targets"
+    )
     def test_a_rolled_back_activation_schedules_no_projection_refresh(self):
         """A compensated activation publishes no new occupant.
 
@@ -331,6 +353,10 @@ class ActivationTests(EncounterDispatchTestBase):
         self.assertEqual(row.state, scene_store.ENCOUNTER_ACTIVATED)
         self.assertEqual(row.room_id, activations[0].room_id)
 
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary",
+        "story-encounter-activation::independent-encounters-retain-actual-actor-identity",
+    )
     def test_possessed_exploration_keeps_the_original_owner(self):
         companion = create_object(NPC, key="同伴", location=self.room)
         companion.db.possessed_by = int(self.player.pk)
@@ -360,6 +386,9 @@ class SettledTraversalOrderingTests(EncounterDispatchTestBase):
     the whole point of activating there rather than after the receipt.
     """
 
+    @covers_requirement(
+        "story-encounter-activation::activation-precedes-final-settled-escort-observations"
+    )
     def test_a_settled_traversal_materializes_the_role_before_the_final_evaluation(self):
         import world.quests.escort_events as escort_events
         from typeclasses.exits import Exit
@@ -450,6 +479,9 @@ class PrerequisiteTriggerTests(EncounterDispatchTestBase):
             scene_store.read_package(self.package_id), "daughter", "searching", tick=1
         )
 
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary"
+    )
     def test_a_committed_closure_reaches_the_encounters_that_declared_it(self):
         from world.quests.story_dialogue import transition_story_dialogue
 
@@ -484,6 +516,9 @@ class PrerequisiteTriggerTests(EncounterDispatchTestBase):
 class StatusSyncTests(EncounterDispatchTestBase):
     """Reconnect and startup synchronize the owner's actual current position."""
 
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary"
+    )
     def test_startup_syncs_every_connected_owner(self):
         self.player.location = self.room
         activated = sync_connected_owners(tick=13, characters=[self.player])
@@ -500,6 +535,9 @@ class StatusSyncTests(EncounterDispatchTestBase):
         )
         self.assertEqual(scene_store.list_role_bindings(self.package_id), [])
 
+    @covers_requirement(
+        "dream-story-dispatch::status-feedback-follows-the-current-legal-owner-mapping"
+    )
     def test_startup_sync_delivers_the_latest_durable_status(self):
         from unittest.mock import Mock
 
@@ -521,6 +559,9 @@ class StatusSyncTests(EncounterDispatchTestBase):
 
 
 class MoveHookTests(EncounterDispatchTestBase):
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary"
+    )
     def test_move_hook_activates_outside_the_movement_boundary(self):
         self.player.location = self.room
         activations = activate_for_move(self.player, tick=9)
