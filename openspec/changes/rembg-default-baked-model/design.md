@@ -88,4 +88,6 @@ Use these retained and replacement literal requirement IDs in substantive tests:
 - `container-image::multi-stage-containerfile`
 - `container-image::compose-persists-mutable-state-and-exposes-image-data`
 
+Run only the six affected test modules explicitly selected in tasks.md. Do not run repository-wide Evennia, unittest, browser, coverage, or CI suites. Integration gates select only static traceability, observability, and manifest checks; do not select the contract gate's unrelated unittest target.
+
 The added model-delivery requirement uses `container-image::the-default-background-removal-model-is-acquired-during-image-build`. Keep `container-image::non-root-arbitrary-uid-capable-runtime` on permission coverage. Manual image acceptance is separate from the automated suite: inspect the final image's nonempty artifact and hash, then perform one real cutout with no network and a read-only root filesystem, output in `/tmp`, using the default UID and separately `1000630000:0`. Use the baked model with downloads disabled and confirm CPU-only initialization and alpha output; no runtime artifact writes or downloads are allowed. Repeat the default readiness path with downloads enabled to prove cached reuse. Capture build and smoke evidence without claiming the source-only tests exercised real weights.
