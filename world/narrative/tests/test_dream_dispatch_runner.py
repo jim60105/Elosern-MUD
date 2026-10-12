@@ -10,6 +10,8 @@ from unittest.mock import patch
 
 from twisted.internet import defer
 
+from tools.spec_traceability import covers_requirement
+
 from world.narrative import dispatch
 from world.narrative.attention import SOURCE_REQUEST
 from world.narrative.dispatch_runner import RunResult, StageClients, run_next
@@ -310,6 +312,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(result, RunResult("", "no_work", "", ""))
         self.assertEqual(len(client.calls), 0)
 
+    @covers_requirement(
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries"
+    )
     def test_a_changed_captured_fact_refuses_the_resumed_publication(self):
         """A relevant fact changed before an interrupted publication resumed."""
         _request, work = self._queued_work()
@@ -359,6 +364,9 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(settled.dispatch_id, work.dispatch_id)
         self.assertEqual(settled.request_version, work.request_version)
 
+    @covers_requirement(
+        "story-director-beats::beat-application-preserves-owner-and-snapshot-boundaries"
+    )
     def test_movement_during_generation_does_not_reject_the_publication(self):
         """The saved scene is published for the declared place, not the room.
 

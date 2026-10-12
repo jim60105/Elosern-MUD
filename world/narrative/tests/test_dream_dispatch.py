@@ -17,6 +17,8 @@ from django.db import transaction
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
+
 from world.narrative import dispatch
 from world.narrative.authoring import (
     DirectionValidationError,
@@ -997,6 +999,7 @@ class DispatchEventTests(DreamDispatchTestCase):
         self.assertEqual(info, [])
         self.assertEqual(DreamDispatch.objects.count(), 0)
 
+    @covers_requirement("observability-logging::facade-is-the-sole-game-code-log-entry-point")
     def test_dispatch_events_never_carry_the_direction_summary(self):
         draft = self._draft()
         summary = draft.direction["summary"]

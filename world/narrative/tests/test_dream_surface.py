@@ -593,6 +593,7 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertEqual(stored.direction["requirements"], requirements)
         self.assertEqual(stored.direction["requirement_version"], shown)
 
+    @covers_requirement("dream-authoring::explicit-version-confirmation-submits-once")
     def test_an_edited_summary_cannot_freeze_the_shown_requirement_version(self):
         # The review is bound to the version the player actually read: echoing
         # the shown rows and identity under a different summary freezes

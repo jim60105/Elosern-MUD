@@ -17,6 +17,8 @@ import json
 from unittest.mock import patch
 
 from server import dream_dispatch_service as pump
+from tools.spec_traceability import covers_requirement
+
 from world.narrative import dispatch
 from world.narrative import dream_session as lifecycle
 from world.narrative.quest_beats import is_scene_package
@@ -226,6 +228,9 @@ class DreamDispatchSmokeTests(CompileRegistryIsolation, StoryDirectorBeatsTestCa
             (),
         )
 
+    @covers_requirement(
+        "narrative-quest-compilation::quest-seed-beats-compile-only-through-existing-owners"
+    )
     def test_a_published_private_encounter_activates_without_guild_standing(self):
         """No guild membership is required for a privately issued encounter."""
         responses = self._responses()
