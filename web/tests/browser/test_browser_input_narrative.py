@@ -1690,6 +1690,11 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         _press(page, "Enter")  # 交談 -> explore.talk_open
         # The choice list over the stage appears once the greeting is read.
         open_dialogue_choices(page)
+        self.assertEqual(
+            sent_action_count(page, "explore.talk_scripted"),
+            0,
+            "reading the greeting must not choose a dialogue option",
+        )
         page.click('[data-testid="dialogue-freeform"]')
         _wait_field_focused(page)
         speech = "你好，詩人"
@@ -1700,6 +1705,22 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # is read (webclient-dialogue-choices-overlay) — and the command line is still present (it is never closed).
         wait_command_field_released(page)
         self.assertEqual(sent_action_count(page, "explore.talk_freeform"), 1)
+        request_id = next(
+            args[0]["request_id"]
+            for command, args, _kwargs in outbound_messages(page)
+            if command == "ui_action" and args
+            and args[0].get("action_id") == "explore.talk_freeform"
+        )
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state.get("lastActionResult") or {}).get("requestId") == request_id
+                and not (state.get("dispatch") or {}).get("inFlight")
+            ),
+        )
+        result = store_state(page)["lastActionResult"]
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], "talked", result)
         # Two deliberate mutations echoed: the conversation open, then the
         # one free-form send.
         _wait_inp_line(page, 2, keep_open=True)

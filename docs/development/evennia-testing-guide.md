@@ -1186,6 +1186,29 @@ runtime state），它維持原本的 late-import 語義，scope 結束時由 la
 完整 `t_` key 的端到端 browser journey proof 屬於 `migrate-browser-tests-off-real-data`。
 預設 off，shipped 行為不變。
 
+**Browser harness determinism contracts.** When `ELOSERN_BROWSER_SYNTH_CATALOGS=1`
+is set, the `at_server_init` wrapper runs the production `at_server_start` inside
+a *shipped-catalog scope*: the shipped registries are temporarily restored for
+the shipped NPC-roster validation step, so the genuine fail-loud validator
+executes against the shipped universe instead of the synthetic one, and the
+synthetic catalogs (including late-bound consumers and the service/economy
+grafts) come back afterwards. An invalid shipped roster therefore still aborts
+startup with `startup_step_failed` and a non-zero exit.
+
+Reading a dialogue line to its end is a single atomic event: `open_dialogue_choices`
+reads every unread page and only returns once the choice list has taken focus,
+so a following `Enter` cannot activate a row that appeared between the read and
+the keypress.
+
+Only the dedicated options-surface fixture (`ELOSERN_BROWSER_OPTIONS_SURFACE=1`)
+enables the `action_options` profile, together with its deterministic replay
+client. Every other browser journey takes the disabled-profile early return in
+`world/ai/action_options/generation.py` followed by the options service's
+rule-card fallback; no journey reaches a live LLM transport. Journeys that
+assert a dialogue outcome check the server side — the committed player/NPC turn
+pair reloaded from the private SQLite database and the NPC speech rendered in
+the narrative window — rather than only the dispatched envelope.
+
 **JS mirror 規則**：Web 端測試載體（vitest 與 Node gate）共用
 `web/webclient-app/tests/support/synthetic-data.mjs` 與
 `web/static/webclient/js/tests/support/synthetic-data.js` 兩份**位元組相同**的

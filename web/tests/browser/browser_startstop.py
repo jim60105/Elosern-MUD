@@ -196,6 +196,17 @@ def at_server_start():
     def _synth_startup_step(name, run, **kwargs):
         if name == "sync_guild_economy":
             return None
+        if name == "npc_persona_roster_validation":
+            # This gate owns the shipped inventory, profiles and examples.
+            # Validate their matching catalogs, then restore every synthetic
+            # graft before any world synchronization, including on failure.
+            from world.tests.synthetic_data import uninstall_synthetic_catalogs
+
+            uninstall_synthetic_catalogs()
+            try:
+                return original(name, run, **kwargs)
+            finally:
+                _install_synthetic_catalogs_if_flagged()
         return original(name, run, **kwargs)
 
     module._startup_step = _synth_startup_step

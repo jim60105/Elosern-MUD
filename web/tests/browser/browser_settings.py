@@ -70,17 +70,6 @@ SECRET_KEY = _env_path("ELOSERN_BROWSER_SECRET_KEY", "elosern-browser-test-key")
 DATABASES["default"]["NAME"] = _env_path(
     "ELOSERN_BROWSER_DB", DATABASES["default"]["NAME"]
 )
-# Multi-process SQLite contention: every browser test owns one database file
-# shared by the portal and the server (and the one-off migrate/seed processes),
-# and CI runners run the two shard processes side by side while background
-# world-clock/narrative writers hold write transactions. Python's default
-# 5-second busy timeout turns a contended write into OperationalError
-# 'database is locked' (observed as the talk_freeform seam errbacking to
-# dialogue_failed on saturated runners), so the harness raises it to 30s —
-# a test-environment knob that never touches production settings.
-_DB_OPTIONS = dict(DATABASES["default"].get("OPTIONS") or {})
-_DB_OPTIONS.setdefault("timeout", 30)
-DATABASES["default"]["OPTIONS"] = _DB_OPTIONS
 
 # Loopback-only listening services on dynamic ports.
 TELNET_ENABLED = True
@@ -200,15 +189,17 @@ ART_SCHEDULER_LIMIT = 4
 # developer settings, so every knob the deterministic core reads must be
 # declared here.
 DEFEAT_ADULT_SCENES = True
-# The browser harness is fully offline: every LLM profile stays enabled for the
-# layers that are never called, but ``npc_dialogue`` is disabled so the free-form
-# dialogue seam degrades to the authored greeting/silence deterministically with
-# no transport attempt. This mirrors the "deterministic game must remain fully
-# playable offline" invariant without touching the developer environment.
+# Disable dialogue transport and ordinary room-entry options generation.
+# The dedicated options fixture enables its deterministic replay client only.
+# Free-form dialogue uses the authored greeting/silence; other browser journeys
+# use the options service's rule-card fallback without contacting a live LLM.
 from world.ai.profiles import default_profiles  # noqa: E402
 
 _LLM_PROFILES = default_profiles()
 _LLM_PROFILES["npc_dialogue"]["enabled"] = False
+_LLM_PROFILES["action_options"]["enabled"] = (
+    os.environ.get("ELOSERN_BROWSER_OPTIONS_SURFACE") == "1"
+)
 LLM_PROFILES = _LLM_PROFILES
 
 
@@ -334,8 +325,8 @@ _ingress.is_webclient = _browser_is_webclient
 # for the empty-ground room fail with a scripted transport error (the
 # memoized degraded path), and any other room matches no fixture and degrades
 # exactly like an offline endpoint. No socket is ever opened. Sibling browser
-# suites keep the production client (and its plain offline degrade), exactly
-# as before this change. The room names below are authored by the seed
+# suites disable the options profile and use the service's rule-card fallback.
+# The room names below are authored by the seed
 # fixture in seed.py.
 # ---------------------------------------------------------------------------
 import server.option_proposal_service as _options_service  # noqa: E402

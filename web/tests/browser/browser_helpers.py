@@ -757,37 +757,35 @@ def open_dialogue_choices(page: Page, timeout: int = 30000) -> None:
     webclient-dialogue-choices-overlay: the dialogue line is paged and typed
     like any response, and the choice list over the stage renders only once
     the current response's last page is fully shown and no action is in
-    flight. This reads the line with the page surface's own reading key (a
-    real Enter on the focused page: the first press shows a typing page in
-    full, the next advances) until the window reports the line read, then
+    flight. This targets the page surface's Enter handler in the same browser
+    task as the readiness check: the first event shows a typing page in full,
+    the next advances. Focus cannot move to a newly rendered choice between
+    checking the page and delivering its reading event. Once the line is read,
     waits for ``[data-testid="dialogue-choices"]`` in the ``choices`` anchor.
     The shell moves focus from the page onto the list when it appears; the
     helper leaves that focus as it lands.
     """
     list_selector = '[data-anchor="choices"] [data-testid="dialogue-choices"]'
-    step_ms = 150
-    spent = 0
-    while spent < timeout:
-        state = page.evaluate(
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        ready = page.evaluate(
             """(listSelector) => {
+              if (document.querySelector(listSelector)) { return true; }
               const win = document.querySelector('[data-testid="message-window"]');
               const surface = document.querySelector('[data-testid="message-page"]');
-              return {
-                complete: !!win && win.getAttribute("data-reading-complete") === "true",
-                list: !!document.querySelector(listSelector),
-                onPage: !!surface && document.activeElement === surface,
-              };
+              if (win && surface && win.getAttribute('data-reading-complete') !== 'true') {
+                surface.focus();
+                surface.dispatchEvent(new KeyboardEvent('keydown', {
+                  key: 'Enter', code: 'Enter', bubbles: true, cancelable: true,
+                }));
+              }
+              return false;
             }""",
             list_selector,
         )
-        if state["list"]:
+        if ready:
             return
-        if not state["complete"]:
-            if not state["onPage"]:
-                page.focus('[data-testid="message-page"]')
-            page.keyboard.press("Enter")
-        page.wait_for_timeout(step_ms)
-        spent += step_ms
+        page.wait_for_timeout(150)
     page.wait_for_selector(list_selector, timeout=1000)
 
 
