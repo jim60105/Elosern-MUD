@@ -139,6 +139,10 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
         return _result("rejected", error.code, text)
     except (lifecycle.DreamSessionError, AuthoringError, ProtocolValidationError) as error:
         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_state_or_direction"}, exc=error)
+        # The refused action's Attribute and session writes rolled back with the
+        # transaction; drop the in-process cache so the next read (and the
+        # panel) serves the authoritative row instead of the aborted value.
+        surface.reset_cache(actor)
         return _result("rejected", "dream_refused", "目前無法接受這個操作，請確認故事方向與夢境狀態。")
 
     _refresh(actor, session)

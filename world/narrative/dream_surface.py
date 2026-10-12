@@ -127,6 +127,25 @@ def store_failure(actor):
     actor.db.dream_surface = value
 
 
+def reset_cache(actor):
+    """Drop the actor's in-process association cache after a rolled-back action.
+
+    A failed confirmation rolls its Attribute writes back in the database, but
+    the in-process Attribute cache would otherwise keep serving the aborted
+    value to the next read and to the panel. The idmapper cache holds the
+    Attribute instances themselves, so the flush is what makes the next read
+    authoritative -- the same discipline ``evict_created_actors`` applies to
+    actors a rolled-back activation created. Safely callable on any actor: an
+    object without the Attribute handler is simply skipped.
+    """
+    attributes = getattr(actor, "attributes", None)
+    if attributes is not None:
+        attributes.reset_cache()
+    from evennia.utils.idmapper.models import flush_cache
+
+    flush_cache()
+
+
 def dream_state(actor):
     """Server-authored actions, count, track, prose and committed sleep identity."""
     value = association(actor)

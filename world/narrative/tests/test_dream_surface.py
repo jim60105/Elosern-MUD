@@ -527,6 +527,31 @@ class DreamSurfaceTests(EvenniaTest):
         self.assertIn("南門", rendered)
         self.assertIn("帶她找媽媽", rendered)
 
+    def test_a_failed_confirmation_rolls_back_work_and_compensates_the_surface(self):
+        # The delta's own failure scenario: the work record fails inside the
+        # confirmation transaction, so the request, the work, the session
+        # closure and the surface write must all roll back together, and the
+        # in-process Attribute cache must not keep serving the aborted value.
+        from world.narrative.authoring import AuthoringError
+        from world.narrative.models import DreamDispatch
+
+        self.enter()
+        before = surface.association(self.actor)
+
+        def explode(*args, **kwargs):
+            surface.store_direction(self.actor, "不該留下的內容")
+            raise AuthoringError("synthetic work failure")
+
+        with patch.object(service.lifecycle, "confirm_session", side_effect=explode):
+            result = self.request(
+                "confirm", direction={"kind": "new_story", "summary": "合成方向"}
+            )
+        self.assertEqual(result.result["code"], "dream_refused")
+        self.assertFalse(CreativeRequest.objects.exists())
+        self.assertFalse(DreamDispatch.objects.exists())
+        self.assertTrue(service.dream_state(self.actor)["open"])
+        self.assertEqual(surface.association(self.actor), before)
+
     def test_confirmation_requires_the_shown_requirement_version(self):
         # A proposed requirement set becomes reviewable only when the version
         # that carries it is persisted, and confirmation must echo exactly that
