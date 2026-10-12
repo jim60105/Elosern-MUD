@@ -1,0 +1,397 @@
+"""Behavior tests for durable dream-dispatch work records.
+
+Everything here is deterministic and offline: synthetic actors, a fixed clock,
+no model or image service, and no fabricated success. The tests exercise the
+real confirmation transaction, the real work-record state machine and the real
+fencing/recovery path; the model boundary is never reached, which is exactly the
+claim ("confirmation and work management never advance the clock or await a
+model") that must be proved rather than asserted.
+"""
+
+from __future__ import annotations
+
+from evennia.utils.create import create_object
+from evennia.utils.test_resources import EvenniaTest
+
+from world.narrative import dispatch
+from world.narrative.authoring import (
+    DirectionValidationError,
+    confirm_draft,
+    requirement_version_for,
+    save_draft,
+    validate_direction,
+)
+from world.narrative.models import DreamDispatch
+from world.rules.clock import get_world_clock
+
+
+def new_story_direction(**overrides):
+    """A complete, valid new-story direction; overrides replace whole fields."""
+    direction = {
+        "summary": "合成夢境方向：在南門遇見一個女孩，帶她找媽媽。",
+        "themes": ["合成主題"],
+        "atmosphere": ["合成氛圍"],
+        "participants": [],
+        "emphasis": ["合成重點"],
+        "exclusions": [],
+        "kind": "new_story",
+        "thread_id": None,
+        "effects": [],
+        "revisions": [],
+    }
+    direction.update(overrides)
+    return direction
+
+
+class DreamDispatchTestCase(EvenniaTest):
+    """A synthetic owner, a fixed clock and a registered pump probe."""
+
+    def setUp(self):
+        super().setUp()
+        self.owner = create_object(
+            "typeclasses.characters.PlayerCharacter",
+            key="Synthetic dispatch owner",
+            location=self.room1,
+        )
+        self.clock = get_world_clock()
+        self.clock._persist(100)
+        self.clock.tick = 100
+        self.hints: list[str] = []
+        dispatch.register_pump(lambda: self.hints.append("hint"))
+        self.addCleanup(dispatch.register_pump, None)
+
+    @property
+    def owner_id(self) -> str:
+        return str(self.owner.pk)
+
+    def _draft(self, **overrides):
+        return save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(**overrides),
+            tick=100,
+        )
+
+    def _confirm(self, draft):
+        with self.captureOnCommitCallbacks(execute=True):
+            return confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+
+
+class WorkIdentityTests(DreamDispatchTestCase):
+    def test_one_work_record_per_confirmed_version(self):
+        draft = self._draft()
+        request = self._confirm(draft)
+        works = list(DreamDispatch.objects.all())
+        self.assertEqual(len(works), 1)
+        self.assertEqual(works[0].submission_key, request.submission_key)
+        self.assertEqual(works[0].state, dispatch.STATE_QUEUED)
+        self.assertEqual(works[0].owner_id, self.owner_id)
+        self.assertEqual(works[0].dispatch_id, dispatch.dispatch_id_for(request.submission_key))
+
+        # A duplicate confirmation replays the same request and never adds work.
+        again = self._confirm(draft)
+        self.assertEqual(again.pk, request.pk)
+        self.assertEqual(DreamDispatch.objects.count(), 1)
+
+        # A separately confirmed, edited version is a distinct source and work.
+        draft = save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(summary="合成第二版方向：在北門遇見一個商人。"),
+            tick=100,
+            draft_id=draft.draft_id,
+        )
+        second = self._confirm(draft)
+        self.assertNotEqual(second.submission_key, request.submission_key)
+        self.assertEqual(DreamDispatch.objects.count(), 2)
+        keys = {work.submission_key for work in DreamDispatch.objects.all()}
+        self.assertEqual(keys, {request.submission_key, second.submission_key})
+
+    def test_confirmation_hint_fires_only_after_commit(self):
+        draft = self._draft()
+        with self.captureOnCommitCallbacks(execute=True):
+            confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+            # The hint is a committed wake-up: the callback is registered, but
+            # the pump has not been woken while the transaction is still open.
+            self.assertEqual(self.hints, [])
+        # It fires exactly once, on commit.
+        self.assertEqual(self.hints, ["hint"])
+
+    def test_lost_hint_leaves_queued_work_discoverable(self):
+        dispatch.register_pump(None)
+        draft = self._draft()
+        with self.captureOnCommitCallbacks(execute=True):
+            request = confirm_draft(
+                draft_id=draft.draft_id, owner_id=self.owner_id, tick=100
+            )
+        self.assertFalse(dispatch.pump_registered())
+        # No hint was delivered, yet startup finds the saved queued work.
+        considered = dispatch.next_considered()
+        self.assertEqual([work.submission_key for work in considered], [request.submission_key])
+
+    def test_confirmation_never_advances_the_clock(self):
+        before = int(get_world_clock().tick)
+        draft = self._draft()
+        self._confirm(draft)
+        self.assertEqual(int(get_world_clock().tick), before)
+
+
+class ClaimAndFenceTests(DreamDispatchTestCase):
+    def setUp(self):
+        super().setUp()
+        self.draft = self._draft()
+        self.request = self._confirm(self.draft)
+        self.work = dispatch.find_by_submission(self.request.submission_key)
+
+    def test_pending_stage_sequence_follows_checkpoints(self):
+        self.assertEqual(dispatch.pending_stage(self.work), dispatch.STAGE_STORY)
+        self.assertEqual(dispatch.required_capability(self.work), dispatch.CAPABILITY_STORY)
+
+        claimed = dispatch.claim(self.work, process="p1")
+        row, token = claimed
+        self.assertEqual(row.state, dispatch.STATE_GENERATING_STORY)
+        self.assertEqual(int(row.attempts), 1)
+
+        self.assertTrue(
+            dispatch.checkpoint_story(
+                row,
+                token,
+                checkpoint={
+                    "snapshot_id": "snap",
+                    "scene_required": True,
+                    "proposal": {"kind": "quest_seed"},
+                },
+                tick=100,
+            )
+        )
+        row.refresh_from_db()
+        self.assertEqual(row.state, dispatch.STATE_GENERATING_SCENE)
+        self.assertEqual(row.stage, dispatch.STAGE_SCENE)
+
+        self.assertTrue(
+            dispatch.checkpoint_scene(row, token, checkpoint={"context": {}, "blueprint": {}})
+        )
+        row.refresh_from_db()
+        self.assertEqual(row.stage, dispatch.STAGE_PUBLISH)
+        self.assertEqual(dispatch.required_capability(row), None)
+
+    def test_non_scene_story_checkpoint_goes_straight_to_publication(self):
+        _, token = dispatch.claim(self.work, process="p1")
+        self.assertTrue(
+            dispatch.checkpoint_story(
+                self.work,
+                token,
+                checkpoint={"snapshot_id": "snap", "scene_required": False},
+            )
+        )
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.stage, dispatch.STAGE_PUBLISH)
+
+    def test_stale_token_cannot_checkpoint_or_settle(self):
+        _, first = dispatch.claim(self.work, process="p1")
+        _, second = dispatch.claim(self.work, process="p1")
+        self.assertNotEqual(first, second)
+        self.assertFalse(
+            dispatch.checkpoint_story(
+                self.work, first, checkpoint={"snapshot_id": "old", "scene_required": False}
+            )
+        )
+        self.assertFalse(
+            dispatch.mark_failed(self.work, first, dispatch.REASON_EXECUTION_FAILED)
+        )
+        self.work.refresh_from_db()
+        self.assertIsNone(self.work.story_checkpoint)
+        self.assertEqual(self.work.state, dispatch.STATE_GENERATING_STORY)
+        self.assertTrue(
+            dispatch.checkpoint_story(
+                self.work, second, checkpoint={"snapshot_id": "new", "scene_required": False}
+            )
+        )
+
+    def test_arranged_requires_durable_references_and_is_terminal(self):
+        _, token = dispatch.claim(self.work, process="p1")
+        dispatch.checkpoint_story(
+            self.work, token, checkpoint={"snapshot_id": "snap", "scene_required": False}
+        )
+        self.assertTrue(
+            dispatch.mark_arranged(
+                self.work,
+                token,
+                decision_id="dec_1",
+                thread_id="story:1",
+                beat_id="beat:dec_1",
+                package_id="",
+                tick=100,
+            )
+        )
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_ARRANGED)
+        self.assertEqual(self.work.decision_id, "dec_1")
+        self.assertEqual(dispatch.pending_stage(self.work), None)
+        self.assertEqual(dispatch.claim(self.work, process="p1"), None)
+        self.assertEqual(dispatch.next_considered(), [])
+
+    def test_terminal_failure_is_not_rerolled(self):
+        _, token = dispatch.claim(self.work, process="p1")
+        self.assertTrue(
+            dispatch.mark_failed(self.work, token, dispatch.REASON_INVALID_OUTPUT)
+        )
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_FAILED)
+        self.assertEqual(self.work.reason_code, dispatch.REASON_INVALID_OUTPUT)
+        self.assertEqual(dispatch.claim(self.work, process="p1"), None)
+        # A later pump pass cannot silently regenerate the same source.
+        self.assertEqual(dispatch.next_considered(), [])
+
+    def test_unknown_reason_is_bounded_to_a_known_code(self):
+        _, token = dispatch.claim(self.work, process="p1")
+        self.assertTrue(dispatch.mark_failed(self.work, token, "<script>"))
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.reason_code, dispatch.REASON_EXECUTION_FAILED)
+
+    def test_waiting_does_not_block_other_eligible_work(self):
+        other_draft = save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(summary="合成其他方向：在碼頭遇見一位船夫。"),
+            tick=100,
+        )
+        other = dispatch.find_by_submission(self._confirm(other_draft).submission_key)
+        self.assertTrue(dispatch.mark_waiting(self.work, tick=100))
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_WAITING_SERVICE)
+        # The waiting record is still considered (so a later notification can
+        # re-evaluate it) and its later sibling was never blocked.
+        considered = [work.dispatch_id for work in dispatch.next_considered()]
+        self.assertEqual(considered, [self.work.dispatch_id, other.dispatch_id])
+        self.assertEqual(dispatch.consider_waiting(), 1)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_QUEUED)
+
+
+class RecoveryTests(DreamDispatchTestCase):
+    def setUp(self):
+        super().setUp()
+        self.draft = self._draft()
+        self.request = self._confirm(self.draft)
+        self.work = dispatch.find_by_submission(self.request.submission_key)
+
+    def test_recovery_fences_a_previous_process_claim(self):
+        _, stale_token = dispatch.claim(self.work, process="previous-process")
+        self.assertEqual(dispatch.recover_interrupted(process="current-process"), [self.work.dispatch_id])
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_QUEUED)
+        self.assertEqual(self.work.execution_token, "")
+        self.assertEqual(self.work.claimed_by, "current-process")
+        # The interrupted execution's late callback mutates nothing.
+        self.assertFalse(
+            dispatch.checkpoint_story(
+                self.work, stale_token, checkpoint={"snapshot_id": "late"}
+            )
+        )
+        self.work.refresh_from_db()
+        self.assertIsNone(self.work.story_checkpoint)
+
+    def test_recovery_reuses_saved_checkpoints(self):
+        _, token = dispatch.claim(self.work, process="previous-process")
+        dispatch.checkpoint_story(
+            self.work,
+            token,
+            checkpoint={"snapshot_id": "kept", "scene_required": True},
+            tick=100,
+        )
+        dispatch.recover_interrupted(process="current-process")
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.story_checkpoint["snapshot_id"], "kept")
+        # Only the still-uncommitted stage remains to run.
+        self.assertEqual(dispatch.pending_stage(self.work), dispatch.STAGE_SCENE)
+
+    def test_a_live_claim_is_never_recovered(self):
+        _, token = dispatch.claim(self.work, process=dispatch.process_identity())
+        self.assertEqual(dispatch.recover_interrupted(), [])
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.state, dispatch.STATE_GENERATING_STORY)
+        self.assertEqual(self.work.execution_token, token)
+
+    def test_shutdown_invalidates_unfinished_callback_ownership(self):
+        _, token = dispatch.claim(self.work, process=dispatch.process_identity())
+        self.assertEqual(dispatch.fence_all(), 1)
+        self.work.refresh_from_db()
+        self.assertEqual(self.work.execution_token, "")
+        self.assertFalse(dispatch.mark_arranged(
+            self.work, token, decision_id="d", thread_id="t", beat_id="b"
+        ))
+
+
+class RequirementsContractTests(DreamDispatchTestCase):
+    def test_bounded_requirements_are_normalized_and_versioned(self):
+        direction = new_story_direction(
+            requirements=[
+                {"kind": "place", "text": "南門"},
+                {"kind": "new_character", "text": "一個女孩"},
+                {"kind": "private_commission", "text": "帶她找媽媽"},
+            ],
+            requirement_version="draft:v1",
+        )
+        result = validate_direction(direction, owner_id=self.owner_id)
+        self.assertTrue(result.valid)
+        self.assertEqual(len(result.direction["requirements"]), 3)
+        self.assertEqual(result.direction["requirement_version"], "draft:v1")
+
+    def test_requirements_reject_unknown_kind_shape_and_length(self):
+        bad_rows = [
+            [{"kind": "explode", "text": "南門"}],
+            [{"kind": "place", "text": "南門", "extra": "x"}],
+            [{"kind": "place", "text": " "}],
+            [{"kind": "place", "text": "長" * 201}],
+            [{"kind": "place"}] * 9,
+        ]
+        for rows in bad_rows:
+            with self.subTest(rows=rows):
+                result = validate_direction(
+                    new_story_direction(requirements=rows, requirement_version="draft:v1"),
+                    owner_id=self.owner_id,
+                )
+                self.assertFalse(result.valid)
+                self.assertIn("malformed_requirements", result.reason_codes)
+
+    def test_requirements_without_a_version_are_malformed(self):
+        result = validate_direction(
+            new_story_direction(
+                requirements=[{"kind": "place", "text": "南門"}],
+                requirement_version=None,
+            ),
+            owner_id=self.owner_id,
+        )
+        self.assertFalse(result.valid)
+        self.assertIn("malformed_requirements", result.reason_codes)
+
+    def test_requirement_version_is_deterministic_per_shown_version(self):
+        draft = self._draft()
+        first = requirement_version_for(draft.draft_id, 1)
+        self.assertEqual(first, requirement_version_for(draft.draft_id, 1))
+        self.assertNotEqual(first, requirement_version_for(draft.draft_id, 2))
+
+
+class UnreviewedRequirementsTests(DreamDispatchTestCase):
+    def test_confirmation_refuses_stale_requirements(self):
+        draft = self._draft()
+        stale = new_story_direction(
+            requirements=[{"kind": "place", "text": "南門"}],
+            requirement_version=requirement_version_for(draft.draft_id, 99),
+        )
+        save_draft(owner_id=self.owner_id, direction=stale, tick=100, draft_id=draft.draft_id)
+        with self.assertRaises(DirectionValidationError) as failure:
+            with self.captureOnCommitCallbacks(execute=True):
+                confirm_draft(draft_id=draft.draft_id, owner_id=self.owner_id, tick=100)
+        self.assertIn("stale_requirements", failure.exception.reason_codes)
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+
+    def test_confirmation_accepts_the_shown_requirements(self):
+        draft = self._draft()
+        reviewed = new_story_direction(
+            requirements=[{"kind": "place", "text": "南門"}],
+            requirement_version=requirement_version_for(draft.draft_id, 2),
+        )
+        save_draft(owner_id=self.owner_id, direction=reviewed, tick=100, draft_id=draft.draft_id)
+        self.assertEqual(int(confirm_draft(
+            draft_id=draft.draft_id, owner_id=self.owner_id, tick=100
+        ).version), 2)
+        self.assertEqual(DreamDispatch.objects.count(), 1)

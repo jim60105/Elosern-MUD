@@ -938,3 +938,66 @@ class ScheduledBeat(models.Model):
 
     def __str__(self) -> str:
         return f"ScheduledBeat({self.beat_id}, kind={self.kind}, effect={self.effect})"
+
+
+class DreamDispatch(models.Model):
+    """One durable narrative-owned work record per confirmed request version.
+
+    ``submission_key`` is database-unique and equals the confirmed
+    :class:`CreativeRequest` identity, so "one work record per request/version"
+    is a constraint and not a scan: replaying a confirmation or a stale callback
+    cannot create a second work record. The confirmed direction stays immutable
+    source data in ``CreativeRequest``; every mutable execution fact lives here.
+
+    The row is the authoritative work state. A pump notification is only a
+    wake-up hint, so a lost hint costs a delay and never a lost request. The
+    stage checkpoints hold *validated* stage outputs (the captured immutable
+    director frame plus the validated proposal, and the captured scene planning
+    context plus the validated blueprint payload) -- never credentials and never
+    an unrestricted raw transcript, which stays in the transcript log keyed by
+    ``call_id``.
+
+    ``execution_token``/``claimed_by`` fence one execution: every checkpoint and
+    settlement compares both, so a stale callback from an interrupted or
+    superseded execution cannot mutate work, publication or dialogue.
+    """
+
+    dispatch_id = models.CharField(max_length=160, unique=True, db_index=True)
+    submission_key = models.CharField(max_length=160)
+    owner_id = models.CharField(max_length=255, db_index=True)
+    draft_id = models.CharField(max_length=128, default="")
+    request_version = models.BigIntegerField(default=0)
+    source_key = models.CharField(max_length=255, default="")
+    state = models.CharField(max_length=24, default="queued")
+    stage = models.CharField(max_length=16, default="")
+    execution_token = models.CharField(max_length=64, default="")
+    claimed_by = models.CharField(max_length=64, default="")
+    story_checkpoint = models.JSONField(null=True, blank=True)
+    scene_checkpoint = models.JSONField(null=True, blank=True)
+    decision_id = models.CharField(max_length=160, default="")
+    thread_id = models.CharField(max_length=128, default="")
+    beat_id = models.CharField(max_length=200, default="")
+    package_id = models.CharField(max_length=128, default="")
+    reason_code = models.CharField(max_length=48, default="")
+    attempts = models.IntegerField(default=0)
+    tick = models.BigIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        app_label = "narrative"
+        db_table = "narrative_dream_dispatch"
+        ordering = ["id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["submission_key"],
+                name="unique_dream_dispatch_submission",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["state", "id"], name="dream_dispatch_state_id"),
+            models.Index(fields=["owner_id", "id"], name="dream_dispatch_owner_id"),
+        ]
+
+    def __str__(self) -> str:
+        return f"DreamDispatch({self.dispatch_id}, state={self.state})"
