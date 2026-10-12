@@ -26,9 +26,9 @@ from world.quests.generated_quest_store import (
 )
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
-    ObjectiveKind,
     QuestDefinition,
     register_quest_definition,
+    validate_definition,
 )
 from world.rules.guild_offers import (
     GUILD_OFFER_REGISTRY,
@@ -195,12 +195,13 @@ def register_generated_quest(compiled: CompiledQuest) -> None:
     durable mirror.
     """
     definition = compiled.definition
-    for stage in definition.stages:
-        if stage.objective.kind is ObjectiveKind.ESCORT:
-            _reject(
-                "ESCORT stages cannot be published until a protected-entity "
-                "binding flow exists; the whole quest is refused"
-            )
+    # ESCORT stages are publishable now that the protected-entity binding flow
+    # exists: their complete contract (quantity one, exactly one completion
+    # discriminator, nonempty exact protected/meeting role sets, no mixed
+    # fields) is validated by the definition validator, so this boundary no
+    # longer refuses them wholesale. Validate BEFORE the durable write so a
+    # malformed contract is rejected before any mutation.
+    validate_definition(definition)
     payload_added = append_generated_quest_payload(_compiled_to_payload(compiled))
     try:
         _publish_registration(

@@ -138,12 +138,14 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_register_generated_quest_refuses_escort_stages(self):
+    def test_a_complete_escort_registers_at_the_publication_boundary(self):
+        # The blanket "ESCORT stages cannot be published" refusal is gone: a
+        # complete escort contract now registers like any other definition.
         from ._fixtures import anchor_locator, escort, quest
         from world.quests.definitions import QuestType
 
         definition = quest(
-            "escort_publication_guard",
+            "escort_publication_cutover",
             quest_type=QuestType.ESCORT,
             stages=(QuestStage(0, escort(anchor_locator())),),
         )
@@ -156,10 +158,47 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
             ),
             stage_requirements=(),
         )
+        register_generated_quest(compiled)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY[definition.key], definition)
+        self.assertIn(
+            (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
+        )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_an_incomplete_escort_is_refused_by_its_contract(self):
+        # An ESCORT stage with no completion discriminator is refused by its own
+        # complete-contract validation before any registry mutation.
+        from ._fixtures import anchor_locator
+        from world.quests.definitions import QuestDefinitionError, QuestType
+
+        definition = QuestDefinition(
+            key="escort_incomplete_contract",
+            display_name="護衛未完成",
+            quest_type=QuestType.ESCORT,
+            rank="F",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ESCORT,
+                        destination=anchor_locator(),
+                        protected_role_refs=("escortee",),
+                    ),
+                ),
+            ),
+        )
+        compiled = CompiledQuest(
+            definition=definition,
+            reward=QuestReward(copper=50, items=(), merit=25),
+            issuance=IssuanceDescriptor(
+                issuer_key="guild:guild_branch_altoria",
+                settlement=Settlement.COUNTER,
+            ),
+            stage_requirements=(),
+        )
         with self.assertRaisesRegex(
-            QuestCompileError,
-            "ESCORT stages cannot be published until a protected-entity "
-            "binding flow exists",
+            (QuestCompileError, QuestDefinitionError),
+            "exactly one completion discriminator",
         ):
             register_generated_quest(compiled)
         self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
