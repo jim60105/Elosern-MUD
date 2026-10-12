@@ -24,10 +24,18 @@ from world.rules.upkeep import settle_upkeep
 
 from ._fixtures import (
     QuestRegistryIsolation, bound_instance_locator, escort, quest, register,
+    register_catalog_once,
 )
 
+# The shipped affinity rulebook cross-references one catalog quest by key, so
+# the affinity-config loader needs the catalog definitions present in-process
+# (the guild/service suites do the same at import, before any synthetic scope).
+register_catalog_once()
 
-class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
+
+class EscortFixtureMixin:
+    """The shared synthetic escort package, issuer, roles and stores."""
+
     def setUp(self):
         super().setUp()
         self.owner = self.char1
@@ -76,6 +84,14 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
 
     def outcome_groups(self):
         return []
+
+
+class EscortTestBase(EscortFixtureMixin, QuestRegistryIsolation, EvenniaTest):
+    """The shared synthetic escort fixture for the escort behaviour suites."""
+
+
+class EscortLifecycleTests(EscortTestBase):
+    """Acceptance, release and settled evaluation through the real owners."""
 
     def test_acceptance_returns_exact_persisted_binding_beyond_general_quota(self):
         for _ in range(4):
@@ -167,7 +183,7 @@ class EscortLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
 
 
-class EscortExclusiveOutcomeTests(EscortLifecycleTests):
+class EscortExclusiveOutcomeTests(EscortTestBase):
     def outcome_groups(self):
         return [{
             "group_id": "reunion", "alternatives": [self.definition.key],
@@ -191,7 +207,7 @@ class EscortExclusiveOutcomeTests(EscortLifecycleTests):
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
 
 
-class EscortExclusiveAlternativeTests(EscortLifecycleTests):
+class EscortAlternativeMixin(EscortFixtureMixin):
     """Two distinct commissions share one exclusive result; one winner pays."""
 
     ALTERNATIVE = "synthetic_bound_escort_alternative"
@@ -252,6 +268,14 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
             completion=EscortCompletion.RENDEZVOUS,
             protected_role_refs=("protected",), meeting_role_refs=("meeting",),
         )),)
+
+
+class EscortAlternativeTestBase(EscortAlternativeMixin, QuestRegistryIsolation, EvenniaTest):
+    """The two-commission exclusive-result fixture."""
+
+
+class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
+    """Exclusive alternative-resolution behaviour."""
 
     def test_first_accepted_alternative_wins_and_the_other_is_invalidated(self):
         from world.quests.escort_events import exclusive_outcome_status
@@ -364,8 +388,15 @@ class EscortExclusiveAlternativeTests(EscortLifecycleTests):
         self.assertEqual(list(records), ["synthetic_bound_escort:1"])
 
 
-class EscortEntitlementTests(EscortLifecycleTests):
+class EscortEntitlementTests(EscortTestBase):
     """Only the group winner, or a group-less record, is ever entitled."""
+
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion", "alternatives": [self.definition.key],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
 
     def test_entitlement_follows_the_group_result(self):
         from types import SimpleNamespace
@@ -395,8 +426,160 @@ class EscortEntitlementTests(EscortLifecycleTests):
             self.owner, SimpleNamespace(group_id=None, package_id=None, quest_id="free:1")
         ))
 
+    def test_automatic_planning_skips_a_completed_non_winner(self):
+        from world.quests import outcome_store
+        from world.quests.escort_events import reward_entitled
+        from world.quests.runtime import apply_quest_log_replacement, fulfill_record_for
+        from world.quests.settlement import plan_auto_settlement
 
-class EscortIntermediateStageTests(EscortExclusiveAlternativeTests):
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        outcome_store.mark_group_resolved(
+            owner_id=self.owner.pk, package_id=self.package.package_id,
+            group_id="reunion", resolution_source="s", winner_quest_id="other:9",
+        )
+        completed = fulfill_record_for(self.owner, record, self.definition)
+        apply_quest_log_replacement(self.owner, [completed])
+        self.assertFalse(reward_entitled(self.owner, completed))
+        self.assertEqual(plan_auto_settlement(self.owner, [completed]).entries, ())
+
+
+class EscortCounterClaimTests(EscortTestBase):
+    """The counter-claim path turns in exactly the entitled record."""
+
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion", "alternatives": [self.definition.key],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
+
+    def setUp(self):
+        from world.rules.tests._combat_session_helpers import open_synthetic_scope
+
+        open_synthetic_scope(self, "guild_branches", "items", "monster_tiers")
+        super().setUp()
+        from typeclasses.components import GuildStaff
+        from world.rules.guild import register_adventurer
+        from world.rules.guild_offers import (
+            GuildQuestOffer, QuestReward, register_guild_offer,
+        )
+        from world.rules.tests._guild_service_probes import (
+            rank_reward_band, synthetic_branch_key,
+        )
+
+        self.branch = synthetic_branch_key()
+        self.staff = create_object(NPC, key="公會職員", location=self.room1)
+        self.staff.components.add(
+            GuildStaff.create(self.staff, service_id="staff", branch_key=self.branch)
+        )
+        self.owner.race = "human"
+        self.owner.apply_race_baseline()
+        register_adventurer(self.owner, self.staff)
+        low, _high = rank_reward_band(self.definition.rank)
+        register_guild_offer(GuildQuestOffer(
+            self.definition.key, self.branch, QuestReward(low, (), 0),
+        ))
+
+    def test_a_completed_non_winner_is_refused_by_the_counter_claim(self):
+        from world.quests import outcome_store
+        from world.quests.runtime import apply_quest_log_replacement, fulfill_record_for
+        from world.rules.guild import RewardClaimError, turn_in_quest
+
+        record = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        outcome_store.mark_group_resolved(
+            owner_id=self.owner.pk, package_id=self.package.package_id,
+            group_id="reunion", resolution_source="s", winner_quest_id="other:9",
+        )
+        completed = fulfill_record_for(self.owner, record, self.definition)
+        apply_quest_log_replacement(self.owner, [completed])
+        self.assertEqual(read_records(self.owner)[0].state.value, "completed")
+        with self.assertRaises(RewardClaimError):
+            turn_in_quest(self.owner, self.staff, completed.quest_id)
+
+
+class EscortResultFaultTests(EscortAlternativeTestBase):
+    """A fault after any result write rolls the whole result back."""
+
+    def _begin(self):
+        winner = accept_quest(self.owner, self.definition.key, self.issuer_key)
+        other = accept_quest(self.owner, self.ALTERNATIVE, self.issuer_key)
+        return winner, other, (self.owner.db.wallet or 0)
+
+    def _assert_unresolved_baseline(self, winner, other, wallet_before):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertFalse(group.resolved)
+        self.owner.attributes.reset_cache()
+        records = {record.quest_id: record.state.value for record in read_records(self.owner)}
+        self.assertEqual(records[winner.quest_id], "in_progress")
+        self.assertEqual(records[other.quest_id], "in_progress")
+        self.assertEqual(self.owner.db.wallet, wallet_before)
+        self.assertEqual(list(self.owner.db.guild_reward_claims or []), [])
+
+    def test_a_group_write_fault_rolls_the_whole_result_back(self):
+        from unittest.mock import patch
+
+        from world.quests import outcome_store
+
+        winner, other, wallet_before = self._begin()
+        with patch.object(
+            outcome_store, "mark_group_resolved", side_effect=RuntimeError("group fault")
+        ):
+            with self.assertRaises(RuntimeError):
+                self.protected.move_to(self.room2, quiet=True)
+        self._assert_unresolved_baseline(winner, other, wallet_before)
+
+    def test_a_narrative_fault_rolls_the_whole_result_back(self):
+        from unittest.mock import patch
+
+        winner, other, wallet_before = self._begin()
+        with patch(
+            "world.narrative.memory.record_memory",
+            side_effect=RuntimeError("narrative fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.protected.move_to(self.room2, quiet=True)
+        self._assert_unresolved_baseline(winner, other, wallet_before)
+
+    def test_a_record_write_fault_rolls_the_whole_result_back(self):
+        from unittest.mock import patch
+
+        winner, other, wallet_before = self._begin()
+        with patch(
+            "world.quests.escort_events.apply_quest_log_replacement",
+            side_effect=RuntimeError("record fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.protected.move_to(self.room2, quiet=True)
+        self._assert_unresolved_baseline(winner, other, wallet_before)
+
+    def test_a_reward_write_fault_rolls_the_whole_result_back(self):
+        from unittest.mock import patch
+
+        winner, other, wallet_before = self._begin()
+        with patch(
+            "world.quests.settlement.commit_auto_settlement",
+            side_effect=RuntimeError("reward fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.protected.move_to(self.room2, quiet=True)
+        self._assert_unresolved_baseline(winner, other, wallet_before)
+
+    def test_a_handback_fault_rolls_the_whole_result_back(self):
+        from unittest.mock import patch
+
+        winner, other, wallet_before = self._begin()
+        with patch(
+            "world.rules.possession.release_for_party_change",
+            side_effect=RuntimeError("handback fault"),
+        ):
+            with self.assertRaises(RuntimeError):
+                self.protected.move_to(self.room2, quiet=True)
+        self._assert_unresolved_baseline(winner, other, wallet_before)
+
+
+class EscortIntermediateStageTests(EscortAlternativeTestBase):
     """A multi-stage alternative advances without settling its final group."""
 
     def alternative_stages(self):
@@ -421,7 +604,7 @@ class EscortIntermediateStageTests(EscortExclusiveAlternativeTests):
         self.assertEqual(self.owner.db.wallet, before)
 
 
-class EscortCasualtyTests(EscortLifecycleTests):
+class EscortCasualtyTests(EscortTestBase):
     """Lawful committed death fails an escort without kill-credit attribution."""
 
     def setUp(self):
@@ -542,7 +725,7 @@ class EscortCasualtyTests(EscortLifecycleTests):
         self.assertEqual(stored.state.value, "in_progress")
 
 
-class EscortEventBoundaryTests(EscortLifecycleTests):
+class EscortEventBoundaryTests(EscortTestBase):
     """Movement boundaries settle exactly once and attribute real actors."""
 
     def test_unrelated_general_companion_move_cannot_advance_a_rendezvous(self):
