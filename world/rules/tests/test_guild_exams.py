@@ -448,7 +448,20 @@ class ExamStartTests(ExamHostFixture, EvenniaTestCase):
                     start_guild_exam(self.player, self.host, "E")
                 self.assertEqual(self._host_state(), host_before)
                 self.assertEqual(self._actor_state(), actor_before)
-                self.assertEqual(_BATTLEFIELDS, {})
+                # The rollback contract is about THIS examination's
+                # participants: the process-wide registry may carry an
+                # unrelated live registration from another test module in
+                # the same runner process, and asserting the whole registry
+                # empty made that residue (plus an unpicklable Battlefield
+                # in the diff) fail this subTest under --parallel.
+                self.assertEqual(
+                    [
+                        key
+                        for key in _BATTLEFIELDS
+                        if key in (str(self.player.pk), str(self.host.pk))
+                    ],
+                    [],
+                )
                 self.assertFalse(self.host.relations.has_record(self.player))
         # The retry starts exactly once, as attempt number one.
         record = start_guild_exam(self.player, self.host, "E")
