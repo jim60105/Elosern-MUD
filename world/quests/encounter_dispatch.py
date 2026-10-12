@@ -282,9 +282,15 @@ def activate_for_move(actor: Any, *, tick: int | None = None) -> tuple[Any, ...]
     if in_escort_boundary():
         return ()
     if tick is None:
-        from world.rules.clock import get_world_clock
+        from world.rules.clock import read_world_clock
 
-        tick = int(get_world_clock().tick)
+        # A hook that owns no clock charge resolves the current tick without
+        # materializing the singleton: deterministic startup creates it
+        # (at_server_startstop's own ``world_clock_init`` step), and an absent
+        # clock is the world's own initial tick 0. Creating the Script here
+        # would publish global state from every NPC creation and relocation.
+        clock = read_world_clock()
+        tick = 0 if clock is None else int(clock.tick)
     return activate_pending_encounters(
         actor, room=getattr(actor, "location", None), tick=int(tick)
     )

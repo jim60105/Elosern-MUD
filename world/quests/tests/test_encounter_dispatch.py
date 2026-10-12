@@ -574,3 +574,32 @@ class MoveHookTests(EncounterDispatchTestBase):
         with escort_event_boundary((self.player,)):
             self.assertEqual(activate_for_move(self.player, tick=3), ())
         self.assertEqual(scene_store.list_role_bindings(self.package_id), [])
+
+    @covers_requirement(
+        "story-encounter-activation::all-production-encounter-triggers-use-one-eligibility-boundary"
+    )
+    def test_implicit_move_hook_tick_never_creates_the_world_clock(self):
+        # A relocation that owns no clock charge resolves the current tick
+        # without materializing the singleton: deterministic startup creates
+        # that Script, and every NPC creation or move runs this hook. The
+        # absent clock's own initial tick is 0.
+        from world.rules.clock import read_world_clock
+
+        self.player.location = self.room
+        self.assertIsNone(read_world_clock())
+        self.assertTrue(activate_for_move(self.player))
+        self.assertIsNone(
+            read_world_clock(),
+            "the movement hook must not create the world clock",
+        )
+        row = scene_store.get_encounter(self.package_id, "south_gate", self.player.pk)
+        self.assertEqual(row.activation_tick, 0)
+
+    def test_implicit_move_hook_tick_is_the_existing_clock_tick(self):
+        from world.rules.clock import AdvanceSource, get_world_clock
+
+        get_world_clock().advance(30, AdvanceSource.COMMAND, ())
+        self.player.location = self.room
+        self.assertTrue(activate_for_move(self.player))
+        row = scene_store.get_encounter(self.package_id, "south_gate", self.player.pk)
+        self.assertEqual(row.activation_tick, 30)
