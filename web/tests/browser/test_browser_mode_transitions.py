@@ -141,6 +141,11 @@ _INSTALL_READER = """() => {
       list: !!q('[data-anchor="choices"] [data-testid="dialogue-choices"]'),
       listFocused: active === q('[data-anchor="choices"] [data-testid="dialogue-choices"]'),
       dockFocused: !!active && active.id === 'action-dock',
+      // The exploration focus home is the exit compass inside the dock
+      // (webclient-contextual-hud: the command region collapses in dialogue
+      // mode; the scene-overview redesign §5.4): leaving dialogue re-homes
+      // focus there, not on the dock container itself.
+      compassFocused: !!active && active === q('[data-testid="exit-compass"]'),
       rows: rows.map((el) => ({ delay: getComputedStyle(el).animationDelay, name: getComputedStyle(el).animationName, opacity: Number(getComputedStyle(el).opacity) })),
       flashPeak: getComputedStyle(document.documentElement).getPropertyValue('--motion-flash-peak').trim(),
     };
@@ -215,7 +220,8 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
     def test_dialogue_enter_and_leave_full(self):
         """Entering dialogue widens the window at once and slides the inert
         command region out; the host enters over 350ms with the plate. Leaving
-        reverses it: the host leaves inert and the dock is focused, in reach."""
+        reverses it: the host leaves inert and the exploration focus home —
+        the exit compass inside the dock — is focused, in reach."""
         page = self._page(None)
         self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), "full")
         state = self._enter_dialogue(page)
@@ -245,7 +251,7 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(state["hosts"][0]["leaving"])
         self.assertTrue(state["hosts"][0]["inert"])
         self.assertFalse(state["list"])
-        self._wait(page, "s.dockFocused")
+        self._wait(page, "s.compassFocused")
         self._wait(page, "s.hosts.length === 0 && s.command.opacity === 1 && s.plates.length === 0")
         page.close()
 
@@ -285,7 +291,7 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         open_dialogue_choices(page)
         self._wait(page, "s.list && s.listFocused")
         steps["leave dialogue"] = sampled(
-            lambda: self._leave_dialogue(page), "s.dockFocused && s.command.opacity === 1 && s.hosts.length === 0"
+            lambda: self._leave_dialogue(page), "s.compassFocused && s.command.opacity === 1 && s.hosts.length === 0"
         )
         steps["enter combat"] = sampled(
             lambda: self._commit(page, "combat", {"context_actions": _combat_panel()}),
@@ -300,7 +306,9 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
                 self.assertGreater(worst["frames"], 1)
                 self.assertEqual(worst["scrollLeft"], 0, worst)
                 self.assertLessEqual(worst["overflow"], 0, worst)
-        self.assertTrue(self._read(page)["dockFocused"])
+        # The last commit returned to exploration, where the focus home is the
+        # exit compass inside the dock (scene-overview redesign §5.4).
+        self.assertTrue(self._read(page)["compassFocused"])
         page.close()
 
     @covers_requirement(
