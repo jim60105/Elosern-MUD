@@ -83,7 +83,10 @@ class ScenePackage(models.Model):
 
     package_id = models.CharField(max_length=128, unique=True)
     source_id = models.CharField(max_length=255, null=True, blank=True, unique=True)
-    owner_id = models.CharField(max_length=255)
+    # Indexed: the production encounter-eligibility boundary resolves one
+    # owner's pending published packages through this reference on every real
+    # exploration boundary, never through a global scan (dream-story-dispatch §7).
+    owner_id = models.CharField(max_length=255, db_index=True)
     version = models.BigIntegerField(default=1)
     status = models.CharField(max_length=16, default="published")
     payload = models.JSONField()

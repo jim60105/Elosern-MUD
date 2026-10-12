@@ -131,6 +131,17 @@ def escort_event_boundary(actors: tuple[Any, ...] = ()):
         _CURRENT_SOURCE.reset(token)
 
 
+def in_escort_boundary() -> bool:
+    """Whether the caller already runs inside one settled movement receipt.
+
+    A move hook that fires mid-traversal must not run its own
+    activation/evaluation pass: the enclosing boundary already covers the
+    traversal and evaluates once, at the charged tick, after the movement has
+    settled (dream-story-dispatch §7).
+    """
+    return _CURRENT_SOURCE.get() is not None
+
+
 def _require_source(source: EscortSource) -> None:
     if not isinstance(source, EscortSource) or _CURRENT_SOURCE.get() is not source:
         raise EscortOperationError("invalid_source")

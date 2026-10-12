@@ -132,6 +132,13 @@ class PlayerCharacter(LivingEntity):
         from world.quests.room_observation import observe_arrival_lore
 
         observe_arrival_lore(self, self.location)
+        # Published story encounters whose declared locator covers this actual
+        # position activate at the real room-entry boundary (dream-story-dispatch
+        # §7). The call is skipped while the settled traversal boundary owns the
+        # movement, and it never raises into the move hook.
+        from world.quests.encounter_dispatch import activate_for_move
+
+        activate_for_move(self)
 
     def at_post_unpuppet(self, account=None, session=None, **kwargs) -> None:
         """Fire the logout epithet-nomination rest point (change G)."""

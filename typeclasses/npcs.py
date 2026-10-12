@@ -192,6 +192,14 @@ class NPC(LivingEntity):
         from typeclasses.characters import _schedule_action_options_after_move
 
         _schedule_action_options_after_move(self)
+        # A lawfully possessed companion exploring on the owner's behalf is a
+        # real exploration boundary: published encounters whose locator covers
+        # its actual position activate, with ownership staying with the original
+        # player (dream-story-dispatch §7). Skipped while the settled traversal
+        # boundary already owns the movement, and never raising into the hook.
+        from world.quests.encounter_dispatch import activate_for_move
+
+        activate_for_move(self)
         if source_location is None:
             return
         from django.db import transaction

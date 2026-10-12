@@ -112,6 +112,23 @@ def list_packages() -> list[ScenePackage]:
     return list(ScenePackage.objects.order_by("id"))
 
 
+def packages_for_owner(owner_id: Any) -> tuple[ScenePackage, ...]:
+    """Every published package one owner identity holds, in creation order.
+
+    The production encounter-eligibility boundary reads pending work through
+    this indexed owner reference, so a movement never scans another player's
+    packages or the global package set (design §7).
+    """
+    clean = str(owner_id).strip()
+    if not clean:
+        return ()
+    return tuple(
+        ScenePackage.objects.filter(
+            owner_id=clean, status=PACKAGE_STATUS_PUBLISHED
+        ).order_by("id")
+    )
+
+
 def package_for_definition(definition_key: str) -> ScenePackage | None:
     """Return the published package whose compiled definition key matches, or ``None``.
 
