@@ -426,6 +426,8 @@ function validQuestLogRow(overrides) {
         disabled_reason: null,
         quantity: null,
       },
+      terminal_reason: null,
+      abandon: null,
     },
     overrides || {}
   );
@@ -441,6 +443,22 @@ test("quest_log available form validates, empty rows and null commission fields 
   assert.deepEqual(empty, { schema_version: 2, available: true, rows: [] });
   const unresolved = validQuestLogRow({ settlement: null, reward: null, deadline_line: null });
   assert.doesNotThrow(() => Protocol.validateQuestLogPanel(validQuestLogPanel([unresolved])));
+  const invalidated = validQuestLogRow({
+    state: "invalidated",
+    track: { action_id: "guild.quest_track", label: "追蹤", enabled: false,
+             disabled_reason: "此委託已結束，無法追蹤。", quantity: null },
+    terminal_reason: { code: "obsolete_outcome", message: "此委託已由其他結局取代。" },
+  });
+  assert.doesNotThrow(() =>
+    Protocol.validateQuestLogPanel(validQuestLogPanel([invalidated]))
+  );
+  const privateEscort = validQuestLogRow({
+    abandon: { action_id: "guild.quest_abandon", label: "放棄", enabled: true,
+               disabled_reason: null, quantity: null },
+  });
+  assert.doesNotThrow(() =>
+    Protocol.validateQuestLogPanel(validQuestLogPanel([privateEscort]))
+  );
 });
 
 test("quest_log validator mirrors the server drift rejections", () => {
@@ -491,6 +509,26 @@ test("quest_log validator mirrors the server drift rejections", () => {
     validQuestLogPanel([
       validQuestLogRow({ track: Object.assign(validQuestLogRow().track, { quantity: { min: 1, max: 2 } }) }),
     ]),
+    // terminal_reason / abandon drift: an invalidated row must disable its
+    // track, carry a structured reason and no abandon action
+    validQuestLogPanel([
+      validQuestLogRow({ state: "invalidated", terminal_reason: { code: "obsolete_outcome", message: "x" } }),
+    ]),
+    validQuestLogPanel([
+      validQuestLogRow({
+        state: "invalidated",
+        track: { action_id: "guild.quest_track", label: "追蹤", enabled: false,
+                 disabled_reason: "此委託已結束，無法追蹤。", quantity: null },
+        terminal_reason: { code: "obsolete_outcome", message: "x" },
+        abandon: { action_id: "guild.quest_abandon", label: "放棄", enabled: true,
+                   disabled_reason: null, quantity: null },
+      }),
+    ]),
+    validQuestLogPanel([validQuestLogRow({ terminal_reason: { code: "x" } })]),
+    validQuestLogPanel([validQuestLogRow({
+      abandon: { action_id: "shop.buy", label: "放棄", enabled: true,
+                 disabled_reason: null, quantity: null },
+    })]),
     // duplicate quest IDs
     validQuestLogPanel([validQuestLogRow({ quest_id: "q:1" }), validQuestLogRow({ quest_id: "q:1" })]),
     // over-bound string
