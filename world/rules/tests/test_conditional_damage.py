@@ -9,6 +9,10 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
+# Pre-import cross_lineage_unlock before synthetic registries patch
+# SKILL_REGISTRY, so its module-level RULEBOOK evaluates against shipped rows.
+import world.rules.cross_lineage_unlock  # noqa: F401
+
 from tools.spec_traceability import covers_requirement
 from world.quests.tests._card_fixtures import occupant_card_record
 from typeclasses.characters import PlayerCharacter
@@ -934,7 +938,7 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
             _compile_characterization(dict(char_req, combat_traits=["invalid_trait"]))
 
     def test_wilderness_population_supports_combat_traits(self):
-        pop = MonsterPopulation(tier="low", name_zh="腐爛行屍", combat_traits=("undead",))
+        pop = MonsterPopulation(tier="low", art_species_key="undead", name_zh="腐爛行屍", combat_traits=("undead",))
         self.assertEqual(pop.combat_traits, ("undead",))
 
         # Test spawn helper assigns trait
@@ -950,5 +954,5 @@ class CombatTraitsPersistenceAndConstructionTests(EvenniaTestCase):
         self.assertTrue(_matches_expected(spawned, pop))
 
         # Mismatched trait fails matching
-        diff_pop = MonsterPopulation(tier="low", name_zh="腐爛行屍", combat_traits=())
+        diff_pop = MonsterPopulation(tier="low", art_species_key="undead", name_zh="腐爛行屍", combat_traits=())
         self.assertFalse(_matches_expected(spawned, diff_pop))

@@ -1,7 +1,7 @@
 """The single read/write boundary over the persistent scene-package records.
 
 Every write to ``world.quests.models`` goes through this module, exactly as the
-compile boundary is the sole writer of ``SCENE_REQUIREMENT_REGISTRY`` and the
+compile boundary is the sole writer of the scene requirement registry and the
 generated-quest store is the sole writer of its Script. Immutable published
 definitions are written once by :func:`publish_package`; mutable runtime state
 (role binding, encounter, dialogue revision, commission grant) is written by the

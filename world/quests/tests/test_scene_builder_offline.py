@@ -9,6 +9,10 @@ imported from the ``test_scene_builder`` package's ``_support`` module
 from unittest.mock import patch
 import unittest
 
+# Pre-import cross_lineage_unlock before synthetic registries patch
+# SKILL_REGISTRY, so its module-level RULEBOOK evaluates against shipped rows.
+import world.rules.cross_lineage_unlock  # noqa: F401
+
 from django.test import override_settings
 
 from evennia.utils.create import create_object
@@ -25,7 +29,25 @@ from commands.scene import CmdEnterScene
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
 from world.quests.runtime import QuestState, read_records
 from world.quests.compile import StageNpcCharacterization
-from world.quests.scene_builder import _spawn_npc, materialize_stage
+from world.quests.materializer import RoleSpawn, spawn_role_actor
+from world.quests.scene_builder import materialize_stage
+import world.quests.materializer as materializer
+
+
+def _spawn_npc(
+    room, requirement, role, tier_key, disposition, position, quest_key
+):
+    characterization = requirement.characterizations[position]
+    return spawn_role_actor(
+        room,
+        RoleSpawn(
+            role=role,
+            tier=tier_key,
+            disposition=disposition,
+            characterization=characterization,
+        ),
+        {"kind": "generated_quest", "quest": quest_key, "stage": requirement.index, "occupant": position},
+    )
 from world.quests.tests.test_scene_builder._support import (
     SceneBuilderIsolation,
     _T_ARCHETYPE,
@@ -343,7 +365,7 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
                 "SKILL" + "_REGISTRY",
             )
 
-        real_spawn = scene_builder.spawn
+        real_spawn = materializer.spawn
 
         def deep_skill_spawn(prototype):
             # Simulate an NPC tier whose prototype owns only the deep skill;
@@ -364,7 +386,7 @@ class SceneSpawnLineageSeedTests(SceneBuilderIsolation, EvenniaTest):
                 ),
             ),
         )
-        with patch.object(scene_builder, "spawn", deep_skill_spawn):
+        with patch.object(materializer, "spawn", deep_skill_spawn):
             npc = _spawn_npc(
                 self.room, requirement, "bandit", _T_NPC_TIER, None, 0, "t_quest_key"
             )

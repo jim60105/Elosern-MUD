@@ -31,7 +31,12 @@ from world.rules.creation_wizard import (
     save_custom_draft,
     save_preset_draft,
 )
-from world.tests.synthetic_data import SYNTH_PRESETS, make_subrace, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_PRESETS,
+    SYNTH_RACES,
+    make_subrace,
+    synthetic_registries,
+)
 
 # Kit rows: every draft/activation path resolves race, subrace, and preset
 # data through the scoped catalogs. A foreign-blood subrace (race key outside
@@ -82,7 +87,7 @@ def balanced_allocations(race: str, subrace: str | None = None) -> dict[str, int
 # target the kit can replace); the scoped race gets an entry so the custom
 # form descriptor renders against the synthetic registry.
 @patch.dict(
-    "world.rules.character_creation._AFFINITY_INPUT_BOUNDS", {"t_duskmari": 2}
+    "world.rules.character_creation._AFFINITY_INPUT_BOUNDS", {"t_duskmari": 2, "t_starlit": 2}
 )
 @_SCOPE
 class CreationWizardTests(EvenniaTest):
@@ -117,7 +122,10 @@ class CreationWizardTests(EvenniaTest):
         self.assertEqual(view.custom.age.age_minimum, 0)
         self.assertEqual(view.custom.age.apparent_age_minimum, 0)
         race_keys = {race.key for race in view.custom.races}
-        race_key = next(iter(race_keys))
+        # The kit registers two races; the subrace/profile assertions follow
+        # the one that carries a subrace (the divine-capability twin has none).
+        self.assertEqual(race_keys, set(SYNTH_RACES))
+        race_key = "t_duskmari"
         race = next(r for r in view.custom.races if r.key == race_key)
         subrace_key = race.subraces[0]
         self.assertEqual({subrace_key}, {"t_duskmari_evensong"})

@@ -32,22 +32,21 @@ from world.quests.transitions import apply_quest_log_replacement
 class QuestRegistryIsolation:
     """Snapshot and restore the process-global quest registries.
 
-    ``QUEST_DEFINITION_REGISTRY`` and ``QUEST_ISSUANCE_REGISTRY`` are
-    module-global and shared across the whole test process, so every quest
-    test restores whatever it found rather than clearing state other tests
-    (or the catalog) rely on.
+    All four ``_PROCESS_GLOBAL_REGISTRIES`` are module-global and shared across
+    the whole test process; every quest test restores whatever it found.
     """
 
     def setUp(self):
         super().setUp()
+        self._snapshots = tuple(dict(reg) for reg in _PROCESS_GLOBAL_REGISTRIES)
+        # Named aliases for the two registries compiler tests assert against.
         self._registry_items = list(QUEST_DEFINITION_REGISTRY.items())
         self._issuance_items = list(QUEST_ISSUANCE_REGISTRY.items())
 
     def tearDown(self):
-        QUEST_DEFINITION_REGISTRY.clear()
-        QUEST_DEFINITION_REGISTRY.update(self._registry_items)
-        QUEST_ISSUANCE_REGISTRY.clear()
-        QUEST_ISSUANCE_REGISTRY.update(self._issuance_items)
+        for registry, snapshot in zip(_PROCESS_GLOBAL_REGISTRIES, self._snapshots):
+            registry.clear()
+            registry.update(snapshot)
         super().tearDown()
 
 

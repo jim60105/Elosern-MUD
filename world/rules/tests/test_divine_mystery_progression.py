@@ -14,6 +14,7 @@ and a chain root needs no prerequisite edge.
 
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -31,6 +32,7 @@ from world.rules.targeting import RoomActionContext
 from world.skills.effects import EffectAudience, EffectPolicy
 from world.skills.registry import (
     SkillCategory,
+    SkillEligibility,
     SkillDef,
     SkillKind,
     SkillPrerequisite,
@@ -295,6 +297,7 @@ def _divine_lineage_node(
         cost={},
         usable_out_of_combat=True,
         element=None,
+        eligibility=SkillEligibility(required_capabilities=("can_use_divine_arts",)),
         effects=["confer_skill_partial"],
         category=SkillCategory.DIVINE_MYSTERY,
         prerequisites=tuple(prerequisites),
@@ -320,16 +323,21 @@ class CapstoneGateTests(unittest.TestCase):
             ),
         }
         validate_prerequisite_graph(self.registry)
+        identity_patch = patch("world.skills.eligibility.actor_kind_for", return_value="player")
+        identity_patch.start()
+        self.addCleanup(identity_patch.stop)
         self.addCleanup(validate_prerequisite_graph, live_skill_registry())
 
     def _entity(self, proficiency):
         owned = tuple(self.registry)
         return SimpleNamespace(
-            race=None,
+            race="elf",
             pk=None,
             key="stub",
             skills=SimpleNamespace(owned_keys=lambda: set(owned)),
             db=SimpleNamespace(
+                race="elf",
+                subrace=None,
                 skill_proficiency=dict(proficiency),
                 affinity_elements=[],
                 skills={"active": list(owned), "passive": []},
@@ -365,11 +373,13 @@ class CapstoneGateTests(unittest.TestCase):
         # The root declares no edge and the entity owns no descendant: the
         # single use predicate needs nothing but ownership.
         entity = SimpleNamespace(
-            race=None,
+            race="elf",
             pk=None,
             key="stub",
             skills=SimpleNamespace(owned_keys=lambda: {"t_cap_root_a"}),
             db=SimpleNamespace(
+                race="elf",
+                subrace=None,
                 skill_proficiency={},
                 affinity_elements=[],
                 skills={"active": ["t_cap_root_a"], "passive": []},
