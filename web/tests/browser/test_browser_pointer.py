@@ -290,20 +290,23 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         del panel
         exit_key = "look-room"
         page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
+        # Both clicks dispatch inside ONE synchronous task: the first click
+        # marks the mutation in flight before the second runs, so the rapid
+        # second activation is rejected by the lock. Two separate evaluates
+        # would let a fast committed response settle the lock between them,
+        # turning the race (which row state the second click sees) into the
+        # variable under test.
         page.evaluate(
             """() => {
               const row = document.querySelector('[data-item-key="EXITKEY"]');
               window.__staleRow = row;
               row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
-            }""".replace("EXITKEY", exit_key)
-        )
-        page.evaluate(
-            """() => {
-              const row = window.__staleRow;
-              if (row) {
-                row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+              if (window.__staleRow) {
+                window.__staleRow.dispatchEvent(
+                  new MouseEvent('click', {bubbles: true, detail: 1})
+                );
               }
-            }"""
+            }""".replace("EXITKEY", exit_key)
         )
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
