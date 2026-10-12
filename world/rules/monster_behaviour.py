@@ -182,7 +182,7 @@ class BehaviourProfile:
     prefer_area_when_multiple_enemies: bool
     flee_hp_fraction: float | None
     decision_mode: DecisionMode
-    utility_weights: UtilityWeights
+    utility_weights: UtilityWeights | None
 
 
 _MANDATORY_PROFILE_FIELDS = frozenset(
@@ -203,10 +203,27 @@ _TOP_LEVEL_FIELDS = frozenset(
         "candidate_budget",
     }
 )
-#: An archetype that declares no mode is legacy (design section 5).
+#: An archetype that declares no mode is legacy, and one that declares no
+#: weights is simply not scored yet (design section 5; attack design section 2
+#: makes both fields additive).
 _DEFAULT_DECISION_MODE = DecisionMode.LEGACY
 _TARGET_STRATEGIES = frozenset({"lowest_hp", "highest_effective_power"})
 _SKILL_CHOICES = frozenset({"first_owned", "highest_expected_damage"})
+
+
+def _format_keys(keys: Any) -> str:
+    """Format authored keys for a diagnostic without comparing mixed types."""
+    return repr(sorted(keys, key=repr))
+
+
+def _finite_real(value: Any) -> bool:
+    """Return whether ``value`` is a finite real number, never a boolean."""
+    if isinstance(value, bool) or not isinstance(value, Real):
+        return False
+    try:
+        return isfinite(value)
+    except OverflowError:
+        return False
 
 
 def _validated_mode(value: Any, where: str) -> DecisionMode:
@@ -219,8 +236,14 @@ def _validated_mode(value: Any, where: str) -> DecisionMode:
     raise _configuration_error(f"{where} has unrecognized decision_mode {value!r}")
 
 
-def _validated_weights(value: Any, where: str) -> UtilityWeights:
-    """Return the complete named weight schema, rejecting partial tuning."""
+def _validated_weights(value: Any, where: str) -> UtilityWeights | None:
+    """Return the complete named weight schema, or ``None`` when unauthored.
+
+    The field is additive: an archetype may stop at the four mandatory legacy
+    fields, and a supplied mapping must then declare exactly the named schema.
+    """
+    if value is None:
+        return None
     if not isinstance(value, Mapping):
         raise _configuration_error(
             f"{where} must declare a utility_weights mapping"
@@ -228,16 +251,12 @@ def _validated_weights(value: Any, where: str) -> UtilityWeights:
     if set(value) != set(UTILITY_WEIGHT_NAMES):
         raise _configuration_error(
             f"{where} must declare exactly "
-            f"{sorted(UTILITY_WEIGHT_NAMES)} utility weights"
+            f"{_format_keys(UTILITY_WEIGHT_NAMES)} utility weights"
         )
     resolved: dict[str, float] = {}
     for name in UTILITY_WEIGHT_NAMES:
         weight = value[name]
-        if (
-            isinstance(weight, bool)
-            or not isinstance(weight, Real)
-            or not isfinite(weight)
-        ):
+        if not _finite_real(weight):
             raise _configuration_error(
                 f"{where} has non-finite or non-numeric {name} weight {weight!r}"
             )
@@ -270,12 +289,13 @@ def _load_behaviour_profiles(
         declared = set(values)
         if not declared >= _MANDATORY_PROFILE_FIELDS:
             raise _configuration_error(
-                f"archetype {key!r} must declare {sorted(_MANDATORY_PROFILE_FIELDS)}"
+                f"archetype {key!r} must declare "
+                f"{_format_keys(_MANDATORY_PROFILE_FIELDS)}"
             )
         unknown = declared - _MANDATORY_PROFILE_FIELDS - _OPTIONAL_PROFILE_FIELDS
         if unknown:
             raise _configuration_error(
-                f"archetype {key!r} declares unknown fields {sorted(unknown)}"
+                f"archetype {key!r} declares unknown fields {_format_keys(unknown)}"
             )
         target_strategy = values["target_strategy"]
         if (
@@ -325,7 +345,7 @@ def _load_behaviour_profiles(
 
     if set(defaults) != tier_keys:
         raise _configuration_error(
-            f"tier_default_archetype must map exactly {sorted(tier_keys)}"
+            f"tier_default_archetype must map exactly {_format_keys(tier_keys)}"
         )
     for tier, archetype_key in defaults.items():
         if not isinstance(archetype_key, str) or archetype_key not in profiles:
@@ -431,12 +451,16 @@ def _validate_utility_coverage(
             raise _configuration_error(
                 f"variant {key!r} references unknown archetype {archetype_key!r}"
             )
-        if modes.get(key, profile.decision_mode) is DecisionMode.UTILITY and (
-            key not in intelligence
-        ):
-            raise _configuration_error(
-                f"utility variant {key!r} declares no intelligence"
-            )
+        if modes.get(key, profile.decision_mode) is DecisionMode.UTILITY:
+            if key not in intelligence:
+                raise _configuration_error(
+                    f"utility variant {key!r} declares no intelligence"
+                )
+            if profile.utility_weights is None:
+                raise _configuration_error(
+                    f"utility variant {key!r} binds an archetype with no "
+                    f"utility weights"
+                )
 
 
 def _tuning_fingerprint(
@@ -455,7 +479,11 @@ def _tuning_fingerprint(
     representation -- so identical tuning always fingerprints identically and
     a change to the algorithm, a mode, a weight, the budget, an intelligence
     value, a tier default, a behaviour leaf or a referenced variant's binding
-    always changes it.
+    always changes it. It is the complete set of decision-relevant rulebook
+    inputs this process consumes today (design section 5): the archetype
+    decision leaves, the tier defaults and the referenced variant bindings.
+    Estimator-side inputs join the same projection when the estimator itself
+    lands.
     """
     payload = {
         "algorithm_version": AI_ALGORITHM_VERSION,
@@ -470,7 +498,11 @@ def _tuning_fingerprint(
                 ),
                 "flee_hp_fraction": profile.flee_hp_fraction,
                 "decision_mode": profile.decision_mode.value,
-                "utility_weights": profile.utility_weights.as_payload(),
+                "utility_weights": (
+                    None
+                    if profile.utility_weights is None
+                    else profile.utility_weights.as_payload()
+                ),
             }
             for key, profile in sorted(profiles.items())
         },
@@ -505,10 +537,14 @@ def _load_ai_tuning(
         raise _configuration_error("rulebook must be a mapping")
     unknown = set(rulebook) - _TOP_LEVEL_FIELDS
     if unknown:
-        raise _configuration_error(f"unknown top-level fields {sorted(unknown)}")
+        raise _configuration_error(
+            f"unknown top-level fields {_format_keys(unknown)}"
+        )
     missing = _TOP_LEVEL_FIELDS - set(rulebook)
     if missing:
-        raise _configuration_error(f"missing top-level fields {sorted(missing)}")
+        raise _configuration_error(
+            f"missing top-level fields {_format_keys(missing)}"
+        )
     resolved_profiles = BEHAVIOUR_PROFILES if profiles is None else profiles
     species_rows = MONSTER_SPECIES_REGISTRY if species is None else species
     variant_rows = MONSTER_VARIANT_REGISTRY if variants is None else variants
@@ -552,6 +588,18 @@ def _load_ai_tuning(
 MONSTER_AI_TUNING = _load_ai_tuning(MONSTER_BEHAVIOUR_YAML)
 
 
+def _invalid_binding(fingerprint: str) -> MonsterAIDecision:
+    """The typed state of a monster whose actual stored binding is unusable."""
+    return MonsterAIDecision(
+        mode=None,
+        intelligence=None,
+        archetype_key=None,
+        variant_key=None,
+        invalid_reason=InvalidDecisionReason.INVALID_BINDING,
+        tuning_fingerprint=fingerprint,
+    )
+
+
 def resolve_monster_ai(
     monster: Any,
     *,
@@ -563,30 +611,29 @@ def resolve_monster_ai(
     validates the species/variant pair against the registries, so a repaired
     binding or identity is honoured rather than a remembered one, and a
     variant string alone is never trusted: its override applies only once the
-    pair resolves. ``None`` means the entity carries no ``threat_tier`` and is
-    therefore not a registered-monster decision target -- the delegated policy
-    owns it.
+    pair resolves. An unset placeholder (no stored value, or the empty string)
+    selects the tier default, while a stored value no archetype key can be
+    read from -- an unknown key or a repaired non-string -- is reported as an
+    unusable binding instead of being silently replaced by that default.
+    ``None`` means the entity carries no ``threat_tier`` and is therefore not
+    a registered-monster decision target; the delegated policy owns it.
     """
     if not hasattr(monster, "threat_tier"):
         return None
     resolved = MONSTER_AI_TUNING if tuning is None else tuning
     stored = _stored_binding(monster)
     tier = getattr(monster, "threat_tier", None)
-    archetype_key = (
-        stored
-        if isinstance(stored, str) and stored
-        else resolved.tier_defaults.get(tier if isinstance(tier, str) else None)
-    )
+    if stored is None or stored == "":
+        archetype_key = resolved.tier_defaults.get(
+            tier if isinstance(tier, str) else None
+        )
+    elif isinstance(stored, str):
+        archetype_key = stored
+    else:
+        return _invalid_binding(resolved.fingerprint)
     profile = resolved.behaviour_profiles.get(archetype_key)
     if profile is None:
-        return MonsterAIDecision(
-            mode=None,
-            intelligence=None,
-            archetype_key=None,
-            variant_key=None,
-            invalid_reason=InvalidDecisionReason.INVALID_BINDING,
-            tuning_fingerprint=resolved.fingerprint,
-        )
+        return _invalid_binding(resolved.fingerprint)
     variant = _registered_variant(
         getattr(monster, "species_key", None),
         getattr(monster, "variant_key", None),

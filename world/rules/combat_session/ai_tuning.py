@@ -69,8 +69,17 @@ def session_ai_tuning(session_id: str) -> Mapping[str, MonsterAIDecision]:
     return MappingProxyType(dict(_SESSION_AI_TUNING.get(session_id, {})))
 
 
+def discard_session_ai_tuning(session_id: str) -> None:
+    """Drop one finished session's records, leaving every other session intact.
+
+    Called from the session's terminal cleanup, where the session id is still
+    known. Records do not outlive the session they describe.
+    """
+    _SESSION_AI_TUNING.pop(session_id, None)
+
+
 def clear_session_ai_tuning() -> None:
-    """Drop every recorded resolution -- the restart/terminal-cleanup seam.
+    """Drop every recorded resolution -- the restart seam.
 
     A restart clears the store by construction (module state); this explicit
     seam lets a focused test simulate one without a new interpreter.

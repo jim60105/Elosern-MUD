@@ -9,18 +9,23 @@ from tools.spec_traceability import covers_requirement
 
 import unittest
 from dataclasses import FrozenInstanceError
+from pathlib import Path
+import tempfile
 from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTestCase
+import yaml
 
 from world.rules import monster_behaviour as behaviour
 from world.rules.combat import Battlefield
 from world.rules.combat_session.ai_tuning import (
     clear_session_ai_tuning,
+    discard_session_ai_tuning,
     record_session_ai_tuning,
     session_ai_tuning,
 )
+from world.rules.combat_session.lifecycle import clear_session
 from world.rules.combat_session.policies import _enemy_policy
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.monster_behaviour import (
@@ -31,6 +36,7 @@ from world.rules.monster_behaviour import (
     UTILITY_WEIGHT_NAMES,
     _load_ai_tuning,
     _load_behaviour_profiles,
+    _load_rulebook,
     monster_behaviour_policy,
     resolve_monster_ai,
 )
@@ -173,6 +179,17 @@ def _rulebook(
     }
 
 
+def _load(rulebook, *, variants=None):
+    """Load one tuned rulebook exactly as startup loads the shipped one."""
+    profiles = _load_behaviour_profiles(rulebook, tiers=TIER_KEYS)
+    return _load_ai_tuning(
+        rulebook,
+        profiles=profiles,
+        species=_SPECIES_ROWS,
+        variants=_VARIANT_ROWS if variants is None else variants,
+    )
+
+
 def _tuning(
     *,
     defaults=None,
@@ -181,25 +198,26 @@ def _tuning(
     modes=None,
     budget=BUDGET,
     variants=None,
-    tiers=None,
 ):
-    """Load one synthetic tuning exactly as startup loads the shipped one."""
-    rulebook = _rulebook(
-        defaults=defaults,
-        archetypes=archetypes,
-        intelligence=intelligence,
-        modes=modes,
-        budget=budget,
+    """Load one synthetic tuning from an in-memory rulebook mapping."""
+    return _load(
+        _rulebook(
+            defaults=defaults,
+            archetypes=archetypes,
+            intelligence=intelligence,
+            modes=modes,
+            budget=budget,
+        ),
+        variants=variants,
     )
-    profiles = _load_behaviour_profiles(
-        rulebook, tiers=TIER_KEYS if tiers is None else tiers
-    )
-    return _load_ai_tuning(
-        rulebook,
-        profiles=profiles,
-        species=_SPECIES_ROWS,
-        variants=_VARIANT_ROWS if variants is None else variants,
-    )
+
+
+def _tuning_from_disk(rulebook):
+    """Load one tuning from a rulebook file, as a restart would read it."""
+    with tempfile.TemporaryDirectory() as directory:
+        path = Path(directory) / "monster_behaviour.yaml"
+        path.write_text(yaml.safe_dump(rulebook), encoding="utf-8")
+        return _load(_load_rulebook(path))
 
 
 class FakeAIMonster:
@@ -277,24 +295,21 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
     def test_each_mandatory_legacy_field_is_required(self):
         for field in MANDATORY_FIELDS:
             with self.subTest(field=field):
-                entry = {
-                    name: value
-                    for name, value in _archetype().items()
-                    if name != field
-                }
+                # One field leaves an otherwise complete, otherwise valid table.
+                complete = _archetypes()
+                del complete[ARCHETYPE][field]
                 with self.assertRaises(MonsterBehaviourConfigError):
-                    self._profiles(_rulebook(archetypes={ARCHETYPE: entry}))
+                    self._profiles(_rulebook(archetypes=complete))
 
     def test_unknown_archetype_and_top_level_fields_are_rejected(self):
-        unknown_field = _rulebook(
-            archetypes={ARCHETYPE: dict(_archetype(), surprise=1)}
-        )
+        complete = _archetypes()
+        complete[ARCHETYPE]["surprise"] = 1
         with self.assertRaises(MonsterBehaviourConfigError):
-            self._profiles(unknown_field)
+            self._profiles(_rulebook(archetypes=complete))
         loaded = _tuning()
         with self.assertRaises(MonsterBehaviourConfigError):
             _load_ai_tuning(
-                dict(_rulebook(), surprise={}),
+                {**_rulebook(), "surprise": {}},
                 profiles=loaded.behaviour_profiles,
                 species=_SPECIES_ROWS,
                 variants=_VARIANT_ROWS,
@@ -431,6 +446,56 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         with self.assertRaises(MonsterBehaviourConfigError):
             _tuning(variants=broken)
 
+    def test_the_optional_fields_are_additive(self):
+        # A legacy archetype may stop at the four mandatory fields: no mode,
+        # no weights, and the load still succeeds.
+        minimal = {name: _archetype()[name] for name in MANDATORY_FIELDS}
+        table = _archetypes()
+        table[ARCHETYPE] = minimal
+        profiles = self._profiles(_rulebook(archetypes=table))
+        self.assertIs(profiles[ARCHETYPE].decision_mode, DecisionMode.LEGACY)
+        self.assertIsNone(profiles[ARCHETYPE].utility_weights)
+        # "Not scored yet" is a decision input of its own.
+        self.assertNotEqual(
+            _tuning().fingerprint, _tuning(archetypes=table).fingerprint
+        )
+        # Authoring that same archetype utility needs both its intelligence
+        # and its weights to be usable.
+        with self.assertRaises(MonsterBehaviourConfigError):
+            _tuning(
+                archetypes={
+                    ARCHETYPE: dict(minimal, decision_mode="utility"),
+                    OTHER_ARCHETYPE: _archetypes()[OTHER_ARCHETYPE],
+                },
+                intelligence=_intelligence(PATROL_VARIANTS, 10),
+            )
+
+    def test_malformed_key_types_and_unrepresentable_numbers_are_named(self):
+        mixed = _archetypes()
+        mixed[ARCHETYPE][1] = "extra"
+        with self.assertRaises(MonsterBehaviourConfigError) as mixed_archetype:
+            self._profiles(_rulebook(archetypes=mixed))
+        self.assertIsInstance(mixed_archetype.exception, MonsterBehaviourConfigError)
+        loaded = _tuning()
+        with self.assertRaises(MonsterBehaviourConfigError) as mixed_top_level:
+            _load_ai_tuning(
+                {**_rulebook(), 1: {}},
+                profiles=loaded.behaviour_profiles,
+                species=_SPECIES_ROWS,
+                variants=_VARIANT_ROWS,
+            )
+        self.assertIsInstance(
+            mixed_top_level.exception, MonsterBehaviourConfigError
+        )
+        with self.assertRaises(MonsterBehaviourConfigError):
+            self._profiles(
+                _rulebook(
+                    archetypes=_archetypes(
+                        patrol={"weights": dict(WEIGHTS, damage=10**1000)}
+                    )
+                )
+            )
+
     def test_all_legacy_tuning_loads_with_empty_variant_maps(self):
         tuning = _tuning()
         self.assertEqual(tuning.algorithm_version, AI_ALGORITHM_VERSION)
@@ -449,24 +514,51 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
     def test_fingerprint_is_reproducible_and_moves_with_every_input(self):
         base = _tuning().fingerprint
         self.assertEqual(base, _tuning().fingerprint)
+        with patch.object(
+            behaviour, "AI_ALGORITHM_VERSION", AI_ALGORITHM_VERSION + 1
+        ):
+            self.assertNotEqual(base, _tuning().fingerprint)
         changed = {
             "budget": _tuning(budget=BUDGET - 1),
             "weight": _tuning(
-                archetypes=_archetypes(patrol={"weights": dict(WEIGHTS, damage=2.0)})
-            ),
-            "mode": _tuning(
-                archetypes=_archetypes(patrol={"mode": "utility"}),
-                intelligence=_intelligence(PATROL_VARIANTS, 10),
+                archetypes=_archetypes(
+                    patrol={"weights": dict(WEIGHTS, damage=2.0)}
+                )
             ),
             "intelligence": _tuning(intelligence={ORDINARY: 10}),
             "tier-default": _tuning(
                 defaults={TIER: OTHER_ARCHETYPE, OTHER_TIER: ARCHETYPE}
             ),
-            "behaviour-leaf": _tuning(archetypes=_archetypes(patrol={"flee": 0.5})),
+            "target-strategy": _tuning(
+                archetypes=_archetypes(
+                    patrol={"target_strategy": "highest_effective_power"}
+                )
+            ),
+            "skill-choice": _tuning(
+                archetypes=_archetypes(
+                    patrol={"skill_choice": "highest_expected_damage"}
+                )
+            ),
+            "area-preference": _tuning(
+                archetypes=_archetypes(patrol={"prefer_area": True})
+            ),
+            "flee-threshold": _tuning(
+                archetypes=_archetypes(patrol={"flee": 0.5})
+            ),
         }
         for label, tuning in changed.items():
             with self.subTest(case=label):
                 self.assertNotEqual(base, tuning.fingerprint)
+        # The mode is an input on its own: hold the authored intelligence, the
+        # budget and every other field constant.
+        authored = _intelligence(PATROL_VARIANTS, 10)
+        self.assertNotEqual(
+            _tuning(intelligence=authored).fingerprint,
+            _tuning(
+                archetypes=_archetypes(patrol={"mode": "utility"}),
+                intelligence=authored,
+            ).fingerprint,
+        )
         # A referenced variant's authored binding is a decision input, while a
         # display-only rename of that same variant is not.
         named = _tuning(modes={ORDINARY: "legacy"})
@@ -633,6 +725,22 @@ class MonsterAIDecisionTests(unittest.TestCase):
         del classified.threat_tier
         self.assertIsNone(resolve_monster_ai(classified))
 
+    def test_a_malformed_stored_binding_is_a_typed_invalid_state(self):
+        # Only the unset placeholder falls back to the tier default; a
+        # repaired non-string binding is reported instead of being masked.
+        for stored in (None, ""):
+            with self.subTest(unset=stored):
+                monster = FakeAIMonster("t_ai_unset", behaviour_tree=stored)
+                self.assertEqual(self._resolve(monster).archetype_key, ARCHETYPE)
+        for stored in (0, 7, [], {}, ["t_ai_patrol"]):
+            with self.subTest(malformed=stored):
+                monster = FakeAIMonster("t_ai_junk", behaviour_tree=stored)
+                resolved = self._resolve(monster)
+                self.assertIs(
+                    resolved.invalid_reason,
+                    InvalidDecisionReason.INVALID_BINDING,
+                )
+
 
 class SessionAITuningTests(unittest.TestCase):
     """One process records its startup tuning per session; a restart replaces it."""
@@ -675,7 +783,7 @@ class SessionAITuningTests(unittest.TestCase):
         # The rulebook on disk changes, but this process only ever loads the
         # tuning it started with -- and loading the edited file does not
         # replace it.
-        edited = _tuning(budget=BUDGET - 1)
+        edited = _tuning_from_disk(_rulebook(budget=BUDGET - 1))
         self.assertNotEqual(startup.fingerprint, edited.fingerprint)
         self.assertIs(behaviour.MONSTER_AI_TUNING, startup)
         self.assertEqual(
@@ -832,3 +940,33 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
             recorded[f"dbref:{self.monster.pk}"],
             resolve_monster_ai(self.monster, tuning=self.tuning),
         )
+
+    def test_a_repaired_stored_binding_is_read_in_place(self):
+        self.monster.db.behaviour_tree = 7
+        recorded = self._record(SESSION)
+        self.assertIs(
+            recorded.invalid_reason, InvalidDecisionReason.INVALID_BINDING
+        )
+        self.assertEqual(self.monster.db.behaviour_tree, 7)
+
+    def test_terminal_cleanup_drops_only_its_own_session(self):
+        record = CombatSessionRecord(
+            session_id=SESSION,
+            mode="normal",
+            room_id=0,
+            player_ids=(),
+            enemy_ids=(),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=0,
+            exam_id=None,
+        )
+        self._record(SESSION)
+        record_session_ai_tuning(
+            OTHER_SESSION, self.opponent, tuning=self.tuning
+        )
+        clear_session(self.monster, None, record)
+        self.assertEqual(session_ai_tuning(SESSION), {})
+        self.assertTrue(session_ai_tuning(OTHER_SESSION))
+        discard_session_ai_tuning(OTHER_SESSION)
+        self.assertEqual(session_ai_tuning(OTHER_SESSION), {})
