@@ -5,7 +5,7 @@ Define the Podman container image and Compose deployment for the Evennia service
 ## Requirements
 
 ### Requirement: Multi-stage Containerfile
-The project SHALL provide a Podman-focused multi-stage `Containerfile` with a downloader stage that verifies the init binary, a builder stage, an application-layout stage that prepares the runtime tree and permissions, and a final stage that carries only the resulting virtual environment, init binary, and application code.
+The project SHALL provide a Podman-focused multi-stage `Containerfile` with a downloader stage that verifies the init binary, a builder stage, an application-layout stage that prepares the runtime tree and permissions, and a final stage that carries only the resulting virtual environment, init binary, application code, and the build-acquired default background-removal model. Model acquisition SHALL occur after locked dependency installation and before application-source copying, so application-only rebuilds can reuse the model layer.
 
 #### Scenario: Builder artifacts do not reach the runtime image
 - **WHEN** the image is built with `podman build` from the `Containerfile`
@@ -24,7 +24,7 @@ The project SHALL provide a Podman-focused multi-stage `Containerfile` with a do
 
 #### Scenario: Final artifacts use independent linked layers
 - **WHEN** a final-stage base or metadata instruction changes without changing the venv, init
-  binary, or prepared application tree
+  binary, prepared application tree, or default-model artifact
 - **THEN** Buildah can reuse the unchanged `COPY --link` layers independently of earlier
   final-stage filesystem layers
 
@@ -40,6 +40,12 @@ The project SHALL provide a Podman-focused multi-stage `Containerfile` with a do
 #### Scenario: Linked-layer reuse targets supported tooling versions
 - **WHEN** full `COPY --link` layer reuse is evaluated
 - **THEN** it SHALL target Podman 5.6 or later with Buildah 1.41 or later
+
+#### Scenario: Application-only rebuilds reuse model acquisition
+- **WHEN** application code changes without a change to the locked dependencies or the
+  model acquisition instruction
+- **THEN** the build can reuse the layer containing the already-acquired default weight
+  without fetching it again
 
 ### Requirement: Non-root, arbitrary-UID-capable runtime
 The container SHALL run as a non-root user by default, and SHALL also start successfully when run
@@ -58,8 +64,8 @@ remain read-only at runtime.
 - **THEN** Evennia starts successfully and writes logs, without permission errors, because the
   relevant directories are owned by `root:0` with group-writable permissions
 
-### Requirement: compose.yaml for local and networked GPU services
-The project SHALL provide a `compose.yaml` that runs the Evennia service with the ports and volumes design doc §9 specifies, persisting the SQLite database, logs, generated static files, uploaded media, scene art, and the background-removal model cache.
+### Requirement: Compose persists mutable state and exposes image data
+The project SHALL provide a `compose.yaml` that runs the Evennia service with the ports and volumes design doc §9 specifies, persisting the SQLite database, logs, generated static files, uploaded media, scene art, and translation model cache. The background-removal weight SHALL come from the image; Compose SHALL NOT mount a volume over `/app/server/.rembg` or declare `evennia-rembg`, and the image SHALL NOT declare a rembg `VOLUME`.
 
 #### Scenario: Fresh database is bootstrapped interactively
 - **WHEN** an operator runs `podman compose --profile bootstrap run --rm bootstrap` against a fresh
@@ -80,15 +86,14 @@ The project SHALL provide a `compose.yaml` that runs the Evennia service with th
 
 #### Scenario: Persistent state survives container recreation
 - **WHEN** the `evennia` service container is removed and recreated (`compose up --force-recreate`)
-- **THEN** the SQLite database, scene art store, background-removal model cache, logs, generated
+- **THEN** the SQLite database, scene art store, logs, generated
   static files, and media contents from the previous volume contents are still present, because they are
   backed by volumes rather than the container's writable layer
 
-#### Scenario: The model cache is a volume, never an image layer
-- **WHEN** `compose.yaml` and the built image are inspected
-- **THEN** the `evennia` service mounts a named volume at `/app/server/.rembg`, the image declares
-  that path as a persistent volume with a `root:0` group-writable directory, and the image itself
-  contains no `.onnx` model artifact
+#### Scenario: The default removal weight is visible from the image
+- **WHEN** Compose and the final image are inspected
+- **THEN** the service has no mount over `/app/server/.rembg`, the image declares no
+  volume for that path, and the default weight is present there in an image layer
 
 #### Scenario: Prompt files are mounted read-only from the host
 - **WHEN** `compose.yaml` is inspected and the container is started
@@ -154,13 +159,17 @@ The project SHALL provide a `compose.yaml` that runs the Evennia service with th
 - **WHEN** the runtime image is inspected
 - **THEN** it carries no Git client, S3 client, or archive-extraction workflow of its own: every preparation method is host/deployment tooling
 
-#### Scenario: The background-removal model cache is a prepared writable volume
-- **WHEN** `compose.yaml` and the image are inspected
-- **THEN** the background-removal model cache is a writable named volume mounted at `/app/server/.rembg`, matching the code-only `ART_REMBG_MODEL_DIR` setting; the image prepares that directory `root:0` and group-writable in the application-layout stage and declares it alongside the other persistent paths, exactly like `/app/server/.art`, so an arbitrary-UID run can write it
+#### Scenario: An old named volume cannot hide the baked artifact
+- **WHEN** the revised standard Compose deployment runs on a host where an existing
+  `evennia-rembg` volume is empty or contains only a former model
+- **THEN** that volume is unused and unchanged, the service reads the image's default
+  artifact, and no model download, startup copy, or migration is needed
 
-#### Scenario: The ~1 GB background-removal model is fetched, never baked
-- **WHEN** the background-removal model artifact is considered
-- **THEN** the ~1 GB model artifact SHALL NOT be baked into the image: it is fetched on first use into the volume and reused across container recreations, and an operator MAY pre-seed the volume and set `ART_REMBG_DOWNLOAD_ENABLED=false` for an air-gapped deployment
+#### Scenario: An air-gapped deployment transfers the complete image
+- **WHEN** an operator deploys an image built on a connected machine to an air-gapped
+  runtime host and disables runtime rembg downloads
+- **THEN** the image's baked default weight is sufficient for enabled cutouts without
+  rembg volume pre-seeding or runtime acquisition
 
 #### Scenario: The model cache lives in neither the art store nor $HOME
 - **WHEN** the model cache location is considered
@@ -172,7 +181,7 @@ The project SHALL provide a `compose.yaml` that runs the Evennia service with th
 
 #### Scenario: The translation volume fills at run time or is pre-seeded
 - **WHEN** the translation volume is used
-- **THEN** like the background-removal cache, it is filled at run time only by the backend's own first-use fetch when `ART_TRANSLATE_DOWNLOAD_ENABLED=true` (the default), and reused across container recreations; an operator MAY pre-seed the volume with `scripts/fetch-translate-model.sh` and set `ART_TRANSLATE_DOWNLOAD_ENABLED=false` for an air-gapped deployment, in which case the fetch is structurally impossible
+- **THEN** it is filled at run time only by the backend's own first-use fetch when `ART_TRANSLATE_DOWNLOAD_ENABLED=true` (the default), and reused across container recreations; an operator MAY pre-seed the volume with `scripts/fetch-translate-model.sh` and set `ART_TRANSLATE_DOWNLOAD_ENABLED=false` for an air-gapped deployment, in which case the fetch is structurally impossible
 
 #### Scenario: An empty translation volume is a bounded error, never a crash
 - **WHEN** the translation volume is empty on either track
@@ -181,6 +190,11 @@ The project SHALL provide a `compose.yaml` that runs the Evennia service with th
 #### Scenario: Bootstrap keeps the admin password out of service configuration
 - **WHEN** `compose.yaml` is inspected
 - **THEN** it provides a profile-gated, interactive one-shot bootstrap service for initializing a fresh database without storing the initial administrator's password in the long-lived service configuration
+
+#### Scenario: Background-removal availability survives recreation through the image
+- **WHEN** the service is recreated with the same revised image and standard Compose file
+- **THEN** the same default-model artifact remains available from the image and no
+  writable rembg cache is initialized or required
 
 ### Requirement: Container ignore file excludes non-build-context files
 The project SHALL provide a `.containerignore` that excludes version control metadata, local virtual
@@ -237,3 +251,48 @@ The build context and every public container layer SHALL exclude the official-ar
 #### Scenario: The built-in fallback originals are preserved
 - **WHEN** the exclusion is applied
 - **THEN** the six committed built-in fallback originals under `web/static/art/defaults/` SHALL remain in the code repository and in the served static assets: the exclusion SHALL NOT remove them
+
+### Requirement: The default background-removal model is acquired during image build
+
+The Containerfile SHALL acquire the locked rembg default `bria-rmbg` weight during image
+construction with its upstream checksum verification enabled and SHALL ship the nonempty
+artifact at `/app/server/.rembg/models/bria-rmbg/bria-rmbg.onnx`. Acquisition failure SHALL
+fail the build. The artifact SHALL be readable without modification by the default
+non-root user and arbitrary numeric UID with GID 0. Build acquisition SHALL be independent
+of runtime rembg switches.
+
+#### Scenario: Successful image construction includes the default artifact
+- **WHEN** a clean image build completes
+- **THEN** the final image contains the default artifact with the locked upstream checksum
+  and no isnet or u2net weight, and no model output exists solely in a build cache mount
+- **AND** build-only caches and downloader scaffolding are absent from the runtime image
+
+#### Scenario: Acquisition failure cannot publish an incomplete image
+- **WHEN** model acquisition encounters a download failure, checksum mismatch, or absent
+  or empty output artifact
+- **THEN** the image build exits unsuccessfully rather than producing an image that
+  defers obtaining its required model to first use
+
+#### Scenario: Runtime switches cannot omit the required image payload
+- **WHEN** an image is built while the operator's runtime configuration disables cutouts
+  or disables runtime model downloads
+- **THEN** the build still acquires and ships the default weight
+
+#### Scenario: Offline inference reads the weight as the default non-root user
+- **WHEN** the built image performs its first real cutout as its default user without
+  runtime network access and with a read-only root filesystem
+- **THEN** CPU-only inference reads the baked artifact and returns an alpha-carrying PNG
+  without writing, copying, or downloading a model
+
+#### Scenario: Offline inference reads the weight as an arbitrary UID
+- **WHEN** the same image cutout smoke runs with UID `1000630000` and GID `0`, no runtime
+  network access, and a read-only root filesystem
+- **THEN** the result has the same model-readability and no-acquisition behavior as the
+  default-user run, without permission errors
+
+#### Scenario: Image size and licence obligations are disclosed
+- **WHEN** the operator documentation describes image construction and delivery
+- **THEN** it states the approximately 1.02 GB uncompressed model payload and the BRIA
+  weight's applicable use and redistribution licence obligations
+- **AND** it distinguishes transferring a built image for offline use from a cold image
+  build, which requires access to the model source

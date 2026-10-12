@@ -23,12 +23,13 @@ None. The behavior belongs to existing portrait, container, and settings capabil
 - `art-portrait-cutout`: Use the default model without selection parameters; reuse a single CPU session, retain download-disabled readiness checks, and report the fixed model identity.
 - `container-image`: Acquire and ship the default weight during image construction; remove the writable rembg volume while preserving other mounts and non-root operation.
 - `settings-environment-overrides`: Remove the model knob from the exact environment inventory, defaults, coercion cases, and operator guide; retain the remaining knobs and code-only seams.
+- `art-gallery-fallback`: Record that the six committed fallbacks were produced with the permissive model before this cutover (so they carry no BRIA obligation) and pin any future regeneration to the sole shipped weight under the publisher's licence responsibility. Added during apply: removing the model-selection escape hatch is what makes that production rule unsatisfiable otherwise, and the maintenance tool that regenerates the fallbacks is a supported `ART_REMBG_MODEL` caller.
 
 The deltas explicitly remove and replace the two composite contracts containing retired model-choice and never-baked-volume scenarios. The CLI forbids omitting scenarios from `MODIFIED` blocks. Unrelated behavior is preserved in full, and apply updates the affected literal requirement annotations.
 
 ## Impact
 
-Implementation touches `server/conf/settings.py`, `server/conf/test_settings.py`, `world/art/cutout.py`, `world/art/worker.py`, `Containerfile`, `compose.yaml`, and their existing tests. Settings regressions now live under `server/conf/tests/`, including `test_art_settings.py` and `test_env_overrides/`; the older top-level paths are absent.
+Implementation touches `server/conf/settings.py`, `server/conf/test_settings.py`, `world/art/cutout.py`, `world/art/worker.py`, `Containerfile`, `compose.yaml`, `tools/regenerate_default_art.py`, and their existing tests. Settings regressions now live under `server/conf/tests/`, including `test_art_settings.py` and `test_env_overrides/`; the older top-level paths are absent.
 
 Documentation updates cover `.env.example`, `docs/development/settings-and-environment.md`, `docs/gm/prompts.md`, and an explicit amendment to architecture design §9 allowing the model payload. BRIA's licence applies to the weight and its redistribution; image publishers and operators own licence compliance, including commercial use. The permissive ISNet model-selection escape hatch is removed.
 
