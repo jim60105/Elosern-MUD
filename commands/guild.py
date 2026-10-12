@@ -41,14 +41,13 @@ from world.rules.service_gate import MESSAGE_OFF_ANCHOR
 from world.rules.surfaces import read_counter_trait
 
 from server.ai_director_service import (
-    EscortUnavailableError,
     NoSuitableTemplateError,
     request_generated_quest,
 )
 
 _REQUESTED_TYPES = ("討伐", "採集", "護衛", "探索", "緊急")
 
-_ESCORT_REFUSAL_MESSAGE = "護衛委託目前尚未開放，請選擇其他類型的委託。"
+
 
 
 class _GuildRequestPendingError(RuntimeError):
@@ -88,8 +87,6 @@ def _resolve_deferred(deferred, caller):
         if isinstance(result, Failure):
             if result.check(NoSuitableTemplateError):
                 caller.msg("公會目前沒有適合你的委託。")
-            elif result.check(EscortUnavailableError):
-                caller.msg(_ESCORT_REFUSAL_MESSAGE)
             else:
                 caller.msg("委託未能完成，請稍後再試。")
         else:
@@ -409,9 +406,6 @@ class CmdGuildRequest(_GuildCommandBase):
             compiled = _resolve_deferred(
                 request_generated_quest(context=context), self.caller
             )
-        except EscortUnavailableError:
-            self.caller.msg(_ESCORT_REFUSAL_MESSAGE)
-            return
         except NoSuitableTemplateError:
             self.caller.msg("公會目前沒有適合你的委託。")
             return

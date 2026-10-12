@@ -30,7 +30,7 @@ from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
 from server.ai_director_service import (
-    EscortUnavailableError,
+
     NoSuitableTemplateError,
     request_generated_quest,
 )
@@ -162,7 +162,10 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         self.assertTrue(failure.check(NoSuitableTemplateError))
 
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_escort_request_is_refused_and_nothing_is_registered(self):
+    def test_an_escort_request_without_a_template_degrades_with_nothing_registered(self):
+        # The blanket pre-transport escort refusal is gone; with no
+        # context-fitting escort template the deterministic draw refuses
+        # through the shared unsupported-template path with no registration.
         definitions_before = dict(QUEST_DEFINITION_REGISTRY)
         offers_before = dict(GUILD_OFFER_REGISTRY)
         disabled = _raw(scenario_director={"enabled": False})
@@ -171,18 +174,23 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
                 context=_context(requested_type="護衛")
             )
             failure = await_result(d)
-        self.assertTrue(failure.check(EscortUnavailableError))
+        self.assertTrue(failure.check(NoSuitableTemplateError))
         self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), definitions_before)
         self.assertEqual(dict(GUILD_OFFER_REGISTRY), offers_before)
 
-    def test_escort_request_refuses_before_any_transport_work(self):
+    def test_an_escort_request_now_reaches_the_director_like_any_other_type(self):
+        # The blanket pre-transport escort refusal is gone: the request is
+        # handed to the director, so the transport is invoked and a bare
+        # (fixtureless) transport failure surfaces with nothing registered.
+        definitions_before = dict(QUEST_DEFINITION_REGISTRY)
         client = FakeLLMClient()
         d = request_generated_quest(
             client, context=_context(requested_type="護衛")
         )
         failure = await_result(d)
-        self.assertTrue(failure.check(EscortUnavailableError))
-        self.assertEqual(client.calls, [])
+        self.assertIsNotNone(failure)
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), definitions_before)
 
     @covers_requirement("scene-builder::the-composition-root-posts-one-generated-quest-to-the-guild-board-and-degrades-offline")
     def test_module_imports_before_server_initialization_without_binding_a_logger(self):

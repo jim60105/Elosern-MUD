@@ -121,8 +121,7 @@ class SceneBuilderMaterializationTests(SceneBuilderTestBase):
     def test_escort_stage_is_refused_before_publication(self):
         with self.assertRaisesRegex(
             QuestCompileError,
-            "ESCORT objective, which cannot be published until a "
-            "protected-entity binding flow exists",
+            "ESCORT objective requires exactly one completion discriminator",
         ):
             compile_quest_blueprint(_escort_anchor_payload())
 

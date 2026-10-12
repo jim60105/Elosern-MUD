@@ -421,7 +421,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
-    def test_escort_stage_at_instance_is_rejected_and_retried(self):
+    def test_a_contractless_escort_stage_at_instance_is_rejected_and_retried(self):
         bad = self._instance_bound_payload()
         bad["quest_type"] = "護衛"
         bad["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
@@ -437,7 +437,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_escort_stage_at_anchor_is_rejected_and_retried(self):
+    def test_a_contractless_escort_stage_at_anchor_is_rejected_and_retried(self):
         bad = _payload()
         bad["quest_type"] = "護衛"
         bad["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
@@ -455,6 +455,27 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
             result = await_result(d)
         self.assertEqual(result, _blueprint())
         self.assertEqual(len(client.calls), 2)
+
+    @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    def test_a_complete_escort_contract_passes_the_validators(self):
+        # The blanket ESCORT refusal is gone: a proposal declaring the complete
+        # closed contract is accepted by the semantic validators.
+        good = _payload()
+        good["quest_type"] = "護衛"
+        good["stages"][0]["objective"] = {
+            "kind": "escort",
+            "quantity": 1,
+            "completion": "rendezvous",
+            "protected_role_refs": ["daughter"],
+            "meeting_role_refs": ["mother"],
+            "relation": {
+                "kind": "parent_child",
+                "from_role": "mother",
+                "to_role": "daughter",
+            },
+        }
+        for validator_fn in scenario_director._VALIDATORS.values():
+            self.assertEqual(validator_fn(good), [], validator_fn.__name__)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     @covers_requirement("quest-blueprint::reach-and-escort-objectives-accept-only-quantity-one")
