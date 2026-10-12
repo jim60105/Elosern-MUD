@@ -293,6 +293,25 @@ class ActivationTests(EncounterDispatchTestBase):
             self.assertIn(context["scene"], {"south_gate", "market"})
             self.assertEqual(context["tick"], "5")
 
+    def test_a_rolled_back_activation_schedules_no_projection_refresh(self):
+        """A compensated activation publishes no new occupant.
+
+        The refresh is registered through ``on_commit``, so a failed activation
+        write rolls the registration back with it and the player's window keeps
+        the authoritative prior state.
+        """
+        with patch(
+            "world.quests.encounter_dispatch.activate_scene_encounter",
+            side_effect=RuntimeError("store exploded"),
+        ), patch(
+            "typeclasses.characters._schedule_projection_refresh_after_activation"
+        ) as refresh:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertEqual(
+                    activate_pending_encounters(self.player, room=self.room, tick=5), ()
+                )
+        refresh.assert_not_called()
+
     def test_instance_layer_encounter_activates_from_the_origin_room(self):
         from typeclasses.rooms import InstanceRoom
 

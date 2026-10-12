@@ -359,6 +359,51 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         self.assertEqual(settled.dispatch_id, work.dispatch_id)
         self.assertEqual(settled.request_version, work.request_version)
 
+    def test_movement_during_generation_does_not_reject_the_publication(self):
+        """The saved scene is published for the declared place, not the room.
+
+        A captured context names the player's authoritative place anchor, never
+        the room: walking to another room of the same place while the work sits
+        interrupted must not reject the arrangement or relocate the encounters
+        the package declared.
+        """
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import AnchorRoom
+
+        _request, work = self._queued_work()
+        client = self._client()
+        original = dispatch.checkpoint_scene
+
+        def interrupt(row, token, **kwargs):
+            original(row, token, **kwargs)
+            dispatch.release_claim(row, token)
+            return False
+
+        with patch(
+            "world.narrative.dispatch_runner.dispatch.checkpoint_scene",
+            side_effect=interrupt,
+        ):
+            self.assertEqual(self._run(client).outcome, "deferred")
+        calls = len(client.calls)
+        # The player walks on: a second room of the same anchored place.
+        elsewhere_in_place = create_object(AnchorRoom, key="南門外")
+        elsewhere_in_place.anchor_key = self.anchor
+        self.owner.location = elsewhere_in_place
+
+        dispatch.recover_interrupted(process="restarted")
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self._run(client).outcome, "arranged")
+        self.assertEqual(len(client.calls), calls)
+        settled = dispatch.find_work(work.dispatch_id)
+        self.assertEqual(settled.state, dispatch.STATE_ARRANGED)
+        published = scene_store.read_package(settled.package_id)
+        self.assertIsNotNone(published)
+        # The declared locators are the package's own, unchanged by the walk.
+        self.assertEqual(
+            published.payload["encounters"], self.package_payload["encounters"]
+        )
+        self.assertEqual(self.owner.location.pk, elsewhere_in_place.pk)
+
     def test_a_committed_publication_survives_a_restart_without_a_second_package(self):
         """A crash after commit but before the notice changes nothing on restart."""
         request, work = self._queued_work()
