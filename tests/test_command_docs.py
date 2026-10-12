@@ -123,7 +123,10 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "guild request [討伐|採集|護衛|探索|緊急]",
         "context": "公會（需已註冊冒險者）",
     },
-    "guild exam": {"syntax": "guild exam [<rank>]", "context": "公會（需當地考核官）"},
+    "guild exam": {
+        "syntax": "guild exam [<rank>]",
+        "context": "公會（需在所屬分部的公會櫃台前，且已註冊為冒險者）",
+    },
     "church join": {
         "syntax": "church join",
         "context": "教會（需當地教會神職人員）",
