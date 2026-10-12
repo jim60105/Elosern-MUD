@@ -523,8 +523,8 @@ ART_REMBG_ALLOWANCE_SECONDS = _env_int_bounded(
 
 # Cap on the ONNX session's intra/inter-op thread count. 0 leaves ONNX
 # Runtime's own default in place. Non-zero reaches the session through
-# OMP_NUM_THREADS (the only mechanism the locked rembg 2.0.84 offers — its
-# new_session() builds its own SessionOptions); this is a deliberate
+# OMP_NUM_THREADS (the mechanism this backend uses — rembg's new_session()
+# builds its own SessionOptions unless a caller supplies one); this is a deliberate
 # PROCESS-GLOBAL environment setting (see world/art/cutout.py).
 ART_REMBG_THREADS = _env_int_bounded("ART_REMBG_THREADS", 0, low=0, high=256)
 
@@ -563,7 +563,9 @@ ART_TRANSLATE_ENABLED = _env_bool("ART_TRANSLATE_ENABLED", False)
 # machine with scripts/fetch-translate-model.sh, disable runtime downloads —
 # the fetch then becomes structurally impossible). True (the default) lets the
 # backend fetch the Argos Open Tech package on first use into the pinned
-# volume, exactly mirroring ART_REMBG_DOWNLOAD_ENABLED.
+# volume — the same boolean policy as ART_REMBG_DOWNLOAD_ENABLED, whose own
+# weight the standard image already ships, so only a bare-metal or
+# secret_settings-overridden directory ever acquires it.
 ART_TRANSLATE_DOWNLOAD_ENABLED = _env_bool("ART_TRANSLATE_DOWNLOAD_ENABLED", True)
 
 # Cap on the CTranslate2 intra-op thread count. 0 (the default) leaves the

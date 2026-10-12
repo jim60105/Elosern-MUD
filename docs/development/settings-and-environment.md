@@ -68,7 +68,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | `ART_REMBG_ENABLED` | `ART_REMBG_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時整條管線與變更前逐位元組相同（設計 D2：程式碼與測試預設不得觸發任何模型取得） |
 | `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；標準映像已內建權重，兩種值都不取得任何模型。False＝裸機或 `secret_settings.py` 自訂目錄的離線配置，backend 先檢查唯一預設模型 `bria-rmbg` 的產物是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
 | `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；裸機首次取得模型刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
-| `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.84 的唯一機制），屬刻意的行程全域設定 |
+| `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（本 backend 採用的機制），屬刻意的行程全域設定 |
 
 ### 美術提示詞翻譯
 
@@ -77,7 +77,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
 | `ART_TRANSLATE_ENABLED` | `ART_TRANSLATE_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；`True` 時啟用本機提示詞前處理，翻譯失敗只降級提示詞，不會令圖片工作失敗。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
-| `ART_TRANSLATE_DOWNLOAD_ENABLED` | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；True（預設）＝佈局檢查失敗時 backend 首次使用可把 Argos Open Tech `translate-zh_en-1_9` 封包（約 74 MB）抓進持久的 `server/.translate` volume，與 `ART_REMBG_DOWNLOAD_ENABLED` 完全同型；False＝支援的離線配置，backend 先檢查種子佈局，缺席時立即以 `art_translate_unavailable` 有界失敗（不 import 翻譯函式庫、不觸網、不等待） |
+| `ART_TRANSLATE_DOWNLOAD_ENABLED` | `ART_TRANSLATE_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；True（預設）＝佈局檢查失敗時 backend 首次使用可把 Argos Open Tech `translate-zh_en-1_9` 封包（約 74 MB）抓進持久的 `server/.translate` volume（與 `ART_REMBG_DOWNLOAD_ENABLED` 同為布林政策，但 rembg 的權重已內建於標準映像，只有裸機／自訂目錄才會取得）；False＝支援的離線配置，backend 先檢查種子佈局，缺席時立即以 `art_translate_unavailable` 有界失敗（不 import 翻譯函式庫、不觸網、不等待） |
 | `ART_TRANSLATE_THREADS` | `ART_TRANSLATE_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝CTranslate2 自行決定；非零值在 translator 建構時送達 intra-op 執行緒數（建構參數，非行程全域環境變數；鎖定的 ctranslate2 4.8.2 機制） |
 
 **翻譯 backend（僅限程式碼）**：`ART_TRANSLATE_BACKEND = "world.art.translate_ct2.CTranslate2Backend"` 是第三個會執行匯入的 dotted-path seam，因此不讀環境變數。測試與瀏覽器 harness 指向 `world.art.fake_translate.FakeTranslator`，避免載入翻譯函式庫或連線。

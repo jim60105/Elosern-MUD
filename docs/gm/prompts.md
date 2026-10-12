@@ -125,7 +125,7 @@ prompts:
 | `ART_REMBG_ALLOWANCE_SECONDS` | 同名 | `120` | 啟用時每項租約寬限秒數，10–1800 包含兩端；是租約預算而非強制逾時 |
 | `ART_REMBG_THREADS` | 同名 | `0` | ONNX session 執行緒上限，0–256；`0`＝ONNX Runtime 自行決定；非零經 `OMP_NUM_THREADS` 送達（行程全域） |
 | `ART_TRANSLATE_ENABLED` | 同名 | `False` | 提示詞本機前處理總開關。只翻譯含 Han 字的行，保留 authored `source_description` 與 `source_hash`；翻譯失敗會用原始提示詞生成圖片。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
-| `ART_TRANSLATE_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 backend 下載翻譯模型到持久 volume（與 `ART_REMBG_DOWNLOAD_ENABLED` 同型，約 74 MB 的 `translate-zh_en-1_9` 封包）。`false` 加上預置的 `server/.translate` volume＝無執行期網路配置；模型缺席時立即以有界的 `art_translate_unavailable` 失敗 |
+| `ART_TRANSLATE_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 backend 下載翻譯模型到持久 volume（與 `ART_REMBG_DOWNLOAD_ENABLED` 同為布林政策，但兩者的取得時機不同：rembg 的權重已內建於標準映像，只有裸機／自訂目錄才會取得；約 74 MB 的 `translate-zh_en-1_9` 封包則由 backend 首次使用時抓取）。`false` 加上預置的 `server/.translate` volume＝無執行期網路配置；模型缺席時立即以有界的 `art_translate_unavailable` 失敗 |
 | `ART_TRANSLATE_THREADS` | 同名 | `0` | CTranslate2 intra-op 執行緒上限，0–256；`0`＝CTranslate2 自行決定；非零在建構時送達 translator |
 | `ART_TRANSLATE_BACKEND` | —（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
 
@@ -187,7 +187,7 @@ cp   ct2-zh-en/source.spm /path/to/server/.translate/sentencepiece.model
 
 **未種子 volume 的降級路徑是設計內行為**：每次生成記錄一條 `art_translate_failed`（`art_translate_unavailable`）警告、以 authored 提示詞生成圖片、圖片照常產生。翻譯降級的效果只到提示詞品質變差，工作不會失敗。`@art status` 與 `@art retry`/`requeue` 的行為不變。
 
-**肖像去背的成本**：啟用後，首次生成肖像前 rembg 會下載約 1 GB 的模型檔（快取在持久的 `server/.rembg` volume，跨容器重建保留）；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`），處理方式是保留前一份有效輸出、不阻斷批次，`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
+**肖像去背的成本**：標準容器映像已在建置時內建唯一的去背權重（`bria-rmbg`，未壓縮約 1.02 GB），因此啟用後第一次生成肖像不會有任何下載；每張肖像在單一 worker 執行緒上多花約 10 秒 CPU；ONNX session 建立後 Evennia 伺服器行程的常駐記憶體**永久**增加約 1–1.5 GB。小機器請以此估算，避免 OOM。去背只影響啟用後新生成的肖像；既有資產與種子同步檔案不會被回溯改寫，需要時用 `@art retry`／`@art requeue` 逐張重生成。去背失敗是有界失敗（`art_cutout_unavailable`／`art_cutout_error`），處理方式是保留前一份有效輸出、不阻斷批次，`@art retry` 在修復後即可恢復。`ART_REMBG_ENABLED=true` 時 `ART_SD_OUTPUT_FORMAT` 不得為 `jpeg`（JPEG 無法攜帶 alpha，啟動即拒絕）；`png`／`webp`／`avif` 皆可。
 
 ### 提示詞編輯流程（美術生成）
 
