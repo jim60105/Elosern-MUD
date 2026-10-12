@@ -18,7 +18,11 @@ rather than shipping a silently dead row.
 Import layering: this module imports ``world.rules.progression`` at module
 top, while progression imports this module lazily inside its award helpers —
 so importing progression never imports this module, and importing this module
-never observes a half-initialized progression.
+never observes a half-initialized progression. That lazy import can run inside
+a synthetic catalog scope (the first practice award of a process may be the
+first thing to reach this module), so the shipped table below validates
+against ``SHIPPED_SKILL_REGISTRY`` — the shipped catalog's own snapshot — and
+never against the live binding a scope may have substituted.
 """
 
 from __future__ import annotations
@@ -32,7 +36,12 @@ from typing import Any
 import yaml
 
 from world.rules.progression import proficiency_cap, skill_proficiency_level
-from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillDef, SkillKind
+from world.skills.registry import (
+    SHIPPED_SKILL_REGISTRY,
+    SkillCategory,
+    SkillDef,
+    SkillKind,
+)
 
 
 @dataclass(frozen=True)
@@ -236,7 +245,7 @@ def _parse_clause(
 def load_rules(
     raw_rules: Any,
     *,
-    registry: Mapping[str, SkillDef] = SKILL_REGISTRY,
+    registry: Mapping[str, SkillDef] = SHIPPED_SKILL_REGISTRY,
     cap: Callable[[str], int] = proficiency_cap,
 ) -> UnlockRulebook:
     """Build and validate an :class:`UnlockRulebook` from raw YAML-shaped data.
@@ -247,6 +256,9 @@ def load_rules(
     structural no-cycle check raise ``ValueError`` naming the offending rule
     id(s). ``registry`` and ``cap`` are injectable so behavior tests can load
     synthetic tables against synthetic rows without touching the live catalogs.
+    The default is the shipped snapshot, not the live binding: every rulebook
+    this module ships is authored against the shipped catalog, so a load that
+    happens inside a synthetic catalog scope must still see the shipped rows.
     """
     if raw_rules is None:
         raw_rules = []
@@ -471,10 +483,13 @@ def unlock_line_for_grant(
     return unlock_line(registry[skill_key])
 
 
-# The shipped rulebook, validated against the live registry at import. Tests
+# The shipped rulebook, validated against the shipped catalog at import. Tests
 # that need synthetic tables load them through :func:`load_rules` and patch
-# this binding; the module must be imported outside any synthetic catalog
-# scope so this load always sees the shipped registry.
+# this binding. The catalog source is the shipped snapshot rather than the
+# live ``SKILL_REGISTRY`` binding, so this load holds whether or not the module
+# is first imported inside a synthetic catalog scope — the practice-award path
+# imports it lazily, and under a ``synthetic_registries("skills")`` scope every
+# shipped grant key would otherwise be unknown and the award would roll back.
 RULEBOOK: UnlockRulebook = load_rulebook(
     Path(__file__).parent / "rulebook" / "cross_lineage_unlock.yaml"
 )

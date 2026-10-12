@@ -4,6 +4,14 @@ The later guild-exam lifecycle calls preflight against its proposed real kit,
 then activates inside its start transaction. This module never starts an exam.
 The module-level profile map is validated at import (rulebook tests re-seat it
 through the idempotent ``reload_restriction_profiles`` re-validation).
+
+Validation resolves authored references through ``SHIPPED_SKILL_REGISTRY``,
+the shipped catalog's own snapshot, never through the live binding: this
+module is reached lazily from dialogue (``world.rules.npc_intents``), so its
+import can happen inside a synthetic catalog scope, and a shipped rulebook
+must validate against the shipped rows it was authored against, whatever
+catalog the running scope installed. Runtime reads (permitted-skill usability)
+keep reading the live binding.
 """
 
 from collections.abc import Mapping
@@ -26,7 +34,7 @@ from world.rules.surfaces import (
 )
 from world.skills.effects import StatMultiplyEffect
 from world.skills.equipment import ACCESSORY_MAX_SLOTS, EquipmentSlot
-from world.skills.registry import SKILL_REGISTRY
+from world.skills.registry import SHIPPED_SKILL_REGISTRY, SKILL_REGISTRY
 from world.skills.restrictions import exam_restriction
 
 
@@ -49,9 +57,9 @@ class RestrictionProfile:
 def _lineage(top_key: str, root_key: str) -> tuple[str, ...]:
     """Include both lower sword branches, without granting learned ownership."""
     def ancestry(key, visiting=()):
-        if key in visiting or key not in SKILL_REGISTRY:
+        if key in visiting or key not in SHIPPED_SKILL_REGISTRY:
             raise RestrictionError("invalid examination lineage")
-        edges = SKILL_REGISTRY[key].prerequisites
+        edges = SHIPPED_SKILL_REGISTRY[key].prerequisites
         if not edges:
             return {key}, 0
         roots = set()
@@ -66,13 +74,18 @@ def _lineage(top_key: str, root_key: str) -> tuple[str, ...]:
     if roots != {root_key}:
         raise RestrictionError("examination top skill is outside the sword lineage")
     return tuple(
-        key for key in SKILL_REGISTRY
+        key for key in SHIPPED_SKILL_REGISTRY
         if ancestry(key)[0] == roots and ancestry(key)[1] <= depth
     )
 
 
 def load_restriction_profiles(document: Mapping) -> Mapping[str, RestrictionProfile]:
-    """Validate authored references before any restriction can be activated."""
+    """Validate authored references before any restriction can be activated.
+
+    Every reference resolves through the shipped catalog snapshot, so the
+    validation of this shipped rulebook is independent of any synthetic
+    catalog scope that happens to be installed when the module is imported.
+    """
     if not isinstance(document, Mapping) or set(document) != {"sword_root", "guild_exam_policies"}:
         raise RestrictionError("invalid restriction rulebook fields")
     if not isinstance(document["guild_exam_policies"], Mapping):
@@ -95,7 +108,7 @@ def load_restriction_profiles(document: Mapping) -> Mapping[str, RestrictionProf
         allowed = ["basic_attack", "flee", *_lineage(row["top_skill"], document["sword_root"])]
         body = row["body_skill"]
         if body is not None:
-            skill = SKILL_REGISTRY.get(body)
+            skill = SHIPPED_SKILL_REGISTRY.get(body)
             if skill is None or not any(isinstance(effect, StatMultiplyEffect) and effect.multiplier == 1.2 for effect in skill.parsed_effects):
                 raise RestrictionError("invalid permitted body enhancement")
             allowed.append(body)
