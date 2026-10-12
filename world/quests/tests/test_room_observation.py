@@ -20,6 +20,7 @@ from typeclasses.rooms import (
     Room,
     TerrainRoom,
 )
+from world.quests import scene_store
 from world.quests.binding import bind_stage_runtime
 from world.quests.definitions import (
     QUEST_DEFINITION_REGISTRY,
@@ -27,8 +28,15 @@ from world.quests.definitions import (
     QuestType,
 )
 from world.quests.room_observation import QuestObservableRoomMixin
-from world.quests.runtime import QuestState, read_records, to_storage
+from world.quests.runtime import QuestState, accept_quest, read_records, to_storage
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.rules.guild_offers import QuestReward
+from world.rules.quest_issuance import (
+    QuestIssuance,
+    Settlement,
+    provision_scoped_issuer,
+    register_quest_issuance,
+)
 
 
 def _east_gate_xyz():
@@ -72,11 +80,89 @@ def reach_stage(destination, index: int = 0):
     return QuestStage(index, reach(destination))
 
 
-def escort_stage(destination, index: int = 0):
-    return QuestStage(index, escort(destination))
+def escort_stage(destination, index: int = 0, roles=("escortee",)):
+    return QuestStage(index, escort(destination, protected_role_refs=tuple(roles)))
 
 
-class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
+class EscortOfferMixin:
+    """Accept a synthetic ESCORT definition through its own published offer.
+
+    Room arrival advances a REACH stage on its own, but an ESCORT stage is
+    decided by the settled escort pass over the exact protected bindings an
+    acceptance committed. An escort test therefore publishes a real offer,
+    binds its roles and accepts through the deterministic owner instead of
+    staging a record nothing would ever evaluate.
+    """
+
+    def _protected(self, key: str, location: Any = None) -> NPC:
+        npc = create_object(
+            NPC, key=key, location=self.room1 if location is None else location
+        )
+        npc.race = "human"
+        npc.apply_race_baseline()
+        return npc
+
+    def _accept_escort(self, definition, protected, *, package_id: str):
+        """Publish ``definition``'s offer bound to ``protected`` and accept it."""
+        objective = definition.stages[0].objective
+        issuer = create_object(NPC, key=f"{package_id} issuer", location=self.room1)
+        issuer.race = "human"
+        issuer.apply_race_baseline()
+        content_key = f"{package_id}_issuer"
+        issuer_key = provision_scoped_issuer(issuer, content_key=content_key)
+        register_quest_issuance(
+            QuestIssuance(
+                definition_key=definition.key,
+                issuer_key=issuer_key,
+                reward=QuestReward(copper=1, items=(), merit=0),
+                settlement=Settlement.AUTO,
+            )
+        )
+        package, _ = scene_store.publish_package(
+            package_id=package_id,
+            source_id=None,
+            owner_id="fixture",
+            payload={
+                "roles": [
+                    {"role_id": role}
+                    for role in ("issuer", *objective.protected_role_refs)
+                ],
+                "commissions": [
+                    {"role_id": "issuer", "issuer_content_key": content_key}
+                ],
+                "dialogue": [
+                    {
+                        "role_id": "issuer",
+                        "phases": [
+                            {
+                                "phase_id": "offer",
+                                "topics": [
+                                    {
+                                        "keyword": "escort",
+                                        "effect_verb": "offer_commission",
+                                        "effect_reference": definition.key,
+                                    }
+                                ],
+                            }
+                        ],
+                    }
+                ],
+                "outcome_groups": [],
+            },
+        )
+        scene_store.bind_role(package, "issuer", issuer.pk)
+        for role, actor in zip(objective.protected_role_refs, protected):
+            scene_store.bind_role(package, role, actor.pk)
+        scene_store.ensure_commission_grant(
+            package, "issuer", definition.key, issuer_key=issuer_key
+        )
+        scene_store.assign_grant_actor(package, "issuer", definition.key, issuer.pk)
+        scene_store.set_grant_registered(package, "issuer", definition.key, True)
+        scene_store.set_dialogue_phase(package, "issuer", "offer")
+        return accept_quest(self.player, definition.key, issuer_key)
+
+
+class RoomArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, EvenniaTest):
     def setUp(self):
         super().setUp()
         create_object(Room, key="虛境", location=None)
@@ -96,12 +182,6 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         room = GridRoom.objects.filter_xyz(xyz=(x, y, live_anchor_placement_row().zcoord)).first()
         self.assertIsNotNone(room)
         return room
-
-    def _npc(self, key: str) -> NPC:
-        npc = create_object(NPC, key=key)
-        npc.race = "human"
-        npc.apply_race_baseline()
-        return npc
 
     def _companion(self, key: str, room: Any) -> NPC:
         """Bind ``key`` to the player and place it in ``room`` (co-presence)."""
@@ -184,26 +264,23 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
             quest(
                 "escort_presence",
                 quest_type=QuestType.ESCORT,
-                stages=(escort_stage(anchor_locator()),),
+                stages=(escort_stage(anchor_locator(), roles=("first", "second")),),
             )
         )
-        record = accept(self.player, definition.key)
-        first = self._npc("first")
-        second = self._npc("second")
-        bind_stage_runtime(
-            self.player,
-            record.quest_id,
-            protected_entities=(first, second),
+        first = self._protected("first")
+        second = self._protected("second")
+        record = self._accept_escort(
+            definition, (first, second), package_id="escort_presence_package"
         )
         anchor = self._anchor()
-        self._companion("同伴", anchor)
         first.move_to(anchor, quiet=True)
-        self._enter(anchor)
+        self.assertIs(first.location, anchor)
         self.assertEqual(self._records()[0]["state"], "in_progress")
         second.move_to(anchor, quiet=True)
-        self.player.move_to(self.room1, quiet=True)
-        self._enter(anchor)
-        self.assertEqual(self._records()[0]["state"], "completed")
+        self.assertIs(second.location, anchor)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["quest_id"], record.quest_id)
 
     def test_escort_with_dead_protected_entity_does_not_complete(self):
         definition = register(
@@ -213,15 +290,17 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept(self.player, definition.key)
-        guard = self._npc("dead-guard")
-        bind_stage_runtime(self.player, record.quest_id, protected_entities=(guard,))
+        guard = self._protected("dead-guard")
+        record = self._accept_escort(
+            definition, (guard,), package_id="escort_dead_package"
+        )
         anchor = self._anchor()
-        self._companion("同伴", anchor)
         guard.traits.hp._data["current"] = 0
         guard.move_to(anchor, quiet=True)
-        self._enter(anchor)
-        self.assertEqual(self._records()[0]["state"], "in_progress")
+        self.assertIs(guard.location, anchor)
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "in_progress")
+        self.assertEqual(stored["quest_id"], record.quest_id)
 
     def test_instance_interaction_behavior_remains_intact(self):
         definition = register(
@@ -328,7 +407,7 @@ class RoomArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(stored["stage_progress"], 2)
 
 
-class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
+class PartyArrivalProgressTests(EscortOfferMixin, QuestRegistryIsolation, EvenniaTest):
     """Real exit traversal with companion follow (party-quest task 2.4).
 
     The player's own arrival observation runs before the follow moves, so a
@@ -435,19 +514,20 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept(self.player, definition.key)
-        guard = create_object(NPC, key="stay-guard")
-        guard.race = "human"
-        guard.apply_race_baseline()
-        bind_stage_runtime(self.player, record.quest_id, protected_entities=(guard,))
+        guard = self._protected("stay-guard")
+        record = self._accept_escort(
+            definition, (guard,), package_id="escort_missing_package"
+        )
+        # The accepted protected actor leaves the follower's own source room,
+        # so the traversal cannot carry it along: the destination waits for it.
+        guard.move_to(self.room2, quiet=True)
         self._companion("跟隨者")
         self.door.at_traverse(self.player, self.anchor)
         self.assertEqual(self._records()[0]["state"], "in_progress")
         guard.move_to(self.anchor, quiet=True)
-        back = create_object(Exit, key="back", location=self.anchor, destination=self.room1)
-        back.at_traverse(self.player, self.room1)
-        self.door.at_traverse(self.player, self.anchor)
-        self.assertEqual(self._records()[0]["state"], "completed")
+        stored = self._records()[0]
+        self.assertEqual(stored["state"], "completed")
+        self.assertEqual(stored["quest_id"], record.quest_id)
 
     @covers_requirement("party-system::companions-assist-the-player-s-quest-objectives")
     def test_escort_dead_protected_entity_stays_unchanged(self):
@@ -458,11 +538,10 @@ class PartyArrivalProgressTests(QuestRegistryIsolation, EvenniaTest):
                 stages=(escort_stage(anchor_locator()),),
             )
         )
-        record = accept(self.player, definition.key)
-        guard = create_object(NPC, key="dead-traversal-guard")
-        guard.race = "human"
-        guard.apply_race_baseline()
-        bind_stage_runtime(self.player, record.quest_id, protected_entities=(guard,))
+        guard = self._protected("dead-traversal-guard")
+        self._accept_escort(
+            definition, (guard,), package_id="escort_dead_traversal_package"
+        )
         guard.traits.hp._data["current"] = 0
         guard.move_to(self.anchor, quiet=True)
         self._companion("跟隨者")
