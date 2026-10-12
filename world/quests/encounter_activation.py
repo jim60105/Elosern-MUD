@@ -129,6 +129,14 @@ def committed_observations(package_id: str) -> dict[str, bool]:
         facts["unresolved"] = False
     if facts["abandoned"]:
         facts["separation"] = False
+    # The exclusive-result facts are owned by this change (escort-rendezvous
+    # §7): ``reunion`` holds once any group of the package has committed a
+    # result and ``reunion_closure`` once the participants' closure phase is
+    # also committed. Both are read from durable state, never from prose.
+    from . import outcome_store
+
+    facts["reunion"] = outcome_store.has_resolved_group(package_id)
+    facts["reunion_closure"] = facts["reunion"] and facts["closure"]
     return facts
 
 

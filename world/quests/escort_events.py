@@ -274,6 +274,21 @@ def resolve_exclusive_outcome(owner: Any, package_id: str, group_id: str, *, sou
     if replacements:
         apply_quest_log_replacement(owner, [replacements.get(record.quest_id, record)
                                           for record in current.values()], pins)
+    # The committed result also commits every participant role's own result
+    # knowledge and acknowledgment phase, in the same transaction
+    # (escort-rendezvous §7).
+    from .story_dialogue import commit_reunion_participation
+
+    participant_roles = tuple(dict.fromkeys(
+        (*group_definition.result.protected_role_refs,
+         *group_definition.result.meeting_role_refs)
+    ))
+    commit_reunion_participation(
+        package_id,
+        participant_roles,
+        group_id=group_id,
+        winner_quest_id=winner.quest_id if winner is not None else "",
+    )
     return row
 
 

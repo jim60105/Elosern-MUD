@@ -71,6 +71,14 @@ def dialogue(role_id: str, **overrides) -> dict:
         "initial_phase": "searching",
         "phases": [
             phase("searching", [{"default": True}]),
+            # The reunion acknowledgment phase: selected once the exclusive
+            # result is committed and before the closure interaction advances
+            # to everyday content (escort-rendezvous §7).
+            phase(
+                "acknowledgment",
+                [{"reunion": True}, {"closure": False}],
+                topics=[{"keyword": "重逢", "response": LONG_PROSE}],
+            ),
             phase(
                 "everyday",
                 [{"closure": True}],

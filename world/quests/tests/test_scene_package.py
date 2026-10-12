@@ -103,12 +103,18 @@ class ScenePackageValidationTests(EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
     )
-    def test_a_guarded_reunion_observation_is_rejected(self):
-        package = _package()
-        package["dialogue"][0]["phases"][1]["conditions"] = [{"reunion": True}]
-        with self.assertRaises(ScenePackageError) as caught:
-            validate_scene_package(package)
-        self.assertIn("reunion", str(caught.exception))
+    def test_a_reunion_conditioned_phase_is_a_registered_fact(self):
+        # escort-rendezvous released the guard on ``reunion``; a package may now
+        # declare a reunion-conditioned phase, which validates as a complete
+        # registered fact instead of being refused as guarded.
+        definition = validate_scene_package(_package())
+        acknowledgment = next(
+            phase
+            for dialogue in definition.dialogue
+            for phase in dialogue.phases
+            if phase.phase_id == "acknowledgment"
+        )
+        self.assertIn({"reunion": True}, list(acknowledgment.conditions))
 
     @covers_requirement(
         "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"

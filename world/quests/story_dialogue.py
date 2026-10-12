@@ -7,10 +7,13 @@ permitted knowledge through the narrative owner, and refreshing live dialogue
 sessions through the existing session helpers after the commit. Persona, prior
 turns and previous frames are never rewritten (design §6).
 
-The boundary refuses guarded escort/reunion observations (their owning
-capability is the second design), refuses a stale expected revision, refuses an
-ambiguous selection, and never derives an outcome from prose: the observation
-provenance must name only registered deterministic facts.
+``commit_reunion_participation`` records a committed exclusive result as each
+participant role's own knowledge and advances the role's dialogue to its
+acknowledgment phase. The boundary refuses guarded acceptance/progress
+observations, refuses a stale expected revision, refuses an ambiguous selection,
+and never derives an outcome from prose: the observation provenance must name
+only registered deterministic facts, and the ``reunion``/``reunion_closure``
+values are re-derived from the committed result state (escort-rendezvous §7).
 """
 
 from __future__ import annotations
@@ -154,6 +157,18 @@ def transition_story_dialogue(
         raise StoryRoleNotFound(f"role {role_id!r} has no dialogue definition")
 
     facts = resolve_observations(provenance)
+    # The exclusive-result facts are not the caller's to assert: verify the
+    # supplied value against the committed result state so a fabricated
+    # ``reunion`` can never select the acknowledgment phase (escort-rendezvous
+    # §7, design §"Explicit final-result arbitration").
+    from .encounter_activation import committed_observations
+
+    committed = committed_observations(package_id)
+    for fact in ("reunion", "reunion_closure"):
+        if fact in facts and facts[fact] is not committed.get(fact, False):
+            raise StoryDialogueError(
+                f"provenance {fact!r} contradicts the committed result state"
+            )
     selected = select_dialogue_phase(role_dialogue, facts)
 
     current = scene_store.get_dialogue_phase(package_id, role_id)
@@ -207,6 +222,68 @@ def transition_story_dialogue(
         revision=updated.revision,
         changed=True,
     )
+
+
+def commit_reunion_participation(
+    package_id: str,
+    role_ids: tuple[str, ...],
+    *,
+    group_id: str,
+    winner_quest_id: str,
+    tick: int = 0,
+) -> None:
+    """Record a resolved group's participant knowledge and acknowledgment phase.
+
+    For every participant role, the committed result is recorded as that role
+    actor's own knowledge through the narrative owner (idempotent per
+    package/group, so a replay records nothing new), and the role's dialogue
+    advances to the acknowledgment phase its package declares for the committed
+    ``reunion`` fact. A role with no dialogue definition is skipped; the
+    transition re-derives ``reunion`` from the committed result state, so the
+    caller asserting it is verified rather than trusted (escort-rendezvous §7).
+    """
+    from world.narrative.memory import record_memory
+
+    row = scene_store.read_package(package_id)
+    declared_dialogue = set()
+    if row is not None:
+        declared_dialogue = {
+            entry.get("role_id")
+            for entry in row.payload.get("dialogue", [])
+            if isinstance(entry, dict)
+        }
+    for role_id in role_ids:
+        actor = _resolve_role_actor(package_id, role_id)
+        if actor is None:
+            continue
+        record_memory(
+            owner_id=str(actor.pk),
+            content={
+                "package": package_id,
+                "group": group_id,
+                "result": winner_quest_id or "no_commission",
+            },
+            tick=tick,
+            category="knowledge",
+            knowledge_scope="witnessed",
+            source_id=f"reunion:{package_id}:{group_id}",
+            projector_version=1,
+        )
+        if role_id not in declared_dialogue:
+            # A participant role that declares no dialogue has no phase to
+            # advance; its committed result knowledge is still recorded.
+            continue
+        runtime = scene_store.get_dialogue_phase(package_id, role_id)
+        try:
+            transition_story_dialogue(
+                package_id,
+                role_id,
+                expected_revision=runtime.revision if runtime is not None else 0,
+                provenance={"reunion": True},
+                tick=tick,
+            )
+        except StoryRoleNotFound:  # observability: ignore R2: a role with no dialogue definition has no phase to advance and its committed result knowledge is already recorded above
+            continue
 
 
 def _grant_role_knowledge(

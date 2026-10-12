@@ -242,10 +242,23 @@ def package_owner_ids(package_id: str) -> tuple[int, ...]:
     ).values_list("owner_id", flat=True).distinct())
 
 
+def has_resolved_group(package_id: str) -> bool:
+    """Whether any exclusive group of ``package_id`` has committed a result.
+
+    Read-only and owner-agnostic: the committed result is a package-level fact
+    the persistent story roles select their acknowledgment phase from
+    (escort-rendezvous §7).
+    """
+    return ExclusiveOutcomeGroup.objects.filter(
+        package_id=str(package_id), resolved=True,
+    ).exists()
+
+
 __all__ = [
     "allocate_acceptance_sequence",
     "consume_transition",
     "get_or_create_group",
+    "has_resolved_group",
     "list_owner_groups",
     "mark_group_resolved",
     "read_group",
