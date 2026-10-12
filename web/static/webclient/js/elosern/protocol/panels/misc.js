@@ -17,7 +17,9 @@ var hasLoneSurrogate = core.hasLoneSurrogate;
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 var PARTY_SCHEMA_VERSION = C.PARTY_SCHEMA_VERSION;
-var PARTY_MAX_ROWS = C.PARTY_MAX_ROWS;
+var PARTY_GENERAL_LIMIT = C.PARTY_GENERAL_LIMIT;
+var PARTY_MAX_SLOTS = C.PARTY_MAX_SLOTS;
+var PARTY_MAX_COMMISSION_LABEL = C.PARTY_MAX_COMMISSION_LABEL;
 var PARTY_MAX_DISPLAY_NAME = C.PARTY_MAX_DISPLAY_NAME;
 var OBJECTIVES_SCHEMA_VERSION = C.OBJECTIVES_SCHEMA_VERSION;
 var OBJECTIVES_MAX_ROWS = C.OBJECTIVES_MAX_ROWS;
@@ -48,12 +50,44 @@ var validatePortraitOrigin = art.validatePortraitOrigin;
 var questLog = require("./quest_log.js");
 var validateQuestLogPanel = questLog.validateQuestLogPanel;
 
+function validateCommissionRef(value, name) {
+  requireExactFields(value, name, ["quest_id", "role_id", "label"], []);
+  function bounded(field) {
+    var text = requireString(value[field], field, PARTY_MAX_COMMISSION_LABEL);
+    if (text.length === 0 || hasLoneSurrogate(text)) {
+      throw new Error(name + " " + field + " must be non-empty");
+    }
+    return text;
+  }
+  return { quest_id: bounded("quest_id"), role_id: bounded("role_id"), label: bounded("label") };
+}
+
+function validatePartyMembership(value, name) {
+  requireExactFields(value, name, ["general", "temporary_commissions"], []);
+  var general = requireBool(value.general, "general");
+  if (!Array.isArray(value.temporary_commissions)) {
+    throw new Error(name + " temporary_commissions must be a list");
+  }
+  var commissions = [];
+  var seen = {};
+  for (var i = 0; i < value.temporary_commissions.length; i++) {
+    var ref = validateCommissionRef(value.temporary_commissions[i], name + " commission " + (i + 1));
+    var key = ref.quest_id + "\u0000" + ref.role_id;
+    if (Object.prototype.hasOwnProperty.call(seen, key)) {
+      throw new Error(name + " temporary commission references must be unique");
+    }
+    seen[key] = true;
+    commissions.push(ref);
+  }
+  return { general: general, temporary_commissions: commissions };
+}
+
 function validatePartySlot(value, index) {
   var name = "party slot " + index;
   requireExactFields(
     value,
     name,
-    ["identity", "display_name", "portrait_ref", "hp_current", "hp_maximum", "bond_stage"],
+    ["identity", "display_name", "portrait_ref", "hp_current", "hp_maximum", "bond_stage", "membership"],
     []
   );
   var identity = requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
@@ -73,6 +107,7 @@ function validatePartySlot(value, index) {
   if (bondStage.length === 0 || hasLoneSurrogate(bondStage)) {
     throw new Error("slot bond_stage must be a non-empty stage name");
   }
+  var membership = validatePartyMembership(value.membership, name + " membership");
   return {
     identity: identity,
     display_name: displayName,
@@ -80,11 +115,12 @@ function validatePartySlot(value, index) {
     hp_current: hpCurrent,
     hp_maximum: hpMaximum,
     bond_stage: bondStage,
+    membership: membership,
   };
 }
 
 function validatePartyPanel(payload) {
-  requireExactFields(payload, "party panel", ["schema_version", "available", "slots"], []);
+  requireExactFields(payload, "party panel", ["schema_version", "available", "slots", "general_quota"], []);
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
   if (payload.schema_version !== PARTY_SCHEMA_VERSION) {
     throw new Error("unsupported party schema_version");
@@ -96,8 +132,8 @@ function validatePartyPanel(payload) {
   if (!Array.isArray(slots)) {
     throw new Error("party slots must be a list");
   }
-  if (slots.length > PARTY_MAX_ROWS) {
-    throw new Error("party slots must hold at most " + PARTY_MAX_ROWS + " rows");
+  if (slots.length > PARTY_MAX_SLOTS) {
+    throw new Error("party slots must hold at most " + PARTY_MAX_SLOTS + " rows");
   }
   var normalized = [];
   var seen = {};
@@ -109,9 +145,17 @@ function validatePartyPanel(payload) {
     seen[row.identity] = true;
     normalized.push(row);
   }
+  var quota = payload.general_quota;
+  requireExactFields(quota, "general quota", ["used", "limit"], []);
+  var used = requireInt(quota.used, "used", 0, MAX_SAFE_INTEGER);
+  var limit = requireInt(quota.limit, "limit", 0, MAX_SAFE_INTEGER);
+  if (used > limit) {
+    throw new Error("general quota used exceeds the limit");
+  }
   var result = {
     schema_version: PARTY_SCHEMA_VERSION,
     available: true,
+    general_quota: { used: used, limit: limit },
     slots: normalized,
   };
   // Envelope guarantee mirrors the Python validator's closing check.
@@ -529,7 +573,9 @@ module.exports = {
   validateDialoguePanel: validateDialoguePanel,
   validateRosterPanel: validateRosterPanel,
   PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
-  PARTY_MAX_ROWS: PARTY_MAX_ROWS,
+  PARTY_GENERAL_LIMIT: PARTY_GENERAL_LIMIT,
+  PARTY_MAX_SLOTS: PARTY_MAX_SLOTS,
+  PARTY_MAX_COMMISSION_LABEL: PARTY_MAX_COMMISSION_LABEL,
   PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
   OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,
   OBJECTIVES_MAX_ROWS: OBJECTIVES_MAX_ROWS,

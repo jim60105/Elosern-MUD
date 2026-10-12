@@ -23,13 +23,23 @@ function validPartySlot(overrides) {
       hp_current: 180,
       hp_maximum: 220,
       bond_stage: "摯友",
+      membership: { general: true, temporary_commissions: [] },
     },
     overrides || {}
   );
 }
 
 function validPartyPanel(slots) {
-  return { schema_version: 2, available: true, slots: slots || [validPartySlot()] };
+  const rows = slots || [validPartySlot()];
+  const used = rows.filter(
+    (slot) => slot && slot.membership && slot.membership.general === true
+  ).length;
+  return {
+    schema_version: 2,
+    available: true,
+    general_quota: { used: used, limit: Protocol.PARTY_GENERAL_LIMIT },
+    slots: rows,
+  };
 }
 
 test("party available form validates and empty slots is legal", () => {
@@ -37,6 +47,7 @@ test("party available form validates and empty slots is legal", () => {
   assert.deepEqual(Protocol.validatePartyPanel(validPartyPanel([])), {
     schema_version: 2,
     available: true,
+    general_quota: { used: 0, limit: Protocol.PARTY_GENERAL_LIMIT },
     slots: [],
   });
   // Paired astral code points are legal text on both mirrors.
@@ -62,18 +73,44 @@ test("party validator mirrors the server drift rejections", () => {
         '{"identity":41,"display_name":"a","portrait_ref":null,"hp_current":1,"hp_maximum":1,"bond_stage":"友","constructor":1}'
       ),
     ]),
-    // fifth row
-    validPartyPanel([
-      validPartySlot({ identity: 1 }),
-      validPartySlot({ identity: 2 }),
-      validPartySlot({ identity: 3 }),
-      validPartySlot({ identity: 4 }),
-      validPartySlot({ identity: 5 }),
-    ]),
+    // over the envelope slot bound (the old four-row cap is gone; temporary
+    // rows beyond the general quota are legal)
+    validPartyPanel(
+      Array.from({ length: Protocol.PARTY_MAX_SLOTS + 1 }, (_, index) =>
+        validPartySlot({
+          identity: index + 1,
+          membership: { general: false, temporary_commissions: [] },
+        })
+      )
+    ),
     // missing row keys
     validPartyPanel([
       { identity: 1, display_name: "a", portrait_ref: null, hp_current: 0, hp_maximum: 0 },
     ]),
+    // malformed membership and quota
+    validPartyPanel([validPartySlot({ membership: [] })]),
+    validPartyPanel([
+      validPartySlot({ membership: { general: 1, temporary_commissions: [] } }),
+    ]),
+    validPartyPanel([
+      validPartySlot({
+        membership: {
+          general: false,
+          temporary_commissions: [{ quest_id: "q", role_id: "r", label: "l", x: 1 }],
+        },
+      }),
+    ]),
+    {
+      schema_version: 2,
+      available: true,
+      slots: [],
+    },
+    {
+      schema_version: 2,
+      available: true,
+      general_quota: { used: 5, limit: 4 },
+      slots: [],
+    },
     // unknown row key (a token field must never ride the party row)
     validPartyPanel([{ ...validPartySlot(), token: "a1" }]),
     // numeric bond_stage (raw affinity can never reach the wire)
@@ -113,7 +150,7 @@ test("party is in the production panel allowlist and rejects atomically", () => 
     revision: 5,
     mode: "exploration",
     panels: {
-      party: { schema_version: 2, available: true, slots: [{ ...validPartySlot(), bond_stage: 9 }] },
+      party: validPartyPanel([{ ...validPartySlot(), bond_stage: 9 }]),
     },
     layout_version: 1,
     server_time: serverTime(),

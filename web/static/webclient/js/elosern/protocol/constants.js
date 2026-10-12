@@ -341,10 +341,15 @@ var MESSAGE_NAMES = {
 // The registered production panel allowlist. Each key maps to its exact
 // schema version; unknown panel names reject the whole presentation message.
 // Party panel bounds (mirror of web.webclient.presentation.party,
-// webclient-align-04): at most four companion rows reusing the NPC
-// display-name bound; bond_stage is a canonical stage NAME string.
+// webclient-align-04): the complete ordered effective roster reusing the NPC
+// display-name bound; bond_stage is a canonical stage NAME string. The old
+// four-row cap is removed (temporary members sit beyond the general quota);
+// PARTY_MAX_SLOTS is only an envelope safety bound, and PARTY_GENERAL_LIMIT is
+// the general quota the panel reports.
 var PARTY_SCHEMA_VERSION = 2;
-var PARTY_MAX_ROWS = 4;
+var PARTY_GENERAL_LIMIT = 4;
+var PARTY_MAX_SLOTS = 16;
+var PARTY_MAX_COMMISSION_LABEL = 128;
 var PARTY_MAX_DISPLAY_NAME = 128;
 
 // Objectives panel bounds (mirror of web.webclient.presentation.objectives,
@@ -626,7 +631,9 @@ module.exports = {
   CREATION_AFFINITY_MAXIMUMS: CREATION_AFFINITY_MAXIMUMS,
   MESSAGE_NAMES: MESSAGE_NAMES,
   PARTY_SCHEMA_VERSION: PARTY_SCHEMA_VERSION,
-  PARTY_MAX_ROWS: PARTY_MAX_ROWS,
+  PARTY_GENERAL_LIMIT: PARTY_GENERAL_LIMIT,
+  PARTY_MAX_SLOTS: PARTY_MAX_SLOTS,
+  PARTY_MAX_COMMISSION_LABEL: PARTY_MAX_COMMISSION_LABEL,
   PARTY_MAX_DISPLAY_NAME: PARTY_MAX_DISPLAY_NAME,
   OBJECTIVES_SCHEMA_VERSION: OBJECTIVES_SCHEMA_VERSION,
   OBJECTIVES_MAX_ROWS: OBJECTIVES_MAX_ROWS,

@@ -47,14 +47,26 @@ from world.art.subjects import ArtSubjectError, character_subject_for
 from world.rules.action import stored_gauge_pair
 from world.rules.art_view import portrait_catalog_key
 from world.rules.npc_identity import npc_display_name
-from world.rules.party import bound_owner_of, live_companions
+from world.rules.party import (
+    PARTY_MAX_COMPANIONS,
+    bound_owner_of,
+    has_general_membership,
+    live_companions,
+    party_size,
+    reasons_for,
+)
 
 PARTY_SCHEMA_VERSION = 2
 
-# Mirrors ``world.rules.party.PARTY_MAX_COMPANIONS``; the row cap is pinned in
-# the spec so drift between the rules bound and the wire bound fails loudly.
-PARTY_MAX_ROWS = 4
+#: The general-quota limit the panel reports as ``general_quota.limit``;
+#: mirrors ``world.rules.party.PARTY_MAX_COMPANIONS`` so drift fails loudly.
+PARTY_GENERAL_LIMIT = PARTY_MAX_COMPANIONS
+#: Envelope safety bound on the ordered roster. The spec removes the old
+#: four-row cap: temporary members sit beyond the general quota, so the panel
+#: renders every effective row and never truncates on quota.
+PARTY_MAX_SLOTS = 16
 MAX_PARTY_PORTRAIT_REF = 32
+MAX_PARTY_COMMISSION_LABEL = MAX_DISPLAY_NAME_CODE_POINTS
 
 
 class PartyPanelError(ProtocolValidationError):
@@ -82,6 +94,47 @@ def _bounded_name(value: str, field: str) -> str:
     return _reject_lone_surrogates(value, field)
 
 
+def _validate_commission_ref(value: Any) -> dict[str, Any]:
+    """Validate one ordered temporary-commission reference on a party row.
+
+    The reference carries the exact quest identity and protected-role reference
+    with a player-permitted label; it never carries private planning data.
+    """
+    _require_exact_fields(
+        value, "temporary commission", {"quest_id", "role_id", "label"}, {}
+    )
+    return {
+        "quest_id": _bounded_name(
+            _require_str(value, "quest_id", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
+            "commission quest_id",
+        ),
+        "role_id": _bounded_name(
+            _require_str(value, "role_id", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
+            "commission role_id",
+        ),
+        "label": _bounded_name(
+            _require_str(value, "label", maximum=MAX_PARTY_COMMISSION_LABEL),
+            "commission label",
+        ),
+    }
+
+
+def _validate_membership(value: Any) -> dict[str, Any]:
+    """Validate one row's ``membership`` metadata: general flag plus reasons."""
+    _require_exact_fields(
+        value, "party membership", {"general", "temporary_commissions"}, {}
+    )
+    general = _require_bool(value, "general")
+    refs = value["temporary_commissions"]
+    if not isinstance(refs, list):
+        raise PartyPanelError("temporary_commissions must be a list")
+    commissions = [_validate_commission_ref(ref) for ref in refs]
+    pairs = [(ref["quest_id"], ref["role_id"]) for ref in commissions]
+    if len(set(pairs)) != len(pairs):
+        raise PartyPanelError("temporary commission references must be unique")
+    return {"general": general, "temporary_commissions": commissions}
+
+
 def _validate_slot(value: Any) -> dict[str, Any]:
     _require_exact_fields(
         value,
@@ -93,6 +146,7 @@ def _validate_slot(value: Any) -> dict[str, Any]:
             "hp_current",
             "hp_maximum",
             "bond_stage",
+            "membership",
         },
         {},
     )
@@ -122,6 +176,7 @@ def _validate_slot(value: Any) -> dict[str, Any]:
         _require_str(value, "bond_stage", maximum=MAX_DISPLAY_NAME_CODE_POINTS),
         "slot bond_stage",
     )
+    membership = _validate_membership(value["membership"])
     return {
         "identity": identity,
         "display_name": display_name,
@@ -129,6 +184,7 @@ def _validate_slot(value: Any) -> dict[str, Any]:
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
         "bond_stage": bond_stage,
+        "membership": membership,
     }
 
 
@@ -139,7 +195,10 @@ def validate_party(payload: Any) -> dict[str, Any]:
     common unavailable form is NOT accepted here; the registry handles it.
     """
     _require_exact_fields(
-        payload, "party panel", {"schema_version", "available", "slots"}, {}
+        payload,
+        "party panel",
+        {"schema_version", "available", "slots", "general_quota"},
+        {},
     )
     if _require_int(
         payload, "schema_version", minimum=1, maximum=MAX_SAFE_INTEGER
@@ -148,17 +207,24 @@ def validate_party(payload: Any) -> dict[str, Any]:
     if not _require_bool(payload, "available"):
         raise PartyPanelError("available must be true for the party form")
     slots = payload["slots"]
-    if not isinstance(slots, list) or len(slots) > PARTY_MAX_ROWS:
+    if not isinstance(slots, list) or len(slots) > PARTY_MAX_SLOTS:
         raise PartyPanelError(
-            f"slots must be a list of at most {PARTY_MAX_ROWS} rows"
+            f"slots must be a list of at most {PARTY_MAX_SLOTS} rows"
         )
     rows = [_validate_slot(row) for row in slots]
     identities = [row["identity"] for row in rows]
     if len(set(identities)) != len(identities):
         raise PartyPanelError("party slot identities must be unique")
+    quota = payload["general_quota"]
+    _require_exact_fields(quota, "general quota", {"used", "limit"}, {})
+    used = _require_int(quota, "used", minimum=0, maximum=MAX_SAFE_INTEGER)
+    limit = _require_int(quota, "limit", minimum=0, maximum=MAX_SAFE_INTEGER)
+    if used > limit:
+        raise PartyPanelError("general quota used exceeds the limit")
     result = {
         "schema_version": PARTY_SCHEMA_VERSION,
         "available": True,
+        "general_quota": {"used": used, "limit": limit},
         "slots": rows,
     }
     # Envelope guarantee (the shared per-panel closing check): an over-limit
@@ -197,9 +263,35 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
     if owner is None:
         raise PanelUnavailableError
 
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+    from world.quests.runtime import read_records
+
+    records = {record.quest_id: record for record in read_records(owner)}
+
+    def _commission_label(quest_id: str) -> str:
+        record = records.get(quest_id)
+        if record is None:
+            return quest_id
+        definition = QUEST_DEFINITION_REGISTRY.get(record.definition_key)
+        return (
+            definition.display_name
+            if definition is not None
+            else record.definition_key
+        )[:MAX_PARTY_COMMISSION_LABEL]
+
     slots: list[dict[str, Any]] = []
-    for npc in live_companions(owner)[:PARTY_MAX_ROWS]:
+    # The complete ordered effective roster: temporary members sit beyond the
+    # general quota, so no four-row slice truncates a valid roster.
+    for npc in live_companions(owner):
         hp_current, hp_maximum = stored_gauge_pair(npc, "hp")
+        commissions = [
+            {
+                "quest_id": quest_id,
+                "role_id": role_id,
+                "label": _commission_label(quest_id),
+            }
+            for quest_id, role_id in reasons_for(npc, owner)
+        ]
         slots.append(
             {
                 "identity": int(npc.pk),
@@ -210,19 +302,28 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "hp_current": hp_current,
                 "hp_maximum": hp_maximum,
                 "bond_stage": npc.relations.stage_for(owner).name,
+                "membership": {
+                    "general": has_general_membership(npc, owner),
+                    "temporary_commissions": commissions,
+                },
             }
         )
     return validate_party(
         {
             "schema_version": PARTY_SCHEMA_VERSION,
             "available": True,
+            "general_quota": {
+                "used": party_size(owner),
+                "limit": PARTY_GENERAL_LIMIT,
+            },
             "slots": slots,
         }
     )
 
 
 __all__ = [
-    "PARTY_MAX_ROWS",
+    "PARTY_GENERAL_LIMIT",
+    "PARTY_MAX_SLOTS",
     "PARTY_SCHEMA_VERSION",
     "PartyPanelError",
     "party_presenter",
