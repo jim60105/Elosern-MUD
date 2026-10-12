@@ -53,8 +53,15 @@ def _resolve_context(
     if row is None:
         return None, "unknown_package"
     definition = validate_scene_package(row.payload)
-    commission = definition.commission
-    if commission is None or commission.definition_key != reference:
+    commission = next(
+        (
+            declared
+            for declared in definition.commissions
+            if declared.definition_key == reference
+        ),
+        None,
+    )
+    if commission is None:
         return None, "out_of_scope"
     role_dialogue = definition.role_dialogue(generated.role_id)
     if role_dialogue is None:

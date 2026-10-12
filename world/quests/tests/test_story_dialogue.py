@@ -1,7 +1,7 @@
 """Revisioned phase-transition tests (quest-scene-encounters 1.3/4.3).
 
 Selection must be complete and deterministic, the revision monotonic, a stale
-expected revision refused without a write, guarded escort/reunion observations
+expected revision refused without a write, a fabricated result observation
 refused, and truthful permitted information transfer recorded through the
 narrative owner.
 """
@@ -15,7 +15,6 @@ from typeclasses.rooms import AnchorRoom
 from world.quests import scene_store
 from world.quests.encounter_activation import activate_scene_encounter
 from world.quests.encounters import publish_scene_package
-from world.quests.phases import PhaseConditionError
 from world.quests.story_dialogue import (
     StalePhaseRevision,
     StoryDialogueError,
@@ -98,8 +97,12 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
-    def test_a_guarded_reunion_observation_is_refused(self):
-        with self.assertRaises(PhaseConditionError):
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
+    def test_a_fabricated_reunion_observation_is_refused(self):
+        # The guard on the ``reunion`` name was released by escort-rendezvous,
+        # its owning change; a caller still cannot assert a reunion the
+        # committed exclusive-result state does not hold.
+        with self.assertRaises(StoryDialogueError):
             transition_story_dialogue(
                 self.package_id,
                 "daughter",
@@ -135,6 +138,88 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
         self.assertFalse(
             transfer_story_knowledge(
                 self.package_id, "daughter", "seeking", tick=9
+            )
+        )
+
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
+    def test_a_committed_result_records_knowledge_and_advances_acknowledgment(self):
+        from world.narrative.memory import get_owner_memories
+        from world.quests import outcome_store
+        from world.quests.story_dialogue import commit_reunion_participation
+
+        outcome_store.mark_group_resolved(
+            owner_id=1, package_id=self.package_id, group_id="reunion",
+            resolution_source="s", winner_quest_id="q:1",
+        )
+        commit_reunion_participation(
+            self.package_id, ("daughter",), group_id="reunion", winner_quest_id="q:1",
+        )
+        self.assertEqual(
+            scene_store.get_dialogue_phase(
+                self.package_id, "daughter"
+            ).selected_phase,
+            "acknowledgment",
+        )
+        daughter = scene_store.get_role_binding(self.package_id, "daughter").npc_id
+        memories = get_owner_memories(owner_id=str(daughter))
+        self.assertTrue(any(m.content.get("result") == "q:1" for m in memories))
+        # A replay records nothing further and keeps the committed phase.
+        commit_reunion_participation(
+            self.package_id, ("daughter",), group_id="reunion", winner_quest_id="q:1",
+        )
+        self.assertEqual(
+            scene_store.get_dialogue_phase(
+                self.package_id, "daughter"
+            ).selected_phase,
+            "acknowledgment",
+        )
+
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
+    def test_the_closure_interaction_after_reunion_advances_to_everyday(self):
+        from world.quests import outcome_store
+        from world.quests.story_dialogue import commit_reunion_participation
+
+        outcome_store.mark_group_resolved(
+            owner_id=1, package_id=self.package_id, group_id="reunion",
+            resolution_source="s", winner_quest_id="q:1",
+        )
+        commit_reunion_participation(
+            self.package_id, ("daughter",), group_id="reunion", winner_quest_id="q:1",
+        )
+        # The subsequent authorized closure interaction advances to everyday.
+        closed = transition_story_dialogue(
+            self.package_id, "daughter", expected_revision=1,
+            provenance={"closure": True}, tick=8,
+        )
+        self.assertEqual(closed.phase_id, "everyday")
+
+    @covers_requirement(
+        "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
+    )
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
+    def test_result_knowledge_stays_private_to_the_participant(self):
+        from world.narrative.memory import get_owner_memories
+        from world.quests import outcome_store
+        from world.quests.story_dialogue import commit_reunion_participation
+
+        outcome_store.mark_group_resolved(
+            owner_id=1, package_id=self.package_id, group_id="reunion",
+            resolution_source="s", winner_quest_id="q:1",
+        )
+        commit_reunion_participation(
+            self.package_id, ("daughter",), group_id="reunion", winner_quest_id="q:1",
+        )
+        # An actor that did not participate receives no result knowledge.
+        outsider = create_object(PlayerCharacter, key="旁人")
+        self.assertFalse(
+            any(
+                memory.content.get("result") == "q:1"
+                for memory in get_owner_memories(owner_id=str(outsider.pk))
             )
         )
 

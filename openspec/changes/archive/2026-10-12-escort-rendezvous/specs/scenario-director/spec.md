@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The deterministic compile boundary translates validated proposals into the runtime type
-The deterministic compiler SHALL revalidate shared schema and immutable lore constraints before mutation, producing immutable runtime definitions, rewards, issuance declarations and scene requirements. Existing contiguous indices, supported kinds, quantity/deadline, item/tier/archetype, characterization, age, rank reward band, zero private merit, empty unsupported failure clause and bound-target quantity rules SHALL remain. Escort publication SHALL admit the complete proved protected-role/destination-or-rendezvous flow and refuse incomplete contracts. Symbolic issuer roles SHALL remain unresolved/unregistered until activation authorizes the exact bound issuer; explicit runtime issuer keys SHALL require an authorized carrier. Permanent occupants SHALL retain validated package ownership/retention. Whole-package validation SHALL retain unambiguous locators, exact role/scene references, reciprocal relations, provenance-bearing knowledge, reachable dialogue, scoped authority and registered effects. Registration SHALL remain atomic, conflict-rejecting and idempotent, using stable runtime/scene characterization digests extended with the new completion/group fields. Separate issuer identities SHALL coexist and raw proposal mappings SHALL never enter runtime registries.
+The compiler SHALL revalidate shared schema and immutable lore constraints before mutation, producing immutable runtime definitions, rewards, issuance declarations and scene requirements. Escort publication SHALL admit the complete proved protected-role/destination-or-rendezvous flow and refuse incomplete contracts. Symbolic issuer roles SHALL remain unresolved/unregistered until activation authorizes the exact bound issuer; explicit runtime issuer keys SHALL require an authorized carrier.
 
 #### Scenario: Existing compiler and issuer behavior remains strict
 - **WHEN** equal ordinary content, distinct authorized issuers, unauthorized runtime keys and conflicting registrations are exercised
@@ -162,8 +162,14 @@ The deterministic compiler SHALL revalidate shared schema and immutable lore con
 - **WHEN** a raw AI-shaped dict is offered for registration
 - **THEN** `register_quest_definition` still rejects it; the compile boundary is the sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly
 
+#### Scenario: The retained rule set and registration behavior
+- **WHEN** an ordinary proposal, a whole package or a conflicting registration is compiled
+- **THEN** The existing rule set SHALL remain: contiguous indices, supported kinds, quantity/deadline, item/tier/archetype, characterization, age, rank reward band, zero private merit, empty unsupported failure clause and bound-target quantity rules.
+- **THEN** Permanent occupants SHALL retain validated package ownership/retention. Whole-package validation SHALL retain unambiguous locators, exact role/scene references, reciprocal relations, provenance-bearing knowledge, reachable dialogue, scoped authority and registered effects.
+- **THEN** Registration SHALL remain atomic, conflict-rejecting and idempotent, using stable runtime/scene characterization digests extended with the new completion/group fields. Separate issuer identities SHALL coexist and raw proposal mappings SHALL never enter runtime registries.
+
 ### Requirement: Scene-bound proposal stages are validated before publication
-Semantic validators and deterministic compilation SHALL enforce the same validated package ownership/retention, bound-target quantity, registry locator/anchor and escort-binding rules. ESCORT SHALL permit exactly the implemented destination or rendezvous contract with complete protected roles and validated meeting/relation references. Ordinary stage occupants SHALL retain instance ownership unless explicitly package-owned under the upstream permanent-role contract. Escort participants SHALL resolve existing published roles without destination auto-spawn or invented nearby actors. Invalid declarations SHALL return generative validation errors and deterministic `QuestCompileError` before publication. Unsupported templates and arbitrary failure-condition expressions SHALL remain rejected.
+Semantic validators and deterministic compilation SHALL enforce the same validated package ownership/retention, bound-target quantity, registry locator/anchor and escort-binding rules. ESCORT SHALL permit exactly the implemented destination or rendezvous contract with complete protected roles and validated meeting/relation references. Escort participants SHALL resolve existing published roles without destination auto-spawn or invented nearby actors.
 
 #### Scenario: Closed escort validation agrees across boundaries
 - **WHEN** complete destination and rendezvous packages and malformed mixed/role-less alternatives are submitted to semantic validation and compilation
@@ -217,6 +223,10 @@ Semantic validators and deterministic compilation SHALL enforce the same validat
 #### Scenario: A declared anchor_near must be a placed anchor
 - **WHEN** a stage declares a non-`None` `location_req.anchor_near`
 - **THEN** it must name a key present in `ANCHOR_PLACEMENT_REGISTRY`
+
+#### Scenario: Occupant ownership and named publication errors
+- **WHEN** a stage occupant or an invalid declaration reaches either boundary
+- **THEN** Ordinary stage occupants SHALL retain instance ownership unless explicitly package-owned under the upstream permanent-role contract. Invalid declarations SHALL return generative validation errors and deterministic `QuestCompileError` before publication, and unsupported templates and arbitrary failure-condition expressions SHALL remain rejected.
 
 ## ADDED Requirements
 

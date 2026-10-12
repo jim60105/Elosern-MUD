@@ -36,6 +36,16 @@ from .story_dialogue import (
     transfer_story_knowledge,
     transition_story_dialogue,
 )
+from .escort_lifecycle import (
+    EscortOperationError,
+    accept_escort_commission,
+    release_escort_bindings,
+)
+from .escort_events import (
+    evaluate_escort_event,
+    exclusive_outcome_status,
+    resolve_exclusive_outcome,
+)
 
 __all__ = [
     "EncounterActivation",
@@ -56,4 +66,10 @@ __all__ = [
     "publish_scene_package",
     "transfer_story_knowledge",
     "transition_story_dialogue",
+    "EscortOperationError",
+    "accept_escort_commission",
+    "release_escort_bindings",
+    "evaluate_escort_event",
+    "exclusive_outcome_status",
+    "resolve_exclusive_outcome",
 ]

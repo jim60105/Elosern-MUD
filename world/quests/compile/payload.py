@@ -26,6 +26,7 @@ from world.quests.compile.contracts import (
 )
 from world.quests.definitions import (
     DestinationKind,
+    EscortCompletion,
     ObjectiveKind,
     QuestDefinition,
     QuestDefinitionError,
@@ -150,6 +151,33 @@ def _variant_keys_from_payload(value: Any) -> Any:
     return value
 
 
+def _role_refs_from_payload(value: Any) -> tuple[str, ...]:
+    """Decode one stored role-reference list strictly, or its empty default.
+
+    A stored list or tuple of non-empty strings becomes an immutable tuple; an
+    absent key becomes the empty default. Any other shape (a bare string, a
+    non-string entry, a boolean) is passed through unchanged so the definition
+    validator rejects it loudly instead of shredding it into plausible
+    single-character references.
+    """
+    if value is None:
+        return ()
+    if isinstance(value, (list, tuple)) and all(
+        isinstance(entry, str) and entry for entry in value
+    ):
+        return tuple(value)
+    return value
+
+
+def _relation_from_payload(value: Any) -> Any:
+    """Decode one stored typed relation strictly, or ``None`` when absent."""
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)) and len(value) == 3:
+        return tuple(value)
+    return value
+
+
 def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
     """Decode one stored objective, including the hand-written selectors.
 
@@ -174,6 +202,16 @@ def _objective_from_payload(data: dict[str, Any]) -> QuestObjective:
             data.get("countable_variant_keys")
         ),
         site_key=data.get("site_key"),
+        completion=(
+            None
+            if data.get("completion") is None
+            else EscortCompletion(data["completion"])
+        ),
+        protected_role_refs=_role_refs_from_payload(
+            data.get("protected_role_refs")
+        ),
+        meeting_role_refs=_role_refs_from_payload(data.get("meeting_role_refs")),
+        relation=_relation_from_payload(data.get("relation")),
     )
 
 

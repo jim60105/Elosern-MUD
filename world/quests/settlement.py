@@ -162,12 +162,14 @@ def plan_auto_settlement(
     resolves each contribute nothing, the last without raising.
     """
     from world.rules.guild import parse_reward_claims
+    from world.quests.escort_events import reward_entitled
 
     claims = set(parse_reward_claims(actor))
     entries = [
         entry
         for record in completed_records
         if record.quest_id not in claims
+        and reward_entitled(actor, record)
         and (entry := _settlement_entry(record)) is not None
     ]
     return AutoSettlementPlan(entries=tuple(entries))
@@ -192,6 +194,7 @@ def plan_auto_settlement_chain(
     from world.rules.equipment import plan_inventory_delta
     from world.rules.guild import parse_reward_claims
     from .acquire import _compute_acquire_replacement_for
+    from .escort_events import reward_entitled
 
     completing = just_completed_records(old_entries, new_records)
     if not completing:
@@ -205,6 +208,8 @@ def plan_auto_settlement_chain(
     while queue:
         record = queue.pop(0)
         if record.quest_id in settled or record.quest_id in claims:
+            continue
+        if not reward_entitled(actor, record):
             continue
         entry = _settlement_entry(record)
         if entry is None:

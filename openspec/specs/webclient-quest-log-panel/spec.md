@@ -6,8 +6,7 @@ The host-independent quest-log read model — one exact read-only version-1 pane
 ## Requirements
 
 ### Requirement: The quest log panel is an exact read-only version-2 presentation panel
-
-The presentation registry SHALL register a `quest_log` panel at schema version 2. Its available form SHALL contain exactly `schema_version`, `available`, and `rows`, where `rows` is the holder's stored quest records in quest-log order, at most the shared `MAX_QUEST_ROWS` bound of twelve. The presenter SHALL be read-only: it SHALL NOT mutate the quest log, tracking state, reward claims, inventory, wallet, traits, or world state, and SHALL emit no live object or filesystem reference.
+The version-2 quest_log panel SHALL retain its exact envelope, ordered twelve-row bound, read-only ownership, existing canonical row fields and bounds. Rows SHALL additionally carry nullable terminal_reason and abandon fields. State SHALL include invalidated; its reason SHALL be a bounded code/message object, its track descriptor disabled, and its abandon null. Active owned private escorts SHALL carry host-independent abandonment descriptors; ordinary counter descriptors remain service-owned.
 
 #### Scenario: A two-quest log serializes exactly the bounded rows
 - **WHEN** a puppeted holder with two stored records receives a full snapshot
@@ -32,11 +31,11 @@ The presentation registry SHALL register a `quest_log` panel at schema version 2
 
 #### Scenario: The exact row field set
 - **WHEN** any row is serialized
-- **THEN** it contains exactly `quest_id`, `definition_key`, `display_name`, `state`, `category`, `grade`, `stage_index`, `stage_total`, `stage_progress`, `objective_quantity`, `objective_line`, `objective_note`, `deadline_line`, `rationale`, `flavor`, `tracked`, `issuer`, `settlement`, `reward`, `reward_claimed`, and `track`, and it contains no `detail` and no `reward_line`
+- **THEN** the existing exact row field set is retained with terminal_reason and abandon added; terminal_reason is null or exactly code/message under shared reason bounds, and abandon is null or a bounded existing action descriptor for guild.quest_abandon with quest_id
 
 #### Scenario: State is bounded to the stored states
-- **WHEN** a row's `state` is serialized
-- **THEN** it is one of the bounded stored states `in_progress`, `completed`, `failed`
+- **WHEN** a row state is serialized or validated
+- **THEN** server and client mirrors accept exactly in_progress, completed, failed and invalidated and reject unknown states
 
 #### Scenario: Category is a closed stable wire vocabulary
 - **WHEN** a row's `category` is serialized
@@ -59,8 +58,12 @@ The presentation registry SHALL register a `quest_log` panel at schema version 2
 - **THEN** it contains exactly `copper` and `merit` (non-negative safe integers) and `items`, a list of at most one entry in the issuance's declared order, each containing exactly `item_key`, `display_name`, and a positive safe-integer `quantity`
 
 #### Scenario: Nullable lines and the always-enabled track descriptor
-- **WHEN** a row's `objective_note`, `deadline_line`, `rationale`, `flavor`, `reward`, and `track` are serialized
-- **THEN** the first five are nullable, and `track` is the `guild.quest_track` action descriptor, always enabled
+- **WHEN** nullable prose/reward/action fields are serialized
+- **THEN** existing nullable prose fields remain; track retains guild.quest_track with invalidated records disabled as quest_terminal, and abandon is present only for active owned private escorts eligible for host-independent abandonment
+
+#### Scenario: Private escort abandonment works without a guild host
+- **WHEN** an active owned private escort appears in the quest book away from any issuer or guild staff
+- **THEN** its enabled abandon descriptor targets its exact quest ID, while an invalidated row shows its reason and no enabled tracking, abandonment or payout
 
 ### Requirement: The quest log panel is host-independent
 
@@ -163,11 +166,7 @@ guarded by the existing dual-direction parity test.
 - **THEN** the client rejects it rather than rendering it
 
 ### Requirement: The panel is pushed on every quest-log mutation
-
-The coordinator SHALL mark the panel dirty and push it on the existing quest-log mutation seams —
-acceptance, abandonment, tracking, stage advance, completion, and deadline settlement — so the quest
-book never lags the stored record. The panel SHALL be pushed for exploration and combat puppets
-alike, because a quest can complete mid-combat.
+The existing acceptance, abandonment, tracking, stage, completion and deadline push seams SHALL also refresh after committed invalidation and escort source/offer changes. Exploration and combat views SHALL use only committed records and reason/action descriptors. Rollback SHALL emit no success view.
 
 #### Scenario: Completing a quest refreshes the book
 - **WHEN** a record transitions to `COMPLETED` during a committed action
@@ -176,6 +175,10 @@ alike, because a quest can complete mid-combat.
 #### Scenario: Tracking refreshes the book
 - **WHEN** the holder submits `guild.quest_track`
 - **THEN** the panel is pushed carrying the new `tracked` value for that row
+
+#### Scenario: Invalidation refreshes open quest history
+- **WHEN** exclusive resolution invalidates a visible accepted alternative
+- **THEN** the next committed quest_log update shows invalidated and its reason, with no stale active controls
 
 ### Requirement: Each row discloses whether its reward has been claimed
 

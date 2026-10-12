@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Due movement uses real exits and emits events
-Schedule movement SHALL retain real Exit traversal, locks/vetoes, default state and truthful departure/arrival events. A valid escort reason SHALL give follower movement precedence over ordinary schedule movement, without accumulating replayable missed movement. On last temporary-source release, applicable schedule behavior SHALL resume at the current tick and actual actor location; it SHALL neither transport the actor to the old encounter nor replay skipped movement. Existing possession/service silencing and exam holds SHALL retain their own behavior and authority.
+Schedule movement SHALL retain real Exit traversal, locks/vetoes, state and truthful departure/arrival events. A valid escort reason SHALL give follower movement precedence over ordinary schedule movement with no replayable missed movement. After the last temporary-source release, schedule behavior SHALL resume at the current tick and actual location, neither transporting the actor to the old encounter nor replaying skipped movement.
 
 #### Scenario: Escort follow wins over a due schedule move
 - **WHEN** a valid temporary member follows while its normal schedule movement is due
@@ -24,3 +24,7 @@ Schedule movement SHALL retain real Exit traversal, locks/vetoes, default state 
 #### Scenario: Events carry safe identity, target, and due tick
 - **WHEN** a settlement event is emitted
 - **THEN** its JSON-safe payload carries stable `npc_id`, display `npc`, and `state` or `from`/`to`; `due_tick` equals `cycle_start + tick_offset`
+
+#### Scenario: Possession, service and exam holds keep their own authority
+- **WHEN** an escort silences a scheduled actor or an exam hold applies
+- **THEN** Possession/service silencing and exam holds SHALL retain their own behavior and authority.

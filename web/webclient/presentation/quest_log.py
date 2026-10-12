@@ -47,6 +47,8 @@ from web.webclient.presentation.protocol import (
     _require_exact_fields,
     _require_int,
     _require_str,
+    _validate_identifier,
+    _validate_message,
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
@@ -56,6 +58,7 @@ from web.webclient.presentation.quest_facts import (
     describe_reward_parts,
 )
 from web.webclient.presentation.services import (
+    ABANDON_ACTION,
     MAX_KEY_CODE_POINTS,
     MAX_LABEL_CODE_POINTS,
     MAX_QUEST_ROWS,
@@ -87,6 +90,22 @@ QUEST_LOG_SCHEMA_VERSION = 2
 QUEST_LOG_MAX_ROWS = MAX_QUEST_ROWS
 
 _SETTLEMENT_VALUES = frozenset(item.value for item in Settlement)
+
+#: Disabled ``guild.quest_track`` reason for a terminal-but-not-invalidated
+#: record; an invalidated record is terminal, so its tracking descriptor
+#: carries this deterministic line and is disabled.
+_QUEST_TERMINAL_MESSAGE = "此委託已結束，無法追蹤。"
+#: The unified abandon action's default label (host-independent quest book).
+_ABANDON_LABEL = "放棄"
+#: Bounded player-facing lines for the terminal failure reasons a stored
+#: record can carry; an unrecognised code degrades to a generic line rather
+#: than leaking the raw code as prose.
+_FAILURE_MESSAGES = {
+    "abandoned": "你已放棄此委託。",
+    "deadline_expired": "此委託已逾期。",
+    "protected_actor_dead": "受保護者已身亡，委託失敗。",
+}
+_FAILURE_FALLBACK = "此委託已失敗。"
 
 
 class QuestLogPanelError(ProtocolValidationError):
@@ -139,16 +158,60 @@ def _issuer_label(parsed: Any) -> str:
     return fallback
 
 
-def _track_descriptor() -> dict[str, Any]:
-    """Build the always-enabled ``guild.quest_track`` action descriptor.
+def _track_descriptor(*, terminal: bool = False) -> dict[str, Any]:
+    """Build the ``guild.quest_track`` action descriptor.
 
-    Tracking is host-independent by contract, so the descriptor is always
-    enabled and carries no disabled reason and no quantity bounds. The wire
-    shape matches the services action descriptor exactly.
+    Tracking is host-independent by contract. An active record's descriptor is
+    enabled with no reason; an ``INVALIDATED`` record is terminal, so its
+    descriptor is disabled with a deterministic reason. The wire shape matches
+    the services action descriptor exactly.
     """
     return {
         "action_id": TRACK_ACTION,
         "label": "追蹤",
+        "enabled": not terminal,
+        "disabled_reason": _QUEST_TERMINAL_MESSAGE if terminal else None,
+        "quantity": None,
+    }
+
+
+def _terminal_reason_for(record: Any) -> dict[str, Any] | None:
+    """Build a record's nullable structured ``terminal_reason``.
+
+    An ``INVALIDATED`` record carries its stored code/message; a ``FAILED``
+    record carries its stored failure code with a bounded player-facing line;
+    every other state is null.
+    """
+    state = record.state.value
+    if state == "invalidated" and record.invalidated_reason is not None:
+        reason = record.invalidated_reason
+        return {
+            "code": _validate_identifier(reason["code"], "terminal_reason.code"),
+            "message": _validate_message(reason["message"], "terminal_reason.message"),
+        }
+    if state == "failed" and record.failure_reason:
+        return {
+            "code": _validate_identifier(record.failure_reason, "terminal_reason.code"),
+            "message": _FAILURE_MESSAGES.get(
+                record.failure_reason, _FAILURE_FALLBACK
+            ),
+        }
+    return None
+
+
+def _abandon_descriptor(record: Any) -> dict[str, Any] | None:
+    """Build an active owned private escort's host-independent abandon action.
+
+    Only a record accepted under a published package (a private escort)
+    receives the unified ``guild.quest_abandon`` descriptor, so it can be
+    abandoned away from any issuer or guild host; an ordinary guild counter
+    quest keeps its service-owned descriptor and returns ``None`` here.
+    """
+    if record.state.value != "in_progress" or record.package_id is None:
+        return None
+    return {
+        "action_id": ABANDON_ACTION,
+        "label": _ABANDON_LABEL,
         "enabled": True,
         "disabled_reason": None,
         "quantity": None,
@@ -179,7 +242,48 @@ def _validate_issuer(value: Any) -> dict[str, Any]:
     return {"kind": kind, "key": key, "label": label}
 
 
-def _validate_track(value: Any) -> dict[str, Any]:
+def _validate_terminal_reason(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    _require_exact_fields(value, "terminal reason", {"code", "message"}, {})
+    return {
+        "code": _validate_identifier(value["code"], "terminal_reason.code"),
+        "message": _validate_message(value["message"], "terminal_reason.message"),
+    }
+
+
+def _validate_abandon(value: Any) -> dict[str, Any] | None:
+    if value is None:
+        return None
+    _require_exact_fields(
+        value,
+        "quest_log abandon descriptor",
+        {"action_id", "label", "enabled", "disabled_reason", "quantity"},
+        {},
+    )
+    if value["action_id"] != ABANDON_ACTION:
+        raise QuestLogPanelError("quest_log abandon must be guild.quest_abandon")
+    label = _bounded_line(
+        _require_str(value, "label", maximum=MAX_LABEL_CODE_POINTS),
+        "abandon label",
+        MAX_LABEL_CODE_POINTS,
+    )
+    if not _require_bool(value, "enabled"):
+        raise QuestLogPanelError("a private escort abandon is enabled")
+    if value["disabled_reason"] is not None:
+        raise QuestLogPanelError("an enabled abandon must not carry a disabled_reason")
+    if value["quantity"] is not None:
+        raise QuestLogPanelError("quest_log abandon must not carry quantity bounds")
+    return {
+        "action_id": ABANDON_ACTION,
+        "label": label,
+        "enabled": True,
+        "disabled_reason": None,
+        "quantity": None,
+    }
+
+
+def _validate_track(value: Any, *, terminal: bool) -> dict[str, Any]:
     _require_exact_fields(
         value,
         "quest_log track descriptor",
@@ -193,17 +297,27 @@ def _validate_track(value: Any) -> dict[str, Any]:
         "track label",
         MAX_LABEL_CODE_POINTS,
     )
-    if not _require_bool(value, "enabled"):
-        raise QuestLogPanelError("quest_log track is always enabled")
-    if value["disabled_reason"] is not None:
-        raise QuestLogPanelError("an enabled track must not carry a disabled_reason")
+    enabled = _require_bool(value, "enabled")
+    disabled_reason = value["disabled_reason"]
+    if terminal:
+        if enabled:
+            raise QuestLogPanelError("a terminal record's track must be disabled")
+        if not isinstance(disabled_reason, str) or not disabled_reason:
+            raise QuestLogPanelError("a disabled track must carry a reason")
+    else:
+        if not enabled:
+            raise QuestLogPanelError("an active track is always enabled")
+        if disabled_reason is not None:
+            raise QuestLogPanelError(
+                "an enabled track must not carry a disabled_reason"
+            )
     if value["quantity"] is not None:
         raise QuestLogPanelError("quest_log track must not carry quantity bounds")
     return {
         "action_id": TRACK_ACTION,
         "label": label,
-        "enabled": True,
-        "disabled_reason": None,
+        "enabled": enabled,
+        "disabled_reason": disabled_reason if terminal else None,
         "quantity": None,
     }
 
@@ -251,6 +365,8 @@ def _validate_row(value: Any) -> dict[str, Any]:
             "reward",
             "reward_claimed",
             "track",
+            "terminal_reason",
+            "abandon",
         },
         {},
     )
@@ -319,7 +435,12 @@ def _validate_row(value: Any) -> dict[str, Any]:
         raise QuestLogPanelError(
             "settlement and reward must be null together or present together"
         )
-    track = _validate_track(value["track"])
+    terminal = state == "invalidated"
+    track = _validate_track(value["track"], terminal=terminal)
+    terminal_reason = _validate_terminal_reason(value["terminal_reason"])
+    abandon = _validate_abandon(value["abandon"])
+    if terminal and abandon is not None:
+        raise QuestLogPanelError("an invalidated record carries no abandon action")
     return {
         "quest_id": quest_id,
         "definition_key": definition_key,
@@ -340,6 +461,8 @@ def _validate_row(value: Any) -> dict[str, Any]:
         "reward": reward,
         "reward_claimed": reward_claimed,
         "track": track,
+        "terminal_reason": terminal_reason,
+        "abandon": abandon,
     }
 
 
@@ -459,7 +582,11 @@ def quest_log_presenter(context: PresentationContext) -> dict[str, Any]:
                 "settlement": settlement,
                 "reward": reward,
                 "reward_claimed": record.quest_id in claims,
-                "track": _track_descriptor(),
+                "track": _track_descriptor(
+                    terminal=record.state.value == "invalidated"
+                ),
+                "terminal_reason": _terminal_reason_for(record),
+                "abandon": _abandon_descriptor(record),
             }
         )
     return validate_quest_log(

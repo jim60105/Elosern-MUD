@@ -170,6 +170,20 @@ def get_role_binding_for_npc(npc_id: int) -> StoryRoleBinding | None:
     return StoryRoleBinding.objects.filter(npc_id=npc_id).first()
 
 
+def packages_for_actors(actor_ids: tuple[int, ...]) -> tuple[str, ...]:
+    """Resolve affected published packages through durable role reverse refs."""
+    return tuple(StoryRoleBinding.objects.filter(
+        npc_id__in=actor_ids, package__status=PACKAGE_STATUS_PUBLISHED,
+    ).values_list("package__package_id", flat=True).distinct())
+
+
+def encounter_player_ids(package_id: str) -> tuple[int, ...]:
+    """Player scopes are runtime identities, never publication provenance."""
+    return tuple(SceneEncounterRuntime.objects.filter(
+        package__package_id=package_id,
+    ).values_list("player_id", flat=True).distinct())
+
+
 def bind_role(
     package: ScenePackage,
     role_id: str,

@@ -705,12 +705,7 @@ def release_possession(
 
     # Lock rows in deterministic ascending order before side effects
     ids_to_lock = sorted([player.pk, resolved_npc.pk])
-    player_before = deepcopy(getattr(player.db, "possession", None))
-    npc_before = (
-        deepcopy(getattr(resolved_npc.db, "possessed_by", None))
-        if hasattr(resolved_npc, "db")
-        else None
-    )
+    control_before = snapshot_party_control(player, resolved_npc)
 
     try:
         with transaction.atomic():
@@ -731,22 +726,10 @@ def release_possession(
                 if getattr(resolved_npc.db, "possessed_by", None) == int(player.pk):
                     resolved_npc.db.possessed_by = None
     except PossessionWriteError:
-        restore_possession_surfaces(player, resolved_npc, player_before, npc_before)
+        restore_party_control(player, resolved_npc, control_before)
         raise
     except Exception as error:
-        # Full inverse compensation if mirror clear fails after unpuppet
-        account = _resolve_account(player, resolved_npc)
-        if account is not None:
-            _grant_puppet_lock(resolved_npc, account)
-            _mount_cmdset(resolved_npc)
-            from web.webclient.presentation.ingress import synchronize_session
-            for session in _acting_sessions(player):
-                try:
-                    account.puppet_object(session, resolved_npc)
-                    synchronize_session(session, resolved_npc)
-                except Exception:  # observability: ignore R2: best-effort inverse compensation
-                    pass
-        restore_possession_surfaces(player, resolved_npc, player_before, npc_before)
+        restore_party_control(player, resolved_npc, control_before)
         raise PossessionWriteError(REASON_WRITE_FAILED, str(error)) from error
 
     log_info(
@@ -775,6 +758,52 @@ def release_for_party_change(npc: Any, player: Any) -> None:
     if npc_possessed is not None and int(npc_possessed) != int(player.pk):
         return
     release_possession(player, npc=npc, reason="party_change")
+
+
+def snapshot_party_control(player: Any, npc: Any) -> dict[str, Any]:
+    """Capture control surfaces before a membership owner's outer transaction."""
+    return {
+        "player": deepcopy(player.db.possession),
+        "npc": deepcopy(npc.db.possessed_by),
+        "lock": npc.locks.get("puppet") or "",
+        "lock_before": deepcopy(npc.db.possession_lock_before),
+        "account": _resolve_account(player, npc),
+        "sessions": tuple(_acting_sessions(npc)),
+    }
+
+
+def restore_party_control(player: Any, npc: Any, snapshot: dict[str, Any]) -> None:
+    """Restore a rolled-back handback, never reviving a retired client epoch.
+
+    Session transfer is a non-transactional effect. Verify its inverse and
+    synchronize the restored puppet under a fresh sequence, so pending work
+    from either transitional puppet cannot gain authority after rollback.
+    """
+    restore_possession_surfaces(player, npc, snapshot["player"], snapshot["npc"])
+    npc.db.possession_lock_before = snapshot["lock_before"]
+    if snapshot["lock"]:
+        npc.locks.add(snapshot["lock"])
+    else:
+        npc.locks.remove("puppet")
+    if snapshot["player"] is None or snapshot["npc"] != player.pk:
+        return
+    _mount_cmdset(npc)
+    account = snapshot["account"]
+    if account is None:
+        return
+    from web.webclient.actions.dispatcher import retire_sequence
+    from web.webclient.presentation.ingress import reset_client_sequence, synchronize_session
+
+    for session in snapshot["sessions"]:
+        retire_sequence(session)
+        reset_client_sequence(session)
+        if account.get_puppet(session) is not npc:
+            account.puppet_object(session, npc)
+        if account.get_puppet(session) is not npc:
+            raise PossessionWriteError(
+                REASON_RELEASE_REFUSED, "Cannot restore possessed companion after rollback"
+            )
+        synchronize_session(session, npc)
 
 
 def purge_possession_on_delete(npc: Any) -> None:

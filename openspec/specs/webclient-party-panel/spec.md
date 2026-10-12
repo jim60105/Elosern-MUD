@@ -8,18 +8,27 @@ presenter isolation) that the companion quickbar and party drawer consume.
 ## Requirements
 
 ### Requirement: The party panel is an exact read-only version-2 presentation panel
-The presentation registry SHALL register a `party` panel at schema version 2. Its available form
-SHALL contain exactly `schema_version`, `available`, and `slots`, where `slots` is an ordered
-array of zero to four companion rows, and the registered common unavailable form SHALL keep the
-shared field set, reason, and semantics. Each slot row SHALL contain exactly `identity`,
-`display_name`, `portrait_ref`, `hp_current`, `hp_maximum`, and `bond_stage`.
+The party panel SHALL present one ordered row per exact NPC in the canonical roster, including dual membership. Existing version-2 identity/display/portrait/HP/bond-stage vocabulary, possession owner resolution, unavailable forms and read-only behavior SHALL remain; server/client validators SHALL extend the version-2 shape together. Each row SHALL add `membership` with boolean `general` and ordered `temporary_commissions`; the panel SHALL add `general_quota` with integer `used` and `limit`.
+
+#### Scenario: Full general party plus escorts is complete
+- **WHEN** four general members and two temporary-only members are presented
+- **THEN** six ordered rows appear, general usage is four of four, every temporary actor is reachable through existing controls and no quota-based truncation occurs
+
+#### Scenario: Dual member is one truthful row
+- **WHEN** a general member carries two escort reasons
+- **THEN** one row marks general true and identifies both commissions without duplicate identity or raw affinity
+
+#### Scenario: Stale and dangling bindings do not leak
+- **WHEN** membership references a deleted actor or invalid temporary source, or a possessed actor has no valid owner
+- **THEN** stale rows/reasons are filtered through canonical readers and invalid-owner presentation uses the shared unavailable form
+
+#### Scenario: Shape validators and clients change together
+- **WHEN** server, protocol mirror and Vue validators receive the extended panel or malformed metadata/quota
+- **THEN** all accept the same valid shape and reject malformed shapes while retaining existing portrait/HP/display bounds
 
 #### Scenario: A two-companion party serializes exactly the six-key bounded rows
-- **WHEN** a puppeted explorer with two live companions — one with a gallery portrait, one without — receives a full snapshot
-- **THEN** `party.slots` carries two rows in party-list order with the exact field set, their
-  true HP integers, each companion's canonical bond stage name, the first companion's
-  `portrait_ref` as a non-null `portrait_catalog` key and the second's as `null`, and no raw
-  affinity value appears in the payload
+- **WHEN** two general members are presented through the extended version-2 panel
+- **THEN** each preserves the existing six NPC fields and adds validated membership metadata, while the panel separately reports general quota usage
 
 #### Scenario: The raw affinity number never appears
 - **WHEN** any party payload is serialized
@@ -43,10 +52,8 @@ shared field set, reason, and semantics. Each slot row SHALL contain exactly `id
   payload
 
 #### Scenario: Validation rejects row-shape drift
-- **WHEN** a candidate party payload carries a fifth row, an unknown or missing row key, a
-  numeric `bond_stage`, a negative HP value, an over-bound display name, or a non-string
-  non-null `portrait_ref`, an empty/non-decimal ref, or a ref longer than 32 characters
-- **THEN** the server validator rejects it and the client mirror rejects it identically
+- **WHEN** a panel contains missing/unknown keys, malformed membership or quota, numeric bond stage, invalid HP, display or portrait reference
+- **THEN** server and client mirrors reject identically; a fifth valid temporary row is accepted
 
 #### Scenario: Creation-pending puppets see the unavailable form
 - **WHEN** a creation-pending puppet receives a snapshot
@@ -102,11 +109,20 @@ shared field set, reason, and semantics. Each slot row SHALL contain exactly `id
 - **THEN** the presenter raises the registry-unavailable error and the panel takes the shared
   unavailable form
 
+#### Scenario: Quota, row count and commission reference bounds
+- **WHEN** a dual member or an over-quota party is presented
+- **THEN** General usage SHALL use valid general identity, total roster rows SHALL not be limited to four, and temporary commission references SHALL contain exact quest identity and protected-role reference with player-permitted labels, never private planning data. Existing portrait formatting/bounds and no-raw-affinity rules SHALL remain.
+
 ### Requirement: Party presentation stays current across membership and combat changes
-The coordinator SHALL include the `party` panel in the presentation updates it pushes after the
-party write seams (`join_party`, `leave_party`, membership purge) and wherever it already
-re-pushes companion-adjacent state on combat settlement. The panel SHALL be pushed for
-exploration and combat puppets alike.
+Existing exploration/combat party push seams SHALL include temporary joins, per-source releases and general identity changes after commit. Existing combat HP/portrait refresh behavior SHALL remain. Related mission state/reason, phase and offer capabilities SHALL refresh after committed changes; stale choices SHALL refuse. Text clients SHALL retain equivalent interaction and explicit reasons. No new escort-control UI SHALL be added.
+
+#### Scenario: Membership and invalidation refresh committed controls
+- **WHEN** an escort ends or an alternative invalidates while the party/quest/dialogue surfaces are open
+- **THEN** the next committed view shows remaining membership and explicit mission reason, refreshes capability versions, and rejects old acceptance/dismissal choices
+
+#### Scenario: Rolled-back transitions do not refresh false state
+- **WHEN** a release or arbitration rolls back after a write
+- **THEN** connected clients receive no success view or stale-capability replacement based on that rolled-back state
 
 #### Scenario: Dismissing a companion re-pushes the party panel
 - **WHEN** a companion leaves the party through the leave seam while the puppet is connected
@@ -146,10 +162,11 @@ combat panel's participant rows by `identity`.
   panel, and the party payload itself named no token
 
 ### Requirement: The party drawer offers possession controls per companion
-The Vue PartyDrawer SHALL render, on each companion row, the `explore.possess` affordance from
-the shared exploration vocabulary (enabled state and disabled reason exactly as emitted), and
-SHALL present the single `explore.possess_release` control while the vocabulary carries one; the
-controls SHALL dispatch through the same `ui_action` path as every other affordance.
+Existing party drawer controls SHALL render server-owned possess/release enablement and reasons for every effective row, including temporary actors beyond the general quota. Dispatch SHALL remain through the shared action path. Existing layout/input behavior SHALL remain; no dedicated escort-control screen SHALL be introduced. Source-aware dismissal SHALL route to existing quest abandonment choices when an effective escort reason would be removed.
+
+#### Scenario: Beyond-quota temporary actor remains controllable
+- **WHEN** a temporary-only sixth row passes possession gates
+- **THEN** its existing possess control dispatches for its exact identity and the normal release control remains available
 
 #### Scenario: A possessable companion row offers the action
 - **WHEN** the drawer renders a co-located bound companion whose possess entry is enabled
@@ -161,11 +178,9 @@ controls SHALL dispatch through the same `ui_action` path as every other afforda
 - **THEN** the row renders the control disabled carrying the emitted reason, never hidden
 
 #### Scenario: The panel payload schema is untouched
-- **WHEN** the party panel payload is validated while the player possesses a companion
-- **THEN** the payload is byte-identical in shape to the schema-version-2 contract and carries no
-  possession field
+- **WHEN** party possession controls render for general and temporary rows after the coordinated unreleased payload extension
+- **THEN** controls use the existing vocabulary while server and client validators agree on membership metadata and general quota fields
 
 #### Scenario: Possession state rides the vocabulary and banner only
-- **WHEN** possession state reaches the client
-- **THEN** it arrives through the vocabulary and the possession banner only, and the
-  schema-version-2 six-key row contract is unchanged
+- **WHEN** possession control state is displayed on the extended party panel
+- **THEN** control permission still comes from the existing shared vocabulary/banner and rows add no duplicated possession state or combat token

@@ -2,9 +2,11 @@
 
 Phase selection uses only committed observations resolved by their owning
 system; a package declares finite phases whose conditions come from this closed
-registry, never an arbitrary expression or generated code. Escort and reunion
-observations stay guarded: their owning capability is the second design, so a
-package that declares them is rejected here rather than faking the outcome.
+registry, never an arbitrary expression or generated code. ``reunion`` and
+``reunion_closure`` are owned by this change (escort-rendezvous §7) and are
+derived from the committed exclusive-result state; ``escort_started`` and
+``escort_complete`` remain guarded until the acceptance/progress facts that
+own them are exposed.
 """
 
 from __future__ import annotations
@@ -16,17 +18,25 @@ from typing import Any
 #: supported generic closure fact; ``abandoned`` is the supported unresolved
 #: terminal outcome.
 REGISTERED_FACTS: frozenset[str] = frozenset(
-    {"separation", "closure", "abandoned", "unresolved"}
+    {
+        "separation",
+        "closure",
+        "abandoned",
+        "unresolved",
+        # Owned by escort-rendezvous §7: derived from the committed exclusive
+        # result, never from prose or a caller-supplied mapping.
+        "reunion",
+        "reunion_closure",
+    }
 )
 
-#: Observations owned by the second design (escort/reunion). Declaring one is a
-#: named validation failure until that capability lands; the transition boundary
-#: never derives them from prose or from a caller-supplied mapping.
+#: Acceptance/progress observations still owned by an unimplemented boundary.
+#: Declaring one is a named validation failure until that capability lands; the
+#: transition boundary never derives them from prose or a caller-supplied
+#: mapping.
 GUARDED_FACTS: tuple[str, ...] = (
-    "reunion",
     "escort_started",
     "escort_complete",
-    "reunion_closure",
 )
 
 
@@ -49,7 +59,7 @@ def validate_condition(condition: Any) -> dict[str, Any]:
         raise PhaseConditionError("a phase condition fact must be a non-empty string")
     if fact in GUARDED_FACTS:
         raise PhaseConditionError(
-            f"observation {fact!r} is guarded until escort/reunion mechanics land"
+            f"observation {fact!r} is guarded until its owning boundary lands"
         )
     if fact not in REGISTERED_FACTS:
         raise PhaseConditionError(f"unknown observation fact {fact!r}")
@@ -83,7 +93,7 @@ def resolve_observations(observations: Any) -> dict[str, bool]:
     for fact, value in observations.items():
         if fact in GUARDED_FACTS:
             raise PhaseConditionError(
-                f"observation {fact!r} is guarded until escort/reunion mechanics land"
+                f"observation {fact!r} is guarded until its owning boundary lands"
             )
         if fact not in REGISTERED_FACTS:
             raise PhaseConditionError(f"unknown observation fact {fact!r}")

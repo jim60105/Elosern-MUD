@@ -12,6 +12,7 @@ from world.observability import log_info, log_warn
 from world.rules.clock import CLOCK_YAML, get_world_clock
 
 from .definitions import (
+    MAX_ROLE_REF_LENGTH,
     QUEST_DEFINITION_REGISTRY,
     QuestDefinition,
     QuestObjective,
@@ -68,11 +69,27 @@ class QuestTargetsUnavailable(ValueError):
 
 
 class QuestState(StrEnum):
-    """The three stored record states; unaccepted is represented by absence."""
+    """The four stored record states; unaccepted is represented by absence.
+
+    ``INVALIDATED`` is a distinct terminal state (escort-rendezvous design §7):
+    an accepted alternative whose shared exclusive outcome was resolved by
+    another commission. It is not ``FAILED`` (no penalty, no retry) and not
+    ``COMPLETED`` (no payout); it carries a structured obsolete-outcome reason.
+    """
 
     IN_PROGRESS = "in_progress"
     COMPLETED = "completed"
     FAILED = "failed"
+    INVALIDATED = "invalidated"
+
+
+#: The closed terminal-invalidation reason vocabulary: a resolved explicit
+#: exclusive outcome obsoletes the still-open accepted alternatives.
+INVALIDATED_OBSOLETE_OUTCOME = "obsolete_outcome"
+INVALIDATED_REASONS: frozenset[str] = frozenset({INVALIDATED_OBSOLETE_OUTCOME})
+
+#: The fixed player-facing line of the one shipped invalidation reason.
+OBSOLETE_OUTCOME_MESSAGE = "此委託的結果已由另一項委託決定。"
 
 
 # The closed cap on simultaneously tracked in-progress quests. The tracking
@@ -95,6 +112,26 @@ _RECORD_FIELDS = frozenset(
         "failure_reason",
         "tracked",
         "counted_defeat_ids",
+        "package_id",
+        "group_id",
+        "acceptance_sequence",
+        "protected_roles",
+        "invalidated_reason",
+    }
+)
+
+#: The record keys whose absence loads under a documented default, so a
+#: quest-log entry written before the key existed stays readable without being
+#: rewritten. Every other key is required.
+_OPTIONAL_RECORD_FIELDS = frozenset(
+    {
+        "tracked",
+        "counted_defeat_ids",
+        "package_id",
+        "group_id",
+        "acceptance_sequence",
+        "protected_roles",
+        "invalidated_reason",
     }
 )
 
@@ -121,6 +158,20 @@ class QuestRecord:
     #: the other runtime bindings, so a new objective counts from empty and a
     #: redelivered defeat event for a counted identity advances nothing.
     counted_defeat_ids: tuple[int, ...] = ()
+    #: The published package identity this record was accepted under, or
+    #: ``None`` for an ordinary record. An escort may have no exclusive group.
+    package_id: str | None = None
+    #: The explicit exclusive outcome group this record competes in, or ``None``.
+    group_id: str | None = None
+    #: The monotonic acceptance sequence allocated under the group lock, or
+    #: ``None``. World tick alone cannot order two acceptances in one tick.
+    acceptance_sequence: int | None = None
+    #: The exact protected role bindings this record retains for release, as
+    #: JSON-safe ``(role_id, actor_dbref)`` pairs in declaration order.
+    protected_roles: tuple[tuple[str, int], ...] = ()
+    #: The structured, bounded invalidation reason of an ``INVALIDATED`` record,
+    #: or ``None``. Exactly the keys ``code`` and ``message``.
+    invalidated_reason: dict[str, str] | None = None
 
 
 def to_storage(record: QuestRecord) -> dict[str, Any]:
@@ -140,6 +191,17 @@ def to_storage(record: QuestRecord) -> dict[str, Any]:
         "failure_reason": record.failure_reason,
         "tracked": record.tracked,
         "counted_defeat_ids": list(record.counted_defeat_ids),
+        "package_id": record.package_id,
+        "group_id": record.group_id,
+        "acceptance_sequence": record.acceptance_sequence,
+        "protected_roles": [
+            [role_id, actor_id] for role_id, actor_id in record.protected_roles
+        ],
+        "invalidated_reason": (
+            None
+            if record.invalidated_reason is None
+            else dict(record.invalidated_reason)
+        ),
     }
 
 
@@ -161,10 +223,9 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     unknown = set(data) - _RECORD_FIELDS
     if unknown:
         raise QuestDataError(f"quest-log entry has unknown fields {sorted(unknown)}")
-    # ``tracked`` and ``counted_defeat_ids`` are the optional-with-default keys:
-    # an entry written before either field existed loads under its default
-    # (untracked / nothing counted) without being rewritten.
-    missing = (_RECORD_FIELDS - {"tracked", "counted_defeat_ids"}) - set(data)
+    # The optional-with-default keys load under their documented default, so an
+    # entry written before a key existed stays readable without being rewritten.
+    missing = (_RECORD_FIELDS - _OPTIONAL_RECORD_FIELDS) - set(data)
     if missing:
         raise QuestDataError(f"quest-log entry is missing fields {sorted(missing)}")
     quest_id = data["quest_id"]
@@ -207,6 +268,15 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
     counted_defeat_ids = _parse_id_list(
         data.get("counted_defeat_ids", []), "counted_defeat_ids"
     )
+    package_id = _optional_bounded_string(data.get("package_id"), "package_id")
+    group_id = _optional_bounded_string(data.get("group_id"), "group_id")
+    acceptance_sequence = _require_int(
+        data, "acceptance_sequence", nullable=True
+    )
+    if acceptance_sequence is not None and acceptance_sequence < 0:
+        raise QuestDataError("acceptance_sequence must be non-negative or None")
+    protected_roles = _parse_protected_roles(data.get("protected_roles", []))
+    invalidated_reason = _parse_invalidated_reason(data.get("invalidated_reason"))
     return QuestRecord(
         quest_id=quest_id,
         definition_key=definition_key,
@@ -222,6 +292,11 @@ def from_storage(data: dict[str, Any]) -> QuestRecord:
         failure_reason=failure_reason,
         tracked=tracked,
         counted_defeat_ids=counted_defeat_ids,
+        package_id=package_id,
+        group_id=group_id,
+        acceptance_sequence=acceptance_sequence,
+        protected_roles=protected_roles,
+        invalidated_reason=invalidated_reason,
     )
 
 
@@ -232,6 +307,86 @@ def _parse_id_list(values: Any, field: str) -> tuple[int, ...]:
     if not all(isinstance(v, int) and not isinstance(v, bool) for v in items):
         raise QuestDataError(f"record field {field!r} must be a list of integer dbrefs")
     return tuple(items)
+
+
+def _optional_bounded_string(value: Any, field: str) -> str | None:
+    """Parse one optional bounded identity string, rejecting odd shapes."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value:
+        raise QuestDataError(f"record field {field!r} must be a non-empty string or None")
+    if len(value) > MAX_ROLE_REF_LENGTH:
+        raise QuestDataError(
+            f"record field {field!r} exceeds the {MAX_ROLE_REF_LENGTH}-character bound"
+        )
+    return value
+
+
+def _parse_protected_roles(values: Any) -> tuple[tuple[str, int], ...]:
+    """Parse the retained protected-role bindings as JSON-safe pairs.
+
+    Each entry is exactly ``[role_id, actor_dbref]``; a role appears at most
+    once (one exact actor per published role). Inner lists round-trip through
+    JSON, so the parse is strict about length, type, and positivity rather than
+    coercing a plausible-looking value.
+    """
+    if isinstance(values, (str, bytes)) or not hasattr(values, "__iter__"):
+        raise QuestDataError(
+            "record field 'protected_roles' must be a list of role/actor pairs"
+        )
+    pairs: list[tuple[str, int]] = []
+    seen: set[str] = set()
+    for entry in values:
+        if isinstance(entry, (str, bytes)) or not hasattr(entry, "__iter__"):
+            raise QuestDataError(
+                "record field 'protected_roles' entries must be role/actor pairs"
+            )
+        items = list(entry)
+        if len(items) != 2:
+            raise QuestDataError(
+                "record field 'protected_roles' entries must be [role_id, actor] pairs"
+            )
+        role_id, actor_id = items
+        if not isinstance(role_id, str) or not role_id:
+            raise QuestDataError(
+                "record field 'protected_roles' role ids must be non-empty strings"
+            )
+        if isinstance(actor_id, bool) or not isinstance(actor_id, int) or actor_id <= 0:
+            raise QuestDataError(
+                "record field 'protected_roles' actors must be positive integer dbrefs"
+            )
+        if role_id in seen:
+            raise QuestDataError(
+                f"record field 'protected_roles' binds role {role_id!r} twice"
+            )
+        seen.add(role_id)
+        pairs.append((role_id, actor_id))
+    return tuple(pairs)
+
+
+def _parse_invalidated_reason(value: Any) -> dict[str, str] | None:
+    """Parse the structured invalidation reason under its closed vocabulary."""
+    from collections.abc import Mapping
+
+    if value is None:
+        return None
+    # Evennia serves a stored dict as a ``_SaverDict`` (a MutableMapping, not a
+    # ``dict`` subclass), so the shape check is mapping-based and the value is
+    # copied into a plain dict.
+    if not isinstance(value, Mapping) or set(value) != {"code", "message"}:
+        raise QuestDataError(
+            "record field 'invalidated_reason' must carry exactly code and message"
+        )
+    code = value["code"]
+    message = value["message"]
+    if not isinstance(code, str) or code not in INVALIDATED_REASONS:
+        raise QuestDataError(f"unknown invalidation reason code {code!r}")
+    if not isinstance(message, str) or not message or len(message) > 200:
+        raise QuestDataError(
+            "record field 'invalidated_reason' message must be a bounded "
+            "non-empty string"
+        )
+    return {"code": code, "message": message}
 
 
 def read_records(actor: Any) -> list[QuestRecord]:
@@ -295,6 +450,17 @@ def validate_record_runtime(record: QuestRecord) -> None:
             f"quest {record.quest_id!r} stage index {record.stage_index} "
             f"is outside definition {record.definition_key!r}"
         )
+    group_fields = (
+        record.group_id is not None,
+        record.acceptance_sequence is not None,
+    )
+    if any(group_fields) and (not all(group_fields) or record.package_id is None):
+        raise QuestDataError(
+            f"quest {record.quest_id!r} declares an incomplete exclusive-group "
+            "identity; group_id and acceptance_sequence require package_id"
+        )
+    if record.group_id is not None and record.group_id == "":  # pragma: no cover - guarded by the reader
+        raise QuestDataError(f"quest {record.quest_id!r} has an empty group id")
     stage = definition.stages[record.stage_index]
     if stage.index != record.stage_index:
         raise QuestDataError(
@@ -318,7 +484,29 @@ def validate_record_runtime(record: QuestRecord) -> None:
             raise QuestDataError(
                 f"failed quest {record.quest_id!r} lacks a failure reason"
             )
+        if record.state is QuestState.FAILED and record.invalidated_reason is not None:
+            raise QuestDataError(
+                f"failed quest {record.quest_id!r} carries an invalidation reason"
+            )
+        if record.state is QuestState.INVALIDATED:
+            if record.invalidated_reason is None:
+                raise QuestDataError(
+                    f"invalidated quest {record.quest_id!r} lacks its reason"
+                )
+            if record.failure_reason is not None:
+                raise QuestDataError(
+                    f"invalidated quest {record.quest_id!r} carries a failure reason"
+                )
+        elif record.invalidated_reason is not None:
+            raise QuestDataError(
+                f"quest {record.quest_id!r} carries an invalidation reason while "
+                f"it is {record.state.value!r}"
+            )
         return
+    if record.invalidated_reason is not None:
+        raise QuestDataError(
+            f"active quest {record.quest_id!r} carries an invalidation reason"
+        )
     objective = stage.objective
     if not (0 <= record.stage_progress <= objective.quantity):
         raise QuestDataError(
@@ -337,6 +525,36 @@ def fail_record(record: QuestRecord, reason: str) -> QuestRecord:
         record,
         state=QuestState.FAILED,
         failure_reason=reason,
+        stage_room_id=None,
+        objective_target_ids=(),
+        protected_entity_ids=(),
+        counted_defeat_ids=(),
+    )
+
+
+def invalidate_record(
+    record: QuestRecord,
+    *,
+    code: str = INVALIDATED_OBSOLETE_OUTCOME,
+    message: str = OBSOLETE_OUTCOME_MESSAGE,
+) -> QuestRecord:
+    """Return an ``INVALIDATED`` copy with bindings cleared and its reason.
+
+    The terminal-invalidation counterpart of :func:`fail_record`, for an
+    accepted alternative whose explicit exclusive outcome was resolved by
+    another commission (escort-rendezvous design §7). It is not a failure: no
+    failure reason, no penalty, no retry. The caller releases the record's
+    stage pins and temporary membership reasons through the same release
+    discipline every other terminal transition uses; this primitive only
+    rewrites the record.
+    """
+    if code not in INVALIDATED_REASONS:
+        raise QuestDataError(f"unknown invalidation reason code {code!r}")
+    return replace(
+        record,
+        state=QuestState.INVALIDATED,
+        failure_reason=None,
+        invalidated_reason={"code": code, "message": message},
         stage_room_id=None,
         objective_target_ids=(),
         protected_entity_ids=(),
@@ -619,7 +837,10 @@ def _emit_site_targets_unavailable(
     log_warn("hunt_site_targets_unavailable", context=context)
 
 
-def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecord:
+def accept_quest(
+    actor: Any, definition_key: str, issuer_key: str, *,
+    actual_actor: Any = None, expected_revision: int | None = None,
+) -> QuestRecord:
     """Create one deterministic stage-zero active record for ``definition_key``.
 
     The record is only created under a registered issuance: the issuer key
@@ -649,6 +870,15 @@ def accept_quest(actor: Any, definition_key: str, issuer_key: str) -> QuestRecor
     definition = QUEST_DEFINITION_REGISTRY.get(definition_key)
     if definition is None:
         raise QuestNotFound(f"unknown definition {definition_key!r}")
+    from .definitions import ObjectiveKind
+
+    if any(stage.objective.kind is ObjectiveKind.ESCORT for stage in definition.stages):
+        from .escort_lifecycle import accept_escort_commission
+
+        return accept_escort_commission(
+            actor, definition_key, issuer_key, actual_actor=actual_actor,
+            expected_revision=expected_revision,
+        )
     current = read_records(actor)
     if any(
         record.definition_key == definition_key

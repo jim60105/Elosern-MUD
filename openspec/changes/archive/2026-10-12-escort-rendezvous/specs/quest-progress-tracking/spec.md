@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Room arrival drives REACH and ESCORT through supported persistent room hooks
-REACH SHALL retain player-arrival, supported anchor/XYZ/bound-instance and companion co-presence behavior. ESCORT SHALL evaluate complete exact protected bindings using destination or rendezvous mode after applicable owner traversal, possessed protected-actor movement and follower settlement. Destination SHALL require every protected identity living at its validated locator. Rendezvous SHALL require exact protected and meeting identities living at the same authoritative position, with any published typed relation satisfied. Ordinary room identity SHALL remain distinct from wilderness provider/coordinate identity; recycled room objects SHALL not prove wilderness co-location. An original-body or unrelated-companion presence gate SHALL not apply to ESCORT. Actor absence, different identity, dead state or relation mismatch SHALL not satisfy a predicate.
+REACH SHALL retain player-arrival, anchor/XYZ/bound-instance and companion co-presence behavior as its scenarios state. ESCORT SHALL evaluate complete exact protected bindings in destination or rendezvous mode after owner traversal, possessed-actor movement and follower settlement. Destination SHALL require every protected identity living at its validated locator; rendezvous SHALL require exact protected and meeting identities living at one position with any declared relation satisfied.
 
 #### Scenario: Destination waits for the last protected actor
 - **WHEN** the owner arrives before all protected actors at a declared anchor, XYZ or bound instance
@@ -63,6 +63,10 @@ REACH SHALL retain player-arrival, supported anchor/XYZ/bound-instance and compa
 - **WHEN** an ESCORT arrival is evaluated
 - **THEN** at least one protected entity is required
 
+#### Scenario: Room and wilderness identity stay distinct for ESCORT
+- **WHEN** an arrival or rendezvous is evaluated at a room or wilderness position
+- **THEN** Ordinary room identity SHALL remain distinct from wilderness provider/coordinate identity, and recycled room objects SHALL not prove wilderness co-location. An original-body or unrelated-companion presence gate SHALL not apply to ESCORT, and actor absence, a different identity, dead state or relation mismatch SHALL not satisfy a predicate.
+
 ### Requirement: Wilderness rooms do not advertise an arrival hook that normal traversal bypasses
 Terrain rooms SHALL retain no false player room-arrival hook or invented wilderness destination locator. Wilderness traversal SHALL provide its authoritative settled role movement to the escort evaluator separately. Existing destination families SHALL remain unchanged.
 
@@ -100,7 +104,7 @@ Arrival and escort role-result observation SHALL cap progress and transition eac
 - **THEN** the consumed REACH transition is not repeated, the settled ESCORT pass still evaluates the newly arrived exact protected roster and activated meeting roles, and persisted source identity prevents a second transition
 
 ### Requirement: Stage completion advances exactly once and releases obsolete runtime bindings
-Existing stage completion SHALL cap progress, release obsolete stage pins/bindings, reset per-stage counted state and enter at most one next contiguous stage or terminal completion. Terminal `COMPLETED`, `FAILED` and `INVALIDATED` records SHALL ignore later progress. Escort membership reasons SHALL remain valid across intermediate stages only while the definition explicitly retains that protected binding; terminal transitions SHALL release that record's reasons. Declared exclusive final results SHALL arbitrate before a completion or reward becomes eligible.
+Stage completion SHALL cap progress, release obsolete stage pins/bindings, reset per-stage counted state and enter at most one next contiguous stage or terminal completion. Terminal `COMPLETED`, `FAILED` and `INVALIDATED` records SHALL ignore later progress. Escort membership reasons SHALL stay valid across intermediate stages only while the definition retains that protected binding, and terminal transitions SHALL release that record's reasons.
 
 #### Scenario: Intermediate arrival cannot settle a final result
 - **WHEN** a multistage alternative completes an intermediate arrival or clue stage
@@ -137,6 +141,10 @@ Existing stage completion SHALL cap progress, release obsolete stage pins/bindin
 #### Scenario: A terminal record ignores a later matching transfer
 - **WHEN** later matching transfer reaches completed, failed or invalidated quest history
 - **THEN** the terminal record stays unchanged
+
+#### Scenario: Exclusive results arbitrate before eligibility
+- **WHEN** a declared exclusive final result becomes satisfiable
+- **THEN** Declared exclusive final results SHALL arbitrate before a completion or reward becomes eligible.
 
 ## ADDED Requirements
 

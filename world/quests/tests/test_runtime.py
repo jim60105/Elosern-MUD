@@ -13,8 +13,11 @@ from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.characters import PlayerCharacter
 from world.quests.catalog import register_catalog
+from world.quests.describe import describe_quest_detail
 from world.quests.definitions import QuestStage
 from world.quests.runtime import (
+    INVALIDATED_OBSOLETE_OUTCOME,
+    OBSOLETE_OUTCOME_MESSAGE,
     QuestAlreadyActive,
     QuestDataError,
     QuestNotFound,
@@ -29,6 +32,7 @@ from world.quests.runtime import (
     from_storage,
     fulfill_record,
     fulfill_record_for,
+    invalidate_record,
     read_records,
     register_quest_completion_observer,
     set_quest_tracked,
@@ -84,7 +88,7 @@ class RuntimeLifecycleTests(QuestRegistryIsolation, EvenniaTest):
         with self._tick(tick):
             return accept(self.player, registered.key)
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_record_round_trips_through_json(self):
         original = from_storage(
             {
@@ -581,7 +585,7 @@ class QuestTrackingTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(restored, tracked)
         self.assertTrue(restored.tracked)
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_legacy_entry_without_key_loads_untracked(self):
         entry = {
             "quest_id": "legacy:1",
@@ -691,7 +695,7 @@ class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
     def _accept(self, key: str):
         return accept(self.player, register(quest(key)))
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_a_record_round_trips_with_counted_identities(self):
         counted = replace(
             self._accept("counted_round_trip"), counted_defeat_ids=(11, 12)
@@ -700,13 +704,13 @@ class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(restored, counted)
         self.assertEqual(restored.counted_defeat_ids, (11, 12))
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_accepting_starts_with_nothing_counted(self):
         record = self._accept("counted_accept")
         self.assertEqual(record.counted_defeat_ids, ())
         self.assertEqual(read_records(self.player)[0].counted_defeat_ids, ())
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_a_legacy_entry_without_the_key_loads_empty_without_rewriting(self):
         record = self._accept("counted_legacy")
         legacy = {
@@ -719,7 +723,7 @@ class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
         # The strict reader never rewrites the stored entry.
         self.assertNotIn("counted_defeat_ids", dict(self.player.db.quest_log[0]))
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_a_transition_and_a_terminal_record_clear_the_counted_set(self):
         definition = register(
             quest(
@@ -746,7 +750,7 @@ class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertEqual(abandoned.state, QuestState.FAILED)
         self.assertEqual(abandoned.counted_defeat_ids, ())
 
-    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-three-stored-states")
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
     def test_a_terminal_record_carrying_counted_identities_is_rejected(self):
         record = self._accept("counted_terminal")
         residual = {
@@ -761,3 +765,153 @@ class CountedDefeatIdentityTests(QuestRegistryIsolation, EvenniaTest):
         # The same record with nothing counted is final and loads clean.
         self.player.db.quest_log = [{**residual, "counted_defeat_ids": []}]
         self.assertEqual(read_records(self.player)[0].state, QuestState.COMPLETED)
+
+
+class InvalidatedRecordTests(QuestRegistryIsolation, EvenniaTest):
+    """The INVALIDATED terminal state, its structured reason, and its readers.
+
+    An accepted alternative obsoleted by a resolved exclusive outcome is a
+    distinct terminal state: JSON-safe, penalty-free, payout-free, untrackable,
+    and never a failure.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.player = create_object(PlayerCharacter, key="作廢者")
+        self.definition = register(quest("invalidated_state"))
+
+    def _invalidated(self, **overrides):
+        record = replace(
+            accept(self.player, self.definition.key),
+            package_id="pkg_abc",
+            group_id="reunion",
+            acceptance_sequence=2,
+            protected_roles=(("daughter", 41), ("mother", 42)),
+        )
+        return invalidate_record(replace(record, **overrides) if overrides else record)
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
+    def test_an_invalidated_record_round_trips_through_json(self):
+        record = self._invalidated()
+        stored = json.loads(json.dumps(to_storage(record)))
+        reloaded = from_storage(stored)
+        self.assertEqual(reloaded, record)
+        self.assertIs(reloaded.state, QuestState.INVALIDATED)
+        self.assertEqual(
+            reloaded.invalidated_reason,
+            {
+                "code": INVALIDATED_OBSOLETE_OUTCOME,
+                "message": OBSOLETE_OUTCOME_MESSAGE,
+            },
+        )
+        self.assertEqual(reloaded.package_id, "pkg_abc")
+        self.assertEqual(reloaded.group_id, "reunion")
+        self.assertEqual(reloaded.acceptance_sequence, 2)
+        self.assertEqual(
+            reloaded.protected_roles, (("daughter", 41), ("mother", 42))
+        )
+        self.assertIsNone(reloaded.failure_reason)
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
+    def test_invalidation_clears_bindings_and_rejects_an_unknown_reason(self):
+        record = replace(
+            accept(self.player, self.definition.key),
+            protected_entity_ids=(41,),
+            objective_target_ids=(42,),
+            counted_defeat_ids=(7,),
+        )
+        invalidated = invalidate_record(record)
+        self.assertEqual(invalidated.protected_entity_ids, ())
+        self.assertEqual(invalidated.objective_target_ids, ())
+        self.assertEqual(invalidated.counted_defeat_ids, ())
+        self.assertIsNone(invalidated.stage_room_id)
+        with self.assertRaises(QuestDataError):
+            invalidate_record(record, code="not_a_reason")
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
+    def test_an_invalidated_record_is_terminal_for_every_reader(self):
+        record = self._invalidated()
+        apply_quest_log_replacement(self.player, [record])
+        # Tracking an invalidated record is refused without mutation.
+        with self.assertRaises(QuestTransitionError):
+            set_quest_tracked(self.player, record.quest_id, True)
+        # Abandonment is an idempotent no-op that returns the same record.
+        self.assertEqual(
+            abandon_quest(self.player, record.quest_id).state, QuestState.INVALIDATED
+        )
+        # The detail renderer states the obsolete-result reason and no payout.
+        text = describe_quest_detail(record, self.definition, None, 0)
+        self.assertIn("已作廢", text)
+        self.assertIn("作廢原因：", text)
+        self.assertNotIn("失敗", text)
+
+    @covers_requirement("quest-lifecycle::questrecord-is-json-safe-persisted-state-with-explicit-terminal-invalidation")
+    def test_malformed_invalidation_and_group_metadata_are_rejected(self):
+        record = self._invalidated()
+        base = to_storage(record)
+        invalid_payloads = {
+            "invalidated-without-reason": {**base, "invalidated_reason": None},
+            "reason-on-completed": {
+                **base,
+                "state": "completed",
+                "stage_progress": 1,
+            },
+            "unknown-reason-code": {
+                **base,
+                "invalidated_reason": {"code": "other", "message": "文字"},
+            },
+            "reason-extra-key": {
+                **base,
+                "invalidated_reason": {
+                    "code": "obsolete_outcome",
+                    "message": "文字",
+                    "extra": "x",
+                },
+            },
+            "reason-blank-message": {
+                **base,
+                "invalidated_reason": {"code": "obsolete_outcome", "message": ""},
+            },
+            "incomplete-group": {**base, "group_id": None},
+            "orphan-sequence": {**base, "package_id": None, "group_id": None},
+            "bad-protected-pair": {**base, "protected_roles": [["daughter"]]},
+            "duplicate-protected-role": {
+                **base,
+                "protected_roles": [["daughter", 41], ["daughter", 42]],
+            },
+            "non-positive-protected-actor": {
+                **base,
+                "protected_roles": [["daughter", 0]],
+            },
+            "boolean-protected-actor": {
+                **base,
+                "protected_roles": [["daughter", True]],
+            },
+        }
+        for name, payload in invalid_payloads.items():
+            with self.subTest(case=name):
+                self.player.db.quest_log = [payload]
+                with self.assertRaises(QuestDataError):
+                    read_records(self.player)
+
+    def test_a_legacy_entry_without_the_new_keys_still_loads(self):
+        record = accept(self.player, self.definition.key)
+        legacy = {
+            key: value
+            for key, value in to_storage(record).items()
+            if key
+            not in {
+                "package_id",
+                "group_id",
+                "acceptance_sequence",
+                "protected_roles",
+                "invalidated_reason",
+            }
+        }
+        self.player.db.quest_log = [legacy]
+        reloaded = read_records(self.player)[0]
+        self.assertIsNone(reloaded.package_id)
+        self.assertIsNone(reloaded.group_id)
+        self.assertIsNone(reloaded.acceptance_sequence)
+        self.assertEqual(reloaded.protected_roles, ())
+        self.assertIsNone(reloaded.invalidated_reason)

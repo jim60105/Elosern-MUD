@@ -74,15 +74,25 @@ describe("quest-drawer-model: grouping and counts", () => {
       { quest_id: "f", state: "completed" },
     ];
     const groups = rowsByState({ schema_version: 2, available: true, rows });
-    expect(BOOK_STATES.map((state) => state.key)).toEqual(["in_progress", "completed", "failed"]);
+    expect(BOOK_STATES.map((state) => state.key)).toEqual([
+      "in_progress",
+      "completed",
+      "failed",
+      "invalidated",
+    ]);
     expect(groups.in_progress.map((row) => row.quest_id)).toEqual(["b", "c", "e"]);
     expect(groups.completed.map((row) => row.quest_id)).toEqual(["a", "f"]);
-    expect(stateCounts(groups)).toEqual({ in_progress: 3, completed: 2, failed: 1 });
+    expect(stateCounts(groups)).toEqual({ in_progress: 3, completed: 2, failed: 1, invalidated: 0 });
   });
 
   it("lists no row for an absent or unavailable book", () => {
     for (const panel of [null, QUEST_LOG_PANEL_UNAVAILABLE_SAMPLE]) {
-      expect(stateCounts(rowsByState(panel))).toEqual({ in_progress: 0, completed: 0, failed: 0 });
+      expect(stateCounts(rowsByState(panel))).toEqual({
+        in_progress: 0,
+        completed: 0,
+        failed: 0,
+        invalidated: 0,
+      });
     }
   });
 });
@@ -172,6 +182,36 @@ describe("quest-drawer-model: the detail view model", () => {
     expect(bookDetail(rowById("q_1042")).stamp).toBeNull();
     expect(bookDetail(rowById("q_0301")).stamp).toEqual({ kind: "completed", label: "達成" });
     expect(bookDetail(rowById("q_0099")).stamp).toEqual({ kind: "failed", label: "失敗" });
+  });
+
+  it("stamps and gates an invalidated row", () => {
+    const row = {
+      ...rowById("q_0099"),
+      state: "invalidated",
+      terminal_reason: { code: "obsolete_outcome", message: "此委託已由其他結局取代。" },
+      track: { action_id: "guild.quest_track", label: "追蹤", enabled: false, disabled_reason: "此委託已結束，無法追蹤。", quantity: null },
+      abandon: null,
+    };
+    expect(bookDetail(row).stamp).toEqual({ kind: "failed", label: "已失效" });
+    expect(bookActions(row, null)).toEqual({
+      track: null,
+      abandon: null,
+      turnin: null,
+      accept: null,
+      reason: "此委託已由其他結局取代。",
+    });
+  });
+
+  it("carries a host-independent abandon for an active private escort row", () => {
+    const row = {
+      ...rowById("q_1042"),
+      state: "in_progress",
+      abandon: { action_id: "guild.quest_abandon", label: "放棄", enabled: true, disabled_reason: null, quantity: null },
+    };
+    expect(bookActions(row, null).abandon).toMatchObject({
+      action_id: "guild.quest_abandon",
+      payload: { quest_id: "q_1042" },
+    });
   });
 
   it("keeps null prose honest", () => {

@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The party panel is an exact read-only version-2 presentation panel
-The party panel SHALL present the complete ordered canonical effective roster, with one row per exact NPC even for dual membership. Existing version-2 NPC identity/display/portrait/true-HP/bond-stage vocabulary, owner resolution during possession, unavailable forms and read-only/leak-free behavior SHALL remain. In this unreleased cutover the server/client validators SHALL extend the version-2 shape together. Each row SHALL add `membership` containing exactly boolean `general` and ordered `temporary_commissions` references; the panel SHALL add `general_quota` containing integer `used` and `limit`. General usage SHALL use valid general identity; total roster rows SHALL not be limited to four. Temporary commission references SHALL contain exact quest identity and protected-role reference with player-permitted labels, never private planning data. Existing portrait formatting/bounds and no-raw-affinity rules SHALL remain.
+The party panel SHALL present one ordered row per exact NPC in the canonical roster, including dual membership. Existing version-2 identity/display/portrait/HP/bond-stage vocabulary, possession owner resolution, unavailable forms and read-only behavior SHALL remain; server/client validators SHALL extend the version-2 shape together. Each row SHALL add `membership` with boolean `general` and ordered `temporary_commissions`; the panel SHALL add `general_quota` with integer `used` and `limit`.
 
 #### Scenario: Full general party plus escorts is complete
 - **WHEN** four general members and two temporary-only members are presented
@@ -103,6 +103,10 @@ The party panel SHALL present the complete ordered canonical effective roster, w
 - **WHEN** the `party_member` back-reference resolves to no live player
 - **THEN** the presenter raises the registry-unavailable error and the panel takes the shared
   unavailable form
+
+#### Scenario: Quota, row count and commission reference bounds
+- **WHEN** a dual member or an over-quota party is presented
+- **THEN** General usage SHALL use valid general identity, total roster rows SHALL not be limited to four, and temporary commission references SHALL contain exact quest identity and protected-role reference with player-permitted labels, never private planning data. Existing portrait formatting/bounds and no-raw-affinity rules SHALL remain.
 
 ### Requirement: Party presentation stays current across membership and combat changes
 Existing exploration/combat party push seams SHALL include temporary joins, per-source releases and general identity changes after commit. Existing combat HP/portrait refresh behavior SHALL remain. Related mission state/reason, phase and offer capabilities SHALL refresh after committed changes; stale choices SHALL refuse. Text clients SHALL retain equivalent interaction and explicit reasons. No new escort-control UI SHALL be added.

@@ -83,11 +83,27 @@ combat-round transaction as the lethal damage.
 - **THEN** the planner SHALL aggregate every matching entry into that one EventLog per quest, cap progress at the current objective quantity, perform at most one stage transition, and discard surplus kills rather than applying them to the next stage
 
 ### Requirement: Room arrival drives REACH and ESCORT through supported persistent room hooks
-`QuestObservableRoomMixin.at_object_receive()` SHALL call its parent hook and then
-`observe_room_entry(self, obj)` for a `PlayerCharacter`. `GridRoom` SHALL adopt the mixin,
-`AnchorRoom` SHALL inherit it, and `InstanceRoom` SHALL adopt it while preserving its existing
-interacted flag behavior. REACH SHALL match an anchor key, exact XYZ tuple, or bound instance
-dbref, and arrival observation SHALL advance only when the player is the arriving object.
+REACH SHALL retain player-arrival, anchor/XYZ/bound-instance and companion co-presence behavior as its scenarios state. ESCORT SHALL evaluate complete exact protected bindings in destination or rendezvous mode after owner traversal, possessed-actor movement and follower settlement. Destination SHALL require every protected identity living at its validated locator; rendezvous SHALL require exact protected and meeting identities living at one position with any declared relation satisfied.
+
+#### Scenario: Destination waits for the last protected actor
+- **WHEN** the owner arrives before all protected actors at a declared anchor, XYZ or bound instance
+- **THEN** progress remains unchanged until all exact protected actors arrive living; another companion or same-name actor cannot substitute
+
+#### Scenario: Rendezvous works at different actual locations
+- **WHEN** the same published related roles meet at two different ordinary locations in independent fixtures, and at a valid wilderness position in another fixture
+- **THEN** each actual reunion satisfies the rendezvous predicate with no fixed destination or original-body requirement
+
+#### Scenario: Recycled wilderness rooms do not prove reunion
+- **WHEN** meeting actors occupy different coordinates or different providers despite sharing recycled room/display identity
+- **THEN** the predicate remains unsatisfied
+
+#### Scenario: Typed relation and exact actors are required
+- **WHEN** a same-name impostor, dead/missing actor or wrong published relation is supplied
+- **THEN** the real rendezvous does not complete
+
+#### Scenario: REACH behavior remains owner-arrival gated
+- **WHEN** a player enters its existing matching REACH locator with valid companion co-presence
+- **THEN** existing progress and instance-interaction behavior is preserved
 
 #### Scenario: Anchor arrival completes a matching REACH stage
 - **WHEN** the player enters an `AnchorRoom` whose `anchor_key` matches the active stage locator
@@ -116,8 +132,8 @@ dbref, and arrival observation SHALL advance only when the player is the arrivin
 - **THEN** `interacted` becomes true and quest arrival observation also runs
 
 #### Scenario: Arrival requires a bound companion present in the destination
-- **WHEN** arrival observation runs for a matching destination
-- **THEN** it advances only when at least one bound companion is present in the destination room — already there or arriving with the player
+- **WHEN** ordinary REACH arrival observation evaluates a matching locator
+- **THEN** its existing owner-arrival and companion co-presence gate applies; ESCORT uses its exact protected predicate with no unrelated-companion gate
 
 #### Scenario: Observation is re-run once after companion follow moves complete
 - **WHEN** companion follow moves complete after an arrival
@@ -127,21 +143,35 @@ dbref, and arrival observation SHALL advance only when the player is the arrivin
 - **WHEN** an ESCORT arrival is evaluated
 - **THEN** at least one protected entity is required
 
+#### Scenario: Room and wilderness identity stay distinct for ESCORT
+- **WHEN** an arrival or rendezvous is evaluated at a room or wilderness position
+- **THEN** Ordinary room identity SHALL remain distinct from wilderness provider/coordinate identity, and recycled room objects SHALL not prove wilderness co-location. An original-body or unrelated-companion presence gate SHALL not apply to ESCORT, and actor absence, a different identity, dead state or relation mismatch SHALL not satisfy a predicate.
+
 ### Requirement: Wilderness rooms do not advertise an arrival hook that normal traversal bypasses
-`TerrainRoom` SHALL NOT adopt `QuestObservableRoomMixin`, and no definition registered by this change
-SHALL contain a wilderness-coordinate destination. Tests SHALL preserve the verified behavior that
-normal wilderness entry and stepping do not invoke quest room observation.
+Terrain rooms SHALL retain no false player room-arrival hook or invented wilderness destination locator. Wilderness traversal SHALL provide its authoritative settled role movement to the escort evaluator separately. Existing destination families SHALL remain unchanged.
+
+#### Scenario: Wilderness role movement reaches rendezvous without a room hook
+- **WHEN** a protected NPC or possessed actor steps to a live meeting role's exact provider/coordinate position
+- **THEN** rendezvous evaluation runs from settled movement, while the ordinary REACH room-arrival hook remains absent
 
 #### Scenario: Wilderness traversal does not produce false quest progress
-- **WHEN** a player enters the wilderness and then takes an intra-wilderness step
-- **THEN** `observe_room_entry()` is not called by either traversal and no quest stage advances
+- **WHEN** a player enters or steps through wilderness with no satisfied exact rendezvous binding
+- **THEN** no ordinary room-arrival hook or invented wilderness destination progress occurs; real settled role movement separately reaches the rendezvous evaluator
 
 ### Requirement: Stage completion advances exactly once and releases obsolete runtime bindings
-When progress reaches an objective's quantity, the runtime SHALL release the current stage's instance
-pin, clear all current-stage runtime bindings, reset progress, and either enter the next contiguous stage
-or mark the quest `COMPLETED` if the objective was final. One event, room hook, or committed item
-transfer SHALL transition a given quest at most once even when its quantity exceeds the remaining
-amount. Terminal records SHALL ignore later matching events, hooks, and transfers.
+Stage completion SHALL cap progress, release obsolete stage pins/bindings, reset per-stage counted state and enter at most one next contiguous stage or terminal completion. Terminal `COMPLETED`, `FAILED` and `INVALIDATED` records SHALL ignore later progress. Escort membership reasons SHALL stay valid across intermediate stages only while the definition retains that protected binding, and terminal transitions SHALL release that record's reasons.
+
+#### Scenario: Intermediate arrival cannot settle a final result
+- **WHEN** a multistage alternative completes an intermediate arrival or clue stage
+- **THEN** it advances one stage, releases obsolete pins, and neither invalidates alternatives nor plans the terminal reward
+
+#### Scenario: Physical final condition during an intermediate transition stays unresolved
+- **WHEN** one source advances an intermediate stage and also leaves the exact reunion roles co-located, and the source is replayed after reload
+- **THEN** candidate eligibility uses the pre-event stage and consumed transition state, the group remains unresolved, active alternatives retain entitlement, no no-commission fallback runs, and replay grants no second-stage progress
+
+#### Scenario: All terminal states reject future progress
+- **WHEN** later matching movement, combat or inventory events reach completed, failed and invalidated records
+- **THEN** each remains unchanged
 
 #### Scenario: Intermediate objective enters the next stage
 - **WHEN** a matching event satisfies a non-final stage
@@ -164,9 +194,12 @@ amount. Terminal records SHALL ignore later matching events, hooks, and transfer
   surplus does not carry into the next stage
 
 #### Scenario: A terminal record ignores a later matching transfer
-- **WHEN** the objective's item is transferred to the former recipient after the quest is `COMPLETED`
-  or `FAILED`
-- **THEN** the record is unchanged
+- **WHEN** later matching transfer reaches completed, failed or invalidated quest history
+- **THEN** the terminal record stays unchanged
+
+#### Scenario: Exclusive results arbitrate before eligibility
+- **WHEN** a declared exclusive final result becomes satisfiable
+- **THEN** Declared exclusive final results SHALL arbitrate before a completion or reward becomes eligible.
 
 ### Requirement: Change 15 exposes a deterministic no-AI completion seam for Phase 4
 An integration test SHALL synchronize the hand-written catalog, accept its introductory hunt, resolve a
@@ -188,8 +221,15 @@ completed without directly calling quest progress functions or importing `world/
 - **THEN** it SHALL NOT be treated as proof that the player-playable Phase-4 milestone is complete before that command-level change-16 integration exists
 
 ### Requirement: Arrival observation advances at most one per event and never exceeds quantity
+Arrival and escort role-result observation SHALL cap progress and transition each record at most once per stable authoritative source identity, including across pre-follow/post-follow hooks and restart. The source SHALL remain the same through related encounter activation and final movement evaluation. An intermediate stage SHALL never cause another stage transition or final-group resolution from the same source.
 
-REACH/ESCORT arrival observation SHALL increment stage progress by at most one per matching arrival event and SHALL cap progress at the objective quantity, so even a non-1 quantity (should one slip through) can never jump to full completion in a single arrival.
+#### Scenario: Pre-follow and post-follow share one source
+- **WHEN** room receive, encounter activation and follower completion observe one traversal
+- **THEN** each relevant record advances at most one stage and a later-stage match from the same source is ignored
+
+#### Scenario: Replayed source remains consumed after restart
+- **WHEN** the same settled movement result is replayed after committed reload
+- **THEN** no progress, group resolution, payout or later-stage transition is repeated
 
 #### Scenario: First arrival with quantity one completes the stage
 
@@ -202,8 +242,8 @@ REACH/ESCORT arrival observation SHALL increment stage progress by at most one p
 - **THEN** progress is capped at the quantity and the quest transitions at most once
 
 #### Scenario: Post-follow re-observation never re-counts the same arrival
-- **WHEN** the post-follow re-observation (party-follow D-2) runs and a companion was already present in the destination
-- **THEN** the re-run is skipped because the first observation has already advanced every matching stage for that event, so it SHALL NOT re-count the same arrival event
+- **WHEN** final post-follow observation runs after ordinary REACH consumed its transition while an unrelated general companion was already at the destination and protected escort actors arrive with the followers
+- **THEN** the consumed REACH transition is not repeated, the settled ESCORT pass still evaluates the newly arrived exact protected roster and activated meeting roles, and persisted source identity prevents a second transition
 
 ### Requirement: Species-hunt objectives match by variant membership, region, and persistent identity
 The quest planner SHALL evaluate a regional species-hunt DEFEAT objective against the `target_defeated`
@@ -243,3 +283,29 @@ Matching SHALL NOT consult display names, guild rank, or a single stat.
 #### Scenario: A specific-variant hunt counts only its named variants
 - **WHEN** a hunt's countable variants name specific variants
 - **THEN** only those variants are counted
+
+### Requirement: Indexed authoritative role events drive escort evaluation
+`evaluate_escort_event` SHALL consume owner/package/source/tick and owner-resolved settled role provenance through indexed owned bindings/groups. It SHALL join the event transaction and return unsatisfied, stage_advanced, resolved or already_observed plus affected identities, with invalid_source/role_unavailable failures. Movement, activation, binding and living-state boundaries SHALL reach it without global player/story scans.
+
+#### Scenario: Non-player movement reaches the same evaluator
+- **WHEN** a scheduled meeting role moves, an encounter activates a relevant role, a protected binding is accepted, or a relevant living state changes
+- **THEN** the same evaluator revalidates relevant owned identities without a player-body arrival or global log scan
+
+#### Scenario: Fabricated observation is rejected
+- **WHEN** a caller supplies a source without owner-resolvable movement/activation/binding/living-state provenance
+- **THEN** `invalid_source` returns before any stage, group, knowledge or reward write
+
+#### Scenario: Complete indexed authoritative role events drive escort evaluation contract
+- **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
+- **THEN** Evaluation SHALL consume role movement, activation, acceptance/binding and living-state changes through indexed owner/package/role/outcome references. It SHALL inspect only relevant owned bindings, never scan every player or generated story per movement. `evaluate_escort_event` SHALL accept owner, package, source identity, tick and owner-resolved committed event provenance; return `unsatisfied`, `stage_advanced`, `resolved`, or `already_observed` plus affected record/group identities; and refuse `invalid_source` or `role_unavailable` as appropriate. It SHALL join the authoritative event transaction; standalone acceptance/activation evaluation SHALL join that operation's outer transaction. Prose or fabricated observation dictionaries SHALL have no mutation authority.
+
+### Requirement: Escort finding does not disclose hidden actor positions
+Actual presence and permitted interaction SHALL determine finding and clues. Evaluation MAY inspect actual meeting positions but SHALL not reveal them to the player or uninformed speakers. Participant knowledge SHALL be recorded through narrative owners and upstream phase transitions; reunion acknowledgment and its closure interaction SHALL precede everyday dialogue. Prior history/persona/memory SHALL remain; failure SHALL not select successful reunion content.
+
+#### Scenario: Actual reunion changes participant conversation only
+- **WHEN** reunion commits and the actual participants complete acknowledgment and closure
+- **THEN** reopening their conversation shows everyday greeting/topics with prior history preserved, and an uninformed third party has no reunion knowledge
+
+#### Scenario: Hidden target cannot become a clue by reference
+- **WHEN** an objective refers to a distant meeting actor whose position the speaker does not know
+- **THEN** dialogue and player hints omit that position until an explicit permitted information transfer occurs

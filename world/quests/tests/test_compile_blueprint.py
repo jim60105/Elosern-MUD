@@ -446,15 +446,16 @@ class SceneBoundCompileTests(CompileRegistryIsolation, unittest.TestCase):
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_escort_stage_at_anchor_is_rejected_by_the_compiler(self):
+    def test_escort_stage_without_a_discriminator_is_refused_by_the_compiler(self):
+        # The blanket publication guard is gone: an ESCORT stage is refused
+        # only by its own complete-contract validation.
         payload = _defeat_payload()
         payload["quest_type"] = "護衛"
         payload["stages"][0]["objective"] = {"kind": "escort", "quantity": 1}
         payload["stages"][0]["npc_req"] = []
         with self.assertRaisesRegex(
             QuestCompileError,
-            "ESCORT objective, which cannot be published until a "
-            "protected-entity binding flow exists",
+            "ESCORT objective requires exactly one completion discriminator",
         ):
             compile_quest_blueprint(payload)
 

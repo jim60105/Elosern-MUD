@@ -157,7 +157,7 @@ The production action registry SHALL register `explore.talk_open`, whose payload
 - **THEN** it takes the session line from the host's resolved offline greeting, else one fixed server-authored fallback line naming the host, delivers the line, and records the session
 
 ### Requirement: Exploration affordances are server-authored, never inferred from prose
-Every `interact` affordance SHALL be derived from canonical data with the same checks commands use, never from typeclass names, display prose, or other heuristics. Every present conversable host SHALL carry exactly one conversation affordance, labelled 交談 and naming `explore.talk_open`, listed before the target's other affordances; it SHALL be enabled unless the puppeted actor is a possessed NPC, in which case it SHALL be disabled with the stable possession-refusal code and message.
+Existing exploration affordances SHALL remain server-authored. Party invite SHALL use general identity and its separate four-member quota; same-owner temporary-only members SHALL remain normally recruitable. Party leave SHALL address source-aware general removal or selected private escort abandonment through the existing mission drawer, never detach a valid escort reason directly. Other conversation/service/combat/editor gates SHALL remain.
 
 #### Scenario: A scripted host exposes its authored keywords
 - **WHEN** a present NPC carries a `ScriptedDialogue` component with two authored keywords and the player opens a conversation with it
@@ -168,12 +168,12 @@ Every `interact` affordance SHALL be derived from canonical data with the same c
 - **THEN** its interact descriptor offers exactly one 交談 `explore.talk_open` affordance and no `explore.talk_freeform` affordance, and the conversation that 交談 opens offers free-form speech
 
 #### Scenario: An unbound generative NPC offers an invite
-- **WHEN** a present `LLMNPC` is not a companion of the actor and the party has room
-- **THEN** its interact descriptor offers `explore.party_invite` enabled; with four companions already the affordance is disabled with the full-party reason
+- **WHEN** an eligible present unbound or same-owner temporary-only LLMNPC has no general identity
+- **THEN** its invite affordance is enabled below four valid general identities regardless of temporary count, otherwise disabled as full_party
 
 #### Scenario: A bound companion offers leave instead of invite
-- **WHEN** a present NPC is currently a companion of the actor
-- **THEN** its interact descriptor offers `explore.party_leave` and never an `explore.party_invite`
+- **WHEN** a present companion has general identity
+- **THEN** its leave affordance offers general removal; a temporary-only eligible actor may also offer ordinary recruitment
 
 #### Scenario: A living hostile monster offers engage
 - **WHEN** a present living `Monster` is in the room and the actor has no active session
@@ -204,13 +204,12 @@ Every `interact` affordance SHALL be derived from canonical data with the same c
 - **THEN** no target carries an `explore.talk_scripted` or `explore.talk_freeform` affordance or a keyword list: the host's authored keywords and free-form speech are offered by the dialogue surface once the conversation is open, and the shared vocabulary's per-keyword and free-form entries remain the source of suggestion cards
 
 #### Scenario: Party invite eligibility and enablement
-- **WHEN** the presenter decides whether to offer `explore.party_invite`
-- **THEN** it is offered only for a present NPC with an eligible free-form dialogue surface (an `LLMNPC`) that is not already a companion of the actor
-- **AND** it is enabled when the actor's party has fewer than 4 companions and disabled with the full-party reason otherwise, and never offered for an already-bound companion (the leave affordance covers it)
+- **WHEN** party invite affordances are built
+- **THEN** ordinary local free-form eligibility, ownership and general quota apply; already-general/foreign-bound actors are refused while same-owner temporary-only actors are recruitable
 
 #### Scenario: Party leave targets only bound companions
-- **WHEN** the presenter decides whether to offer `explore.party_leave`
-- **THEN** it is offered only for a present NPC that is currently a bound companion of the actor
+- **WHEN** party leave affordances are built
+- **THEN** only effective owned present companions receive them, and active escort reasons identify the affected missions for selected abandonment rather than blind detachment
 
 #### Scenario: Engage targets only living hostile monsters outside combat
 - **WHEN** the presenter decides whether to offer `explore.engage`
@@ -228,6 +227,10 @@ Every `interact` affordance SHALL be derived from canonical data with the same c
 - **WHEN** an exploration adapter runs after the dispatcher's checks
 - **THEN** it re-verifies, against the actor's current location and current canonical state, the affordance that produced its descriptor — presence in the actor's location, the exact typeclass/component/eligibility, and the unchanged keyword, party, or host condition
 - **AND** a target removed from the room, type-changed, or no longer eligible between render and submit is rejected before the display, dialogue, invite, leave, or engage API is called and before any memory, intent, party, session, or time state changes
+
+#### Scenario: Dual membership preserves one row and independent controls
+- **WHEN** a same-owner temporary-only actor is normally recruited and later has its general identity removed
+- **THEN** its one effective roster row and escort controls remain until all valid escort reasons end
 
 ### Requirement: The character panel is an exact read-only version-7 panel
 The production presentation registry SHALL register panel name `character` at schema version 7 with `available` true and `kind` `character`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `traits`, `actives`, `passives`, `equipment`, `disguise`, `guild`, `wallet`, `persona`, and `intimate`.
@@ -601,7 +604,7 @@ The freeform-talk adapter SHALL re-run the co-location and interactability check
 - **THEN** the adapter shows the speech, discards the intent, and reports the stale context to the player
 
 ### Requirement: explore.party_invite proposes a party through the guarded dialogue seam
-The production action registry SHALL register `explore.party_invite`, whose payload SHALL accept exactly `npc_id` (a positive integer) and `message` (a string of at most 512 code points, possibly empty). The adapter SHALL re-verify the NPC's presence in the actor's current location, free-form eligibility (an `LLMNPC`), no existing binding, and a party below the 4-companion bound, obtain the `npc_dialogue` profile client, and run `npc.run_npc_exchange(message, actor, client)`.
+The existing explore.party_invite SHALL retain exactly npc_id and bounded message, injected dialogue and output semantics. Both preflight and commit SHALL use ordinary recruitment eligibility, co-location, ownership, no existing general identity and fewer than four valid general identities. Same-owner temporary-only actors MAY acquire general identity without source loss, duplicate rows or an affinity bypass.
 
 #### Scenario: An invited generative NPC joins through the webclient
 - **WHEN** an actor submits `explore.party_invite` for a present unbound `LLMNPC` and the dialogue reply carries `party_invite` with `accept: true`
@@ -612,8 +615,8 @@ The production action registry SHALL register `explore.party_invite`, whose payl
 - **THEN** the invitation accepts on `affinity >= 70` with a deterministic acceptance line and rejects below it, with no network request
 
 #### Scenario: A full party blocks the webclient invite before the AI call
-- **WHEN** an actor with 4 companions submits `explore.party_invite`
-- **THEN** the adapter rejects synchronously with the full-party reason and the dialogue seam is never invoked
+- **WHEN** a holder of four valid general identities submits a further ordinary invite
+- **THEN** preflight refuses before dialogue; temporary escort rows do not themselves fill this quota
 
 #### Scenario: Target resolution never trusts stale or remote references
 - **WHEN** the `explore.party_invite` adapter re-resolves the NPC
@@ -637,15 +640,19 @@ The production action registry SHALL register `explore.party_invite`, whose payl
 - **THEN** the adapter returns a Deferred that resolves to a safe success result after the seam settles, publishes a full snapshot at one newer revision so the applied membership binding refreshes atomically, and does not assign memory, intent, party, or affinity state directly
 
 #### Scenario: An invalid invite rejects synchronously before client work
-- **WHEN** the NPC is missing, no-longer-present, non-eligible, or already-bound, or the party is full
-- **THEN** the adapter rejects synchronously with a stable code before any client or transport work
+- **WHEN** the actor is absent, ambiguous, non-eligible, already-general, foreign-owned or the valid general quota is full
+- **THEN** preflight rejects synchronously with no client/transport work or source changes
+
+#### Scenario: Temporary identity does not bypass invitation judgment
+- **WHEN** a temporary-only actor receives an ordinary invitation below the offline affinity threshold
+- **THEN** ordinary offline refusal applies and its valid escort reasons remain; successful online acceptance adds only general identity
 
 ### Requirement: explore.party_leave dismisses a bound companion without affinity change
-The production action registry SHALL register `explore.party_leave`. Its payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the NPC from the actor's current location's present contents, re-verify that the NPC is currently a bound companion, and dismiss it through `world/rules/party.py::leave_party(npc, actor, reason="dismissed")`.
+The existing explore.party_leave SHALL retain exactly npc_id and authenticated/local target checks. General-only dismissal SHALL use the party owner with existing possession/affinity gates. An active escort reason SHALL require selected commission abandonment in the existing mission drawer with two-step confirmation; the action SHALL never directly remove that reason. Multiple sources SHALL identify affected owned records and preserve non-selected/general sources.
 
 #### Scenario: Webclient dismissal removes the binding
-- **WHEN** an actor submits `explore.party_leave` for a present bound companion
-- **THEN** the binding is removed through `leave_party(reason="dismissed")`, affinity is unchanged, and the actor receives the dismissal notification
+- **WHEN** an actor dismisses a present general-only companion under ordinary gates
+- **THEN** party-owned removal and notification commit without affinity change; an escort-backed actor instead routes to its selected mission abandonment flow
 
 #### Scenario: A webclient leave on an unbounded target rejects
 - **WHEN** an actor submits `explore.party_leave` for a present NPC that is not a companion
@@ -662,6 +669,10 @@ The production action registry SHALL register `explore.party_leave`. Its payload
 #### Scenario: An invalid leave rejects synchronously with no state change
 - **WHEN** the NPC is missing, no-longer-present, or unbounded
 - **THEN** the adapter rejects synchronously with a stable code and no state change
+
+#### Scenario: Escort dismissal cannot silently detach
+- **WHEN** explore.party_leave names a present actor with active escort reasons
+- **THEN** those sources are not removed, existing mission choices name the affected owned records and confirm the selected quest_log abandon descriptor; cancellation preserves quest, possession and party state
 
 ### Requirement: explore.engage delegates to the existing engage contract
 The production action registry SHALL register `explore.engage`. Its payload SHALL accept exactly `monster_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session, re-resolve the monster from the actor's current location's present contents, and call `world.rules.combat_session.engage(actor, monster)`.

@@ -9,10 +9,13 @@ from commands.command import Command
 
 from commands.talk import _resolve_npc
 from world.rules.party import (
+    ESCORT_BOUND_MESSAGE,
     LEAVE_DISMISSED_MESSAGE,
     NOT_COMPANION_MESSAGE,
+    has_general_membership,
     is_companion,
     PartyJoinError,
+    reasons_for,
     REASON_HANDBACK_FIRST,
     HANDBACK_FIRST_MESSAGE,
     leave_party,
@@ -47,6 +50,13 @@ class CmdLeave(Command):
         if not is_companion(npc, self.caller):
             self.caller.msg(NOT_COMPANION_MESSAGE)
             return
+        if not has_general_membership(npc, self.caller):
+            reasons = reasons_for(npc, self.caller)
+            if reasons:
+                self.caller.msg(ESCORT_BOUND_MESSAGE.format(
+                    quests="、".join(sorted({quest_id for quest_id, _ in reasons}))
+                ))
+                return
         if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
             if int(npc.db.possessed_by) == int(self.caller.pk):
                 self.caller.msg(HANDBACK_FIRST_MESSAGE)

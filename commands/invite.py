@@ -25,7 +25,7 @@ from world.rules.party import (
     PARTY_MAX_COMPANIONS,
     REFUSED_MESSAGE,
     PartyJoinError,
-    is_companion,
+    has_general_membership,
     join_party,
     party_size,
 )
@@ -62,7 +62,9 @@ class CmdInvite(Command):
         if not isinstance(npc, LLMNPC):
             self.caller.msg(NOT_DIALOGUE_MESSAGE)
             return
-        if is_companion(npc, self.caller):
+        if has_general_membership(npc, self.caller) or (
+            npc.db.party_member is not None and npc.db.party_member != self.caller.pk
+        ):
             self.caller.msg(ALREADY_COMPANION_MESSAGE)
             return
         if party_size(self.caller) >= PARTY_MAX_COMPANIONS:

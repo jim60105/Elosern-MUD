@@ -229,20 +229,15 @@ grants nothing.
 - **THEN** hosts SHALL be NPC instances: a host that cannot hold affinity is rejected before any write, so a successful operation always carries its gain
 
 ### Requirement: The party auto-leave recheck hook runs after negative affinity deltas
-The sole-writer API SHALL invoke the party auto-leave recheck after every negative delta. The hook
-SHALL be the wired rule from `party-core`: when the NPC is a bound companion and its affinity
-toward the player drops below the invite threshold (70), it SHALL call
-`world/rules/party.py::leave_party(npc, player, reason="affinity_below_threshold")` as part of the
-affinity write's transaction.
+Every negative affinity delta SHALL run the canonical party recheck. A valid active exact escort reason SHALL suppress automatic departure while relationship changes and lawful damage remain. General-only companions SHALL retain existing threshold departure, possession handback, notification and rollback behavior. Invalid/stale reasons SHALL grant no exemption.
 
 #### Scenario: The hook is invoked on negative deltas
 - **WHEN** a negative delta is applied through the sole-writer API
 - **THEN** the auto-leave recheck hook runs once with the affected NPC and player
 
 #### Scenario: A below-threshold drop ends a companion party
-- **WHEN** a bound companion's affinity drops from 70 to 69 through a negative delta
-- **THEN** the binding is removed with the auto-leave reason, the write API returns the
-  notification line, and the caller notifies the player only after the write commits
+- **WHEN** a general-only companion with no valid escort reason crosses below the ordinary threshold
+- **THEN** ordinary departure and its transactional returned notification remain; a valid escort instead preserves membership while the affinity delta commits
 
 #### Scenario: A failed auto-leave rolls back the affinity write
 - **WHEN** the leave write fails after the affinity value was lowered below the threshold
@@ -264,6 +259,10 @@ affinity write's transaction.
 #### Scenario: The hook is deterministic
 - **WHEN** the same negative delta and companion state are replayed
 - **THEN** the hook produces the same recheck outcome, and it is side-effect free for non-companions
+
+#### Scenario: Valid escort survives friendly fire and low affinity
+- **WHEN** a lawful friendly-fire hit damages a temporary or dual member and its penalty crosses below the ordinary threshold
+- **THEN** damage and affinity penalty commit through current owners without automatic departure or possession handback while a valid escort reason remains
 
 ### Requirement: Affinity presentation is stage-only and never exposes the numeric value
 NPC appearance SHALL include one affinity stage line rendered from the record's stage for the

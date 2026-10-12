@@ -31,7 +31,10 @@ var QUEST_LOG_MAX_TRACK_LABEL = C.QUEST_LOG_MAX_TRACK_LABEL;
 // most MAX_QUEST_ROWS stored records in quest-log order; settlement and
 // reward are null when the record's issuance can no longer be
 // resolved; same surrogate guards as the party and objectives mirrors.
-var QUEST_LOG_STATES = ["in_progress", "completed", "failed"];
+// Four-state vocabulary, mirroring web.webclient.presentation.quest_log /
+// services. "invalidated" is a structured terminal state an exclusive outcome
+// writes, so the client accepts and renders it like the other terminal states.
+var QUEST_LOG_STATES = ["in_progress", "completed", "failed", "invalidated"];
 var QUEST_LOG_SETTLEMENTS = ["counter", "auto"];
 
 function validateQuestLogBoundedLine(value, name, field, maximum) {
@@ -109,7 +112,7 @@ function validateQuestLogIssuer(value, name) {
   return value;
 }
 
-function validateQuestLogTrack(value, name) {
+function validateQuestLogTrack(value, name, terminal) {
   requireExactFields(
     value,
     name + " track descriptor",
@@ -125,14 +128,70 @@ function validateQuestLogTrack(value, name) {
     "track label",
     QUEST_LOG_MAX_TRACK_LABEL
   );
-  if (value.enabled !== true) {
-    throw new Error(name + " track is always enabled");
-  }
-  if (value.disabled_reason !== null) {
-    throw new Error(name + " enabled track must not carry a disabled_reason");
+  if (terminal) {
+    if (value.enabled !== false) {
+      throw new Error(name + " terminal track must be disabled");
+    }
+    validateQuestLogBoundedLine(
+      value.disabled_reason,
+      name,
+      "disabled_reason",
+      C.MAX_REASON_MESSAGE
+    );
+  } else {
+    if (value.enabled !== true) {
+      throw new Error(name + " active track is always enabled");
+    }
+    if (value.disabled_reason !== null) {
+      throw new Error(name + " enabled track must not carry a disabled_reason");
+    }
   }
   if (value.quantity !== null) {
     throw new Error(name + " track must not carry quantity bounds");
+  }
+  return value;
+}
+
+function validateQuestLogTerminalReason(value, name) {
+  if (value === null) {
+    return value;
+  }
+  requireExactFields(value, name + " terminal reason", ["code", "message"], []);
+  requireString(value.code, "terminal_reason code", C.SERVICES_MAX_REASON_MESSAGE);
+  requireString(value.message, "terminal_reason message", C.MAX_REASON_MESSAGE);
+  if (!value.code.trim() || !value.message.trim() || hasLoneSurrogate(value.message)) {
+    throw new Error(name + " terminal reason must be non-empty text");
+  }
+  return value;
+}
+
+function validateQuestLogAbandon(value, name) {
+  if (value === null) {
+    return value;
+  }
+  requireExactFields(
+    value,
+    name + " abandon descriptor",
+    ["action_id", "label", "enabled", "disabled_reason", "quantity"],
+    []
+  );
+  if (value.action_id !== "guild.quest_abandon") {
+    throw new Error(name + " abandon must be guild.quest_abandon");
+  }
+  validateQuestLogBoundedLine(
+    value.label,
+    name,
+    "abandon label",
+    QUEST_LOG_MAX_TRACK_LABEL
+  );
+  if (value.enabled !== true) {
+    throw new Error(name + " private escort abandon is enabled");
+  }
+  if (value.disabled_reason !== null) {
+    throw new Error(name + " enabled abandon must not carry a disabled_reason");
+  }
+  if (value.quantity !== null) {
+    throw new Error(name + " abandon must not carry quantity bounds");
   }
   return value;
 }
@@ -164,6 +223,8 @@ function validateQuestLogRow(value, index) {
       "reward",
       "reward_claimed",
       "track",
+      "terminal_reason",
+      "abandon",
     ],
     []
   );
@@ -238,7 +299,13 @@ function validateQuestLogRow(value, index) {
       name + " settlement and reward must be null together or present together"
     );
   }
-  validateQuestLogTrack(value.track, name);
+  var terminal = value.state === "invalidated";
+  validateQuestLogTrack(value.track, name, terminal);
+  validateQuestLogTerminalReason(value.terminal_reason, name);
+  validateQuestLogAbandon(value.abandon, name);
+  if (terminal && value.abandon !== null) {
+    throw new Error(name + " invalidated record carries no abandon action");
+  }
   return value;
 }
 

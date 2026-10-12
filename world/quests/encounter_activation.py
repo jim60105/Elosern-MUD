@@ -129,6 +129,14 @@ def committed_observations(package_id: str) -> dict[str, bool]:
         facts["unresolved"] = False
     if facts["abandoned"]:
         facts["separation"] = False
+    # The exclusive-result facts are owned by this change (escort-rendezvous
+    # §7): ``reunion`` holds once any group of the package has committed a
+    # result and ``reunion_closure`` once the participants' closure phase is
+    # also committed. Both are read from durable state, never from prose.
+    from . import outcome_store
+
+    facts["reunion"] = outcome_store.has_resolved_group(package_id)
+    facts["reunion_closure"] = facts["reunion"] and facts["closure"]
     return facts
 
 
@@ -255,17 +263,16 @@ def _provision_role(
     tick: int,
 ) -> str | None:
     """Provision the declared scoped commission for one freshly spawned issuer."""
-    commission = definition.commission
-    if commission is None or commission.role_id != role_id:
+    commission = definition.commission_for_role(role_id)
+    if commission is None:
         return None
     from world.rules.quest_issuance import provision_scoped_issuer
 
-    payload_commission = row.payload.get("commission")
-    content_key = (
-        payload_commission.get("issuer_content_key")
-        if isinstance(payload_commission, dict)
-        else None
-    )
+    content_key = None
+    for entry in row.payload.get("commissions") or []:
+        if isinstance(entry, dict) and entry.get("role_id") == role_id:
+            content_key = entry.get("issuer_content_key")
+            break
     actual = provision_scoped_issuer(actor, content_key=content_key)
     scene_store.assign_grant_actor(
         row, role_id, commission.definition_key, int(actor.pk), tick=tick
@@ -366,8 +373,7 @@ def _replay(
             grant.issuer_key
             for grant in scene_store.list_commission_grants(row.package_id)
             if grant.registered
-            and definition.commission is not None
-            and grant.role_id == definition.commission.role_id
+            and definition.commission_for_role(grant.role_id) is not None
         ),
         room_id=existing.room_id,
     )
@@ -485,6 +491,24 @@ def activate_scene_encounter(
             scene_store.mark_encounter_activated(
                 row, scene_id, int(player.pk), activation_tick=tick, tick=tick
             )
+            activated = [
+                actor
+                for actor in (ObjectDB.objects.filter(id=pk).first() for pk in bindings.values())
+                if actor is not None
+            ]
+            if activated:
+                # Activating an encounter materializes or revalidates its exact
+                # roles, so the settled final escort pass runs inside this same
+                # transaction: a meeting role now standing beside an accepted
+                # escort's protected actor resolves the group, and a failure
+                # rolls the activation back with the evaluation. The activated
+                # actors are collected as attributable, not merely present, and
+                # the indexed owner/package references keep the pass off any
+                # global player or story scan (escort-rendezvous §5).
+                from .escort_events import collect_escort_actors, escort_event_boundary
+
+                with escort_event_boundary():
+                    collect_escort_actors(tuple(activated))
     except EncounterUnavailable as error:  # observability: ignore R2: the named unavailability is emitted as scene_encounter_unavailable by _unavailable() and returned to the caller
         evict_created_actors(created_pks)
         return _unavailable(package_id, scene_id, player, error.reason, tick=tick)

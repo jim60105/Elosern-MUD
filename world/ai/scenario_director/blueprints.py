@@ -19,6 +19,9 @@ from typing import Any
 from world.ai.immutable import (
     reject_mutable_containers as _reject_mutable_containers,
 )
+#: The sibling schema module owns the closed escort vocabularies; it imports
+#: nothing from this module, so this direction is cycle-free.
+from world.ai.scenario_director import packages
 
 # Hard prompt bounds (design D2): per-field string-length caps and a bounded
 # total serialized size, so a pathological request cannot produce an unbounded
@@ -205,13 +208,49 @@ class BlueprintNpcReq:
 
 
 @dataclass(frozen=True)
+class BlueprintRelation:
+    """The optional typed relation a rendezvous escort declares.
+
+    ``kind`` is a closed relationship-kind key and both endpoints name exact
+    published role references (escort-rendezvous §6.2).
+    """
+
+    kind: str
+    from_role: str
+    to_role: str
+
+    def __post_init__(self) -> None:
+        _reject_mutable_containers(self, type(self).__name__)
+        if self.kind not in packages.RELATIONSHIP_KINDS:
+            raise ValueError(
+                f"relation kind {self.kind!r} is outside "
+                f"{list(packages.RELATIONSHIP_KINDS)}"
+            )
+        for field_name in ("from_role", "to_role"):
+            endpoint = getattr(self, field_name)
+            if not isinstance(endpoint, str) or not endpoint.strip():
+                raise ValueError(f"relation {field_name} must be a non-empty string")
+
+
+@dataclass(frozen=True)
 class BlueprintObjective:
-    """One stage's progress mechanic: a closed kind plus its selectors."""
+    """One stage's progress mechanic: a closed kind plus its selectors.
+
+    An ``escort`` objective carries its closed completion discriminator plus
+    exact role references (escort-rendezvous §6): quantity one, ``completion``
+    exactly one of destination/rendezvous, a nonempty protected-role set, and
+    meeting roles only in rendezvous mode with an optional typed relation.
+    Every other kind leaves all four fields unset.
+    """
 
     kind: str
     quantity: int = 1
     monster_tier: str | None = None
     item_key: str | None = None
+    completion: str | None = None
+    protected_role_refs: tuple[str, ...] = ()
+    meeting_role_refs: tuple[str, ...] = ()
+    relation: BlueprintRelation | None = None
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
@@ -224,6 +263,41 @@ class BlueprintObjective:
             not isinstance(self.quantity, int) or self.quantity < 1
         ):
             raise ValueError("objective quantity must be a positive integer")
+        if self.kind != BlueprintObjectiveKind.ESCORT.value:
+            if (
+                self.completion is not None
+                or self.protected_role_refs
+                or self.meeting_role_refs
+                or self.relation is not None
+            ):
+                raise ValueError(
+                    "only an escort objective may declare completion, "
+                    "protected_role_refs, meeting_role_refs or a relation"
+                )
+            return
+        if self.quantity != 1:
+            raise ValueError("escort objective quantity must be exactly 1")
+        if self.completion not in packages.ESCORT_COMPLETIONS:
+            raise ValueError(
+                "escort objective requires exactly one completion "
+                f"discriminator in {list(packages.ESCORT_COMPLETIONS)}"
+            )
+        if not self.protected_role_refs:
+            raise ValueError("escort objective requires protected_role_refs")
+        for role in (*self.protected_role_refs, *self.meeting_role_refs):
+            if not isinstance(role, str) or not role.strip():
+                raise ValueError("escort role references must be non-empty strings")
+        if set(self.protected_role_refs) & set(self.meeting_role_refs):
+            raise ValueError(
+                "escort roles may not be both protected and meeting references"
+            )
+        if self.completion == "destination":
+            if self.meeting_role_refs or self.relation is not None:
+                raise ValueError(
+                    "a destination escort declares no meeting_role_refs or relation"
+                )
+        elif not self.meeting_role_refs:
+            raise ValueError("a rendezvous escort requires meeting_role_refs")
 
 
 @dataclass(frozen=True)
@@ -336,6 +410,31 @@ class QuestBlueprint:
                         "quantity": stage.objective.quantity,
                         "monster_tier": stage.objective.monster_tier,
                         "item_key": stage.objective.item_key,
+                        **(
+                            {
+                                "completion": stage.objective.completion,
+                                "protected_role_refs": list(
+                                    stage.objective.protected_role_refs
+                                ),
+                                "meeting_role_refs": list(
+                                    stage.objective.meeting_role_refs
+                                ),
+                                "relation": (
+                                    None
+                                    if stage.objective.relation is None
+                                    else {
+                                        "kind": stage.objective.relation.kind,
+                                        "from_role": (
+                                            stage.objective.relation.from_role
+                                        ),
+                                        "to_role": stage.objective.relation.to_role,
+                                    }
+                                ),
+                            }
+                            if stage.objective.kind
+                            == BlueprintObjectiveKind.ESCORT.value
+                            else {}
+                        ),
                     },
                     "location_req": (
                         None
@@ -423,6 +522,22 @@ class QuestBlueprint:
                     quantity=stage["objective"].get("quantity", 1),
                     monster_tier=stage["objective"].get("monster_tier"),
                     item_key=stage["objective"].get("item_key"),
+                    completion=stage["objective"].get("completion"),
+                    protected_role_refs=tuple(
+                        stage["objective"].get("protected_role_refs") or ()
+                    ),
+                    meeting_role_refs=tuple(
+                        stage["objective"].get("meeting_role_refs") or ()
+                    ),
+                    relation=(
+                        None
+                        if stage["objective"].get("relation") is None
+                        else BlueprintRelation(
+                            kind=stage["objective"]["relation"]["kind"],
+                            from_role=stage["objective"]["relation"]["from_role"],
+                            to_role=stage["objective"]["relation"]["to_role"],
+                        )
+                    ),
                 ),
                 location=(
                     None

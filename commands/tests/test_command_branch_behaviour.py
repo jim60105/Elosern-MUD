@@ -173,8 +173,11 @@ class GuildCommandBranchTests(TestCase):
         self.assertIsNone(_parse_requested_type("烤肉"))
 
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_request_refuses_escort_with_a_clear_message(self):
-        from server.ai_director_service import EscortUnavailableError
+    def test_request_passes_an_escort_request_through_to_the_director(self):
+        # The blanket pre-transport escort refusal is gone: the 護衛 request
+        # reaches the director like any other type, and an absent fitting
+        # template surfaces the shared unsupported-template line.
+        from server.ai_director_service import NoSuitableTemplateError
 
         command = _command(CmdGuildRequest, "護衛")
         staff = Mock()
@@ -187,27 +190,15 @@ class GuildCommandBranchTests(TestCase):
             return_value={"branch_key": SYNTH_GUILD_BRANCH_KEY},
         ), patch(
             "commands.guild.request_generated_quest",
-            side_effect=EscortUnavailableError("no binding flow"),
-        ):
+            side_effect=NoSuitableTemplateError("no escort template"),
+        ) as request:
             command.func()
-        command.caller.msg.assert_called_with(
-            "護衛委託目前尚未開放，請選擇其他類型的委託。"
+        self.assertEqual(
+            request.call_args.kwargs["context"]["requested_type"], "護衛"
         )
-
-    def test_resolve_deferred_reports_escort_refusal_on_the_pending_path(self):
-        from twisted.internet.defer import Deferred
-
-        from commands.guild import _GuildRequestPendingError, _resolve_deferred
-        from server.ai_director_service import EscortUnavailableError
-
-        caller = Mock()
-        caller.ndb.guild_request_pending = None
-        pending = Deferred()
-        with self.assertRaises(_GuildRequestPendingError):
-            _resolve_deferred(pending, caller)
-        pending.addErrback(lambda failure: None)
-        pending.errback(EscortUnavailableError("no binding flow"))
-        caller.msg.assert_called_with("護衛委託目前尚未開放，請選擇其他類型的委託。")
+        command.caller.msg.assert_called_with(
+            "公會目前沒有適合你的委託。"
+        )
 
     def test_resolve_deferred_sync_and_pending_paths(self):
         from twisted.internet.defer import Deferred, fail, succeed

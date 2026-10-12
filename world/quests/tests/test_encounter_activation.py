@@ -51,6 +51,7 @@ class EncounterActivationTests(EncounterActivationTestBase):
     @covers_requirement(
         "quest-scene-encounters::encounter-activation-is-independent-of-quest-acceptance"
     )
+    @covers_requirement("quest-scene-encounters::encounter-packages-expose-distinct-escort-commissions-and-final-result-observation")
     def test_activation_binds_exact_roles_without_accepting_a_quest(self):
         result = self._activate()
         self.assertTrue(result.activated)
@@ -62,10 +63,26 @@ class EncounterActivationTests(EncounterActivationTestBase):
         self.assertEqual(read_records(self.player), [])
         self.assertEqual(self.room.db.desc, None)
 
+    @covers_requirement("quest-progress-tracking::indexed-authoritative-role-events-drive-escort-evaluation")
+    @covers_requirement("quest-scene-encounters::encounter-packages-expose-distinct-escort-commissions-and-final-result-observation")
+    def test_activation_runs_the_settled_escort_pass_with_the_exact_actors(self):
+        with patch("world.quests.escort_events.evaluate_escort_event") as evaluate:
+            result = self._activate()
+        self.assertTrue(result.activated)
+        evaluate.assert_called()
+        args, kwargs = evaluate.call_args
+        self.assertEqual(args[0].pk, self.player.pk)
+        self.assertEqual(args[1], self.published.package_id)
+        # The materialized role is attributable, not merely present.
+        self.assertIn(
+            result.role_bindings["daughter"], kwargs["source"].actor_ids,
+        )
+
     @covers_requirement(
         "quest-scene-encounters::encounter-activation-is-independent-of-quest-acceptance",
         "persistent-story-roles::reusable-roles-bind-exact-actor-identities",
     )
+    @covers_requirement("quest-scene-encounters::encounter-packages-expose-distinct-escort-commissions-and-final-result-observation")
     def test_either_encounter_activates_first_and_both_preserve_the_relationship(self):
         first = self._activate("south_gate")
         second = self._activate("market")
@@ -112,6 +129,7 @@ class EncounterActivationTests(EncounterActivationTestBase):
         "quest-scene-encounters::repeated-activation-never-repairs-missing-actors",
         "persistent-story-roles::named-role-retention-survives-quest-termination",
     )
+    @covers_requirement("quest-lifecycle::real-actor-loss-produces-an-explicit-escort-lifecycle-result")
     def test_a_missing_bound_actor_is_named_without_a_repair_actor(self):
         first = self._activate()
         npc = ObjectDB.objects.filter(id=first.role_bindings["daughter"]).first()
@@ -161,6 +179,7 @@ class EncounterActivationTests(EncounterActivationTestBase):
         with self.assertRaises(EncounterUnavailable):
             self._activate(observations={"closure": True})
 
+    @covers_requirement("quest-issuer-authorization::escort-issuer-scope-authorizes-each-distinct-current-commission")
     def test_the_issuer_role_is_provisioned_and_its_commission_registered(self):
         self._activate("market")
         actor = ObjectDB.objects.filter(

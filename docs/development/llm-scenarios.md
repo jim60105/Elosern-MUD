@@ -290,6 +290,37 @@ LLM 必須輸出 JSON 格式：
 
 變更紀錄：啟用真實的任務種子發布，加入無填充產生與來源重驗證，並保留一般的離線行為。玩家指令與瀏覽器動作都沒有變更。
 
+### Deterministic escort acceptance
+
+`accept_quest` dispatches definitions containing an ESCORT objective to
+`scene_api.accept_escort_commission`. The quest owner revalidates the activated
+commission grant, scoped issuer, current offer phase/revision, exact published
+protected-role bindings, living state, physical presence and membership owner.
+Temporary membership uses the existing roster's record/role reasons, not a
+second roster or the four-member general quota. Exclusive-group acceptances
+allocate their sequence under the durable group owner.
+
+Terminal replacement releases only that record's sources through
+`scene_api.release_escort_bindings`. General or other valid temporary sources
+preserve possession; actual last-source release performs verified handback.
+An outer write failure restores roster metadata, back-references, control
+mirrors, puppet locks and the live puppet. Presentation synchronization uses a
+fresh sequence, never a retired epoch. Generated escort publication remains
+closed until the real-owner smoke proves the full movement/result/payment path.
+
+### 已結算的護送評估與專屬結果
+
+`scene_api.evaluate_escort_event` 由來源交易簽發的事件回條驅動，只透過既有的
+場景與結果反向參照解析相關的已發布群組／角色／擁有者記錄，不掃描全體玩家。
+實際移動、遭遇啟用、承接綁定與生命狀態變更各自在自身交易內彙整一次最終評估；
+同一穩定來源重播或跨重啟都不會再次推進階段或重複結算。
+
+`scene_api.resolve_exclusive_outcome` 與唯讀的 `exclusive_outcome_status` 在
+擁有者／套件／群組的唯一資料列下裁決：以具體最終結果語意與逐記錄的承接序號，
+依序號與穩定記錄識別選出一位贏家，其餘已承接的替代以結構化的過時結果理由
+`INVALIDATED`，未承接的替代關閉報價。裁決在同一交易內先於報酬規劃完成，兩種
+付款模式都只對贏家放行；未屬於該群組的相異委託不受影響。
+
 ## 相關延伸閱讀
 
 * 深入探索各情境的語意驗證器與天梯實作：[護欄天梯與語意驗證機制](/development/llm-guardrails)

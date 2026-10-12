@@ -37,7 +37,8 @@ from web.webclient.presentation.protocol import (
     validate_ui_snapshot,
 )
 from web.webclient.presentation.party import (
-    PARTY_MAX_ROWS,
+    PARTY_GENERAL_LIMIT,
+    PARTY_MAX_SLOTS,
     PARTY_SCHEMA_VERSION,
     validate_party,
 )
@@ -98,6 +99,7 @@ def _slot(**overrides):
         "hp_current": 180,
         "hp_maximum": 220,
         "bond_stage": "摯友",
+        "membership": {"general": True, "temporary_commissions": []},
     }
     row.update(overrides)
     return row
@@ -225,7 +227,11 @@ class PartyPresenterTests(EvenniaTest):
                 "hp_current": 60,
                 "hp_maximum": 120,
                 "bond_stage": get_config().stage_for_value(affinity_value).name,
+                "membership": {"general": True, "temporary_commissions": []},
             },
+        )
+        self.assertEqual(
+            payload["general_quota"], {"used": 2, "limit": PARTY_GENERAL_LIMIT}
         )
         self.assertEqual(
             payload["slots"][1]["bond_stage"],
@@ -243,6 +249,7 @@ class PartyPresenterTests(EvenniaTest):
                     "hp_current",
                     "hp_maximum",
                     "bond_stage",
+                    "membership",
                 },
             )
             self.assertNotEqual(row["hp_current"], affinity_value)
@@ -288,9 +295,9 @@ class PartyPresenterTests(EvenniaTest):
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
-    def test_rows_cap_at_four_and_presenting_twice_is_read_only(self):
+    def test_full_general_party_renders_and_presenting_twice_is_read_only(self):
         companions = [
-            _companion(f"同伴{index}", self.room) for index in range(PARTY_MAX_ROWS)
+            _companion(f"同伴{index}", self.room) for index in range(PARTY_GENERAL_LIMIT)
         ]
         for companion in companions:
             join_party(companion, self.player)
@@ -307,7 +314,10 @@ class PartyPresenterTests(EvenniaTest):
         first = self._render()
         second = self._render()
 
-        self.assertEqual(len(first["slots"]), PARTY_MAX_ROWS)
+        self.assertEqual(len(first["slots"]), PARTY_GENERAL_LIMIT)
+        self.assertEqual(
+            first["general_quota"], {"used": PARTY_GENERAL_LIMIT, "limit": PARTY_GENERAL_LIMIT}
+        )
         self.assertEqual(first, second)
         self.assertEqual(self.player.db.party, before["party"])
         self.assertEqual(witness.db.relations_data, before["relations"])
@@ -316,7 +326,19 @@ class PartyPresenterTests(EvenniaTest):
 
 class PartyValidatorTests(unittest.TestCase):
     def _panel(self, slots):
-        return {"schema_version": PARTY_SCHEMA_VERSION, "available": True, "slots": slots}
+        used = sum(
+            1
+            for slot in slots
+            if isinstance(slot, dict)
+            and isinstance(slot.get("membership"), dict)
+            and slot["membership"].get("general") is True
+        )
+        return {
+            "schema_version": PARTY_SCHEMA_VERSION,
+            "available": True,
+            "general_quota": {"used": used, "limit": PARTY_GENERAL_LIMIT},
+            "slots": slots,
+        }
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
@@ -346,13 +368,71 @@ class PartyValidatorTests(unittest.TestCase):
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
+    def test_extended_shape_accepts_membership_and_beyond_quota_rows(self):
+        payload = self._panel([
+            _slot(identity=1),
+            _slot(identity=2, membership={
+                "general": False,
+                "temporary_commissions": [
+                    {"quest_id": "reunion:1", "role_id": "protected", "label": "重逢"},
+                ],
+            }),
+            _slot(identity=3, membership={
+                "general": False,
+                "temporary_commissions": [
+                    {"quest_id": "reunion:2", "role_id": "protected", "label": "重逢"},
+                ],
+            }),
+        ])
+        self.assertEqual(validate_party(payload), payload)
+        self.assertEqual(payload["general_quota"], {"used": 1, "limit": PARTY_GENERAL_LIMIT})
+
     def test_drift_rejections(self):
         cases = {
-            "fifth row": self._panel([_slot(identity=i + 1) for i in range(5)]),
+            "over slot bound": self._panel([
+                _slot(
+                    identity=i + 1,
+                    membership={"general": False, "temporary_commissions": []},
+                )
+                for i in range(PARTY_MAX_SLOTS + 1)
+            ]),
             "missing row key": self._panel(
-                [{"identity": 1, "display_name": "a", "portrait_ref": None, "hp_current": 0, "hp_maximum": 0}]
+                [{
+                    "identity": 1,
+                    "display_name": "a",
+                    "portrait_ref": None,
+                    "hp_current": 0,
+                    "hp_maximum": 0,
+                    "bond_stage": "摯友",
+                }]
             ),
             "unknown row key": self._panel([_slot(token="a1")]),
+            "missing membership": self._panel([{
+                key: value for key, value in _slot().items() if key != "membership"
+            }]),
+            "membership not a mapping": self._panel([_slot(membership=[])]),
+            "unknown membership key": self._panel(
+                [_slot(membership={"general": True, "temporary_commissions": [], "x": 1})]
+            ),
+            "numeric general": self._panel(
+                [_slot(membership={"general": 1, "temporary_commissions": []})]
+            ),
+            "commission not a mapping": self._panel(
+                [_slot(membership={"general": False, "temporary_commissions": ["q"]})]
+            ),
+            "unknown commission key": self._panel([_slot(membership={
+                "general": False,
+                "temporary_commissions": [
+                    {"quest_id": "q", "role_id": "r", "label": "l", "x": 1}
+                ],
+            })]),
+            "duplicate commission": self._panel([_slot(membership={
+                "general": False,
+                "temporary_commissions": [
+                    {"quest_id": "q", "role_id": "r", "label": "l"},
+                    {"quest_id": "q", "role_id": "r", "label": "l"},
+                ],
+            })]),
             "numeric bond_stage": self._panel([_slot(bond_stage=3)]),
             "bool bond_stage": self._panel([_slot(bond_stage=True)]),
             "blank bond_stage": self._panel([_slot(bond_stage="")]),
@@ -369,6 +449,23 @@ class PartyValidatorTests(unittest.TestCase):
             "empty portrait_ref": self._panel([_slot(portrait_ref="")]),
             "over-bound portrait_ref": self._panel([_slot(portrait_ref="1" * 33)]),
             "old version": {"schema_version": 1, "available": True, "slots": []},
+            "missing general_quota": {
+                "schema_version": PARTY_SCHEMA_VERSION,
+                "available": True,
+                "slots": [],
+            },
+            "unknown quota key": {
+                "schema_version": PARTY_SCHEMA_VERSION,
+                "available": True,
+                "general_quota": {"used": 0, "limit": 4, "x": 1},
+                "slots": [],
+            },
+            "quota used exceeds limit": {
+                "schema_version": PARTY_SCHEMA_VERSION,
+                "available": True,
+                "general_quota": {"used": 5, "limit": 4},
+                "slots": [],
+            },
             "duplicate identities": self._panel(
                 [_slot(identity=7), _slot(identity=7)]
             ),

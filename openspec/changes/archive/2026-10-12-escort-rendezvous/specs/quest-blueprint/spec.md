@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Registration validates every runtime-critical objective field
-Registration SHALL retain immutable contiguous stages, positive quantity, deadline validation, idempotent equal registration and conflicting-content refusal. DEFEAT SHALL retain its closed mutually exclusive selector families and registry/quantity checks. REACH SHALL require an existing supported destination. ESCORT SHALL declare quantity one, a nonempty exact protected-role set, and exactly one closed completion discriminator `destination` or `rendezvous`. Destination mode SHALL use an existing anchor, XYZ or bound-instance locator and carry no rendezvous fields. Rendezvous SHALL declare nonempty exact meeting-role references and any required validated typed relation, with no destination requirement or incompatible destination fields. Definitions SHALL remain deeply immutable and JSON-safe through compilation/restoration. Other objective families SHALL reject escort-only fields.
+Registration SHALL retain the existing immutable-stage, positive-quantity, deadline, equal-registration idempotence, conflicting-content, DEFEAT-selector and REACH-destination rules the scenarios below state. ESCORT SHALL declare quantity one, an exact nonempty protected-role set and exactly one discriminator: `destination` with a validated locator and no rendezvous fields, or `rendezvous` with exact meeting roles and any validated relation.
 
 #### Scenario: Destination and rendezvous definitions register
 - **WHEN** two synthetic definitions declare complete destination and rendezvous contracts respectively
@@ -92,12 +92,16 @@ Registration SHALL retain immutable contiguous stages, positive quantity, deadli
 - **WHEN** REACH omits its destination, destination-mode ESCORT omits its locator, or rendezvous-mode ESCORT omits its meeting roles
 - **THEN** registration rejects; a complete rendezvous needs no fixed destination, and every escort still needs exact protected bindings
 
+#### Scenario: Escort definitions stay immutable and other families reject escort fields
+- **WHEN** a definition registers or is restored from its compiled payload
+- **THEN** Definitions SHALL remain deeply immutable and JSON-safe through compilation and restoration, and other objective families SHALL reject escort-only fields.
+
 ### Requirement: ESCORT quests require a bound protected entity path
-Generated escort publication SHALL remain refused until this change's production acceptance, exact role binding, actual movement evaluation and settlement flow is implemented and proved. Thereafter every proposal/service, semantic validation, deterministic compilation and generated registration boundary SHALL require the complete protected-role/completion contract and a real executable binding path. Directly constructed compiled values SHALL receive the same check. Unsupported templates SHALL remain refused without fabricated nearby NPCs, a special-case family payload or relabeled objective.
+Generated escort publication SHALL stay refused until this change's production acceptance, exact role binding, movement evaluation and settlement flow is implemented and proved. Thereafter every proposal/service, semantic validation, compilation and generated registration boundary SHALL require the complete protected-role/completion contract and a real executable binding path, and directly constructed compiled values SHALL receive the same check.
 
 #### Scenario: Unsupported request is refused before transport
 - **WHEN** `server/ai_director_service.py` receives an escort request lacking a supported complete role-binding context/template
-- **THEN** `EscortUnavailableError` is surfaced before transport work and no registration or actor creation occurs
+- **THEN** the shared unsupported-template refusal (`NoSuitableTemplateError`) is surfaced before transport work and no registration or actor creation occurs
 
 #### Scenario: Supported generated escort executes through real owners
 - **WHEN** a complete synthetic package passes the implemented service/semantic/compiler/registration path and its authorized offer is accepted, moved and completed
@@ -120,3 +124,7 @@ Generated escort publication SHALL remain refused until this change's production
 #### Scenario: Currently, ESCORT requests are refused with a clear message
 - **WHEN** an escort request lacks the complete implemented protected-role/completion path
 - **THEN** the existing clear named refusal registers no quest; complete proved contracts use the owning flow
+
+#### Scenario: Unsupported templates keep their refusal
+- **WHEN** no context-fitting escort template exists for a request
+- **THEN** Unsupported templates SHALL remain refused without fabricated nearby NPCs, a special-case family payload or a relabeled objective.

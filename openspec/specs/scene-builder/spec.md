@@ -105,8 +105,19 @@ SceneBuilder SHALL derive an NPC occupant's stored traits from its `NPCTier` ent
 - **THEN** it shares the lineage auto-seed helper — prerequisite proficiency seeded to exactly the edge values for owned deep skills, with explicit assignments winning
 
 ### Requirement: Materializing a stage spawns the destination, sets scene metadata, and binds one stage atomically and idempotently
+Stage materialization SHALL retain accepted-current-stage eligibility, shared whitelisted construction, exact bindings, disposable instance ownership, permanent package-role ownership/retention, validated idempotent reuse and all-or-nothing cache restoration. Escort destination materialization SHALL resolve its validated anchor/XYZ or actual bound instance separately from protected-role creation, spawning no replacement participants and granting no progress from description/room creation.
 
-Accepted-stage materialization SHALL resolve the actor's in-progress stage and reject unknown, inactive, terminal, requirement-less or wrong-origin requests. Instance destinations SHALL create one whitelisted room and exit pair, materialize and own occupants, and bind objective targets atomically. Permanent destinations SHALL reuse their validated room and permit only package-owned occupants and exact role bindings. Failures SHALL roll back every write; ESCORT publication SHALL stay guarded.
+#### Scenario: Existing stage construction remains atomic
+- **WHEN** an ordinary accepted instance stage materializes or a validated package stage uses a permanent room
+- **THEN** existing room/exit/metadata/occupant ownership and exact-binding behavior remains and an injected later failure restores objects and caches
+
+#### Scenario: Escort uses the retained actor
+- **WHEN** a protected role has moved away from its original encounter and its destination is materialized
+- **THEN** the role's exact identity/location/history remain unchanged, no second NPC appears, and progress requires actual settled movement
+
+#### Scenario: Wrong eligibility refuses without scene edits
+- **WHEN** stage materialization targets an unknown, inactive, terminal, requirement-less or wrong-origin record
+- **THEN** the existing named side-effect-free error returns and independent encounter activation remains a separate operation
 
 #### Scenario: Validated permanent occupants replace the blanket restriction
 - **WHEN** a validated package stage requiring a named role materializes at a permanent destination
@@ -121,8 +132,8 @@ Accepted-stage materialization SHALL resolve the actor's in-progress stage and r
 - **THEN** it rejects without writes, while independently eligible pre-acceptance encounters use their separate lifecycle boundary
 
 #### Scenario: Escort remains guarded
-- **WHEN** an ESCORT definition is proposed before a protected-role production binding path exists
-- **THEN** publication rejects it and entering a destination grants no escort progress
+- **WHEN** an escort proposal lacks the complete implemented protected-role and completion contract
+- **THEN** publication rejects and entering a destination cannot grant false escort progress
 
 #### Scenario: Binding failure rolls back the scene
 - **WHEN** failure occurs after instance creation, occupant writes, or binding
@@ -135,8 +146,8 @@ Accepted-stage materialization SHALL resolve the actor's in-progress stage and r
   the stage is bound to the room and objective targets in one atomic operation
 
 #### Scenario: A permanent-layer scene is located without spawning or binding
-- **WHEN** a current permanent anchor/grid stage without validated package-owned occupants is materialized, including any legacy ESCORT stage still guarded from publication
-- **THEN** it locates the existing room without spawning or binding and never grants escort progress
+- **WHEN** a permanent destination without validated package-owned occupants is materialized
+- **THEN** the existing room is located without room/exit/participant creation; protected escort actors remain independently bound through acceptance
 
 #### Scenario: DEFEAT occupants map to the objective-target binding set
 - **WHEN** a DEFEAT stage materializes its occupants
@@ -179,8 +190,8 @@ Accepted-stage materialization SHALL resolve the actor's in-progress stage and r
 - **THEN** one NPC is spawned per `npc_req` entry and `objective.quantity` monsters are spawned for a monster-tier DEFEAT stage, and every occupant is registered as an owned entity
 
 #### Scenario: An ESCORT stage never spawns or binds its protected entities
-- **WHEN** an ESCORT stage is materialized
-- **THEN** it is treated as a permanent destination located only, the SceneBuilder never spawns or binds the escort's protected entities, and an ESCORT can never auto-complete on entry
+- **WHEN** an escort destination materializes or a rendezvous objective is evaluated
+- **THEN** the builder creates no protected replacement actor; acceptance owns exact protected binding, and actual settled position determines completion
 
 #### Scenario: Occupant-bearing scenes are instance-layer by publication rule
 - **WHEN** an occupant-bearing definition is published
@@ -198,8 +209,20 @@ Accepted-stage materialization SHALL resolve the actor's in-progress stage and r
 - **WHEN** repeated current-stage materialization returns an existing binding
 - **THEN** its room and exact actor availability are revalidated against the declared instance or permanent destination without actor recreation
 
+#### Scenario: Escort acceptance binds retained actors and rendezvous needs no destination
+- **WHEN** an escort stage materializes after acceptance
+- **THEN** Escort acceptance SHALL bind the upstream's already materialized exact protected actors through the quest/party owners. Rendezvous SHALL require no fabricated destination, and missing, dead or departed bound actors SHALL return named unavailable results without repair.
+
 ### Requirement: The composition root posts one generated quest to the guild board and degrades offline
-`server/ai_director_service.py::request_generated_quest(client=None, *, context)` SHALL bridge the director's guarded proposal to the deterministic compile boundary: it SHALL call `generate_quest_blueprint` with the injected client, compile the accepted blueprint through `compile_quest_blueprint`, and publish it through `register_generated_quest` so the offer appears on the guild board.
+The composition root SHALL retain injected-client/disabled-profile degradation and deterministic compile/registration ownership. Supported generated escorts SHALL proceed only when the complete published-role/completion contract and its owning flow are implemented and proved. An unsupported escort request SHALL retain the shared pre-transport unsupported-template refusal (`NoSuitableTemplateError`) without fabricating actors or relabeling an objective.
+
+#### Scenario: Supported and unsupported escort requests are distinct
+- **WHEN** synthetic requests exercise a complete supported escort package and an unsupported ordinary escort template through the composition service
+- **THEN** the supported path reaches deterministic publication and later real acceptance/completion; the unsupported path refuses before client work and registers nothing
+
+#### Scenario: Existing disabled-profile guild flow still works
+- **WHEN** an ordinary guild request uses a disabled director profile
+- **THEN** the context-fitting template posts the same registered offer without calling live transport
 
 #### Scenario: A generated quest reaches the guild board
 - **WHEN** a client returns a valid context-fitting blueprint and `request_generated_quest` runs
@@ -230,6 +253,10 @@ Accepted-stage materialization SHALL resolve the actor's in-progress stage and r
 #### Scenario: Degradation matches the blueprint generator
 - **WHEN** the profile is disabled or every attempt degrades
 - **THEN** the call resolves to a context-fitting hand-written template quest, exactly as `generate_quest_blueprint` degrades
+
+#### Scenario: Private packages publish scoped commissions
+- **WHEN** a complete private scene package publishes or a guild request runs
+- **THEN** Complete private scene packages SHALL publish scoped commissions through upstream publication/activation without autoacceptance or forcing a guild offer. Existing guild requests SHALL keep their behavior.
 
 ### Requirement: The hand-written template pool gains an instance-layer scene so offline play exercises the materializer
 `world/ai/director_templates.py` SHALL add at least one instance-layer template whose stage carries `location_req.layer: "instance"` and a non-empty `npc_req`, so a disabled-profile `guild request` can resolve to a quest whose scene change 21's SceneBuilder materializes. The added template SHALL satisfy the output schema, every semantic validator (including the scene-bound rules), and compile to a definition whose instance stage binds through `bind_stage_runtime`.
@@ -465,3 +492,14 @@ The system SHALL persist the compiled definition, guild offer, and stage spawn r
 #### Scenario: Registration is idempotent
 - **WHEN** the same generated quest key is registered twice
 - **THEN** the durable store contains exactly one payload for that key
+
+### Requirement: Generated escort registration guards durable publication and restore
+Generated registration SHALL revalidate the complete protected-role/completion/group contract independently of the generative path, before durable or registry writes. Successful publication/restoration SHALL preserve every exact reference and separate issuance. Conflicting registration or durable write failure SHALL restore all registry/cache/durable surfaces. Publication SHALL create no accepted quest or temporary party source; those belong to explicit acceptance.
+
+#### Scenario: Forged compiled escort cannot reach persistence
+- **WHEN** direct generated registration receives an escort missing its executable protected-role contract
+- **THEN** it returns a named compile/publication refusal without durable payload, definition, issuance or requirements entry
+
+#### Scenario: Registration and reload preserve the real path
+- **WHEN** a supported package is registered twice and restored after restart
+- **THEN** its exact definitions, references and issuances resolve once, no accepted quest is added, and later acceptance uses the same actual role bindings

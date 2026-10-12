@@ -43,7 +43,9 @@ class ScenePackageValidationTests(EvenniaTestCase):
         definition = validate_scene_package(_package())
         self.assertTrue(definition.package_id.startswith("pkg_"))
         self.assertEqual(definition.role_ids(), frozenset({"mother", "daughter"}))
-        self.assertEqual(definition.commission.role_id, "mother")
+        self.assertEqual(
+            [commission.role_id for commission in definition.commissions], ["mother"]
+        )
         self.assertIsNone(definition.guild_branch)
 
     def test_unknown_encounter_role_is_rejected(self):
@@ -101,12 +103,18 @@ class ScenePackageValidationTests(EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
     )
-    def test_a_guarded_reunion_observation_is_rejected(self):
-        package = _package()
-        package["dialogue"][0]["phases"][1]["conditions"] = [{"reunion": True}]
-        with self.assertRaises(ScenePackageError) as caught:
-            validate_scene_package(package)
-        self.assertIn("reunion", str(caught.exception))
+    def test_a_reunion_conditioned_phase_is_a_registered_fact(self):
+        # escort-rendezvous released the guard on ``reunion``; a package may now
+        # declare a reunion-conditioned phase, which validates as a complete
+        # registered fact instead of being refused as guarded.
+        definition = validate_scene_package(_package())
+        acknowledgment = next(
+            phase
+            for dialogue in definition.dialogue
+            for phase in dialogue.phases
+            if phase.phase_id == "acknowledgment"
+        )
+        self.assertIn({"reunion": True}, list(acknowledgment.conditions))
 
     @covers_requirement(
         "story-phase-dialogue::packages-declare-complete-finite-dialogue-phases"
@@ -137,6 +145,7 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
     )
+    @covers_requirement("quest-scene-encounters::encounter-packages-expose-distinct-escort-commissions-and-final-result-observation")
     def test_publication_registers_definition_and_requirements_without_issuance(self):
         published = publish_scene_package(_package(), owner="tester", tick=7)
         self.assertTrue(published.created)
@@ -180,10 +189,10 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
     def test_a_guild_branch_package_registers_its_offer(self):
         package = _package(
             quest=_quest_payload(issuer=_issuer_key()),
-            commission=None,
+            commissions=[],
         )
         published = publish_scene_package(package, owner="tester")
-        self.assertIsNone(published.definition.commission)
+        self.assertEqual(published.definition.commissions, ())
         self.assertEqual(len(GUILD_OFFER_REGISTRY), 1)
         self.assertEqual(scene_store.list_commission_grants(published.package_id), [])
 

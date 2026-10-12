@@ -34,7 +34,7 @@ from world.rules.dialogue import (
     is_dialogue_host,
 )
 from world.rules.npc_schedules import interaction_reason
-from world.rules.party import is_companion, party_size
+from world.rules.party import has_general_membership, is_companion, party_size
 from world.rules.time_skip import unsafe_rejection
 from world.rules.service_gate import (
     MESSAGE_OFF_ANCHOR,
@@ -571,7 +571,10 @@ def _target_affordance_entries(
     if isinstance(obj, NPC) and is_companion(obj, actor):
         entries.append(_party_leave_entry(obj))
         entries.append(_possess_entry(obj, actor))
-    elif isinstance(obj, LLMNPC):
+    if (
+        isinstance(obj, LLMNPC) and not has_general_membership(obj, actor)
+        and (obj.db.party_member is None or obj.db.party_member == actor.pk)
+    ):
         entries.append(_party_invite_entry(obj, actor))
     if isinstance(obj, Monster):
         entries.append(_engage_entry(obj, actor=actor))

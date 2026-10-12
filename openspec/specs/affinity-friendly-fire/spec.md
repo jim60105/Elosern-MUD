@@ -115,16 +115,11 @@ No affinity write or penalty SHALL result from recovery skills targeting allies,
 - **THEN** the skill resolves and no affinity record is created or modified
 
 ### Requirement: Friendly-fire penalties below the invite threshold end the companion party
-The auto-leave recheck hook SHALL run for every friendly-fire penalty exactly as for any other
-negative delta: when the affected NPC is a bound companion and its affinity toward the player drops
-below the invite threshold (70), the party binding SHALL be removed with
-`reason="affinity_below_threshold"` inside the same transaction, a failed leave SHALL roll back the
-penalty, and the caller SHALL notify the player only after the transaction commits.
+Every negative affinity delta SHALL run the canonical party recheck. A valid active exact escort reason SHALL suppress automatic departure while relationship changes and lawful damage remain. General-only companions SHALL retain existing threshold departure, possession handback, notification and rollback behavior. Invalid/stale reasons SHALL grant no exemption.
 
 #### Scenario: A drop below 70 triggers auto-leave with notification
-- **WHEN** a friendly-fire penalty drops a bound companion from 70 to 69
-- **THEN** the binding is removed with the auto-leave reason and the player receives the
-  notification after the write commits
+- **WHEN** friendly-fire damage lowers a general-only companion below the ordinary threshold with no valid escort source
+- **THEN** ordinary departure notifies after commit; an escort control receives real damage/penalty but keeps membership
 
 #### Scenario: A drop that stays at or above 70 keeps the party
 - **WHEN** a friendly-fire penalty leaves the affinity at or above 70
@@ -139,3 +134,7 @@ penalty, and the caller SHALL notify the player only after the transaction commi
 - **WHEN** a player action in a subsequent round damages an NPC that left the party in an earlier
   round
 - **THEN** the later hit writes nothing, because membership is re-snapshotted per round
+
+#### Scenario: Valid escort survives friendly fire and low affinity
+- **WHEN** a lawful friendly-fire hit damages a temporary or dual member and its penalty crosses below the ordinary threshold
+- **THEN** damage and affinity penalty commit through current owners without automatic departure or possession handback while a valid escort reason remains

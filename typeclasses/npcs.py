@@ -110,6 +110,26 @@ class NPC(LivingEntity):
     schedule: Any | None = AttributeProperty(default=None)
     npc_title: str = AttributeProperty(default="", autocreate=False)
 
+    def move_to(self, destination, *args, **kwargs):
+        """Settle direct actor moves through the existing movement owner."""
+        from world.rules.movement_settlement import settle_movement
+
+        source = self.location
+        move = super().move_to
+
+        def traverse():
+            result = move(destination, *args, **kwargs)
+            # A falsy return is not a failure when the move really relocated
+            # the actor, mirroring ``DefaultExit.at_traverse`` (design D1: a
+            # plain move cannot distinguish success from a relocated falsy
+            # return). Report the settled relocation as success so a wilderness
+            # terrain entry, whose ``move_to`` returns falsy, is not rolled
+            # back; a move that did not change the location passes its own
+            # falsy refusal through unchanged.
+            return result or self.location is not source
+
+        return settle_movement(self, source, traverse=traverse, destination=destination)
+
     def at_object_delete(self) -> bool:
         """Free every party binding this NPC holds before the object is removed.
 
@@ -166,6 +186,9 @@ class NPC(LivingEntity):
         the callback runs immediately.
         """
         super().at_post_move(source_location, **kwargs)
+        from world.quests.escort_events import collect_escort_actors
+
+        collect_escort_actors((self,))
         from typeclasses.characters import _schedule_action_options_after_move
 
         _schedule_action_options_after_move(self)

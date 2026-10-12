@@ -41,6 +41,10 @@ from world.ai.scenario_director.blueprints import (
     BlueprintObjectiveKind,
     BlueprintQuestType,
 )
+from world.ai.scenario_director.packages import (
+    ESCORT_COMPLETIONS,
+    RELATIONSHIP_KINDS,
+)
 
 
 class ScenarioDirectorClientRequiredError(TypeError):
@@ -124,6 +128,41 @@ SCENARIO_DIRECTOR_OUTPUT_SCHEMA: dict[str, Any] = {
                             "quantity": {"type": "integer", "minimum": 1},
                             "monster_tier": {"type": ["string", "null"]},
                             "item_key": {"type": ["string", "null"]},
+                            # The escort contract (escort-rendezvous §6); every
+                            # other kind leaves all four unset.
+                            "completion": {
+                                "type": ["string", "null"],
+                                "enum": [*ESCORT_COMPLETIONS, None],
+                            },
+                            "protected_role_refs": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "meeting_role_refs": {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            "relation": {
+                                "anyOf": [
+                                    {"type": "null"},
+                                    {
+                                        "type": "object",
+                                        "required": [
+                                            "kind",
+                                            "from_role",
+                                            "to_role",
+                                        ],
+                                        "properties": {
+                                            "kind": {
+                                                "type": "string",
+                                                "enum": list(RELATIONSHIP_KINDS),
+                                            },
+                                            "from_role": {"type": "string"},
+                                            "to_role": {"type": "string"},
+                                        },
+                                    },
+                                ]
+                            },
                         },
                     },
                     "location_req": {
@@ -517,14 +556,120 @@ def _validate_defeat_selector(parsed: Any) -> list[str]:
     return errors
 
 
+def _validate_escort_contract(
+    index: int, objective: Any, package_roles: frozenset[str]
+) -> list[str]:
+    """Validate one ESCORT objective's complete closed contract (design §6).
+
+    Mirrors the deterministic compiler's field parse: quantity one, exactly one
+    completion discriminator, a nonempty exact protected-role set, rendezvous
+    meeting roles with an optional typed relation, and no mixed
+    destination/rendezvous fields. When the caller supplies a published
+    package's role set, every referenced role must belong to it.
+    """
+    errors: list[str] = []
+    if objective.get("quantity", 1) != 1:
+        errors.append(f"stage {index} ESCORT objective quantity must be exactly 1")
+    completion = objective.get("completion")
+    if completion not in ESCORT_COMPLETIONS:
+        errors.append(
+            f"stage {index} ESCORT objective requires exactly one completion "
+            f"discriminator {list(ESCORT_COMPLETIONS)}"
+        )
+        return errors
+
+    def _role_list(field: str) -> list[str]:
+        raw = objective.get(field)
+        if raw is None:
+            return []
+        if not isinstance(raw, list) or any(
+            not isinstance(role, str) or not role.strip() for role in raw
+        ):
+            errors.append(
+                f"stage {index} ESCORT objective {field} must be a list of "
+                "non-empty role references"
+            )
+            return []
+        return list(raw)
+
+    protected = _role_list("protected_role_refs")
+    meeting = _role_list("meeting_role_refs")
+    if not protected:
+        errors.append(
+            f"stage {index} ESCORT objective requires protected_role_refs"
+        )
+    if package_roles:
+        unknown = sorted(
+            role for role in (*protected, *meeting) if role not in package_roles
+        )
+        if unknown:
+            errors.append(
+                f"stage {index} ESCORT role references {unknown} are not roles "
+                "of the published package"
+            )
+    overlap = sorted(set(protected) & set(meeting))
+    if overlap:
+        errors.append(
+            f"stage {index} ESCORT role references {overlap} appear as both "
+            "protected and meeting roles"
+        )
+    if completion == "destination":
+        if meeting:
+            errors.append(
+                f"stage {index} destination ESCORT objective cannot declare "
+                "meeting_role_refs"
+            )
+        if objective.get("relation") is not None:
+            errors.append(
+                f"stage {index} destination ESCORT objective cannot declare a "
+                "typed relation"
+            )
+        return errors
+    if not meeting:
+        errors.append(
+            f"stage {index} rendezvous ESCORT objective requires "
+            "meeting_role_refs"
+        )
+    relation = objective.get("relation")
+    if relation is not None:
+        if not isinstance(relation, dict):
+            errors.append(
+                f"stage {index} ESCORT relation must be a mapping"
+            )
+        elif relation.get("kind") not in RELATIONSHIP_KINDS:
+            errors.append(
+                f"stage {index} ESCORT relation kind must be one of "
+                f"{list(RELATIONSHIP_KINDS)}"
+            )
+        else:
+            endpoints = {relation.get("from_role"), relation.get("to_role")}
+            declared = set(protected) | set(meeting)
+            missing = sorted(
+                endpoint
+                for endpoint in endpoints
+                if not isinstance(endpoint, str) or endpoint not in declared
+            )
+            if missing:
+                errors.append(
+                    f"stage {index} ESCORT relation endpoints {missing} must be "
+                    "declared role references"
+                )
+            if relation.get("from_role") == relation.get("to_role"):
+                errors.append(
+                    f"stage {index} ESCORT relation endpoints must be two "
+                    "distinct roles"
+                )
+    return errors
+
+
 def _validate_scene_bound_rules(
     parsed: Any, *, package_roles: frozenset[str] = frozenset()
 ) -> list[str]:
     """Enforce the shared scene-bound rules the compiler also enforces (D5).
 
     Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
-    entities always live in a reclaimable instance room; an ESCORT stage is
-    refused entirely until a protected-entity binding flow exists; a
+    entities always live in a reclaimable instance room; an ESCORT stage must
+    declare its complete closed contract (:func:`_validate_escort_contract`); a
     bound-target DEFEAT quantity must not exceed its ``npc_req`` count; and
     ``anchor_near`` must name a placed anchor.
 
@@ -532,7 +677,8 @@ def _validate_scene_bound_rules(
     (quest-scene-encounters §5.1): the *published package's own* validated role
     set lifts the instance-only rule for its roles on objectives that need no
     stage binding. The registered blueprint path passes none, so a standalone
-    proposal keeps the blanket rejection, and ESCORT stays refused either way.
+    occupant-bearing proposal keeps the structural rejection; an escort needs no
+    stage binding, so a package's own role set admits it.
     """
     errors: list[str] = []
     for index, stage in enumerate(_stages(parsed)):
@@ -543,12 +689,9 @@ def _validate_scene_bound_rules(
         npc_req = stage.get("npc_req")
         layer = location.get("layer") if isinstance(location, dict) else None
         has_npc = isinstance(npc_req, list) and bool(npc_req)
-        is_escort = isinstance(objective, dict) and objective.get("kind") == "escort"
-        if is_escort:
-            errors.append(
-                f"stage {index} declares an ESCORT objective, which cannot be "
-                "published until a protected-entity binding flow exists"
-            )
+        kind = objective.get("kind") if isinstance(objective, dict) else None
+        if kind == "escort":
+            errors.extend(_validate_escort_contract(index, objective, package_roles))
         roles = {
             entry.get("role") for entry in npc_req if isinstance(entry, dict)
         }
@@ -561,12 +704,11 @@ def _validate_scene_bound_rules(
         # reach/acquire objective or a monster-tier DEFEAT completes without a
         # stage binding, so any other (including a future) kind keeps the
         # instance-only requirement.
-        kind = objective.get("kind") if isinstance(objective, dict) else None
         has_monster_tier = (
             isinstance(objective, dict) and objective.get("monster_tier") is not None
         )
         needs_stage_binding = not (
-            kind in ("reach_location", "acquire")
+            kind in ("reach_location", "acquire", "escort")
             or (kind == "defeat" and has_monster_tier)
         )
         if (
@@ -624,7 +766,18 @@ def _validate_objective_selectors(parsed: Any) -> list[str]:
             if objective.get("monster_tier") is not None:
                 errors.append(f"stage {index} ACQUIRE cannot declare a monster_tier")
         elif kind in ("reach_location", "escort"):
-            if stage.get("location_req") is None:
+            # A destination escort (like a reach objective) needs a locator; a
+            # rendezvous escort declares no destination at all
+            # (escort-rendezvous §6).
+            rendezvous_escort = (
+                kind == "escort" and objective.get("completion") == "rendezvous"
+            )
+            if rendezvous_escort and stage.get("location_req") is not None:
+                errors.append(
+                    f"stage {index} rendezvous ESCORT declares no location_req "
+                    "destination"
+                )
+            elif not rendezvous_escort and stage.get("location_req") is None:
                 errors.append(
                     f"stage {index} {kind} requires a location_req destination"
                 )

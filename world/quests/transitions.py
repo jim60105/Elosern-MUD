@@ -232,6 +232,33 @@ def apply_quest_log_replacement(
     new_records: list[Any],
     pin_operations: Iterable[tuple[Any, tuple[str, ...], tuple[str, ...]]] = (),
 ) -> None:
+    """Commit a replacement and terminal escort release as one control unit."""
+    from .escort_lifecycle import escort_transaction, release_escort_bindings
+    from .escort import resolve_protected_actors
+    from .runtime import QuestState
+
+    terminal = [
+        record for record in new_records
+        if record.protected_roles and record.state is not QuestState.IN_PROGRESS
+    ]
+    if not terminal:
+        _replace_quest_log(actor, new_records, pin_operations)
+        return
+    actors = tuple({
+        entity.pk: entity for record in terminal
+        for _, entity in resolve_protected_actors(record)
+    }.values())
+    with escort_transaction(actor, actors):
+        _replace_quest_log(actor, new_records, pin_operations)
+        for record in terminal:
+            release_escort_bindings(actor, record.quest_id)
+
+
+def _replace_quest_log(
+    actor: Any,
+    new_records: list[Any],
+    pin_operations: Iterable[tuple[Any, tuple[str, ...], tuple[str, ...]]] = (),
+) -> None:
     """Replace one quest log and apply a pin delta atomically with restore.
 
     Records that just reached COMPLETED under an ``AUTO`` issuance settle

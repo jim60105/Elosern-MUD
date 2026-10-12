@@ -138,6 +138,7 @@ class PossessionGateMatrixTests(EvenniaTest):
         # with npc.db.possessed_by set:
         self.npc.db.party_member = self.char2.pk
         self.char2.db.party = [self.npc.pk]
+        self.char2.db.party_meta = {str(self.npc.pk): {"general": True, "reasons": []}}
         with self.assertRaises(PossessionGateError) as ctx:
             enter_possession(self.char2, self.npc)
         self.assertEqual(ctx.exception.reason, REASON_ALREADY_POSSESSING)

@@ -138,12 +138,14 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_register_generated_quest_refuses_escort_stages(self):
+    def test_a_complete_escort_registers_at_the_publication_boundary(self):
+        # The blanket "ESCORT stages cannot be published" refusal is gone: a
+        # complete escort contract now registers like any other definition.
         from ._fixtures import anchor_locator, escort, quest
         from world.quests.definitions import QuestType
 
         definition = quest(
-            "escort_publication_guard",
+            "escort_publication_cutover",
             quest_type=QuestType.ESCORT,
             stages=(QuestStage(0, escort(anchor_locator())),),
         )
@@ -156,16 +158,93 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
             ),
             stage_requirements=(),
         )
+        register_generated_quest(compiled)
+        self.assertEqual(QUEST_DEFINITION_REGISTRY[definition.key], definition)
+        self.assertIn(
+            (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
+        )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
+    @covers_requirement("scene-builder::generated-escort-registration-guards-durable-publication-and-restore")
+    def test_a_directly_forged_compiled_escort_is_refused_by_its_contract(self):
+        # A compiled escort constructed directly (bypassing the compiler) with a
+        # missing discriminator is refused by its own complete-contract
+        # validation before any registry mutation.
+        from ._fixtures import anchor_locator
+        from world.quests.definitions import QuestDefinitionError, QuestType
+
+        definition = QuestDefinition(
+            key="escort_incomplete_contract",
+            display_name="護衛未完成",
+            quest_type=QuestType.ESCORT,
+            rank="F",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ESCORT,
+                        destination=anchor_locator(),
+                        protected_role_refs=("escortee",),
+                    ),
+                ),
+            ),
+        )
+        compiled = CompiledQuest(
+            definition=definition,
+            reward=QuestReward(copper=50, items=(), merit=25),
+            issuance=IssuanceDescriptor(
+                issuer_key="guild:guild_branch_altoria",
+                settlement=Settlement.COUNTER,
+            ),
+            stage_requirements=(),
+        )
         with self.assertRaisesRegex(
-            QuestCompileError,
-            "ESCORT stages cannot be published until a protected-entity "
-            "binding flow exists",
+            (QuestCompileError, QuestDefinitionError),
+            "exactly one completion discriminator",
         ):
             register_generated_quest(compiled)
         self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
         self.assertNotIn(
             (definition.key, "guild_branch_altoria"), GUILD_OFFER_REGISTRY
         )
+
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("scene-builder::generated-escort-registration-guards-durable-publication-and-restore")
+    def test_a_directly_forged_rendezvous_without_meeting_roles_is_refused(self):
+        from world.quests.definitions import EscortCompletion, QuestDefinitionError, QuestType
+
+        definition = QuestDefinition(
+            key="escort_forged_rendezvous",
+            display_name="護衛偽造",
+            quest_type=QuestType.ESCORT,
+            rank="F",
+            stages=(
+                QuestStage(
+                    0,
+                    QuestObjective(
+                        kind=ObjectiveKind.ESCORT,
+                        completion=EscortCompletion.RENDEZVOUS,
+                        protected_role_refs=("escortee",),
+                    ),
+                ),
+            ),
+        )
+        compiled = CompiledQuest(
+            definition=definition,
+            reward=QuestReward(copper=50, items=(), merit=25),
+            issuance=IssuanceDescriptor(
+                issuer_key="guild:guild_branch_altoria",
+                settlement=Settlement.COUNTER,
+            ),
+            stage_requirements=(),
+        )
+        with self.assertRaisesRegex(
+            (QuestCompileError, QuestDefinitionError),
+            "meeting_role_refs",
+        ):
+            register_generated_quest(compiled)
+        self.assertNotIn(definition.key, QUEST_DEFINITION_REGISTRY)
 
 class SceneRequirementRegistryTests(CompileRegistryIsolation, unittest.TestCase):
     def setUp(self):
@@ -735,6 +814,93 @@ class ClearOutCompileBoundaryTests(unittest.TestCase):
                 self.assertIn("site_key", str(caught.exception))
                 rejected += 1
         self.assertGreater(rejected, 0)
+
+
+def _compiled_escort(*, rendezvous: bool) -> CompiledQuest:
+    """A synthetic compiled escort whose predicate is built directly.
+
+    The generative blanket guard still refuses an ESCORT stage at the compile
+    boundary, so this fixture constructs the closed runtime aggregate by hand —
+    exactly the shape a future complete-contract publication will produce — and
+    the codec must carry it losslessly.
+    """
+    from world.quests.definitions import EscortCompletion
+    from world.quests.tests._fixtures import anchor_locator
+
+    objective = QuestObjective(
+        kind=ObjectiveKind.ESCORT,
+        quantity=1,
+        destination=None if rendezvous else anchor_locator(),
+        completion=(
+            EscortCompletion.RENDEZVOUS
+            if rendezvous
+            else EscortCompletion.DESTINATION
+        ),
+        protected_role_refs=("daughter",),
+        meeting_role_refs=("mother",) if rendezvous else (),
+        relation=("parent_child", "mother", "daughter") if rendezvous else None,
+    )
+    definition = QuestDefinition(
+        key="escort_payload_round_trip",
+        display_name="護衛往來",
+        quest_type=QuestType.ESCORT,
+        rank="F",
+        stages=(QuestStage(0, objective),),
+    )
+    return CompiledQuest(
+        definition=definition,
+        reward=QuestReward(copper=25, items=(), merit=0),
+        issuance=IssuanceDescriptor(
+            issuer_key=npc_issuer_key("t_escort_commission"),
+            settlement=Settlement.AUTO,
+        ),
+        stage_requirements=(
+            StageSpawnRequirement(
+                index=0,
+                objective_kind=ObjectiveKind.ESCORT,
+                location=objective.destination,
+                archetype=None,
+                anchor_near=None,
+                scene_sentence=None,
+                npc_reqs=(),
+            ),
+        ),
+    )
+
+
+class EscortPayloadRoundTripTests(CompileRegistryIsolation, unittest.TestCase):
+    """The stored payload codec carries the closed escort completion contract."""
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
+    def test_a_stored_rendezvous_payload_round_trips(self):
+        compiled = _compiled_escort(rendezvous=True)
+        restored = payload_to_registrations(_compiled_to_payload(compiled))
+        self.assertEqual(restored, compiled)
+        objective = restored.definition.stages[0].objective
+        self.assertEqual(objective.protected_role_refs, ("daughter",))
+        self.assertEqual(objective.meeting_role_refs, ("mother",))
+        self.assertEqual(objective.relation, ("parent_child", "mother", "daughter"))
+        self.assertIsNone(objective.destination)
+
+    @covers_requirement(
+        "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
+    )
+    def test_a_mixed_predicate_payload_is_rejected(self):
+        from world.quests.definitions import DestinationKind
+
+        payload = _compiled_to_payload(_compiled_escort(rendezvous=True))
+        stored = payload["definition"]["stages"][0]["objective"]
+        # A rendezvous result may not also carry a destination locator.
+        stored["destination"] = {
+            "kind": DestinationKind.ANCHOR.value,
+            "anchor_key": "any",
+            "xyz": None,
+        }
+        with self.assertRaises(QuestCompileError):
+            payload_to_registrations(payload)
 
 
 if __name__ == "__main__":

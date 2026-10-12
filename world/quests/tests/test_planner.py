@@ -238,8 +238,11 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(after, stored)
         self.assertEqual(after["state"], "completed")
 
+    @covers_requirement(
+        "quest-failure-conditions::defeat-of-an-exact-protected-entity-fails-its-active-quests-atomically"
+    )
     def test_protected_npc_death_fails_escort_quest(self):
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("warden")
         room = create_object(InstanceRoom, key="escort-room")
         bind_stage_runtime(
@@ -254,13 +257,13 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
-        self.assertEqual(stored["failure_reason"], "protected_entity_defeated")
+        self.assertEqual(stored["failure_reason"], "protected_actor_dead")
         self.assertEqual(stored["protected_entity_ids"], [])
         self.assertEqual(stored["stage_room_id"], None)
         self.assertEqual(room.db.pin_reasons, [])
 
     def test_same_display_key_creates_no_false_failure(self):
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("warden-identical")
         impostor = self._npc("warden-identical")
         guard.db.key = "warden"
@@ -297,13 +300,13 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
         self.assertEqual(result.outcome, "success")
         stored = self._records()[0]
         self.assertEqual(stored["state"], "failed")
-        self.assertEqual(stored["failure_reason"], "protected_entity_defeated")
+        self.assertEqual(stored["failure_reason"], "protected_actor_dead")
         self.assertEqual(stored["objective_target_ids"], [])
         self.assertEqual(stored["protected_entity_ids"], [])
 
     @covers_requirement("quest-failure-conditions::defeat-of-an-exact-protected-entity-fails-its-active-quests-atomically")
     def test_commit_fault_rolls_back_death_and_quest_failure_together(self):
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("guard-rollback")
         room = create_object(InstanceRoom, key="escort-rollback")
         bind_stage_runtime(
@@ -354,7 +357,7 @@ class QuestPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
     def test_simulated_defeat_never_fails_protected_entity(self):
         # A simulated lethal crossing on a bound protected entity must not
         # fail its active quest: the battle is a simulation.
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("simulated-guard")
         room = create_object(InstanceRoom, key="simulated-room")
         bind_stage_runtime(
@@ -731,7 +734,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_simulated_upkeep_defeat_never_fails_a_protected_entity(self):
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("u-guard")
         room = create_object(InstanceRoom, key="u-escort-room")
         bind_stage_runtime(
@@ -750,7 +753,7 @@ class UpkeepDefeatPlannerTests(QuestRegistryIsolation, EvenniaTestCase):
 
     @covers_requirement("quest-progress-tracking::defeat-progress-is-planned-automatically-from-committed-player-action-events")
     def test_attributed_upkeep_defeat_fails_a_protected_entity(self):
-        record = accept(self.player, self.escort_quest.key)
+        record = stage_active_record(self.player, self.escort_quest.key)
         guard = self._npc("u-guard-2")
         room = create_object(InstanceRoom, key="u-escort-room-2")
         bind_stage_runtime(

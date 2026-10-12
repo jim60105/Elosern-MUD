@@ -30,7 +30,7 @@ from world.quests.tests._fixtures import QuestRegistryIsolation
 from world.rules.guild_offers import GUILD_OFFER_REGISTRY
 
 from server.ai_director_service import (
-    EscortUnavailableError,
+
     NoSuitableTemplateError,
     request_generated_quest,
 )
@@ -127,6 +127,36 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
             compiled.definition.stages[0].objective.requires_bound_targets
         )
 
+    @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    def test_a_complete_escort_proposal_publishes_through_every_boundary(self):
+        # The generative path now supports a complete escort contract: the
+        # scripted proposal passes the semantic validators, compiles and
+        # registers, carrying its closed predicate into the runtime definition.
+        from world.ai.director_templates import QUEST_TEMPLATE_POOL
+
+        payload = QUEST_TEMPLATE_POOL[0].to_payload()
+        payload["quest_type"] = "護衛"
+        payload["stages"][0]["objective"] = {
+            "kind": "escort",
+            "quantity": 1,
+            "completion": "destination",
+            "protected_role_refs": ["daughter"],
+        }
+        payload["stages"][0]["npc_req"] = []
+        client = FakeLLMClient()
+        client.add_response(lambda d: True, json.dumps(payload, ensure_ascii=False))
+        compiled = await_result(
+            request_generated_quest(
+                client, context=_context(requested_type="護衛")
+            )
+        )
+        objective = compiled.definition.stages[0].objective
+        self.assertEqual(objective.kind.value, "escort")
+        self.assertEqual(objective.completion.value, "destination")
+        self.assertEqual(objective.protected_role_refs, ("daughter",))
+        self.assertEqual(objective.quantity, 1)
+        self.assertIn(compiled.definition.key, QUEST_DEFINITION_REGISTRY)
+
     @covers_requirement("scene-builder::the-composition-root-posts-one-generated-quest-to-the-guild-board-and-degrades-offline")
     def test_disabled_profile_resolves_to_a_template_with_zero_client_calls(self):
         disabled = _raw(scenario_director={"enabled": False})
@@ -162,7 +192,10 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
         self.assertTrue(failure.check(NoSuitableTemplateError))
 
     @covers_requirement("quest-blueprint::escort-quests-require-a-bound-protected-entity-path")
-    def test_escort_request_is_refused_and_nothing_is_registered(self):
+    def test_an_escort_request_without_a_template_degrades_with_nothing_registered(self):
+        # The blanket pre-transport escort refusal is gone; with no
+        # context-fitting escort template the deterministic draw refuses
+        # through the shared unsupported-template path with no registration.
         definitions_before = dict(QUEST_DEFINITION_REGISTRY)
         offers_before = dict(GUILD_OFFER_REGISTRY)
         disabled = _raw(scenario_director={"enabled": False})
@@ -171,18 +204,23 @@ class AiDirectorServiceTests(AiDirectorServiceIsolation, unittest.TestCase):
                 context=_context(requested_type="護衛")
             )
             failure = await_result(d)
-        self.assertTrue(failure.check(EscortUnavailableError))
+        self.assertTrue(failure.check(NoSuitableTemplateError))
         self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), definitions_before)
         self.assertEqual(dict(GUILD_OFFER_REGISTRY), offers_before)
 
-    def test_escort_request_refuses_before_any_transport_work(self):
+    def test_an_escort_request_now_reaches_the_director_like_any_other_type(self):
+        # The blanket pre-transport escort refusal is gone: the request is
+        # handed to the director, so the transport is invoked and a bare
+        # (fixtureless) transport failure surfaces with nothing registered.
+        definitions_before = dict(QUEST_DEFINITION_REGISTRY)
         client = FakeLLMClient()
         d = request_generated_quest(
             client, context=_context(requested_type="護衛")
         )
         failure = await_result(d)
-        self.assertTrue(failure.check(EscortUnavailableError))
-        self.assertEqual(client.calls, [])
+        self.assertIsNotNone(failure)
+        self.assertEqual(len(client.calls), 1)
+        self.assertEqual(dict(QUEST_DEFINITION_REGISTRY), definitions_before)
 
     @covers_requirement("scene-builder::the-composition-root-posts-one-generated-quest-to-the-guild-board-and-degrades-offline")
     def test_module_imports_before_server_initialization_without_binding_a_logger(self):

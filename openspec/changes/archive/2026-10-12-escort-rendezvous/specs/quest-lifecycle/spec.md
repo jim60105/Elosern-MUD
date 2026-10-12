@@ -8,7 +8,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: QuestRecord is JSON-safe persisted state with explicit terminal invalidation
-Quest records SHALL retain existing deterministic identity, definition/issuer, progress, deadline/tick, tracking and counted-defeat fields, while adding distinct terminal `INVALIDATED` state with a structured obsolete-outcome reason and JSON-safe package/group/acceptance-sequence/protected-role binding metadata. The stored vocabulary SHALL contain `IN_PROGRESS`, `COMPLETED`, `FAILED`, and `INVALIDATED`. Terminal records SHALL retain history and no active stage bindings. Invalidation SHALL carry no failure penalty, payout, or retry path after group resolution. Unaccepted definitions SHALL remain absence of a quest record. Existing normal defaults SHALL remain; no migration or compatibility adapter SHALL be introduced.
+Quest records SHALL retain existing deterministic identity, definition/issuer, progress, deadline/tick, tracking and counted-defeat fields, adding terminal `INVALIDATED` state with a structured obsolete-outcome reason and JSON-safe package/group/acceptance-sequence/protected-role bindings. The stored vocabulary SHALL be `IN_PROGRESS`, `COMPLETED`, `FAILED` and `INVALIDATED`, and terminal records SHALL retain history with no active stage bindings.
 
 #### Scenario: Invalidated record round-trips
 - **WHEN** an accepted alternative is invalidated and its serialized record is reloaded
@@ -68,8 +68,12 @@ Quest records SHALL retain existing deterministic identity, definition/issuer, p
 - **WHEN** a definition is unaccepted or a quest is abandoned
 - **THEN** unaccepted is represented by absence and abandonment uses `FAILED` with reason `abandoned`
 
+#### Scenario: Invalidation, absence and defaults
+- **WHEN** an invalidated record is read, or a definition was never accepted
+- **THEN** Invalidation SHALL carry no failure penalty, payout or retry path after group resolution. Unaccepted definitions SHALL remain absence of a quest record, existing normal defaults SHALL remain, and no migration or compatibility adapter SHALL be introduced.
+
 ### Requirement: accept_quest creates one deterministic active record
-Acceptance SHALL retain existing definition/issuance validation, deterministic record numbering, accepted tick/deadline, no automatic tracking, and existing hunt/site guarantees. Escort acceptance SHALL additionally revalidate actual issuer scope and current offer capability, unresolved exclusive group, exact protected role identity, co-location, living state and membership ownership. The relevant physical actor SHALL use existing possession actor/owner mapping. All declared protected roles SHALL be available. One owning outer transaction SHALL create the record, bind exact actors, add party reasons, allocate the group's monotonic sequence and record authorized dialogue/acceptance knowledge. Full general quota SHALL permit temporary joining. Any later write failure SHALL restore quest, party, component and dialogue caches. Terminal retry SHALL remain allowed for unrelated definitions under existing rules; resolved exclusive alternatives SHALL refuse every retry.
+Acceptance SHALL retain definition/issuance validation, deterministic numbering, accepted tick/deadline, no automatic tracking and hunt/site guarantees. Escort acceptance SHALL revalidate issuer scope, offer capability, unresolved group, exact protected identity, co-location, living state and membership ownership. One owning transaction SHALL create the record, bind exact actors, add party reasons, allocate the group's monotonic sequence and record authorized dialogue/acceptance knowledge.
 
 #### Scenario: Acceptance returns the committed bound record
 - **WHEN** an authorized available multi-role escort is accepted at full general quota
@@ -194,8 +198,12 @@ Acceptance SHALL retain existing definition/issuance validation, deterministic r
 - **WHEN** a binding acceptance completes
 - **THEN** the record the operation returns is the persisted, bound record rather than the unbound value written a moment earlier
 
+#### Scenario: Acceptance fault, quota and retry behavior
+- **WHEN** an escort acceptance writes, joins at full general quota, or is retried
+- **THEN** Any later write failure SHALL restore quest, party, component and dialogue caches. Full general quota SHALL permit temporary joining, terminal retry SHALL remain allowed for unrelated definitions under existing rules, and resolved exclusive alternatives SHALL refuse every retry.
+
 ### Requirement: bind_stage_runtime attaches only current-stage instance and entity identities
-Current-stage binding SHALL retain exact live entity IDs, disjoint objective/protected sets, immutable identical-rebind behavior and named conflict refusal. Escort protected roles SHALL resolve through published package/role identity to the same exact NPC at acceptance and every evaluation. A supplied pinned room SHALL remain an actual existing instance; permanent destination resolution SHALL be separate and SHALL create no fake instance pin. Meeting roles SHALL retain upstream bindings and SHALL never be added to the protected roster by proximity.
+Current-stage binding SHALL retain exact live entity IDs, disjoint objective/protected sets, immutable identical-rebind behavior and named conflict refusal. Escort protected roles SHALL resolve through published package/role identity to the same exact NPC at acceptance and every evaluation. A supplied pinned room SHALL remain an actual existing instance, and permanent destination resolution SHALL stay separate, creating no fake instance pin.
 
 #### Scenario: Permanent destination creates no instance pin
 - **WHEN** an escort binds protected actors for an anchor or XYZ destination
@@ -234,6 +242,10 @@ Current-stage binding SHALL retain exact live entity IDs, disjoint objective/pro
 - **WHEN** an identical binding is repeated
 - **THEN** the operation is idempotent, while replacing any existing binding raises before mutation
 
+#### Scenario: Meeting roles keep their upstream bindings
+- **WHEN** a rendezvous escort stage resolves its meeting roles
+- **THEN** Meeting roles SHALL retain upstream bindings and SHALL never be added to the protected roster by proximity.
+
 ### Requirement: Multi-attribute lifecycle writes are atomic and cache-consistent
 Quest transitions SHALL atomically commit their quest log, pins, party reasons, exclusive group, dialogue/knowledge and applicable settlement effects through their existing owners. Snapshot/restore SHALL include Evennia Attribute/component caches, process registration views where touched, and live possession/session surfaces. Post-commit presentation SHALL not expose rolled-back state. No partial success SHALL be returned.
 
@@ -251,7 +263,7 @@ Quest transitions SHALL atomically commit their quest log, pins, party reasons, 
 - **THEN** database state and cached room attributes both contain the original pin list
 
 ### Requirement: abandon_quest fails only an active quest and releases its runtime binding
-Abandonment SHALL retain `FAILED` with reason `abandoned` for an active record, clear its stage bindings/pin and release only its temporary membership reasons through the compensated party/possession APIs. Repeated calls on terminal records SHALL be idempotent and unknown IDs SHALL retain `QuestNotFound`. Completion, actual failure and invalidation SHALL use the same per-record release discipline. Surviving general identity or other valid reasons SHALL remain; no release SHALL delete, regenerate or reset an actor's memory.
+Abandonment SHALL retain `FAILED` with reason `abandoned` for an active record, clear its stage bindings/pin and release only its temporary membership reasons through the compensated party/possession APIs. Repeated calls on terminal records SHALL be idempotent, and unknown IDs SHALL retain `QuestNotFound` without mutation.
 
 #### Scenario: Terminal release preserves unrelated sources
 - **WHEN** one of two escort records terminates for completion, abandonment, death, deadline or invalidation
@@ -269,6 +281,10 @@ Abandonment SHALL retain `FAILED` with reason `abandoned` for an active record, 
 #### Scenario: Repeated abandonment is harmless
 - **WHEN** `abandon_quest()` is called twice for the same quest ID
 - **THEN** the second call makes no additional state change and does not fail on the already-removed pin
+
+#### Scenario: Release discipline extends to every terminal transition
+- **WHEN** a record completes, fails or is invalidated
+- **THEN** Completion, actual failure and invalidation SHALL use the same per-record release discipline. Surviving general identity or other valid reasons SHALL remain, and no release SHALL delete, regenerate or reset an actor's memory.
 
 ## ADDED Requirements
 

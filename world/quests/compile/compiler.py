@@ -73,11 +73,13 @@ def _validate_scene_bound_rules(
 
     Occupant-bearing scenes (any ``npc_req``) must be instance-layer so spawned
     entities always live in a reclaimable instance room, never a permanent map
-    room. An ESCORT stage is refused entirely until a protected-entity binding
-    flow exists: permanent-location stages are never bound to protected
-    entities today (the SceneBuilder locates permanent rooms only, so a bound
-    entity could never be spawned into an ESCORT destination), which would
-    leave the quest structurally uncompletable. A bound-target DEFEAT must
+    room. An ESCORT stage is now publishable: its contract (quantity one,
+    exactly one completion discriminator, nonempty exact role sets, no mixed
+    destination/rendezvous fields) is validated at definition registration, and
+    its protected entities are existing published-package role NPCs rather than
+    spawned occupants, so the occupant rule below is exactly the structural
+    rule it needs -- a package-owned role set on an objective that needs no
+    stage binding. A bound-target DEFEAT must
     declare a quantity no greater than its ``npc_req`` count so the objective
     is always satisfiable by defeating the bound targets.
 
@@ -87,14 +89,9 @@ def _validate_scene_bound_rules(
     of those package-owned roles AND the objective needs no stage binding -- a
     bound-target DEFEAT can only bind an instance room, so at a permanent
     destination it would be left uncompletable. A standalone payload (the
-    direct compile path) passes no ``package_roles`` and keeps the blanket
-    rejection unchanged, and ESCORT stays refused on both paths.
+    direct compile path) passes no ``package_roles``, so an occupant-bearing
+    ESCORT without a package still fails this structural check.
     """
-    if objective.kind is ObjectiveKind.ESCORT:
-        _reject(
-            f"stage {stage_index} declares an ESCORT objective, which cannot be "
-            "published until a protected-entity binding flow exists"
-        )
     has_occupants = bool(npc_reqs)
     roles = {entry[0] for entry in npc_reqs}
     package_owned = (
@@ -121,6 +118,42 @@ def _validate_scene_bound_rules(
             f"stage {stage_index} bound DEFEAT quantity {objective.quantity} exceeds "
             f"the number of npc_req entries {len(npc_reqs)}"
         )
+
+
+def _objective_canonical(objective: QuestObjective) -> dict[str, Any]:
+    """Serialize one objective into the canonical definition-digest shape.
+
+    The base shape (kind/quantity/selectors/destination) is always present, so
+    a non-escort objective contributes a byte-identical digest to the pre-change
+    output; the escort completion fields join it only when declared, so two
+    escort objectives differing in predicate, roles, or typed relation stay
+    distinguishable while every existing key is unchanged.
+    """
+    canonical: dict[str, Any] = {
+        "kind": objective.kind.value,
+        "quantity": objective.quantity,
+        "monster_tier": objective.monster_tier,
+        "destination": (
+            None
+            if objective.destination is None
+            else {
+                "kind": objective.destination.kind.value,
+                "anchor_key": objective.destination.anchor_key,
+                "xyz": objective.destination.xyz,
+            }
+        ),
+        "requires_bound_targets": objective.requires_bound_targets,
+        "item_key": objective.item_key,
+    }
+    if objective.completion is not None:
+        canonical["completion"] = objective.completion.value
+    if objective.protected_role_refs:
+        canonical["protected_role_refs"] = list(objective.protected_role_refs)
+    if objective.meeting_role_refs:
+        canonical["meeting_role_refs"] = list(objective.meeting_role_refs)
+    if objective.relation is not None:
+        canonical["relation"] = list(objective.relation)
+    return canonical
 
 
 @dataclass(frozen=True)
@@ -288,22 +321,7 @@ def compile_blueprint_core(
         "stages": [
             {
                 "index": stage.index,
-                "objective": {
-                    "kind": stage.objective.kind.value,
-                    "quantity": stage.objective.quantity,
-                    "monster_tier": stage.objective.monster_tier,
-                    "destination": (
-                        None
-                        if stage.objective.destination is None
-                        else {
-                            "kind": stage.objective.destination.kind.value,
-                            "anchor_key": stage.objective.destination.anchor_key,
-                            "xyz": stage.objective.destination.xyz,
-                        }
-                    ),
-                    "requires_bound_targets": stage.objective.requires_bound_targets,
-                    "item_key": stage.objective.item_key,
-                },
+                "objective": _objective_canonical(stage.objective),
             }
             for stage in quest_stages
         ],

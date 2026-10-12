@@ -38,6 +38,29 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     return wrapper;
   }
 
+  it("renders every effective row beyond the general quota", () => {
+    const temporary = (identity, label) => ({
+      identity,
+      display_name: label,
+      portrait_ref: null,
+      hp_current: 12,
+      hp_maximum: 12,
+      bond_stage: "初識",
+      membership: {
+        general: false,
+        temporary_commissions: [{ quest_id: `q:${identity}`, role_id: "protected", label: "護衛" }],
+      },
+    });
+    const slots = [
+      ...PARTY_PANEL_FULL_SAMPLE.slots,
+      temporary(105, "臨時甲"),
+      temporary(106, "臨時乙"),
+    ];
+    const w = mountDrawer({ slots });
+    expect(w.findAll('[data-testid^="party-drawer__row-"]')).toHaveLength(6);
+    expect(w.get('[data-testid="party-drawer__row-106"]').exists()).toBe(true);
+  });
+
   it("renders compbig rows following the committed party slots", () => {
     const w = mountDrawer();
 

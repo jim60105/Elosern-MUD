@@ -374,6 +374,10 @@ def turn_in_quest(
     record = find_record(records, quest_id)
     if record is None or record.state is not QuestState.COMPLETED:
         raise RewardClaimError(RewardClaim.NO_COMPLETED_RECORD)
+    from world.quests.escort_events import reward_entitled
+
+    if not reward_entitled(actor, record):
+        raise RewardClaimError(RewardClaim.NO_COMPLETED_RECORD)
     try:
         offer = get_guild_offer(record.definition_key, branch_key)
     except GuildOfferNotFound as error:

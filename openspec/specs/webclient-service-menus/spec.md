@@ -137,12 +137,7 @@ host, `rank` the hall's `GuildExaminer` exam counter (never the qualified persis
   snapshot values for wallet, rank, merit, or eligibility
 
 ### Requirement: The guild surface covers registration, board, quest log, and rank examination
-
-The `guild` section SHALL contain exactly `branch_label`, `rank_ladder`, `registration`, `board`, `quests`, and
-`rank`, and SHALL require exactly one local `GuildStaff` host. `branch_label` SHALL name that host's branch,
-`rank_ladder` every guild rank key in ascending order. `board` and `quests` SHALL be bounded lists of at most 12
-deterministic server-rendered rows. `rank` SHALL report true-merit `merit_qualified` separately from its merit- and
-host-independent `guild.exam_request` descriptor.
+The guild section SHALL retain its existing exact branch/rank/registration/board/quests/exam shape, local GuildStaff gate and read-only ownership. Quest rows SHALL accept invalidated and add nullable bounded terminal_reason; invalidated rows SHALL have disabled abandon/turn-in. Private escort abandonment is a separate host-independent quest_log descriptor using the same action ID, and SHALL not make a guild section available without staff.
 
 #### Scenario: Unregistered player can register
 - **WHEN** an unregistered actor stands in the guild hall
@@ -193,20 +188,16 @@ host-independent `guild.exam_request` descriptor.
 - **THEN** it is enabled only while that offer is board-eligible and the actor has no active record for it
 
 #### Scenario: Quest rows carry their exact fields in record order
-- **WHEN** the `quests` list ships
-- **THEN** it holds at most 12 quest-log rows in deterministic record order, each containing exactly `quest_id`,
-  `definition_key`, `display_name`, `state`, `stage_index`, `stage_progress`, `objective_summary`, `deadline_line`,
-  `detail`, `abandon`, and `turnin`; `state` is one of `in_progress`, `completed`, or `failed`, and `detail` is the
-  server-rendered full quest detail
+- **WHEN** the services quests list ships
+- **THEN** the existing bounded ordered row shape, including tracked, adds terminal_reason; state accepts in_progress/completed/failed/invalidated, detail stays canonical, and invalidated reasons are present with no enabled terminal mutation
 
 #### Scenario: Abandon enables only for an in-progress record at a staff host
-- **WHEN** a quest row's `abandon` descriptor is computed
-- **THEN** it is enabled only for an `in_progress` record with one local `GuildStaff` host
+- **WHEN** a guild-section quest row abandon descriptor is computed
+- **THEN** the existing guild counter descriptor retains its active-record/local-staff gate; private escort quest_log descriptors separately require owned active escort state and no staff
 
 #### Scenario: Turn-in requires an unclaimed completed record at a staff host
-- **WHEN** a quest row's `turnin` descriptor is computed
-- **THEN** it is enabled only for a `completed` record with one local `GuildStaff` host and the quest ID absent
-  from the actor's reward claims
+- **WHEN** a guild quest row turnin descriptor is computed
+- **THEN** the existing local staff, completed and unclaimed gates remain, grouped records additionally require selected-winner entitlement, and invalidated records never enable turn-in
 
 #### Scenario: Rank section presence and exact fields
 - **WHEN** the `rank` section is computed
@@ -306,12 +297,7 @@ disabled reason. The `inventory` section SHALL be present in exploration and com
   or drop action
 
 ### Requirement: Service actions are exact, allowlisted, and server-authoritative
-
-The production action registry SHALL retain every existing combat, service, creation, exploration, and options
-action and SHALL add exactly `inventory.use`, `inventory.toggle_equip`, and `guild.quest_track`. The service action
-set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest_abandon`, `guild.quest_turnin`,
-`guild.quest_track`, `guild.exam_request`, `shop.buy`, `shop.sell`, `inventory.use`, and
-`inventory.toggle_equip`.
+The existing service action allowlist and exact bounded payloads SHALL remain. guild.quest_abandon SHALL revalidate the authenticated owner and referenced record. Active private escort records MAY abandon without a guild host through the quest-owned compensated operation; ordinary guild counter actions retain existing host/eligibility gates. No new action ID or actor/host authority field SHALL be added.
 
 #### Scenario: Existing registration reaches its deterministic API once
 - **WHEN** an unregistered actor submits an empty `guild.register` at the local guild hall
@@ -372,9 +358,8 @@ set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest
 - **THEN** it accepts exactly `item_key` as a 1..64-character non-empty string
 
 #### Scenario: Adapters are session-scoped and re-resolve everything
-- **WHEN** any service adapter runs
-- **THEN** it obtains the actor from the authenticated session, re-resolves every local host and referenced quest,
-  definition, item, rank, mechanic, and current condition, and invokes only its listed public deterministic API
+- **WHEN** a service adapter runs
+- **THEN** it resolves the authenticated actor and referenced canonical state, resolves local hosts where the action requires them, and delegates to the existing public owner; private escort abandonment needs no guild staff
 
 #### Scenario: Inventory payloads reject every authority field
 - **WHEN** an inventory payload carries any of actor, host, branch, session, effect, consumable, quantity, target,
@@ -389,6 +374,14 @@ set SHALL therefore contain `guild.register`, `guild.quest_accept`, `guild.quest
 #### Scenario: Actions never route through the text parser
 - **WHEN** any service or inventory action is dispatched
 - **THEN** no action routes an action ID or payload through the text command parser
+
+#### Scenario: Host-independent escort abandonment uses the existing action
+- **WHEN** a holder confirms guild.quest_abandon for an active owned private escort away from a counter
+- **THEN** the unchanged quest_id payload invokes compensated abandonment once, releases only that record's sources and refreshes committed quest/party/dialogue state
+
+#### Scenario: Forged terminal or foreign abandonment is refused
+- **WHEN** a stale, invalidated, non-owned or foreign quest ID is submitted as a private escort abandonment
+- **THEN** current domain authorization refuses without control, membership, quest or reward mutation
 
 ### Requirement: Service actions reject stale, duplicate, and tampered input without mutation
 Every service and inventory action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and

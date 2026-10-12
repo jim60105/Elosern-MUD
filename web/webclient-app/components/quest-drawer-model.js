@@ -17,6 +17,7 @@ export const BOOK_STATES = Object.freeze([
   Object.freeze({ key: "in_progress", label: "進行中", glyph: "quest_in_progress", guidance: "接取的委託會列在這裡。" }),
   Object.freeze({ key: "completed", label: "已完成", glyph: "quest_completed", guidance: "達成的委託會列在這裡。" }),
   Object.freeze({ key: "failed", label: "失敗", glyph: "quest_failed", guidance: "失敗或放棄的委託會列在這裡。" }),
+  Object.freeze({ key: "invalidated", label: "已失效", glyph: "quest_failed", guidance: "因其他結局而失效的委託會列在這裡。" }),
 ]);
 
 const CATEGORY_LABELS = Object.freeze({
@@ -43,6 +44,7 @@ const ISSUER_FALLBACK = "委託人沒有留下說明。";
 const REASON_CLAIMED = "報酬已領取";
 const REASON_RETURN_TO_COUNTER = "回到公會櫃檯即可交付並領取報酬。";
 const REASON_FAILED = "此委託已失敗，沒有報酬。";
+const REASON_INVALIDATED = "此委託已因其他結局而失效，沒有報酬。";
 
 // Pips render up to this many objective units; larger targets use a bar.
 export const PIP_LIMIT = 12;
@@ -178,7 +180,11 @@ export function bookDetail(row) {
       pct: percent(row.stage_progress, target),
     };
   }
-  const STAMPS = { completed: { kind: "completed", label: "達成" }, failed: { kind: "failed", label: "失敗" } };
+  const STAMPS = {
+    completed: { kind: "completed", label: "達成" },
+    failed: { kind: "failed", label: "失敗" },
+    invalidated: { kind: "failed", label: "已失效" },
+  };
   return {
     kind: "book",
     id: row.quest_id,
@@ -224,13 +230,21 @@ export function bookActions(row, counterRow) {
         reason: row.track.enabled ? null : (row.track.disabled_reason?.message ?? null),
       };
     }
-    const abandon = counterRow?.abandon;
+    // A host-independent private-escort abandon rides the row itself; an
+    // ordinary guild counter quest keeps its service-owned descriptor.
+    const abandon = row.abandon ?? counterRow?.abandon;
     if (abandon?.enabled) {
       result.abandon = mirrored(abandon, row.quest_id);
     } else if (abandon) {
       result.reason = abandon.disabled_reason?.message ?? null;
     }
     if (!result.reason && result.track?.reason) result.reason = result.track.reason;
+    return result;
+  }
+  if (row.state === "invalidated") {
+    // A terminal invalidation offers no tracking, abandonment or payout; the
+    // row's own structured terminal reason is the fixed disclosure.
+    result.reason = row.terminal_reason?.message ?? REASON_INVALIDATED;
     return result;
   }
   if (row.state === "completed") {

@@ -663,7 +663,11 @@ def _party_invite_adapter(actor: Any, payload: dict[str, Any], session: Any = No
     npc = _resolve_llm_npc(actor, payload["npc_id"])
     if npc is None:
         return _rejected("no_npc", "這裡沒有可以邀請的對象。")
-    if is_companion(npc, actor):
+    from world.rules.party import has_general_membership
+
+    if has_general_membership(npc, actor) or (
+        npc.db.party_member is not None and npc.db.party_member != actor.pk
+    ):
         from world.rules.party import ALREADY_COMPANION_MESSAGE
 
         return _rejected("already_companion", ALREADY_COMPANION_MESSAGE)
@@ -771,9 +775,13 @@ def _party_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
     """Dismiss a bound companion through the membership module (party-core)."""
     del session
     from world.rules.party import (
+        ESCORT_BOUND_MESSAGE,
         LEAVE_DISMISSED_MESSAGE,
         NOT_COMPANION_MESSAGE,
+        REASON_ESCORT_BOUND,
+        has_general_membership,
         leave_party,
+        reasons_for,
     )
 
     npc = _resolve_npc(actor, payload["npc_id"])
@@ -781,6 +789,18 @@ def _party_leave_adapter(actor: Any, payload: dict[str, Any], session: Any = Non
         return _rejected("no_npc", "這裡沒有這個對象。")
     if not is_companion(npc, actor):
         return _rejected("not_companion", NOT_COMPANION_MESSAGE)
+    if not has_general_membership(npc, actor):
+        reasons = reasons_for(npc, actor)
+        if reasons:
+            # A temporary-only member's companionship is a live escort
+            # commission: never detach the reason directly; route the player to
+            # the affected missions' selected abandonment (escort-rendezvous §3).
+            return _rejected(
+                REASON_ESCORT_BOUND,
+                ESCORT_BOUND_MESSAGE.format(
+                    quests="、".join(sorted({quest_id for quest_id, _ in reasons}))
+                ),
+            )
     leave_party(npc, actor, reason="dismissed")
     actor.msg(LEAVE_DISMISSED_MESSAGE)
     return _success("left", LEAVE_DISMISSED_MESSAGE, AFFECTED_FULL)

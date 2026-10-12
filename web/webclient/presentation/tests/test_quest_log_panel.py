@@ -107,6 +107,8 @@ ROW_FIELDS = {
     "reward",
     "reward_claimed",
     "track",
+    "terminal_reason",
+    "abandon",
 }
 
 
@@ -302,6 +304,35 @@ class QuestLogPresenterTests(EvenniaTest):
             })
             self.assertEqual(row["track"]["action_id"], "guild.quest_track")
             self.assertTrue(row["track"]["enabled"])
+
+    def test_an_invalidated_row_shows_its_reason_and_no_controls(self):
+        from world.quests.runtime import invalidate_record
+        from world.quests.transitions import apply_quest_log_replacement
+
+        definition = register(quest("log_invalidated"))
+        record = accept_under_auto(self.player, definition)
+        apply_quest_log_replacement(self.player, [invalidate_record(record)])
+
+        row = self._render()["rows"][0]
+        self.assertEqual(row["state"], "invalidated")
+        self.assertEqual(row["terminal_reason"]["code"], "obsolete_outcome")
+        self.assertFalse(row["track"]["enabled"])
+        self.assertIsNone(row["abandon"])
+
+    def test_an_active_private_escort_row_carries_an_abandon_action(self):
+        from dataclasses import replace
+
+        from world.quests.transitions import apply_quest_log_replacement
+
+        definition = register(quest("log_private"))
+        record = accept_under_auto(self.player, definition)
+        apply_quest_log_replacement(
+            self.player, [replace(record, package_id="synthetic_package")]
+        )
+
+        row = self._render()["rows"][0]
+        self.assertEqual(row["abandon"]["action_id"], "guild.quest_abandon")
+        self.assertTrue(row["abandon"]["enabled"])
 
     def test_empty_log_is_available_with_empty_rows(self):
         payload = self._render()
@@ -708,6 +739,8 @@ class QuestLogValidatorTests(unittest.TestCase):
                 "disabled_reason": None,
                 "quantity": None,
             },
+            "terminal_reason": None,
+            "abandon": None,
         }
         row.update(overrides)
         return row
@@ -727,6 +760,68 @@ class QuestLogValidatorTests(unittest.TestCase):
     def test_null_settlement_reward_and_deadline_are_permitted(self):
         row = self._valid_row(settlement=None, reward=None, deadline_line=None)
         self.assertEqual(validate_quest_log(self._valid_payload(rows=[row])), self._valid_payload(rows=[row]))
+
+    def test_invalidated_row_carries_a_reason_and_disabled_track(self):
+        row = self._valid_row(
+            state="invalidated",
+            track={
+                "action_id": "guild.quest_track",
+                "label": "追蹤",
+                "enabled": False,
+                "disabled_reason": "此委託已結束，無法追蹤。",
+                "quantity": None,
+            },
+            terminal_reason={"code": "obsolete_outcome", "message": "此委託已由其他結局取代。"},
+        )
+        validated = validate_quest_log(self._valid_payload(rows=[row]))["rows"][0]
+        self.assertFalse(validated["track"]["enabled"])
+        self.assertEqual(validated["terminal_reason"]["code"], "obsolete_outcome")
+        self.assertIsNone(validated["abandon"])
+
+    def test_terminal_row_rejections(self):
+        abandon = {
+            "action_id": "guild.quest_abandon",
+            "label": "放棄",
+            "enabled": True,
+            "disabled_reason": None,
+            "quantity": None,
+        }
+        disabled_track = {
+            "action_id": "guild.quest_track",
+            "label": "追蹤",
+            "enabled": False,
+            "disabled_reason": "此委託已結束，無法追蹤。",
+            "quantity": None,
+        }
+        for row in (
+            # an invalidated row must disable tracking
+            self._valid_row(
+                state="invalidated",
+                terminal_reason={"code": "obsolete_outcome", "message": "x"},
+            ),
+            # an invalidated row carries no abandon action
+            self._valid_row(
+                state="invalidated",
+                track=disabled_track,
+                terminal_reason={"code": "obsolete_outcome", "message": "x"},
+                abandon=abandon,
+            ),
+            # a malformed terminal reason
+            self._valid_row(state="failed", terminal_reason={"code": "x"}),
+        ):
+            with self.assertRaises(ProtocolValidationError):
+                validate_quest_log(self._valid_payload(rows=[row]))
+
+    def test_active_private_escort_carries_a_host_independent_abandon(self):
+        row = self._valid_row(abandon={
+            "action_id": "guild.quest_abandon",
+            "label": "放棄",
+            "enabled": True,
+            "disabled_reason": None,
+            "quantity": None,
+        })
+        validated = validate_quest_log(self._valid_payload(rows=[row]))["rows"][0]
+        self.assertEqual(validated["abandon"]["action_id"], "guild.quest_abandon")
 
     @covers_requirement(
         "webclient-quest-log-panel::the-panel-is-bounded-and-closes-with-the-shared-envelope-check"

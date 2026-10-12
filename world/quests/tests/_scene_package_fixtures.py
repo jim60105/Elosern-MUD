@@ -71,6 +71,14 @@ def dialogue(role_id: str, **overrides) -> dict:
         "initial_phase": "searching",
         "phases": [
             phase("searching", [{"default": True}]),
+            # The reunion acknowledgment phase: selected once the exclusive
+            # result is committed and before the closure interaction advances
+            # to everyday content (escort-rendezvous §7).
+            phase(
+                "acknowledgment",
+                [{"reunion": True}, {"closure": False}],
+                topics=[{"keyword": "重逢", "response": LONG_PROSE}],
+            ),
             phase(
                 "everyday",
                 [{"closure": True}],
@@ -139,7 +147,7 @@ def package(**overrides) -> dict:
             },
         ],
         "dialogue": [dialogue("mother"), dialogue("daughter")],
-        "commission": {"role_id": "mother", "issuer_content_key": "story_mother"},
+        "commissions": [{"role_id": "mother", "issuer_content_key": "story_mother"}],
     }
     payload.update(overrides)
     return payload
@@ -148,6 +156,6 @@ def package(**overrides) -> dict:
 def guild_package(**overrides) -> dict:
     return package(
         quest=quest_payload(issuer=_issuer_key()),
-        commission=None,
+        commissions=[],
         **overrides,
     )

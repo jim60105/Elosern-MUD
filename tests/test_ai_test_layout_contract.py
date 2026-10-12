@@ -448,11 +448,14 @@ PRE_SPLIT_ANNOTATIONS = {
         "test_bound_defeat_quantity_exceeding_is_rejected_and_retried": [
             "scenario-director::scene-bound-proposal-stages-are-validated-before-publication"
         ],
-        "test_escort_stage_at_anchor_is_rejected_and_retried": [
+        "test_a_complete_escort_contract_passes_the_validators": [
+            "scenario-director::scene-bound-proposal-stages-are-validated-before-publication"
+        ],
+        "test_a_contractless_escort_stage_at_anchor_is_rejected_and_retried": [
             "quest-blueprint::escort-quests-require-a-bound-protected-entity-path",
             "scenario-director::scene-bound-proposal-stages-are-validated-before-publication"
         ],
-        "test_escort_stage_at_instance_is_rejected_and_retried": [
+        "test_a_contractless_escort_stage_at_instance_is_rejected_and_retried": [
             "scenario-director::scene-bound-proposal-stages-are-validated-before-publication"
         ],
         "test_occupant_stage_at_anchor_is_rejected_and_retried": [

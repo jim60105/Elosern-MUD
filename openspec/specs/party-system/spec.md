@@ -5,24 +5,43 @@ Defines the party core: the bounded, persistent, single-writer membership bindin
 ## Requirements
 
 ### Requirement: Party membership is bounded, persistent, and single-writer
+The party owner SHALL keep one ordered persistent ID roster and one NPC owner back-reference; metadata SHALL carry general membership and a unique set of temporary `(quest identity, protected role)` reasons. Ordinary join SHALL declare general membership, and the four-companion quota SHALL count valid general members alone. Temporary escort joining SHALL use the party owner API on an exact live owned protected binding, never stealing another owner's actor or duplicating a row.
 
-`world/rules/party.py` SHALL be the sole writer of party membership: `player.db.party` holds the list of companion NPC dbids (at most 4) and each companion's `npc.db.party_member` holds the player's dbid. `join_party(npc, player)` SHALL require an NPC target, co-location (same room), no existing binding, and a party below the 4-companion bound; `leave_party(npc, player, reason)` SHALL remove the binding regardless of the reason.
+#### Scenario: Full general party accepts an escort
+- **WHEN** a player with four valid general companions accepts an available escort through the quest owner
+- **THEN** the exact protected NPC becomes a fifth temporary-only row, general usage remains four, no member is evicted, and reload preserves the metadata and back-reference
+
+#### Scenario: Dual membership and several reasons have one row
+- **WHEN** a general member receives two valid escort reasons and one reason is released
+- **THEN** it retains one row, general membership and quota usage, and the other reason; repeating the release changes nothing
+
+#### Scenario: General recruitment remains bounded
+- **WHEN** a temporary-only NPC is ordinarily recruited while the general quota is full or ordinary eligibility fails
+- **THEN** recruitment refuses without changing the escort reason or granting general identity
+
+#### Scenario: Normal join still validates ownership and presence
+- **WHEN** general joining targets a remote, non-NPC, already-general, or another owner's bound actor
+- **THEN** the ordinary named refusal changes neither roster nor metadata
+
+#### Scenario: Paired write failure restores membership
+- **WHEN** persistence fails after the roster write and before metadata or back-reference completion
+- **THEN** live reads and committed reload equal the pre-operation state
 
 #### Scenario: A valid join binds both sides
-- **WHEN** a player invites a co-located NPC with 2 companions already
-- **THEN** the NPC appears in `player.db.party`, the NPC's `party_member` is the player, and the party size is 3
+- **WHEN** a player ordinarily invites an eligible co-located NPC with two valid general companions
+- **THEN** general membership, the ordered roster and owner back-reference commit together and general usage becomes three
 
 #### Scenario: The party bound is four companions
-- **WHEN** a player with 4 companions invites a fifth NPC
-- **THEN** the join is rejected with a full-party outcome and no binding changes
+- **WHEN** a player with four valid general companions attempts to recruit another general companion, including a temporary-only member
+- **THEN** ordinary quota refusal changes no source or binding
 
 #### Scenario: A remote NPC cannot join
 - **WHEN** a player invites an NPC in another room
 - **THEN** the join is rejected and no binding changes
 
 #### Scenario: A duplicate join is a no-op
-- **WHEN** a join is attempted for an NPC already bound to the player
-- **THEN** the join is rejected and no binding changes
+- **WHEN** general joining is attempted for an already-general member
+- **THEN** the existing refusal/idempotence policy changes no stored source or binding
 
 #### Scenario: A failed join restores both entities
 - **WHEN** the NPC-side write fails after the player-side write applied
@@ -56,85 +75,99 @@ Defines the party core: the bounded, persistent, single-writer membership bindin
 - **WHEN** the auto-leave recheck evaluates a companion bound at activation
 - **THEN** it behaves exactly as it does for an invited companion, with no origin-dependent branch
 
-### Requirement: The invite command proposes a party through the AI-judged dialogue seam
+#### Scenario: Membership writes commit paired state atomically
+- **WHEN** a membership join, promotion or release commits
+- **THEN** Persistent membership writes SHALL commit paired state atomically with cache restoration.
 
-The character cmdset SHALL provide `invite <npc> [訊息]` (aliases 邀請, 組隊) that resolves a local NPC target and, after the deterministic preflight gate passes, sends the player's invitation message through the guarded dialogue seam with the NPC's affinity context. A `party_invite {accept: true}` intent SHALL be verified and applied through `join_party`; `accept: false` SHALL notify of the refusal and change nothing; any illegal or unverifiable intent SHALL keep the speech and change nothing.
+### Requirement: The invite command proposes a party through the AI-judged dialogue seam
+The existing invite command SHALL use ordinary eligibility, dialogue judgment and offline affinity fallback to add general identity. Its preflight and commit checks SHALL reject already-general and foreign-owned actors, count only valid general identities toward four, and admit same-owner temporary-only actors without bypassing ordinary recruitment. Successful promotion SHALL preserve every escort reason and the deduplicated roster.
 
 #### Scenario: A co-located NPC is invited and joins
-- **WHEN** a player invites a co-located NPC and the dialogue reply carries `party_invite` with `accept: true`
-- **THEN** the player sees the NPC's speech and a join notification, and the membership binding exists
+- **WHEN** a player invites an eligible co-located NPC and the dialogue accepts
+- **THEN** join_party adds general identity and notifies without duplicating its roster entry
 
 #### Scenario: The NPC declines through the AI
-- **WHEN** a player invites an NPC and the dialogue reply carries `party_invite` with `accept: false`
-- **THEN** the player sees the NPC's refusal speech and no binding is created
+- **WHEN** an eligible NPC declines through party_invite accept false
+- **THEN** refusal speech appears and no general identity is added
 
 #### Scenario: An illegal party intent keeps the speech
-- **WHEN** the reply's intent is not a valid `party_invite` payload
-- **THEN** the speech is shown, the intent is discarded, and no binding is created
+- **WHEN** the reply intent is invalid
+- **THEN** speech is shown and no identity or escort reason changes
 
 #### Scenario: Offline invitations fall back to the fixed threshold
-- **WHEN** the dialogue layer is unavailable and the NPC's affinity is 70 or higher
-- **THEN** the invitation succeeds with a deterministic acceptance line and the binding is created; below 70 it is refused with a deterministic rejection line
+- **WHEN** dialogue is unavailable for an otherwise eligible invite
+- **THEN** the existing affinity threshold 70 determines general recruitment and preserves escort reasons
 
 #### Scenario: The AI is not bound by the threshold
-- **WHEN** the dialogue layer is available and the NPC's affinity is below 70
-- **THEN** the decision is entirely the reply's `party_invite` value — the threshold never overrides it
+- **WHEN** online dialogue judges an eligible invite below affinity 70
+- **THEN** the verified party_invite decision stands without a threshold override
 
 #### Scenario: An AI decline is never overridden by the threshold
-- **WHEN** the dialogue layer is available, the reply's intent is `party_invite` with `accept: false`, and the NPC's affinity is 70 or higher
-- **THEN** the refusal stands, the threshold is not consulted, and no binding is created
+- **WHEN** online dialogue declines at affinity 70 or above
+- **THEN** the refusal stands and no general identity is added
 
 #### Scenario: Inviting an already-bound companion reports a clear result
-- **WHEN** a player invites an NPC that is already a companion
-- **THEN** the invite is rejected before any dialogue call with a Traditional Chinese message and no state changes
+- **WHEN** an invite targets an already-general actor or a foreign-owned actor
+- **THEN** preflight rejects with the existing clear message before dialogue; same-owner temporary-only actors remain eligible under ordinary gates
 
 #### Scenario: A non-dialogue NPC cannot be invited
-- **WHEN** a player invites a present NPC without an eligible free-form dialogue surface
-- **THEN** the invite is rejected before any dialogue call with a Traditional Chinese message and no state changes
+- **WHEN** the present actor has no eligible free-form dialogue surface
+- **THEN** preflight refuses before dialogue without source changes
 
 #### Scenario: A party filled after the AI accepted is surfaced to the player
-- **WHEN** the AI replies `accept: true` but the party became full before `join_party` ran
-- **THEN** the NPC's speech is shown, the join is rejected with the full-party reason, and the player receives the fixed Traditional Chinese full-party message
+- **WHEN** dialogue accepts but valid general identities reach four before commit
+- **THEN** speech remains and the full-party refusal adds no general identity or source
 
 #### Scenario: A full party blocks the invite before the AI call
-- **WHEN** a player with 4 companions invites a fifth NPC
-- **THEN** the invite is rejected with a full-party error and no dialogue call is made
+- **WHEN** a holder of four valid general identities proposes another general recruit
+- **THEN** preflight rejects before dialogue regardless of temporary escort count
 
 #### Scenario: The invite command surface is documented
 - **WHEN** the command reference is inspected
-- **THEN** `invite` and its aliases and syntax appear in `docs/game/command-reference.md`
+- **THEN** invite aliases, syntax and general-identity recruitment rules are documented
 
 #### Scenario: Target resolution mirrors talk's error contract
-- **WHEN** the invite target is absent or ambiguous
-- **THEN** Traditional Chinese errors are produced, mirroring `talk`
+- **WHEN** a target is absent or ambiguous
+- **THEN** existing localized talk-compatible errors appear without changes
 
 #### Scenario: The deterministic preflight gate admits only eligible invitees
-- **WHEN** the invite preflight gate is evaluated
-- **THEN** it admits only an NPC with an eligible free-form dialogue surface — an `LLMNPC` — that is not already a companion, with the party not full
+- **WHEN** invite preflight evaluates local actors
+- **THEN** it requires ordinary eligible free-form dialogue, no existing general identity, same-owner or unbound ownership and available general quota; same-owner temporary membership is not a duplicate rejection
 
 #### Scenario: The reply's speech reaches the player
-- **WHEN** any invitation dialogue reply arrives
-- **THEN** the reply's speech is shown to the player
+- **WHEN** invitation dialogue settles
+- **THEN** speech appears through the existing output path
 
 #### Scenario: An accepted intent is rechecked and applied through join_party
-- **WHEN** a `party_invite {accept: true}` intent is applied
-- **THEN** `join_party` rechecks co-location, binding, and the 4-companion bound, and the player is notified of the joined companion
+- **WHEN** a verified accept true intent applies
+- **THEN** join_party rechecks ordinary eligibility, co-location, ownership and general quota, adds general identity and preserves all escort sources
 
 #### Scenario: An unavailable dialogue layer degrades to the fixed threshold
-- **WHEN** the dialogue layer is disabled, unreachable, or retry-exhausted
-- **THEN** the invitation degrades to a fixed threshold decision (`affinity >= 70`, the 羈絆 stage floor) with deterministic accept/reject lines
+- **WHEN** the existing dialogue layer is disabled or unavailable
+- **THEN** the existing fixed affinity threshold and deterministic lines apply with no new retry subsystem
 
 #### Scenario: The webclient offers the same invite flow
-- **WHEN** the invite flow is used from the webclient
-- **THEN** a webclient action offers the same flow with the injected client
+- **WHEN** the webclient offers a normal invitation to a temporary-only actor
+- **THEN** the same injected-client preflight and general recruitment flow apply
 
 ### Requirement: The leave command dismisses a companion without affinity change
+The existing leave command and browser flow SHALL remove general membership without changing affinity. Effective escort reasons SHALL require abandonment of selected commissions through the quest owner; dismissal SHALL never silently detach them while their quests stay active, and several reasons SHALL expose the affected commissions and release only the selected ones.
 
-The character cmdset SHALL provide `leave <npc>` (alias 解散) that resolves a bound companion (absent, ambiguous, or unbounded targets produce Traditional Chinese errors) and dismisses it through `leave_party(npc, player, reason="dismissed")`. Dismissal SHALL NOT change affinity in either direction and SHALL notify the player. A webclient action SHALL offer the same flow.
+#### Scenario: General dismissal preserves an escort
+- **WHEN** a dual member's general membership is dismissed
+- **THEN** its valid temporary reasons and row remain, general quota usage decreases, and affinity is unchanged
+
+#### Scenario: Several commissions require a selection
+- **WHEN** dismissal targets a temporary member bound to two active escorts
+- **THEN** both commissions are identified; abandoning the selected commission terminates that record and releases its reason while preserving the other
+
+#### Scenario: Ordinary possessed dismissal keeps the existing refusal
+- **WHEN** manual dismissal targets a possessed general-only member
+- **THEN** the existing handback-first refusal leaves control and membership unchanged
 
 #### Scenario: Dismissal removes the binding
-- **WHEN** a player dismisses a bound companion
-- **THEN** `player.db.party` and the NPC's `party_member` are cleared and the player is notified
+- **WHEN** a general-only companion is dismissed through the existing leave path
+- **THEN** its general source, row and owner back-reference clear and the player is notified after commit
 
 #### Scenario: Dismissal keeps affinity unchanged
 - **WHEN** a player dismisses a companion with a 信賴-stage record
@@ -149,25 +182,35 @@ The character cmdset SHALL provide `leave <npc>` (alias 解散) that resolves a 
 - **THEN** `leave` and its alias appear in `docs/game/command-reference.md`
 
 #### Scenario: A possessed companion refuses dismissal
-- **WHEN** `leave` (or any `leave_party` caller) targets the companion the account possesses
-- **THEN** the fixed handback-first message surfaces and party and possession attributes are
-  unchanged
+- **WHEN** ordinary manual dismissal targets a possessed general-only companion
+- **THEN** the existing handback-first refusal leaves membership and possession unchanged
 
 #### Scenario: Possession refusal is enforced at both layers
-- **WHEN** a companion currently possessed by the caller's account is targeted for dismissal
-- **THEN** the fixed handback-first message is enforced at the command surface AND inside `leave_party` itself, defense-in-depth for every API caller
+- **WHEN** ordinary manual dismissal targets a possessed general-only member
+- **THEN** command and party API both enforce the existing handback-first refusal
+
+#### Scenario: Possessed dismissal and escort abandonment keep their refusals
+- **WHEN** the dismissed member is possessed or carries several escort reasons
+- **THEN** A possessed member's ordinary manual dismissal SHALL retain its handback-first refusal; escort abandonment SHALL use the compensated terminal release contract.
 
 ### Requirement: Companions auto-leave when affinity drops below the invite threshold
+Negative affinity changes SHALL retain existing relationship writes. Automatic departure below the ordinary threshold SHALL be suppressed while any validated active escort reason remains. General-only members SHALL retain ordinary departure behavior and its handback/failure rules. Corrupt or expired temporary reasons SHALL grant no immunity.
 
-The auto-leave recheck hook installed by `affinity-system` SHALL be wired: after every negative affinity delta, when the NPC is a bound companion and the NPC's affinity toward the player drops below the invite threshold (70), the hook SHALL call `leave_party(npc, player, reason="affinity_below_threshold")` as part of the affinity write's transaction. The writer SHALL never send the notification itself. A negative delta that leaves affinity at or above the threshold SHALL NOT end the party.
+#### Scenario: Valid escort survives a negative affinity delta
+- **WHEN** a temporary member's affinity crosses below the invite threshold while its exact owned escort binding remains active
+- **THEN** affinity changes but the NPC stays; a general-only control leaves under the existing rule
+
+#### Scenario: Corrupt temporary source provides no immunity
+- **WHEN** the reason references an unknown, terminal, invalidated, foreign-owned, or differently bound record
+- **THEN** safe membership evaluation rejects that reason and automatic departure receives no escort exemption
 
 #### Scenario: Below-threshold affinity ends the party
-- **WHEN** a bound companion's affinity drops from 70 to 69 through a negative delta
-- **THEN** the party binding is removed with the auto-leave reason, the write API returns the notification line, and the caller notifies the player only after the write commits
+- **WHEN** a general-only member crosses below the ordinary invite threshold through a negative delta
+- **THEN** the existing departure reason applies with ordinary transactional notification behavior
 
 #### Scenario: At-threshold affinity keeps the party
-- **WHEN** a bound companion's affinity drops to exactly 70 through a negative delta
-- **THEN** the party binding remains
+- **WHEN** a general-only member reaches exactly the ordinary threshold
+- **THEN** membership remains
 
 #### Scenario: A failed auto-leave rolls back or aborts the affinity write
 - **WHEN** the leave write fails after the affinity value was lowered below the threshold, or the
@@ -181,14 +224,13 @@ The auto-leave recheck hook installed by `affinity-system` SHALL be wired: after
 - **THEN** no party call or notification occurs
 
 #### Scenario: Auto-leaving a possessed companion releases first
-- **WHEN** a possessed companion's affinity crosses below the threshold
+- **WHEN** a possessed general-only companion has no valid escort reason and its affinity crosses below the threshold, requiring actual ordinary departure
 - **THEN** the possession release commits before the affinity/party atomic opens, and a release
   failure leaves affinity, party binding, and possession all untouched
 
 #### Scenario: A failed leave makes the bound-but-below-threshold state unreachable
-- **WHEN** the leave inside the affinity write's transaction fails
-- **THEN** the failed leave rolls back the entire negative-delta operation, so "affinity below threshold but still bound" is unreachable
-
+- **WHEN** a general-only member departure fails within the negative-affinity operation
+- **THEN** the entire ordinary affinity/party operation rolls back; valid escort immunity remains governed by its explicit source contract
 
 ### Requirement: Deleting an NPC purges its party bindings
 
@@ -265,6 +307,7 @@ The follow function in the party module SHALL move every companion of the traver
 #### Scenario: Follow triggers only on exit paths
 - **WHEN** the player is relocated by a teleport, spawn, or other non-exit move, or a bound companion waits in a different room
 - **THEN** follow does not trigger: companions are not pulled, and a bound companion in a different room is not teleported to the player
+
 ### Requirement: Companions fight as allies in the player's combat session
 When the player engages a hostile target, `engage` SHALL include every bound companion that is co-located, living, and not knocked out in the session's allied team (`player_ids`). Each companion SHALL receive at most one deterministic policy request per round through the session's non-player action provider, and SHALL NOT consume or delay the player's queued request.
 
@@ -371,7 +414,15 @@ skip-safety registration, and the party binding SHALL be unchanged by companion 
   regen over subsequent world-time advances, clearing the knockout marker above 1 HP
 
 ### Requirement: Companions assist the player's quest objectives
-A bound companion's contributions SHALL count toward the quest owner's active objectives: a DEFEAT entry produced by a bound companion's action SHALL advance the owner's matching DEFEAT stage, only while the binding is valid in both directions (the actor appears in the owner's valid party list and the actor's back-reference points to the owner) and the actor is not knocked out. The player's active quest record SHALL be the only record advanced; companions SHALL have no quest log of their own.
+Both membership kinds SHALL use the same safe owner attribution for DEFEAT contributions, with existing living, knockout, battlefield and one-transition rules. REACH SHALL retain its existing owner-arrival and companion co-presence gates. ESCORT SHALL use exact protected-role destination/rendezvous predicates without an unrelated-companion or original-body gate. Possessed NPCs SHALL remain physical actors and the player SHALL remain quest owner.
+
+#### Scenario: Temporary actor contribution belongs to its owner
+- **WHEN** a valid temporary companion produces a counting defeat in combat
+- **THEN** the owner's matching record progresses once and the NPC receives no separate quest log
+
+#### Scenario: Possessed protected actor can complete escort alone
+- **WHEN** the exact possessed protected actor moves to its validated destination or live meeting role while the original player body and unrelated companions remain elsewhere
+- **THEN** the owner's escort evaluates from the physical actor's result without moving the body or rewriting ownership
 
 #### Scenario: A companion's kill advances the owner's DEFEAT objective
 - **WHEN** a bound companion's action lethally defeats a monster matching the owner's active DEFEAT stage, with a valid bidirectional binding and an active battlefield
@@ -454,3 +505,22 @@ The terminal settlement of a combat session SHALL apply the combat-time gauge re
 
 - **WHEN** a session with a companion floored at 1 HP reaches a terminal outcome whose accumulated combat seconds exceed what its regen needs to rise above 1
 - **THEN** the companion's HP rises above 1 and the companion is eligible for a later engagement
+
+### Requirement: Canonical effective membership drives every party consumer
+Every party consumer SHALL use the same ordered bidirectionally validated effective member set. General identity or active exact owned escort reasons SHALL grant membership; stale/deleted/corrupt references SHALL not. Temporary membership SHALL retain ordinary lawful targeting, damage and knockout behavior.
+
+#### Scenario: Real traversal and combat use the exact roster
+- **WHEN** a temporary NPC follows an exit and a wilderness step, engages combat and receives damage
+- **THEN** the same identity follows at most once, adds no clock charge, participates under ordinary combat/targeting policy, and received damage changes its real traits
+
+#### Scenario: Safe readers reject broken membership
+- **WHEN** stale roster IDs, mismatched back-references and corrupt temporary sources are read by each affected consumer
+- **THEN** none yields owner attribution, possession permission, combat membership or affinity immunity
+
+#### Scenario: Knockout retains existing engagement policy
+- **WHEN** a temporary companion is knocked out and later recovers through existing lawful rules
+- **THEN** the escort does not fabricate death and the existing knocked-out engagement behavior remains unchanged
+
+#### Scenario: Complete canonical effective membership drives every party consumer contract
+- **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
+- **THEN** Safe readers SHALL accept general members or valid temporary reasons through the same bidirectionally validated ordered member set. Deleted, stale and corrupt references SHALL grant no membership. Owner lookup, following, combat collection, incoming targeting, affiliation, quest attribution, possession, affinity rechecks and presentation SHALL consume this set. Temporary membership SHALL preserve ordinary living/presence/knockout gates and lawful combat/damage behavior. Existing companion knockout rules SHALL remain applicable; actual committed death from lawful sources SHALL reach escort failure planning. No temporary-only invulnerability SHALL be introduced.

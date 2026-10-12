@@ -1,8 +1,10 @@
 """Party membership: the sole writer of player-party bindings (party-core D-1).
 
-``player.db.party`` holds the list of companion NPC dbids (at most
-``PARTY_MAX_COMPANIONS``) and each companion's ``npc.db.party_member`` holds
-the player's dbid. Only this module assigns those attributes; joins, leaves,
+``player.db.party`` holds one ordered companion ID roster; ``party_meta``
+declares general identity and exact quest/role sources. Only valid general
+identities count toward ``PARTY_MAX_COMPANIONS``. Each companion's
+``npc.db.party_member`` holds the player's dbid. Only this module assigns
+these attributes; joins, leaves,
 and deletion purges write both sides inside one transaction with
 snapshot/restore of both entities' in-process caches, and reads treat a stale
 dbid (a deleted NPC) as an absent companion. The party auto-leave recheck
@@ -17,14 +19,17 @@ or spawn -- with no clock charge, no announce messages, and the party binding
 left untouched.
 """
 
+from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 from django.db import transaction
 
-from world.observability import log_warn
+from world.observability import log_info, log_warn
 from world.maps.wilderness_provider import WILDERNESS_NAME
 
 PARTY_MAX_COMPANIONS = 4
+PARTY_META_ATTRIBUTE = "party_meta"
 
 # Stable join-gate rejection reasons surfaced through ``PartyJoinError.reason``
 # and ``IntentOutcome.reason`` so callers can render distinct feedback.
@@ -33,6 +38,13 @@ REASON_NOT_CO_LOCATED = "not_co_located"
 REASON_ALREADY_COMPANION = "already_companion"
 REASON_PARTY_FULL = "party_full"
 REASON_HANDBACK_FIRST = "handback_first"
+REASON_NOT_PROTECTED_BINDING = "not_protected_binding"
+#: A temporary-only member's companionship is a live escort commission, not a
+#: general dismissal: detaching it silently would abandon the quest without the
+#: player's chosen commission. Both the ``leave`` command and the webclient
+#: ``explore.party_leave`` adapter refuse with this stable reason and name the
+#: affected commissions, pointing at the existing quest-abandonment path.
+REASON_ESCORT_BOUND = "escort_bound"
 
 # Fixed player-facing party lines shared by the ``invite``/``leave`` commands
 # and the webclient ``explore.party_invite``/``explore.party_leave`` adapters,
@@ -43,6 +55,9 @@ ALREADY_COMPANION_MESSAGE = "她已經是你的同伴了。"
 PARTY_FULL_MESSAGE = "你的隊伍已經滿了（最多 4 人）。"
 NOT_DIALOGUE_MESSAGE = "對方無法回應你的邀請。"
 HANDBACK_FIRST_MESSAGE = "請先歸位再解散同伴。"
+ESCORT_BOUND_MESSAGE = (
+    "她仍與你的護送委託同行；請先放棄對應的委託（{quests}）才能解除同行關係。"
+)
 NOT_COMPANION_MESSAGE = "她不是你的同伴。"
 LEAVE_DISMISSED_MESSAGE = "你解散了與她的隊伍。"
 AUTO_LEAVE_MESSAGE = "她與你的羈絆淡去，隊伍解散了。"
@@ -60,6 +75,7 @@ JOIN_REJECTION_MESSAGES: dict[str, str] = {
     REASON_NOT_CO_LOCATED: "她不在這裡。",
     REASON_NOT_NPC: "那不是你可以邀請的對象。",
     REASON_HANDBACK_FIRST: HANDBACK_FIRST_MESSAGE,
+    REASON_NOT_PROTECTED_BINDING: "對方沒有可用的護送委託。",
 }
 
 
@@ -89,7 +105,70 @@ def party_ids(player: Any) -> list[int]:
     raw = player.db.party
     if not raw:
         return []
-    return [int(dbid) for dbid in raw]
+    result = []
+    for entry in raw:
+        try:
+            dbid = int(entry)
+        except (TypeError, ValueError):  # observability: ignore R2: malformed roster entries grant no membership
+            continue
+        if dbid > 0 and dbid not in result:
+            result.append(dbid)
+    return result
+
+
+def party_meta(player: Any) -> dict[str, dict[str, Any]]:
+    """Normalize persisted metadata, including Evennia saved containers."""
+    raw = player.db.party_meta
+    if not isinstance(raw, Mapping):
+        return {}
+    result = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key.isdecimal() or int(key) <= 0:
+            continue
+        if not isinstance(value, Mapping) or type(value.get("general")) is not bool:
+            continue
+        reasons = value.get("reasons")
+        if not isinstance(reasons, Sequence) or isinstance(reasons, (str, bytes)):
+            continue
+        pairs = []
+        for pair in reasons:
+            if (
+                isinstance(pair, Sequence) and not isinstance(pair, (str, bytes))
+                and len(pair) == 2 and all(isinstance(item, str) and item for item in pair)
+                and list(pair) not in pairs
+            ):
+                pairs.append(list(pair))
+        result[key] = {"general": value["general"], "reasons": pairs}
+    return result
+
+
+def member_meta(player: Any, member_id: int) -> dict[str, Any]:
+    """Missing metadata grants no membership; construction declares defaults."""
+    return party_meta(player).get(str(member_id), {"general": False, "reasons": []})
+
+
+def reasons_for(npc: Any, player: Any) -> tuple[tuple[str, str], ...]:
+    from world.quests.escort import valid_reason_pairs
+
+    return valid_reason_pairs(
+        player, member_meta(player, npc.pk)["reasons"], member_id=npc.pk
+    )
+
+
+def has_general_membership(npc: Any, player: Any) -> bool:
+    return member_meta(player, npc.pk)["general"] and npc in live_companions(player)
+
+
+def general_member_ids(player: Any) -> list[int]:
+    metadata = party_meta(player)
+    return [
+        npc.pk for npc in live_companions(player)
+        if metadata.get(str(npc.pk), {}).get("general") is True
+    ]
+
+
+def temporary_member_ids(player: Any) -> list[int]:
+    return [npc.pk for npc in live_companions(player) if reasons_for(npc, player)]
 
 
 def _resolve_live_object(dbid: int) -> Any | None:
@@ -101,29 +180,17 @@ def _resolve_live_object(dbid: int) -> Any | None:
 
 def live_companion_ids(player: Any) -> list[int]:
     """The companion dbids whose NPC still exists (stale dbids are absent)."""
-    from typeclasses.npcs import NPC
-
-    live: list[int] = []
-    for dbid in party_ids(player):
-        obj = _resolve_live_object(dbid)
-        if obj is not None and isinstance(obj, NPC):
-            live.append(dbid)
-    return live
+    return [npc.pk for npc in live_companions(player)]
 
 
 def party_size(player: Any) -> int:
-    """The number of live companions (deleted NPCs never count)."""
-    return len(live_companion_ids(player))
+    """General quota usage; temporary-only members do not consume a slot."""
+    return len(general_member_ids(player))
 
 
 def is_companion(npc: Any, player: Any) -> bool:
-    """Whether ``npc`` is currently bound to ``player`` (O(1) mirror read).
-
-    The player-owned list is the authoritative direction; a stale entry whose
-    NPC no longer exists can never be passed in, so a matching pk is always a
-    live companion.
-    """
-    return npc.pk in party_ids(player)
+    """Whether both binding directions and a legitimate source hold."""
+    return npc in live_companions(player)
 
 
 def bound_owner_of(npc: Any) -> Any | None:
@@ -180,9 +247,13 @@ def live_companions(player: Any) -> list[Any]:
             if not isinstance(obj, NPC):
                 continue
             member = obj.db.party_member
-            if member is not None and int(member) != int(player.pk):
+            if member is None or int(member) != int(player.pk):
                 continue
-            companions.append(obj)
+            metadata = member_meta(player, dbid)
+            if not metadata["general"] and not reasons_for(obj, player):
+                continue
+            if obj not in companions:
+                companions.append(obj)
         except Exception:  # observability: ignore R2: per-entry isolation on a traversal-hook hot path; degrades to skipping that companion
             continue
     return companions
@@ -382,13 +453,19 @@ def join_party(npc: Any, player: Any) -> None:
         raise PartyJoinError(REASON_NOT_NPC)
     if player.location is None or npc.location is not player.location:
         raise PartyJoinError(REASON_NOT_CO_LOCATED)
-    party = party_ids(player)
-    if npc.pk in party or npc.db.party_member is not None:
+    member = npc.db.party_member
+    if has_general_membership(npc, player) or (
+        member is not None and int(member) != int(player.pk)
+    ):
         raise PartyJoinError(REASON_ALREADY_COMPANION)
     live = live_companion_ids(player)
-    if len(live) >= PARTY_MAX_COMPANIONS:
+    if party_size(player) >= PARTY_MAX_COMPANIONS:
         raise PartyJoinError(REASON_PARTY_FULL)
-    _write_binding(npc, player, [*live, npc.pk], player.pk)
+    metadata = party_meta(player)
+    identity = member_meta(player, npc.pk)
+    identity["general"] = True
+    metadata[str(npc.pk)] = identity
+    _write_binding(npc, player, list(dict.fromkeys([*live, npc.pk])), player.pk, metadata)
 
 
 def leave_party(npc: Any, player: Any, reason: str) -> None:
@@ -402,7 +479,8 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
     both surfaces are restored and ``PartyWriteError`` is raised.
     """
     del reason
-    if getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
+    remaining = reasons_for(npc, player)
+    if not remaining and getattr(getattr(npc, "db", None), "possessed_by", None) is not None:
         if int(npc.db.possessed_by) == int(player.pk):
             raise PartyJoinError(REASON_HANDBACK_FIRST)
     party = party_ids(player)
@@ -411,12 +489,19 @@ def leave_party(npc: Any, player: Any, reason: str) -> None:
     bound = npc.pk in party or member_is_ours
     if not bound:
         return
+    metadata = party_meta(player)
+    if remaining and member_is_ours:
+        metadata[str(npc.pk)] = {"general": False, "reasons": [list(pair) for pair in remaining]}
+        _write_binding(npc, player, party, member, metadata)
+        return
+    metadata.pop(str(npc.pk), None)
     member_after = member if (member is not None and not member_is_ours) else None
     _write_binding(
         npc,
         player,
         [dbid for dbid in party if dbid != npc.pk],
         member_after,
+        metadata,
     )
     # A departed companion ends any conversation held with it
     # (webclient-align-07): the conditional clear touches only sessions
@@ -446,22 +531,28 @@ def purge_npc_memberships(npc: Any) -> None:
         return
     player = _resolve_live_object(int(member))
     party_before = party_ids(player) if player is not None else []
+    meta_before = party_meta(player) if player is not None else {}
     try:
         with transaction.atomic():
             if player is not None:
                 player.db.party = [
                     dbid for dbid in party_before if dbid != npc.pk
                 ]
+                metadata = deepcopy(meta_before)
+                metadata.pop(str(npc.pk), None)
+                player.db.party_meta = metadata
             npc.db.party_member = None
     except Exception as error:
         if player is not None:
             player.db.party = list(party_before)
+            player.db.party_meta = meta_before
         npc.db.party_member = member
         raise PartyWriteError("purge_failed", str(error)) from error
 
 
 def _write_binding(
-    npc: Any, player: Any, party_after: list[int], member_after: Any
+    npc: Any, player: Any, party_after: list[int], member_after: Any,
+    meta_after: dict[str, dict[str, Any]],
 ) -> None:
     """Commit one mirrored membership write with snapshot/restore of both sides.
 
@@ -471,21 +562,26 @@ def _write_binding(
     the caller's outer transaction (if any) can roll back as well.
     """
     party_before = list(party_ids(player))
+    meta_before = deepcopy(player.db.party_meta)
     member_before = npc.db.party_member
     try:
         with transaction.atomic():
             player.db.party = list(party_after)
+            player.db.party_meta = meta_after
             npc.db.party_member = member_after
     except Exception as error:
         player.db.party = party_before
+        player.db.party_meta = meta_before
         npc.db.party_member = member_before
         raise PartyWriteError("write_failed", str(error)) from error
+    log_info("party_membership_commit", context={"char": player.pk, "npc": npc.pk})
 
 
 def restore_membership_surfaces(
     player: Any,
     party_before: list[int],
     members_before: dict[int, Any],
+    meta_before: dict[str, dict[str, Any]] | None = None,
 ) -> None:
     """Restore the in-process party surfaces after a rolled-back transaction.
 
@@ -496,8 +592,89 @@ def restore_membership_surfaces(
     rolled-back state. Only this module assigns party attributes (party-core
     single-writer contract).
     """
+    if meta_before is None:
+        # Existing outer owners call after rollback. Retire the Attribute cache
+        # before reading metadata so a nested successful write cannot survive it.
+        player.attributes.reset_cache()
+        meta_before = party_meta(player)
     player.db.party = list(party_before)
+    player.db.party_meta = meta_before
     for npc_pk, member in members_before.items():
         npc = _resolve_live_object(npc_pk)
         if npc is not None:
             npc.db.party_member = member
+
+
+def add_temporary_source(npc: Any, player: Any, record_id: str, role_id: str) -> None:
+    """Add one quest-owned exact source without consuming a general slot."""
+    from typeclasses.npcs import NPC
+    from world.quests.escort import valid_reason_pairs
+
+    if not isinstance(npc, NPC):
+        raise PartyJoinError(REASON_NOT_NPC)
+    member = npc.db.party_member
+    if member is not None and int(member) != int(player.pk):
+        raise PartyJoinError(REASON_ALREADY_COMPANION)
+    pair = [record_id, role_id]
+    if not valid_reason_pairs(player, [pair], member_id=npc.pk):
+        raise PartyJoinError(REASON_NOT_PROTECTED_BINDING)
+    metadata = party_meta(player)
+    identity = member_meta(player, npc.pk)
+    if pair in identity["reasons"] and is_companion(npc, player):
+        return
+    identity["reasons"].append(pair)
+    metadata[str(npc.pk)] = identity
+    _write_binding(
+        npc, player, list(dict.fromkeys([*party_ids(player), npc.pk])), player.pk, metadata
+    )
+
+
+def remove_reason(npc: Any, player: Any, record_id: str, role_id: str) -> None:
+    """Remove exactly one source, handing back control only on actual release."""
+    metadata = party_meta(player)
+    identity = member_meta(player, npc.pk)
+    pair = [record_id, role_id]
+    if pair not in identity["reasons"]:
+        return
+    identity["reasons"] = [entry for entry in identity["reasons"] if entry != pair]
+    from world.quests.escort import valid_reason_pairs
+
+    surviving = valid_reason_pairs(player, identity["reasons"], member_id=npc.pk)
+    retained = identity["general"] or bool(surviving)
+    identity["reasons"] = [list(entry) for entry in surviving]
+    if retained:
+        metadata[str(npc.pk)] = identity
+    else:
+        metadata.pop(str(npc.pk), None)
+    member = npc.db.party_member
+    from world.rules.possession import (
+        release_for_party_change, restore_party_control, snapshot_party_control,
+    )
+
+    party_before = party_ids(player)
+    meta_before = deepcopy(player.db.party_meta)
+    control = snapshot_party_control(player, npc)
+    try:
+        with transaction.atomic():
+            if not retained and member == player.pk:
+                release_for_party_change(npc, player)
+            _write_binding(
+                npc, player,
+                party_before if retained else [dbid for dbid in party_before if dbid != npc.pk],
+                member if retained or member != player.pk else None, metadata,
+            )
+    except Exception:
+        restore_membership_surfaces(player, party_before, {npc.pk: member}, meta_before)
+        restore_party_control(player, npc, control)
+        raise
+
+
+def release_record_reasons(player: Any, record_id: str) -> None:
+    """Release record sources without disturbing another identity."""
+    for dbid, identity in tuple(party_meta(player).items()):
+        npc = _resolve_live_object(int(dbid))
+        if npc is None:
+            continue
+        for quest_id, role_id in identity["reasons"]:
+            if quest_id == record_id:
+                remove_reason(npc, player, quest_id, role_id)

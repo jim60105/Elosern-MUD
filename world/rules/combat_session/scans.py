@@ -34,9 +34,9 @@ def _scan_friendly_fire(
     from typeclasses.npcs import NPC
     from world.rules.affinity import AffinitySource, apply_affinity_change
     from world.rules.affinity_config import get_config
-    from world.rules.party import party_ids
+    from world.rules.party import live_companion_ids
 
-    companion_pks = set(party_ids(actor))
+    companion_pks = set(live_companion_ids(actor))
     if not companion_pks:
         return ()
     player_key = str(actor.key)
