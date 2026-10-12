@@ -23,6 +23,135 @@ from world.rules.guild import register_adventurer
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 
 
+class ScenePackageBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
+    """A confirmed executable direction publishes one linked scene package."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self,
+            "items",
+            "guild_branches",
+            "archetypes",
+            "anchors",
+            "anchor_placements",
+        )
+        super().setUp()
+        register_scenario_director()
+        from world.quests.tests._compile_helpers import _anchor_key
+        from world.quests.tests._scene_package_fixtures import package as _package
+
+        self.anchor = _anchor_key()
+        self.room1.anchor_key = self.anchor
+        self.owner.location = self.room1
+        self.package_payload = _package()
+
+    def _requirement_request(self):
+        from world.narrative.authoring import confirm_draft, save_draft
+
+        draft = save_draft(
+            owner_id=str(self.owner.pk),
+            direction={
+                "summary": "在南門遇見一個女孩，帶她找媽媽。",
+                "kind": "new_story",
+                "thread_id": None,
+                "effects": [],
+                "revisions": [],
+                "requirements": [
+                    {"kind": "place", "text": "南門"},
+                    {"kind": "new_character", "text": "一個女孩"},
+                    {"kind": "private_commission", "text": "帶她找媽媽"},
+                ],
+            },
+            tick=self.now,
+        )
+        return confirm_draft(
+            draft_id=draft.draft_id, owner_id=str(self.owner.pk), tick=self.now
+        )
+
+    def _symbolic_prepared(self, payload=None):
+        from world.narrative.director import prepare_decision, resolve_source
+
+        request = self._requirement_request()
+        source = resolve_source(self.owner.pk, request=request)
+        invocation = prepare_decision(self.owner.pk, source=source, now_tick=self.now)
+        proposal = self.proposal("quest_seed")
+        captured = quest_context(invocation, proposal)
+        self.assertIsNotNone(captured)
+        context, issuer_id = captured
+        # The planning context is symbolic: no guild branch, no rank gate, and
+        # the frozen requirements travel with it.
+        self.assertTrue(context["scene_package"])
+        self.assertNotIn("issuer_branch", context)
+        self.assertEqual(issuer_id, "")
+        self.assertEqual(len(context["requirements"]), 3)
+        prepared = PreparedQuestBeat(
+            json.dumps(context, ensure_ascii=False, sort_keys=True),
+            json.dumps(payload or self.package_payload, ensure_ascii=False),
+            issuer_id,
+        )
+        return invocation, proposal, prepared
+
+    def test_a_requirement_bearing_direction_publishes_one_linked_scene_package(self):
+        from world.quests import scene_store
+
+        invocation, proposal, prepared = self._symbolic_prepared()
+        with self.captureOnCommitCallbacks(execute=True):
+            result = settle_decision(
+                invocation=invocation,
+                proposals=[proposal],
+                prepared_quest=prepared,
+                now_tick=self.now,
+            )
+        self.assertTrue(result.scheduled)
+        quest = result.beat.payload["quest"]
+        self.assertTrue(quest["package_id"])
+        self.assertTrue(quest["symbolic"])
+        self.assertEqual(quest["issuer_key"], "")
+        published = scene_store.package_by_source(result.beat.execution_ref)
+        self.assertIsNotNone(published)
+        self.assertEqual(published.package_id, quest["package_id"])
+        # Publication is an arrangement: nothing was accepted, materialized or
+        # rewarded for the player.
+        self.assertEqual(read_records(self.owner), [])
+
+    def test_a_replay_publishes_no_second_package(self):
+        from world.quests import scene_store
+
+        invocation, proposal, prepared = self._symbolic_prepared()
+        with self.captureOnCommitCallbacks(execute=True):
+            first = settle_decision(
+                invocation=invocation,
+                proposals=[proposal],
+                prepared_quest=prepared,
+                now_tick=self.now,
+            )
+        before = len(scene_store.list_packages())
+        replay = settle_decision(
+            invocation=invocation,
+            proposals=[proposal],
+            prepared_quest=prepared,
+            now_tick=self.now,
+        )
+        self.assertEqual(replay.beat.beat_id, first.beat.beat_id)
+        self.assertEqual(len(scene_store.list_packages()), before)
+
+    def test_an_invalid_package_publishes_nothing_and_fails_the_beat(self):
+        from world.quests import scene_store
+
+        broken = json.loads(json.dumps(self.package_payload))
+        broken["encounters"][0]["role_ids"] = ["ghost"]
+        invocation, proposal, prepared = self._symbolic_prepared(payload=broken)
+        result = settle_decision(
+            invocation=invocation,
+            proposals=[proposal],
+            prepared_quest=prepared,
+            now_tick=self.now,
+        )
+        self.assertEqual(result.outcome, OUTCOME_NO_CONTENT)
+        self.assertEqual(scene_store.list_packages(), [])
+        self.assertEqual(ScheduledBeat.objects.count(), 0)
+
+
 class QuestBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
     def setUp(self):
         open_synthetic_scope(self, "items", "guild_branches", "archetypes", "anchors", "anchor_placements")
