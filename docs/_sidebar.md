@@ -51,6 +51,7 @@
     - [7 大業務情境與調度流程](/development/llm-scenarios)
     - [護欄天梯與語意驗證機制](/development/llm-guardrails)
     - [端點配置與模型調優指南](/development/llm-configuration)
+    - [任務產生的三種模式](/development/quest-generation-modes)
   - [新增魔法指南](/development/adding-spells)
   - [新增物品指南](/development/adding-items)
   - [新增角色模板指南](/development/adding-player-presets)
