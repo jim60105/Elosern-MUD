@@ -93,11 +93,11 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_a_monster_portrait_is_stored_transparent(self):
-        subject = self._subject("low", ArtSubjectKind.MONSTER)
+        subject = self._subject("goblin", ArtSubjectKind.MONSTER)
         self._record(subject)
         with self._client(self.client):
             drain_synchronous(10)
-        target = self.root / "portrait" / "monster" / "low.png"
+        target = self.root / "portrait" / "monster" / "goblin.png"
         disabled_bytes = target.read_bytes()
         requeue(subject)
         fake = FakeCutoutBackend()
@@ -112,7 +112,7 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
     @covers_requirement("art-queue-worker::the-internal-worker-contract-generates-every-output-through-the-sd-webui-client-and-confines-paths-to-the-store-root")
     @covers_requirement("art-portrait-cutout::character-and-monster-portraits-are-stored-with-their-background-removed")
     def test_gallery_portrait_jobs_are_cut_out_on_the_same_terms(self):
-        monster = self._subject("low", ArtSubjectKind.MONSTER)
+        monster = self._subject("goblin", ArtSubjectKind.MONSTER)
         character_image_id = "aaaaaaaa-1111-4111-8111-111111111111"
         monster_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
         character_job = enqueue_gallery_job(
@@ -140,7 +140,7 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
             self.root / "gallery" / "character" / "42" / f"{character_image_id}.png"
         )
         self._assert_region_transparent(
-            self.root / "gallery" / "monster" / "low" / f"{monster_image_id}.png"
+            self.root / "gallery" / "monster" / "goblin" / f"{monster_image_id}.png"
         )
         self.assertEqual(len(gallery_api.cards_for(self._subject("42", ArtSubjectKind.CHARACTER))), 1)
         self.assertEqual(len(gallery_api.cards_for(monster)), 1)
@@ -175,7 +175,7 @@ class CutoutStageTests(WorkerStoreIsolation):  # noqa: E501
         fake = FakeCutoutBackend()
         self._record(self._subject())
         self._record(self._subject("42", ArtSubjectKind.CHARACTER))
-        self._record(self._subject("low", ArtSubjectKind.MONSTER))
+        self._record(self._subject("goblin", ArtSubjectKind.MONSTER))
         with patch("world.art.fake_cutout.FakeCutoutBackend", return_value=fake):
             with self._client(self.client):
                 drain_synchronous(10)

@@ -49,7 +49,7 @@ class TranslationStageTests(WorkerStoreIsolation):
         subjects = (
             self._subject("t_synth_translation", ArtSubjectKind.SCENE),
             self._subject("42", ArtSubjectKind.CHARACTER),
-            self._subject("low", ArtSubjectKind.MONSTER),
+            self._subject("goblin", ArtSubjectKind.MONSTER),
         )
         originals = {}
         for subject in subjects:
