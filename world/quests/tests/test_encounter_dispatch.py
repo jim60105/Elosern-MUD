@@ -110,10 +110,38 @@ class ActivationTests(EncounterDispatchTestBase):
         with patch(
             "world.quests.encounter_dispatch.activate_scene_encounter",
             side_effect=RuntimeError("store exploded"),
-        ):
+        ) as call:
             self.assertEqual(
                 activate_pending_encounters(self.player, room=self.room, tick=5), ()
             )
+        # One candidate's failure never stops the remaining eligible scenes:
+        # both declared encounters were attempted, each in its own savepoint.
+        self.assertEqual(call.call_count, 2)
+        # Nothing was committed and the package store is still usable.
+        self.assertEqual(scene_store.list_role_bindings(self.package_id), [])
+        self.assertEqual(
+            scene_store.packages_for_owner(str(self.player.pk))[0].package_id,
+            self.package_id,
+        )
+
+    def test_instance_layer_encounter_activates_from_the_origin_room(self):
+        from typeclasses.rooms import InstanceRoom
+
+        payload = _package()
+        payload["source_id"] = "synthetic-instance-source"
+        payload["encounters"][0]["locator"] = {"layer": "instance"}
+        published = publish_scene_package(payload, owner=str(self.player.pk))
+        origin = create_object(Room, key="村口")
+        activations = activate_pending_encounters(self.player, room=origin, tick=11)
+        self.assertEqual(
+            [activation.scene_id for activation in activations], ["south_gate"]
+        )
+        self.assertTrue(activations[0].activated)
+        # The one instance room the activation created is the recorded locator.
+        self.assertEqual(InstanceRoom.objects.all().count(), 1)
+        row = scene_store.get_encounter(published.package_id, "south_gate", self.player.pk)
+        self.assertEqual(row.state, scene_store.ENCOUNTER_ACTIVATED)
+        self.assertEqual(row.room_id, activations[0].room_id)
 
     def test_possessed_exploration_keeps_the_original_owner(self):
         companion = create_object(NPC, key="同伴", location=self.room)

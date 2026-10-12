@@ -381,7 +381,13 @@ def _fenced(
     work: DreamDispatch, token: str, fence: Optional[str]
 ) -> Optional[DreamDispatch]:
     """Re-read the row and return it only when the execution fence still holds."""
-    row = DreamDispatch.objects.filter(pk=work.pk).first()
+    # Locked where the backend supports it: without this, a concurrent
+    # recover_interrupted/fence_all commit could land between the read and the
+    # caller's unconditional save on a locking backend, letting a post-shutdown
+    # callback write (SQLite serializes writers, so its tests never show this).
+    row = (
+        DreamDispatch.objects.select_for_update().filter(pk=work.pk).first()
+    )
     if row is None or row.state in TERMINAL_STATES:
         return None
     if not token or row.execution_token != token:

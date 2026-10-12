@@ -177,9 +177,15 @@ def activate_pending_encounters(
             owner, room=position, prerequisite_fact=prerequisite_fact
         ):
             try:
-                activation = activate_scene_encounter(
-                    owner, package_id, scene_id, room=position, tick=int(tick)
-                )
+                # Each candidate runs inside its own savepoint: a failure that
+                # poisons the surrounding movement transaction (a statement
+                # error, or an integrity error escaping the activation
+                # boundary) rolls back to this savepoint instead of aborting
+                # the committed move that triggered the check.
+                with transaction.atomic():
+                    activation = activate_scene_encounter(
+                        owner, package_id, scene_id, room=position, tick=int(tick)
+                    )
             except (ScenePackageNotFound, EncounterUnavailable) as error:
                 log_warn(
                     "scene_encounter_activation_refused",
@@ -190,6 +196,20 @@ def activate_pending_encounters(
                         "reason": str(getattr(error, "reason", error)),
                         "tick": str(tick),
                     },
+                )
+                continue
+            except Exception as error:
+                # One store's technical failure must not stop the remaining
+                # eligible scenes; the savepoint above already rolled it back.
+                log_warn(
+                    "scene_encounter_activation_failed",
+                    context={
+                        "char": str(getattr(owner, "pk", "")),
+                        "package": package_id,
+                        "scene": scene_id,
+                        "tick": str(tick),
+                    },
+                    exc=error,
                 )
                 continue
             if activation.created:
