@@ -192,7 +192,10 @@ var SERVICES_MAX_QUANTITY = 1000;
 var SERVICES_MIN_QUANTITY = 1;
 var SERVICES_MAX_PRESENTATION_KEY = 32;
 var SERVICES_MAX_PRESENTATION_SUMMARY = 240;
-var SERVICES_QUEST_STATES = ["in_progress", "completed", "failed"];
+// Mirrors the server's four-state quest vocabulary (web/webclient/presentation/
+// services.py). "invalidated" is a structured terminal state, so the client
+// accepts the row rather than rejecting the whole panel.
+var SERVICES_QUEST_STATES = ["in_progress", "completed", "failed", "invalidated"];
 var SERVICES_ACTIONS = [
   "guild.register",
   "guild.quest_accept",

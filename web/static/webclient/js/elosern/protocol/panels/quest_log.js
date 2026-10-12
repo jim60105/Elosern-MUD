@@ -31,7 +31,10 @@ var QUEST_LOG_MAX_TRACK_LABEL = C.QUEST_LOG_MAX_TRACK_LABEL;
 // most MAX_QUEST_ROWS stored records in quest-log order; settlement and
 // reward are null when the record's issuance can no longer be
 // resolved; same surrogate guards as the party and objectives mirrors.
-var QUEST_LOG_STATES = ["in_progress", "completed", "failed"];
+// Four-state vocabulary, mirroring web.webclient.presentation.quest_log /
+// services. "invalidated" is a structured terminal state an exclusive outcome
+// writes, so the client accepts and renders it like the other terminal states.
+var QUEST_LOG_STATES = ["in_progress", "completed", "failed", "invalidated"];
 var QUEST_LOG_SETTLEMENTS = ["counter", "auto"];
 
 function validateQuestLogBoundedLine(value, name, field, maximum) {
