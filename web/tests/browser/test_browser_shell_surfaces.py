@@ -34,6 +34,7 @@ def _party_panel(count: int) -> dict:
     return {
         "schema_version": 2,
         "available": True,
+        "general_quota": {"used": min(count, 4), "limit": 4},
         "slots": [
             {
                 "identity": 101 + i,
@@ -42,6 +43,7 @@ def _party_panel(count: int) -> dict:
                 "hp_current": 90 + i,
                 "hp_maximum": 120,
                 "bond_stage": "初識",
+                "membership": {"general": True, "temporary_commissions": []},
             }
             for i in range(count)
         ],

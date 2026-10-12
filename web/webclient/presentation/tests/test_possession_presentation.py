@@ -480,18 +480,25 @@ class PossessionPresentationTests(EvenniaTest):
     )
     def test_party_panel_schema_untouched_and_companion_affordance_present(self):
         """party panel payload schema carries no possession field; vocabulary offers possess."""
-        # The party v2 six-key shape carries no possession-specific field.
+        # The party v2 shape carries no possession-specific field: the panel
+        # adds the general quota and each row adds its membership block.
         ctx = PresentationContext(actor=self.player, protocol_version=1)
         panel = party_presenter(ctx)
         self.assertEqual(panel["schema_version"], 2)
         self.assertTrue(panel["available"])
-        self.assertEqual(set(panel.keys()), {"schema_version", "available", "slots"})
+        self.assertEqual(
+            set(panel.keys()),
+            {"schema_version", "available", "general_quota", "slots"},
+        )
 
         for slot in panel["slots"]:
-            # Slot is standard 6-key row contract
+            # Slot is the standard row contract plus the membership block.
             self.assertEqual(
                 set(slot.keys()),
-                {"identity", "display_name", "portrait_ref", "bond_stage", "hp_current", "hp_maximum"},
+                {
+                    "identity", "display_name", "portrait_ref", "bond_stage",
+                    "hp_current", "hp_maximum", "membership",
+                },
             )
             self.assertNotIn("possessed", slot)
             self.assertNotIn("possess", slot)
