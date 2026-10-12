@@ -148,9 +148,13 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         self.assertEqual(registered, vue, "Vue store allowlist diverged from registry registrations")
 
     def test_party_row_and_display_bounds_are_pinned(self):
-        # The party row cap mirrors the rules companion bound and the shared
-        # display-name ceiling, in Python AND the UMD mirror (review round:
-        # the presenter's "fails loudly" claim needs an executed guard).
+        # The general-quota limit mirrors the rules companion bound and the
+        # ordered-roster envelope bound mirrors the UMD envelope, while the
+        # display-name ceiling is shared across both (review round: the
+        # presenter's "fails loudly" claim needs an executed guard). The old
+        # four-row cap is gone: temporary members sit beyond the general quota,
+        # so the panel renders every effective row and the only remaining row
+        # bound is the envelope safety bound.
         party_source = (
             REPO_ROOT / "web/webclient/presentation/party.py"
         ).read_text(encoding="utf-8")
@@ -162,14 +166,17 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         ).read_text(encoding="utf-8")
         js_source = protocol_client_source()
         values = {
-            "party.PARTY_MAX_ROWS": re.search(
-                r"^PARTY_MAX_ROWS\s*=\s*(\d+)", party_source, re.MULTILINE
-            ),
             "rules PARTY_MAX_COMPANIONS": re.search(
                 r"^PARTY_MAX_COMPANIONS\s*=\s*(\d+)", rules_source, re.MULTILINE
             ),
-            "js PARTY_MAX_ROWS": re.search(
-                r"^var PARTY_MAX_ROWS\s*=\s*(\d+);", js_source, re.MULTILINE
+            "js PARTY_GENERAL_LIMIT": re.search(
+                r"^var PARTY_GENERAL_LIMIT\s*=\s*(\d+);", js_source, re.MULTILINE
+            ),
+            "party.PARTY_MAX_SLOTS": re.search(
+                r"^PARTY_MAX_SLOTS\s*=\s*(\d+)", party_source, re.MULTILINE
+            ),
+            "js PARTY_MAX_SLOTS": re.search(
+                r"^var PARTY_MAX_SLOTS\s*=\s*(\d+);", js_source, re.MULTILINE
             ),
             "affordances MAX_DISPLAY_NAME_CODE_POINTS": re.search(
                 r"^MAX_DISPLAY_NAME_CODE_POINTS\s*=\s*(\d+)",
@@ -182,14 +189,23 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
                 re.MULTILINE,
             ),
         }
+        missing = sorted(key for key, match in values.items() if match is None)
+        self.assertEqual(missing, [], f"pinned bound vanished: {missing}")
         extracted = {key: match.group(1) for key, match in values.items()}
-        self.assertNotIn(None, [match for match in values.values()], extracted)
-        rows = {extracted[key] for key in (
-            "party.PARTY_MAX_ROWS",
+        limits = {extracted[key] for key in (
             "rules PARTY_MAX_COMPANIONS",
-            "js PARTY_MAX_ROWS",
+            "js PARTY_GENERAL_LIMIT",
         )}
-        self.assertEqual(len(rows), 1, f"party row cap drifted: {extracted}")
+        self.assertEqual(len(limits), 1, f"general quota limit drifted: {extracted}")
+        self.assertRegex(
+            party_source,
+            r"(?m)^PARTY_GENERAL_LIMIT\s*=\s*PARTY_MAX_COMPANIONS\s*$",
+        )
+        slots = {extracted[key] for key in (
+            "party.PARTY_MAX_SLOTS",
+            "js PARTY_MAX_SLOTS",
+        )}
+        self.assertEqual(len(slots), 1, f"party roster envelope drifted: {extracted}")
         names = {extracted[key] for key in (
             "affordances MAX_DISPLAY_NAME_CODE_POINTS",
             "js PARTY_MAX_DISPLAY_NAME",
