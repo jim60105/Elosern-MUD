@@ -247,12 +247,21 @@ def activate_pending_encounters(
 
 
 def _refresh_after_commit(owner: Any) -> None:
-    """Refresh the existing action-option projection once activation commits."""
+    """Refresh the existing projections once an activation commits.
+
+    Occupant, affordance and conversation projections are re-derived through the
+    character's own committed seam, so the boundary stays below the presentation
+    layer: only a live, player-driven owner is refreshed, visibility and access
+    gates stay authoritative, and an offline owner simply keeps its durable
+    state for the reconnect sync to publish.
+    """
 
     def refresh() -> None:
-        from typeclasses.characters import _schedule_action_options_after_move
+        from typeclasses.characters import (
+            _schedule_projection_refresh_after_activation,
+        )
 
-        _schedule_action_options_after_move(owner)
+        _schedule_projection_refresh_after_activation(owner)
 
     transaction.on_commit(refresh)
 

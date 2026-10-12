@@ -60,6 +60,43 @@ def _schedule_action_options_committed(actor: Any) -> None:
         )
 
 
+def _schedule_projection_refresh_after_activation(actor: Any) -> None:
+    """Refresh the live session projections after an activation commit.
+
+    A committed activation can add an occupant the player's open window does not
+    know about yet, so the refresh re-derives the same three projections a
+    settled room entry produces, through the existing seams only: the
+    action-options schedule (affordances), and the WebClient full snapshot for
+    each live session (occupants and the dialogue target list), which itself
+    resolves ordinary visibility and access gates. It runs only for a live,
+    player-driven actor, after the commit, and a failure is a bounded diagnostic
+    that never alters the committed activation.
+    """
+    from world.rules.player_control import is_player_driven
+
+    if not is_player_driven(actor):
+        return
+    if isinstance(actor, PlayerCharacter) and getattr(actor, "account", None) is None:
+        return
+    try:
+        from server.option_proposal_service import schedule_action_options
+        from web.webclient.presentation.ingress import refresh_after_command
+        from web.webclient.presentation.watchers import watchers_for
+
+        watchers = tuple(watchers_for(actor))
+        schedule_action_options(actor, watchers=watchers)
+        # ``watchers_for`` pairs each live session with its captured
+        # coordinator epoch; the session is what the snapshot push takes.
+        for session, _epoch in watchers:
+            refresh_after_command(session, actor)
+    except Exception as error:
+        log_warn(
+            "scene_activation_projection_refresh_failed",
+            context={"char": str(getattr(actor, "pk", "?"))},
+            exc=error,
+        )
+
+
 def _schedule_nomination_on_logout(character: Any) -> None:
     """Logout rest-point trigger (title-system D4 §7.1, change G).
 

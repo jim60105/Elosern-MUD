@@ -70,6 +70,104 @@ class EligibilityTests(EncounterDispatchTestBase):
 
 
 class ActivationTests(EncounterDispatchTestBase):
+    def test_activation_refreshes_the_owner_projections_after_commit(self):
+        from unittest.mock import patch
+
+        with patch(
+            "typeclasses.characters._schedule_projection_refresh_after_activation"
+        ) as refresh:
+            with self.captureOnCommitCallbacks(execute=True):
+                activations = activate_pending_encounters(
+                    self.player, room=self.room, tick=5
+                )
+        self.assertTrue(activations)
+        # Post-commit only, and for the owner the activation belongs to.
+        refresh.assert_called_once()
+        self.assertIs(refresh.call_args.args[0], self.player)
+
+    def test_a_refused_activation_refreshes_no_projection(self):
+        from unittest.mock import patch
+
+        with patch(
+            "typeclasses.characters._schedule_projection_refresh_after_activation"
+        ) as refresh:
+            with self.captureOnCommitCallbacks(execute=True):
+                self.assertEqual(
+                    activate_pending_encounters(
+                        self.player, room=self.elsewhere, tick=5
+                    ),
+                    (),
+                )
+        refresh.assert_not_called()
+
+    def _puppet_owner(self):
+        """Give the fixture player a live account, as a puppeted owner has."""
+        from evennia.utils.create import create_account
+
+        self.player.account = create_account(
+            "投影測試", email="projection@example.test", password="testpassword"
+        )
+        return self.player
+
+    def test_the_committed_refresh_pushes_every_live_watcher_session(self):
+        """The body, not the call site: the watcher pairs reach the push.
+
+        ``watchers_for`` returns ``(session, epoch)`` pairs while the snapshot
+        push takes the session, so a pair passed through unpacked would refresh
+        nothing and leave a freshly activated occupant invisible until some
+        unrelated trigger happened to run.
+        """
+        from typeclasses.characters import (
+            _schedule_projection_refresh_after_activation,
+        )
+
+        session = object()
+        watchers = ((session, "epoch-7"),)
+        self._puppet_owner()
+        with patch(
+            "web.webclient.presentation.watchers.watchers_for", return_value=watchers
+        ) as watchers_for, patch(
+            "server.option_proposal_service.schedule_action_options"
+        ) as schedule, patch(
+            "web.webclient.presentation.ingress.refresh_after_command"
+        ) as refresh:
+            _schedule_projection_refresh_after_activation(self.player)
+        watchers_for.assert_called_once_with(self.player)
+        schedule.assert_called_once_with(self.player, watchers=watchers)
+        refresh.assert_called_once_with(session, self.player)
+
+    def test_an_offline_or_non_player_owner_refreshes_no_projection(self):
+        from typeclasses.characters import (
+            _schedule_projection_refresh_after_activation,
+        )
+
+        with patch("web.webclient.presentation.watchers.watchers_for") as watchers_for:
+            _schedule_projection_refresh_after_activation(
+                create_object(NPC, key="路人")
+            )
+            watchers_for.assert_not_called()
+        # A player character with no live session keeps its durable state for
+        # the reconnect sync instead of pushing into a session that is gone.
+        self.player.account = None
+        with patch("web.webclient.presentation.watchers.watchers_for") as watchers_for:
+            _schedule_projection_refresh_after_activation(self.player)
+            watchers_for.assert_not_called()
+
+    def test_a_failing_refresh_is_a_bounded_diagnostic_and_never_raises(self):
+        from typeclasses.characters import (
+            _schedule_projection_refresh_after_activation,
+        )
+
+        self._puppet_owner()
+        with patch(
+            "web.webclient.presentation.watchers.watchers_for",
+            side_effect=RuntimeError("no session handler"),
+        ), patch("typeclasses.characters.log_warn") as warn:
+            _schedule_projection_refresh_after_activation(self.player)
+        self.assertEqual(
+            warn.call_args.args[0], "scene_activation_projection_refresh_failed"
+        )
+
     def test_a_lost_definition_view_is_restored_before_activation(self):
         from world.quests.definitions import QUEST_DEFINITION_REGISTRY
         from world.quests.encounters import ensure_package_views
