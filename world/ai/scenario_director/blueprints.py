@@ -221,7 +221,7 @@ class BlueprintRelation:
 
     def __post_init__(self) -> None:
         _reject_mutable_containers(self, type(self).__name__)
-        if self.kind not in {packages.RELATIONSHIP_KINDS}:
+        if self.kind not in packages.RELATIONSHIP_KINDS:
             raise ValueError(
                 f"relation kind {self.kind!r} is outside "
                 f"{list(packages.RELATIONSHIP_KINDS)}"

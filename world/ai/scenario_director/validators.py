@@ -654,6 +654,11 @@ def _validate_escort_contract(
                     f"stage {index} ESCORT relation endpoints {missing} must be "
                     "declared role references"
                 )
+            if relation.get("from_role") == relation.get("to_role"):
+                errors.append(
+                    f"stage {index} ESCORT relation endpoints must be two "
+                    "distinct roles"
+                )
     return errors
 
 

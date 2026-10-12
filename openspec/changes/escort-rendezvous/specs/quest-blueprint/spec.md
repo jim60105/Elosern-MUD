@@ -97,7 +97,7 @@ Generated escort publication SHALL remain refused until this change's production
 
 #### Scenario: Unsupported request is refused before transport
 - **WHEN** `server/ai_director_service.py` receives an escort request lacking a supported complete role-binding context/template
-- **THEN** `EscortUnavailableError` is surfaced before transport work and no registration or actor creation occurs
+- **THEN** the shared unsupported-template refusal (`NoSuitableTemplateError`) is surfaced before transport work and no registration or actor creation occurs
 
 #### Scenario: Supported generated escort executes through real owners
 - **WHEN** a complete synthetic package passes the implemented service/semantic/compiler/registration path and its authorized offer is accepted, moved and completed

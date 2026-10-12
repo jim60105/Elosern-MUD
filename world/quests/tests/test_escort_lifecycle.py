@@ -973,6 +973,11 @@ def _generated_escort_payload():
         "completion": "rendezvous",
         "protected_role_refs": ["protected"],
         "meeting_role_refs": ["meeting"],
+        "relation": {
+            "kind": "parent_child",
+            "from_role": "meeting",
+            "to_role": "protected",
+        },
     }
     # A rendezvous declares no destination locator.
     payload["stages"][0]["location_req"] = None
