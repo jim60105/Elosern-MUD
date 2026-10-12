@@ -587,6 +587,16 @@ class RequirementsContractTests(DreamDispatchTestCase):
         self.assertEqual(first, requirement_version_for(draft.draft_id, 1))
         self.assertNotEqual(first, requirement_version_for(draft.draft_id, 2))
 
+    def test_the_longest_legal_version_identity_fits_the_client_bound(self):
+        from world.narrative.authoring import MAX_REQUIREMENT_VERSION_LENGTH
+
+        # A session draft's handle is ``dream:<session_id>`` (at most 64 + 6
+        # characters), so this is the longest published identity any client can
+        # receive; the browser mirror validates the same bound and must never be
+        # tighter than the server's own accept bound.
+        longest = requirement_version_for("dream:" + "s" * 64, 999999)
+        self.assertLessEqual(len(longest), MAX_REQUIREMENT_VERSION_LENGTH)
+
     def test_the_store_refuses_malformed_rows_and_stores_normalized_ones(self):
         # The store is the one writer of a shown requirement set, and every
         # client renders and echoes those rows back: a malformed row must never

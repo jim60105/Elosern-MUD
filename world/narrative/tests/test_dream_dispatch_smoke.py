@@ -226,6 +226,34 @@ class DreamDispatchSmokeTests(CompileRegistryIsolation, StoryDirectorBeatsTestCa
             (),
         )
 
+    def test_a_published_private_encounter_activates_without_guild_standing(self):
+        """No guild membership is required for a privately issued encounter."""
+        responses = self._responses()
+        _TransportlessClient.responses = responses
+        with patch("world.ai.client.OpenAICompatClient", _TransportlessClient):
+            request = self._confirm_the_direction()
+            pump.start_pump()
+        settled = dispatch.find_work(
+            dispatch.find_by_submission(request.submission_key).dispatch_id
+        )
+        self.assertEqual(settled.state, dispatch.STATE_ARRANGED)
+        # The confirmed direction declared its own private issuer, so the
+        # arrangement needs no guild branch: an owner without any standing must
+        # still meet the role the package declared, at their actual position.
+        self.owner.guild_rank = None
+        with self.captureOnCommitCallbacks(execute=True):
+            activations = activate_pending_encounters(
+                self.owner, room=self.owner.location, tick=self.now
+            )
+        self.assertTrue(activations)
+        daughter = scene_store.get_role_binding(settled.package_id, "daughter")
+        self.assertIsNotNone(daughter)
+        from evennia.objects.models import ObjectDB
+
+        materialized = ObjectDB.objects.filter(pk=daughter.npc_id).first()
+        self.assertIsNotNone(materialized)
+        self.assertEqual(materialized.location.pk, self.owner.location.pk)
+
     def test_the_smoke_needs_no_model_for_the_deterministic_half(self):
         responses = self._responses()
         _TransportlessClient.responses = responses

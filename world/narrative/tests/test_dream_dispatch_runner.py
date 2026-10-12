@@ -309,3 +309,99 @@ class DispatchRunnerTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase):
         result = self._run(client)
         self.assertEqual(result, RunResult("", "no_work", "", ""))
         self.assertEqual(len(client.calls), 0)
+
+    def test_a_changed_captured_fact_refuses_the_resumed_publication(self):
+        """A relevant fact changed before an interrupted publication resumed."""
+        _request, work = self._queued_work()
+        client = self._client()
+        # Interrupt exactly at the publication boundary: the scene checkpoint
+        # is saved, then the process that held the claim dies before it can
+        # publish, exactly as a crash immediately before publication would.
+        original = dispatch.checkpoint_scene
+
+        def interrupt(row, token, **kwargs):
+            # The checkpoint itself is durable, but the claim that wrote it was
+            # stolen before the pass could continue: the pass defers, leaving
+            # the work parked at the publication stage with the saved scene.
+            original(row, token, **kwargs)
+            dispatch.release_claim(row, token)
+            return False
+
+        with patch(
+            "world.narrative.dispatch_runner.dispatch.checkpoint_scene",
+            side_effect=interrupt,
+        ):
+            self.assertEqual(self._run(client).outcome, "deferred")
+        parked = dispatch.find_work(work.dispatch_id)
+        self.assertEqual(parked.stage, dispatch.STAGE_PUBLISH)
+        self.assertTrue(parked.scene_checkpoint)
+        story_calls = len(client.calls)
+        self.assertEqual(story_calls, 2)
+
+        # The owner's captured authority changes before the resume: the saved
+        # scene was planned for the old rank, so publishing it unchanged would
+        # silently ignore the change.
+        self.owner.guild_rank = "S"
+        self.assertEqual(
+            dispatch.recover_interrupted(process="restarted"), [work.dispatch_id]
+        )
+        result = self._run(client)
+        self.assertEqual(result.outcome, "failed")
+        settled = dispatch.find_work(work.dispatch_id)
+        self.assertEqual(settled.state, dispatch.STATE_FAILED)
+        self.assertEqual(settled.reason_code, dispatch.REASON_STALE_SOURCE)
+        self.assertEqual(settled.package_id, "")
+        self.assertEqual(settled.beat_id, "")
+        self.assertEqual(scene_store.list_packages(), [])
+        # Only the uncommitted stage was revalidated: neither completed stage
+        # ran a model again, under the same work identity.
+        self.assertEqual(len(client.calls), story_calls)
+        self.assertEqual(settled.dispatch_id, work.dispatch_id)
+        self.assertEqual(settled.request_version, work.request_version)
+
+    def test_a_committed_publication_survives_a_restart_without_a_second_package(self):
+        """A crash after commit but before the notice changes nothing on restart."""
+        request, work = self._queued_work()
+        client = self._client()
+        with self.captureOnCommitCallbacks(execute=True):
+            self.assertEqual(self._run(client).outcome, "arranged")
+        settled = dispatch.find_work(work.dispatch_id)
+        published = (
+            settled.decision_id,
+            settled.thread_id,
+            settled.beat_id,
+            settled.package_id,
+        )
+        self.assertTrue(all(published))
+        calls = len(client.calls)
+
+        # A restart fences nothing (an arranged record is terminal), ignores no
+        # waiting record, and the next pass finds no eligible work: the same
+        # arrangement is read back with no second model call, decision, beat,
+        # package, NPC, offer or reward.
+        self.assertEqual(dispatch.recover_interrupted(process="restarted"), [])
+        self.assertEqual(dispatch.consider_waiting(process="restarted"), 0)
+        fresh = self._client()
+        self.assertEqual(self._run(fresh).outcome, "no_work")
+        self.assertEqual(len(fresh.calls), 0)
+        again = dispatch.find_work(work.dispatch_id)
+        self.assertEqual(
+            (
+                again.decision_id,
+                again.thread_id,
+                again.beat_id,
+                again.package_id,
+            ),
+            published,
+        )
+        self.assertEqual(again.state, dispatch.STATE_ARRANGED)
+        self.assertEqual(len(scene_store.list_packages()), 1)
+        self.assertEqual(len(client.calls), calls)
+        # The duplicate confirmation replays the same durable work record and
+        # publishes nothing further.
+        replay = confirm_draft(
+            draft_id=request.draft.draft_id, owner_id=str(self.owner.pk), tick=self.now
+        )
+        self.assertEqual(replay.pk, request.pk)
+        self.assertEqual(dispatch.DreamDispatch.objects.count(), 1)
+        self.assertEqual(len(scene_store.list_packages()), 1)
