@@ -3,6 +3,10 @@
 import json
 from dataclasses import dataclass
 
+from world.ai.scenario_director.generation import (
+    BLUEPRINT_KEYS,
+    PACKAGE_SECTION_KEYS,
+)
 from world.lore.guild import GUILD_RANK_REGISTRY
 from world.observability import log_info, log_warn
 from world.quests.compile import compile_quest_blueprint, register_generated_quest
@@ -59,9 +63,49 @@ def is_scene_package(payload) -> bool:
     """
     return (
         isinstance(payload, dict)
+        and isinstance(payload.get("quest"), dict)
         and isinstance(payload.get("roles"), list)
         and isinstance(payload.get("encounters"), list)
     )
+
+
+def to_scene_package(payload):
+    """Reshuffle one extended beat blueprint into the package payload contract.
+
+    Pure and content-preserving: the embedded quest keeps exactly the blueprint
+    fields and every declared package section moves under its own key, so a
+    single proposal reaches the upstream publication boundary without inventing
+    or dropping anything. A payload that is already a package returns unchanged;
+    ``None`` means the payload is neither shape, and the caller then keeps the
+    legacy quest-only compile path.
+    """
+    #: Sections the upstream package schema requires; a legacy quest-only
+    #: blueprint carries none of them and must keep its compile path.
+    required_sections = (
+        "roles",
+        "relationships",
+        "knowledge",
+        "encounters",
+        "dialogue",
+        "commissions",
+    )
+    if not isinstance(payload, dict):
+        return None
+    if is_scene_package(payload):
+        return dict(payload)
+    if any(key not in payload for key in (*BLUEPRINT_KEYS, *required_sections)):
+        return None
+    package: dict = {
+        "display_name": str(payload.get("display_name") or payload.get("name") or ""),
+        # Publication supplies the durable source identity itself; the package
+        # schema accepts a null one, and an extended blueprint carries none.
+        "source_id": None,
+        "quest": {key: payload[key] for key in BLUEPRINT_KEYS},
+    }
+    for key in PACKAGE_SECTION_KEYS:
+        if key in payload:
+            package[key] = payload[key]
+    return package
 
 
 def quest_context(invocation, proposal):
@@ -138,10 +182,11 @@ def publish_quest_beat(prepared, invocation, proposal, beat, thread, now_tick):
     if current is None or current != (captured, prepared.issuer_id):
         raise _EffectRejected(OUTCOME_STALE)
     payload = json.loads(prepared.blueprint_json)
-    if is_scene_package(payload):
+    package = to_scene_package(payload)
+    if package is not None:
         # A complete scene package: publication goes through the quest owner's
         # package boundary, not the quest-only compile path.
-        _publish_scene_package(invocation, payload, beat, thread, now_tick)
+        _publish_scene_package(invocation, package, beat, thread, now_tick)
         return
     try:
         compiled = compile_quest_blueprint(payload)

@@ -142,6 +142,7 @@ from world.ai.scenario_director.generation import (
     _uninstall_schema,
     generate_quest_blueprint,
     generate_beat_quest_blueprint,
+    generate_beat_scene_blueprint,
     get_template_pool,
     register_scenario_director,
 )

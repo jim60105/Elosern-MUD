@@ -68,9 +68,12 @@ class ScenePackageBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase
             draft_id=draft.draft_id, owner_id=str(self.owner.pk), tick=self.now
         )
 
-    def _symbolic_prepared(self, payload=None):
+    def _symbolic_context(self):
         from world.narrative.director import prepare_decision, resolve_source
 
+        # The fixture's own quest rank is allowed, so the fitness gate is about
+        # the scene rather than about a rank accident.
+        self.owner.guild_rank = self.package_payload["quest"]["rank"]
         request = self._requirement_request()
         source = resolve_source(self.owner.pk, request=request)
         invocation = prepare_decision(self.owner.pk, source=source, now_tick=self.now)
@@ -84,12 +87,82 @@ class ScenePackageBeatTests(CompileRegistryIsolation, StoryDirectorBeatsTestCase
         self.assertNotIn("issuer_branch", context)
         self.assertEqual(issuer_id, "")
         self.assertEqual(len(context["requirements"]), 3)
+        return invocation, proposal, context, issuer_id
+
+    def _symbolic_prepared(self, payload=None):
+        invocation, proposal, context, issuer_id = self._symbolic_context()
         prepared = PreparedQuestBeat(
             json.dumps(context, ensure_ascii=False, sort_keys=True),
             json.dumps(payload or self.package_payload, ensure_ascii=False),
             issuer_id,
         )
         return invocation, proposal, prepared
+
+    def _extended_blueprint(self):
+        """The same proposal flattened into the extended blueprint contract."""
+        extended = dict(self.package_payload["quest"])
+        extended["display_name"] = self.package_payload["display_name"]
+        for key in (
+            "roles",
+            "relationships",
+            "knowledge",
+            "encounters",
+            "dialogue",
+            "commissions",
+            "outcome_groups",
+        ):
+            if key in self.package_payload:
+                extended[key] = self.package_payload[key]
+        return extended
+
+    def test_an_extended_blueprint_generates_and_publishes_one_package(self):
+        # The whole route, end to end: the scenario layer proposes an extended
+        # blueprint, the deterministic core reshuffles it, and settlement
+        # publishes one package whose content is exactly what was proposed.
+        from world.ai.scenario_director.generation import (
+            generate_beat_scene_blueprint,
+        )
+        from world.quests import scene_store
+
+        invocation, proposal, context, issuer_id = self._symbolic_context()
+        extended = self._extended_blueprint()
+        client = _recorded("quest_seed")
+        client.add_response(
+            lambda descriptor: descriptor.schema_id == "scenario_director",
+            json.dumps(extended, ensure_ascii=False),
+        )
+        produced = generate_beat_scene_blueprint(client, context=context).result
+        if produced is None:
+            detail = (
+                client.calls[-1].messages[-1]["content"]
+                if len(client.calls) > 1
+                else "no validation retry was recorded"
+            )
+            self.fail(f"the route produced no payload: {detail[:800]}")
+        self.assertEqual(produced["encounters"], extended["encounters"])
+        self.assertEqual(produced["quest_type"], extended["quest_type"])
+
+        prepared = PreparedQuestBeat(
+            json.dumps(context, ensure_ascii=False, sort_keys=True),
+            json.dumps(produced, ensure_ascii=False),
+            issuer_id,
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            result = settle_decision(
+                invocation=invocation,
+                proposals=[proposal],
+                prepared_quest=prepared,
+                now_tick=self.now,
+            )
+        self.assertTrue(result.scheduled)
+        package_id = result.beat.payload["quest"]["package_id"]
+        published = scene_store.read_package(package_id)
+        self.assertIsNotNone(published)
+        self.assertEqual(published.source_id, result.beat.execution_ref)
+        self.assertEqual(published.payload["encounters"], extended["encounters"])
+        self.assertEqual(published.payload["roles"], extended["roles"])
+        self.assertEqual(published.payload["quest"]["issuer"], extended["issuer"])
+        self.assertEqual(read_records(self.owner), [])
 
     def test_a_requirement_bearing_direction_publishes_one_linked_scene_package(self):
         from world.quests import scene_store
