@@ -70,6 +70,25 @@ class EligibilityTests(EncounterDispatchTestBase):
 
 
 class ActivationTests(EncounterDispatchTestBase):
+    def test_a_lost_definition_view_is_restored_before_activation(self):
+        from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+        from world.quests.encounters import ensure_package_views
+
+        key = self.published.definition_key
+        # Simulate the divergence this recovery exists for: the durable package
+        # survives while the process-local registry lost its view.
+        self.assertIsNotNone(QUEST_DEFINITION_REGISTRY.pop(key, None))
+        self.assertTrue(ensure_package_views(self.package_id))
+        self.assertIn(key, QUEST_DEFINITION_REGISTRY)
+        # Idempotent once registered, and an unknown package is not a target.
+        self.assertFalse(ensure_package_views(self.package_id))
+        self.assertFalse(ensure_package_views("synthetic-unknown-package"))
+        # The activation boundary repairs it by itself, without a caller flag.
+        QUEST_DEFINITION_REGISTRY.pop(key, None)
+        activations = activate_pending_encounters(self.player, room=self.room, tick=5)
+        self.assertTrue(activations)
+        self.assertIn(key, QUEST_DEFINITION_REGISTRY)
+
     def test_post_publication_activation_at_the_current_position(self):
         activations = activate_pending_encounters(self.player, room=self.room, tick=5)
         self.assertEqual(

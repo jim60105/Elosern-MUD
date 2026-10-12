@@ -179,6 +179,36 @@ def _publish_definition_views_for(
         )
 
 
+def ensure_package_views(package_id: str) -> bool:
+    """Re-register one committed package's process-local views when they are gone.
+
+    Publication registers the compiled definition, its spawn requirements and
+    (for a guild-branch package) its offer inside the publication transaction's
+    registration scope. If an exception escapes an *outer* scope while the
+    durable row survives, the registry can lose those views while the package
+    stays committed, and the activation boundary then resolves an unknown
+    definition for that player forever. This restores them from the payload.
+
+    Idempotent: an already-registered package is left untouched and reports
+    ``False``; an unknown package is not a repair target either.
+    """
+    from world.quests.definitions import QUEST_DEFINITION_REGISTRY
+
+    row = scene_store.read_package(package_id)
+    if row is None:
+        return False
+    definition = validate_scene_package(row.payload)
+    key = definition.quest.definition.key
+    if key in QUEST_DEFINITION_REGISTRY:
+        return False
+    _publish_definition_views_for(row, definition)
+    log_info(
+        "scene_package_views_restored",
+        context={"package": package_id, "definition": key},
+    )
+    return True
+
+
 def lookup_story_role(package_id: str, role_id: str) -> StoryRoleLookup:
     """Return one package role's definition and exact binding status (read-only).
 
@@ -217,6 +247,7 @@ def lookup_story_role(package_id: str, role_id: str) -> StoryRoleLookup:
 __all__ = [
     "PublishedPackage",
     "ScenePackageNotFound",
+    "ensure_package_views",
     "SceneRoleNotFound",
     "StoryRoleLookup",
     "lookup_story_role",

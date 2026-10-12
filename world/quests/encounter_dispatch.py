@@ -34,7 +34,7 @@ from world.observability import log_info, log_warn
 
 from . import scene_store
 from .encounter_activation import EncounterUnavailable, activate_scene_encounter
-from .encounters import ScenePackageNotFound
+from .encounters import ScenePackageNotFound, ensure_package_views
 
 __all__ = [
     "activate_pending_encounters",
@@ -177,6 +177,10 @@ def activate_pending_encounters(
             owner, room=position, prerequisite_fact=prerequisite_fact
         ):
             try:
+                # A committed package whose process-local views were lost to an
+                # outer-scope rollback is restored before this player could fail
+                # to resolve its definition.
+                ensure_package_views(package_id)
                 # Each candidate runs inside its own savepoint: a failure that
                 # poisons the surrounding movement transaction (a statement
                 # error, or an integrity error escaping the activation
