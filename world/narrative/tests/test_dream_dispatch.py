@@ -18,7 +18,9 @@ from world.narrative.authoring import (
     DirectionValidationError,
     confirm_draft,
     requirement_version_for,
+    reviewed_version_matches,
     save_draft,
+    stamp_shown_requirements,
     validate_direction,
 )
 from world.narrative.models import DreamDispatch
@@ -408,6 +410,87 @@ class RequirementsContractTests(DreamDispatchTestCase):
         first = requirement_version_for(draft.draft_id, 1)
         self.assertEqual(first, requirement_version_for(draft.draft_id, 1))
         self.assertNotEqual(first, requirement_version_for(draft.draft_id, 2))
+
+
+class ShownRequirementTests(DreamDispatchTestCase):
+    """Only what the surface actually showed can be frozen at confirmation."""
+
+    def _requirement_draft(self):
+        return save_draft(
+            owner_id=self.owner_id,
+            direction=new_story_direction(
+                requirements=[{"kind": "place", "text": "南門"}]
+            ),
+            tick=100,
+        )
+
+    def test_stamping_records_the_shown_version_without_advancing_it(self):
+        draft = self._requirement_draft()
+        self.assertIsNone((draft.direction or {}).get("requirement_version"))
+        stamped = stamp_shown_requirements(draft)
+        self.assertEqual(int(stamped.revision), 1)
+        self.assertEqual(
+            stamped.direction["requirement_version"],
+            requirement_version_for(draft.draft_id, 1),
+        )
+        # Re-presenting the same shown version is idempotent: no new review.
+        again = stamp_shown_requirements(stamped)
+        self.assertEqual(int(again.revision), 1)
+        self.assertEqual(
+            again.direction["requirement_version"],
+            stamped.direction["requirement_version"],
+        )
+
+    def test_stamping_leaves_a_requirement_free_draft_untouched(self):
+        draft = self._draft()
+        self.assertIs(stamp_shown_requirements(draft), draft)
+        self.assertIsNone(draft.direction.get("requirement_version"))
+
+    def test_review_match_requires_the_exact_shown_version(self):
+        draft = stamp_shown_requirements(self._requirement_draft())
+        rows = draft.direction["requirements"]
+        identity = draft.direction["requirement_version"]
+        self.assertTrue(
+            reviewed_version_matches(
+                {"requirements": rows, "requirement_version": identity}, draft=draft
+            )
+        )
+        # A different identity, different rows, or a submission that reviewed
+        # nothing all refuse; so does requirements the server never showed.
+        self.assertFalse(
+            reviewed_version_matches(
+                {"requirements": rows, "requirement_version": "other:v9"}, draft=draft
+            )
+        )
+        self.assertFalse(
+            reviewed_version_matches(
+                {
+                    "requirements": [{"kind": "place", "text": "北門"}],
+                    "requirement_version": identity,
+                },
+                draft=draft,
+            )
+        )
+        self.assertFalse(
+            reviewed_version_matches(
+                {"kind": "new_story", "summary": "改了摘要"}, draft=draft
+            )
+        )
+        plain = self._draft()
+        self.assertTrue(
+            reviewed_version_matches(
+                {"kind": "new_story", "summary": "無需求"}, draft=plain
+            )
+        )
+        self.assertFalse(
+            reviewed_version_matches(
+                {
+                    "requirements": [{"kind": "place", "text": "南門"}],
+                    "requirement_version": "draft:v1",
+                },
+                draft=plain,
+            )
+        )
 
 
 class UnreviewedRequirementsTests(DreamDispatchTestCase):

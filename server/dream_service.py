@@ -10,7 +10,16 @@ from twisted.internet import defer
 from web.webclient.presentation.protocol import check_json_safety, json_byte_size, ProtocolValidationError
 from world.narrative import dream_session as lifecycle
 from world.narrative import dream_surface as surface
-from world.narrative.authoring import AuthoringError, DIRECTION_KEYS, MAX_SUMMARY_CHARACTERS, collaborator_creative_brief, get_draft, validate_direction
+from world.narrative.authoring import (
+    REASON_MESSAGES,
+    AuthoringError,
+    DIRECTION_KEYS,
+    MAX_SUMMARY_CHARACTERS,
+    collaborator_creative_brief,
+    get_draft,
+    reviewed_version_matches,
+    validate_direction,
+)
 from world.observability import log_info, log_warn
 
 enter_after_sleep = surface.enter_after_sleep
@@ -81,6 +90,20 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                 elif action == "confirm":
                     if not summary.strip():
                         return _result("rejected", "empty_direction", "請先提出要確認的故事方向。")
+                    # Bounded shown experience requirements: a submission may
+                    # only freeze what the surface actually showed for this
+                    # draft version. Deterministic equality, no model call.
+                    shown = get_draft(current.draft_id, owner) if current.draft_id else None
+                    if shown is not None and not reviewed_version_matches(payload, draft=shown):
+                        log_warn(
+                            "dream_surface_rejected",
+                            context={**boundary, "reason": "stale_requirements"},
+                        )
+                        return _result(
+                            "rejected",
+                            "stale_requirements",
+                            REASON_MESSAGES["stale_requirements"],
+                        )
                     validation = validate_direction(payload, owner_id=owner)
                     if not validation.valid:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)

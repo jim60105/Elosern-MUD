@@ -337,6 +337,49 @@ def confirm_requirements_match(direction: Mapping[str, Any], *, draft: Any) -> b
     )
 
 
+def stamp_shown_requirements(draft: AuthoringDraft) -> AuthoringDraft:
+    """Record the shown-version identity on a requirement-bearing draft in place.
+
+    The identity describes the draft's *current* revision, so writing it never
+    advances the revision (that is what makes a re-presented draft stable and
+    idempotent) and a draft with no requirements is left exactly as it is. This
+    is the one writer that turns a proposed requirement set into a *shown*,
+    reviewable version; nothing here can freeze requirements a player never saw.
+    """
+    direction = dict(draft.direction or {})
+    if not direction.get("requirements"):
+        return draft
+    identity = requirement_version_for(draft.draft_id, draft.revision)
+    if direction.get("requirement_version") == identity:
+        return draft
+    direction["requirement_version"] = identity
+    draft.direction = direction
+    draft.save(update_fields=["direction", "updated_at"])
+    return draft
+
+
+def reviewed_version_matches(submitted: Any, *, draft: AuthoringDraft) -> bool:
+    """Whether one submitted confirmation reviewed the draft version that was shown.
+
+    Deterministic and offline: a submission carrying no requirements is accepted
+    only when the shown draft carries none either (requirements the player never
+    saw can never be frozen), and a submission carrying requirements must equal
+    the shown version's identity and rows exactly. No model is consulted.
+    """
+    rows = submitted.get("requirements") if isinstance(submitted, Mapping) else None
+    rows = rows or []
+    shown = (draft.direction or {}).get("requirements") or []
+    if not rows:
+        return not shown
+    if not shown or not isinstance(rows, list) or len(rows) != len(shown):
+        return False
+    return (
+        str((submitted or {}).get("requirement_version") or "")
+        == str((draft.direction or {}).get("requirement_version") or "")
+        and list(rows) == list(shown)
+    )
+
+
 def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
     """Deterministically validate a desired direction for one owner.
 
