@@ -11,6 +11,10 @@ outcome is never reported twice.
 The backend is an injectable seam exactly like ``ART_SD_CLIENT``:
 ``resolve_cutout_backend()`` instantiates the ``ART_REMBG_BACKEND`` dotted-path
 class, and the real ``RembgCutoutBackend`` wraps the optional ``rembg`` stack.
+Its sole model is the locked library default ``bria-rmbg`` (BRIA RMBG-2.0),
+which the standard container image bakes in; there is no model-selection
+setting, and the weight's BRIA licence obligations belong to whoever publishes
+or redistributes the image (see ``server/conf/settings.py``).
 ``rembg``/``onnxruntime`` are imported LAZILY inside the first backend call —
 never at module import — so this module stays importable (and the settings
 module stays loadable) on a checkout where the optional stack is absent or
@@ -166,20 +170,33 @@ def _validate_cutout_bytes(result: object) -> None:
         )
 
 
-# One inference session per configured model per process (design D7). The lock
-# guards CONSTRUCTION only — check, lock, re-check — never the inference call,
-# so a future second worker slot would not serialize on the ~3 s pass.
+# The sole removal model: the locked ``rembg`` library default (``bria-rmbg``,
+# i.e. BRIA RMBG-2.0). This is FIXED IDENTITY METADATA for the artifact
+# readiness check, the bounded error messages, and the worker's boundary events
+# — NEVER an argument to ``new_session()`` and never an override surface
+# (design D1). A lock bump that changes the library default or the artifact
+# layout requires a deliberate revision of this contract, which
+# ``world/art/tests/test_cutout.py`` pins against the installed package.
+REMBG_MODEL_NAME = "bria-rmbg"
+
+# One inference session per process (design D7). The lock guards CONSTRUCTION
+# only — check, lock, re-check — never the inference call, so a future second
+# worker slot would not serialize on the ~10 s pass.
 _session_lock = threading.Lock()
-_sessions: dict[str, object] = {}
+_session: object | None = None
 
 
 class RembgCutoutBackend:
     """The real CPU-only backend wrapping the optional ``rembg`` stack.
 
-    Contract (design D7 / D8 / D10, pinned against the locked rembg 2.0.84):
+    Contract (design D1 / D7 / D8, pinned against the locked rembg 2.0.84):
 
     - ``rembg`` is imported lazily inside the first call, never at module
       import.
+    - ``new_session()`` is called with NO model argument — the locked library
+      default (``bria-rmbg``) is the only model — and with
+      ``providers=["CPUExecutionProvider"]``. There is no model-selection
+      parameter, no model-keyed cache, and no ``ART_REMBG_MODEL`` setting.
     - ``U2NET_HOME`` and ``REMBG_HOME`` are BOTH set to
       ``ART_REMBG_MODEL_DIR`` immediately before the lazy import. rembg
       2.0.84's home resolution reads ``REMBG_HOME`` and lets ``U2NET_HOME``
@@ -194,26 +211,29 @@ class RembgCutoutBackend:
       untouched and ONNX Runtime's own default stands. Setting the variable is
       a deliberate PROCESS-GLOBAL mutation (it happens once, under the
       construction lock, with deployment settings restart-bound).
-    - ``ART_REMBG_DOWNLOAD_ENABLED=false`` verifies the model artifact under
+    - ``ART_REMBG_DOWNLOAD_ENABLED=false`` verifies the default artifact under
       the model directory BEFORE importing rembg: absent -> an immediate
       ``art_cutout_unavailable`` with no import, no network, and no unbounded
       wait. 2.0.84 writes the per-model layout
-      (``<home>/models/<model>/<model>.onnx``); the flat layout
-      (``<home>/<model>.onnx``) of older releases is also accepted, so both
-      locations are checked.
+      (``<home>/models/bria-rmbg/bria-rmbg.onnx``); the flat layout
+      (``<home>/bria-rmbg.onnx``) of older releases is also accepted, so both
+      locations are checked. The standard image bakes the artifact, so the
+      ordinary container run never needs this check to pass by fetching.
     - The session requests exactly ``["CPUExecutionProvider"]``; no GPU
       execution provider is ever requested.
+    - At most ONE session is built per process, cached at module level behind
+      the construction lock and shared by every backend instance.
     """
 
     def remove_background(self, png_bytes: bytes) -> bytes:
-        """Remove the background through the cached per-model session."""
+        """Remove the background through the cached process-wide session."""
         session = self._session()
         from rembg import remove  # noqa: PLC0415 - lazy optional stack (design D7)
 
         return remove(png_bytes, session=session)
 
     def _session(self) -> object:
-        """Return the cached session for the configured model, building once.
+        """Return the cached session, building it at most once per process.
 
         The cache read is lock-free (the common path after the first build);
         a miss takes the lock and re-checks before constructing (design D7's
@@ -221,25 +241,21 @@ class RembgCutoutBackend:
         environment setup are serialized while the ~10 s inference call never
         runs under the lock.
         """
-        model = str(settings.ART_REMBG_MODEL)
-        session = _sessions.get(model)
-        if session is not None:
-            return session
-        with _session_lock:
-            session = _sessions.get(model)
-            if session is None:
-                session = self._build_session(model)
-                _sessions[model] = session
-            return session
+        global _session
+        if _session is None:
+            with _session_lock:
+                if _session is None:
+                    _session = self._build_session()
+        return _session
 
-    def _build_session(self, model: str) -> object:
+    def _build_session(self) -> object:
         """Build one CPU-only session; every failure is ``art_cutout_unavailable``.
 
         Runs under ``_session_lock``. The environment setup is deliberately
         process-global and one-time: the model home variables point rembg at
         the persistent cache directory, and the thread cap (when set) reaches
         rembg's session factory through ``OMP_NUM_THREADS`` — the mechanism
-        the locked 2.0.69 supports (see the class docstring).
+        the locked 2.0.84 supports (see the class docstring).
         """
         model_dir = Path(settings.ART_REMBG_MODEL_DIR)
         model_dir.mkdir(parents=True, exist_ok=True)
@@ -251,8 +267,11 @@ class RembgCutoutBackend:
 
         if not bool(settings.ART_REMBG_DOWNLOAD_ENABLED):
             for candidate in (
-                model_dir / f"{model}.onnx",
-                model_dir / "models" / model / f"{model}.onnx",
+                model_dir / f"{REMBG_MODEL_NAME}.onnx",
+                model_dir
+                / "models"
+                / REMBG_MODEL_NAME
+                / f"{REMBG_MODEL_NAME}.onnx",
             ):
                 if candidate.is_file():
                     break
@@ -260,7 +279,7 @@ class RembgCutoutBackend:
                 raise CutoutError(
                     "art_cutout_unavailable",
                     f"ART_REMBG_DOWNLOAD_ENABLED=false and no cached "
-                    f"{model!r} model artifact under {model_dir}",
+                    f"{REMBG_MODEL_NAME!r} model artifact under {model_dir}",
                 )
 
         try:
@@ -274,9 +293,10 @@ class RembgCutoutBackend:
                 f"the rembg stack could not be imported: {error}",
             ) from error
         try:
-            return new_session(model, providers=["CPUExecutionProvider"])
+            return new_session(providers=["CPUExecutionProvider"])
         except Exception as error:
             raise CutoutError(
                 "art_cutout_unavailable",
-                f"the {model!r} inference session could not be built: {error}",
+                f"the {REMBG_MODEL_NAME!r} inference session could not be "
+                f"built: {error}",
             ) from error

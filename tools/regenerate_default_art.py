@@ -1,10 +1,15 @@
 """One-shot maintenance script whose generated default portraits are committed.
 
-The call-site model pin uses permissively licensed isnet-anime rather than the
-runtime's non-commercial BRIA weights. Run from the repository with uv run
---locked python tools/regenerate_default_art.py. Missing weights require both
---allow-download and ART_REMBG_DOWNLOAD_ENABLED=true. --allow-bria deliberately
-uses the configured model instead and must not be used for committed defaults.
+Run from the repository with uv run --locked python tools/regenerate_default_art.py.
+
+The cutout stage has exactly ONE model — the locked rembg default `bria-rmbg`
+(BRIA RMBG-2.0), the same weight the container image bakes in — so this tool no
+longer pins a permissive substitute. The six committed defaults were produced
+with the permissively licensed isnet-anime model BEFORE that model-selection
+escape hatch was removed (rembg-default-baked-model), which is why they carry no
+BRIA obligation; a future regeneration with this tool publishes BRIA-licensed
+pixels, and the publisher owns the applicable licence. Missing weights require
+both --allow-download and ART_REMBG_DOWNLOAD_ENABLED=true.
 
 Repository settings come from the environment: the operator .env (the worktree
 file first, then the primary checkout's) is loaded before Django starts and
@@ -121,7 +126,6 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--key", choices=tuple(DESCRIPTIONS))
     parser.add_argument("--base-url", help="Override SD_WEBUI_BASE_URL for host-side runs")
-    parser.add_argument("--allow-bria", action="store_true", help="Use the ambient model instead of the permissive pin; not for committed defaults")
     parser.add_argument("--allow-download", action="store_true", help="Consent to missing model downloads when enabled in settings")
     args = parser.parse_args()
 
@@ -155,7 +159,9 @@ def main() -> None:
         f"url={settings.ART_SD_BASE_URL}",
         flush=True,
     )
-    model = str(settings.ART_REMBG_MODEL) if args.allow_bria else "isnet-anime"
+    # The sole shipped model, named once in the backend module: there is no
+    # model-selection setting left to consult (rembg-default-baked-model).
+    model = cutout.REMBG_MODEL_NAME
     download = args.allow_download and bool(settings.ART_REMBG_DOWNLOAD_ENABLED)
     model_dir = Path(settings.ART_REMBG_MODEL_DIR)
     if not download and not any(path.is_file() for path in (
@@ -164,7 +170,7 @@ def main() -> None:
     )):
         parser.error(f"missing {model} weights under {model_dir}; pre-place them or enable downloads and pass --allow-download")
     destination = root / "web/static/art/defaults"
-    with override_settings(ART_REMBG_MODEL=model, ART_REMBG_DOWNLOAD_ENABLED=download):
+    with override_settings(ART_REMBG_DOWNLOAD_ENABLED=download):
         client = resolve_sd_client()
         for key in ([args.key] if args.key else DESCRIPTIONS):
             kind, description = DESCRIPTIONS[key]

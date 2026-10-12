@@ -891,8 +891,16 @@ compose.yaml      evennia + volumes; ollama and sd-webui reached over the networ
 .containerignore
 ```
 
-- **Multi-stage.** Builder installs dependencies with BuildKit cache mounts; runtime carries only
-  the venv and application code.
+- **Multi-stage.** Builder installs dependencies with BuildKit cache mounts and acquires the
+  background-removal weight; runtime carries only the venv, the application code, and that
+  build-acquired model artifact.
+- **Deliberate runtime-data exception.** The background-removal weight (BRIA RMBG-2.0,
+  `bria-rmbg`, ~1.02 GB uncompressed) is acquired during the image build into
+  `/app/server/.rembg` and ships in the image, so the container needs no model download and no
+  named volume for it — and an existing `evennia-rembg` volume can neither mask nor seed it. It
+  is the one runtime-data payload the image carries beyond code, and it qualifies the
+  small-image claim below. BRIA's licence obligations for the weight belong to whoever
+  publishes or redistributes the image (rembg-default-baked-model).
 - **Non-root with arbitrary UID.** Group 0 writable, OpenShift-compatible, and no root-owned files
   when run locally.
 - **Python floor is 3.12**, set by Evennia 6.1.0. Do not target 3.11.
@@ -902,9 +910,11 @@ compose.yaml      evennia + volumes; ollama and sd-webui reached over the networ
   load-bearing rather than optional.
 - **Ports.** 4000 telnet, 4001 webserver, 4002 websocket.
 - **Volumes.** SQLite DB, generated art at `/app/server/.art`, `server/logs` (required — see above),
-  static files, and media. Never mount generated files over the importable `world/art/` package.
+  the translation model cache, static files, and media. The background-removal weight is image
+  content, never a volume. Never mount generated files over the importable `world/art/` package.
 - **GPU services stay outside.** Ollama and sd-webui are reached via environment variables or
-  `extra_hosts`; the image needs no GPU runtime and stays small.
+  `extra_hosts`; the image needs no GPU runtime. It is deliberately not a small image: the baked
+  background-removal weight adds roughly 1.02 GB uncompressed (see the exception above).
 
 Authored to the `containerfile-creator` skill's standards.
 

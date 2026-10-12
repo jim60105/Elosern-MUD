@@ -114,7 +114,11 @@ Thumbs.db
 .idea/
 .claude/worktrees/
 .worktrees/
-server/.rembg/models/
+
+# The background-removal weight directory: the sole `bria-rmbg` artifact is
+# acquired by the image build or by a bare-metal first use, never committed —
+# covering both the per-model layout and the upstream-supported flat layout.
+server/.rembg/
 
 # GM portal Vite build output (gm-portal-s1-foundation): always built from
 # web/admin-app sources by `pnpm run build:gm`, never hand-authored.

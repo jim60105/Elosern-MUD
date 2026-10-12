@@ -121,8 +121,7 @@ prompts:
 | `ART_SD_PROBE_TIMEOUT_MS` | 同名 | `5000` | `@art health` 連線探測（`GET /sdapi/v1/samplers`）的總預算毫秒數，1000–60000 包含兩端；僅診斷用途 |
 | `ART_SD_PROBE_CACHE_SECONDS` | 同名 | `300` | 探測判定可重複使用的最長秒數，5–3600 包含兩端；URL／憑證存在性／探測預算任一變更即失效；`@art health` 一律強制重新探測 |
 | `ART_REMBG_ENABLED` | 同名 | `False` | 肖像背景移除（rembg）總開關。`true` 一行即啟用：`#ART_REMBG_ENABLED=true`（寫入 `.env` 後重啟）。場景藝術**永不**去背；種子同步的藝術保留原背景（引擎不重寫操作者供應的檔案） |
-| `ART_REMBG_MODEL` | 同名 | `bria-rmbg` | 去背模型，封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`（不分大小寫）。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重，非商業免費、商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
-| `ART_REMBG_DOWNLOAD_ENABLED` | 同名 | `True` | 允許首次使用時由 rembg 下載模型到持久 volume。`false` 加上預置的 `server/.rembg` volume＝無執行期網路配置；模型缺席時每個肖像 job 立即以有界的 `art_cutout_unavailable` 失敗 |
+| `ART_REMBG_DOWNLOAD_ENABLED` | 同名 | `True` | 標準容器映像在建置時就內建唯一的去背權重 `bria-rmbg`（BRIA RMBG-2.0，約 1.02 GB 未壓縮），執行期不需要下載，映像也未宣告 rembg volume。`false` 是裸機或 `secret_settings.py` 自訂模型目錄的離線配置：把 `models/bria-rmbg/bria-rmbg.onnx` 預先放好再設 `false`，模型缺席時每個肖像 job 立即以有界的 `art_cutout_unavailable` 失敗。⚠️ 授權：`bria-rmbg` 非商業使用免費，商業使用與任何再散布需向 BRIA 取得適用權利，由映像發布者與操作者負責；專案沒有寬鬆授權的替代模型 |
 | `ART_REMBG_ALLOWANCE_SECONDS` | 同名 | `120` | 啟用時每項租約寬限秒數，10–1800 包含兩端；是租約預算而非強制逾時 |
 | `ART_REMBG_THREADS` | 同名 | `0` | ONNX session 執行緒上限，0–256；`0`＝ONNX Runtime 自行決定；非零經 `OMP_NUM_THREADS` 送達（行程全域） |
 | `ART_TRANSLATE_ENABLED` | 同名 | `False` | 提示詞本機前處理總開關。只翻譯含 Han 字的行，保留 authored `source_description` 與 `source_hash`；翻譯失敗會用原始提示詞生成圖片。執行引擎由 `add-ctranslate2-translate-backend` 提供 |
@@ -131,6 +130,10 @@ prompts:
 | `ART_TRANSLATE_BACKEND` | —（僅限程式碼） | `world.art.translate_ct2.CTranslate2Backend` | 第三個 import-executing dotted-path seam，不提供環境變數。測試與瀏覽器 harness 使用 `world.art.fake_translate.FakeTranslator`，不載入翻譯函式庫也不開啟網路連線 |
 
 標註「同名」的設定由同名環境變數設定（變數不存在或空白時用預設值；存在但無效的值會在啟動時直接報錯並點名變數，絕不靜默失效）。完整的三層設定模型、優先順序與驗證規則見[設定與環境變數](/development/settings-and-environment)。
+
+### 去背模型與映像（rembg）
+
+去背階段只有一個模型：鎖定依賴的預設權重 `bria-rmbg`（BRIA RMBG-2.0）。標準映像在**建置時**無條件下載並內建它（未壓縮約 1.02 GB），所以即使 `.env` 關掉去背或關掉執行期下載，映像仍然變大這麼多；建置機器需要能連到模型來源。執行期不需要下載、不需要預置任何 rembg volume，映像也未宣告該路徑為 volume、compose 也不掛載它——**既有的 `evennia-rembg` volume 不會被使用、也不會被刪除或遷移**，它既不能遮蔽映像層，也不影響任何資料。離線環境的作法是把在連網機器上建好的**完整映像**傳過去再設 `ART_REMBG_DOWNLOAD_ENABLED=false`，而不是在離線機器上重新建置。裸機或自訂模型目錄則相反：把 `models/bria-rmbg/bria-rmbg.onnx` 預先放到 `ART_REMBG_MODEL_DIR` 再關下載。若你以自訂 compose override／掛載覆蓋 `/app/server/.rembg`，該掛載就必須自行提供這個權重。⚠️ 授權：`bria-rmbg` 非商業使用免費，商業使用與任何再散布需向 BRIA 取得適用權利；建置或散布映像的人自行負責合規。
 
 ### 翻譯模型種子（zh→en）
 

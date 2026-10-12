@@ -62,6 +62,9 @@ class InventoryTests(unittest.TestCase):
         self.assertNotIn("ART_SD_PASSWORD", call_string_args)
         self.assertNotIn("ART_REMBG_BACKEND", call_string_args)
         self.assertNotIn("ART_REMBG_MODEL_DIR", call_string_args)
+        # The retired choice knob: no environment read may be reintroduced for
+        # it under any call shape (rembg-default-baked-model).
+        self.assertNotIn("ART_REMBG_MODEL", call_string_args)
         self.assertNotIn("ART_TRANSLATE_BACKEND", call_string_args)
         self.assertNotIn("ART_TRANSLATE_MODEL_DIR", call_string_args)
 

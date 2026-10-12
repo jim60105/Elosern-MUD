@@ -34,6 +34,22 @@ def _stage(containerfile: str, name: str) -> str:
     return containerfile[match.start():end]
 
 
+def _model_fetch_run(builder: str) -> str:
+    """The builder stage's model-acquisition RUN block, comments excluded."""
+    lines = builder.splitlines()
+    start = next(
+        index
+        for index, line in enumerate(lines)
+        if line.startswith("RUN U2NET_HOME=/rembg")
+    )
+    block: list[str] = []
+    for line in lines[start:]:
+        block.append(line)
+        if not line.endswith("\\"):
+            break
+    return "\n".join(block)
+
+
 class ContainerContractTests(unittest.TestCase):
     @covers_requirement("container-image::multi-stage-containerfile")
     def test_containerfile_separates_verified_download_build_layout_and_runtime(self):
@@ -53,6 +69,11 @@ class ContainerContractTests(unittest.TestCase):
         final = _stage(containerfile, "final")
         self.assertIn("sha256sum --check", download)
         self.assertRegex(builder, r"uv sync\s+--locked\s+--no-dev")
+        self.assertLess(
+            builder.index("uv sync --locked --no-dev"),
+            builder.index("BriaRmBgSession.download_models()"),
+            "the locked dependency install must precede model acquisition",
+        )
         self.assertRegex(builder, r"id=uv-\$TARGETARCH\$TARGETVARIANT")
         self.assertRegex(builder, r"COPY[^\n]*pyproject\.toml uv\.lock")
         self.assertRegex(vue_dist, r"RUN\s+npm\s+install\s+--global\s+pnpm@12\.5\.1")
@@ -83,7 +104,6 @@ class ContainerContractTests(unittest.TestCase):
             "/app/server/.static",
             "/app/server/.media",
             "/app/server/.art",
-            "/app/server/.rembg",
             "/app/server/.translate",
         }
 
@@ -109,7 +129,7 @@ class ContainerContractTests(unittest.TestCase):
             )
         self.assertIn("find /app -type f -exec chmod 0644", layout)
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    @covers_requirement("container-image::compose-persists-mutable-state-and-exposes-image-data")
     def test_compose_exposes_ports_persists_state_and_keeps_gpu_services_external(self):
         compose = yaml.safe_load(_read("compose.yaml"))
         services = compose["services"]
@@ -123,7 +143,6 @@ class ContainerContractTests(unittest.TestCase):
             {
                 "evennia-db:/app/server/db",
                 "evennia-art:/app/server/.art",
-                "evennia-rembg:/app/server/.rembg",
                 "evennia-translate:/app/server/.translate",
                 "evennia-logs:/app/server/logs",
                 "evennia-static:/app/server/.static",
@@ -138,7 +157,6 @@ class ContainerContractTests(unittest.TestCase):
             {
                 "evennia-db",
                 "evennia-art",
-                "evennia-rembg",
                 "evennia-translate",
                 "evennia-logs",
                 "evennia-static",
@@ -155,28 +173,135 @@ class ContainerContractTests(unittest.TestCase):
         self.assertEqual(bootstrap["volumes"], ["evennia-db:/app/server/db"])
         self.assertIn("evennia createsuperuser", " ".join(bootstrap["command"]))
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
-    def test_the_rembg_model_cache_is_a_named_volume_never_an_image_layer(self):
-        # art-portrait-cutout: the ~1 GB model artifact is fetched at runtime
-        # into a persistent named volume (code-only ART_REMBG_MODEL_DIR), never
-        # baked into the image and never the tmpfs HOME under /tmp. The knobs
-        # arrive through env_file: .env like the rest of the ART_* family, so
-        # compose.yaml carries no ART_REMBG_* interpolation line.
+    @covers_requirement("container-image::compose-persists-mutable-state-and-exposes-image-data")
+    def test_the_default_removal_weight_ships_in_the_image_without_a_rembg_volume(self):
+        # rembg-default-baked-model: the weight comes from an image layer, so
+        # neither a named nor an anonymous volume may sit over
+        # /app/server/.rembg — an old `evennia-rembg` volume is left untouched
+        # and unused instead of masking the baked artifact.
         compose = yaml.safe_load(_read("compose.yaml"))
         evennia = compose["services"]["evennia"]
-        self.assertIn("evennia-rembg:/app/server/.rembg", evennia["volumes"])
-        self.assertIn("evennia-rembg", compose["volumes"])
-        self.assertNotIn(
-            "ART_REMBG_ENABLED", evennia.get("environment", {})
+        self.assertNotIn("evennia-rembg", compose["volumes"])
+        self.assertFalse(
+            [line for line in evennia["volumes"] if ".rembg" in line],
+            "the evennia service must not mount over the baked model path",
         )
+        for name, service in compose["services"].items():
+            with self.subTest(service=name):
+                self.assertFalse(
+                    [line for line in service.get("volumes", []) if ".rembg" in line],
+                    f"{name} must not mount over /app/server/.rembg",
+                )
+        self.assertNotIn("ART_REMBG_", evennia.get("environment", {}))
+
         containerfile = _read("Containerfile")
         layout = _stage(containerfile, "app-layout")
         final = _stage(containerfile, "final")
-        self.assertIn("install -d -m 775 -o root -g 0 /app/server/.rembg", layout)
-        self.assertIn('"/app/server/.rembg"', final)
-        self.assertNotIn("ART_REMBG_", final)
+        volume_match = re.search(r'^VOLUME \[(.+)\]$', final, flags=re.MULTILINE)
+        self.assertIsNotNone(volume_match)
+        self.assertNotIn(
+            "/app/server/.rembg",
+            set(re.findall(r'"([^"]+)"', volume_match.group(1))),
+            "the image must declare no volume for the baked model path",
+        )
+        # Readable and immutable: the exported tree is normalized to root:0 with
+        # 0755 directories and 0644 files — NOT a group-writable runtime cache.
+        self.assertIn("find /app -type d -exec chmod 0755", layout)
+        self.assertIn("find /app -type f -exec chmod 0644", layout)
+        self.assertFalse(
+            [line for line in layout.splitlines() if "install -d" in line and ".rembg" in line],
+            "the obsolete group-writable rembg directory setup must be gone",
+        )
+        self.assertNotIn("ART_REMBG_", containerfile)
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    @covers_requirement(
+        "container-image::the-default-background-removal-model-is-acquired-during-image-build"
+    )
+    def test_the_default_removal_weight_is_acquired_during_the_image_build(self):
+        # Acquisition happens in the builder stage, with the stage's own
+        # virtualenv, after the locked dependency sync and before any
+        # application source reaches the image, so a code-only rebuild reuses
+        # the layer containing the already-acquired weight.
+        containerfile = _read("Containerfile")
+        builder = _stage(containerfile, "builder")
+        fetch = _model_fetch_run(builder)
+        self.assertIn("U2NET_HOME=/rembg", fetch)
+        self.assertIn("REMBG_HOME=/rembg", fetch)
+        self.assertRegex(
+            fetch,
+            r"/venv/bin/python -c \"from rembg\.sessions\.bria_rmbg import "
+            r"BriaRmBgSession; BriaRmBgSession\.download_models\(\)\"",
+            "the locked package's own downloader must acquire the default weight",
+        )
+        self.assertLess(
+            builder.index("uv sync --locked --no-dev"),
+            builder.index("BriaRmBgSession.download_models()"),
+        )
+        # The acquisition is a plain stage output, never solely a cache mount,
+        # passes no model-selection argument, and constructs no inference
+        # session during the build.
+        self.assertNotIn("--mount=type=cache", fetch)
+        self.assertNotIn("new_session", fetch)
+        self.assertNotIn("model_name", fetch)
+        # Application source is copied only by the app-layout stage, which
+        # CONSUMES this builder, so the fetch always precedes it.
+        self.assertNotIn("COPY", builder[builder.index("BriaRmBgSession"):])
+
+    @covers_requirement(
+        "container-image::the-default-background-removal-model-is-acquired-during-image-build"
+    )
+    def test_the_acquired_weight_is_exported_before_permission_normalization(self):
+        layout = _stage(_read("Containerfile"), "app-layout")
+        self.assertRegex(
+            layout,
+            r"(?m)^COPY[ \t]+--chown=root:0[ \t]+--from=builder[ \t]+"
+            r"/rembg/[ \t]+/app/server/\.rembg/[ \t]*$",
+            "the acquired weight must be exported into the application tree",
+        )
+        self.assertLess(
+            layout.index("COPY --chown=root:0 --from=builder /rembg/"),
+            layout.index("find /app -type d -exec chmod 0755"),
+            "the export must land before permission normalization",
+        )
+
+    @covers_requirement(
+        "container-image::the-default-background-removal-model-is-acquired-during-image-build"
+    )
+    def test_acquisition_keeps_checksum_verification_and_fails_on_empty_output(self):
+        containerfile = _read("Containerfile")
+        builder = _stage(containerfile, "builder")
+        # Upstream checksum verification is the default; nothing disables it and
+        # no download error is suppressed. (The fetch comment names the switch it
+        # must NOT set, so the file-wide check looks for a real assignment.)
+        self.assertNotIn("MODEL_CHECKSUM_DISABLED=", containerfile)
+        self.assertNotRegex(
+            containerfile, r"(?m)^\s*ENV\s+MODEL_CHECKSUM_DISABLED"
+        )
+        self.assertNotIn("MODEL_CHECKSUM_DISABLED", _model_fetch_run(builder))
+        self.assertNotRegex(builder, r"(?i)\|\|\s*(?:true|:)\b")
+        self.assertNotRegex(builder, r"(?i)--(?:no|skip)-?check")
+        # A nonempty canonical artifact is REQUIRED in the same RUN, so a failed
+        # fetch, a checksum mismatch, or empty output fails the build rather
+        # than shipping an image that defers the model to first use.
+        fetch = _model_fetch_run(builder)
+        self.assertIn("test -s /rembg/models/bria-rmbg/bria-rmbg.onnx", fetch)
+        self.assertIn("&&", fetch, "the empty-output check must gate the build")
+        self.assertNotIn("||", fetch, "no download failure may be swallowed")
+
+    @covers_requirement(
+        "container-image::the-default-background-removal-model-is-acquired-during-image-build"
+    )
+    def test_build_acquisition_is_independent_of_runtime_switches(self):
+        containerfile = _read("Containerfile")
+        # The image always ships the weight: no build knob, no runtime switch,
+        # and no model-selection argument can omit it.
+        self.assertNotIn("ART_REMBG", containerfile)
+        fetch = _model_fetch_run(_stage(containerfile, "builder"))
+        for forbidden in ("ARG ", "ENV ", "--build-arg", "ART_"):
+            with self.subTest(forbidden=forbidden):
+                self.assertNotIn(forbidden, fetch)
+
+    @covers_requirement("container-image::compose-persists-mutable-state-and-exposes-image-data")
     def test_the_translation_model_cache_is_an_operator_seeded_volume_never_an_image_layer(self):
         # art-prompt-translation: the translation model lives in a persistent
         # named volume (code-only ART_TRANSLATE_MODEL_DIR). Following the
@@ -214,7 +339,7 @@ class ContainerContractTests(unittest.TestCase):
         self.assertNotIn("ART_TRANSLATE_", final)
         self.assertIn("server/.translate/", _read(".containerignore").splitlines())
 
-    @covers_requirement("container-image::compose-yaml-for-local-and-networked-gpu-services")
+    @covers_requirement("container-image::compose-persists-mutable-state-and-exposes-image-data")
     def test_prompt_files_are_baked_and_mounted_read_only(self):
         compose = yaml.safe_load(_read("compose.yaml"))
         volumes = compose["services"]["evennia"]["volumes"]
@@ -254,7 +379,7 @@ class ContainerContractTests(unittest.TestCase):
         self.assertIn("art-seed/", set(_read(".gitignore").splitlines()))
 
     @covers_requirement(
-        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::compose-persists-mutable-state-and-exposes-image-data",
         "container-image::official-artwork-is-excluded-from-publication-inputs-while-built-in-defaults-ship",
     )
     def test_official_artwork_is_mounted_read_only_and_never_baked_into_the_image(self):
@@ -301,7 +426,7 @@ class ContainerContractTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "container-image::compose-yaml-for-local-and-networked-gpu-services",
+        "container-image::compose-persists-mutable-state-and-exposes-image-data",
         "container-image::one-shot-official-artwork-archive-preparation-service",
     )
     def test_the_official_artwork_preparation_service_is_profile_gated_and_confined(self):

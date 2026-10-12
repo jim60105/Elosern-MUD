@@ -61,15 +61,14 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 ### 美術肖像去背（rembg）
 
-本機 CPU 去背階段（`rembg`），在生成與本機轉碼之間對傳輸 PNG bytes 作用，僅套用於角色與怪物肖像（classic 記錄與 gallery 卡片採相同處理；scene 完全不進入 backend）。以一行 `ART_REMBG_ENABLED=true` 開啟。開啟的實際成本有：首次使用下載約 1 GB 模型（快取於持久的 `server/.rembg` volume）、每張肖像約 10 秒 CPU、ONNX session 建立後 Evennia 伺服器行程的常駐記憶體永久增加約 1–1.5 GB（`isnet-anime` 少一個數量級）。
+本機 CPU 去背階段（`rembg`），在生成與本機轉碼之間對傳輸 PNG bytes 作用，僅套用於角色與怪物肖像（classic 記錄與 gallery 卡片採相同處理；scene 完全不進入 backend）。以一行 `ART_REMBG_ENABLED=true` 開啟。此階段只有一個模型：鎖定依賴的預設權重 `bria-rmbg`（BRIA RMBG-2.0，約 1.02 GB 未壓縮），標準容器映像在建置時就把權重放進 `/app/server/.rembg`，執行期不下載、不宣告 rembg volume，也沒有任何模型選擇旋鈕。開啟的實際成本有：每張肖像約 10 秒 CPU，以及 ONNX session 建立後 Evennia 伺服器行程的常駐記憶體永久增加約 1–1.5 GB。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重，非商業使用免費；商業使用與任何再散布都需向 BRIA 取得適用權利，並由映像發布者與操作者自行負責（建置映像本身不授予任何權利）。專案不提供寬鬆授權的替代模型。
 
 | 設定 | 環境變數 | 型別 | 預設值 | 驗證規則／說明 |
 | --- | --- | --- | --- | --- |
-| `ART_REMBG_ENABLED` | `ART_REMBG_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時整條管線與變更前逐位元組相同（設計 D2：程式碼與測試預設不得隱含 1 GB 下載） |
-| `ART_REMBG_MODEL` | `ART_REMBG_MODEL` | 選擇 | `bria-rmbg` | 不分大小寫限於封閉集合 `bria-rmbg/isnet-anime/isnet-general-use/u2net/u2netp`；集合外值啟動即失敗。⚠️ 授權：`bria-rmbg` 封裝 BRIA 授權的 RMBG-2.0 權重，非商業免費，商業使用需向 BRIA 取得授權；`isnet-anime`（約 176 MB）是寬鬆授權的替換品，改一個變數加 `@art requeue` 即可 |
-| `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；False＝支援的離線配置，backend 先檢查模型檔是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
-| `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；首次模型下載刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
-| `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.69 的唯一機制），屬刻意的行程全域設定 |
+| `ART_REMBG_ENABLED` | `ART_REMBG_ENABLED` | 布林 | `False` | 布林字（1/true/yes/on／0/false/no/off，不分大小寫）；False 時整條管線與變更前逐位元組相同（設計 D2：程式碼與測試預設不得觸發任何模型取得） |
+| `ART_REMBG_DOWNLOAD_ENABLED` | `ART_REMBG_DOWNLOAD_ENABLED` | 布林 | `True` | 布林字；標準映像已內建權重，兩種值都不取得任何模型。False＝裸機或 `secret_settings.py` 自訂目錄的離線配置，backend 先檢查唯一預設模型 `bria-rmbg` 的產物是否存在於 `ART_REMBG_MODEL_DIR`，缺席時立即以 `art_cutout_unavailable` 有界失敗（不 import rembg、不觸網、不等待） |
+| `ART_REMBG_ALLOWANCE_SECONDS` | `ART_REMBG_ALLOWANCE_SECONDS` | 整數 | `120` | 10 到 1800 包含兩端；啟用時每項租約寬限，是租約預算而非強制逾時（ONNX 推論無法從其他執行緒中斷）；裸機首次取得模型刻意在此界限之外，由 claim-token 規則（設計 D6a）保證超時安全 |
+| `ART_REMBG_THREADS` | `ART_REMBG_THREADS` | 整數 | `0` | 0 到 256 包含兩端；0＝ONNX Runtime 自行決定；非零值經 `OMP_NUM_THREADS` 送達 session（鎖定 rembg 2.0.84 的唯一機制），屬刻意的行程全域設定 |
 
 ### 美術提示詞翻譯
 
@@ -87,7 +86,7 @@ django.core.exceptions.ImproperlyConfigured: setting ART_SD_STEPS: invalid envir
 
 **模型目錄佈局與種子政策**：該目錄必須包含 CTranslate2 模型目錄 `model/`（內含 `config.json` 與 `model.bin`）與 SentencePiece 來源模型 `sentencepiece.model`，也就是解壓後的 Argos Open Tech `.argosmodel` 封包佈局（`add-ctranslate2-translate-backend`，D3）。取得方式為雙軌（`add-translate-model-download-policy`）。`ART_TRANSLATE_DOWNLOAD_ENABLED=true`（預設）時，backend 在首次使用、建構引擎的鎖內抓取同一個封包進這個目錄（有界、單次、原子落地、驗證 zip 與佈局並保留 CC-BY 4.0 README）；`false` 時未種子的目錄是「有界不可用」，不是下載功能，每次生成記錄一條 `art_translate_failed` 警告並以未翻譯的提示詞出圖（圖片仍然產生）。操作者事先以 `scripts/fetch-translate-model.sh` 種子＋設 `false` 即為離線配置。種子流程見 [提示詞資料庫的「翻譯模型種子」](/gm/prompts)。
 
-**模型快取目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把約 1 GB 產物搬離持久 volume；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。compose 以具名 volume `evennia-rembg` 掛載於 `/app/server/.rembg`。
+**模型目錄（code-only）**：`ART_REMBG_MODEL_DIR = <GAME_DIR>/server/.rembg`，不讀任何環境變數（理由同 `ART_STORE_ROOT`：打錯字會把權重搬離映像內建路徑或裸機快取；容器 `HOME=/tmp` 是 tmpfs，rembg 預設位置會在每次容器重啟時重新下載）。`secret_settings.py` 是唯一的逃生氣閘。標準映像在建置階段把唯一的 `bria-rmbg` 權重放進此目錄（見 `Containerfile`），並以 `root:0`／目錄 0755／檔案 0644 正規化；映像不宣告此路徑為 volume，compose 也不掛載它，因此既有的 `evennia-rembg` volume 既不會遮蔽映像層、也不會被使用。裸機或自訂目錄的離線配置：把 `models/bria-rmbg/bria-rmbg.onnx`（或上游支援的扁平 `bria-rmbg.onnx`）預先放到該目錄，再設 `ART_REMBG_DOWNLOAD_ENABLED=false`。自訂掛載若遮住映像內建路徑，就必須自行提供該權重。
 
 **Alpha 敵對組合啟動即拒絕**：`ART_REMBG_ENABLED=true` 搭配有效 `ART_SD_OUTPUT_FORMAT=jpeg` 在 settings 匯入時直接 `ImproperlyConfigured`（JPEG 的 RGB 正規化會丟掉 alpha，存下帶背景的肖像卻宣稱是去背成品）。檢查位於 `secret_settings` 匯入之後，因此環境與 `secret_settings.py` 兩條覆寫路徑都經過同一個檢查驗證；`png`／`webp`／`avif` 攜帶 alpha，三者啟用階段皆正常啟動。
 
@@ -273,7 +272,7 @@ host-gateway 預設外，其餘 22 個全域 `LLM_*` knob（含 `LLM_API_KEY`）
 | `LLM_PROFILES` 整張地圖 | 結構化的每層地圖（多欄位 wholesale 覆寫）仍以 `secret_settings.py` 為慣用位置；純量調校值改由上述 23 個 `LLM_*` knob（含每層變體）承載 |
 | `ART_SD_CLIENT` | 這是會執行匯入的 dotted path；環境可控制的匯入縫等於讓任何繼承環境在引擎啟動時匯入任意程式碼（匯入注入） |
 | `ART_REMBG_BACKEND`／`ART_TRANSLATE_BACKEND` | 這兩個 local art stage seam 也會執行 dotted-path 匯入；它們分別是第二與第三個 import-executing seam，維持 code-only 可阻止繼承環境載入任意程式碼 |
-| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久卷規則：環境變數打錯字會把約 1 GB 去背模型／翻譯模型悄悄搬離其 volume（`ART_STORE_ROOT` 同規則）；非標準佈局請在 `secret_settings.py` 明確設定 |
+| `ART_REMBG_MODEL_DIR`／`ART_TRANSLATE_MODEL_DIR` | 持久路徑規則：環境變數打錯字會把去背權重悄悄搬離映像內建路徑、或把翻譯模型搬離其 volume（`ART_STORE_ROOT` 同規則）；非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_STORE_ROOT` | 環境變數打錯字會把生成美術悄悄搬到持久卷之外的路徑；非標準佈局請在 `secret_settings.py` 明確設定 |
 | `ART_SD_USERNAME`／`ART_SD_PASSWORD` | 這是憑證；環境變數會洩漏進程序清單與 `compose inspect`。客戶端只在兩個值都非空時送出 Basic auth；密碼永不出現在任何記錄。`LLM_API_KEY` 是憑證禁令唯一的範圍例外（見上方 LLM knob 表），本表其餘項目與 `SECRET_KEY` 類一律維持禁令 |
 

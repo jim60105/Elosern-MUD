@@ -123,7 +123,7 @@ tail -n 100 server/logs/server.log
 若開發環境以容器執行：
 
 1. **僅重置資料庫磁碟區（建議）**：
-   為了保留美術圖片快取（`evennia-art`）、去背模型（`evennia-rembg`）、日誌（`evennia-logs`）等無關資料，僅移除 `evennia-db` 磁碟區：
+   為了保留美術圖片快取（`evennia-art`）、日誌（`evennia-logs`）等無關資料，僅移除 `evennia-db` 磁碟區（去背模型已由映像內建，不再是磁碟區）：
    ```bash
    docker compose stop evennia
    docker compose rm -f evennia
@@ -136,7 +136,7 @@ tail -n 100 server/logs/server.log
    ```
 
 2. **全堆疊完整重置（選用）**：
-   > **警告**：使用 `docker compose down -v` 會一併刪除所有具名磁碟區（包含生成的美術圖片、去背快取、翻譯模型與歷史日誌）。
+   > **警告**：使用 `docker compose down -v` 會一併刪除所有具名磁碟區（包含生成的美術圖片、翻譯模型與歷史日誌）；去背模型內建於映像，不受影響。
    ```bash
    docker compose down -v
    ```
