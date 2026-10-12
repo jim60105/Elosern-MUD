@@ -183,6 +183,58 @@ class ActivationTests(EncounterDispatchTestBase):
         self.assertEqual(activate_pending_encounters(stray, room=self.room, tick=5), ())
 
 
+class PrerequisiteTriggerTests(EncounterDispatchTestBase):
+    """A committed phase moves a declared prerequisite and re-evaluates it."""
+
+    def setUp(self):
+        super().setUp()
+        self.player.location = self.room
+        # Retire the inherited prerequisite-free package so this test observes
+        # only the encounters it declares prerequisites for.
+        self.assertTrue(scene_store.cancel_package(self.published.package_id))
+        payload = _package()
+        payload["source_id"] = "synthetic-prerequisite-source"
+        for encounter in payload["encounters"]:
+            encounter["prerequisites"] = [{"closure": True}]
+        self.published = publish_scene_package(payload, owner=str(self.player.pk))
+        self.package_id = self.published.package_id
+        # Seed the role's committed phase, as materialization would; the
+        # transition below advances it to the closure-backed phase.
+        scene_store.set_dialogue_phase(
+            scene_store.read_package(self.package_id), "daughter", "searching", tick=1
+        )
+
+    def test_a_committed_closure_reaches_the_encounters_that_declared_it(self):
+        from world.quests.story_dialogue import transition_story_dialogue
+
+        # With the prerequisite unmet and the player already at the locator,
+        # nothing activates and no encounter row is written.
+        self.assertEqual(
+            activate_pending_encounters(self.player, room=self.room, tick=5), ()
+        )
+        self.assertIsNone(
+            scene_store.get_encounter(self.package_id, "south_gate", self.player.pk)
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            transition = transition_story_dialogue(
+                self.package_id,
+                "daughter",
+                expected_revision=0,
+                provenance={"closure": True},
+                tick=7,
+            )
+        self.assertTrue(transition.changed)
+        self.assertEqual(transition.phase_id, "everyday")
+        # The commit that moved the fact activated exactly the encounters that
+        # declared it, without the player re-entering.
+        for scene_id in ("south_gate", "market"):
+            row = scene_store.get_encounter(
+                self.package_id, scene_id, self.player.pk
+            )
+            self.assertIsNotNone(row, scene_id)
+            self.assertEqual(row.state, scene_store.ENCOUNTER_ACTIVATED, scene_id)
+
+
 class StatusSyncTests(EncounterDispatchTestBase):
     """Reconnect and startup synchronize the owner's actual current position."""
 

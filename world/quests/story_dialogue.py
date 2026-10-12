@@ -201,6 +201,17 @@ def transition_story_dialogue(
             )
         if actor is not None:
             _grant_role_knowledge(actor, definition, role_id, package_id, tick=tick)
+        # A committed phase can move a fact one of this package's own encounters
+        # declares as its prerequisite. Only those encounters are re-evaluated,
+        # and only after this transition commits, through the one shared
+        # eligibility boundary (design §7). An unrelated scene is never touched.
+        declared = _declared_prerequisite_facts(definition)
+        if declared:
+            transaction.on_commit(
+                lambda: _reevaluate_declared_prerequisites(
+                    row, declared, tick=int(tick)
+                )
+            )
     if actor is not None and participants:
         transaction.on_commit(
             lambda: _refresh_sessions(participants, actor, selected.greeting)
@@ -325,6 +336,46 @@ def _refresh_sessions(participants: tuple[Any, ...], actor: Any, greeting: str) 
         if session is None or session.npc_id != int(actor.pk):
             continue
         open_or_refresh_dialogue(participant, actor, greeting)
+
+
+def _declared_prerequisite_facts(definition) -> frozenset:
+    """The prerequisite fact names this package's own encounters declare."""
+    facts: set[str] = set()
+    for encounter in definition.encounters:
+        for condition in encounter.prerequisites:
+            if isinstance(condition, dict):
+                facts.update(str(key) for key in condition)
+    return frozenset(facts)
+
+
+def _reevaluate_declared_prerequisites(row, facts: frozenset, *, tick: int) -> None:
+    """Re-evaluate the affected encounters of one package, after its commit.
+
+    Scoped twice over: only this package's own encounters reach the shared
+    boundary (it reads the owner's own published packages and matches the
+    declared locator), and only the facts those encounters declare. A player who
+    is offline or standing elsewhere is left alone -- reconnect, startup and
+    ordinary movement reach the same boundary.
+    """
+    from evennia.objects.models import ObjectDB
+
+    from .encounter_dispatch import activate_pending_encounters
+
+    player_ids = {str(row.owner_id)}
+    player_ids.update(
+        str(player) for player in scene_store.encounter_player_ids(row.package_id)
+    )
+    for raw in sorted(player_ids):
+        try:
+            primary_key = int(raw)
+        except (TypeError, ValueError):
+            # observability: ignore R2: a non-numeric owner reference names no live player
+            continue
+        player = ObjectDB.objects.filter(pk=primary_key).first()
+        if player is None or getattr(player, "location", None) is None:
+            continue
+        for fact in sorted(facts):
+            activate_pending_encounters(player, tick=tick, prerequisite_fact=fact)
 
 
 __all__ = [
