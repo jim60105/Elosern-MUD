@@ -70,6 +70,17 @@ SECRET_KEY = _env_path("ELOSERN_BROWSER_SECRET_KEY", "elosern-browser-test-key")
 DATABASES["default"]["NAME"] = _env_path(
     "ELOSERN_BROWSER_DB", DATABASES["default"]["NAME"]
 )
+# Multi-process SQLite contention: every browser test owns one database file
+# shared by the portal and the server (and the one-off migrate/seed processes),
+# and CI runners run the two shard processes side by side while background
+# world-clock/narrative writers hold write transactions. Python's default
+# 5-second busy timeout turns a contended write into OperationalError
+# 'database is locked' (observed as the talk_freeform seam errbacking to
+# dialogue_failed on saturated runners), so the harness raises it to 30s —
+# a test-environment knob that never touches production settings.
+_DB_OPTIONS = dict(DATABASES["default"].get("OPTIONS") or {})
+_DB_OPTIONS.setdefault("timeout", 30)
+DATABASES["default"]["OPTIONS"] = _DB_OPTIONS
 
 # Loopback-only listening services on dynamic ports.
 TELNET_ENABLED = True
