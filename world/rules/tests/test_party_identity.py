@@ -7,6 +7,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
@@ -175,6 +176,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
             reasons_for(npc, self.player), ((source.quest_id, "escortee"),)
         )
 
+    @covers_requirement("party-system::canonical-effective-membership-drives-every-party-consumer")
     def test_terminal_foreign_and_differently_bound_reasons_grant_nothing(self):
         npc = self._npc()
         record = self._source(npc)
@@ -193,6 +195,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
             add_temporary_source(npc, stranger, record.quest_id, "escortee")
         self.assertIsNone(stranger.db.party)
 
+    @covers_requirement("party-system::canonical-effective-membership-drives-every-party-consumer")
     def test_corrupt_missing_and_deleted_surfaces_grant_no_identity(self):
         npc = self._npc()
         join_party(npc, self.player)
@@ -269,6 +272,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         self.assertFalse(schedule_silenced(npc))
         self.assertIs(npc.location, self.room)
 
+    @covers_requirement("companion-possession-core::every-exit-path-releases-the-possession")
     def test_last_source_hands_back_but_surviving_sources_preserve_control(self):
         from world.rules.possession import current_possession, enter_possession
 
@@ -285,6 +289,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
         with self.assertRaises(PartyJoinError):
             leave_party(npc, self.player, "dismissed")
 
+    @covers_requirement("companion-possession-core::every-exit-path-releases-the-possession")
     def test_temporary_last_source_release_clears_control_after_reload(self):
         from world.rules.possession import current_possession, enter_possession
 
@@ -300,6 +305,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
             self.assertIsNone(npc.db.possessed_by)
             self.assertFalse(is_companion(npc, self.player))
 
+    @covers_requirement("companion-possession-core::every-exit-path-releases-the-possession")
     def test_write_after_successful_handback_restores_control_and_membership(self):
         from world.rules.possession import current_possession, enter_possession
 
@@ -319,6 +325,7 @@ class PartyIdentityTests(QuestRegistryIsolation, EvenniaTest):
             self.assertEqual(party_meta(self.player), before)
             self.assertTrue(is_companion(npc, self.player))
 
+    @covers_requirement("companion-possession-core::every-exit-path-releases-the-possession")
     def test_technical_handback_refusal_keeps_last_source(self):
         from world.rules.possession import enter_possession
 

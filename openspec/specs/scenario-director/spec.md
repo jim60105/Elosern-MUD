@@ -454,8 +454,19 @@ drift.
 - **THEN** it is accepted only as an empty list
 
 ### Requirement: The deterministic compile boundary translates validated proposals into the runtime type
+The compiler SHALL revalidate shared schema and immutable lore constraints before mutation, producing immutable runtime definitions, rewards, issuance declarations and scene requirements. Escort publication SHALL admit the complete proved protected-role/destination-or-rendezvous flow and refuse incomplete contracts. Symbolic issuer roles SHALL remain unresolved/unregistered until activation authorizes the exact bound issuer; explicit runtime issuer keys SHALL require an authorized carrier.
 
-The deterministic compile boundary SHALL revalidate proposals against shared schema and immutable lore constraints before mutation and produce the runtime definitions, rewards, issuance declarations and scene requirements. Every guardrail-checked constraint SHALL remain re-checked, invalid proposals SHALL raise named errors before writes, and ESCORT publication SHALL remain refused. Registration SHALL stay strict, atomic, conflict-rejecting and idempotent.
+#### Scenario: Existing compiler and issuer behavior remains strict
+- **WHEN** equal ordinary content, distinct authorized issuers, unauthorized runtime keys and conflicting registrations are exercised
+- **THEN** equal content is idempotent, authorized issuances coexist, unauthorized keys refuse, and conflict leaves no partial durable or registry state
+
+#### Scenario: Symbolic planning still grants no runtime authority
+- **WHEN** a complete escort package names an unmaterialized symbolic issuer role
+- **THEN** publication creates no actor, accepted quest or runtime commission until authorized encounter activation
+
+#### Scenario: Escort predicate differences affect content identity
+- **WHEN** payloads differ only in protected/meeting roles, completion mode, relation or group final-result references
+- **THEN** their runtime-critical content is included in stable identity and cannot overwrite another definition silently
 
 #### Scenario: Symbolic issuer planning creates no commission
 - **WHEN** a package declares a validated role-issued commission whose actor is unmaterialized
@@ -602,24 +613,34 @@ The deterministic compile boundary SHALL revalidate proposals against shared sch
 - **WHEN** a raw AI-shaped dict is offered for registration
 - **THEN** `register_quest_definition` still rejects it; the compile boundary is the sole sanctioned translator and AI dicts never enter `QUEST_DEFINITION_REGISTRY` directly
 
+#### Scenario: The retained rule set and registration behavior
+- **WHEN** an ordinary proposal, a whole package or a conflicting registration is compiled
+- **THEN** The existing rule set SHALL remain: contiguous indices, supported kinds, quantity/deadline, item/tier/archetype, characterization, age, rank reward band, zero private merit, empty unsupported failure clause and bound-target quantity rules.
+- **THEN** Permanent occupants SHALL retain validated package ownership/retention. Whole-package validation SHALL retain unambiguous locators, exact role/scene references, reciprocal relations, provenance-bearing knowledge, reachable dialogue, scoped authority and registered effects.
+- **THEN** Registration SHALL remain atomic, conflict-rejecting and idempotent, using stable runtime/scene characterization digests extended with the new completion/group fields. Separate issuer identities SHALL coexist and raw proposal mappings SHALL never enter runtime registries.
+
 ### Requirement: Scene-bound proposal stages are validated before publication
-The `scenario_director` guardrail semantic validators and the deterministic compiler SHALL both
-enforce the same scene-bound rules, so the two sides cannot drift, covering the occupant-layer,
-escort-destination, bound-target-quantity, and `anchor_near` rules pinned by the scenarios below.
-Every violation SHALL be reported as a validation error that triggers a retry on the generative path
-and a named `QuestCompileError` on the deterministic path, before any publication.
+Semantic validators and deterministic compilation SHALL enforce the same validated package ownership/retention, bound-target quantity, registry locator/anchor and escort-binding rules. ESCORT SHALL permit exactly the implemented destination or rendezvous contract with complete protected roles and validated meeting/relation references. Escort participants SHALL resolve existing published roles without destination auto-spawn or invented nearby actors.
+
+#### Scenario: Closed escort validation agrees across boundaries
+- **WHEN** complete destination and rendezvous packages and malformed mixed/role-less alternatives are submitted to semantic validation and compilation
+- **THEN** complete supported packages agree on acceptance and malformed alternatives agree on side-effect-free rejection
+
+#### Scenario: Unsupported templates never invent a protected actor
+- **WHEN** an ordinary offline escort template lacks published protected-role and completion declarations
+- **THEN** it stays unavailable and no nearby NPC is chosen or spawned to make it pass
+
+#### Scenario: Existing scene-bound constraints remain enforced
+- **WHEN** ordinary occupants lack instance/package ownership, a bound DEFEAT exceeds its target count, or `anchor_near` is unknown
+- **THEN** both validators reject before writes
 
 #### Scenario: An occupant-bearing stage must be an instance scene
-- **WHEN** a payload declares `npc_reqs` with `location_req.layer` set to `"anchor"` or `"grid"`
-- **THEN** both the semantic validator and the compiler reject it, so no scene occupant is ever
-  spawned into a permanent room
+- **WHEN** ordinary occupant-bearing stage data lacks instance ownership or a validated upstream permanent package ownership/retention contract
+- **THEN** semantic validation and compilation refuse before any state change
 
 #### Scenario: An ESCORT stage must be a permanent destination
-- **WHEN** a payload declares an ESCORT objective at `location_req.layer: "instance"` (or an ESCORT
-  objective together with `npc_reqs`)
-- **THEN** both the semantic validator and the compiler reject it, so the SceneBuilder never spawns
-  an escort's protected entities into the destination room and never auto-completes the escort on
-  entry
+- **WHEN** an escort declares any locator or roles without the complete protected-role and closed completion contract
+- **THEN** both validation paths reject; complete destination supports existing anchor/XYZ/bound-instance locators and complete rendezvous needs no fixed destination
 
 #### Scenario: A bound-target DEFEAT quantity is bounded by its targets
 - **WHEN** a DEFEAT stage declares `npc_reqs` and an objective `quantity` greater than the number of
@@ -639,12 +660,12 @@ and a named `QuestCompileError` on the deterministic path, before any publicatio
   compiler deterministically
 
 #### Scenario: Occupants require an instance layer
-- **WHEN** a stage declares any `npc_req` entry
-- **THEN** its `location_req.layer` must be exactly `"instance"` — occupant-bearing scenes must be reclaimable instances, never permanent rooms, so permanent maps are never polluted by spawned scene NPCs and scene occupants always have a reclaim lifecycle
+- **WHEN** ordinary disposable stage occupants are declared outside an instance without validated package ownership and retention
+- **THEN** publication refuses; upstream validated permanent-role ownership remains supported
 
 #### Scenario: Escorts require permanent destinations and no occupants
-- **WHEN** an ESCORT stage is validated
-- **THEN** it must use a permanent (`anchor`/`grid`) destination, never `"instance"` and never `npc_reqs` — the SceneBuilder locates permanent rooms only, so it never spawns an escort's protected entities into a destination room (which would auto-complete the escort on entry) and never pollutes a permanent map
+- **WHEN** a proposal tries to satisfy escort by inventing destination occupants instead of binding published protected roles
+- **THEN** both validators reject; supported exact protected bindings and destination/rendezvous fields are required
 
 #### Scenario: Bound-target quantities stay satisfiable
 - **WHEN** a DEFEAT stage declares `npc_reqs`
@@ -653,6 +674,10 @@ and a named `QuestCompileError` on the deterministic path, before any publicatio
 #### Scenario: A declared anchor_near must be a placed anchor
 - **WHEN** a stage declares a non-`None` `location_req.anchor_near`
 - **THEN** it must name a key present in `ANCHOR_PLACEMENT_REGISTRY`
+
+#### Scenario: Occupant ownership and named publication errors
+- **WHEN** a stage occupant or an invalid declaration reaches either boundary
+- **THEN** Ordinary stage occupants SHALL retain instance ownership unless explicitly package-owned under the upstream permanent-role contract. Invalid declarations SHALL return generative validation errors and deterministic `QuestCompileError` before publication, and unsupported templates and arbitrary failure-condition expressions SHALL remain rejected.
 
 ### Requirement: Hook registration is atomic, idempotent, and boot-tolerant
 `register_scenario_director()` SHALL install the output schema, every semantic validator, and the
@@ -740,3 +765,22 @@ Generated package schemas and deterministic compilation SHALL derive from the sa
 #### Scenario: Canonical package round-trip preserves references
 - **WHEN** a schema-valid synthetic package is compiled, published, and reloaded
 - **THEN** its normalized role references, dialogue definitions, quest requirements and source identity remain unchanged and independently revalidate
+
+### Requirement: Canonical generated escort payloads preserve all executable references
+The shared schema/proposal/payload/compiler/restore contract SHALL preserve exact package, commission, protected/meeting roles, typed relations, closed completion and explicit final-result groups. Distinct alternatives SHALL retain separate definition/issuance/reward references. New fields SHALL enter content identity and independently revalidate at compilation and registration.
+
+#### Scenario: Complete escort references round-trip
+- **WHEN** a synthetic related-role package with distinct commissions is compiled, published and restored
+- **THEN** every completion/relation/group reference and reward survives unchanged, different predicate content has different identity, and no accepted record is fabricated
+
+#### Scenario: Direct compiler or registration bypass refuses
+- **WHEN** schema validation is skipped or a compiled escort is manually constructed without complete binding metadata
+- **THEN** deterministic compilation or generated registration raises `QuestCompileError` before registry/durable publication
+
+#### Scenario: Existing unsafe mechanical fields stay rejected
+- **WHEN** a proposal injects typeclass paths, out-of-range ages, unknown registry keys, nonempty unsupported failure clauses, unauthorized runtime issuers or private merit
+- **THEN** existing semantic/compiler rejection remains with no state mutation
+
+#### Scenario: Complete canonical generated escort payloads preserve all executable references contract
+- **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
+- **THEN** The shared versioned blueprint schema, immutable proposal type, canonical payload, compiler and durable restore SHALL carry exact package/commission/protected/meeting role references, closed completion fields, typed relations and explicit exclusive final-result group membership. Quantity one, contiguous stages, registry-derived mechanics/rewards, age bounds, namespaced issuer authority, zero private merit and empty unsupported failure conditions SHALL remain enforced. Symbolic issuer roles SHALL remain planning declarations until authorized actor activation. Distinct alternatives SHALL retain separate definition/issuance/reward references. The content digest SHALL include all new runtime-critical fields; equal content SHALL remain idempotent and conflicting registration SHALL remain atomic. `compile_quest_blueprint` and generated registration SHALL independently reject incomplete or forged executable escort contracts before writes.

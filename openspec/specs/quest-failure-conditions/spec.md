@@ -5,6 +5,7 @@ Deterministic quest failure: world-clock deadline expiry through the existing or
 and key-entity defeat failure for bound protected entities, each atomic with the originating transition.
 
 ## Requirements
+
 ### Requirement: Quest deadline settlement is registered from the server startup composition root
 `world/quests/bootstrap.py::sync_quest_runtime()` SHALL register
 `settle_quest_deadlines` through `register_event_source("quest_deadlines", ...)`. The server
@@ -56,14 +57,11 @@ unpinned by quest settlement before map-instance evaluates it.
   advance returns
 
 ### Requirement: Defeat of an exact protected entity fails its active quests atomically
-The quest action event-effect planner SHALL compare each `target_defeated.data["target_id"]` against
-active records' `protected_entity_ids`. Every exact match SHALL stage a failure with reason
-`protected_entity_defeated` and release that quest's instance pin in the same action commit. It SHALL
-not compare display keys, monster tiers, or `objective_target_ids` for this failure condition.
+The failure planner SHALL match exact protected IDs and actual committed death, never display keys or objective-target sets. The canonical failure reason SHALL be protected_actor_dead for protected records; the old protected_entity_defeated reason SHALL be replaced without an alias. Hostile/environmental death SHALL fail each active affected escort and release its reasons/pins atomically with originating damage, compensating control and caches. Ordinary knockout SHALL not count as death.
 
 #### Scenario: Protected NPC death fails an escort quest
-- **WHEN** a hostile action lethally damages the exact NPC dbref protected by an active escort quest
-- **THEN** the damage, quest failure, and pin release commit together
+- **WHEN** a lawful hostile or environmental source commits exact protected NPC death
+- **THEN** damage, protected_actor_dead failure, exact pin/source release and required handback commit together, with no payout or successful reunion
 
 #### Scenario: Same display key does not create a false failure
 - **WHEN** another NPC shares the protected NPC's display key but has a different dbref and is defeated
@@ -75,5 +73,9 @@ not compare display keys, monster tiers, or `objective_target_ids` for this fail
 - **THEN** it may advance DEFEAT progress but cannot fail the quest
 
 #### Scenario: Commit fault rolls back death and quest failure together
-- **WHEN** a staged pin or quest-log write raises during protected-entity failure commit
-- **THEN** target HP, the quest record, and the room pin list all equal their pre-action state
+- **WHEN** a pin/source/quest/group write or handback fails during a protected-death commit
+- **THEN** HP, record, pins, membership, possession/session and cached surfaces return to pre-action baseline
+
+#### Scenario: Knockout is not protected death
+- **WHEN** existing ordinary companion policy produces knockout and later recovery for a protected temporary actor
+- **THEN** no protected death reason is recorded and current engagement/recovery behavior remains

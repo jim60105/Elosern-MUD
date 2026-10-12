@@ -5,6 +5,7 @@ import unittest
 from django.db import IntegrityError, transaction
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from world.quests.models import EscortEventTransition, ExclusiveOutcomeGroup
 from world.quests.outcome_store import (
     allocate_acceptance_sequence,
@@ -24,6 +25,7 @@ _GROUP = "reunion"
 class OutcomeStoreTests(EvenniaTest):
     """The two database-unique outcome records and their write seams."""
 
+    @covers_requirement("quest-exclusive-outcomes::exclusive-groups-preserve-distinct-commissions-and-durable-result-identity")
     def test_group_identity_is_database_unique(self):
         first = get_or_create_group(
             owner_id=_OWNER, package_id=_PACKAGE, group_id=_GROUP
@@ -46,6 +48,7 @@ class OutcomeStoreTests(EvenniaTest):
             get_or_create_group(owner_id=_OWNER, package_id=_PACKAGE, group_id=_GROUP)
         self.assertEqual(ExclusiveOutcomeGroup.objects.count(), 1)
 
+    @covers_requirement("quest-exclusive-outcomes::exclusive-groups-preserve-distinct-commissions-and-durable-result-identity")
     def test_distinct_owner_package_and_group_are_distinct_rows(self):
         first = get_or_create_group(
             owner_id=_OWNER, package_id=_PACKAGE, group_id=_GROUP
@@ -65,6 +68,7 @@ class OutcomeStoreTests(EvenniaTest):
         self.assertEqual(len(list_owner_groups(_OWNER)), 3)
         self.assertEqual(len(list_owner_groups(_OWNER + 1)), 1)
 
+    @covers_requirement("quest-exclusive-outcomes::exclusive-groups-preserve-distinct-commissions-and-durable-result-identity")
     def test_acceptance_sequences_are_monotonic_and_persist(self):
         first = allocate_acceptance_sequence(
             owner_id=_OWNER, package_id=_PACKAGE, group_id=_GROUP, tick=7
@@ -139,6 +143,7 @@ class OutcomeStoreTests(EvenniaTest):
                     owner_id=_OWNER, record_id="escort:1", source_key="move:41:room:9"
                 )
 
+    @covers_requirement("quest-exclusive-outcomes::exclusive-groups-preserve-distinct-commissions-and-durable-result-identity")
     def test_resolution_state_is_persisted_and_exclusive(self):
         get_or_create_group(owner_id=_OWNER, package_id=_PACKAGE, group_id=_GROUP)
         resolved = mark_group_resolved(

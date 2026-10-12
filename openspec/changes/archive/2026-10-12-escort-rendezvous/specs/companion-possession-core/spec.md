@@ -40,7 +40,7 @@ Possession SHALL resolve the same canonical effective party membership for gener
 - **THEN** `already_possessing` refuses, scanned over the account's own characters only
 
 ### Requirement: Every exit path releases the possession
-Actual membership removal SHALL call `release_for_party_change(npc, player)` through existing full session/control transfer before detaching the NPC. Ordinary dismissal/auto-leave/deletion/disconnect semantics SHALL remain unchanged. Ending an escort reason SHALL interrupt possession only when no legitimate membership source remains. Escort terminal operations SHALL compensate session puppet, lock grants, cmdsets, mirrored possession, membership and quest caches if handback or any later owning-transaction write fails. A technical handback failure SHALL abort the complete terminal operation; dangling control SHALL never be reported as successful release.
+Actual membership removal SHALL call `release_for_party_change(npc, player)` through full session/control transfer before detaching the NPC; ordinary dismissal/auto-leave/deletion/disconnect semantics SHALL remain unchanged. Ending an escort reason SHALL interrupt possession only when no legitimate membership source remains. A technical handback failure SHALL abort the complete terminal operation; dangling control SHALL never be reported as successful release.
 
 #### Scenario: Last escort reason releases a possessed actor
 - **WHEN** an escort terminates while its temporary-only actor is possessed and has no other valid reason
@@ -101,3 +101,7 @@ Actual membership removal SHALL call `release_for_party_change(npc, player)` thr
 #### Scenario: The handback seam precedes the attribute clear
 - **WHEN** release_for_party_change runs full possession release
 - **THEN** the implemented verified unpuppet-NPC/re-puppet-owner ladder precedes mirrored attribute clear
+
+#### Scenario: Terminal escort operations compensate every affected surface
+- **WHEN** an escort terminates and a handback or later owning write fails
+- **THEN** Escort terminal operations SHALL compensate session puppet, lock grants, cmdsets, mirrored possession, membership and quest caches if handback or any later owning-transaction write fails.

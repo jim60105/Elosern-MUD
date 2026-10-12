@@ -6,12 +6,16 @@ stage binding, completion, and failure — with every multi-attribute write atom
 
 ## Requirements
 
-### Requirement: QuestRecord is JSON-safe persisted state with three stored states
-`world/quests/runtime.py` SHALL define `QuestState` values `IN_PROGRESS`, `COMPLETED`, and `FAILED`, and a
-frozen `QuestRecord` containing `quest_id`, `definition_key`, `issuer_key`, `state`, `stage_index`,
-`stage_progress`, `deadline_tick`, `accepted_tick`, `stage_room_id`, `objective_target_ids`,
-`protected_entity_ids`, `failure_reason`, `tracked`, and `counted_defeat_ids`. Records SHALL be stored as plain
-JSON-safe dicts in `PlayerCharacter.db.quest_log`.
+### Requirement: QuestRecord is JSON-safe persisted state with explicit terminal invalidation
+Quest records SHALL retain existing deterministic identity, definition/issuer, progress, deadline/tick, tracking and counted-defeat fields, adding terminal `INVALIDATED` state with a structured obsolete-outcome reason and JSON-safe package/group/acceptance-sequence/protected-role bindings. The stored vocabulary SHALL be `IN_PROGRESS`, `COMPLETED`, `FAILED` and `INVALIDATED`, and terminal records SHALL retain history with no active stage bindings.
+
+#### Scenario: Invalidated record round-trips
+- **WHEN** an accepted alternative is invalidated and its serialized record is reloaded
+- **THEN** its distinct state, structured reason, issuer, group and acceptance sequence are preserved with no live objects or active stage pins
+
+#### Scenario: Tracking and deadlines ignore invalidated history
+- **WHEN** tracking, deadline processing, action/arrival planners, detail views and objective presentation inspect an invalidated record
+- **THEN** it is terminal, cannot be tracked active or expired as a new failure, shows its reason, and never gains progress or payout
 
 #### Scenario: A record round-trips through JSON
 - **WHEN** a record containing integer dbrefs and tuple bindings is serialized to its storage dict,
@@ -62,6 +66,10 @@ JSON-safe dicts in `PlayerCharacter.db.quest_log`.
 #### Scenario: Unaccepted and abandoned representations
 - **WHEN** a definition is unaccepted or a quest is abandoned
 - **THEN** unaccepted is represented by absence and abandonment uses `FAILED` with reason `abandoned`
+
+#### Scenario: Invalidation, absence and defaults
+- **WHEN** an invalidated record is read, or a definition was never accepted
+- **THEN** Invalidation SHALL carry no failure penalty, payout or retry path after group resolution. Unaccepted definitions SHALL remain absence of a quest record, existing normal defaults SHALL remain, and no migration or compatibility adapter SHALL be introduced.
 
 ### Requirement: Tracking state is bounded deterministic quest state
 `world/quests/runtime.py` SHALL provide a tracking operation that sets `tracked` on exactly one
@@ -127,11 +135,23 @@ exceeding the objective quantity, or invalid state transition SHALL raise a name
 - **THEN** it persists one replacement quest-log list rather than mutating a nested dict in place
 
 ### Requirement: accept_quest creates one deterministic active record
-`accept_quest(actor, definition_key, issuer_key)` SHALL reject an unknown definition, reject when the
-actor already has an active record for that definition, and reject when
-`resolve_issuance(definition_key, issuer_key)` returns no issuance — a record SHALL never be created
-pointing at a commission that does not exist. Otherwise it SHALL create an `IN_PROGRESS` stage-zero
-record carrying the supplied `issuer_key`.
+Acceptance SHALL retain definition/issuance validation, deterministic numbering, accepted tick/deadline, no automatic tracking and hunt/site guarantees. Escort acceptance SHALL revalidate issuer scope, offer capability, unresolved group, exact protected identity, co-location, living state and membership ownership. One owning transaction SHALL create the record, bind exact actors, add party reasons, allocate the group's monotonic sequence and record authorized dialogue/acceptance knowledge.
+
+#### Scenario: Acceptance returns the committed bound record
+- **WHEN** an authorized available multi-role escort is accepted at full general quota
+- **THEN** the returned record equals a fresh read, binds every exact published protected actor and commits unique reasons and acceptance sequence together
+
+#### Scenario: Acceptance refuses a partial protected roster
+- **WHEN** any required actor is dead, missing, remote, substituted, or owned by another player
+- **THEN** the named refusal creates no record, source reason, authority change or partial roster
+
+#### Scenario: Stale capability or resolved group refuses acceptance
+- **WHEN** an old offer is submitted after its phase or exclusive outcome has changed
+- **THEN** acceptance returns `offer_stale` or `outcome_resolved` without retroactive record creation
+
+#### Scenario: Acceptance faults restore all surfaces
+- **WHEN** failures are injected after record, binding, membership and dialogue writes
+- **THEN** database reload and live caches match baseline and no acceptance event is committed
 
 #### Scenario: First acceptance succeeds
 - **WHEN** a character accepts a known definition under a registered issuance with no previous record
@@ -148,10 +168,8 @@ record carrying the supplied `issuer_key`.
 - **THEN** acceptance raises a named error and the quest log is unchanged
 
 #### Scenario: Terminal quest may be retried deterministically
-- **WHEN** the previous record for a definition is `COMPLETED` or `FAILED` and the character accepts it
-  again
-- **THEN** a new active record is stored with the next acceptance number and the terminal history is
-  retained
+- **WHEN** a previous unrelated record is completed or failed and the definition remains currently available
+- **THEN** existing next-number acceptance retains terminal history; a resolved exclusive alternative instead refuses with outcome_resolved
 
 #### Scenario: Explicit deadline is converted to ticks
 - **WHEN** a definition with `deadline_hours=72` is accepted at tick T
@@ -242,11 +260,20 @@ record carrying the supplied `issuer_key`.
 - **WHEN** a binding acceptance completes
 - **THEN** the record the operation returns is the persisted, bound record rather than the unbound value written a moment earlier
 
+#### Scenario: Acceptance fault, quota and retry behavior
+- **WHEN** an escort acceptance writes, joins at full general quota, or is retried
+- **THEN** Any later write failure SHALL restore quest, party, component and dialogue caches. Full general quota SHALL permit temporary joining, terminal retry SHALL remain allowed for unrelated definitions under existing rules, and resolved exclusive alternatives SHALL refuse every retry.
+
 ### Requirement: abandon_quest fails only an active quest and releases its runtime binding
-`abandon_quest(actor, quest_id)` SHALL transition an active record to `FAILED` with
-`failure_reason="abandoned"`, clear its runtime bindings, and release its current stage's instance pin.
-Calling it again for the same terminal record SHALL be an idempotent no-op returning that record. An
-unknown quest ID SHALL raise `QuestNotFound` without mutation.
+Abandonment SHALL retain `FAILED` with reason `abandoned` for an active record, clear its stage bindings/pin and release only its temporary membership reasons through the compensated party/possession APIs. Repeated calls on terminal records SHALL be idempotent, and unknown IDs SHALL retain `QuestNotFound` without mutation.
+
+#### Scenario: Terminal release preserves unrelated sources
+- **WHEN** one of two escort records terminates for completion, abandonment, death, deadline or invalidation
+- **THEN** only its reasons/pins are removed and any remaining legitimate membership persists without actor replacement
+
+#### Scenario: Repeated terminal release writes nothing
+- **WHEN** the same terminal transition is replayed after reload
+- **THEN** no additional handback, phase mutation, source release or reward occurs
 
 #### Scenario: Abandonment records failure and releases a pin
 - **WHEN** an active bound-instance quest is abandoned
@@ -257,12 +284,20 @@ unknown quest ID SHALL raise `QuestNotFound` without mutation.
 - **WHEN** `abandon_quest()` is called twice for the same quest ID
 - **THEN** the second call makes no additional state change and does not fail on the already-removed pin
 
+#### Scenario: Release discipline extends to every terminal transition
+- **WHEN** a record completes, fails or is invalidated
+- **THEN** Completion, actual failure and invalidation SHALL use the same per-record release discipline. Surviving general identity or other valid reasons SHALL remain, and no release SHALL delete, regenerate or reset an actor's memory.
+
 ### Requirement: bind_stage_runtime attaches only current-stage instance and entity identities
-`bind_stage_runtime(actor, quest_id, *, room=None, objective_targets=(), protected_entities=())` SHALL
-accept only an active current stage. A supplied room SHALL be an existing `InstanceRoom`; supplied
-entities SHALL be live `LivingEntity` objects. It SHALL persist integer dbrefs, keep objective targets
-separate from protected entities, and pin the room with
-`quest:<character-id>:<quest-id>:stage:<stage-index>`.
+Current-stage binding SHALL retain exact live entity IDs, disjoint objective/protected sets, immutable identical-rebind behavior and named conflict refusal. Escort protected roles SHALL resolve through published package/role identity to the same exact NPC at acceptance and every evaluation. A supplied pinned room SHALL remain an actual existing instance, and permanent destination resolution SHALL stay separate, creating no fake instance pin.
+
+#### Scenario: Permanent destination creates no instance pin
+- **WHEN** an escort binds protected actors for an anchor or XYZ destination
+- **THEN** exact protected IDs persist without passing the permanent room to the instance-only pin contract
+
+#### Scenario: Substitution and overlapping sets refuse
+- **WHEN** a caller substitutes a same-name NPC, changes an existing role binding or overlaps objective/protected IDs
+- **THEN** binding refuses before any record or pin change
 
 #### Scenario: Runtime binding stores identities and pins the instance
 - **WHEN** a current stage is bound to one instance room, two objective targets, and one protected NPC
@@ -293,10 +328,16 @@ separate from protected entities, and pin the room with
 - **WHEN** an identical binding is repeated
 - **THEN** the operation is idempotent, while replacing any existing binding raises before mutation
 
+#### Scenario: Meeting roles keep their upstream bindings
+- **WHEN** a rendezvous escort stage resolves its meeting roles
+- **THEN** Meeting roles SHALL retain upstream bindings and SHALL never be added to the protected roster by proximity.
+
 ### Requirement: Multi-attribute lifecycle writes are atomic and cache-consistent
-Operations that update both a quest log and an instance pin SHALL preflight the complete transition,
-perform both writes in one `transaction.atomic()` block, and restore pre-operation Evennia attribute
-values if any write raises. No successful exception path SHALL leave only one side changed.
+Quest transitions SHALL atomically commit their quest log, pins, party reasons, exclusive group, dialogue/knowledge and applicable settlement effects through their existing owners. Snapshot/restore SHALL include Evennia Attribute/component caches, process registration views where touched, and live possession/session surfaces. Post-commit presentation SHALL not expose rolled-back state. No partial success SHALL be returned.
+
+#### Scenario: Failure after a group or reward write restores baseline
+- **WHEN** group, claim, reward, pin or later dialogue persistence raises during a transition
+- **THEN** durable and cached state return to pre-operation values including session control if handback occurred
 
 #### Scenario: Pin failure rolls back acceptance or binding
 - **WHEN** pin persistence is fault-injected to raise during a runtime binding
@@ -381,3 +422,29 @@ species or variant identity.
 #### Scenario: Newcomers are bindable only after creation
 - **WHEN** a site recovers fresh individuals
 - **THEN** those newcomers can only ever be referenced by bindings made after their creation, and site recovery state and quest republish decisions remain mutually consistent
+
+### Requirement: Escort lifecycle observations expose named owned operations
+`accept_escort_commission` SHALL accept owner, actual interaction actor, package, authorized issuance and expected offer capability and return the persisted bound record/membership effects. `release_escort_bindings` SHALL accept owner, record, terminal reason and source and return terminal state plus removed/preserved sources. Each SHALL own or join the authoritative transaction with compensation and expose the scenario-defined stable failures.
+
+#### Scenario: Downstream caller sees a named rejection without writes
+- **WHEN** a consumer invokes escort acceptance with an unauthorized issuer or stolen protected role
+- **THEN** it receives the specified reason and unchanged durable/cache state, without requiring knowledge of internal module placement
+
+#### Scenario: Complete escort lifecycle observations expose named owned operations contract
+- **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
+- **THEN** The quest-owned `accept_escort_commission` operation SHALL consume owner, authorized issuance reference, package identity and expected offer capability; return the persisted bound record and membership effects; and report `issuer_unauthorized`, `offer_stale`, `outcome_resolved`, `role_unavailable`, `role_not_co_located`, `membership_owned_elsewhere` or `acceptance_write_failed`. `release_escort_bindings` SHALL consume owner, record identity, validated terminal reason and source identity; return terminal record and removed/preserved sources; and report `control_handback_failed` or `transition_write_failed`. Both SHALL own an outer transaction or join the enclosing authoritative event transaction with equivalent compensation. Callers SHALL receive successful durable results only after commit.
+
+### Requirement: Real actor loss produces an explicit escort lifecycle result
+Lawful committed protected death SHALL fail escort as `protected_actor_dead`; essential meeting actor death/removal SHALL transition unavailable as `meeting_actor_unavailable`. Hostile/environmental sources SHALL share the failure planner. Separation SHALL preserve actual location and active binding; knockout SHALL follow existing recovery rules. Deadline/abandonment SHALL retain distinct reasons.
+
+#### Scenario: Hostile and environmental death fail the escort
+- **WHEN** a lawful hostile or environmental source commits protected death
+- **THEN** its escort fails and releases its reasons without payout or successful reunion dialogue
+
+#### Scenario: Meeting removal is explicit and separation is recoverable
+- **WHEN** an essential meeting actor is removed or a follower misses movement
+- **THEN** removal transitions the objective unavailable without repair spawn, while mere separation leaves the escort active at the NPC's real location and permits resumption
+
+#### Scenario: Complete real actor loss produces an explicit escort lifecycle result contract
+- **WHEN** the operation is exercised through its deterministic owner with valid and rejecting inputs
+- **THEN** Committed protected death SHALL fail its active escort with `protected_actor_dead`; essential meeting actor death/removal SHALL make it unavailable through `meeting_actor_unavailable`, releasing its own sources. Hostile and environmental sources SHALL use the same failure planner. Deadline and abandonment SHALL retain distinct existing reasons. Separation SHALL preserve actual location and active binding with the existing lost-follow notice. Knockout/recovery SHALL follow existing living-state rules and never fabricate death or reunion.

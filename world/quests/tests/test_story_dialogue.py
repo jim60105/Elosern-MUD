@@ -97,6 +97,7 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
     def test_a_fabricated_reunion_observation_is_refused(self):
         # The guard on the ``reunion`` name was released by escort-rendezvous,
         # its owning change; a caller still cannot assert a reunion the
@@ -178,6 +179,7 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
     def test_the_closure_interaction_after_reunion_advances_to_everyday(self):
         from world.quests import outcome_store
         from world.quests.story_dialogue import commit_reunion_participation
@@ -199,6 +201,7 @@ class StoryDialogueTransitionTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "story-phase-dialogue::phase-selection-uses-committed-outcomes-and-permitted-role-knowledge"
     )
+    @covers_requirement("quest-progress-tracking::escort-finding-does-not-disclose-hidden-actor-positions")
     def test_result_knowledge_stays_private_to_the_participant(self):
         from world.narrative.memory import get_owner_memories
         from world.quests import outcome_store

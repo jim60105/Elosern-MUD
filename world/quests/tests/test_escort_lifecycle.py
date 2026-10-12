@@ -5,6 +5,7 @@ from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from world.quests import scene_store
@@ -100,6 +101,7 @@ class EscortTestBase(EscortFixtureMixin, QuestRegistryIsolation, EvenniaTest):
 class EscortLifecycleTests(EscortTestBase):
     """Acceptance, release and settled evaluation through the real owners."""
 
+    @covers_requirement("quest-lifecycle::escort-lifecycle-observations-expose-named-owned-operations")
     def test_acceptance_returns_exact_persisted_binding_beyond_general_quota(self):
         for _ in range(4):
             join_party(create_object(NPC, key="general member", location=self.room1), self.owner)
@@ -113,6 +115,8 @@ class EscortLifecycleTests(EscortTestBase):
         self.assertEqual(read_records(self.owner)[0], record)
         self.assertEqual(reasons_for(self.protected, self.owner), ((record.quest_id, "protected"),))
 
+    @covers_requirement("quest-lifecycle::escort-lifecycle-observations-expose-named-owned-operations")
+    @covers_requirement("quest-issuer-authorization::escort-issuer-scope-authorizes-each-distinct-current-commission")
     def test_current_offer_revision_presence_and_foreign_ownership_refuse(self):
         for setup, reason in (
             (lambda: None, "offer_stale"),
@@ -131,6 +135,7 @@ class EscortLifecycleTests(EscortTestBase):
                 self.assertEqual(failure.exception.reason, reason)
                 self.assertEqual(read_records(self.owner), [])
 
+    @covers_requirement("quest-lifecycle::escort-lifecycle-observations-expose-named-owned-operations")
     def test_source_write_fault_restores_acceptance_and_paired_cache(self):
         with patch("world.quests.escort_lifecycle.add_temporary_source", side_effect=RuntimeError("source fault")):
             with self.assertRaises(EscortOperationError) as failure:
@@ -144,6 +149,7 @@ class EscortLifecycleTests(EscortTestBase):
             self.assertFalse(is_companion(self.protected, self.owner))
             self.assertIsNone(self.protected.db.party_member)
 
+    @covers_requirement("quest-lifecycle::escort-lifecycle-observations-expose-named-owned-operations")
     def test_abandonment_releases_only_record_source_and_keeps_general_member(self):
         join_party(self.protected, self.owner)
         record = accept_quest(self.owner, self.definition.key, self.issuer_key)
@@ -168,6 +174,8 @@ class EscortLifecycleTests(EscortTestBase):
         self.assertTrue(self.protected.move_to(self.room2, quiet=True))
         self.assertEqual(self.owner.db.wallet, wallet_before + 1)
 
+    @covers_requirement("quest-progress-tracking::indexed-authoritative-role-events-drive-escort-evaluation")
+    @covers_requirement("quest-exclusive-outcomes::outcome-operations-expose-named-transaction-ownership")
     def test_forged_source_is_rejected_without_writes(self):
         from world.quests.escort_events import EscortSource, evaluate_escort_event
 
@@ -198,6 +206,7 @@ class EscortExclusiveOutcomeTests(EscortTestBase):
                        "meeting_role_refs": ["meeting"]},
         }]
 
+    @covers_requirement("quest-exclusive-outcomes::outcome-operations-expose-named-transaction-ownership")
     def test_real_meeting_move_selects_winner_before_payment(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -212,6 +221,36 @@ class EscortExclusiveOutcomeTests(EscortTestBase):
         self.assertEqual(self.owner.db.wallet, before + 1)
         self.owner.attributes.reset_cache()
         self.assertEqual(list(self.owner.db.guild_reward_claims), [record.quest_id])
+
+
+class EscortUnacceptedReunionTests(EscortTestBase):
+    """A declared rendezvous resolves without a commission and without payout."""
+
+    def outcome_groups(self):
+        return [{
+            "group_id": "reunion", "alternatives": [self.definition.key],
+            "result": {"completion": "rendezvous", "protected_role_refs": ["protected"],
+                       "meeting_role_refs": ["meeting"]},
+        }]
+
+    @covers_requirement("quest-exclusive-outcomes::unaccepted-physical-results-close-offers-without-inventing-a-quest")
+    def test_a_reunion_without_acceptance_resolves_without_a_commission(self):
+        from world.quests.escort_events import exclusive_outcome_status
+
+        # The protected actor is an ordinary general companion: no escort
+        # commission was ever accepted, and the declared physical reunion must
+        # still commit the explicit no-commission result.
+        join_party(self.protected, self.owner)
+        wallet_before = self.owner.db.wallet or 0
+        self.assertTrue(self.protected.move_to(self.room2, quiet=True))
+        group = exclusive_outcome_status(self.owner, self.package.package_id, "reunion")
+        self.assertTrue(group.resolved)
+        self.assertTrue(group.no_commission)
+        self.assertEqual(group.winner_quest_id, "")
+        # No invented record, acceptance or claim, and no payout.
+        self.assertEqual(read_records(self.owner), [])
+        self.assertEqual(self.owner.db.wallet, wallet_before)
+        self.assertEqual(list(self.owner.db.guild_reward_claims or []), [])
 
 
 class EscortAlternativeMixin(EscortFixtureMixin):
@@ -284,6 +323,7 @@ class EscortAlternativeTestBase(EscortAlternativeMixin, QuestRegistryIsolation, 
 class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
     """Exclusive alternative-resolution behaviour."""
 
+    @covers_requirement("quest-exclusive-outcomes::authoritative-result-arbitration-grants-at-most-one-winner")
     def test_first_accepted_alternative_wins_and_the_other_is_invalidated(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -319,6 +359,7 @@ class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
         self.assertIsNotNone(second.acceptance_sequence)
         self.assertLess(first.acceptance_sequence, second.acceptance_sequence)
 
+    @covers_requirement("quest-exclusive-outcomes::authoritative-result-arbitration-grants-at-most-one-winner")
     def test_meeting_first_order_selects_the_earlier_sequence(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -333,6 +374,7 @@ class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
         self.assertEqual(records[winner.quest_id].state.value, "completed")
         self.assertEqual(records[other.quest_id].state.value, "invalidated")
 
+    @covers_requirement("quest-exclusive-outcomes::authoritative-result-arbitration-grants-at-most-one-winner")
     def test_simultaneous_satisfaction_picks_the_earlier_sequence(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -350,6 +392,7 @@ class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
         self.assertEqual(records[other.quest_id].state.value, "invalidated")
         self.assertEqual(self.owner.db.wallet, before + 1)
 
+    @covers_requirement("quest-exclusive-outcomes::authoritative-result-arbitration-grants-at-most-one-winner")
     def test_active_alternatives_without_an_attributable_candidate_stay_unresolved(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -365,6 +408,7 @@ class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
         records = read_records(self.owner)
         self.assertEqual({record.state.value for record in records}, {"in_progress"})
 
+    @covers_requirement("quest-exclusive-outcomes::exclusive-groups-preserve-distinct-commissions-and-durable-result-identity")
     def test_unrelated_commission_is_not_invalidated_by_group_resolution(self):
         from world.quests.escort_events import exclusive_outcome_status
 
@@ -381,6 +425,7 @@ class EscortExclusiveAlternativeTests(EscortAlternativeTestBase):
         # invalidated by a resolution that never named it.
         self.assertEqual(records[singleton.quest_id].state.value, "in_progress")
 
+    @covers_requirement("quest-exclusive-outcomes::outcome-operations-expose-named-transaction-ownership")
     def test_a_closed_unaccepted_offer_cannot_be_accepted(self):
         from world.quests.escort_lifecycle import EscortOperationError
 
@@ -405,6 +450,8 @@ class EscortEntitlementTests(EscortTestBase):
                        "meeting_role_refs": ["meeting"]},
         }]
 
+    @covers_requirement("quest-auto-settlement::exclusive-automatic-settlement-follows-committed-winner-arbitration")
+    @covers_requirement("quest-reward-settlement::counter-claims-require-the-exclusive-group-s-selected-winner")
     def test_entitlement_follows_the_group_result(self):
         from types import SimpleNamespace
 
@@ -433,6 +480,7 @@ class EscortEntitlementTests(EscortTestBase):
             self.owner, SimpleNamespace(group_id=None, package_id=None, quest_id="free:1")
         ))
 
+    @covers_requirement("quest-auto-settlement::exclusive-automatic-settlement-follows-committed-winner-arbitration")
     def test_automatic_planning_skips_a_completed_non_winner(self):
         from world.quests import outcome_store
         from world.quests.escort_events import reward_entitled
@@ -487,6 +535,7 @@ class EscortCounterClaimTests(EscortTestBase):
             self.definition.key, self.branch, QuestReward(low, (), 0),
         ))
 
+    @covers_requirement("quest-reward-settlement::counter-claims-require-the-exclusive-group-s-selected-winner")
     def test_a_completed_non_winner_is_refused_by_the_counter_claim(self):
         from world.quests import outcome_store
         from world.quests.runtime import apply_quest_log_replacement, fulfill_record_for
@@ -524,6 +573,7 @@ class EscortResultFaultTests(EscortAlternativeTestBase):
         self.assertEqual(self.owner.db.wallet, wallet_before)
         self.assertEqual(list(self.owner.db.guild_reward_claims or []), [])
 
+    @covers_requirement("quest-exclusive-outcomes::authoritative-result-arbitration-grants-at-most-one-winner")
     def test_a_group_write_fault_rolls_the_whole_result_back(self):
         from unittest.mock import patch
 
@@ -632,6 +682,7 @@ class EscortCasualtyTests(EscortTestBase):
             {team: frozenset(members) for team, members in teams.items()}, roster,
         )
 
+    @covers_requirement("quest-lifecycle::real-actor-loss-produces-an-explicit-escort-lifecycle-result")
     def test_environmental_lethal_tick_fails_the_escort(self):
         from world.rules.buffs import apply_buff
 
@@ -666,6 +717,7 @@ class EscortCasualtyTests(EscortTestBase):
         self.assertEqual(failed.state.value, "failed")
         self.assertEqual(failed.failure_reason, "protected_actor_dead")
 
+    @covers_requirement("quest-lifecycle::real-actor-loss-produces-an-explicit-escort-lifecycle-result")
     def test_attributed_hostile_tick_fails_the_protected_escort(self):
         from world.rules.buffs import apply_buff
 
@@ -744,6 +796,7 @@ class EscortEventBoundaryTests(EscortTestBase):
         self.assertEqual(stored.quest_id, record.quest_id)
         self.assertEqual(stored.state.value, "in_progress")
 
+    @covers_requirement("quest-progress-tracking::indexed-authoritative-role-events-drive-escort-evaluation")
     def test_restart_replay_does_not_advance_again(self):
         record = accept_quest(self.owner, self.definition.key, self.issuer_key)
         wallet_before = self.owner.db.wallet or 0
@@ -769,6 +822,7 @@ class EscortEventBoundaryTests(EscortTestBase):
         self.assertEqual(self.owner.db.wallet, wallet_before + 1)
         self.assertEqual(self.owner.location, self.room1)
 
+    @covers_requirement("quest-progress-tracking::indexed-authoritative-role-events-drive-escort-evaluation")
     def test_follower_settlement_completes_the_rendezvous_once(self):
         from world.rules.movement_settlement import settle_movement
         from world.rules.party import follow_companions
@@ -1108,6 +1162,7 @@ class EscortGeneratedPublicationTests(
         )
         self.assertEqual(reasons_for(self.protected, self.owner), ())
 
+    @covers_requirement("scene-builder::generated-escort-registration-guards-durable-publication-and-restore")
     def test_protected_first_order(self):
         record = accept_quest(self.owner, _GENERATED_ESCORT_KEY, self.issuer_key)
         self.assertEqual(read_records(self.owner)[0].state.value, "in_progress")

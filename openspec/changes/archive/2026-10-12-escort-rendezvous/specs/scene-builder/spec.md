@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Materializing a stage spawns the destination, sets scene metadata, and binds one stage atomically and idempotently
-Stage materialization SHALL retain accepted-current-stage eligibility, shared whitelisted construction, exact bindings, disposable instance ownership, permanent package-role ownership/retention, validated idempotent reuse, and all-or-nothing cache restoration from the upstream encounter change. Escort acceptance SHALL bind the upstream's already materialized exact protected actors through the quest/party owners. Escort destination materialization SHALL resolve its validated anchor/XYZ or actual bound instance separately from protected-role creation; it SHALL not spawn replacement participants into the destination or grant progress from description/room creation. Rendezvous SHALL require no fabricated destination. Missing/dead/departed bound actors SHALL return named unavailable results without repair.
+Stage materialization SHALL retain accepted-current-stage eligibility, shared whitelisted construction, exact bindings, disposable instance ownership, permanent package-role ownership/retention, validated idempotent reuse and all-or-nothing cache restoration. Escort destination materialization SHALL resolve its validated anchor/XYZ or actual bound instance separately from protected-role creation, spawning no replacement participants and granting no progress from description/room creation.
 
 #### Scenario: Existing stage construction remains atomic
 - **WHEN** an ordinary accepted instance stage materializes or a validated package stage uses a permanent room
@@ -107,8 +107,12 @@ Stage materialization SHALL retain accepted-current-stage eligibility, shared wh
 - **WHEN** repeated current-stage materialization returns an existing binding
 - **THEN** its room and exact actor availability are revalidated against the declared instance or permanent destination without actor recreation
 
+#### Scenario: Escort acceptance binds retained actors and rendezvous needs no destination
+- **WHEN** an escort stage materializes after acceptance
+- **THEN** Escort acceptance SHALL bind the upstream's already materialized exact protected actors through the quest/party owners. Rendezvous SHALL require no fabricated destination, and missing, dead or departed bound actors SHALL return named unavailable results without repair.
+
 ### Requirement: The composition root posts one generated quest to the guild board and degrades offline
-The existing composition root SHALL retain injected-client/disabled-profile degradation and deterministic compile/registration ownership. Supported generated escorts SHALL proceed only when the complete new published-role/completion contract is available and the owning flow is implemented and proved. An unsupported escort request SHALL retain the shared pre-transport unsupported-template refusal (`NoSuitableTemplateError`); no template SHALL fabricate actors or relabel an objective. Complete private scene packages SHALL publish scoped commissions through upstream publication/activation without autoacceptance or forcing a guild offer. Existing guild requests SHALL keep their registered-offer result and `NoSuitableTemplateError` behavior.
+The composition root SHALL retain injected-client/disabled-profile degradation and deterministic compile/registration ownership. Supported generated escorts SHALL proceed only when the complete published-role/completion contract and its owning flow are implemented and proved. An unsupported escort request SHALL retain the shared pre-transport unsupported-template refusal (`NoSuitableTemplateError`) without fabricating actors or relabeling an objective.
 
 #### Scenario: Supported and unsupported escort requests are distinct
 - **WHEN** synthetic requests exercise a complete supported escort package and an unsupported ordinary escort template through the composition service
@@ -147,6 +151,10 @@ The existing composition root SHALL retain injected-client/disabled-profile degr
 #### Scenario: Degradation matches the blueprint generator
 - **WHEN** the profile is disabled or every attempt degrades
 - **THEN** the call resolves to a context-fitting hand-written template quest, exactly as `generate_quest_blueprint` degrades
+
+#### Scenario: Private packages publish scoped commissions
+- **WHEN** a complete private scene package publishes or a guild request runs
+- **THEN** Complete private scene packages SHALL publish scoped commissions through upstream publication/activation without autoacceptance or forcing a guild offer. Existing guild requests SHALL keep their behavior.
 
 ## ADDED Requirements
 

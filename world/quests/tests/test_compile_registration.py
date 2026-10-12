@@ -165,6 +165,8 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         )
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
+    @covers_requirement("scene-builder::generated-escort-registration-guards-durable-publication-and-restore")
     def test_a_directly_forged_compiled_escort_is_refused_by_its_contract(self):
         # A compiled escort constructed directly (bypassing the compiler) with a
         # missing discriminator is refused by its own complete-contract
@@ -208,6 +210,7 @@ class RegisterGeneratedQuestTests(CompileRegistryIsolation, unittest.TestCase):
         )
 
     @covers_requirement("scenario-director::the-deterministic-compile-boundary-translates-validated-proposals-into-the-runtime-type")
+    @covers_requirement("scene-builder::generated-escort-registration-guards-durable-publication-and-restore")
     def test_a_directly_forged_rendezvous_without_meeting_roles_is_refused(self):
         from world.quests.definitions import EscortCompletion, QuestDefinitionError, QuestType
 
@@ -871,6 +874,7 @@ class EscortPayloadRoundTripTests(CompileRegistryIsolation, unittest.TestCase):
     @covers_requirement(
         "quest-blueprint::registration-validates-every-runtime-critical-objective-field"
     )
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
     def test_a_stored_rendezvous_payload_round_trips(self):
         compiled = _compiled_escort(rendezvous=True)
         restored = payload_to_registrations(_compiled_to_payload(compiled))

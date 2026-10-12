@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: Party membership is bounded, persistent, and single-writer
-The party owner SHALL retain one ordered persistent ID roster and one NPC owner back-reference. Persistent metadata SHALL carry general membership and a unique set of temporary `(quest identity, protected role)` reasons. Ordinary join and starting-companion binding SHALL declare general membership by default. The current four-companion quota SHALL count valid general members alone. Temporary escort joining SHALL use the party owner API, require an exact live owned protected binding, and never steal another owner's actor or duplicate a row. General recruitment of a temporary-only member SHALL apply ordinary eligibility and quota checks. All membership writes SHALL commit paired state atomically with cache restoration.
+The party owner SHALL keep one ordered persistent ID roster and one NPC owner back-reference; metadata SHALL carry general membership and a unique set of temporary `(quest identity, protected role)` reasons. Ordinary join SHALL declare general membership, and the four-companion quota SHALL count valid general members alone. Temporary escort joining SHALL use the party owner API on an exact live owned protected binding, never stealing another owner's actor or duplicating a row.
 
 #### Scenario: Full general party accepts an escort
 - **WHEN** a player with four valid general companions accepts an available escort through the quest owner
@@ -72,6 +72,10 @@ The party owner SHALL retain one ordered persistent ID roster and one NPC owner 
 #### Scenario: An activation-bound companion is indistinguishable to the auto-leave recheck
 - **WHEN** the auto-leave recheck evaluates a companion bound at activation
 - **THEN** it behaves exactly as it does for an invited companion, with no origin-dependent branch
+
+#### Scenario: Membership writes commit paired state atomically
+- **WHEN** a membership join, promotion or release commits
+- **THEN** Persistent membership writes SHALL commit paired state atomically with cache restoration.
 
 ### Requirement: The invite command proposes a party through the AI-judged dialogue seam
 The existing invite command SHALL use ordinary eligibility, dialogue judgment and offline affinity fallback to add general identity. Its preflight and commit checks SHALL reject already-general and foreign-owned actors, count only valid general identities toward four, and admit same-owner temporary-only actors without bypassing ordinary recruitment. Successful promotion SHALL preserve every escort reason and the deduplicated roster.
@@ -145,7 +149,7 @@ The existing invite command SHALL use ordinary eligibility, dialogue judgment an
 - **THEN** the same injected-client preflight and general recruitment flow apply
 
 ### Requirement: The leave command dismisses a companion without affinity change
-The existing leave command and browser flow SHALL remove general membership without changing affinity. Effective escort reasons SHALL require abandonment of selected commissions through the quest owner; dismissal SHALL never silently detach them while their quests remain active. Several reasons SHALL expose the affected commissions and release only selected ones. Ordinary possessed-member manual dismissal SHALL retain its handback-first refusal; escort abandonment SHALL use the compensated terminal release contract.
+The existing leave command and browser flow SHALL remove general membership without changing affinity. Effective escort reasons SHALL require abandonment of selected commissions through the quest owner; dismissal SHALL never silently detach them while their quests stay active, and several reasons SHALL expose the affected commissions and release only the selected ones.
 
 #### Scenario: General dismissal preserves an escort
 - **WHEN** a dual member's general membership is dismissed
@@ -182,6 +186,10 @@ The existing leave command and browser flow SHALL remove general membership with
 #### Scenario: Possession refusal is enforced at both layers
 - **WHEN** ordinary manual dismissal targets a possessed general-only member
 - **THEN** command and party API both enforce the existing handback-first refusal
+
+#### Scenario: Possessed dismissal and escort abandonment keep their refusals
+- **WHEN** the dismissed member is possessed or carries several escort reasons
+- **THEN** A possessed member's ordinary manual dismissal SHALL retain its handback-first refusal; escort abandonment SHALL use the compensated terminal release contract.
 
 ### Requirement: Companions auto-leave when affinity drops below the invite threshold
 Negative affinity changes SHALL retain existing relationship writes. Automatic departure below the ordinary threshold SHALL be suppressed while any validated active escort reason remains. General-only members SHALL retain ordinary departure behavior and its handback/failure rules. Corrupt or expired temporary reasons SHALL grant no immunity.

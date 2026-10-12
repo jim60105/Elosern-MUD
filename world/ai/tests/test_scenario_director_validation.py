@@ -457,6 +457,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         self.assertEqual(len(client.calls), 2)
 
     @covers_requirement("scenario-director::scene-bound-proposal-stages-are-validated-before-publication")
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
     def test_a_complete_escort_contract_passes_the_validators(self):
         # The blanket ESCORT refusal is gone: a proposal declaring the complete
         # closed contract is accepted by the semantic validators.
@@ -497,6 +498,7 @@ class SceneBoundValidatorTests(RegistryIsolationMixin, unittest.TestCase):
         }
         return payload
 
+    @covers_requirement("scenario-director::canonical-generated-escort-payloads-preserve-all-executable-references")
     def test_a_relation_bearing_rendezvous_round_trips_through_the_blueprint(self):
         # The immutable proposal type must build and re-serialize the typed
         # relation, so a conforming relation-bearing proposal is never silently

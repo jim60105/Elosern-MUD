@@ -145,6 +145,7 @@ class ScenePackagePublicationTests(RegistryIsolationMixin, EvenniaTestCase):
     @covers_requirement(
         "persistent-story-roles::published-packages-separate-immutable-definitions-from-runtime-bindings"
     )
+    @covers_requirement("quest-scene-encounters::encounter-packages-expose-distinct-escort-commissions-and-final-result-observation")
     def test_publication_registers_definition_and_requirements_without_issuance(self):
         published = publish_scene_package(_package(), owner="tester", tick=7)
         self.assertTrue(published.created)

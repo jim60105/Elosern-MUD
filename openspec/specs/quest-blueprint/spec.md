@@ -65,11 +65,23 @@ static location field.
 - **THEN** it carries no static location field and resolves only through the accepted record's `stage_room_id`
 
 ### Requirement: Registration validates every runtime-critical objective field
-`register_quest_definition()` SHALL treat re-registering equal content under the same key as an
-idempotent no-op and SHALL reject conflicting content under an existing key. DEFEAT SHALL declare
-exactly one selector family. REACH and ESCORT SHALL declare a destination; ESCORT SHALL be unable
-to complete until protected runtime entities are bound. `deadline_hours` SHALL be `None`
-(no deadline) or a positive integer.
+Registration SHALL retain the existing immutable-stage, positive-quantity, deadline, equal-registration idempotence, conflicting-content, DEFEAT-selector and REACH-destination rules the scenarios below state. ESCORT SHALL declare quantity one, an exact nonempty protected-role set and exactly one discriminator: `destination` with a validated locator and no rendezvous fields, or `rendezvous` with exact meeting roles and any validated relation.
+
+#### Scenario: Destination and rendezvous definitions register
+- **WHEN** two synthetic definitions declare complete destination and rendezvous contracts respectively
+- **THEN** each registers and round-trips its exact role references and closed predicate without conflating quest classification and objective kind
+
+#### Scenario: Missing or mixed predicates are rejected
+- **WHEN** an escort omits its discriminator, declares both completion modes, omits a required role, mixes destination and rendezvous fields, or has quantity two
+- **THEN** registration rejects before mutation with a named definition error
+
+#### Scenario: Existing objective validation remains intact
+- **WHEN** a definition has a noncontiguous stage, invalid deadline, unknown locator or DEFEAT selector, overlapping selector families, or impossible bound-target quantity
+- **THEN** registration raises the existing definition error and retains the registry unchanged
+
+#### Scenario: Equal content remains idempotent
+- **WHEN** equal content is re-registered and conflicting content is then submitted under the same key
+- **THEN** equal content is a no-op and conflicting content refuses without replacement
 
 #### Scenario: A complete hand-written definition registers
 - **WHEN** a definition has contiguous stages and every objective supplies its required typed fields
@@ -85,9 +97,8 @@ to complete until protected runtime entities are bound. `deadline_hours` SHALL b
   `QuestDefinitionError`, and the original definition remains registered
 
 #### Scenario: Objective fields are validated before play
-- **WHEN** an ESCORT objective has no destination, a DEFEAT objective has no selector, or a quantity is
-  zero
-- **THEN** registration raises `QuestDefinitionError` rather than deferring failure to event handling
+- **WHEN** an ESCORT objective has no complete discriminator-specific predicate/protected roles, a DEFEAT selector is absent, or quantity is zero
+- **THEN** registration raises the existing definition error before event handling
 
 #### Scenario: Structural field validation happens at registration
 - **WHEN** a definition has empty stages, non-contiguous stage indices starting anywhere other than
@@ -140,9 +151,12 @@ to complete until protected runtime entities are bound. `deadline_hours` SHALL b
 - **THEN** registration raises `QuestDefinitionError`
 
 #### Scenario: REACH and ESCORT must declare a destination
-- **WHEN** a REACH objective declares no destination, or an ESCORT objective declares none
-- **THEN** registration raises `QuestDefinitionError`, and an ESCORT objective with a destination
-  still cannot complete until its protected runtime entities are bound
+- **WHEN** REACH omits its destination, destination-mode ESCORT omits its locator, or rendezvous-mode ESCORT omits its meeting roles
+- **THEN** registration rejects; a complete rendezvous needs no fixed destination, and every escort still needs exact protected bindings
+
+#### Scenario: Escort definitions stay immutable and other families reject escort fields
+- **WHEN** a definition registers or is restored from its compiled payload
+- **THEN** Definitions SHALL remain deeply immutable and JSON-safe through compilation and restoration, and other objective families SHALL reject escort-only fields.
 
 ### Requirement: The hand-written catalog is idempotent and provides an offline quest
 `world/quests/catalog.py` SHALL declare at least one deterministic introductory hunt using only
@@ -174,8 +188,19 @@ Proposal validation and the quest compiler SHALL reject REACH and ESCORT objecti
 - **THEN** the proposal compiles and registers normally
 
 ### Requirement: ESCORT quests require a bound protected entity path
+Generated escort publication SHALL stay refused until this change's production acceptance, exact role binding, movement evaluation and settlement flow is implemented and proved. Thereafter every proposal/service, semantic validation, compilation and generated registration boundary SHALL require the complete protected-role/completion contract and a real executable binding path, and directly constructed compiled values SHALL receive the same check.
 
-The system SHALL refuse to publish an ESCORT quest unless its stage can actually bind at least one protected entity at runtime; an ESCORT stage whose scene constraints make binding impossible SHALL be rejected at proposal/compile time with a clear error instead of being registered uncompletable.
+#### Scenario: Unsupported request is refused before transport
+- **WHEN** `server/ai_director_service.py` receives an escort request lacking a supported complete role-binding context/template
+- **THEN** the shared unsupported-template refusal (`NoSuitableTemplateError`) is surfaced before transport work and no registration or actor creation occurs
+
+#### Scenario: Supported generated escort executes through real owners
+- **WHEN** a complete synthetic package passes the implemented service/semantic/compiler/registration path and its authorized offer is accepted, moved and completed
+- **THEN** the exact protected NPC joins temporarily, the real predicate completes the record, registered settlement pays once and reload preserves the terminal result
+
+#### Scenario: Every rejection boundary rejects incomplete contracts
+- **WHEN** a missing protected path or ambiguous completion payload is presented separately to semantic validation, compiler and generated registration, including a forged compiled object
+- **THEN** each reports its named rejection before durable or registry publication
 
 #### Scenario: Unbindable ESCORT proposal is rejected
 
@@ -188,9 +213,12 @@ The system SHALL refuse to publish an ESCORT quest unless its stage can actually
 - **THEN** the proposal is rejected at validation and no quest is registered
 
 #### Scenario: Currently, ESCORT requests are refused with a clear message
+- **WHEN** an escort request lacks the complete implemented protected-role/completion path
+- **THEN** the existing clear named refusal registers no quest; complete proved contracts use the owning flow
 
-- **WHEN** a player requests an escort-generated quest while no binding flow exists
-- **THEN** the request is refused with a clear player-facing message and no quest is registered
+#### Scenario: Unsupported templates keep their refusal
+- **WHEN** no context-fitting escort template exists for a request
+- **THEN** Unsupported templates SHALL remain refused without fabricated nearby NPCs, a special-case family payload or a relabeled objective.
 
 ### Requirement: Species-hunt objectives carry a validated region/species/variant selector
 `QuestObjective` SHALL support the approved regional species-hunt semantics as a deterministic, deeply
