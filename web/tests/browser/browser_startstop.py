@@ -37,14 +37,15 @@ _IMPORT_BEFORE_INSTALL = (
     # the module loadable under the install, and the terrain graft rebinds
     # those tables to live kit rows afterwards.
     "world.maps.wilderness_population",
-    # The cross-lineage rulebook validates its shipped YAML against the skill
-    # registry at import and is only reached lazily from the practice-award
-    # path (world.rules.progression._run_cross_lineage_eval). Without this
-    # pre-import, the first award inside a cast settlement imports it against
-    # the t_-only install and fails closed (shipped grant keys unknown),
-    # rolling back every cast. The frozen reverse index is built from shipped
-    # keys, so under the install t_-keyed awards never match a rule and the
-    # evaluator is an inert no-op.
+    # The cross-lineage rulebook validates its shipped YAML at import and is
+    # only reached lazily from the practice-award path
+    # (world.rules.progression._run_cross_lineage_eval). Its catalog source is
+    # the shipped snapshot (world.skills.registry.SHIPPED_SKILL_REGISTRY), so
+    # the load no longer depends on this ordering; the entry stays as the
+    # harness's explicit import-time seam for a shipped rulebook whose first
+    # reader may be a cast settlement. The frozen reverse index is built from
+    # shipped keys, so under the install t_-keyed awards never match a rule and
+    # the evaluator is an inert no-op.
     "world.rules.cross_lineage_unlock",
     # The Church rulebook validates its shipped YAML accrual rows against
     # the skill registry at import (every church.yaml skill_key must name a

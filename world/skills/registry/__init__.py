@@ -19,6 +19,12 @@ assembly (never rebound here), so the ``world/rules/disengage.py`` and
 ``world/skills/sexual_acts`` registration side effects — in-place
 mutations of that one dict — stay visible through every import path.
 
+``SHIPPED_SKILL_REGISTRY`` is the shipped catalog's immutable snapshot, taken
+by the assembly before any consumer exists. The synthetic test-data kit
+substitutes the live ``SKILL_REGISTRY`` in place for the duration of a scope,
+so that binding carries kit rows only while a scope is open; modules that
+load and validate a SHIPPED rulebook at import read the snapshot instead.
+
 ``SkillKind`` and ``TargetSpec`` are forward declarations for change 8's
 action resolver to import rather than redefine. Every ``effects`` string is
 parsed into a typed dataclass by ``world.skills.effects.parse_effect`` at
@@ -30,7 +36,7 @@ design §9): an edge ``consumer -> (skill_key, min_proficiency)`` gating USE
 registry load and caches the reverse-edge map the tip-cap derivation reads.
 """
 
-from world.skills.registry.assembly import SKILL_REGISTRY
+from world.skills.registry.assembly import SHIPPED_SKILL_REGISTRY, SKILL_REGISTRY
 from world.skills.registry.builders import (
     _BODY_TRAITS,
     _body_multiplier,
@@ -111,6 +117,7 @@ __all__ = [
     "DESCRIPTION_MAX",
     "LABEL_MAX",
     "FactionConstraint",
+    "SHIPPED_SKILL_REGISTRY",
     "SKILL_REGISTRY",
     "SkillCategory",
     "SkillDef",
