@@ -111,7 +111,18 @@ def act(actor, action, *, session_id, revision, message="", direction="", sessio
                         surface.bump_revision_if_unchanged(actor, revision)
                         log_warn("dream_surface_rejected", context={**boundary, "reason": "invalid_direction", "reason_codes": validation.reason_codes})
                         return _result("rejected", "invalid_direction", "；".join(reason.message for reason in validation.reasons))
+                    # A truthful receipt through ordinary output: the durable
+                    # work record, not the notice, is the evidence, and a
+                    # confirmation never claims an arrangement.
+                    from world.narrative import dispatch_status
+
                     lifecycle.confirm_session(session_id, owner, direction=payload, tick=tick)
+                    # Delivered only once the confirmation has committed, so a
+                    # rolled-back confirmation never produced a receipt. The
+                    # durable work record, not this notice, is the evidence.
+                    transaction.on_commit(
+                        lambda: dispatch_status.deliver_status(actor)
+                    )
                 else:
                     if not current.draft_id and summary.strip() and current.state == lifecycle.STATE_OPEN:
                         lifecycle.preserve_draft(session_id, owner, payload, tick=tick)

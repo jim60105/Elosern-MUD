@@ -183,6 +183,22 @@ class StatusSyncTests(EncounterDispatchTestBase):
         )
         self.assertEqual(scene_store.list_role_bindings(self.package_id), [])
 
+    def test_startup_sync_delivers_the_latest_durable_status(self):
+        from unittest.mock import Mock
+
+        from world.narrative.models import DreamDispatch
+
+        DreamDispatch.objects.create(
+            dispatch_id="dispatch:synthetic-status",
+            submission_key="synthetic-status:v1",
+            owner_id=str(self.player.pk),
+            state="queued",
+        )
+        self.player.msg = Mock()
+        sync_connected_owners(tick=13, characters=[self.player])
+        sent = [call.args[0] for call in self.player.msg.call_args_list]
+        self.assertTrue(any("準備中" in message for message in sent), sent)
+
     def test_startup_sync_with_no_connected_owner_activates_nothing(self):
         self.assertEqual(sync_connected_owners(tick=13, characters=[]), ())
 

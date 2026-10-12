@@ -361,6 +361,93 @@ class PersistenceTests(DreamDispatchTestCase):
         # No legacy scanner turned the historical request into new work.
         self.assertEqual(DreamDispatch.objects.count(), 0)
 
+class StatusMessageTests(DreamDispatchTestCase):
+    """Every durable state and reason says something distinct and truthful."""
+
+    def setUp(self):
+        super().setUp()
+        self._counter = 0
+
+    def _work(self, **overrides):
+        self._counter += 1
+        key = f"synthetic-status:{self._counter}"
+        defaults = {
+            "dispatch_id": dispatch.dispatch_id_for(key),
+            "submission_key": key,
+            "owner_id": self.owner_id,
+        }
+        defaults.update(overrides)
+        return DreamDispatch.objects.create(**defaults)
+
+    def test_no_work_says_nothing(self):
+        from world.narrative import dispatch_status
+
+        self.assertEqual(dispatch_status.status_message(None), "")
+        self.assertEqual(dispatch_status.owner_message(self.owner_id), "")
+
+    def test_preparing_waiting_and_arranged_are_distinct(self):
+        from world.narrative import dispatch_status
+
+        preparing = dispatch_status.status_message(
+            self._work(state=dispatch.STATE_QUEUED)
+        )
+        waiting = dispatch_status.status_message(
+            self._work(state=dispatch.STATE_WAITING_SERVICE)
+        )
+        arranged = dispatch_status.status_message(
+            self._work(state=dispatch.STATE_ARRANGED)
+        )
+        self.assertEqual(len({preparing, waiting, arranged}), 3)
+        # Only a durable arranged record may claim an executable arrangement,
+        # and even then it claims nothing about the encounter itself.
+        self.assertIn("成局", preparing)
+        self.assertIn("服務", waiting)
+        self.assertIn("安排", arranged)
+
+    def test_each_terminal_reason_has_its_own_actionable_message(self):
+        from world.narrative import dispatch_status
+
+        reasons = sorted(dispatch.REASONS - {dispatch.REASON_NO_CAPABILITY})
+        messages = {
+            reason: dispatch_status.status_message(
+                self._work(state=dispatch.STATE_FAILED, reason_code=reason)
+            )
+            for reason in reasons
+        }
+        self.assertNotIn("", messages.values())
+        self.assertEqual(len(set(messages.values())), len(messages))
+        for reason, message in messages.items():
+            with self.subTest(reason=reason):
+                # Spoiler safety: no role, place or outcome is disclosed and no
+                # message claims a completed encounter.
+                self.assertNotIn("女神", message)
+                self.assertNotIn("女孩", message)
+                self.assertIn("夢境方向", message)
+        # An unknown code never renders raw or empty: it falls back to a bounded
+        # message rather than leaking the reason code to the player.
+        self.assertEqual(
+            dispatch_status.status_message(
+                self._work(state=dispatch.STATE_FAILED, reason_code="<script>")
+            ),
+            dispatch_status.MESSAGE_FAILED,
+        )
+
+    def test_delivery_uses_the_current_actor_and_reports_nothing_when_empty(self):
+        from unittest.mock import Mock
+
+        from world.narrative import dispatch_status
+
+        silent = create_object("typeclasses.characters.PlayerCharacter", key="Quiet owner")
+        silent.msg = Mock()
+        self.assertEqual(dispatch_status.deliver_status(silent), "")
+        silent.msg.assert_not_called()
+
+        self._work(state=dispatch.STATE_QUEUED)
+        self.owner.msg = Mock()
+        delivered = dispatch_status.deliver_status(self.owner)
+        self.assertIn("準備中", delivered)
+        self.owner.msg.assert_called_once_with(delivered)
+
 
 class RequirementsContractTests(DreamDispatchTestCase):
     def test_bounded_requirements_are_normalized_and_versioned(self):

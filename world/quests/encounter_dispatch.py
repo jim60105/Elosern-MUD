@@ -304,4 +304,10 @@ def sync_connected_owners(
     activated: list[Any] = []
     for character in connected:
         activated.extend(activate_for_move(character, tick=tick))
+        # Reconnect also reads the owner's latest durable work status: an
+        # offline owner keeps its work, and a returning one is told the truth
+        # about it through ordinary output (dream-story-dispatch §8).
+        from world.narrative import dispatch_status
+
+        dispatch_status.deliver_status(character)
     return tuple(activated)

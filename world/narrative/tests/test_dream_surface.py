@@ -554,10 +554,16 @@ class DreamSurfaceTests(EvenniaTest):
             "stale_requirements",
         )
         self.assertFalse(CreativeRequest.objects.exists())
-        confirmed = self.request(
-            "confirm", direction={**direction, "requirement_version": shown}
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            confirmed = self.request(
+                "confirm", direction={**direction, "requirement_version": shown}
+            )
         self.assertEqual(confirmed.result["outcome"], "success")
+        # The receipt is truthful: it reports preparation, never an arrangement
+        # or an existing encounter, and it travels as ordinary output.
+        receipts = [call.args[0] for call in self.actor.msg.call_args_list]
+        self.assertTrue(any("正在準備中" in line for line in receipts), receipts)
+        self.assertFalse(any("已有可執行的安排" in line for line in receipts), receipts)
         stored = CreativeRequest.objects.get()
         self.assertEqual(stored.direction["requirements"], requirements)
         self.assertEqual(stored.direction["requirement_version"], shown)
