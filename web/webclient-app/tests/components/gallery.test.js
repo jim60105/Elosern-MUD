@@ -469,3 +469,85 @@ describe("official read-only entries", () => {
     expect(wrapper.findComponent(GalleryFaceRectModal).exists()).toBe(false);
   });
 });
+
+// The empty-card guidance. Official entries are committed read-only artwork of
+// the selected subject, so their availability is independent of which card
+// subset the chosen filter shows: the paragraph may only claim missing
+// artwork when there is no official artwork either.
+const GUIDANCE_TEXT = "此分類尚無肖像。選擇「生成新圖」，記錄角色的模樣。";
+const OFFICIAL_ONLY = { ...GALLERY_EMPTY, official_entries: GALLERY_SAMPLE.official_entries };
+// One subject with no cards and no official entries at all.
+const EMPTY_SUBJECT = {
+  ...GALLERY_EMPTY,
+  subjects: [GALLERY_SAMPLE.subjects[1]],
+  selected: GALLERY_SAMPLE.subjects[1].subject_key,
+};
+// One committed card that only 全部 matches: it is neither the default, nor
+// bound, nor pending, nor failed, so the other four filters show zero visible
+// rows on a subject that does have a card row.
+const NO_MATCH_CARD = GALLERY_SAMPLE.cards[5];
+const NO_MATCH_FILTERS = { all: 1, defaults: 0, bound: 0, pending: 0, failed: 0 };
+
+function guidance(wrapper) {
+  return wrapper.get(".gallery-panel__cards + .gallery-panel__empty");
+}
+
+describe("official-only empty-card guidance", () => {
+  it("suppresses the paragraph when committed official rows replace every card", () => {
+    const wrapper = mountSurface(GalleryPanel, { model: OFFICIAL_ONLY });
+    expect(wrapper.findAll(".gallery-card")).toHaveLength(0);
+    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
+    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+  });
+
+  it("keeps the unchanged paragraph inside the cards area without official rows", () => {
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_EMPTY });
+    const paragraph = guidance(wrapper);
+    expect(paragraph.classes()).toContain("gallery-panel__empty");
+    expect(paragraph.text()).toBe(GUIDANCE_TEXT);
+  });
+
+  it("keeps the paragraph for a subject with no cards and no official rows", () => {
+    const wrapper = mountSurface(GalleryPanel, { model: EMPTY_SUBJECT });
+    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(0);
+    expect(guidance(wrapper).text()).toBe(GUIDANCE_TEXT);
+  });
+
+  it("suppresses the paragraph on every card filter with no visible rows while official rows exist", async () => {
+    const model = { ...OFFICIAL_ONLY, cards: [NO_MATCH_CARD], filters: NO_MATCH_FILTERS };
+    const wrapper = mountSurface(GalleryPanel, { model });
+    for (const [label, visible] of [["全部（1）", 1], ["預設（0）", 0], ["已綁定（0）", 0], ["生成中（0）", 0], ["失敗（0）", 0]]) {
+      await button(wrapper, label).trigger("click");
+      expect(wrapper.findAll(".gallery-card")).toHaveLength(visible);
+      expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+      // Committed card counts and the separate official rows never move.
+      expect(button(wrapper, label)).toBeDefined();
+      expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
+    }
+  });
+
+  it("keeps the paragraph for an empty filtered subset without official rows", async () => {
+    const model = { ...EMPTY_SUBJECT, cards: [NO_MATCH_CARD], filters: NO_MATCH_FILTERS };
+    const wrapper = mountSurface(GalleryPanel, { model });
+    await button(wrapper, "預設（0）").trigger("click");
+    expect(wrapper.findAll(".gallery-card")).toHaveLength(0);
+    expect(guidance(wrapper).text()).toBe(GUIDANCE_TEXT);
+    await button(wrapper, "全部（1）").trigger("click");
+    expect(wrapper.findAll(".gallery-card")).toHaveLength(1);
+    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+  });
+
+  it("follows a committed official-entry replacement in both directions without a dispatch", async () => {
+    const dispatch = vi.fn();
+    const wrapper = mountSurface(GalleryPanel, { model: OFFICIAL_ONLY, dispatch });
+    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+    await wrapper.setProps({ model: GALLERY_EMPTY });
+    expect(guidance(wrapper).text()).toBe(GUIDANCE_TEXT);
+    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(0);
+    await wrapper.setProps({ model: OFFICIAL_ONLY });
+    expect(wrapper.find(".gallery-panel__empty").exists()).toBe(false);
+    expect(wrapper.findAll(".gallery-official__row")).toHaveLength(OFFICIAL_ROWS.length);
+    expect(wrapper.findAll(".gallery-card")).toHaveLength(0);
+    expect(dispatch).not.toHaveBeenCalled();
+  });
+});
