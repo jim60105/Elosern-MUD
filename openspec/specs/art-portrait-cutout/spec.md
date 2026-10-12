@@ -106,14 +106,12 @@ is a member of the module's closed `CUTOUT_SUBJECT_KINDS` allowlist.
 
 ### Requirement: The background-removal backend is an injectable, CPU-only seam
 
-`world/art/cutout.py` SHALL expose the backend through the settings `ART_REMBG_BACKEND`
-dotted path (default `world.art.cutout.RembgCutoutBackend`), resolved exactly like
-`ART_SD_CLIENT` is resolved by `resolve_sd_client()`, and SHALL expose a module-level
-`remove_background(png_bytes) -> bytes` entry point that returns PNG bytes carrying an
-alpha channel. `remove_background` SHALL validate the backend's return value before
-returning it and SHALL raise `art_cutout_error` on any invalid return. The real backend
-SHALL use rembg's default `bria-rmbg` model without a model-selection parameter and SHALL
-reuse one inference session per process.
+`world/art/cutout.py` SHALL expose the backend via the `ART_REMBG_BACKEND` setting (default
+`world.art.cutout.RembgCutoutBackend`), resolved like `resolve_sd_client()`, and a
+module-level `remove_background(png_bytes) -> bytes` returning alpha-carrying PNG bytes.
+`remove_background` SHALL validate that return, raising `art_cutout_error` on an invalid
+one. The real backend SHALL use rembg's default `bria-rmbg`, take no model-selection
+parameter, and reuse one session per process.
 
 #### Scenario: The configured backend is the one that runs
 - **WHEN** `ART_REMBG_BACKEND` names the fake and an enabled portrait job runs
@@ -397,13 +395,12 @@ derived `ART_SD_OUTPUT_EXTENSION`, so every override path is covered by the one 
 
 ### Requirement: The background-removal stage emits boundary events
 
-`world/art/worker.py` SHALL emit exactly one `world.observability` facade event per
-applied cutout attempt: `art_cutout_done` at info level on success and
-`art_cutout_failed` at warn level carrying the exception with `exc=` on failure. No
-event SHALL be emitted for a subject the stage skipped. Production modules SHALL use
-named facade imports so tests patch the caller module's binding, and
-`tools/observability_freeze.json` SHALL gain no entry. The `model` context value SHALL
-identify the fixed `bria-rmbg` model without consulting a removed setting.
+`world/art/worker.py` SHALL emit exactly one `world.observability` facade event per applied
+cutout attempt: `art_cutout_done` at info level on success and `art_cutout_failed` at warn
+level carrying the exception with `exc=`. No event SHALL be emitted for a skipped subject.
+Production modules SHALL use named facade imports so tests patch the caller module's
+binding, and `tools/observability_freeze.json` SHALL gain no entry. The `model` context value
+SHALL be the fixed `bria-rmbg` identity.
 
 #### Scenario: A successful cutout leaves one info event
 - **WHEN** an enabled portrait job's cutout succeeds

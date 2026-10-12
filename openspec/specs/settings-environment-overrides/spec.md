@@ -14,10 +14,9 @@ developer guide as the documentation of record.
 `server/conf/settings.py` SHALL derive the initial value of every deployment-tunable setting it
 declares in the `ART_SD_*`, `ART_REMBG_*`, `ART_TRANSLATE_*`, `ART_SCHEDULER_*`,
 `ELOSERN_VUE_CLIENT`, `ELOSERN_MAX_CHARACTERS`, `DEFEAT_ADULT_SCENES`, and `HTTP_USER_AGENT`
-groups from a same-named environment variable — except `ART_SD_BASE_URL`, which reads
-`SD_WEBUI_BASE_URL` as fixed by the `internal-art-worker` spec — using typed conversion at
-settings import. `ART_REMBG_MODEL` SHALL be removed from the settings and environment
-inventory, with no replacement model-selection parameter or choice validation.
+groups from a same-named environment variable, with typed conversion, except `ART_SD_BASE_URL`,
+which reads `SD_WEBUI_BASE_URL` (`internal-art-worker`). No `ART_REMBG_MODEL` setting or
+model-choice validation SHALL exist.
 
 #### Scenario: Unset variables keep the documented defaults
 - **WHEN** the settings module is imported with none of the env-backed variables present in the
