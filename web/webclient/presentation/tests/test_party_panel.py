@@ -9,13 +9,20 @@ the combat participant rows. ``covers_requirement`` annotations for the new
 checker resolves IDs only from ``openspec/specs/``).
 """
 
+from contextlib import ExitStack, contextmanager
 from copy import deepcopy
+import hashlib
+import io
+import json
 from pathlib import Path
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from django.test import override_settings
+from PIL import Image
 from tools.spec_traceability import covers_requirement
 
 from evennia.server.serversession import ServerSession
@@ -44,11 +51,29 @@ from web.webclient.presentation.party import (
 )
 from web.webclient.presentation.registry import build_production_registry
 from world.quests.catalog import register_catalog
-from world.art.gallery import append_card, record_for
+from world.art import official, official_refs
+from world.art.gallery import (
+    GalleryRecord,
+    append_card,
+    official_preferences_for,
+    record_for,
+    set_official_selection,
+)
+from world.art.official import current_catalog, load_catalog, reset_catalog
+from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
+from world.art.presenter import (
+    ORIGIN_OFFICIAL,
+    ORIGIN_PLACEHOLDER,
+    ORIGIN_RUNTIME,
+    ORIGIN_SILHOUETTE,
+)
+from world.art.queue import claim, ensure, record_key, settle
+from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import character_subject_for
 from world.rules.action import stored_gauge_pair
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
+from world.rules.art_view import portrait_catalog_key
 from world.rules.combat_session import engage
 from world.rules.npc_identity import npc_display_name
 from world.rules.party import join_party
@@ -129,6 +154,142 @@ _CALENDAR = SimpleNamespace(
 )
 
 
+# The synthetic preset key and named-portrait stable key this module's
+# official-art fixture admits: file-local identities, exactly like
+# ``world/art/tests/test_gallery_match.py``, so no shipped preset, item, or
+# artwork name ever appears in a behavior test.
+_PRESET_KEY = "t_synth_preset"
+_COMPANION_KEY = "t_synth_companion"
+# One bound equipment item key for the precedence control; the chain compares
+# stored strings, so the identity only has to be a non-empty item key.
+_BOUND_ITEM = "t_synth_coat"
+
+
+def _png(width=4, height=4) -> bytes:
+    """A real, decodable PNG: the official catalog reads the header only."""
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class _OfficialArt:
+    """A synthetic official root beside an isolated runtime store.
+
+    ``mount`` writes one admitted ``preset/<key>/`` image (a decodable PNG the
+    catalog header-decodes) and reloads the snapshot; ``set_manifest`` updates
+    that content folder's manifest and reloads. ``tree`` digests every file
+    under BOTH artwork roots so a render that rewrote bytes in place cannot
+    pass a read-only assertion.
+    """
+
+    def __init__(self, tempdir: Path) -> None:
+        self.root = tempdir / "official"
+        self.store = tempdir / "store"
+        self.store.mkdir()
+
+    @property
+    def content(self) -> Path:
+        return self.root / "preset" / _PRESET_KEY
+
+    def mount(self, name="hero.png") -> str:
+        """Write one admitted image and reload the catalog snapshot."""
+        self.content.mkdir(parents=True, exist_ok=True)
+        (self.content / name).write_bytes(_png())
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def set_manifest(self, **manifest) -> None:
+        """Replace the content folder's manifest and reload the snapshot."""
+        (self.content / "manifest.json").write_text(
+            json.dumps(manifest), encoding="utf-8"
+        )
+        load_catalog()
+
+    def url(self, identity: str) -> str:
+        """The snapshot's own same-origin URL for an admitted identity."""
+        return current_catalog().url_for(identity)
+
+    def write_store_file(self, identity: str, data=b"synthetic image") -> None:
+        """Place one runtime file under the isolated store root."""
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
+    def tree(self) -> dict[str, str]:
+        """Every file under both artwork roots, by path and content digest."""
+        digests: dict[str, str] = {}
+        for root in (self.root, self.store):
+            if not root.exists():
+                continue
+            for path in sorted(root.rglob("*")):
+                if path.is_file():
+                    digests[path.relative_to(root.parent).as_posix()] = (
+                        hashlib.sha256(path.read_bytes()).hexdigest()
+                    )
+        return digests
+
+
+@contextmanager
+def _official_art_scope():
+    """Isolate both artwork roots and admit one synthetic preset key.
+
+    Mirrors the harness in ``world/art/tests/test_gallery_match.py``: the
+    runtime store and the official root are temp directories, the synthetic
+    preset key is the only registered one for both the provenance resolver and
+    the catalog's admission check, and the restart-scoped snapshot plus the
+    bounded-diagnostic dedupe set are reset on exit so nothing leaks between
+    tests.
+    """
+    with ExitStack() as stack:
+        tempdir = Path(stack.enter_context(tempfile.TemporaryDirectory())).resolve()
+        art = _OfficialArt(tempdir)
+        stack.enter_context(
+            override_settings(
+                ART_OFFICIAL_ROOT=str(art.root),
+                ART_STORE_ROOT=str(art.store),
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            )
+        )
+        official_refs._reported_unresolved.clear()
+        stack.callback(official_refs._reported_unresolved.clear)
+        reset_catalog()
+        stack.callback(reset_catalog)
+        yield art
+
+
+# The render-phase tripwires the read-only acceptance forbids: every creating
+# gallery read, record/card/preference write, generation enqueue and official
+# catalog reload or filesystem walk a presentation could attempt. Each is
+# patched to raise AND asserted never called, because the presentation
+# registry isolates a presenter exception into an unavailable payload — a
+# raise alone could hide inside a swallowed panel failure.
+_RENDER_TRIPWIRES = (
+    ("creating gallery read", "world.art.gallery._create_record"),
+    ("card write", "world.art.gallery.append_card"),
+    ("card delete", "world.art.gallery.remove_card"),
+    ("default write", "world.art.gallery.set_default"),
+    ("selection write", "world.art.gallery.set_official_selection"),
+    ("selection clear", "world.art.gallery.clear_official_selection"),
+    ("geometry write", "world.art.gallery.set_official_geometry"),
+    ("geometry clear", "world.art.gallery.clear_official_geometry"),
+    ("gallery enqueue", "world.art.queue.enqueue_gallery_job"),
+    ("gallery request", "world.art.service.request_gallery_image"),
+    ("official re-walk", "world.art.official.open_dir_fd"),
+    ("official re-load", "world.art.official.load_catalog"),
+)
+
+
 class PartyPresenterTests(EvenniaTest):
     def setUp(self):
         super().setUp()
@@ -142,6 +303,39 @@ class PartyPresenterTests(EvenniaTest):
     def _render(self):
         return self.registry.render("party", self.context)
 
+    def _panels(self):
+        """One production coordinator snapshot carrying both party and art."""
+        session = _RecordingSession(self.player)
+        coordinator = PresentationCoordinator(
+            session, self.registry, calendar_provider=lambda: _CALENDAR
+        )
+        return coordinator.full_snapshot(self.context)["panels"]
+
+    def _official_companion(self, key="測試官方隊友"):
+        """A present, joined, preset-born companion with a named portrait."""
+        npc = _companion(key, self.room)
+        npc.db.portrait_policy = {"mode": "named", "stable_key": _COMPANION_KEY}
+        npc.db.age = npc.db.apparent_age = 30
+        npc.db.creation_preset_key = _PRESET_KEY
+        join_party(npc, self.player)
+        return npc
+
+    def _slot_and_entry(self, panels, npc):
+        """The companion's party row and its same-snapshot catalog entry.
+
+        Establishes the acceptance join in one place: the emitted
+        ``portrait_ref`` IS the opaque catalog key of the co-located companion
+        in the art panel built from the same snapshot.
+        """
+        key = portrait_catalog_key(npc.pk)
+        slots = panels["party"]["slots"]
+        self.assertEqual([slot["identity"] for slot in slots], [int(npc.pk)])
+        self.assertIn(key, panels["art"]["portrait_catalog"])
+        return slots[0], panels["art"]["portrait_catalog"][key]
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
     def test_default_gallery_ref_resolves_in_same_snapshot_and_reads_only(self):
         first = _companion("測試同行甲", self.room)
         second = _companion("測試同行乙", self.room)
@@ -169,10 +363,18 @@ class PartyPresenterTests(EvenniaTest):
             catalog = self.registry.render("art", self.context)["portrait_catalog"]
             self.assertEqual(catalog[rows[0]["portrait_ref"]]["url"], f"/art/{identity}")
             self.assertEqual(record.db.cards, before)
+            # A default naming no card the record holds resolves nothing at
+            # step 4, so the chain continues; with no classic asset, no
+            # official reference and no other preference every later branch is
+            # absent too and the truthful null stands (silhouette artwork is
+            # decorative, never the payload's own image).
             record.db.default_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
             self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
             record.db.default_image_id = None
             self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            # An absent record is the legal empty-gallery state, not an
+            # absence-of-portrait claim: the same chain, now starting with no
+            # card at all, still resolves nothing here.
             record.delete()
             self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
             self.assertIsNone(record_for(subject, create=False))
@@ -322,6 +524,335 @@ class PartyPresenterTests(EvenniaTest):
         self.assertEqual(self.player.db.party, before["party"])
         self.assertEqual(witness.db.relations_data, before["relations"])
         self.assertEqual(dict(witness.traits.trait_data), before["traits"])
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_official_selection_presents_without_runtime_cards(self):
+        with _official_art_scope() as art:
+            art.mount("default.png")
+            selected = art.mount("selected.png")
+            art.set_manifest(default="default.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            set_official_selection(subject, selected)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(entry["url"], art.url(selected))
+            self.assertEqual(
+                entry["url"],
+                "/art/official/"
+                f"{current_catalog().fingerprint_for(selected)}/{selected}",
+            )
+            # The selection's own branch owns the payload: the mounted
+            # directory default is a different, non-selected image and the
+            # record stays card-less with no runtime default.
+            record = record_for(subject, create=False)
+            self.assertIsNotNone(record)
+            self.assertEqual(record.db.cards, [])
+            self.assertIsNone(record.db.default_image_id)
+            self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_mounted_official_default_presents_without_a_gallery_record(self):
+        with _official_art_scope() as art:
+            identity = art.mount("hero.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            self.assertIsNone(record_for(subject, create=False))
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(entry["url"], art.url(identity))
+            self.assertEqual(
+                entry["url"],
+                "/art/official/"
+                f"{current_catalog().fingerprint_for(identity)}/{identity}",
+            )
+            # Presenting the mounted default creates nothing: the gallery
+            # record is still absent after both panels rendered.
+            self.assertIsNone(record_for(subject, create=False))
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_equipment_bound_runtime_card_outranks_the_official_selection(self):
+        with _official_art_scope() as art:
+            art.mount("default.png")
+            selected = art.mount("selected.png")
+            art.set_manifest(default="default.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            image_id = "aaaaaaaa-1111-4111-8111-111111111111"
+            bound_identity = f"gallery/character/{_COMPANION_KEY}/{image_id}.png"
+            art.write_store_file(bound_identity)
+            append_card(
+                subject,
+                image_id=image_id,
+                stored_identity=bound_identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding={"mask": ["armor"], "snapshot": {"armor": _BOUND_ITEM}},
+                source="seed",
+                created_at=100,
+                image_size={"width": 768, "height": 1024},
+            )
+            companion.db.equipment = {"armor": _BOUND_ITEM}
+            set_official_selection(subject, selected)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(entry["url"], f"/art/{bound_identity}")
+            self.assertNotEqual(entry["url"], art.url(selected))
+            # The selection survived the outranking presentation untouched.
+            self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_record_default_card_outranks_the_mounted_official_default(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            image_id = "cccccccc-3333-4333-8333-333333333333"
+            identity = f"gallery/character/{_COMPANION_KEY}/{image_id}.png"
+            art.write_store_file(identity)
+            append_card(
+                subject,
+                image_id=image_id,
+                stored_identity=identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="seed",
+                created_at=100,
+                image_size={"width": 768, "height": 1024},
+            )
+            self.assertEqual(record_for(subject, create=False).db.default_image_id, image_id)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(entry["url"], f"/art/{identity}")
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_personal_selection_outranks_a_coexisting_record_default_card(self):
+        with _official_art_scope() as art:
+            art.mount("default.png")
+            selected = art.mount("selected.png")
+            art.set_manifest(default="default.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            set_official_selection(subject, selected)
+            image_id = "dddddddd-4444-4444-8444-444444444444"
+            identity = f"gallery/character/{_COMPANION_KEY}/{image_id}.png"
+            art.write_store_file(identity)
+            # A FIRST card becomes its record's automatic default without
+            # clearing the player's selection, so both preferences coexist:
+            # the selection still owns the payload.
+            append_card(
+                subject,
+                image_id=image_id,
+                stored_identity=identity,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="seed",
+                created_at=100,
+                image_size={"width": 768, "height": 1024},
+            )
+            record = record_for(subject, create=False)
+            self.assertEqual(record.db.default_image_id, image_id)
+            self.assertEqual(official_preferences_for(subject).selection, selected)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(entry["url"], art.url(selected))
+            # The runtime default card and the stored selection are untouched.
+            self.assertEqual(record.db.default_image_id, image_id)
+            self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_classic_runtime_asset_outranks_the_mounted_official_default(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            identity = f"portrait/character/{_COMPANION_KEY}.png"
+            art.write_store_file(identity, b"classic asset")
+            ensure(subject, "synthetic description")
+            claimed = [
+                record for record in claim(10) if record.db_key == record_key(subject)
+            ]
+            self.assertEqual(len(claimed), 1, "the pending classic job was not claimed")
+            settled = settle(
+                subject,
+                generation_token=str(claimed[0].db.generation_token),
+                status=ArtAssetStatus.DONE,
+                output_identity=identity,
+                error=None,
+            )
+            self.assertIsNotNone(settled)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(entry["url"], f"/art/{identity}")
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_portraitless_companion_stays_null_with_silhouette_fallback(self):
+        with _official_art_scope():
+            companion = self._official_companion()
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            # An empty official catalog and no runtime artwork leave the
+            # truthful null: the decorative silhouette is never the payload's
+            # own image, so the client keeps its initial-letter placeholder.
+            self.assertIsNone(slot["portrait_ref"])
+            self.assertEqual(entry["origin"], ORIGIN_SILHOUETTE)
+            self.assertIsNone(entry["url"])
+            self.assertIsNotNone(entry["fallback"])
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_companion_without_a_named_subject_has_no_portrait_ref(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            companion = _companion("測試無肖像隊友", self.room)
+            join_party(companion, self.player)
+
+            panels = self._panels()
+
+            slot, entry = self._slot_and_entry(panels, companion)
+            self.assertIsNone(slot["portrait_ref"])
+            self.assertIsNone(entry["url"])
+            self.assertNotEqual(entry["status"], ArtAssetStatus.DONE)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_unresolved_retained_selection_falls_through_and_stays_stored(self):
+        with _official_art_scope() as art:
+            selected = art.mount("selected.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            set_official_selection(subject, selected)
+            # The artwork an older selection named is gone: the identity stays
+            # a legal stored preference the chain simply ignores.
+            shutil.rmtree(art.content)
+            load_catalog()
+
+            panels = self._panels()
+
+            slot, _entry = self._slot_and_entry(panels, companion)
+            self.assertIsNone(slot["portrait_ref"])
+            self.assertEqual(official_preferences_for(subject).selection, selected)
+
+    @covers_requirement(
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
+    )
+    def test_repeated_official_presentation_writes_nothing(self):
+        with _official_art_scope() as art:
+            art.mount("default.png")
+            selected = art.mount("selected.png")
+            art.set_manifest(default="default.png")
+            companion = self._official_companion()
+            subject = character_subject_for(companion)
+            set_official_selection(subject, selected)
+            expected_url = art.url(selected)
+
+            tripwires: dict[str, object] = {}
+            with ExitStack() as stack:
+                for label, target in _RENDER_TRIPWIRES:
+                    tripwires[label] = stack.enter_context(
+                        patch(target, side_effect=AssertionError(label))
+                    )
+                # A non-creating read is the legal gallery read; a creating one
+                # would take the ``_create_record`` tripwire above.
+                reads = stack.enter_context(
+                    patch("world.art.gallery.record_for", wraps=record_for)
+                )
+                before = self._presentation_state(art, subject, companion)
+                panels = [self._panels() for _ in range(3)]
+                after = self._presentation_state(art, subject, companion)
+
+            # A registry-isolated presenter failure would be swallowed into an
+            # unavailable panel, so the tripwires are asserted directly AND the
+            # repeated snapshots are asserted to carry the resolved portrait:
+            # the render phase provably ran and provably stayed read-only.
+            for label, tripwire in tripwires.items():
+                self.assertFalse(tripwire.called, f"render attempted a {label}")
+            self.assertTrue(reads.called, "no non-creating gallery read happened")
+            for call in reads.call_args_list:
+                self.assertFalse(call.kwargs.get("create", False), call)
+            for snapshot in panels:
+                slot, entry = self._slot_and_entry(snapshot, companion)
+                self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+                self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
+                self.assertEqual(entry["url"], expected_url)
+            self.assertEqual(before, after)
+
+    def _presentation_state(self, art, subject, companion):
+        """Gallery records, asset/queue rows, attributes and both trees."""
+        record = record_for(subject, create=False)
+        return {
+            "gallery_keys": sorted(GalleryRecord.objects.values_list("db_key", flat=True)),
+            "gallery_cards": deepcopy(record.db.cards) if record is not None else None,
+            "gallery_default": record.db.default_image_id if record is not None else None,
+            "gallery_selection": (
+                record.db.official_selection if record is not None else None
+            ),
+            "assets": sorted(
+                (
+                    asset.db_key,
+                    asset.db.status,
+                    asset.db.output_identity or "",
+                    asset.db.prior_output_identity or "",
+                )
+                for asset in ArtAssetRecord.objects.all()
+            ),
+            "attributes": [
+                (attribute.key, deepcopy(attribute.value))
+                for attribute in sorted(
+                    companion.attributes.all(), key=lambda attribute: attribute.key
+                )
+            ],
+            "trees": art.tree(),
+        }
 
 
 class PartyValidatorTests(unittest.TestCase):
