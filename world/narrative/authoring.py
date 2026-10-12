@@ -405,6 +405,16 @@ def _stamped_direction(
     }
 
 
+def stale_requirements_error() -> DirectionValidationError:
+    """The typed refusal for a requirement set that was never reviewed here.
+
+    Shared by every confirmation entry path, so a caller that bypasses the
+    surface gate cannot freeze -- or silently drop -- requirements the player
+    never saw.
+    """
+    return DirectionValidationError(_reasons("stale_requirements"))
+
+
 def validate_direction(direction: Any, *, owner_id: str) -> DirectionValidation:
     """Deterministically validate a desired direction for one owner.
 

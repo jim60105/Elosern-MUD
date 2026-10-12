@@ -76,6 +76,9 @@ from world.narrative.authoring import (
     AuthoringDraft,
     CreativeRequest,
     confirm_draft,
+    get_draft,
+    reviewed_version_matches,
+    stale_requirements_error,
     get_request,
     save_draft,
 )
@@ -114,6 +117,7 @@ REASON_AT_CAP = "at_cap"
 REASON_NO_OUTSTANDING_TURN = "no_outstanding_turn"
 REASON_NOT_DRAFTED = "not_drafted"
 REASON_DUPLICATE_DELIVERY = "duplicate_delivery"
+REASON_STALE_REQUIREMENTS = "stale_requirements"
 
 
 class DreamSessionError(Exception):
@@ -930,6 +934,24 @@ def confirm_session(
 
     handle = session.draft_id
     if direction is not None:
+        # The same deterministic review check every entry path shares: a
+        # submitted direction may only freeze what its persisted draft version
+        # actually showed. Without this, a caller bypassing the surface gate
+        # could overwrite a requirement-bearing draft with a summary and
+        # silently drop the shown requirements.
+        shown = get_draft(handle, clean_owner) if handle else None
+        if shown is not None and not reviewed_version_matches(direction, draft=shown):
+            _reject(
+                "dream_session_requirements_unreviewed",
+                reason=REASON_STALE_REQUIREMENTS,
+                boundary={
+                    "session_id": session.session_id,
+                    "owner": clean_owner,
+                    "draft_id": handle,
+                    "tick": clean_tick,
+                },
+            )
+            raise stale_requirements_error()
         draft = _save_session_draft(session, clean_owner, direction, sources, clean_tick)
         handle = _record_draft_handle(
             session, clean_owner, draft.draft_id, clean_tick

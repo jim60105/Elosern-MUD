@@ -325,6 +325,58 @@ class RecoveryTests(DreamDispatchTestCase):
 class PersistenceTests(DreamDispatchTestCase):
     """The work row is the authoritative state across a process boundary."""
 
+    def test_the_session_path_refuses_an_unreviewed_requirement_change(self):
+        # A caller that bypasses the surface gate cannot replace a draft's shown
+        # requirements with a summary and silently drop them.
+        from world.narrative import dream_session as lifecycle
+        from world.narrative.authoring import DirectionValidationError, get_draft
+        from world.narrative.dream_session import get_session
+        from world.narrative.models import CreativeRequest
+
+        requirements = [{"kind": "place", "text": "南門"}]
+        session = lifecycle.open_session(self.owner_id, tick=100)
+        lifecycle.preserve_draft(
+            session.session_id,
+            self.owner_id,
+            {
+                "kind": "new_story",
+                "summary": "合成方向",
+                "requirements": requirements,
+            },
+            tick=100,
+        )
+        handle = get_session(session.session_id, self.owner_id).draft_id
+        shown = get_draft(handle, self.owner_id).direction["requirement_version"]
+        self.assertTrue(shown)
+
+        with self.assertRaises(DirectionValidationError) as failure:
+            lifecycle.confirm_session(
+                session.session_id,
+                self.owner_id,
+                direction={"kind": "new_story", "summary": "改了摘要"},
+                tick=100,
+            )
+        self.assertIn("stale_requirements", failure.exception.reason_codes)
+        self.assertEqual(CreativeRequest.objects.count(), 0)
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+        # The shown version is untouched, and reviewing exactly it confirms.
+        self.assertEqual(
+            get_draft(handle, self.owner_id).direction["requirements"], requirements
+        )
+        with self.captureOnCommitCallbacks(execute=True):
+            lifecycle.confirm_session(
+                session.session_id,
+                self.owner_id,
+                direction={
+                    "kind": "new_story",
+                    "summary": "合成方向",
+                    "requirements": requirements,
+                    "requirement_version": shown,
+                },
+                tick=100,
+            )
+        self.assertEqual(DreamDispatch.objects.count(), 1)
+
     def test_session_confirmation_commits_request_work_and_closure_together(self):
         # The delta's "work persistence fails" scenario on the session path: a
         # closure that fails after the request was written must leave no
