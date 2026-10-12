@@ -73,16 +73,15 @@ LLM wrote the NPC.
 - **THEN** only the policy-bearing character resolves to a unique portrait subject
 
 ### Requirement: Subject descriptions are deterministic and exclude non-physical truth
-`world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
-description per subject from allowed immutable or validated data. A character description SHALL
-be composed exclusively of the subject's visual truth; it SHALL NOT carry the character's
-`display_name` or any other identity string. A monster description SHALL be composed exclusively
-of the selected visual-species row's public identity fields — its published physical appearance
-and its display label.
+`world/art/subjects.py` SHALL produce one deterministic description per subject from allowed data.
+Descriptions SHALL carry only visual truth — never `display_name` — and monster text only a species
+row's published appearance and display label. The race label SHALL be an image-recognizable RACE
+display name: a subrace resolves to its parent race, a bare race key directly, an unregistered key
+to the stored string. Appearance prose SHALL be image-usable, label-free, and in declared order.
 
 #### Scenario: Character descriptions contain the appearance block and nothing else from the persona
 - **WHEN** a character description is generated for a character with a full persona and a disguise
-- **THEN** it contains the race/subrace label, the apparent age, and the authored appearance sub-keys, and contains no display name, no personality, life story, habit, background, identity, or social-connection text, no combat-resource values, and no disguised stats as physical truth
+- **THEN** it contains the parent-race display label, the apparent age, and the authored `style` and `overview` appearance values, and contains no display name, no personality, life story, habit, background, identity, or social-connection text, no combat-resource values, and no disguised stats as physical truth
 
 #### Scenario: The rendered age is the apparent age
 - **WHEN** a character description is generated for a character whose canonical age and apparent age differ
@@ -94,11 +93,19 @@ and its display label.
 
 #### Scenario: Appearance rendering is deterministic
 - **WHEN** the same character's description is generated twice
-- **THEN** the two results are byte-identical, with appearance sub-keys in the declared order
+- **THEN** the two results are byte-identical, with the kept appearance values in the declared order
 
 #### Scenario: A character with no appearance data is unchanged
 - **WHEN** a character description is generated for a character whose persona has an empty appearance block
 - **THEN** the appearance section is empty and the result is the bare template stem with no dangling separator
+
+#### Scenario: Body numbers and setting clothing never reach the prompt
+- **WHEN** a character description is generated for a character whose only appearance data is the `height`, `weight`, `measurement`, `attire`, and `feature` sub-keys
+- **THEN** the appearance contribution is empty — the result is the bare description with no appearance section — because numeric body data is not renderable visual truth and the equipped equipment-slot combination is the only clothing source for a render
+
+#### Scenario: The appearance fragment is label-free
+- **WHEN** a mapping-shaped persona `appearance` contributes its kept `style` and `overview` values to a character description
+- **THEN** the fragment carries only the authored capped values, one per line, and neither the store's `外觀` section label nor any sub-key label appears anywhere in the description
 
 #### Scenario: Scene and monster descriptions are registry text
 - **WHEN** scene and monster descriptions are generated
@@ -123,7 +130,7 @@ and its display label.
 
 #### Scenario: The degraded fallback reads no persona
 - **WHEN** the prompt library cannot resolve `art.character_description`
-- **THEN** the fallback description is built from the race label and the apparent age only, with no persona read and no display name
+- **THEN** the fallback description is built from the parent-race display label and the apparent age only, with no persona read and no display name
 
 #### Scenario: An unselected appearance field reproduces the pre-appearance description
 - **WHEN** a character description is generated with no field selected
@@ -165,7 +172,8 @@ and its display label.
 
 #### Scenario: Appearance sub-keys render in declared order
 - **WHEN** a character's appearance contribution is composed
-- **THEN** it is read exclusively from the persona record's `appearance` block and renders its sub-keys in the declared `world/rules/persona.py::_SUBKEY_ORDER` order, so the same entity always yields the same prompt regardless of storage iteration order
+- **THEN** it is read exclusively from the persona record's `appearance` block; a mapping-shaped block contributes only its `style` and `overview` values in the declared `world/rules/persona.py::_SUBKEY_ORDER` order, a string-shaped compact NPC-card appearance contributes its whole text, and any other shape contributes nothing
+- **AND** the contribution is label-free — no section label, no sub-key labels — so the same entity always yields the same prompt regardless of storage iteration order
 
 #### Scenario: Descriptions are composable by field selection
 - **WHEN** a character description is generated
@@ -191,7 +199,7 @@ and its display label.
 
 #### Scenario: Each subject kind draws from its allowed data source
 - **WHEN** descriptions are generated for scenes, monsters and characters
-- **THEN** scenes use scene_sentence, monsters use only their declared visual species' public physical appearance with that species' public display label as the sole identity token the template may select, and characters keep race/subrace, apparent age and authored physical appearance
+- **THEN** scenes use scene_sentence, monsters use only their declared visual species' public physical appearance with that species' public display label as the sole identity token the template may select, and characters keep the parent-race display label, apparent age and image-usable authored physical appearance prose
 
 ### Requirement: Subject producer validation rejects unrepresentable keys
 `_validate_subject_key` SHALL reject keys containing `|`, `/`, `:`, `{`, `}`, or control

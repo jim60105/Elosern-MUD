@@ -3,19 +3,11 @@
 ## MODIFIED Requirements
 
 ### Requirement: Subject descriptions are deterministic and exclude non-physical truth
-`world/art/subjects.py` (or the provider it composes) SHALL produce exactly one deterministic
-description per subject from allowed immutable or validated data. A character description SHALL
-be composed exclusively of the subject's visual truth; it SHALL NOT carry the character's
-`display_name` or any other identity string. A monster description SHALL be composed exclusively
-of the selected visual-species row's public identity fields — its published physical appearance
-and its display label. The character race label SHALL be a RACE display name an image backend can
-recognize: a stored subrace resolves to its parent race's display name and a bare race key
-resolves directly, so a project-invented subrace display label never enters a prompt; an
-unregistered key falls back to the stored string. The character appearance contribution SHALL
-carry only image-usable visual prose — the `style` and `overview` sub-keys of a mapping-shaped
-persona `appearance` block in the store's declared order, or a compact NPC card's whole
-string-shaped appearance — with neither the section label nor any sub-key label rendered, one
-kept value per line, each value keeping the store's shipped per-field cap.
+`world/art/subjects.py` SHALL produce one deterministic description per subject from allowed data.
+Descriptions SHALL carry only visual truth — never `display_name` — and monster text only a species
+row's published appearance and display label. The race label SHALL be an image-recognizable RACE
+display name: a subrace resolves to its parent race, a bare race key directly, an unregistered key
+to the stored string. Appearance prose SHALL be image-usable, label-free, and in declared order.
 
 #### Scenario: Character descriptions contain the appearance block and nothing else from the persona
 - **WHEN** a character description is generated for a character with a full persona and a disguise
