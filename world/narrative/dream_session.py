@@ -951,9 +951,12 @@ def confirm_session(
     # Deterministic validation and "submit once" live in the authoring boundary;
     # a refused direction raises DirectionValidationError here and changes no
     # durable state, so the session stays open and unconfirmed.
-    request = confirm_draft(draft_id=handle, owner_id=clean_owner, tick=clean_tick)
-
+    # The request, its one work record and the confirmed closure commit (or roll
+    # back) together on every entry path, not only when the caller happens to
+    # hold an outer transaction: a closure that failed after the request
+    # committed could otherwise leave a confirmed request with no work.
     with transaction.atomic():
+        request = confirm_draft(draft_id=handle, owner_id=clean_owner, tick=clean_tick)
         locked = _locked_session(session.session_id, clean_owner)
         locked.draft_id = handle
         locked.request_key = request.submission_key

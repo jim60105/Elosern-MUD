@@ -325,6 +325,39 @@ class RecoveryTests(DreamDispatchTestCase):
 class PersistenceTests(DreamDispatchTestCase):
     """The work row is the authoritative state across a process boundary."""
 
+    def test_session_confirmation_commits_request_work_and_closure_together(self):
+        # The delta's "work persistence fails" scenario on the session path: a
+        # closure that fails after the request was written must leave no
+        # confirmed request, no work record, an open session and no pump hint.
+        from unittest.mock import patch
+
+        from world.narrative import dream_session as lifecycle
+        from world.narrative.dream_session import STATE_OPEN, get_session
+        from world.narrative.models import CreativeRequest
+
+        session = lifecycle.open_session(self.owner_id, tick=100)
+        lifecycle.preserve_draft(
+            session.session_id,
+            self.owner_id,
+            {"kind": "new_story", "summary": "合成方向"},
+            tick=100,
+        )
+        with patch(
+            "world.narrative.dream_session._locked_session",
+            side_effect=RuntimeError("synthetic closure failure"),
+        ):
+            with self.assertRaises(RuntimeError):
+                with self.captureOnCommitCallbacks(execute=True):
+                    lifecycle.confirm_session(
+                        session.session_id, self.owner_id, tick=100
+                    )
+        self.assertEqual(CreativeRequest.objects.count(), 0)
+        self.assertEqual(DreamDispatch.objects.count(), 0)
+        self.assertEqual(
+            get_session(session.session_id, self.owner_id).state, STATE_OPEN
+        )
+        self.assertEqual(self.hints, [])
+
     def test_saved_reload_preserves_state_stage_token_and_checkpoints(self):
         draft = self._draft()
         request = self._confirm(draft)
