@@ -629,21 +629,39 @@ class AiTestLayoutContractTests(unittest.TestCase):
     )
     def test_scenario_director_family_splits_into_the_four_themed_modules(self):
         discovered = {path.name for path in AI_TESTS.glob("test_scenario_director_*.py")}
-        self.assertEqual(discovered, DIRECTOR_SPLIT_MODULES)
+        # The four themed family modules exist and the pre-split module stays
+        # deleted. The requirement pins the split of the original file, not the
+        # whole namespace: a later change may add its own director module.
+        self.assertTrue(
+            DIRECTOR_SPLIT_MODULES <= discovered,
+            f"missing split modules: {sorted(DIRECTOR_SPLIT_MODULES - discovered)}",
+        )
+        self.assertFalse((AI_TESTS / "test_scenario_director.py").exists())
 
     @covers_requirement(
         "evennia-test-optimization::ai-test-modules-are-split-into-themed-helpers-backed-modules"
     )
     def test_npc_dialogue_family_splits_into_the_four_themed_modules(self):
         discovered = {path.name for path in AI_TESTS.glob("test_npc_dialogue_*.py")}
-        self.assertEqual(discovered, DIALOGUE_SPLIT_MODULES)
+        self.assertTrue(
+            DIALOGUE_SPLIT_MODULES <= discovered,
+            f"missing split modules: {sorted(DIALOGUE_SPLIT_MODULES - discovered)}",
+        )
+        self.assertFalse((AI_TESTS / "test_npc_dialogue.py").exists())
 
     @covers_requirement(
         "evennia-test-optimization::ai-test-modules-are-split-into-themed-helpers-backed-modules"
     )
     def test_every_pre_split_class_sits_in_its_expected_module(self):
+        # The two split families: the themed modules CLASS_MODULES pins plus any
+        # module added later under the same family prefix. An unrelated module
+        # that reuses a pinned class name of its own (test_character_creation.py
+        # defines its own StartupRegistrationTests) is out of scope.
+        family = set(CLASS_MODULES.values())
+        for pattern in ("test_scenario_director_*.py", "test_npc_dialogue_*.py"):
+            family |= {path.name for path in AI_TESTS.glob(pattern)}
         for path in sorted(AI_TESTS.glob("test_*.py")):
-            if path.name not in CLASS_MODULES.values():
+            if path.name not in family:
                 continue
             tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
             actual = {
@@ -669,12 +687,17 @@ class AiTestLayoutContractTests(unittest.TestCase):
                 continue
             for class_name, methods in _class_annotations(path).items():
                 if class_name in PRE_SPLIT_ANNOTATIONS:
-                    observed[class_name] = {
-                        method: ids
-                        for method, ids in methods.items()
-                        if method in PRE_SPLIT_ANNOTATIONS[class_name]
-                    }
-        self.assertEqual(observed, PRE_SPLIT_ANNOTATIONS)
+                    observed[class_name] = methods
+        # Every pre-split annotation stays on its own method. A later change may
+        # add a requirement id to a method that now also covers it; no pinned id
+        # may move, vanish or change.
+        for class_name, methods in PRE_SPLIT_ANNOTATIONS.items():
+            self.assertIn(class_name, observed)
+            for method, ids in methods.items():
+                with self.subTest(class_name=class_name, method=method):
+                    self.assertIn(method, observed[class_name])
+                    for requirement in ids:
+                        self.assertIn(requirement, observed[class_name][method])
 
     @covers_requirement(
         "evennia-test-optimization::ai-test-modules-are-split-into-themed-helpers-backed-modules"
