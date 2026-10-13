@@ -190,10 +190,21 @@ class Candidate:
     preserved rather than converted into characters, and the authored scale is
     preserved rather than normalized away, so whatever the later selector picks
     stays executable exactly as validated.
+
+    ``recipients`` is the plan's submitted recipient set and ``routed`` its
+    per-effect recipient routing -- the shared audience planner's own answer,
+    materialized as tuples here so an estimator can project the same
+    recipients settlement will without re-deriving (and possibly re-disagreeing
+    with) the routing the producer already established. Both describe the plan
+    of the same decision: they are live entities read once by the producer, and
+    they are never persisted, never carried across decisions and never part of
+    a candidate identity.
     """
 
     identity: CandidateIdentity
     plan: PlannedAction
+    recipients: tuple[Any, ...] = ()
+    routed: tuple[tuple[Any, ...], ...] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -303,8 +314,11 @@ def _routed(
     the planner reports by refusing it.
     """
     try:
-        return plan_effect_audiences(
-            actor, context, skill, list(recipients), readings=reads
+        return tuple(
+            tuple(reached)
+            for reached in plan_effect_audiences(
+                actor, context, skill, list(recipients), readings=reads
+            )
         )
     except RejectedAction:
         # observability: ignore R2: an empty routing is the unrepresentable
@@ -384,8 +398,8 @@ def enumerate_candidates(
     magnitude = _validated_scale(scale)
     declared = _declared_order(order)
     reader = DecisionReads() if reads is None else reads
-    pool = _decision_pool(snapshot, actor, roster, context)
-    hostile = _hostile_domain(snapshot, pool)
+    pool = decision_pool(snapshot, actor, roster, context)
+    hostile = hostile_domain(snapshot, pool)
 
     skills: list[SkillDef] = []
     unavailable: list[SkillObservation] = []
@@ -661,7 +675,7 @@ def _group_proposals(
     )
     proposals: list[_Proposal] = []
     for kind in kinds:
-        members = _group_members(kind, snapshot, pool)
+        members = group_members(kind, snapshot, pool)
         if not members:
             continue
         proposals.append(
@@ -789,7 +803,7 @@ def _is_mixed(skill: SkillDef) -> bool:
     )
 
 
-def _decision_pool(
+def decision_pool(
     snapshot: DecisionSnapshot,
     actor: Any,
     roster: dict[str, Any],
@@ -800,7 +814,9 @@ def _decision_pool(
     The actor plus every participant the snapshot names that the reconstruction
     roster still carries, minus the battlefield's knocked-out members -- the
     same expression the shared shorthand expansion applies, so a group and its
-    shorthand always describe the same combatants.
+    shorthand always describe the same combatants. It is the decision's own
+    participant domain, shared with effect estimation so both read the same
+    eligible set.
     """
     battlefield = getattr(context, "battlefield", None)
     knocked_out = frozenset(getattr(battlefield, "knocked_out", ()))
@@ -836,7 +852,7 @@ def _applicable(snapshot: DecisionSnapshot, entity: Any) -> bool:
     )
 
 
-def _hostile_domain(snapshot: DecisionSnapshot, pool: tuple[Any, ...]) -> tuple[Any, ...]:
+def hostile_domain(snapshot: DecisionSnapshot, pool: tuple[Any, ...]) -> tuple[Any, ...]:
     """Return the decision's applicable hostile participants in stable order."""
     return tuple(
         sorted(
@@ -851,7 +867,7 @@ def _hostile_domain(snapshot: DecisionSnapshot, pool: tuple[Any, ...]) -> tuple[
     )
 
 
-def _group_members(
+def group_members(
     kind: str, snapshot: DecisionSnapshot, pool: tuple[Any, ...]
 ) -> tuple[Any, ...]:
     """Return one group kind's applicable members in stable order."""
@@ -1091,7 +1107,12 @@ def _examine(
             _UNREPRESENTABLE,
             "supported hostile damage reaches no hostile recipient",
         )
-    return Candidate(proposal.identity, proposal.plan)
+    return Candidate(
+        proposal.identity,
+        proposal.plan,
+        recipients=proposal.recipients,
+        routed=proposal.routed,
+    )
 
 
 def _reaches_hostile(

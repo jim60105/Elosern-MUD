@@ -27,6 +27,7 @@ from world.rules.buffs import (
     BLOCKING_BUFF_KEYS,
     BUFF_DEFINITIONS,
     active_buff_entries_from_storage,
+    active_buff_entries_keyed,
     active_buff_keys_from_storage,
     entity_active_buffs,
 )
@@ -39,6 +40,7 @@ from world.rules.monster_ai.models import (
     CapabilityState,
     DecisionScope,
     DecisionSnapshot,
+    DivertLimit,
     OwnedSkillSnapshot,
     ParticipantSnapshot,
     PublicObservation,
@@ -108,6 +110,7 @@ class DecisionReads:
         self._conditions: dict[Any, dict[str, Any]] = {}
         self._proficiency: dict[Any, Mapping[str, float]] = {}
         self._costs: dict[tuple[Any, str, float], dict[str, int]] = {}
+        self._diverts: dict[Any, tuple[DivertLimit, ...]] = {}
 
     def skill(self, skill_key: str) -> SkillDef | None:
         """Return the registered skill definition behind one key."""
@@ -262,6 +265,59 @@ class DecisionReads:
                 actions_per_turn=int(modifiers.get("actions_per_turn", 1)),
             )
         return self._capability[key]
+
+    def divert_limits(self, entity: Any) -> tuple[DivertLimit, ...]:
+        """Return the entity's active damage-diversion budgets, read once.
+
+        Projected from the persisted buff cache through the shared no-create
+        liveness reader and the shipped buff definitions, so an estimate can
+        subtract a known shield without mounting the buff handler or running
+        settlement. The order is settlement's own: definition key first, then
+        the buff instance key, because that order is which budget absorbs a
+        strike's residual first once a cap starts binding.
+        """
+        key = _memo_key(entity)
+        if key not in self._diverts:
+            self._diverts[key] = _divert_limits(entity)
+        return self._diverts[key]
+
+
+def _divert_limits(entity: Any) -> tuple[DivertLimit, ...]:
+    """Project one entity's active damage-diversion budgets from storage.
+
+    The shipped buff definition owns the authored fraction, cap and paid
+    gauge (all three validated at load time); the persisted cache entry owns
+    how much of that cap the instance has already spent. Nothing here mounts a
+    handler, so one decision can subtract a known shield from an estimate
+    without running the damage handler.
+    """
+    if not hasattr(entity, "attributes"):
+        return ()
+    limits: list[DivertLimit] = []
+    for instance_key, entry in active_buff_entries_keyed(entity):
+        definition_key = entry.get("definition_key")
+        if not isinstance(definition_key, str):
+            continue
+        definition = BUFF_DEFINITIONS.get(definition_key)
+        if definition is None:
+            continue
+        spec = definition.modifiers.get("divert")
+        if not isinstance(spec, Mapping):
+            continue
+        spent = entry.get("divert_consumed")
+        if isinstance(spent, bool) or not isinstance(spent, (int, float)):
+            spent = 0
+        limits.append(
+            DivertLimit(
+                instance_key=instance_key,
+                definition_key=definition_key,
+                gauge=str(spec["target"]),
+                fraction=float(spec["fraction"]),
+                remaining_cap=max(0, int(spec["cap"]) - max(0, int(spent))),
+            )
+        )
+    limits.sort(key=lambda limit: (limit.definition_key, limit.instance_key))
+    return tuple(limits)
 
 
 def _project_buffs(entity: Any) -> tuple[BuffProjection, ...]:

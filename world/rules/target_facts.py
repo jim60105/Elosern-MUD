@@ -4,6 +4,11 @@ This module is read-only and never mutates entity state or Evennia storage.
 Facts are read strictly from persistent deterministic data (``combat_traits``,
 ``affinity_elements``, and live buff instances via ``entity_active_buffs``);
 narrative names, race labels, and descriptions never imply a combat fact.
+
+The buff-fact branch accepts the optional decision-local ``readings`` seam the
+rest of the shared gates already take: settlement passes nothing and keeps
+reading live buff instances, while a no-create decision reader supplies its own
+already-taken key set so evaluating a damage predicate never mounts a handler.
 """
 
 from collections.abc import Iterable, Sequence
@@ -79,23 +84,34 @@ def get_target_facts(entity: Any) -> frozenset[str]:
     return get_affinity_elements(entity) | get_combat_traits(entity)
 
 
-def matches_target_predicate(entity: Any, predicate: Iterable[str]) -> bool:
+def matches_target_predicate(
+    entity: Any,
+    predicate: Iterable[str],
+    *,
+    readings: Any = None,
+) -> bool:
     """Return True if the target satisfies any fact declared in predicate.
 
     Empty predicate returns False. Narrative labels, descriptions, or entity
     names never imply a fact. Live buff entries (buff:<key>) match if the target
     currently holds a live, unexpired, non-paused instance of the definition key.
+
+    ``readings`` may pre-supply that live key set (any object exposing
+    ``buff_keys(entity)``); the static affinity/trait facts never depend on it.
     """
     if not predicate:
         return False
     facts: frozenset[str] | None = None
-    active_buffs: set[str] | None = None
+    active_buffs: Any = None
     for entry in predicate:
         if entry.startswith("buff:"):
             if active_buffs is None:
-                from world.rules.buffs import entity_active_buffs
+                if readings is not None:
+                    active_buffs = readings.buff_keys(entity)
+                else:
+                    from world.rules.buffs import entity_active_buffs
 
-                active_buffs = entity_active_buffs(entity)
+                    active_buffs = entity_active_buffs(entity)
             if entry[5:] in active_buffs:
                 return True
         else:

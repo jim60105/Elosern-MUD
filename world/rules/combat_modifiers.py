@@ -9,6 +9,7 @@ of equipment contributions.
 """
 
 import math
+from collections.abc import Mapping
 from pathlib import Path
 import re
 from typing import Any
@@ -453,11 +454,29 @@ def adjusted_agility(entity: Any, modifiers: dict[str, Any] | None = None) -> fl
     gear can never invert an agility-driven inequality (to-hit, overwhelm
     estimation, resist scoring, flee contest). ``combat.roll_initiative``
     deliberately keeps its raw-agility exception and does not call this.
-    ``modifiers`` may be a caller-evaluated bundle to avoid a re-read.
+    ``modifiers`` may be a caller-evaluated bundle to avoid a re-read. The
+    fold itself is :func:`agility_with_bundle`, which a reader holding the
+    effective agility already (the monster-AI decision read set) calls with
+    the identical numbers.
     """
     if modifiers is None:
         modifiers = evaluate_combat_modifiers(entity)
-    agility = float(entity.skills.effective_value("agility"))
+    return agility_with_bundle(
+        float(entity.skills.effective_value("agility")), modifiers
+    )
+
+
+def agility_with_bundle(
+    effective_agility: float, modifiers: Mapping[str, Any]
+) -> float:
+    """Return one effective agility with its bundle components applied.
+
+    The numeric half of :func:`adjusted_agility`, so a reader that already
+    holds the effective agility (the monster-AI decision read set) applies the
+    identical percentage-then-flat fold with the identical floor instead of
+    restating it.
+    """
+    agility = float(effective_agility)
     percent = modifiers.get("agility")
     if percent is not None:
         if not isinstance(percent, str) or _PERCENT_RE.fullmatch(percent) is None:
@@ -465,3 +484,24 @@ def adjusted_agility(entity: Any, modifiers: dict[str, Any] | None = None) -> fl
         agility *= 1 + float(percent[:-1]) / 100
     agility += float(modifiers.get("agility_flat", 0))
     return max(0.0, agility)
+
+
+def attack_with_bundle(
+    effective_attack: float, modifiers: Mapping[str, Any], attack_key: str
+) -> float:
+    """Return one effective attack plus its matching flat bundle bonus.
+
+    The numeric half of ``world.rules.combat.battlefield._adjusted_attack``:
+    ``atk_phys`` and ``magic_power`` each take only their own flat addend, and
+    no other statistic takes one at all.
+    """
+    if attack_key not in {"atk_phys", "magic_power"}:
+        return float(effective_attack)
+    return float(effective_attack) + modifiers.get(attack_key, 0)
+
+
+def defense_with_bundle(
+    effective_defense: float, modifiers: Mapping[str, Any]
+) -> float:
+    """Return one effective defense plus its flat ``defense`` bundle bonus."""
+    return float(effective_defense) + modifiers.get("defense", 0)

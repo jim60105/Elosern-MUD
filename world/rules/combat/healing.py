@@ -2,7 +2,10 @@
 
 Magnitude is caster-stat-derived at staging time (mirroring ``damage``), the
 restoration is clamped to the target's remaining hp gap at both staging and
-commit time, and healing never revives a fallen entity.
+commit time, and healing never revives a fallen entity. The staged magnitude
+and the two capacity caps are the shared scalar expressions of
+:mod:`world.rules.combat.scalars`, so effect estimation applies the same
+arithmetic without running this handler.
 """
 
 from typing import Any
@@ -13,8 +16,9 @@ from world.rules.action import (
     register_effect_handler,
 )
 from world.rules.combat.battlefield import COMBAT_YAML, _adjusted_attack, _max_hp
+from world.rules.combat.scalars import heal_amount, staged_restoration
 from world.rules.combat.damage import _extract_effect_coefficient
-from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers
+from world.rules.combat_modifiers import evaluate_combat_modifiers
 from world.rules.progression import scaled_magnitude
 from world.skills.effects import SelfHealEffect, parse_effect
 
@@ -34,12 +38,11 @@ def _heal_magnitude(actor: Any, coefficient: float = 1.0) -> int:
     the configured floor always wins. Item-use healing keeps its flat
     rulebook amount and is never scaled here.
     """
-    multiplier = float(COMBAT_YAML["heal"]["multiplier"])
-    floor = int(COMBAT_YAML["heal"]["floor"])
-    magic = _adjusted_attack(actor, "magic_power")
-    base_amount = max(round(magic * multiplier * coefficient), floor)
-    heal_gain = evaluate_combat_modifiers(actor).get("heal_gain")
-    return max(apply_cost_modifier(base_amount, heal_gain), floor)
+    return heal_amount(
+        magic_power=_adjusted_attack(actor, "magic_power"),
+        coefficient=coefficient,
+        heal_gain=evaluate_combat_modifiers(actor).get("heal_gain"),
+    )
 
 
 def _parse_heal_effect(effect_id: str) -> str:
@@ -65,10 +68,11 @@ def _restored_amount(entity: Any, amount: int) -> int:
     an integer: a cap computed from float gauge storage must never leak a
     fractional amount into the staged log or the applied delta.
     """
-    current = _stored_trait_value(entity.traits.hp)
-    if current <= 0:
-        return 0
-    return int(min(amount, max(0, _max_hp(entity) - current)))
+    return staged_restoration(
+        amount=amount,
+        current=_stored_trait_value(entity.traits.hp),
+        maximum=_max_hp(entity),
+    )
 
 
 def _apply_heal(entity: Any, amount: int) -> None:
