@@ -34,6 +34,13 @@ from world.rules.combat.battlefield import (  # noqa: F401
     is_battle_over,
     roll_initiative,
 )
+from world.rules.combat.decision_scope import (  # noqa: F401
+    ExecutionScope,
+    ExecutionScopeBase,
+    current_decision_scope,
+    decision_scope,
+    stable_actor_id,
+)
 from world.rules.combat.damage import (  # noqa: F401
     _apply_hp_delta,
     _apply_hp_delta_nonlethal,

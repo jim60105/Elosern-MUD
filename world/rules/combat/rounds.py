@@ -21,6 +21,12 @@ from world.rules.combat.battlefield import (
     is_battle_over,
     roll_initiative,
 )
+from world.rules.combat.decision_scope import (
+    ExecutionScopeBase,
+    decision_scope,
+    decision_scope_for,
+    stable_actor_id,
+)
 from world.rules.combat_modifiers import (
     evaluate_combat_modifiers,
     matched_combat_modifiers,
@@ -183,6 +189,7 @@ def run_round(
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
     first_actor: str | None = None,
+    decision_scope_base: ExecutionScopeBase | None = None,
 ) -> list[EventLog]:
     """Resolve one action per capable combatant, then perform upkeep.
 
@@ -211,6 +218,18 @@ def run_round(
     ``notifications_sink`` collects player-facing notification lines staged
     by committed effects (e.g. title grant toasts) for delivery by the outer
     settlement boundary after its commit; ``run_round`` itself never sends.
+
+    ``decision_scope_base`` (monster-ai-attack-selection) is the encounter
+    identity this round's decisions are numbered from: the persistent
+    session's id, the actual round number and the resolved context mode. Each
+    provider call runs inside its own
+    :class:`~world.rules.combat.decision_scope.ExecutionScope`, adding the
+    acting combatant's stable identity and the zero-based index of the action
+    slot being provisioned — so two slots of one actor, and the same slot of
+    two rounds, are distinct decisions. The provider is still called with
+    exactly two arguments, and the scope is restored on normal return and on
+    any exception. An omitted base uses the canonical empty encounter
+    identity: this call is one round whose numbering its caller owns.
 
     The entire round resolution stays within one outer database transaction
     (the session's existing boundary); multiple action slots provisioned for a
@@ -264,14 +283,21 @@ def run_round(
 
         count = min(count, _MAX_ACTIONS_PER_TURN)
 
-        for _ in range(count):
+        for slot_index in range(count):
             if (
                 key in battlefield.fled
                 or battlefield.is_knocked_out(key)
                 or _stored_hp(entity) <= 0
             ):
                 break
-            request = action_provider(entity, battlefield)
+            with decision_scope(
+                decision_scope_for(
+                    decision_scope_base,
+                    actor_id=stable_actor_id(entity),
+                    slot_index=slot_index,
+                )
+            ):
+                request = action_provider(entity, battlefield)
             if request is None:
                 continue
             if isinstance(request, ItemUseRequest):
@@ -333,13 +359,28 @@ def run_battle(
     action_provider: ActionProvider = default_attack_policy,
     max_rounds: int = 100,
 ) -> BattleResult:
-    """Run a bounded encounter and report, but do not settle, elapsed time."""
+    """Run a bounded encounter and report, but do not settle, elapsed time.
+
+    The encounter has no persistent session, so every round carries the
+    canonical empty session id and its own real round number: a decision made
+    in round two is never the same decision as round one. This numbering is
+    zero-based while the persistent session path numbers from its durable
+    ``rounds_elapsed + 1``; the two conventions coexist deliberately and can
+    never collide, because the empty session id is a different encounter
+    namespace from a durable one (``combat_session.rounds._submit_request``).
+    """
     if max_rounds < 0:
         raise ValueError("max_rounds must be non-negative")
     logs: list[EventLog] = []
     rounds = 0
     while rounds < max_rounds and not is_battle_over(battlefield):
-        logs.extend(run_round(battlefield, action_provider))
+        logs.extend(
+            run_round(
+                battlefield,
+                action_provider,
+                decision_scope_base=ExecutionScopeBase(round_index=rounds),
+            )
+        )
         rounds += 1
     return BattleResult(
         event_logs=tuple(logs),

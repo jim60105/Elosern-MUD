@@ -1,21 +1,29 @@
 """Deterministic, rulebook-driven monster combat decisions.
 
-Startup loads and validates one AI tuning rulebook and publishes three things:
+Startup loads and validates one AI tuning rulebook and publishes four things:
 the immutable resolved tuning (:data:`MONSTER_AI_TUNING`) with its reproducible
 fingerprint, the typed per-monster resolution (:func:`resolve_monster_ai`) that
 honours the *actual* stored ``behaviour_tree`` and the registered
-species/variant pair, and the legacy decision body
-(:func:`monster_behaviour_policy`).
+species/variant pair, the legacy decision body, and the utility decision
+dispatch that scores the decision's own bounded candidates and samples one
+with an independent, scope-seeded RNG.
 
 Intelligence is authored per registered variant and never inferred (design
 section 5/6): no tier, species, danger grade, rank, stat or archetype supplies
-one. Every production variant is authored ``legacy``, and the utility selector
-is delivered by the later ``monster-ai-attack-selection`` change, so the legacy
-body below still returns exactly the action it returned before.
+one. Every production variant is still authored ``legacy``, so
+``monster_behaviour_policy`` keeps returning exactly the action the legacy body
+returned; activating a variant is the separate ``monster-ai-staged-activation``
+change's decision, and the utility path itself is complete here.
+
+A typed invalid runtime AI state is the one narrow failure this boundary owns:
+it is reported through the facade and resolved by the configured invalid-state
+behaviour. Everything else -- empty legal candidate sets, individual
+unsupported candidates, late resolver rejection, database errors and ordinary
+programming errors -- keeps its own boundary.
 """
 
 from collections.abc import Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from hashlib import sha256
 from json import dumps
@@ -25,6 +33,8 @@ from pathlib import Path
 from types import MappingProxyType
 from typing import Any, Callable
 
+from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 import yaml
 
 from world.lore.monster_species import (
@@ -32,9 +42,14 @@ from world.lore.monster_species import (
     MONSTER_VARIANT_REGISTRY,
 )
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.observability import log_warn
 from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat.decision_scope import (
+    current_decision_scope,
+    stable_actor_id,
+)
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_individual import _registered_variant
 from world.rules.progression import can_use_skill
@@ -72,7 +87,11 @@ MONSTER_BEHAVIOUR_YAML = _load_rulebook(
 #: selection change alters what an identical resolved tuning decides. Version 2
 #: is the effect-estimation slice: a decision now also reads the shared combat
 #: rulebook's damage, heal and to-hit leaves and the candidate set it produces.
-AI_ALGORITHM_VERSION = 2
+#: Version 3 is the attack-selection slice: a utility variant's decision now
+#: scores those estimates and samples one candidate with an independent,
+#: scope-seeded RNG, so the same resolved tuning decides through one more
+#: implemented stage.
+AI_ALGORITHM_VERSION = 3
 
 #: The authored candidate-budget bounds (attack design section 4).
 MIN_CANDIDATE_BUDGET = 1
@@ -225,6 +244,7 @@ def _finite_real(value: Any) -> bool:
     try:
         return isfinite(value)
     except OverflowError:
+        # observability: ignore R2: a value too large to convert is simply not a finite real, which is the answer this predicate returns
         return False
 
 
@@ -234,6 +254,7 @@ def _validated_mode(value: Any, where: str) -> DecisionMode:
         try:
             return DecisionMode(value)
         except ValueError:
+            # observability: ignore R2: the unrecognized mode is reported immediately below as the typed configuration error
             pass
     raise _configuration_error(f"{where} has unrecognized decision_mode {value!r}")
 
@@ -852,24 +873,70 @@ def _choose_skill(
 def monster_behaviour_policy(
     entity: Any,
     battlefield: Battlefield,
+    *,
+    context: Any = None,
+    scale: float = 1.0,
+    decision: Any = None,
+    trace: "list[Any] | None" = None,
 ) -> ActionRequest | None:
-    """Return one resolver-ready monster action for the current turn."""
+    """Return one resolver-ready monster action for the current turn.
+
+    The two-argument call is the retained contract: anywhere
+    ``default_attack_policy`` is callable, this is too, and a registered
+    monster still resolves through exactly one request. The keyword-only
+    parameters are the execution seams a real orchestration supplies instead
+    of the canonical values this function falls back to:
+
+    * ``context`` -- the settlement context the session already resolved
+      (``simulated``, ``nonlethal_keys``). It is used for the decision *and*
+      for the returned request, so a request is never rebuilt after the fact.
+    * ``scale`` -- the authored cast magnitude the decision plans with.
+    * ``decision`` -- the tuning resolution the caller already recorded for
+      this session, so the selected seed's configuration fingerprint is the
+      one this session actually recorded.
+    * ``trace`` -- an opt-in sink that receives one
+      :class:`~world.rules.monster_ai.trace.DecisionTrace` per decision.
+
+    A non-monster delegates unchanged; a typed invalid runtime AI state is
+    reported and resolved by the configured invalid-state behaviour; an
+    otherwise registered monster dispatches to its resolved decision mode.
+    """
     if not hasattr(entity, "threat_tier"):
-        return combat.default_attack_policy(entity, battlefield)
+        delegated = combat.default_attack_policy(entity, battlefield)
+        if delegated is None or context is None:
+            return delegated
+        return replace(delegated, context=context, scale=scale)
+    settlement = BattlefieldActionContext(battlefield) if context is None else context
+    resolution = resolve_monster_ai(entity) if decision is None else decision
+    if resolution is not None and resolution.invalid_reason is not None:
+        return _degraded_action(entity, battlefield, settlement, resolution)
+    if resolution is not None and resolution.mode is DecisionMode.UTILITY:
+        return _utility_dispatch(entity, battlefield, settlement, scale, resolution, trace)
+    return _legacy_action(
+        entity,
+        battlefield,
+        settlement,
+        resolve_behaviour_profile(entity),
+    )
+
+
+def _legacy_action(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    profile: BehaviourProfile,
+) -> ActionRequest | None:
+    """Return the permanent legacy decision, unchanged, in one context."""
 
     enemies = _living_enemies(battlefield, entity)
     if not enemies:
         return None
-    profile = resolve_behaviour_profile(entity)
     if _should_flee(entity, profile):
         return ActionRequest(
             actor=entity,
             skill_key=FLEE_SKILL_KEY,
             targets=[entity],
-            context=BattlefieldActionContext(
-                battlefield,
-                event_context={"battlefield": battlefield},
-            ),
+            context=context,
         )
     damage_skills = _owned_damage_skills(entity)
     single_skills = [
@@ -887,7 +954,6 @@ def monster_behaviour_policy(
         and len(enemies) > 1
         and bool(area_skills)
     ) or (not single_skills and bool(area_skills))
-    context = BattlefieldActionContext(battlefield)
     if use_area:
         skill = _choose_skill(
             entity,
@@ -951,3 +1017,287 @@ def monster_behaviour_policy(
         eligible_skills = single_skills
     skill = _choose_skill(entity, eligible_skills, profile.skill_choice, target)
     return ActionRequest(entity, skill.key, [target], context)
+
+
+class InvalidStateFallback(StrEnum):
+    """What one typed invalid runtime AI state resolves to (attack design §8).
+
+    ``LEGACY`` is the product's configured behaviour: the decision falls back
+    to the legacy body, which resolves a repaired-but-unusable stored binding
+    through its tier default instead of failing on it. ``NONE`` is the
+    diagnostic choice for a manual investigation: the decision proposes
+    nothing rather than acting on a state it could not validate. Neither is
+    reached by an empty legal candidate set, an individual unsupported
+    candidate, a late resolver rejection, a database error or an ordinary
+    programming error.
+    """
+
+    LEGACY = "legacy"
+    NONE = "none"
+
+
+#: The deployment setting that selects the invalid-state behaviour above.
+INVALID_STATE_FALLBACK_SETTING = "MONSTER_AI_INVALID_STATE_FALLBACK"
+
+
+def invalid_state_fallback() -> InvalidStateFallback:
+    """Return the configured invalid-state behaviour, read at call time.
+
+    Only the explicit ``"none"`` selects the diagnostic behaviour; anything
+    else -- including a process whose Django settings are not configured, so
+    no deployment override exists -- keeps the product's legacy fallback.
+    """
+    try:
+        declared = getattr(settings, INVALID_STATE_FALLBACK_SETTING, None)
+    except ImproperlyConfigured:
+        # observability: ignore R2: unconfigured settings mean no deployment override exists, so the product default applies
+        return InvalidStateFallback.LEGACY
+    if declared == InvalidStateFallback.NONE.value:
+        return InvalidStateFallback.NONE
+    return InvalidStateFallback.LEGACY
+
+
+def _invalid_state_error(reason: InvalidDecisionReason) -> ValueError:
+    """Return the typed error one invalid resolution is reported through."""
+    from world.rules.monster_ai.utility import MonsterAIStateError
+
+    return MonsterAIStateError(f"invalid monster AI state: {reason.value}")
+
+
+def _decision_identifiers(entity: Any, resolution: Any = None) -> dict[str, Any]:
+    """Return the bounded identifiers one decision diagnostic may carry.
+
+    The acting entity's dbref (or key), its actual execution scope when one is
+    installed, and the resolved archetype/variant/reason: the identifiers a
+    repair starts from. No feature value, plan or selection detail rides here.
+    """
+    scope = current_decision_scope()
+    identifiers: dict[str, Any] = {
+        "char": str(getattr(entity, "pk", getattr(entity, "key", "?"))),
+    }
+    if scope is not None:
+        identifiers["session"] = scope.session_id
+        identifiers["round"] = scope.round_index
+        identifiers["slot"] = scope.slot_index
+    if resolution is not None:
+        identifiers["archetype"] = resolution.archetype_key
+        identifiers["variant"] = resolution.variant_key
+        if resolution.invalid_reason is not None:
+            identifiers["reason"] = resolution.invalid_reason.value
+    return identifiers
+
+
+def _invalid_state_action(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    resolution: Any,
+    fallback: InvalidStateFallback,
+) -> ActionRequest | None:
+    """Apply the configured behaviour of an already reported invalid state."""
+    if fallback is InvalidStateFallback.NONE:
+        return None
+    return _legacy_action(
+        entity,
+        battlefield,
+        context,
+        _profile_for(resolution.archetype_key, lambda: entity.threat_tier),
+    )
+
+
+def _degraded_action(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    resolution: Any,
+) -> ActionRequest | None:
+    """Handle one invalid resolved decision, before any mode is dispatched."""
+    fallback = invalid_state_fallback()
+    log_warn(
+        "monster_ai_invalid_state",
+        exc=_invalid_state_error(resolution.invalid_reason),
+        context={**_decision_identifiers(entity, resolution), "action": fallback.value},
+    )
+    return _invalid_state_action(
+        entity, battlefield, context, resolution, fallback
+    )
+
+
+def _utility_dispatch(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    scale: float,
+    resolution: Any,
+    trace: "list[Any] | None",
+) -> ActionRequest | None:
+    """Run one utility decision, reporting its typed invalid state as configured."""
+    from world.rules.monster_ai.utility import MonsterAIStateError
+
+    try:
+        return _utility_action(entity, battlefield, context, scale, resolution, trace)
+    except MonsterAIStateError as error:
+        fallback = invalid_state_fallback()
+        log_warn(
+            "monster_ai_invalid_state",
+            exc=error,
+            context={
+                **_decision_identifiers(entity, resolution),
+                "action": fallback.value,
+            },
+        )
+        return _invalid_state_action(
+            entity, battlefield, context, resolution, fallback
+        )
+
+
+def _utility_action(
+    entity: Any,
+    battlefield: Battlefield,
+    context: Any,
+    scale: float,
+    resolution: Any,
+    trace: "list[Any] | None",
+) -> ActionRequest | None:
+    """Return the utility decision's selected request, or its no-action boundary.
+
+    The whole decision reads through ONE decision-local read set: the snapshot,
+    the candidate enumeration and the estimation all share it, so a plan's
+    legality and its projection can never be derived from different reads. The
+    candidates are the producer's bounded deduplicated set; an empty set is the
+    decision's own no-action boundary and never a fallback to the legacy body.
+
+    The imports are deliberately local: the utility package's candidate
+    producer reads this module's tuning, so the dependency may only be
+    resolved at call time.
+    """
+    from world.rules.monster_ai import (
+        DecisionReads,
+        DecisionScope,
+        build_decision_snapshot,
+        enumerate_candidates,
+        estimate_candidates,
+        roster_index,
+    )
+    from world.rules.monster_ai.estimation import EstimateSet
+    from world.rules.monster_ai.selection import (
+        select_candidate,
+        selection_seed_for,
+        selection_temperature,
+    )
+    from world.rules.monster_ai.trace import (
+        DecisionTrace,
+        trace_exclusions,
+        trace_omissions,
+        trace_plan,
+        trace_rejections,
+        trace_scope,
+        trace_unavailable,
+    )
+    from world.rules.monster_ai.utility import score_candidates
+
+    profile = _profile_for(resolution.archetype_key, lambda: entity.threat_tier)
+    scope = current_decision_scope()
+    inspected = scope is None
+    decision_scope = DecisionScope(
+        "" if scope is None else scope.session_id,
+        0 if scope is None else scope.round_index,
+        0 if scope is None else scope.slot_index,
+    )
+    reads = DecisionReads()
+    participants = tuple(
+        member for member in battlefield.roster.values() if member is not entity
+    )
+    snapshot = build_decision_snapshot(
+        entity,
+        context,
+        scope=decision_scope,
+        participants=participants,
+        context_mode="normal" if scope is None else scope.context_mode,
+        reads=reads,
+    )
+    roster = roster_index((entity, *participants))
+    temperature = selection_temperature(resolution.intelligence)
+    seed = selection_seed_for(
+        scope=scope,
+        actor_id=stable_actor_id(entity) if scope is None else scope.actor_id,
+        configuration_fingerprint=resolution.tuning_fingerprint,
+        snapshot_fingerprint=snapshot.fingerprint,
+    )
+    chosen: Any = None
+    scored: tuple[Any, ...] = ()
+    candidates = None
+    estimates = EstimateSet()
+    if not snapshot.actor.capability.blocked_by_buff:
+        # Permitted read-only capability validation: an actor that cannot act
+        # at all proposes nothing and writes nothing. The round engine's own
+        # capability gate stays the authority on whether its provider is even
+        # called, and settlement revalidates every submitted plan.
+        candidates = enumerate_candidates(
+            snapshot,
+            actor=entity,
+            context=context,
+            roster=roster,
+            reads=reads,
+            scale=scale,
+        )
+        if candidates.candidates:
+            estimates = estimate_candidates(
+                candidates,
+                snapshot=snapshot,
+                actor=entity,
+                context=context,
+                roster=roster,
+                reads=reads,
+            )
+            scored = score_candidates(
+                candidates,
+                estimates,
+                profile=profile,
+                intelligence=resolution.intelligence,
+                actor=entity,
+                context=context,
+                roster=roster,
+                snapshot=snapshot,
+            )
+            if scored:
+                chosen = select_candidate(
+                    scored, temperature=temperature, seed=seed
+                )
+    recorded = DecisionTrace(
+        scope=trace_scope(scope),
+        inspected=inspected,
+        algorithm_version=AI_ALGORITHM_VERSION,
+        configuration_fingerprint=resolution.tuning_fingerprint,
+        snapshot_fingerprint=snapshot.fingerprint,
+        intelligence=resolution.intelligence,
+        temperature=temperature,
+        seed=seed,
+        candidates=0 if candidates is None else len(candidates.candidates),
+        rejections=() if candidates is None else trace_rejections(candidates),
+        exclusions=() if candidates is None else trace_exclusions(candidates),
+        unavailable=() if candidates is None else trace_unavailable(candidates),
+        omitted_estimates=trace_omissions(estimates),
+        omitted_families=0 if candidates is None else candidates.omitted_families,
+        omitted_targets=0 if candidates is None else candidates.omitted_targets,
+        exhausted=False if candidates is None else candidates.exhausted,
+        plans=tuple(trace_plan(item) for item in scored),
+        selected=None if chosen is None else trace_plan(chosen),
+    )
+    if trace is not None:
+        trace.append(recorded)
+    if chosen is None:
+        return None
+    plan = chosen.plan
+    targets: Any = (
+        plan.shorthand
+        if plan.shorthand is not None
+        else [roster[identity] for identity in plan.target_ids]
+    )
+    return ActionRequest(
+        actor=entity,
+        skill_key=plan.skill_key,
+        targets=targets,
+        context=context,
+        scale=plan.scale,
+    )
