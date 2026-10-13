@@ -550,26 +550,23 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.skills = {"active": [], "passive": []}
 
     def _bundle(self, value):
-        """Patch both modifier-engine seams with one bundle value.
+        """Patch the ONE modifier-engine seam with one bundle value.
 
         Rulebook condition matching against shipped skill keys is
         contract-covered in world/rules/tests/test_combat_modifiers.py;
         what is tested here is the PARITY of the adjusted-cost arithmetic
-        across preview, preflight, and resolve.
+        across preview, preflight, and resolve. The bundle is read once by
+        the shared gates in world.rules.action.gates, which both the preview
+        and the resolver consume, so patching that one binding reaches every
+        surface.
         """
         import contextlib
 
         @contextlib.contextmanager
         def patched():
-            with (
-                patch(
-                    "world.rules.action_preview.evaluate_combat_modifiers_no_create",
-                    return_value=value,
-                ),
-                patch(
-                    "world.rules.action.gates.evaluate_combat_modifiers_no_create",
-                    return_value=value,
-                ),
+            with patch(
+                "world.rules.action.gates.evaluate_combat_modifiers_no_create",
+                return_value=value,
             ):
                 yield
 
@@ -638,15 +635,9 @@ class AdjustedCostPreviewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.sp.base = 20
         self.player.traits.sp.current = 9
         bundle = {"sp_cost": "-5%"}
-        with (
-            patch(
-                "world.rules.action_preview.evaluate_combat_modifiers_no_create",
-                return_value=bundle,
-            ),
-            patch(
-                "world.rules.action.gates.evaluate_combat_modifiers_no_create",
-                return_value=bundle,
-            ),
+        with patch(
+            "world.rules.action.gates.evaluate_combat_modifiers_no_create",
+            return_value=bundle,
         ):
             self.assertTrue(self._preview().enabled)
             self.assertEqual(self._preflight().outcome, "success")

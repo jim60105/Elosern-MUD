@@ -1,17 +1,28 @@
 """Frozen side-effect-free action preview shared by presentation and adapters.
 
 This module factors the resolver's pure ownership, resource, target,
-capability, elemental spell-tier, effect-prefix, and time-metadata checks into
-a read-only preview query. It reports enabled state, the exact stable rejection
+capability, cast, interaction, effect-prefix, and time-metadata checks into a
+read-only preview query. It reports enabled state, the exact stable rejection
 reason and resource detail when disabled, and the valid targets or applicable
-AREA shorthands for a menu. Modifier evaluation reads a no-create context from
-stored buff and sexual-state data and never materializes ``entity.buffs``,
+AREA shorthands for a menu. The ordered skill-wide gates and the target-
+dependent cast/interaction/displacement gates are not mirrored here: they are
+the resolver's own shared bodies in :mod:`world.rules.action.gates`, so the
+preview, the submission revalidation and settlement can never disagree about
+which cast is legal. Modifier evaluation reads a no-create context from stored
+buff and sexual-state data and never materializes ``entity.buffs``,
 ``entity.sexual``, or any other lazy handler.
 
 The preview never rolls randomness, stages or applies effects, constructs
 EventLogs, invokes event-effect planners, mutates any persistent or
 nonpersistent state, or advances world time. ``ActionResolver.preflight()`` and
 ``resolve()`` remain authoritative and rerun their required checks.
+
+One decision may pass a decision-local read set (``readings``) that was read
+once for that decision -- the monster-AI decision inputs do exactly that -- so
+validating many plans reuses one read of the registry, the owned-skill
+metadata, the adjusted costs, the participant traits and the buff projections
+instead of re-reading them per candidate. The reads are never carried across
+decisions.
 """
 
 from dataclasses import dataclass
@@ -26,32 +37,27 @@ from world.rules.action import (
     _EFFECT_HANDLER_REQUIRED_CONTEXT,
     _conferral_empty_set_failure,
     _effect_prefix,
-    _stored_trait_value,
     plan_effect_audiences,
 )
-from world.rules.action_gates import damage_requires_battlefield
+from world.rules.action.gates import (
+    capability_failure,
+    ownership_failure,
+    resource_failure,
+    spell_condition_failure,
+)
 from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage
-from world.rules.combat_modifiers import (
-    apply_cost_modifier,
-    evaluate_combat_modifiers_no_create,
-)
-from world.rules.progression import (
-    can_use_skill,
-    FREEFORM_SCALE_VALUES,
-    freeform_scales_for,
-    missing_prerequisite,
-    scaled_mp_cost,
-)
+from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
 from world.rules.targeting import (
     AREA_SHORTHANDS,
     _target_identity,
     candidate_rejection,
     expand_target_shorthand,
+    forbidden_self_failure,
     requirement_for,
+    resolve_targets,
 )
-from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.effects import EffectAudience
-from world.skills.registry import SKILL_REGISTRY, SkillKind, TargetSpec
+from world.skills.registry import SKILL_REGISTRY, TargetSpec
 
 
 @dataclass(frozen=True)
@@ -85,30 +91,6 @@ def _disabled(
     return ActionPreview(skill_key, False, reason, detail, (), ())
 
 
-def _freeform_gate_failure(
-    actor: Any,
-    skill: Any,
-    scale: float,
-) -> tuple[RejectReason, str] | None:
-    """Return the freeform-casting rejection ``(reason, detail)`` or ``None``.
-
-    Mirrors the resolver's step-1 gate with the same fixed crash-safe order:
-    scale membership in the closed table first, then eligibility, then direct
-    mastery ownership and the requested rung in the skill-anchored ladder — so
-    a non-elemental MP skill rejects cleanly instead of dereferencing a missing
-    element. ``scale == 1.0`` never fires the gate.
-    """
-    if scale == 1.0:
-        return None
-    if scale not in FREEFORM_SCALE_VALUES:
-        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
-    if not is_freeform_eligible(skill):
-        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
-    if scale not in freeform_scales_for(actor, skill):
-        return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
-    return None
-
-
 def adjusted_cost(actor: Any, skill: Any, scale: float = 1.0) -> dict[str, int]:
     """Return one skill's current adjusted cost for ``actor`` at ``scale``.
 
@@ -121,69 +103,60 @@ def adjusted_cost(actor: Any, skill: Any, scale: float = 1.0) -> dict[str, int]:
     return dict(_adjusted_costs(actor, skill, scale))
 
 
-def _skill_wide_failure(
+def _ownership_resource_failure(
     actor: Any,
     skill_key: str,
     context: Any,
     scale: float = 1.0,
+    readings: Any = None,
 ) -> tuple[RejectReason, str] | None:
-    """Return the first skill-wide rejection ``(reason, detail)`` or ``None``.
+    """Return the first rejection of resolver steps 1-2, or ``None``.
 
-    Mirrors ``ActionResolver.preflight()``'s ordering: ownership and active
-    kind, out-of-combat availability, the freeform-casting gate, resources
-    (checked against the scaled ``mp`` cost), capability (including
-    ``actions_per_turn == 0``), registered effect prefixes, and time metadata.
-    The retired numeric cast gate (``magic-xp-engine-retirement``) has no
-    preview-side counterpart any more.
+    The ordered shared gates before target resolution: ownership, active kind,
+    identity, lineage, out-of-combat availability, the damaging gate, the
+    freeform (proficiency) gate, then resource availability.
     """
-    skill = SKILL_REGISTRY.get(skill_key)
-    if skill is None or skill_key not in actor.skills.owned_keys():
-        return RejectReason.UNKNOWN_SKILL, skill_key
-    from world.skills.eligibility import skill_identity_eligible
+    failure = ownership_failure(
+        actor, skill_key, context, scale, readings=readings
+    )
+    if failure is not None:
+        return failure
+    skill = (
+        SKILL_REGISTRY[skill_key]
+        if readings is None
+        else readings.skill(skill_key)
+    )
+    return resource_failure(actor, skill, scale, readings=readings)
 
-    if not skill_identity_eligible(actor, skill):
-        return RejectReason.IDENTITY_INELIGIBLE, skill_key
-    from world.skills.restrictions import skill_effect_allowed
 
-    if not skill_effect_allowed(actor, skill_key):
-        return RejectReason.EXAM_SKILL_SEALED, skill_key
-    # The lineage gate mirrors ``_step1_ownership`` exactly, so the preview
-    # never advertises a skill the resolver would reject (DC2): can_use_skill
-    # is the boolean authority (the ONE shared predicate), and
-    # missing_prerequisite only reconstructs the named edge for the detail.
-    if not can_use_skill(actor, skill):
-        unmet = missing_prerequisite(actor, skill)
-        required = SKILL_REGISTRY.get(unmet.skill_key)
-        name = required.label if required is not None else unmet.skill_key
-        return (
-            RejectReason.UNKNOWN_SKILL,
-            f"{skill.key}:需先精通「{name}」至 Lv.{unmet.min_proficiency}",
-        )
-    if skill.kind is not SkillKind.ACTIVE:
-        return RejectReason.SKILL_NOT_ACTIVE, skill_key
-    if not skill.usable_out_of_combat and context.battlefield is None:
-        return RejectReason.SKILL_NOT_USABLE_OUT_OF_COMBAT, skill_key
-    # The preview-side mirror of the sanctioned damaging-action gate, in the
-    # resolver's exact order (usable gate first), so the shared preview, the
-    # combat-session submission revalidation, and ``preflight()`` report the
-    # same one of the two out-of-combat reasons.
-    if damage_requires_battlefield(skill, context):
-        return RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, skill_key
-    freeform_failure = _freeform_gate_failure(actor, skill, scale)
-    if freeform_failure is not None:
-        return freeform_failure
-    bundle = evaluate_combat_modifiers_no_create(actor)
-    for resource_key, amount in skill.cost.items():
-        adjusted = apply_cost_modifier(amount, bundle.get(f"{resource_key}_cost"))
-        if resource_key == "mp" and adjusted > 0:
-            adjusted = scaled_mp_cost(adjusted, scale)
-        if _stored_trait_value(getattr(actor.traits, resource_key)) < adjusted:
-            return RejectReason.INSUFFICIENT_RESOURCE, resource_key
-    active_keys = active_buff_keys_from_storage(actor)
-    if active_keys & BLOCKING_BUFF_KEYS:
-        return RejectReason.ACTION_FORBIDDEN, str(getattr(actor, "key", "?"))
-    if bundle.get("actions_per_turn", 1) == 0:
-        return RejectReason.ACTION_FORBIDDEN, str(getattr(actor, "key", "?"))
+def _skill_tail_failure(
+    actor: Any,
+    skill: Any,
+    context: Any,
+    scale: float = 1.0,
+    readings: Any = None,
+) -> tuple[RejectReason, str] | None:
+    """Return the first rejection of resolver step 4 and the preview extras.
+
+    The shared capability gate (a blocking buff, ``actions_per_turn == 0``)
+    followed by the presentation-side completeness checks: registered effect
+    prefixes, the event context each handler requires, an empty conferral set
+    and time metadata. The retired numeric cast gate
+    (``magic-xp-engine-retirement``) has no preview-side counterpart any more.
+    """
+    modifiers = (
+        evaluate_combat_modifiers_no_create(actor)
+        if readings is None
+        else readings.modifiers(actor)
+    )
+    blocked = (
+        bool(active_buff_keys_from_storage(actor) & BLOCKING_BUFF_KEYS)
+        if readings is None
+        else readings.blocked_by_buff(actor)
+    )
+    failure = capability_failure(actor, blocked, modifiers=modifiers)
+    if failure is not None:
+        return failure
     for effect_id in skill.effects:
         if _effect_prefix(effect_id) not in _EFFECT_HANDLERS:
             return RejectReason.UNKNOWN_EFFECT_ID, effect_id
@@ -205,29 +178,68 @@ def _skill_wide_failure(
     return None
 
 
+def _plan_filter(
+    actor: Any,
+    skill: Any,
+    context: Any,
+    candidates: tuple[Any, ...],
+    readings: Any = None,
+) -> tuple[tuple[Any, ...], tuple[RejectReason, str] | None]:
+    """Return ``(plans, first_failure)`` for the complete planned target sets.
+
+    A SINGLE candidate is a plan of its own; NONE, SELF and AREA validate the
+    whole group they form. Every plan passes the shared target-dependent cast,
+    interaction and displacement gates, so a skill that passes the older
+    preview subset but fails a real cast or interaction prerequisite is
+    rejected here with settlement's own ``(reason, detail)``.
+    """
+    if skill.target_spec is TargetSpec.SINGLE:
+        valid: list[Any] = []
+        first_failure: tuple[RejectReason, str] | None = None
+        for target in candidates:
+            failure = spell_condition_failure(
+                actor, skill, context, [target], readings
+            )
+            if failure is None:
+                valid.append(target)
+            elif first_failure is None:
+                first_failure = failure
+        return tuple(valid), first_failure
+    failure = spell_condition_failure(
+        actor, skill, context, list(candidates), readings
+    )
+    if failure is not None:
+        return (), failure
+    return tuple(candidates), None
+
+
 def _valid_candidates(
     actor: Any,
     context: Any,
     skill: Any,
     candidates: list[Any],
+    readings: Any = None,
 ) -> tuple[tuple[Any, ...], tuple[RejectReason, str] | None]:
     """Filter candidates through the ordered target checks.
 
     Returns ``(valid_targets, first_failure)``. NONE never accepts candidates;
     SELF binds the actor; SINGLE keeps passing candidates for the menu; AREA
     keeps passing candidates and reports a failure only when none survive.
+    The complete per-plan gates run afterwards, in the resolver's own order
+    (target resolution, then capability, then cast/interaction), so a plan's
+    first reported reason is the one settlement would raise.
     """
     if skill.target_spec is TargetSpec.NONE:
         # A NONE skill never accepts targets: the panel passes the whole roster
         # as a candidate pool, so preview must ignore it rather than treat it
         # as caller-supplied input. Submitted NONE targets are rejected by
-        # ``revalidate_submission`` and ``resolve_targets``.
+        # ``resolve_targets``.
         return (), None
     if skill.target_spec is TargetSpec.SELF:
         # SELF binds the actor regardless of the menu candidate pool; the
         # player-facing facade and wire schema accept no SELF target field.
         failure = candidate_rejection(
-            actor, context, requirement_for(skill), actor
+            actor, context, requirement_for(skill), actor, readings=readings
         )
         if failure is not None:
             return (), failure
@@ -237,7 +249,7 @@ def _valid_candidates(
     requirement = requirement_for(skill)
     for target in candidates:
         failure = candidate_rejection(
-            actor, context, requirement, target
+            actor, context, requirement, target, readings=readings
         )
         if failure is None:
             valid.append(target)
@@ -253,8 +265,9 @@ def _applicable_shorthands(
     skill_key: str,
     context: Any,
     skill: Any,
+    readings: Any = None,
 ) -> tuple[str, ...]:
-    """Return approved AREA shorthands that expand to a valid target."""
+    """Return approved AREA shorthands that expand to a legal plan."""
     if skill.target_spec is not TargetSpec.AREA or context.battlefield is None:
         return ()
     applicable: list[str] = []
@@ -264,12 +277,18 @@ def _applicable_shorthands(
         except RejectedAction:
             continue
         valid, _ = _valid_candidates(
-            actor, context, skill, list(expanded)
+            actor, context, skill, list(expanded), readings
         )
         if valid:
+            if spell_condition_failure(
+                actor, skill, context, list(valid), readings
+            ) is not None:
+                continue
             if any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
                 try:
-                    plan_effect_audiences(actor, context, skill, list(valid))
+                    plan_effect_audiences(
+                        actor, context, skill, list(valid), readings=readings
+                    )
                 except RejectedAction:
                     continue
             applicable.append(shorthand)
@@ -282,41 +301,79 @@ def preview_skill(
     context: Any,
     candidates: list[Any] | None = None,
     scale: float = 1.0,
+    readings: Any = None,
 ) -> ActionPreview:
     """Build a frozen availability preview for one owned skill.
 
     ``candidates`` is an optional pool of participant entities to validate as
     targets (for example the active session roster). When omitted, only the
-    skill-wide checks run and ``valid_targets`` stays empty. ``scale`` applies
-    the step-1 freeform gate and the scaled resource check, so the preview
-    reports the same availability the resolver will enforce.
+    skill-wide and actor-scoped checks run and ``valid_targets`` stays empty.
+    ``scale`` applies the step-1 freeform gate and the scaled resource check,
+    so the preview reports the same availability the resolver will enforce.
+    ``readings`` is the optional decision-local read set every plan of this
+    preview reuses; omitting it re-reads live state per plan.
+
+    The order is the resolver's own: ownership, resources, target resolution,
+    capability, then the target-dependent cast, interaction and displacement
+    gates. A skill whose computed target set fails one of them is disabled for
+    that set, and for a SINGLE skill each candidate is validated as its own
+    plan so one failing alternative never hides a legal one.
     """
-    failure = _skill_wide_failure(actor, skill_key, context, scale)
+    failure = _ownership_resource_failure(
+        actor, skill_key, context, scale, readings
+    )
     if failure is not None:
         return _disabled(skill_key, *failure)
-    skill = SKILL_REGISTRY[skill_key]
+    skill = (
+        SKILL_REGISTRY[skill_key]
+        if readings is None
+        else readings.skill(skill_key)
+    )
     if candidates is None:
-        shorthands = _applicable_shorthands(actor, skill_key, context, skill)
+        # Without a candidate pool the actor-scoped half of the
+        # target-dependent gates is still answerable: an actor cast condition
+        # that no target can satisfy disables the skill, while every
+        # per-target condition and the interaction/displacement gates have no
+        # plan to reject yet.
+        failure = spell_condition_failure(actor, skill, context, [], readings)
+        if failure is not None:
+            return _disabled(skill_key, *failure)
+        failure = _skill_tail_failure(actor, skill, context, scale, readings)
+        if failure is not None:
+            return _disabled(skill_key, *failure)
+        shorthands = _applicable_shorthands(
+            actor, skill_key, context, skill, readings
+        )
         return ActionPreview(skill_key, True, None, None, (), shorthands)
     valid, target_failure = _valid_candidates(
-        actor, context, skill, list(candidates)
+        actor, context, skill, list(candidates), readings
     )
     if target_failure is not None:
         return _disabled(skill_key, *target_failure)
-    shorthands = _applicable_shorthands(actor, skill_key, context, skill)
-    if skill.target_spec in (TargetSpec.SINGLE, TargetSpec.AREA) and not valid:
+    failure = _skill_tail_failure(actor, skill, context, scale, readings)
+    if failure is not None:
+        return _disabled(skill_key, *failure)
+    plans, plan_failure = _plan_filter(actor, skill, context, valid, readings)
+    if plan_failure is not None:
+        return _disabled(skill_key, *plan_failure)
+    shorthands = _applicable_shorthands(
+        actor, skill_key, context, skill, readings
+    )
+    if skill.target_spec in (TargetSpec.SINGLE, TargetSpec.AREA) and not plans:
         reason = (
             RejectReason.NO_VALID_TARGETS_IN_AREA
             if skill.target_spec is TargetSpec.AREA
             else RejectReason.TARGET_SPEC_MISMATCH
         )
         return _disabled(skill_key, reason, skill_key)
-    if valid and any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
+    if plans and any(p.audience is not EffectAudience.SELECTED for p in skill.effect_policies):
         try:
-            plan_effect_audiences(actor, context, skill, list(valid))
+            plan_effect_audiences(
+                actor, context, skill, list(plans), readings=readings
+            )
         except RejectedAction as rejection:
             return _disabled(skill_key, rejection.reason, rejection.detail)
-    return ActionPreview(skill_key, True, None, None, tuple(valid), shorthands)
+    return ActionPreview(skill_key, True, None, None, tuple(plans), shorthands)
 
 
 def revalidate_submission(
@@ -325,70 +382,74 @@ def revalidate_submission(
     context: Any,
     targets: list[Any] | str,
     scale: float = 1.0,
+    readings: Any = None,
 ) -> ActionPreview:
     """Revalidate one submitted target value against current canonical state.
 
     Used by adapters and the combat-session facade immediately before
-    initiative. Applies the exact shape and candidate rules shared with final
-    target resolution so a stale or tampered request rejects with a matching
-    stable reason before any round begins. ``scale`` applies the same step-1
-    freeform gate and scaled resource check as ``preview_skill``.
+    initiative, and by the monster-AI decision inputs to judge a planned
+    action. It runs the resolver's own ordered pipeline over the submitted
+    plan: ownership and resources, the shared target resolution (cardinality,
+    duplicates, the forbid-self rule and the presence/alive/range/faction
+    validators), capability, then the target-dependent cast, interaction and
+    displacement gates, then audience planning. Only the wire-shape
+    restrictions and the optional decision read set are submission-side.
+
+    ``scale`` applies the same step-1 freeform gate and scaled resource check
+    as ``preview_skill``; ``readings`` is the optional decision-local read set
+    reused for this one submission.
     """
-    failure = _skill_wide_failure(actor, skill_key, context, scale)
+    failure = _ownership_resource_failure(
+        actor, skill_key, context, scale, readings
+    )
     if failure is not None:
         return _disabled(skill_key, *failure)
-    skill = SKILL_REGISTRY[skill_key]
+    skill = (
+        SKILL_REGISTRY[skill_key]
+        if readings is None
+        else readings.skill(skill_key)
+    )
     try:
-        if skill.target_spec is TargetSpec.NONE:
-            if isinstance(targets, str) or targets:
-                raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
-            resolved: list[Any] = []
-        elif skill.target_spec is TargetSpec.SELF:
-            if isinstance(targets, str) or targets:
-                raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
-            resolved = [actor]
-        elif skill.target_spec is TargetSpec.SINGLE:
-            if isinstance(targets, str):
-                raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
-            if len(targets) != 1:
-                raise RejectedAction(RejectReason.TARGET_SPEC_MISMATCH, skill_key)
-            failure = candidate_rejection(
-                actor, context, requirement_for(skill), targets[0]
+        if isinstance(targets, str):
+            # Shorthand is approved only for AREA-target skills; SINGLE
+            # shorthands are rejected even when expansion would yield exactly
+            # one entity.
+            if skill.target_spec is not TargetSpec.AREA:
+                raise RejectedAction(
+                    RejectReason.TARGET_SPEC_MISMATCH,
+                    "target shorthand requires an area skill",
+                )
+            candidates = list(
+                expand_target_shorthand(actor, context, targets)
             )
-            if failure is not None:
-                raise RejectedAction(*failure)
-            resolved = list(targets)
-        else:  # AREA
-            if isinstance(targets, str):
-                expanded = expand_target_shorthand(actor, context, targets)
-                resolved, _ = _valid_candidates(
-                    actor, context, skill, list(expanded)
+        else:
+            if skill.target_spec is TargetSpec.NONE and targets:
+                raise RejectedAction(
+                    RejectReason.TARGET_SPEC_MISMATCH, skill_key
                 )
-                if not resolved:
-                    raise RejectedAction(
-                        RejectReason.NO_VALID_TARGETS_IN_AREA, skill_key
-                    )
-            elif not targets:
-                raise RejectedAction(RejectReason.NO_VALID_TARGETS_IN_AREA, skill_key)
-            else:
-                # Mirror final target resolution: an explicit AREA list must be
-                # unique by identity, so preview never drifts from preflight.
-                seen: set[tuple[str, int]] = set()
-                for target in targets:
-                    identity = _target_identity(target)
-                    if identity in seen:
-                        raise RejectedAction(
-                            RejectReason.TARGET_SPEC_MISMATCH, skill_key
-                        )
-                    seen.add(identity)
-                resolved, _ = _valid_candidates(
-                    actor, context, skill, list(targets)
+            if skill.target_spec is TargetSpec.SELF and targets:
+                raise RejectedAction(
+                    RejectReason.TARGET_SPEC_MISMATCH, skill_key
                 )
-                if not resolved:
-                    raise RejectedAction(
-                        RejectReason.NO_VALID_TARGETS_IN_AREA, skill_key
-                    )
-        plan_effect_audiences(actor, context, skill, list(resolved))
+            if skill.target_spec is TargetSpec.SINGLE and len(targets) != 1:
+                raise RejectedAction(
+                    RejectReason.TARGET_SPEC_MISMATCH, skill_key
+                )
+            candidates = list(targets)
+        resolved = resolve_targets(
+            actor, context, requirement_for(skill), candidates, readings=readings
+        )
+        failure = _skill_tail_failure(actor, skill, context, scale, readings)
+        if failure is not None:
+            raise RejectedAction(*failure)
+        plan_failure = spell_condition_failure(
+            actor, skill, context, list(resolved), readings
+        )
+        if plan_failure is not None:
+            raise RejectedAction(*plan_failure)
+        plan_effect_audiences(
+            actor, context, skill, list(resolved), readings=readings
+        )
     except RejectedAction as rejection:
         return _disabled(skill_key, rejection.reason, rejection.detail)
     return ActionPreview(skill_key, True, None, None, tuple(resolved), ())

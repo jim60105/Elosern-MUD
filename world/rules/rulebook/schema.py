@@ -153,6 +153,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     if "buff_active" in when:
         checks.append(when["buff_active"] in context.get("active_buffs", set()))
     if "skill_owned" in when:
+        from world.skills.handler import SkillHandler
         from world.skills.restrictions import skill_effect_allowed
 
         entity = context.get("entity")
@@ -165,7 +166,8 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
             entity is not None
             and skill_effect_allowed(entity, when["skill_owned"])
             and (
-                when["skill_owned"] in entity.skills.owned_keys()
+                when["skill_owned"]
+                in context.get("owned_keys", SkillHandler(entity).owned_keys())
                 or when["skill_owned"] in granted_keys
             )
         )

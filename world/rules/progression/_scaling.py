@@ -128,7 +128,12 @@ def scaled_mp_cost(base: int, scale: float) -> int:
     return max(1, scaled_magnitude(base, scale))
 
 
-def freeform_mastery_entitled(entity: Any, element: str) -> bool:
+def freeform_mastery_entitled(
+    entity: Any,
+    element: str,
+    *,
+    owned_keys: Any = None,
+) -> bool:
     """Return whether the entity directly owns the element's mastery passive.
 
     Pure side-effect-free entitlement query: ``element`` is validated against
@@ -141,10 +146,17 @@ def freeform_mastery_entitled(entity: Any, element: str) -> bool:
     """
     if element not in ELEMENT_REGISTRY:
         raise ValueError(f"unknown element {element!r}")
-    return f"{element}_mastery" in entity.skills.owned_keys()
+    owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
+    return f"{element}_mastery" in owned
 
 
-def freeform_scales_for(entity: Any, skill: SkillDef) -> tuple[float, ...]:
+def freeform_scales_for(
+    entity: Any,
+    skill: SkillDef,
+    *,
+    proficiency: Any = None,
+    owned_keys: Any = None,
+) -> tuple[float, ...]:
     """Return the freeform scales one SKILL's own proficiency unlocks.
 
     The single ladder authority (use-driven-skill-lineage DC5): empty for a
@@ -160,9 +172,11 @@ def freeform_scales_for(entity: Any, skill: SkillDef) -> tuple[float, ...]:
     """
     if skill.element is None:
         return ()
-    if not freeform_mastery_entitled(entity, skill.element.key):
+    if not freeform_mastery_entitled(
+        entity, skill.element.key, owned_keys=owned_keys
+    ):
         return ()
-    level = skill_proficiency_level(entity, skill.key)
+    level = skill_proficiency_level(entity, skill.key, proficiency=proficiency)
     cap = proficiency_cap(skill.key)
     return tuple(
         scale

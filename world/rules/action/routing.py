@@ -101,7 +101,12 @@ def _bind_resolved_effect(
     return effect_context
 
 
-def _matches_audience_condition(target: Any, condition: str | None) -> bool:
+def _matches_audience_condition(
+    target: Any,
+    condition: str | None,
+    *,
+    readings: Any = None,
+) -> bool:
     """Evaluate one declarative audience condition against a target entity.
 
     Closed gauge-state vocabulary:
@@ -112,13 +117,18 @@ def _matches_audience_condition(target: Any, condition: str | None) -> bool:
     """
     if condition is None:
         return True
-    traits = getattr(target, "traits", None)
-    if traits is None or not hasattr(traits, "mp"):
-        return False
-    trait = getattr(traits, "mp")
-    if trait is None:
-        return False
-    _, maximum = stored_gauge_pair(target, "mp")
+    if readings is not None:
+        maximum = readings.gauge_maximum(target, "mp")
+        if maximum is None:
+            return False
+    else:
+        traits = getattr(target, "traits", None)
+        if traits is None or not hasattr(traits, "mp"):
+            return False
+        trait = getattr(traits, "mp")
+        if trait is None:
+            return False
+        _, maximum = stored_gauge_pair(target, "mp")
     if condition == "mp_max_zero":
         return maximum == 0
     if condition == "mp_positive":
@@ -137,6 +147,8 @@ def plan_effect_audiences(
     context: ActionContext,
     skill: SkillDef,
     targets: list[Any],
+    *,
+    readings: Any = None,
 ) -> tuple[list[Any], ...]:
     """Derive the per-effect recipient subsets over the validated target pool.
 
@@ -155,6 +167,11 @@ def plan_effect_audiences(
     If a skill declares at least one non-``SELECTED`` audience and every
     effect's routed audience is empty, raises
     ``RejectedAction(RejectReason.NO_VALID_TARGETS_IN_AREA, skill.key)``.
+
+    ``readings`` may pre-supply the decision-local stored facts (the actor's
+    stored hp for a ``SELF`` audience, each target's stored gauge maximum for
+    an audience condition), so a plan validated from a frozen read set never
+    mounts a trait handler to route its own audiences.
     """
     routed: list[list[Any]] = []
     actor_valid: bool | None = None
@@ -175,11 +192,14 @@ def plan_effect_audiences(
             ]
         elif aud is EffectAudience.SELF:
             if actor_valid is None:
-                alive = False
-                try:
-                    alive = _stored_trait_value(actor.traits.hp) > 0
-                except (AttributeError, KeyError):  # observability: ignore R2: actor has no hp trait or lacks traits container, treating as not alive
-                    pass
+                if readings is not None:
+                    alive = readings.hp(actor) > 0
+                else:
+                    alive = False
+                    try:
+                        alive = _stored_trait_value(actor.traits.hp) > 0
+                    except (AttributeError, KeyError):  # observability: ignore R2: actor has no hp trait or lacks traits container, treating as not alive
+                        pass
                 actor_valid = (
                     context.is_present(actor, actor)
                     and alive
@@ -192,7 +212,9 @@ def plan_effect_audiences(
         if policy.audience_condition is not None:
             candidate = [
                 t for t in candidate
-                if _matches_audience_condition(t, policy.audience_condition)
+                if _matches_audience_condition(
+                    t, policy.audience_condition, readings=readings
+                )
             ]
 
         routed.append(candidate)

@@ -26,10 +26,21 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     return _base_builder(entity)
 
 
-def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None:
+def evaluate_cast_conditions(
+    actor: Any,
+    targets: list[Any],
+    skill: Any,
+    *,
+    readings: Any = None,
+) -> None:
     """Evaluate all declared SkillDef.cast_conditions.
 
     Raises RejectedAction(RejectReason.CAST_CONDITION_UNMET) if any condition is unsatisfied.
+
+    ``readings`` may pre-supply the stored condition context per subject, so a
+    caller validating many plans reuses one context per participant instead of
+    rebuilding it, and never re-reads buff, sexual or equipment inputs for a
+    plan it already judged.
     """
     from world.rules.action import RejectReason, RejectedAction
 
@@ -37,12 +48,17 @@ def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None
     if not conditions:
         return
 
+    def subject_context(entity: Any) -> dict[str, Any]:
+        if readings is None:
+            return build_no_create_condition_context(entity)
+        return readings.condition_context(entity)
+
     actor_context: dict[str, Any] | None = None
 
     for cond in conditions:
         if cond.subject is CastConditionSubject.ACTOR:
             if actor_context is None:
-                actor_context = build_no_create_condition_context(actor)
+                actor_context = subject_context(actor)
             if not evaluate_condition(cond.condition, actor_context):
                 raise RejectedAction(
                     RejectReason.CAST_CONDITION_UNMET,
@@ -50,7 +66,7 @@ def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None
                 )
         elif cond.subject is CastConditionSubject.EACH_TARGET:
             for target in targets:
-                target_context = build_no_create_condition_context(target)
+                target_context = subject_context(target)
                 if not evaluate_condition(cond.condition, target_context):
                     raise RejectedAction(
                         RejectReason.CAST_CONDITION_UNMET,
@@ -63,10 +79,17 @@ def evaluate_interaction_policy(
     targets: list[Any],
     context: Any,
     skill: Any,
+    *,
+    readings: Any = None,
 ) -> None:
     """Evaluate SkillDef.interaction (InteractionPolicy) contact and capability requirements.
 
     Raises RejectedAction(RejectReason.CAST_CONDITION_UNMET) on contact or capability failure.
+
+    ``readings`` may pre-supply the decision-local stored facts (the target's
+    alive state and blocking-buff fact), so a caller validating many plans
+    reuses one read per participant; omitting it reads live state per target,
+    which is what final resolution does.
     """
     from world.rules.action import RejectReason, RejectedAction, _stored_trait_value
     from world.rules.buffs import blocks_action
@@ -92,10 +115,13 @@ def evaluate_interaction_policy(
                     RejectReason.CAST_CONDITION_UNMET,
                     f"target {getattr(target, 'key', repr(target))} is out of range for contact",
                 )
-            try:
-                alive = _stored_trait_value(target.traits.hp) > 0
-            except (AttributeError, KeyError):
-                alive = False
+            if readings is not None:
+                alive = readings.hp(target) > 0
+            else:
+                try:
+                    alive = _stored_trait_value(target.traits.hp) > 0
+                except (AttributeError, KeyError):
+                    alive = False
             if not alive:
                 raise RejectedAction(
                     RejectReason.CAST_CONDITION_UNMET,
@@ -111,11 +137,16 @@ def evaluate_interaction_policy(
                         f"target {getattr(target, 'key', repr(target))} has fled",
                     )
             if interaction.target_capable:
-                if (
-                    getattr(target, "attributes", None) is not None
-                    and target.attributes.has("buffs")
-                    and blocks_action(target)
-                ):
+                not_capable = (
+                    readings.blocked_by_buff(target)
+                    if readings is not None
+                    else (
+                        getattr(target, "attributes", None) is not None
+                        and target.attributes.has("buffs")
+                        and blocks_action(target)
+                    )
+                )
+                if not_capable:
                     raise RejectedAction(
                         RejectReason.CAST_CONDITION_UNMET,
                         f"target {getattr(target, 'key', repr(target))} is not action capable",
@@ -150,12 +181,21 @@ def is_strike_class(skill: Any) -> bool:
     return has_physical
 
 
-def evaluate_displaced_gate(actor: Any, targets: list[Any], skill: Any) -> None:
+def evaluate_displaced_gate(
+    actor: Any,
+    targets: list[Any],
+    skill: Any,
+    *,
+    readings: Any = None,
+) -> None:
     """Reject a single-target physical strike naming a displaced target (design D2/D4).
 
     The target-side gate only: the holder's own marker is intentionally NOT
     rejected here (the self-return clear is staged at resolution commit), so
     a rejected climb-back toward an unreachable target consumes nothing.
+
+    ``readings`` may pre-supply each target's live buff keys, so a caller
+    validating many plans reuses one buff read per participant.
     """
     if not is_strike_class(skill):
         return
@@ -164,7 +204,11 @@ def evaluate_displaced_gate(actor: Any, targets: list[Any], skill: Any) -> None:
     for target in targets:
         if target is actor:
             continue
-        if has_positional_marker(target):
+        marked = has_positional_marker(
+            target,
+            active_keys=None if readings is None else readings.buff_keys(target),
+        )
+        if marked:
             from world.rules.action import RejectReason, RejectedAction
 
             raise RejectedAction(

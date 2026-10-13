@@ -54,6 +54,7 @@ from world.rules.buffs.rates import (  # noqa: F401
 from world.rules.buffs.surface import (  # noqa: F401
     _handle_cleanse,
     _remove_buff_keys,
+    active_buff_entries_from_storage,
     active_buff_keys_from_storage,
     active_stack_count,
     apply_buff,

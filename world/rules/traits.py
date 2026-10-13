@@ -282,6 +282,105 @@ def get_display_value(entity: Any, trait_key: str) -> int:
     return getattr(entity.traits, trait_key).value
 
 
+def stored_trait_records(entity: Any) -> Mapping[str, Any]:
+    """Return the whole persisted trait mapping, or ``{}`` when it is absent.
+
+    The single read a decision takes per participant: every stored trait value
+    below is projected from this one mapping, so a decision never re-reads the
+    persisted traits attribute per candidate. A non-mapping storage value fails
+    closed as empty rather than raising into a decision.
+    """
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return {}
+    traits = attributes.get("traits", default=None, category="traits")
+    return traits if isinstance(traits, Mapping) else {}
+
+
+def stored_trait_record(entity: Any, trait_key: str) -> Mapping[str, Any] | None:
+    """Return one persisted trait record, or ``None`` when it is absent.
+
+    The read-only twin of ``getattr(entity.traits, trait_key)``: it reads the
+    persisted ``traits`` attribute directly, so a decision input never
+    materializes the ``TraitHandler``, never regenerates a gauge and never
+    refreshes a timestamp. True trait data only -- ``disguised_stats`` is
+    display-only and stays out of this read.
+    """
+    record = stored_trait_records(entity).get(trait_key)
+    return record if isinstance(record, Mapping) else None
+
+
+def _stored_trait_number(value: Any) -> float | None:
+    """Return one stored numeric field, rejecting booleans and non-numbers."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+def trait_record_value(record: Mapping[str, Any] | None) -> float | None:
+    """Return one persisted trait record's value, or ``None`` when unusable.
+
+    Mirrors :func:`world.rules.action._stored_trait_value` exactly against
+    persisted storage: a gauge resolves from its stored ``current`` (or its
+    declared ``base``/``mod``/``mult`` composition when no current was ever
+    written) and every other trait from its stored ``value`` with the same
+    composition fallback. A decision projects the whole persisted trait map
+    through this record-level function, so one read serves every trait. A
+    missing record, a boolean and a non-numeric field all fail closed with
+    ``None``.
+    """
+    if record is None:
+        return None
+    current = record.get("current", record.get("value"))
+    if current is not None:
+        return _stored_trait_number(current)
+    base = _stored_trait_number(record.get("base", 0))
+    mod = _stored_trait_number(record.get("mod", 0))
+    mult = _stored_trait_number(record.get("mult", 1))
+    if base is None or mod is None or mult is None:
+        return None
+    return (base + mod) * mult
+
+
+def trait_record_gauge_pair(
+    record: Mapping[str, Any] | None,
+) -> tuple[int, int] | None:
+    """Return a persisted gauge record's clamped ``(current, maximum)`` pair.
+
+    The no-create twin of
+    :func:`world.rules.action.gates.stored_gauge_pair`, which reads a mounted
+    ``TraitHandler``. Both terms clamp to zero; the maximum resolves from the
+    declared composition and the current falls back to that maximum when no
+    current was written, matching the live reader. ``None`` for a missing or
+    non-numeric record.
+    """
+    if record is None:
+        return None
+    base = _stored_trait_number(record.get("base"))
+    mod = _stored_trait_number(record.get("mod", 0))
+    mult = _stored_trait_number(record.get("mult", 1))
+    if base is None or mod is None or mult is None:
+        return None
+    maximum = int(round((base + mod) * mult))
+    current = record.get("current")
+    if current is None:
+        current = maximum
+    number = _stored_trait_number(current)
+    if number is None:
+        return None
+    return max(int(number), 0), max(maximum, 0)
+
+
+def stored_trait_value(entity: Any, trait_key: str) -> float | None:
+    """Return one persisted trait value, or ``None`` when it is unusable."""
+    return trait_record_value(stored_trait_record(entity, trait_key))
+
+
+def stored_gauge_pair(entity: Any, trait_key: str) -> tuple[int, int] | None:
+    """Return a stored gauge's clamped ``(current, maximum)`` pair, or ``None``."""
+    return trait_record_gauge_pair(stored_trait_record(entity, trait_key))
+
+
 # Re-export: the closed vocabulary is static lore data (world.lore.combat_traits);
 # this module owns the validation and accessor rules that read it.
 from world.lore.combat_traits import COMBAT_TRAITS_VOCABULARY

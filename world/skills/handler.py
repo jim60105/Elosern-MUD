@@ -1,5 +1,6 @@
 """Skill handling from design section 5.2 and ``skills-equipment``."""
 
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -54,21 +55,50 @@ class SkillHandler:
         """Return base owned keys plus the entity's unlocked sexual acts.
 
         Unlocked act keys are appended sorted for deterministic iteration.
-        The sexual state is read through a duck-typed attribute so this
-        module keeps importing nothing from outside ``world.skills`` — and
-        only when the handler is already materialized, so preview and
-        no-create status reads stay free of side effects. An unmaterialized
-        entity's counters are all at their zero baseline, so its unlocked
-        set is computed from the catalogue registry alone (seed acts, or the
-        whole catalogue for a directly owned mastery skill).
+        The unlocked set resolves from PERSISTED counter values, so reading
+        ownership never mounts the sexual handler: ``SexualState.__init__``
+        writes a complete baseline whenever the stored records are
+        incomplete, and a no-create consumer must not trigger that write.
+        The unmaterialized case is the same read with every counter absent,
+        which ``unlocked_act_keys_for`` takes as zero.
         """
         base = self.base_owned_keys()
-        if not self._sexual_state_materialized():
-            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
-        sexual = getattr(self.entity, "sexual", None)
-        if sexual is None:
-            return [*base, *sorted(self._unlocked_act_keys_without_sexual())]
-        return [*base, *sorted(sexual.unlocked_act_keys())]
+        from world.skills.sexual_acts import unlocked_act_keys_for
+
+        return [
+            *base,
+            *sorted(unlocked_act_keys_for(base, self._stored_counter_values())),
+        ]
+
+    def _stored_counter_values(self) -> dict[str, int]:
+        """Return the persisted lifetime sexual counters, handler-free.
+
+        Counter traits store their value as ``base``; a missing record and a
+        malformed record both read as absent, which the unlock rule treats as
+        the zero baseline.
+        """
+        from collections.abc import Mapping
+
+        from world.rules.sexual_state.lifecycle import _LIFETIME_COUNTER_KEYS
+
+        attributes = getattr(self.entity, "attributes", None)
+        if attributes is None:
+            return {}
+        records = attributes.get(
+            "sexual_traits", default=None, category="traits"
+        )
+        if not isinstance(records, Mapping):
+            return {}
+        values: dict[str, int] = {}
+        for name in _LIFETIME_COUNTER_KEYS:
+            record = records.get(name)
+            if not isinstance(record, Mapping):
+                continue
+            base = record.get("base")
+            if isinstance(base, bool) or not isinstance(base, (int, float)):
+                continue
+            values[name] = int(base)
+        return values
 
     def _sexual_state_materialized(self) -> bool:
         """Return whether the entity's sexual handler was already mounted.
@@ -104,11 +134,34 @@ class SkillHandler:
 
     def stored_effective_value(self, trait_key: str) -> int:
         """Read the identical static fold without mounting a trait handler."""
+        return self.stored_effective_values((trait_key,))[trait_key]
+
+    def stored_effective_values(self, trait_keys: Iterable[str]) -> dict[str, int]:
+        """Fold several static traits from ONE persisted-trait storage read.
+
+        A decision projects every effective trait it needs through one call,
+        so the persisted ``traits`` attribute is read once instead of once
+        per key. Keys absent from storage fold from a zero base, exactly as
+        the single-key reader did.
+        """
         attributes = getattr(self.entity, "attributes", None)
-        traits = attributes.get("traits", default={}, category="traits") if attributes is not None else {}
-        raw = (traits or {}).get(trait_key, {})
-        base = raw.get("value", raw.get("current", (raw.get("base", 0) + raw.get("mod", 0)) * raw.get("mult", 1)))
-        return self._effective_value_from_base(trait_key, base)
+        traits = (
+            attributes.get("traits", default={}, category="traits")
+            if attributes is not None
+            else {}
+        )
+        records = traits if isinstance(traits, Mapping) else {}
+        values: dict[str, int] = {}
+        for trait_key in trait_keys:
+            raw = records.get(trait_key) or {}
+            base = raw.get(
+                "value",
+                raw.get(
+                    "current", (raw.get("base", 0) + raw.get("mod", 0)) * raw.get("mult", 1)
+                ),
+            )
+            values[trait_key] = self._effective_value_from_base(trait_key, base)
+        return values
 
     def _effective_value_from_base(self, trait_key: str, base: int) -> int:
         """One passive/grant fold shared by live and no-create readers."""
