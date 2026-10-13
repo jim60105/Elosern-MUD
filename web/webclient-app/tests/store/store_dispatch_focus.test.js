@@ -291,18 +291,18 @@ describe("store dispatch + focus", () => {
         {},
       );
       const view = store.view;
-      // The exits are the exit compass's (exploration-exit-compass), so the
-      // overview opens on its first person chip.
-      expect(view.focus.key).toBe("target-7");
-      expect(view.focus.label).toBe("店長");
+      // The exits are the exit compass's (exploration-exit-compass) and the
+      // people and objects the presence rail's (exploration-presence-rail),
+      // so the overview opens on its first footer chip.
+      expect(view.focus.key).toBe("look-room");
+      expect(view.focus.label).toBe("查看房間");
       expect(view.focus.enabled).toBe(true);
-      expect(store.router.rootMenu().items.some((item) => item.key.startsWith("exit-"))).toBe(false);
+      expect(store.router.rootMenu().items.some((item) => /^(exit|target|entity|object)-/.test(item.key))).toBe(false);
+      expect(view.presenceEntries.map((entry) => entry.key)).toEqual(["target-7", "object-3"]);
       // The overview navigates as rows of chips in reading order
       // (webclient-scene-overview-swap): ArrowRight steps to the next chip.
       expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("object-3");
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("look-room");
+      expect(store.view.focus.key).toBe("wait");
     });
 
     it("navigates the combat root grid with preserved action keys", () => {
@@ -360,9 +360,9 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.key).toBe("look-room");
       store.focusPress("ArrowRight");
-      expect(store.view.focus.key).toBe("object-3");
+      expect(store.view.focus.key).toBe("wait");
 
       // An identical update must not reset the focus position.
       store.receive(
@@ -371,7 +371,7 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 3, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("object-3");
+      expect(store.view.focus.key).toBe("wait");
 
       // Declarative frame semantics (webclient-declarative-frame-stack): a
       // changed panel RE-RESOLVES the open frame — the focus key survives
@@ -394,7 +394,7 @@ describe("store dispatch + focus", () => {
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("object-3");
+      expect(store.view.focus.key).toBe("wait");
      });
 
     it("routes a confirmed action item through the single dispatch entry", () => {
@@ -406,10 +406,8 @@ describe("store dispatch + focus", () => {
         {},
       );
       // Navigate the overview to the footer's 等待／休息 chip: the reading
-      // order is target-7, object-3, look-room, wait, suggestions.
-      for (let i = 0; i < 3; i += 1) {
-        store.focusPress("ArrowRight");
-      }
+      // order is look-room, wait, suggestions.
+      store.focusPress("ArrowRight");
       expect(store.view.focus.key).toBe("wait");
       // Confirming "wait" opens the wait submenu (openSubmenu).
       expect(store.focusConfirm("keyboard")).toBe(true);
@@ -445,9 +443,11 @@ describe("store dispatch + focus", () => {
       expect(sender.sent.actions.length).toBe(0);
 
       // Pointer activation shares the same gates (mutation-lock + enabled).
-      expect(store.focusItemByKey("object-3")).toBe(true);
+      expect(store.focusItemByKey("look-room")).toBe(true);
        store.dispatchAction("explore.wait", { daypart: "dusk" });
        expect(store.focusConfirm("pointer")).toBe(false);
+       // The rail's look entry runs the same gate (exploration-presence-rail).
+       expect(store.activatePresence("object-3")).toMatchObject({ sent: false, reason: "locked" });
        expect(store.view.dispatch.inFlight).not.toEqual(null);
        expect(sender.sent.actions.length).toBe(1);
      });

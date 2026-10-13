@@ -1,16 +1,18 @@
 // webclient-declarative-frame-stack (task 4.1): the store-level declarative
 // frame contract. Open exploration frames are descriptors, never copies — a
-// committed snapshot RE-RESOLVES them at the next access (the open verb
-// popover shows the target's new affordances with key-tracked focus), a
-// vanished target identity closes the verb popover and lands focus on the
-// nearest surviving chip, whole-stack loss cascades to the root, the
+// committed snapshot RE-RESOLVES them at the next access (the open
+// suggestions frame shows the envelope's new cards with key-tracked focus),
+// whole-stack loss cascades to the root, the
 // suggestions frame survives generating→ready and exits to the root on
 // `unavailable` with no reason row, pointer activation writes the focus key
 // before dispatch, and a mode switch yields the one-frame stack.
 //
-// webclient-retire-exploration-submenus: the move/look/interact frames are
-// gone, so the pushed frame these contracts ride is the verb popover, reached
-// through the real path (person chip → verb popover). The file also pins the
+// webclient-retire-exploration-submenus retired the move/look/interact
+// frames, and exploration-presence-rail retired the verb popover (a target's
+// verbs are the client-local verb card, never a frame; its own contracts live
+// in tests/store/presence_card.test.js), so the pushed frames these contracts
+// ride are the waiting and suggestions frames, reached through the real path
+// (a footer chip). The file also pins the
 // new room-change reset (design D2) and — webclient-talk-open-dock — the
 // conversation-open reset: the commit that changes the mode to `dialogue`
 // returns the dock to the overview (see the describe block at the end).
@@ -57,21 +59,57 @@ function openExploration(store, explorationOverrides) {
   expect(result.accepted).toBe(true);
 }
 
-// One interact target carrying the given v3 affordances: the panel shape the
-// verb popover re-resolves from on every commit.
-function target(identity, affordances) {
-  return { identity, display_name: "店長", portrait_ref: null, affordances };
+// A ready suggestions envelope carrying the given known-action cards: the
+// shape the suggestions frame re-resolves from on every commit.
+function readySuggestions(...cards) {
+  return {
+    suggestions: {
+      status: "ready",
+      cards: cards.map(([action_code, label, params]) => ({ kind: "known_action", action_code, label, params })),
+    },
+  };
 }
 
-function affordance(action_id, label) {
-  return { kind: "action", action_id, label, enabled: true, disabled_reason: null };
-}
+const LOOK_CARD = ["explore.look", "看看木箱", { target_id: 3 }];
+const WAIT_CARD = ["explore.wait", "等到天亮", { daypart: "dawn" }];
+const ROOM_CARD = ["explore.look", "環顧四周", { room: true }];
+const TALK_CARD = ["explore.talk_scripted", "與店長交談", { npc_id: 7, keyword_id: "問候" }];
 
-// A person chip's verb popover: one deliberate activation from the overview.
-function openVerbPopover(store) {
-  expect(store.focusItemByKey("target-7")).toBe(true);
+// The waiting frame: one deliberate activation of its footer chip.
+function openWaitFrame(store) {
+  expect(store.focusItemByKey("wait")).toBe(true);
   expect(store.focusConfirm("keyboard")).toBe(true);
   expect(store.router.depth()).toBe(2);
+}
+
+// The suggestions frame: one deliberate activation of its footer chip.
+function openSuggestionsFrame(store) {
+  expect(store.focusItemByKey("suggestions")).toBe(true);
+  expect(store.focusConfirm("keyboard")).toBe(true);
+  expect(store.router.depth()).toBe(2);
+}
+
+// The exploration snapshot with a ready suggestions envelope.
+function openWithSuggestions(store, contextActionsOverrides) {
+  store.beginTransport(1);
+  store.setConnected(true);
+  const result = store.receive(
+    1,
+    "ui_snapshot",
+    [
+      fx.snapshot({
+        revision: 1,
+        panels: {
+          status: fx.statusPanel(),
+          exploration: fx.explorationPanel(),
+          local_map: fx.localMapPanel(),
+          context_actions: fx.explorationActions(contextActionsOverrides),
+        },
+      }),
+    ],
+    {},
+  );
+  expect(result.accepted).toBe(true);
 }
 
 // A commit that moves the actor: `look.room.identity` is the panel's own
@@ -83,8 +121,7 @@ function roomChange(revision, identity) {
 }
 
 // The committed dialogue panel a successful 交談 commits
-// (webclient-talk-open-dock): the conversation the popover's `talk-open` row
-// opened.
+// (webclient-talk-open-dock).
 function dialoguePanel() {
   return {
     schema_version: 2,
@@ -126,126 +163,84 @@ describe("declarative frame stack (store contract)", () => {
   });
 
   describe("commit-driven re-resolution", () => {
-    it("a snapshot commit updates the open verb popover with key-tracked focus", () => {
-      openExploration(store, {
-        interact: [
-          target(7, [
-            affordance("explore.talk_open", "交談"),
-            affordance("explore.party_invite", "邀請"),
-          ]),
-        ],
-      });
-      // Open the 交談 popover and focus its second affordance row.
-      openVerbPopover(store);
-      expect(store.view.focus.key).toBe("talk-open");
+    it("a snapshot commit updates the open suggestions frame with key-tracked focus", () => {
+      openWithSuggestions(store, readySuggestions(LOOK_CARD, WAIT_CARD, TALK_CARD));
+      openSuggestionsFrame(store);
+      expect(store.view.focus.key).toBe("action-explore.look");
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("party-invite");
+      expect(store.view.focus.key).toBe("action-explore.wait");
 
-      // The target's affordances change under the open frame: a longer list
+      // The envelope's cards change under the open frame: a longer list
       // where the focused key survives at a DIFFERENT index. No re-push
       // exists — the next read resolves it.
       const result = store.receive(
         1,
         "ui_update",
-        [
-          explorationCommit(3, {
-            interact: [
-              target(7, [
-                affordance("explore.engage", "戰鬥"),
-                affordance("explore.talk_open", "交談"),
-                affordance("explore.party_invite", "邀請"),
-              ]),
-            ],
-          }),
-        ],
+        [explorationCommit(3, undefined, readySuggestions(ROOM_CARD, TALK_CARD, WAIT_CARD))],
         {},
       );
       expect(result.accepted).toBe(true);
 
-      // The popover lists the new affordance rows and the focus KEY survived.
       const keys = store.router.currentMenu().items.map((item) => item.key);
-      expect(keys).toEqual(["engage", "talk-open", "party-invite", "look-target", "back"]);
-      expect(store.view.focus.key).toBe("party-invite");
+      expect(keys).toEqual([
+        "action-explore.look",
+        "action-explore.talk_scripted",
+        "action-explore.wait",
+        "action-options.dismiss",
+        "back",
+      ]);
+      expect(store.view.focus.key).toBe("action-explore.wait");
 
-      // Re-activation submits the NEW row's payload (the committed
-      // npc_id), never a copy captured when the frame opened.
+      // Re-activation submits the NEW card's payload, never a copy captured
+      // when the frame opened.
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].action_id).toBe("explore.party_invite");
-      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, message: "" });
+      expect(sender.sent.actions[0].action_id).toBe("explore.wait");
+      expect(sender.sent.actions[0].payload).toEqual({ daypart: "dawn" });
     });
 
     it("a lost focus key lands on the nearest surviving row", () => {
-      openExploration(store, {
-        interact: [
-          target(7, [
-            affordance("explore.talk_open", "交談"),
-            affordance("explore.party_invite", "邀請"),
-          ]),
-        ],
-      });
-      openVerbPopover(store);
+      openWithSuggestions(store, readySuggestions(LOOK_CARD, WAIT_CARD, TALK_CARD));
+      openSuggestionsFrame(store);
       expect(store.focusPress("ArrowDown")).toBe(true);
-      expect(store.view.focus.key).toBe("party-invite");
-      // The focused row disappears: the re-derived frame is
-      // [talk-open, look-target, back]; the router-private cached row index
-      // was 1, and the nearest surviving index takes focus.
+      expect(store.view.focus.key).toBe("action-explore.wait");
+      // The focused card disappears: the re-derived frame is
+      // [look, talk, look-2, dismiss, back]; the router-private cached row
+      // index was 1, and the nearest surviving index takes focus.
+      store.receive(1, "ui_update", [explorationCommit(3, undefined, readySuggestions(LOOK_CARD, TALK_CARD, ROOM_CARD))], {});
+      expect(store.view.focus.key).toBe("action-explore.talk_scripted");
+    });
+  });
+
+  describe("frame loss", () => {
+    it("consecutive unresolvable frames cascade in one access down to the parent", () => {
+      openExploration(store);
+      // The waiting frame, plus the suggestions frame pushed directly on top:
+      // both resolve from the committed exploration panel, so one commit can
+      // invalidate both.
+      openWaitFrame(store);
+      store.router.pushFrame({ source: "exploration.suggestions", params: {} });
+      expect(store.router.depth()).toBe(3);
+
+      // One commit makes the exploration panel unavailable: BOTH frames
+      // become unresolvable at once.
       store.receive(
         1,
         "ui_update",
         [
-          explorationCommit(3, {
-            interact: [target(7, [affordance("explore.talk_open", "交談")])],
+          fx.update({
+            revision: 3,
+            panels: {
+              exploration: {
+                schema_version: 3,
+                available: false,
+                reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
+              },
+            },
           }),
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("look-target");
-    });
-  });
-
-  describe("identity loss", () => {
-    it("a vanished target identity closes the popover and lands focus on the nearest chip", () => {
-      openExploration(store);
-      // The overview's person chip opens target 7's verb popover.
-      openVerbPopover(store);
-      expect(store.router.currentDescriptor()).toEqual({
-        source: "exploration.target",
-        params: { identity: 7 },
-      });
-
-      // The committed panel no longer lists identity 7.
-      store.receive(1, "ui_update", [explorationCommit(3, { interact: [] })], {});
-
-      // The popover closed in that commit and the overview is current; the
-      // vanished chip's slot takes the nearest surviving chip — the same
-      // person's look chip.
-      expect(store.router.depth()).toBe(1);
-      expect(store.router.currentDescriptor().source).toBe("exploration.root");
-      expect(store.view.focus.key).toBe("entity-7");
-    });
-
-    it("consecutive unresolvable frames cascade in one access down to the parent", () => {
-      openExploration(store, {
-        interact: [
-          target(7, [affordance("explore.talk_open", "交談")]),
-          target(9, [affordance("explore.talk_open", "交談")]),
-        ],
-      });
-      // Person chip -> target 7's verb popover, plus target 9's popover pushed
-      // directly on top: both frames resolve from the same committed interact
-      // list, so one commit can invalidate both.
-      openVerbPopover(store);
-      store.router.pushFrame({ source: "exploration.target", params: { identity: 9 } });
-      expect(store.router.depth()).toBe(3);
-      expect(store.router.currentDescriptor()).toEqual({
-        source: "exploration.target",
-        params: { identity: 9 },
-      });
-
-      // One commit removes every identity: BOTH frames become unresolvable at
-      // once.
-      store.receive(1, "ui_update", [explorationCommit(3, { interact: [] })], {});
 
       // Both frames cascaded to the root in a single access (no timer).
       expect(store.router.depth()).toBe(1);
@@ -255,9 +250,9 @@ describe("declarative frame stack (store contract)", () => {
 
     it("whole-stack loss cascades to a degraded root that submits nothing", () => {
       openExploration(store);
-      // The verb popover dispatches nothing, so the assertion below isolates
-      // the degraded root's own submission behaviour.
-      openVerbPopover(store);
+      // The waiting frame dispatches nothing when it opens, so the assertion
+      // below isolates the degraded root's own submission behaviour.
+      openWaitFrame(store);
 
       // A FULL snapshot without the exploration panel (updates replace only
       // the named panels, so only a snapshot drops it): every exploration
@@ -289,7 +284,7 @@ describe("declarative frame stack (store contract)", () => {
       // The panel returns: the same root frame re-resolves and recovers.
       store.receive(1, "ui_update", [explorationCommit(4)], {});
       expect(store.view.degradedRoot).toBeNull();
-      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.key).toBe("look-room");
     });
   });
 
@@ -331,47 +326,30 @@ describe("declarative frame stack (store contract)", () => {
 
   describe("activation", () => {
     it("a pointer pick writes the frame focus key before dispatching", () => {
-      openExploration(store, {
-        interact: [
-          target(7, [
-            affordance("explore.talk_open", "交談"),
-            affordance("explore.party_invite", "邀請"),
-          ]),
-        ],
-      });
-      openVerbPopover(store);
+      openWithSuggestions(store, readySuggestions(LOOK_CARD, WAIT_CARD, TALK_CARD));
+      openSuggestionsFrame(store);
       // Pointer selection of the second row, then a pointer confirm.
-      expect(store.focusItemByKey("party-invite")).toBe(true);
+      expect(store.focusItemByKey("action-explore.wait")).toBe(true);
       expect(store.focusConfirm("pointer")).toBe(true);
       expect(sender.sent.actions.length).toBe(1);
-      expect(sender.sent.actions[0].payload).toEqual({ npc_id: 7, message: "" });
+      expect(sender.sent.actions[0].payload).toEqual({ daypart: "dawn" });
 
       // The written-back key survives the next re-resolution: a commit keeps
       // focus on the ACTIVATED row, not on the row the frame first opened.
       store.receive(
         1,
         "ui_update",
-        [
-          explorationCommit(3, {
-            interact: [
-              target(7, [
-                affordance("explore.engage", "戰鬥"),
-                affordance("explore.talk_open", "交談"),
-                affordance("explore.party_invite", "邀請"),
-              ]),
-            ],
-          }),
-        ],
+        [explorationCommit(3, undefined, readySuggestions(ROOM_CARD, LOOK_CARD, WAIT_CARD, TALK_CARD))],
         {},
       );
-      expect(store.view.focus.key).toBe("party-invite");
+      expect(store.view.focus.key).toBe("action-explore.wait");
     });
   });
 
   describe("teardown", () => {
     it("a mode switch to combat and back yields exactly one frame", () => {
       openExploration(store);
-      openVerbPopover(store);
+      openWaitFrame(store);
 
       // Mode switch to combat: one combat root frame (legacy copy until the
       // combat family migrates), the exploration stack gone.
@@ -412,7 +390,7 @@ describe("declarative frame stack (store contract)", () => {
         source: "exploration.root",
         params: {},
       });
-      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.key).toBe("look-room");
     });
 
     // The named teardown triggers beyond the mode switch. The no-puppet case
@@ -421,7 +399,7 @@ describe("declarative frame stack (store contract)", () => {
     // the detach transition is its own teardown event.
     it("a no_puppet detach at depth 2 collapses the stack to the root frame", () => {
       openExploration(store);
-      openVerbPopover(store);
+      openWaitFrame(store);
 
       const result = store.receive(1, "ui_protocol_error", [fx.protocolError()], {});
       expect(result.accepted).toBe(true);
@@ -471,12 +449,12 @@ describe("declarative frame stack (store contract)", () => {
         source: "exploration.root",
         params: {},
       });
-      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.key).toBe("look-room");
     });
 
     it("a transport loss at depth 2 yields exactly one root frame", () => {
       openExploration(store);
-      openVerbPopover(store);
+      openWaitFrame(store);
 
       store.setConnected(false);
 
@@ -492,26 +470,25 @@ describe("declarative frame stack (store contract)", () => {
   // whenever the committed room changes, whatever opened the frame — the
   // dock's own chips, the minimap, or a typed command.
   describe("room-change reset", () => {
-    it("a popover and a wait frame each reset to the overview", () => {
-      // The verb popover.
+    it("a wait frame and a suggestions frame each reset to the overview", () => {
+      // The waiting frame.
       openExploration(store);
-      openVerbPopover(store);
+      openWaitFrame(store);
       store.receive(1, "ui_update", [roomChange(3, 99)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
-      expect(store.view.focus.key).toBe("target-7");
+      expect(store.view.focus.key).toBe("look-room");
 
-      // The waiting frame.
-      expect(store.focusItemByKey("wait")).toBe(true);
-      expect(store.focusConfirm("keyboard")).toBe(true);
-      expect(store.router.currentDescriptor().source).toBe("exploration.wait");
+      // The suggestions frame.
+      openSuggestionsFrame(store);
+      expect(store.router.currentDescriptor().source).toBe("exploration.suggestions");
       store.receive(1, "ui_update", [roomChange(4, 100)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
 
-      // The verb popover again, one deliberate activation from the overview.
-      openVerbPopover(store);
-      expect(store.router.currentDescriptor().source).toBe("exploration.target");
+      // The waiting frame again, one deliberate activation from the overview.
+      openWaitFrame(store);
+      expect(store.router.currentDescriptor().source).toBe("exploration.wait");
       store.receive(1, "ui_update", [roomChange(5, 101)], {});
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor().source).toBe("exploration.root");
@@ -520,13 +497,13 @@ describe("declarative frame stack (store contract)", () => {
 
     it("a same-room commit keeps the frame open", () => {
       openExploration(store);
-      openVerbPopover(store);
-      // The same room, a new revision: the popover re-resolves in place.
+      openWaitFrame(store);
+      // The same room, a new revision: the frame re-resolves in place.
       store.receive(1, "ui_update", [explorationCommit(3)], {});
       expect(store.router.depth()).toBe(2);
       expect(store.router.currentDescriptor()).toEqual({
-        source: "exploration.target",
-        params: { identity: 7 },
+        source: "exploration.wait",
+        params: {},
       });
     });
 
@@ -620,24 +597,22 @@ describe("declarative frame stack (store contract)", () => {
 
   // webclient-talk-open-dock: 交談 submits `explore.talk_open` in one step and
   // the dock returns to the overview in the commit that makes the mode
-  // `dialogue`, so no popover stays open over the conversation. The reset is
+  // `dialogue`, so no child frame stays open over the conversation. The reset is
   // the store's ONE mode-change teardown (`syncHudDrawer` ->
   // `resetFramesToRoot`, webclient-services-combat-creation-frames): it posts
   // the committed mode's root descriptor, which for dialogue is the ordinary
   // exploration root. These cases pin the transition at the store level; the
   // dock's own contract is stated by `webclient-exploration-menu`.
   describe("the conversation-open reset", () => {
-    it("a popover open when the commit changes the mode to dialogue resets to the overview", () => {
-      openExploration(store, {
-        interact: [target(7, [affordance("explore.talk_open", "交談")])],
-      });
-      openVerbPopover(store);
+    it("a frame open when the commit changes the mode to dialogue resets to the overview", () => {
+      openExploration(store);
+      openWaitFrame(store);
       expect(store.router.depth()).toBe(2);
 
       const result = store.receive(1, "ui_snapshot", [dialogueSnapshot(3)], {});
       expect(result.accepted).toBe(true);
       expect(store.view.mode).toBe("dialogue");
-      // The popover closed IN that commit: the dock is at the overview and no
+      // The frame closed IN that commit: the dock is at the overview and no
       // deeper frame remains activatable over the conversation.
       expect(store.router.depth()).toBe(1);
       expect(store.router.currentDescriptor()).toEqual({
@@ -651,20 +626,20 @@ describe("declarative frame stack (store contract)", () => {
 
     it("a commit that keeps the mode dialogue leaves the open frame alone", () => {
       // A session already in dialogue: the dock is the ordinary exploration
-      // root, so its popover is reachable mid-conversation.
+      // root, so its child frames are reachable mid-conversation.
       store.beginTransport(1);
       store.setConnected(true);
       store.receive(1, "ui_snapshot", [dialogueSnapshot(1)], {});
       expect(store.view.mode).toBe("dialogue");
       expect(store.router.depth()).toBe(1);
-      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusItemByKey("wait")).toBe(true);
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(store.router.depth()).toBe(2);
 
       // No mode transition: the frame re-resolves in place.
       store.receive(1, "ui_update", [fx.update({ revision: 2, mode: "dialogue" })], {});
       expect(store.router.depth()).toBe(2);
-      expect(store.router.currentDescriptor().source).toBe("exploration.target");
+      expect(store.router.currentDescriptor().source).toBe("exploration.wait");
     });
 
     it("the first commit of a dialogue session mounts the one root frame and resets nothing", () => {
@@ -688,12 +663,12 @@ describe("declarative frame stack (store contract)", () => {
       store.beginTransport(1);
       store.setConnected(true);
       store.receive(1, "ui_snapshot", [dialogueSnapshot(1)], {});
-      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusItemByKey("wait")).toBe(true);
       expect(store.focusConfirm("keyboard")).toBe(true);
       expect(store.router.depth()).toBe(2);
 
       // The conversation ends: the same mode-change teardown returns the dock
-      // to the overview rather than leaving a popover over the exploration
+      // to the overview rather than leaving a frame over the exploration
       // surface.
       store.receive(
         1,

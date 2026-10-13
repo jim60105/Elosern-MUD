@@ -155,12 +155,12 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     const sender = fx.createFakeSender();
     store.setSender(sender);
 
-    // The overview's second chip is the object's look chip, so a real row
-    // exists at slot 2 without opening any child frame (the exits are the
-    // exit compass's and take no slot).
-    expect(store.view.focus.key).toBe("target-7");
+    // The presence rail's second slot is the object's look entry
+    // (exploration-presence-rail: the rail owns the root's digits; the exits
+    // are the exit compass's and take no slot).
+    expect(store.view.presenceEntries.map((entry) => entry.key)).toEqual(["target-7", "object-3"]);
 
-    // `2` is consumed by the store's row pick -> the bridge claims it:
+    // `2` is consumed by the rail's pick -> the bridge claims it:
     // preventDefault fires and the row submits through the store.
     const claimed = new KeyboardEvent("keydown", { key: "2", bubbles: true, cancelable: true });
     document.dispatchEvent(claimed);
@@ -168,14 +168,19 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
     expect(claimed.defaultPrevented).toBe(true);
     expect(sender.sent.actions.map((a) => a.action_id)).toContain("explore.look");
 
-    // A digit with no such row is unclaimed: the bridge does not prevent the
-    // default, so the key falls through to the text / command-history path.
-    // The overview renders five chips, so 7 and beyond have no row.
-    for (const key of ["7", "8", "9", "0"]) {
+    // While the rail is on the stage a digit past its slots is claimed and
+    // does nothing (no digit falls through to the footer chips); `0` is not
+    // a pick and stays unclaimed.
+    const before = sender.sent.actions.length;
+    for (const key of ["7", "8", "9"]) {
       const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
       document.dispatchEvent(event);
-      expect(event.defaultPrevented).toBe(false);
+      expect(event.defaultPrevented).toBe(true);
     }
+    const zero = new KeyboardEvent("keydown", { key: "0", bubbles: true, cancelable: true });
+    document.dispatchEvent(zero);
+    expect(zero.defaultPrevented).toBe(false);
+    expect(sender.sent.actions).toHaveLength(before);
   });
 
   it("ArrowDown on the single-row exploration root is a no-op move but still suppresses the default", async () => {

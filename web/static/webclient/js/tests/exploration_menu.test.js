@@ -2,8 +2,8 @@
  * DOM-independent tests for the exploration-menu model.
  *
  * Runs with Node 24's built-in test runner; no npm packages. Covers the
- * scene-overview chip builders (exits, look rows, the footer), the wait
- * submenu, the top navigation bar's entries, a target's verb popover rows,
+ * scene-overview footer, the exit and presence-rail builders, the wait
+ * submenu, the top navigation bar's entries, a target's verb card rows,
  * disabled-row non-submission, and the navigate-kind service affordance being
  * dock-navigation only (never submitted as an action).
  */
@@ -200,25 +200,28 @@ test("menu models carry the mockup grid geometry", () => {
   assert.equal(overview.geometry, "sections");
 });
 
-test("overview person chips open their server-authored affordances", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), {});
-  const menu = ExplorationMenu.overviewMenu(model.panel, { currentNode: "room:3" });
-  const person = menu.items.find((item) => item.key === "target-5");
+test("rail target entries name their server-authored affordances", () => {
+  const entries = ExplorationMenu.presenceEntries(validPanel());
+  const person = entries.find((entry) => entry.key === "target-5");
+  assert.equal(person.presence, "target");
+  assert.equal(person.identity, 5);
   assert.equal(person.enabled, true);
-  assert.equal(person.openTarget, 5);
+  assert.equal(person.actionId, null, "a target entry opens the verb card and submits nothing");
+  assert.equal(person.summary, "交談／公會服務");
+  assert.equal(person.openTarget, undefined, "the openTarget item kind is retired");
 });
 
-test("a target with no affordances still opens its popover, and its affordance frame keeps the empty placeholder", () => {
+test("a target with no affordances still opens its card, and its affordance frame keeps the empty placeholder", () => {
   const panel = validPanel({
     interact: [{ identity: 8, display_name: "路人", portrait_ref: null, affordances: [] }],
   });
   const model = ExplorationMenu.buildMenus(panel, {});
-  // The person chip is always enabled: its verb popover has at least 查看.
-  const menu = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
-  const person = menu.items.find((item) => item.key === "target-8");
+  // The rail entry is always enabled and reads 查看: its verb card has at
+  // least 查看.
+  const person = ExplorationMenu.presenceEntries(panel).find((entry) => entry.key === "target-8");
   assert.equal(person.enabled, true);
-  assert.equal(person.openTarget, 8);
-  // The popover's own source frame carries the disabled empty row.
+  assert.equal(person.summary, "查看");
+  // The card's own source frame carries the disabled empty row.
   const targetMenu = ExplorationMenu.targetMenuFor(model, ExplorationMenu.targetById(model, 8));
   const empty = targetMenu.items.find((item) => item.key === "target-empty");
   assert.equal(empty.enabled, false);
@@ -621,20 +624,16 @@ function overviewPanel() {
   });
 }
 
-test("the overview lists people, objects, and the footer in reading order, and no exit", () => {
+test("the overview is the footer only: no person, object, or exit entry", () => {
   const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
   assert.equal(menu.geometry, "sections");
   assert.equal(menu.title, "場景");
   assert.equal(menu.grid, undefined, "a sections menu carries no grid flag");
   assert.deepEqual(
     menu.items.map((item) => item.key),
-    ["target-5", "entity-8", "object-6", "object-7", "look-room", "wait"]
+    ["look-room", "wait"]
   );
-  assert.deepEqual(menu.sections, [
-    { key: "people", label: "人物", count: 2 },
-    { key: "objects", label: "物件", count: 2 },
-    { key: "footer", label: null, count: 2 },
-  ]);
+  assert.deepEqual(menu.sections, [{ key: "footer", label: null, count: 2 }]);
   const total = menu.sections.reduce((sum, section) => sum + section.count, 0);
   assert.equal(total, menu.items.length);
   assert.equal(menu.items.find((item) => item.key === "look-room").label, "查看房間");
@@ -643,7 +642,7 @@ test("the overview lists people, objects, and the footer in reading order, and n
   assert.ok(!menu.items.some((item) => item.key === "back"), "the root has no back row");
 });
 
-test("the overview omits empty people and objects sections", () => {
+test("the overview's sections do not depend on the room's people or objects", () => {
   const panel = overviewPanel();
   panel.interact = [];
   panel.look.entities = [];
@@ -685,20 +684,57 @@ test("exit targets are exactly the move rows and carry the payload with current_
   assert.equal(unsynced.actionId, null, "an exit without the local-map current_node never submits");
 });
 
-test("entity look chips appear only for identities without an interact descriptor", () => {
-  const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
-  assert.ok(!menu.items.some((item) => item.key === "entity-5"));
-  const traveller = menu.items.find((item) => item.key === "entity-8");
-  assert.equal(traveller.actionId, "explore.look");
-  assert.deepEqual(traveller.payload, { target_id: 8 });
+test("rail entries follow the retired rows' order: targets, bystanders, then objects", () => {
+  const entries = ExplorationMenu.presenceEntries(overviewPanel());
+  assert.deepEqual(
+    entries.map((entry) => [entry.key, entry.presence]),
+    [
+      ["target-5", "target"],
+      ["entity-8", "bystander"],
+      ["object-6", "object"],
+      ["object-7", "object"],
+    ]
+  );
 });
 
-test("person chips are enabled and open their target even with no affordance", () => {
-  const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
-  const guard = menu.items.find((item) => item.key === "target-5");
-  assert.equal(guard.enabled, true);
-  assert.equal(guard.openTarget, 5);
-  assert.equal(guard.actionId, null);
+test("bystander entries appear only for identities without an interact descriptor and carry the look row verbatim", () => {
+  const panel = overviewPanel();
+  const entries = ExplorationMenu.presenceEntries(panel);
+  assert.ok(!entries.some((entry) => entry.key === "entity-5"));
+  const traveller = entries.find((entry) => entry.key === "entity-8");
+  const lookRow = ExplorationMenu.lookItems(panel).find((item) => item.key === "entity-8");
+  for (const field of ["key", "label", "enabled", "actionId", "payload", "commandDisplay"]) {
+    assert.deepEqual(traveller[field], lookRow[field], field);
+  }
+  assert.deepEqual(traveller.payload, { target_id: 8 });
+  assert.equal(traveller.summary, "查看");
+  const chest = entries.find((entry) => entry.key === "object-6");
+  assert.deepEqual(chest.payload, { target_id: 6 });
+  assert.equal(chest.actionId, "explore.look");
+  assert.deepEqual(chest.commandDisplay, { targetLabel: "試驗箱" });
+});
+
+test("rail target entries carry their portrait ref, falling back to the entity's", () => {
+  const panel = overviewPanel();
+  panel.look.entities[0].portrait_ref = "npc_5";
+  panel.look.entities[1].portrait_ref = "char_8";
+  const entries = ExplorationMenu.presenceEntries(panel);
+  assert.equal(entries.find((entry) => entry.key === "target-5").portraitRef, "npc_5");
+  assert.equal(entries.find((entry) => entry.key === "entity-8").portraitRef, "char_8");
+  panel.interact[0].portrait_ref = "own_5";
+  assert.equal(
+    ExplorationMenu.presenceEntries(panel).find((entry) => entry.key === "target-5").portraitRef,
+    "own_5"
+  );
+});
+
+test("an empty room has no rail entries", () => {
+  const panel = overviewPanel();
+  panel.interact = [];
+  panel.look.entities = [];
+  panel.look.objects = [];
+  assert.deepEqual(ExplorationMenu.presenceEntries(panel), []);
+  assert.deepEqual(ExplorationMenu.presenceEntries(null), []);
 });
 
 test("the footer's suggestions entry follows the suggestions status", () => {

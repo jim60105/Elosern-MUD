@@ -41,6 +41,7 @@ import { applyFrames } from "./elosern/frames.js";
 import { applyCombat } from "./elosern/combat.js";
 import { applyCreation } from "./elosern/creation.js";
 import { applyInteraction } from "./elosern/interaction.js";
+import { applyPresence } from "./elosern/presence.js";
 import { applyTransport } from "./elosern/transport.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
@@ -154,6 +155,7 @@ export const useElosernStore = defineStore("elosern", () => {
   applyCombat(ctx);
   applyCreation(ctx);
   applyInteraction(ctx);
+  applyPresence(ctx);
   applySkillUse(ctx);
   applyTransport(ctx);
   // The combat beat playback (webclient-combat-beat-queue, design D5) sits
@@ -213,6 +215,10 @@ export const useElosernStore = defineStore("elosern", () => {
     tabToRootAndConfirm: ctx.tabToRootAndConfirm,
     // The exit compass's gated activation (exploration-exit-compass D2).
     activateExit: ctx.activateExit,
+    // The presence rail and its client-local cards (exploration-presence-rail).
+    activatePresence: ctx.activatePresence,
+    activatePresenceVerb: ctx.activatePresenceVerb,
+    closePresenceCard: ctx.closePresenceCard,
     chooseScale: ctx.chooseScale,
     // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,

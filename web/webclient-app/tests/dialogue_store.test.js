@@ -88,11 +88,7 @@ describe("dialogue frame vocabulary", () => {
     // gone, and so is the tab root.
     expect(menu.dialogueForm).toBeUndefined();
     const keys = (menu.items || []).map((i) => i.key);
-    expect(menu.sections.map((section) => section.key)).toEqual([
-      "people",
-      "objects",
-      "footer",
-    ]);
+    expect(menu.sections.map((section) => section.key)).toEqual(["footer"]);
     expect(keys).not.toContain("exit-east");
     expect(keys).toContain("wait");
     expect(keys).not.toContain("move");
@@ -138,7 +134,7 @@ describe("dialogue store mode lifecycle", () => {
     openSession();
     // Open one exploration child frame so the switch has frames to replace.
     // The dock root is the scene overview, so its child frames are the
-    // waiting frame and the verb popover.
+    // waiting and suggestions frames.
     expect(store.focusItemByKey("wait")).toBe(true);
     expect(store.focusConfirm("keyboard")).toBe(true);
     expect(store.view.dockDepth).toBe(2);
@@ -148,7 +144,7 @@ describe("dialogue store mode lifecycle", () => {
     // The root frame is the ORDINARY exploration root: no dialogue form,
     // no 對話選項 tab, the ordinary overview chips still activatable.
     expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
-    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("target-7");
+    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("look-room");
     // The exits stay reachable outside the root (the compass and the
     // dialogue exits list read them).
     expect(store.view.explorationExits.map((i) => i.key)).toContain("exit-east");
@@ -221,24 +217,23 @@ describe("dialogue store mode lifecycle", () => {
     });
   });
 
-  it("the 交談 row opens the conversation and the popover closes in that commit", () => {
+  it("the 交談 verb opens the conversation and the verb card closes in that commit", () => {
     openSession();
-    // The overview's person chip -> the verb popover: the dock is the ordinary
-    // exploration root in dialogue mode too.
-    expect(store.focusItemByKey("target-7")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
-    expect(store.router.depth()).toBe(2);
+    // The rail's person entry -> the client-local verb card
+    // (exploration-presence-rail): no router frame.
+    expect(store.activatePresence("target-7").handled).toBe(true);
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    expect(store.router.depth()).toBe(1);
 
     // 交談 submits explore.talk_open in one step (no keyword frame).
-    expect(store.focusItemByKey("talk-open")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
+    expect(store.activatePresenceVerb("talk-open").sent).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
       action_id: "explore.talk_open",
       payload: { npc_id: 7 },
     });
-    // The commit that opens the conversation closes the popover in the SAME
-    // commit: no frame stays open over the conversation. The committed panel
+    // The commit that opens the conversation closes the card in the SAME
+    // commit: no card or frame stays open over the conversation. The committed panel
     // names the host the row opened.
     store.receive(
       1,
@@ -254,6 +249,8 @@ describe("dialogue store mode lifecycle", () => {
       {},
     );
     expect(store.view.mode).toBe("dialogue");
+    expect(store.view.presenceCard).toBe(null);
+    expect(store.view.presenceNotice).toBe(null);
     expect(store.router.depth()).toBe(1);
     expect(store.router.currentDescriptor()).toEqual({
       source: "exploration.root",
@@ -420,7 +417,7 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.focusEscape()).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.focus.key).toBe("target-7");
+    expect(store.view.focus.key).toBe("look-room");
   });
 
   it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
@@ -448,8 +445,8 @@ describe("dialogue store mode lifecycle", () => {
     store.setActiveSubDock("character");
     // The genuine push route (the store's pop-policy push, driven through the
     // widened exploration-row gate — itself the align-11 D8 behavior: rows
-    // work in dialogue mode): the overview's person chip opens the popover.
-    expect(store.focusItemByKey("target-7")).toBe(true);
+    // work in dialogue mode): the overview's 等待／休息 chip opens its frame.
+    expect(store.focusItemByKey("wait")).toBe(true);
     expect(store.focusConfirm()).toBe(true);
     expect(store.view.dockDepth).toBe(2);
     store.receive(

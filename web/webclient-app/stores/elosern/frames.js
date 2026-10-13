@@ -105,6 +105,8 @@ export function applyFrames(ctx) {
   // descriptor as the one-frame stack. Browser helpers use it to normalize
   // the stack.
   ctx.resetFramesToRoot = function resetFramesToRoot() {
+    // The presence cards are not frames, but a root reset leaves no card open.
+    ctx.resetPresence?.();
     ctx.inStackMutation = true;
     try {
       router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });

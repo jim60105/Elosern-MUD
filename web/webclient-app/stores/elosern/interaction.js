@@ -74,16 +74,6 @@ export function applyInteraction(ctx) {
       ctx.publishView();
       return true;
     }
-    // An interact target row: push the target's declarative affordance frame.
-    // The subject travels as the descriptor's `{identity}` — the SAME
-    // server-authored identity the row carries — so the open frame follows
-    // the committed panel (identity loss pops it; no client-local copy of
-    // the selection is kept for exploration surfaces).
-    if (item.openTarget != null) {
-      ctx.pushExplorationFrame({ source: "exploration.target", params: { identity: item.openTarget } }, item.key);
-      ctx.publishView();
-      return true;
-    }
     // The rest-duration item (openRestForm): opens the bounded custom-duration
     // form before any OOB action (webclient-exploration-menu: the form is the
     // sole local UI exception — confirm opens the form, no dispatch yet).
@@ -140,6 +130,13 @@ export function applyInteraction(ctx) {
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
     }
     if (isDigit) {
+      // The presence rail owns the exploration root's digits
+      // (exploration-presence-rail design D5): a claimed or refused press
+      // never reaches the router, so no digit falls through to the footer.
+      const railClaim = ctx.presenceDigit(key, !!repeat);
+      if (railClaim !== null) {
+        return railClaim;
+      }
       // A held or repeated digit is suppressed exactly like a held Enter
       // (the router's Enter repeat branch is the reference): the first
       // press already picked its row, and re-confirming on every
@@ -198,13 +195,11 @@ export function applyInteraction(ctx) {
   };
 
   // The exit compass's activation (exploration-exit-compass design D2): the
-  // compass lives outside the router's root frame, so it runs the same gate
-  // `focusConfirm` runs — exploration form, in-flight and awaiting-revision
-  // lock, the row's server-authored `enabled` flag — over the exit row
-  // re-resolved from the committed panels at THIS moment (a stale or
-  // duplicate activation cannot submit), and hands the row to the one
-  // exploration submit handler, so the payload, the command echo, and the
-  // connection lock inside `dispatchAction` are exactly the old exit chip's.
+  // exit row re-resolved from the committed panels at THIS moment (a stale
+  // or duplicate activation cannot submit), through the one gated activation
+  // every exploration row outside the router shares (`activateExplorationRow`,
+  // exploration-presence-rail design D2), so the payload, the command echo,
+  // and the connection lock inside `dispatchAction` are the old exit chip's.
   ctx.activateExit = function activateExit(exitRef) {
     const rs = ctx.reducer.getState();
     if (!ctx.dockOnExplorationForm(rs)) {
@@ -220,15 +215,14 @@ export function applyInteraction(ctx) {
     if (!item) {
       return { sent: false, reason: "missing" };
     }
-    if (!item.enabled) {
+    const outcome = ctx.activateExplorationRow(item);
+    if (outcome.sent) {
+      return { sent: true, requestId: outcome.requestId };
+    }
+    if (outcome.reason === "disabled") {
       return { sent: false, reason: "disabled", item };
     }
-    const before = ctx.lastSubmittedRequestId;
-    ctx.handleExplorationItem(item);
-    if (ctx.lastSubmittedRequestId === before) {
-      return { sent: false, reason: "refused" };
-    }
-    return { sent: true, requestId: ctx.lastSubmittedRequestId };
+    return { sent: false, reason: outcome.reason === "locked" ? "locked" : "refused" };
   };
 
   // Both navigation bars use the committed root's intents. Reference entries

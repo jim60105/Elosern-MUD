@@ -257,6 +257,9 @@ export function applyView(ctx) {
       // (exploration-exit-compass D2/D9), independent of the router's root
       // frame; the dialogue screen's exit list reads the same rows.
       ...explorationExitsView(),
+      // The presence rail's entries and the client-local card slice
+      // (exploration-presence-rail design D2).
+      ...ctx.presenceView(rs),
       // The submission gate the compass waits on: a mutation in flight or a
       // declared presentation revision not yet committed.
       submitLocked: ctx.router.isMutationInFlight() || ctx.router.isAwaitingRevision(),
@@ -383,6 +386,7 @@ export function applyView(ctx) {
     ctx.rebuildCreationDock(prev, rs);
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
+    ctx.settlePresence(rs);
     ctx.syncHudDrawer(prev, rs);
     ctx.syncSkillUse(prev, rs);
     // A free-form borrow speaks to the conversation's host. A refused

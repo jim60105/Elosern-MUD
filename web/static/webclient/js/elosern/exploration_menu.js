@@ -21,13 +21,14 @@
  * retired tab root (webclient-retire-exploration-submenus).
  *
  * The AVG scene overview (webclient-scene-overview-component, AVG stage
- * design §7): `overviewMenu` flattens the people, the objects, and a footer
- * (查看房間 ‧ 等待／休息 ‧ 建議) into ONE reading-order menu with a
- * `sections` index and `geometry: "sections"` for the router, and
- * `verbMenuFor` is a person chip's verb popover (the target's affordances
- * plus 查看). `overviewMenu` is the exploration root the resolver serves.
- * The exits are not part of it: the exit compass (exploration-exit-compass)
- * reads them through `exitTargets`, outside the router's root frame.
+ * design §7): `overviewMenu` is the footer (查看房間 ‧ 等待／休息 ‧ 建議) as
+ * ONE menu with a `sections` index and `geometry: "sections"` for the
+ * router; it is the exploration root the resolver serves. The exits are the
+ * exit compass's (`exitTargets`, exploration-exit-compass), and the people
+ * and objects are the presence rail's (`presenceEntries`,
+ * exploration-presence-rail), both outside the router's root frame.
+ * `verbMenuFor` is an interact target's verb card (the target's affordances
+ * plus 查看).
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -250,7 +251,8 @@
   }
 
   // -------------------------------------------------------------------------
-  // Look rows — the scene overview's 人物 / 物件 / 查看房間 chips.
+  // Look rows — the presence rail's bystander and object entries and the
+  // overview's 查看房間 chip.
   // -------------------------------------------------------------------------
 
   function lookItems(panel) {
@@ -456,7 +458,8 @@
    }
 
   // -------------------------------------------------------------------------
-  // Verb popover (webclient-scene-overview-component design D2): the target's
+  // Verb card (exploration-presence-rail; webclient-scene-overview-component
+  // design D2): the target's
   // affordance rows in payload order (the same mapping as `targetMenuFor`),
   // then 查看, then the back row. A target with no mapped affordance yields
   // 查看 and back only. A vertical list: no grid geometry.
@@ -592,12 +595,13 @@
   // Scene overview (webclient-scene-overview-component design D1).
   // -------------------------------------------------------------------------
 
-  // One flat menu in reading order — 人物, 物件, then the label-less footer
-  // (the exits left for the exit compass, exploration-exit-compass) — with `sections: [{key, label, count}]` naming the non-empty
-  // rows. Item shapes reuse the existing builders so payloads stay
-  // byte-identical. `geometry: "sections"` tells the router how the arrow
-  // keys cross rows; the menu carries no `grid` flag, so focus projects as a
-  // list (the focus index is the reading-order index).
+  // One flat menu: the label-less footer (the exits left for the exit
+  // compass, exploration-exit-compass; the people and objects for the
+  // presence rail, exploration-presence-rail), with `sections: [{key, label,
+  // count}]` naming it. Item shapes reuse the existing builders so payloads
+  // stay byte-identical. `geometry: "sections"` tells the router how the
+  // arrow keys cross rows; the menu carries no `grid` flag, so focus projects
+  // as a list (the focus index is the reading-order index).
   function overviewMenu(panel, options) {
     options = options || {};
     var suggestions = options.suggestions || null;
@@ -612,39 +616,7 @@
       Array.prototype.push.apply(items, rows);
     }
 
-    // 人物: every interact target opens its verb popover (always enabled:
-    // the popover has at least 查看), then a look chip for each present
-    // entity that has no interact descriptor.
-    var targets = (panel && panel.interact) || [];
-    var interactIds = {};
-    var people = targets.map(function (target) {
-      interactIds[target.identity] = true;
-      return {
-        key: "target-" + target.identity,
-        label: target.display_name,
-        enabled: true,
-        actionId: null,
-        payload: null,
-        openTarget: target.identity,
-        description: null,
-      };
-    });
     var lookRows = lookItems(panel);
-    lookRows.forEach(function (item) {
-      if (item.key.indexOf("entity-") === 0 && !interactIds[item.payload.target_id]) {
-        people.push(item);
-      }
-    });
-    addSection("people", "人物", people);
-
-    // 物件: the look rows for objects.
-    addSection(
-      "objects",
-      "物件",
-      lookRows.filter(function (item) {
-        return item.key.indexOf("object-") === 0;
-      })
-    );
 
     // Footer: 查看房間, 等待／休息, and 建議 (N) while suggestions are not
     // `unavailable`. The 查看房間 chip is `lookItems`' room row, which needs
@@ -686,6 +658,75 @@
       focusKey: null,
       title: "場景",
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // Presence rail (exploration-presence-rail design D2/D7; scene overview
+  // redesign §4.1): who and what is in the room, in the retired 人物 / 物件
+  // rows' reading order — every interact target, then each present entity
+  // without an interact descriptor, then the objects. A target entry opens
+  // the client-local verb card (`verbMenuFor`); a bystander or an object
+  // entry IS the existing look row (`lookItems`), so its `explore.look`
+  // payload and command echo stay byte-identical. `summary` is the readout's
+  // second line: the target's verb labels joined by ／, else 查看.
+  // -------------------------------------------------------------------------
+
+  function presenceEntries(panel) {
+    var targets = (panel && panel.interact) || [];
+    var entities = (panel && panel.look && panel.look.entities) || [];
+    var portraitOf = {};
+    entities.forEach(function (entity) {
+      portraitOf[entity.identity] = entity.portrait_ref === undefined ? null : entity.portrait_ref;
+    });
+    var interactIds = {};
+    var entries = targets.map(function (target) {
+      interactIds[target.identity] = true;
+      var verbs = targetMenuFor(null, target).items.filter(function (item) {
+        return item.key !== "target-empty" && item.key !== "back";
+      });
+      var portraitRef = target.portrait_ref;
+      if (portraitRef === null || portraitRef === undefined) {
+        portraitRef = portraitOf[target.identity] === undefined ? null : portraitOf[target.identity];
+      }
+      return {
+        key: "target-" + target.identity,
+        presence: "target",
+        identity: target.identity,
+        label: target.display_name,
+        portraitRef: portraitRef,
+        summary:
+          verbs
+            .map(function (item) {
+              return item.label;
+            })
+            .join("／") || "查看",
+        enabled: true,
+        actionId: null,
+        payload: null,
+      };
+    });
+    lookItems(panel).forEach(function (item) {
+      if (item.key.indexOf("entity-") === 0 && !interactIds[item.payload.target_id]) {
+        var entry = Object.assign({}, item);
+        entry.presence = "bystander";
+        entry.identity = item.payload.target_id;
+        entry.portraitRef =
+          portraitOf[item.payload.target_id] === undefined ? null : portraitOf[item.payload.target_id];
+        entry.summary = "查看";
+        entries.push(entry);
+      }
+    });
+    lookItems(panel).forEach(function (item) {
+      if (item.key.indexOf("object-") === 0) {
+        var entry = Object.assign({}, item);
+        entry.presence = "object";
+        entry.identity = item.payload.target_id;
+        entry.portraitRef = null;
+        entry.summary = "查看";
+        entries.push(entry);
+      }
+    });
+    return entries;
   }
 
   // -------------------------------------------------------------------------
@@ -739,6 +780,7 @@
      targetMenuFor: targetMenuFor,
      verbMenuFor: verbMenuFor,
      overviewMenu: overviewMenu,
+     presenceEntries: presenceEntries,
      targetById: targetById,
      normalizeDirection: normalizeDirection,
      suggestionsMenu: suggestionsMenu,

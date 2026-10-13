@@ -13,11 +13,13 @@
 //
 // The exploration root is the scene overview (webclient-scene-overview-swap,
 // AVG stage design §7): `exploration.root` resolves
-// `ExplorationMenu.overviewMenu` — one reading-order menu of people,
-// objects, and a footer, with the router's `sections` geometry; the exits
-// are the exit compass's, read through `explorationExits` — and
-// `exploration.target` resolves `ExplorationMenu.verbMenuFor`, the target's
-// verb popover. `exploration.navigation` is the top navigation bar's own
+// `ExplorationMenu.overviewMenu` — the footer, with the router's `sections`
+// geometry. The exits are the exit compass's, read through
+// `explorationExits`, and the people and objects are the presence rail's,
+// read through `explorationPresence`; an interact target's verbs are the
+// client-local verb card's, read through `explorationVerbs`
+// (exploration-presence-rail): none of them is a router frame, and the
+// retired `exploration.target` source is unregistered. `exploration.navigation` is the top navigation bar's own
 // entry set (the character status, quest, and inventory surfaces, which no
 // dock frame carries any more). The move/look/interact submenus are retired
 // (webclient-retire-exploration-submenus): their sources are unregistered, so
@@ -159,8 +161,8 @@ export function createFrameResolver(deps) {
   };
 
   // The scene overview (webclient-scene-overview-swap D1): the exploration
-  // root frame. One reading-order menu of the committed panel's people,
-  // objects, and footer, carrying the router's `sections` geometry.
+  // root frame. The committed panel's footer, carrying the router's
+  // `sections` geometry.
   const explorationOverviewSource = () => {
     const gate = requireExplorationPanel();
     if (!gate.ok) return gate.reason;
@@ -183,6 +185,36 @@ export function createFrameResolver(deps) {
       return { rows: isolate(ExplorationMenu.exitTargets(panel, { currentNode })), currentNode };
     } catch (err) {
       return { rows: [], currentNode: null };
+    }
+  };
+
+  // The presence rail's entries (exploration-presence-rail design D2): the
+  // committed people and objects in the retired rows' order, outside the
+  // router. `null` means the exploration panel is absent, unavailable, or
+  // its build threw — distinct from `[]`, an available room with nobody and
+  // nothing in it — so a degraded commit never reads as "everyone left".
+  const explorationPresence = () => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok) return null;
+      return isolate(ExplorationMenu.presenceEntries(gate.panel));
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // An interact target's verb card (exploration-presence-rail design D2):
+  // `verbMenuFor` over the target the committed panel lists for `identity`
+  // right now, or null when the panel or the target is gone.
+  const explorationVerbs = (identity) => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok || identity === undefined || identity === null) return null;
+      const { model } = explorationModel();
+      const target = ExplorationMenu.targetById(model, identity);
+      return target ? isolate(ExplorationMenu.verbMenuFor(model, target)) : null;
+    } catch (err) {
+      return null;
     }
   };
 
@@ -301,34 +333,10 @@ export function createFrameResolver(deps) {
     return isolate(CreationMenu.buildMenus(gate.panel).menus[menuKey]);
   };
 
-  // A target descriptor names its subject by the SAME server-authored
-  // identity the rows carry; an identity the committed panel no longer lists
-  // is the identity-loss degradation.
-  function targetForIdentity(params) {
-    const gate = requireExplorationPanel();
-    if (!gate.ok) return { ok: false, reason: gate.reason };
-    const identity = params && params.identity;
-    if (identity === undefined || identity === null) {
-      return { ok: false, reason: marker(null) };
-    }
-    const { model } = explorationModel();
-    const target = ExplorationMenu.targetById(model, identity);
-    if (!target) {
-      return { ok: false, reason: marker(null) };
-    }
-    return { ok: true, model, target };
-  }
-
   const table = {
     "exploration.root": explorationOverviewSource,
     "exploration.navigation": explorationNavigationSource,
     "exploration.wait": explorationMenuSource("wait"),
-    "exploration.target": (params) => {
-      const found = targetForIdentity(params);
-      if (!found.ok) return found.reason;
-      const menu = ExplorationMenu.verbMenuFor(found.model, found.target);
-      return menu ? isolate(menu) : marker(null);
-    },
     "exploration.suggestions": () => {
       // The frame belongs to the exploration family: an unavailable
       // exploration panel degrades like every other source.
@@ -496,6 +504,8 @@ export function createFrameResolver(deps) {
   return {
     resolve,
     explorationExits,
+    explorationPresence,
+    explorationVerbs,
     // The combat model accessor (the declared selection-state home): the
     // store's client-local combat interactions (focus-skill recording, AREA
     // toggle, scale/shorthand choice, submit payload building) act on this

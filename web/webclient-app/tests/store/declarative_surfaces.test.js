@@ -105,15 +105,13 @@ describe("declarative service/combat/creation surfaces (store)", () => {
     expect(store.view.hudDrawer).toBe("quest");
   }
 
-  // Open the quest drawer via the 店長's navigate affordance. The dock root
-  // is the scene overview (webclient-scene-overview-swap), so the person chip
-  // is one activation away.
+  // Open the quest drawer via the 店長's navigate affordance: the rail's
+  // person entry opens the client-local verb card (exploration-presence-rail),
+  // whose 公會服務 row opens the drawer without a frame.
   function enterGuildSurface() {
-    expect(store.focusItemByKey("target-7")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.focusItemByKey("service-guild")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.router.currentDescriptor().source).toBe("exploration.target");
+    expect(store.activatePresence("target-7").handled).toBe(true);
+    expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
+    expect(store.router.currentDescriptor().source).toBe("exploration.root");
     expect(store.view.hudDrawer).toBe("quest");
   }
 
@@ -127,15 +125,13 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   describe("frameless quest drawer", () => {
     it("activating service-guild opens quest drawer leaving frame stack and depth unchanged", () => {
       openSession();
-      expect(store.focusItemByKey("target-7")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
+      expect(store.activatePresence("target-7").handled).toBe(true);
 
       const depthBefore = store.router.depth();
       const descriptorBefore = store.router.currentDescriptor();
       const trailBefore = store.router.trail();
 
-      expect(store.focusItemByKey("service-guild")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
+      expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
 
       // Quest drawer opens without pushing a frame or recording a service surface
       expect(store.view.hudDrawer).toBe("quest");
@@ -156,7 +152,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
 
     it("tabToRootAndConfirm('quests') from depth > 1 pops to root and opens quest drawer with depth 1", () => {
       openSession();
-      expect(store.focusItemByKey("target-7")).toBe(true);
+      expect(store.focusItemByKey("wait")).toBe(true);
       expect(store.focusConfirm()).toBe(true);
       expect(store.router.depth()).toBe(2);
 
@@ -338,15 +334,13 @@ describe("declarative service/combat/creation surfaces (store)", () => {
  describe("frameless shop drawer", () => {
    it("activating service-shop opens shop drawer leaving frame stack and depth unchanged", () => {
      openSession();
-     expect(store.focusItemByKey("target-7")).toBe(true);
-     expect(store.focusConfirm()).toBe(true);
+     expect(store.activatePresence("target-7").handled).toBe(true);
 
      const depthBefore = store.router.depth();
      const descriptorBefore = store.router.currentDescriptor();
      const trailBefore = store.router.trail();
 
-     expect(store.focusItemByKey("service-shop")).toBe(true);
-     expect(store.focusConfirm()).toBe(true);
+     expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
 
      // Shop drawer opens without pushing a frame or recording a service surface
      expect(store.view.hudDrawer).toBe("shop");

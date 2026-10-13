@@ -442,16 +442,15 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "talk 店長 公會",
     },
     {
-      id: "exploration popover 交談 row (the row descriptor forwarded)",
+      id: "exploration verb card 交談 row (the row descriptor forwarded)",
       ids: ["explore.talk_open"],
       prepare() {
         openExploration();
-        // The real activation path: the overview's person chip opens the verb
-        // popover, whose 交談 row carries `commandDisplay.npcLabel`.
-        expect(store.focusItemByKey("target-7")).toBe(true);
-        expect(store.focusConfirm("keyboard")).toBe(true);
-        expect(store.focusItemByKey("talk-open")).toBe(true);
-        expect(store.focusConfirm("keyboard")).toBe(true);
+        // The real activation path: the rail's person entry opens the verb
+        // card (exploration-presence-rail), whose 交談 row carries
+        // `commandDisplay.npcLabel`.
+        expect(store.activatePresence("target-7").handled).toBe(true);
+        expect(store.activatePresenceVerb("talk-open").sent).toBe(true);
       },
       expected: "talk 店長",
     },
