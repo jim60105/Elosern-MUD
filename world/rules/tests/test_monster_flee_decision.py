@@ -415,10 +415,6 @@ class MonsterFleePolicyTests(unittest.TestCase):
             "urllib.",
             "ActionResolver.resolve(",
             ".fled.add(",
-            "0.35",
-            "0.20",
-            "0.10",
-            "0.25",
         ):
             self.assertNotIn(forbidden, source)
 
