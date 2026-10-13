@@ -2,11 +2,12 @@
 // SceneOverview (AVG stage design §7; OpenSpec change
 // webclient-scene-overview-component, design D4): the exploration root of
 // the command panel. It renders the one overview menu of
-// `ExplorationMenu.overviewMenu` as labelled chip rows — 人物, 物件 — and a
-// label-less footer (查看房間 ‧ 等待／休息 ‧ 建議), in the menu's reading
-// order. Chips wrap inside the panel; an absent section renders no row and
-// no label. The exits are not chips: the exit compass beside the overview
-// owns them (exploration-exit-compass).
+// `ExplorationMenu.overviewMenu` as chip rows in the menu's reading order —
+// today the label-less footer alone (查看房間 ‧ 等待／休息 ‧ 建議). Chips wrap
+// inside the panel; an absent section renders no row and no label. The exits
+// are not chips (the exit compass beside the overview owns them,
+// exploration-exit-compass), nor are the people and objects (the presence
+// rail on the stage owns them, exploration-presence-rail).
 //
 // Every chip is a `DockMenuItem`, the dock's one shared row renderer, so the
 // `data-item-key` identity, the `<idPrefix>-<i>` row id, the focused fill,
@@ -15,8 +16,8 @@
 // server-authored reason while that chip is disabled.
 //
 // The listbox is the surface's single tab stop while `active` (it carries
-// `data-testid="dock-menu"`); while inactive (a verb popover is open over it)
-// the overview is `inert` and hidden from assistive technology. The focused
+// `data-testid="dock-menu"`); while inactive the overview is `inert` and
+// hidden from assistive technology. The focused
 // chip is scrolled into view with `block: "nearest"`; the component never
 // scrolls itself — the dock pane is the single scrolling region.
 import { computed, nextTick, ref, watch } from "vue";

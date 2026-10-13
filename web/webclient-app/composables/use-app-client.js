@@ -15,6 +15,7 @@ import { useOverlays } from "./use-overlays.js";
 import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
 import { useExitCompass } from "./use-exit-compass.js";
+import { usePersonFocus } from "./use-person-focus.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
@@ -34,6 +35,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
   const scene = useScene(store, { panel, panelAvailable, dispatchIntent });
   // The exit compass's template ref (bound by AppClient's `ref="compassRef"`).
   const compassRef = ref(null);
+  const compass = useExitCompass(store, { panel, compassRef });
   return {
     dispatchIntent,
     panel,
@@ -59,6 +61,13 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     // The exploration root pane's exit compass and shared readout
     // (exploration-exit-compass).
     compassRef,
-    ...useExitCompass(store, { panel, compassRef }),
+    ...compass,
+    // The presence rail and the person focus (exploration-presence-rail).
+    ...usePersonFocus(store, {
+      panel,
+      compassRef,
+      onRailHover: compass.onRailHover,
+      showReadoutFlash: compass.showReadoutFlash,
+    }),
   };
 }

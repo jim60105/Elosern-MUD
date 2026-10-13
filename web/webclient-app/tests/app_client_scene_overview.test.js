@@ -1,9 +1,9 @@
 // webclient-scene-overview-swap (task 4.5): the AppClient composition contract
-// for the exploration dock's new root. The dock's root frame is ONE scene
-// overview — exits, people, objects, and a footer in one frame — and a person
-// chip opens that target's verb popover over the inert overview, inside the
-// command region. The move/look/interact tab root and the two-step interaction
-// workspace are gone; only the combat root keeps a tab bar.
+// for the exploration dock's root. exploration-exit-compass moved the exits to
+// the compass and exploration-presence-rail the people and objects to the
+// presence rail on the stage (tests/app_client_presence_rail.test.js), so the
+// overview beside the compass is the footer alone. The move/look/interact tab
+// root is gone; only the combat root keeps a tab bar.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -85,16 +85,16 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
       "scene-overview",
     ]);
     const overview = wrapper.get('[data-testid="scene-overview"]');
-    // One frame: the 人物 / 物件 rows and the label-less footer; no 出口 row.
-    expect(overview.findAll("[data-section]").map((row) => row.attributes("data-section"))).toEqual([
-      "people",
-      "objects",
-      "footer",
-    ]);
+    // One frame: the label-less footer; no 出口, 人物, or 物件 row.
+    expect(overview.findAll("[data-section]").map((row) => row.attributes("data-section"))).toEqual(["footer"]);
     expect(chip("exit-east").exists()).toBe(false);
     expect(wrapper.findAll('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').map((el) => el.attributes("data-exit-ref")).sort()).toEqual(["east", "north"]);
-    expect(chip("target-7").exists()).toBe(true);
-    expect(chip("object-3").exists()).toBe(true);
+    expect(chip("target-7").exists()).toBe(false);
+    expect(chip("object-3").exists()).toBe(false);
+    // The host's medallion and the object's lozenge stand on the rail.
+    expect(
+      wrapper.findAll('[data-anchor="presence"] [data-testid="presence-entry"]').map((el) => el.attributes("data-presence")),
+    ).toEqual(["target", "object"]);
     expect(chip("look-room").exists()).toBe(true);
     expect(chip("wait").exists()).toBe(true);
     // The active overview listbox is the dock's row container and single tab
@@ -167,120 +167,6 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     expect(aimed()).toEqual([destination]);
     await compass.trigger("keydown", { key: "Escape" });
     expect(aimed()).toEqual([]);
-  });
-
-  it("opens the verb popover from a person chip, inerts the overview, and 查看 submits one explore.look", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    commitPanels();
-    await wrapper.vm.$nextTick();
-    const sender = fx.createFakeSender();
-    store.setSender(sender);
-
-    await chip("target-7").trigger("click");
-    await wrapper.vm.$nextTick();
-
-    expect(store.view.dockSource).toBe("exploration.target");
-    const popover = wrapper.get('[data-testid="verb-popover"]');
-    // The target's affordances in payload order, then 查看, then back.
-    expect(popover.findAll("[data-item-key]").map((row) => row.attributes("data-item-key"))).toEqual([
-      "talk-open",
-      "look-target",
-      "back",
-    ]);
-    // The overview beneath is inert ancestor chrome: no focus, no tab stop,
-    // no second row container.
-    const overview = wrapper.get('[data-testid="scene-overview"]');
-    expect(overview.attributes("inert")).toBeDefined();
-    expect(overview.attributes("aria-hidden")).toBe("true");
-    expect(overview.find('[data-testid="dock-menu"]').exists()).toBe(false);
-    expect(popover.find('[data-testid="dock-menu"]').exists()).toBe(true);
-    // The popover's card renders inside the command region, in the dock's
-    // overlay layer (a sibling of the pane), never inside the pane host.
-    expect(wrapper.find('#action-dock [data-testid="verb-popover-layer"]').exists()).toBe(true);
-    expect(wrapper.find('.action-dock__pane [data-testid="verb-popover"]').exists()).toBe(false);
-
-    // 查看 submits exactly one explore.look for the target and pushes nothing.
-    expect(sender.sent.actions).toHaveLength(0);
-    await popover.find('[data-item-key="look-target"]').trigger("click");
-    await wrapper.vm.$nextTick();
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.look",
-      payload: { target_id: 7 },
-    });
-    expect(store.router.depth()).toBe(2);
-  });
-
-  it("closes the popover on an outside press and on Escape, with the chip focused and the dock holding DOM focus", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    commitPanels();
-    await wrapper.vm.$nextTick();
-
-    for (const close of ["outside-press", "escape"]) {
-      await chip("target-7").trigger("click");
-      await wrapper.vm.$nextTick();
-      expect(store.router.depth()).toBe(2);
-
-      if (close === "outside-press") {
-        // A press on the layer outside the card closes exactly as the back row
-        // does.
-        await wrapper.get('[data-testid="verb-popover-layer"]').trigger("pointerdown");
-      } else {
-        // Escape is the keyboard bridge's claim (installed in main.js, not by
-        // the component tree): the store entry is the same router press.
-        expect(store.focusEscape()).toBe(true);
-      }
-      await wrapper.vm.$nextTick();
-
-      expect(store.view.dockSource, close).toBe("exploration.root");
-      expect(store.router.depth(), close).toBe(1);
-      expect(store.view.focus.key, close).toBe("target-7");
-      expect(wrapper.find('[data-testid="verb-popover"]').exists(), close).toBe(false);
-      // The dock element keeps DOM focus across the popover (design D5).
-      const active = document.activeElement;
-      const dock = document.getElementById("action-dock");
-      expect(dock.contains(active) || active === dock, close).toBe(true);
-    }
-  });
-
-  it("returns to the overview when the committed room changes under the popover", async () => {
-    mountAppClient();
-    await wrapper.vm.$nextTick();
-    commitPanels();
-    await wrapper.vm.$nextTick();
-
-    await chip("target-7").trigger("click");
-    await wrapper.vm.$nextTick();
-    expect(store.router.depth()).toBe(2);
-
-    // A move from anywhere — the minimap or a typed command — commits a new
-    // room identity: the dock returns to the new room's overview.
-    const result = store.receive(
-      1,
-      "ui_update",
-      [
-        fx.update({
-          revision: 3,
-          panels: {
-            exploration: explorationPanel({
-              look: { room: { identity: 77, display_name: "渡口", room: true } },
-            }),
-            local_map: fx.localMapPanel(),
-            context_actions: fx.explorationActions(),
-          },
-        }),
-      ],
-      {},
-    );
-    expect(result.accepted).toBe(true);
-    await wrapper.vm.$nextTick();
-
-    expect(store.router.depth()).toBe(1);
-    expect(store.view.dockSource).toBe("exploration.root");
-    expect(wrapper.find('[data-testid="verb-popover"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(true);
   });
 
   it("keeps the tab bar on the combat root", async () => {

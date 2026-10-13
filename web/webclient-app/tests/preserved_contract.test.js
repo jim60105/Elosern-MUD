@@ -216,7 +216,11 @@ describe("H1 preserved DOM contract (design D6)", () => {
     // entry: the exploration root is the scene overview
     // (webclient-scene-overview-swap), so its chips carry the dock's rows
     // while the navigation-carried surfaces live on the top bar alone.
-    expect(wrapper.find('#action-dock [data-item-key="target-7"]').exists()).toBe(true);
+    expect(wrapper.find('#action-dock [data-item-key="look-room"]').exists()).toBe(true);
+    // The people and objects stand on the presence rail, outside the dock
+    // (exploration-presence-rail).
+    expect(wrapper.find('#action-dock [data-item-key="target-7"]').exists()).toBe(false);
+    expect(wrapper.find('[data-anchor="presence"] [data-entry-key="target-7"]').exists()).toBe(true);
     // The exits are the exit compass's, inside the dock (exploration-exit-compass).
     expect(wrapper.find('#action-dock [data-testid="exit-compass"] [data-exit-ref="east"]').exists()).toBe(true);
     expect(wrapper.find('#action-dock [data-item-key="exit-east"]').exists()).toBe(false);

@@ -18,8 +18,14 @@
 //   In combat `actor-right` keeps its box and lets the line-up's row reach
 //   left beyond it;
 // - the `choices` anchor (webclient-dialogue-choices-overlay D6): the
-//   dialogue choice list, centred over the stage between the portraits and
-//   above the expanded command-line row, rendered only in dialogue mode;
+//   centred card — the dialogue choice list, or in exploration the
+//   person-focus verb card and the presence overflow card
+//   (exploration-presence-rail) — between the portraits and above the
+//   expanded command-line row, rendered only in dialogue mode or while an
+//   exploration card is open (`cardOpen`);
+// - the `presence` anchor (exploration-presence-rail design D4): the
+//   presence rail on the stage floor, right-aligned and inset left of the
+//   right-hand island column, its baseline just above the band;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
 //   split into the message region `band-message` (left 2/3) and the command
 //   region `band-command` (right 1/3). No frame, mode, or content resizes it;
@@ -35,8 +41,15 @@
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
 // the veil in DOM order, so the player stays bright in combat), the combat
-// flash 3, the island anchors and the choices anchor 4,
-// band 5, command line 6.
+// flash 3, the presence anchor, the island anchors, and the choices anchor
+// 4 (the choices anchor last in DOM order, so a card paints over the rail),
+// band 5, command line 6. Drawers and overlays live outside the stage, above
+// all of it.
+//
+// Person focus (exploration-presence-rail design D4, `personFocus`): while a
+// person's verb card is open the place card and the minimap (the `map`
+// anchor) step away, as in dialogue, and the command region goes `inert` and
+// dims to about 35%.
 //
 // Mode transitions (webclient-mode-transitions, AVG stage design §9.3): the
 // stage root carries `data-mode-change`, the last LIVE mode change
@@ -79,6 +92,11 @@ const props = defineProps({
   // decorative combat veil stays; every committed surface has already
   // followed the committed mode.
   beatHold: { type: Boolean, default: false },
+  // An exploration card (the verb card or the overflow card) is open in the
+  // `choices` anchor (exploration-presence-rail).
+  cardOpen: { type: Boolean, default: false },
+  // A person's verb card is open: the cockpit steps away around it.
+  personFocus: { type: Boolean, default: false },
 });
 
 // The open-surface registry drives the `menu-open` mark (design D9): the
@@ -116,6 +134,8 @@ defineExpose({ menuOpen });
     :data-lowhp="lowhp ? 'true' : 'false'"
     :data-mode-change="modeChange"
     :data-beat-hold="beatHold ? 'combat' : null"
+    :data-card-open="cardOpen ? 'true' : null"
+    :data-person-focus="personFocus ? 'true' : null"
   >
     <div class="stage-vignette" data-testid="stage-vignette"></div>
     <!-- Decorative: always rendered, faded by opacity (design D2). -->
@@ -147,6 +167,13 @@ defineExpose({ menuOpen });
     <div class="stage-flash" data-testid="stage-flash" aria-hidden="true"></div>
     <div
       class="stage-anchor"
+      data-anchor="presence"
+      data-testid="anchor-presence"
+    >
+      <slot name="presence" />
+    </div>
+    <div
+      class="stage-anchor"
       data-anchor="vitals"
       data-testid="anchor-vitals"
       :inert="mode === 'dialogue' || null"
@@ -158,8 +185,8 @@ defineExpose({ menuOpen });
       class="stage-anchor"
       data-anchor="map"
       data-testid="anchor-map"
-      :inert="mode === 'dialogue' || null"
-      :aria-hidden="mode === 'dialogue' ? 'true' : null"
+      :inert="mode === 'dialogue' || personFocus || null"
+      :aria-hidden="mode === 'dialogue' || personFocus ? 'true' : null"
     >
       <slot name="map" />
     </div>
@@ -184,7 +211,7 @@ defineExpose({ menuOpen });
         data-testid="anchor-band-command"
         :data-flip="flip"
         @animationend="onFlipEnd"
-        :inert="mode === 'dialogue' || null"
+        :inert="mode === 'dialogue' || personFocus || null"
       >
         <slot name="band-command" />
       </div>
@@ -367,8 +394,42 @@ defineExpose({ menuOpen });
   justify-content: center;
   pointer-events: none;
 }
-.elosern-stage:not([data-elosern-mode="dialogue"]) [data-anchor="choices"] {
+.elosern-stage:not([data-elosern-mode="dialogue"]):not([data-card-open="true"]) [data-anchor="choices"] {
   display: none;
+}
+
+/* presence (exploration-presence-rail design D4; redesign §4.1): the
+   presence rail stands on the stage floor, right-aligned and inset left of
+   the right-hand island column (whose left edge is `--right-column - 12px`
+   from the stage's right edge), its baseline just above the band. The anchor
+   is pointer-transparent; the rail inside it takes pointer events. */
+.elosern-stage [data-anchor="presence"] {
+  right: calc(var(--right-column, 258px * var(--ui-scale)) + 12px * var(--ui-scale));
+  bottom: calc(var(--band-h) + 10px * var(--ui-scale));
+  z-index: 4;
+  display: flex;
+  justify-content: flex-end;
+  max-width: calc(100% - var(--right-column, 258px * var(--ui-scale)) - var(--vitals-dock-w) - 64px * var(--ui-scale));
+  pointer-events: none;
+}
+.elosern-stage:not([data-elosern-mode="exploration"]) [data-anchor="presence"] {
+  display: none;
+}
+
+/* Person focus (design D4): the place card and the minimap step away like
+   the dialogue screen's, and the command panel dims to about 35% while
+   `inert` (bound above). The fade uses the reveal token, so `off` resolves
+   it in the commit frame. */
+.elosern-stage [data-anchor="map"],
+.elosern-stage [data-anchor="band-command"] {
+  transition: opacity var(--motion-reveal) var(--ease-standard);
+}
+.elosern-stage[data-person-focus="true"] [data-anchor="map"] {
+  opacity: 0;
+  pointer-events: none;
+}
+.elosern-stage[data-person-focus="true"] [data-anchor="band-command"] {
+  opacity: 0.35;
 }
 
 /* The bottom band (design D1): one fixed-height container spanning the

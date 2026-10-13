@@ -3,7 +3,7 @@
 // root/navigation tab entries, the scene-overview projection, the detail-pane
 // derivation, and the dock's pointer-activation handlers. Extracted verbatim
 // from AppClient.vue so the SFC stays a passive renderer.
-import { computed, nextTick, watch } from "vue";
+import { computed } from "vue";
 import { badgeCount, badgeVisible, classifyPane } from "../components/dock-panes.js";
 
 export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }) {
@@ -177,51 +177,15 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
 
   // The scene overview (webclient-scene-overview-swap D4): the exploration
-  // dock's root frame is the overview, and a target's verb popover is one
-  // child frame of it rendered over the inert overview. The overview is
-  // therefore shown at both sources; it is ACTIVE only at the root. A
+  // dock's root frame. Its child frames (the waiting and suggestions frames)
+  // replace it in the pane; a person's verbs are the client-local verb card
+  // on the stage (exploration-presence-rail), never a dock frame. A
   // degraded root still renders through DockMenu's single marker row.
   const overviewShown = computed(
-    () =>
-      !store.view.degradedRoot &&
-      (store.view.dockSource === "exploration.root" ||
-        store.view.dockSource === "exploration.target"),
+    () => !store.view.degradedRoot && store.view.dockSource === "exploration.root",
   );
-  const overviewActive = computed(() => store.view.dockSource === "exploration.root");
-  // At the root the current frame and the root frame are the same menu; under
-  // the popover the overview keeps rendering the root frame's menu.
-  const overviewMenu = computed(() =>
-    overviewActive.value ? store.view.combatMenu : store.view.rootMenu,
-  );
-  // The chip that opened the popover, read from the verb menu's own `target`
-  // (`verbMenuFor` returns it). The mark is cosmetic — the overview is inert
-  // while the popover is open.
-  const overviewFocusKey = computed(() => {
-    const identity = store.view.combatMenu?.target?.identity;
-    return identity === undefined || identity === null ? null : `target-${identity}`;
-  });
-
-  // DOM focus across the popover (webclient-scene-overview-swap D5): the
-  // overview listbox goes `inert` while the popover is open, and the popover
-  // unmounts on close, so either transition would drop DOM focus to `<body>`
-  // when it sat inside them. Re-focus the mode's focus home — the dock, or
-  // the message window when the popover closed because the mode turned
-  // dialogue (webclient-dialogue-stage-actors D5) — and never steal focus
-  // from the command line or a drawer.
-  watch(
-    () => store.view.dockSource,
-    async (source, previous) => {
-      if (source !== "exploration.target" && previous !== "exploration.target") {
-        return;
-      }
-      await nextTick();
-      const active = document.activeElement;
-      const dock = document.getElementById("action-dock");
-      if (active === document.body || (dock && dock.contains(active))) {
-        shellRef?.value?.restoreFocusHome();
-      }
-    },
-  );
+  const overviewActive = overviewShown;
+  const overviewMenu = computed(() => store.view.combatMenu);
 
   // H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
   // tab's item, and confirms it ("pointer") — one deliberate activation, no
@@ -286,7 +250,6 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
     onDockFocusChange,
     onTabClick,
     overviewActive,
-    overviewFocusKey,
     overviewMenu,
     overviewShown,
     rowPrefix,

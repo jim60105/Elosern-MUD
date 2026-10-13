@@ -12,7 +12,6 @@ import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
-import DockVerbPopover from "./components/DockVerbPopover.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
 import SceneOverview from "./components/SceneOverview.vue";
@@ -54,6 +53,8 @@ import StageActor from "./components/StageActor.vue";
 import FoeLineup from "./components/FoeLineup.vue";
 import { FOE_LINEUP_MAX, activeFoes, foeLineupSpan, foeSlots } from "./components/foe-lineup.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
+import ChoiceCard from "./components/ChoiceCard.vue";
+import PresenceRail from "./components/PresenceRail.vue";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
 const store = useElosernStore();
@@ -81,7 +82,7 @@ const {
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
-  overviewShown, overviewActive, overviewMenu, overviewFocusKey,
+  overviewShown, overviewActive, overviewMenu,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
@@ -92,7 +93,10 @@ const {
   npcPersonaRetry, npcPersonaClose,
   onSkillUse, skillUseDockShown, skillUseLocked,
   compassRef, compassTargets, compassArrivalKey, compassBusy, compassActive,
-  readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked,
+  readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked, onRailHover,
+  railRef, railMounted, railShown, presenceCardOpen, personFocus, focusTarget, focusPortrait,
+  cardRows, cardKey, cardCaption, cardLabel, speaker,
+  onRailActivate, onCardPick, onCardBack, onCompassTab, onRailTab, onOverviewTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The dialogue host's standing portrait (webclient-dialogue-stage-actors
 // D2): the committed `art` panel's raw catalog entry named by the committed
@@ -106,6 +110,23 @@ const hostPortrait = computed(() => {
 const hostAlreadyInLineup = computed(() =>
   !!dialogueVM.value && companionLineupSlots.value.some((slot) => String(slot.identity) === String(dialogueVM.value.host.identity)),
 );
+// The one figure in `actor-right` outside combat (exploration-presence-rail
+// design D3): the dialogue host while the conversation is on, else the
+// person in focus behind the verb card. Both are keyed by the same
+// server-authored identity, so the commit that turns 交談 into the dialogue
+// screen keeps the very same StageActor element on the stage — no leave,
+// no re-entry.
+const standee = computed(() => {
+  if (inDialogue.value && dialogueVM.value) {
+    return hostAlreadyInLineup.value
+      ? null
+      : { identity: dialogueVM.value.host.identity, name: dialogueVM.value.host.displayName, portrait: hostPortrait.value };
+  }
+  if (store.view.mode === "exploration" && personFocus.value && focusTarget.value) {
+    return { identity: focusTarget.value.identity, name: focusTarget.value.display_name, portrait: focusPortrait.value };
+  }
+  return null;
+});
 const isControllingCompanion = computed(() => !!possessionBanner.value?.available);
 const companionLineupSlots = computed(() => companionFigures({
   player: {
@@ -235,6 +256,9 @@ function onFoeLineupGone() {
         :beat-playback="store.view.beatPlayback"
         :mode-change="modeChange"
         :beat-hold="beatHold"
+        :card-open="presenceCardOpen"
+        :person-focus="personFocus"
+        :speaker="speaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
         :offline="!store.view.connected"
@@ -314,12 +338,12 @@ function onFoeLineupGone() {
                host is StageActor's own crossfade. -->
           <Transition name="actor-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving">
             <StageActor
-              v-if="inDialogue && dialogueVM && !hostAlreadyInLineup"
-              :key="dialogueVM.host.identity"
+              v-if="standee"
+              :key="standee.identity"
               side="right"
-              :portrait="hostPortrait"
-              :name="dialogueVM.host.displayName"
-              :dimmed="store.view.dialogueSpeaker === 'player'"
+              :portrait="standee.portrait"
+              :name="standee.name"
+              :dimmed="inDialogue && store.view.dialogueSpeaker === 'player'"
               :motion-level="store.view.motionLevel"
             />
           </Transition>
@@ -356,8 +380,26 @@ function onFoeLineupGone() {
              available, once the line is fully read, and never while an
              action is in flight. -->
         <template #choices>
+          <!-- The exploration cards (exploration-presence-rail design D4):
+               a person's verb card or the overflow card, through the one
+               card shell, trapping focus until it closes. -->
+          <ChoiceCard
+            v-if="presenceCardOpen"
+            :key="cardKey"
+            test-id="presence-card"
+            :data-card-kind="store.view.presenceCard?.kind"
+            :rows="cardRows"
+            :trailing-index="cardRows.length - 1"
+            :caption="cardCaption"
+            :aria-label="cardLabel"
+            :entrance="!modeHydrating"
+            trap-focus
+            autofocus
+            @pick="onCardPick"
+            @back="onCardBack"
+          />
           <DialogueChoices
-            v-if="choicesShown"
+            v-else-if="choicesShown"
             :entrance="!modeHydrating"
             :picks="dialogueVM.picks"
             :exits="dialogueExits"
@@ -369,6 +411,26 @@ function onFoeLineupGone() {
             @move="onDialogueMove"
             @leave="onDialogueLeave"
           />
+        </template>
+        <!-- The presence rail (exploration-presence-rail design D4): the
+             room's people and objects on the stage floor. It stays mounted
+             (hidden, inert) under a card, so the opener takes focus back the
+             moment the card closes. -->
+        <template #presence>
+          <Transition name="presence-rail-fade" :css="store.view.motionLevel !== 'off'">
+            <PresenceRail
+              v-if="railMounted"
+              v-show="railShown"
+              ref="railRef"
+              :entries="store.view.presenceEntries"
+              :art-panel="panel('art')"
+              :motion-level="store.view.motionLevel"
+              :inert="!railShown || null"
+              @activate="onRailActivate"
+              @hover="onRailHover"
+              @tab="onRailTab"
+            />
+          </Transition>
         </template>
         <!-- The lower-left dock carries conditions and vitals only. -->
         <template #vitals>
@@ -464,15 +526,15 @@ function onFoeLineupGone() {
             <!-- The exploration dock's root pane (exploration-exit-compass
                  design D5): the exit compass on the left, filling the panel
                  height, and a right column holding the shared readout and
-                 the scene overview's 人物 / 物件 / footer chip rows (webclient-
-                 scene-overview-swap D4). Under a target's verb popover the
-                 pane stays rendered as inert ancestor chrome. -->
+                 the scene overview's footer chips (webclient-scene-overview-
+                 swap D4); the people and objects are the presence rail's
+                 (exploration-presence-rail). -->
             <div
               v-if="overviewShown"
               class="exploration-root"
               data-testid="exploration-root"
             >
-              <div class="exploration-root__compass" :inert="!overviewActive || null">
+              <div class="exploration-root__compass" :inert="!overviewActive || null" @keydown="onCompassTab">
                 <ExitCompass
                   ref="compassRef"
                   :targets="compassTargets"
@@ -495,8 +557,9 @@ function onFoeLineupGone() {
                 />
                 <SceneOverview
                   :menu="overviewMenu"
-                  :focused-key="overviewActive ? store.view.focus.key : overviewFocusKey"
+                  :focused-key="store.view.focus.key"
                   :active="overviewActive"
+                  @keydown="onOverviewTab"
                   @focus-change="onDockFocusChange"
                   @activate="onDockActivate"
                 />
@@ -539,18 +602,6 @@ function onFoeLineupGone() {
             />
           </div>
           <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
-          <!-- The target's verb popover (webclient-scene-overview-swap D4):
-               a card inside the command region over the inert overview. -->
-          <template #overlay>
-            <DockVerbPopover
-              v-if="store.view.dockSource === 'exploration.target'"
-              :menu="store.view.combatMenu"
-              :focused-key="store.view.focus.key"
-              @focus-change="onDockFocusChange"
-              @activate="onDockActivate"
-              @back="onDockBack"
-            />
-          </template>
         </ActionDock>
       </template>
     </AppShell>
@@ -793,6 +844,18 @@ function onFoeLineupGone() {
 [data-anchor="actor-right"] > .actor-enter-leave-to {
   opacity: 0;
   transform: translateX(calc(var(--motion-shift-lg) * 1.5 * var(--motion-travel)));
+}
+
+/* The presence rail fades as a whole when it leaves or returns to the stage
+   (a card opens or closes, the mode changes); its entries fade on their own
+   (PresenceRail). */
+.presence-rail-fade-enter-active,
+.presence-rail-fade-leave-active {
+  transition: opacity var(--motion-reveal) var(--ease-standard);
+}
+.presence-rail-fade-enter-from,
+.presence-rail-fade-leave-to {
+  opacity: 0;
 }
 
 /* The foe line-up's entrance (webclient-combat-foes-on-stage D3; AVG stage

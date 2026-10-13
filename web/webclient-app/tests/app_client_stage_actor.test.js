@@ -227,19 +227,21 @@ describe("the stage actors in the portrait anchors", () => {
     expect(document.activeElement).toBe(dock);
   });
 
-  it("re-homes focus once when the conversation opens from a verb popover and again on leaving", async () => {
+  it("re-homes focus once when the conversation opens from the verb card and again on leaving", async () => {
     document.getElementById("action-dock").focus();
-    // The overview's person chip opens its verb popover (the dockSource
-    // watcher's case), then the commit that opens the conversation closes it.
-    expect(store.focusItemByKey("target-7")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
+    // The rail's person entry opens the verb card, which takes focus
+    // (exploration-presence-rail), then the commit that opens the
+    // conversation closes it.
+    expect(store.activatePresence("target-7").handled).toBe(true);
     await nextTick();
-    expect(store.view.dockSource).toBe("exploration.target");
+    await nextTick();
+    expect(document.activeElement?.getAttribute("data-testid")).toBe("presence-card");
     commit("dialogue", dialoguePanel("7"));
     await nextTick();
     await nextTick();
     await nextTick();
     expect(store.view.dockDepth).toBe(1);
+    expect(store.view.presenceCard).toBe(null);
     await nextTick();
     expect(document.activeElement).toBe(choiceList());
 

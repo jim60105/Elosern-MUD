@@ -7,8 +7,8 @@
 // `targets` / `scales` / `confirm` / `plain`. The exploration root is not a DockMenu frame at all —
 // it is the scene overview component (webclient-scene-overview-swap), whose
 // exit chips replaced the retired move frame's exit outlet; a target's
-// affordances render in the verb popover component, not here
-// (webclient-talk-open-dock).
+// affordances render on the stage's verb card, not here
+// (exploration-presence-rail).
 //
 // Every row keeps the preserved `#<idPrefix>-<i>` row id and the
 // `data-item-key` identity (defined in exactly one place, task 5.2). The

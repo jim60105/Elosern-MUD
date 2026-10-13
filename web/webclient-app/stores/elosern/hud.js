@@ -41,7 +41,7 @@ export function applyHud(ctx) {
 
   const HUD_DRAWER_NAMES = new Set(["skill", "inventory", "shop", "quest", "lore", "status", "party", "npc_persona", "letters"]);
   // `npc_persona` (the NPC author editor) never hosts a router frame either:
-  // the verb popover that opened it stays the current frame.
+  // the verb card that opened it stays open (exploration-presence-rail).
   const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "party", "quest", "shop", "npc_persona", "letters"]);
   const hudDrawer = ref(null);
   ctx.hudDrawer = hudDrawer;

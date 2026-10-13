@@ -1,9 +1,9 @@
 // The exploration screen's shared readout (exploration-exit-compass design
 // D4; scene overview redesign §3.6 and §5.3): one explanation line whose
 // content is chosen by priority — a transient flash for a blocked move, then
-// whatever is aimed, then the idle summary. Pure: the pane owns the state and
-// the flash timer; changes 2 and 3 add sources (rail, place card, pill)
-// through the same priority function.
+// whatever is aimed or hovered, then the idle summary. Pure: the pane owns
+// the state and the flash timer; changes 2 and 3 add sources (rail, place
+// card, pill) through the same priority function.
 import { octantGlyph } from "./compass-model.js";
 
 // How long a blocked-move flash holds the readout.
@@ -91,10 +91,23 @@ export function presentCount(panel) {
   return ids.size;
 }
 
-// Priority (§5.3): flash, then aim, then idle.
-export function readoutContent({ flash = null, aim = null, idle = null } = {}) {
+// A departed person's flash (exploration-presence-rail; redesign §7): the
+// verb card closed because its person left in the committed panel.
+export function departedReadout(name) {
+  return { lead: "", text: `${name} 已經離開了。`, tone: "warn" };
+}
+
+// Priority (§5.3): flash, then whatever is aimed or hovered — a hovered or
+// focused presence-rail entry (exploration-presence-rail design D6), then the
+// compass aim — then idle. The rail joins the aimed-or-hovered tier ahead of
+// the compass because hovering or focusing it is the player's latest act of
+// attention (focusing the rail blurs the compass).
+export function readoutContent({ flash = null, aim = null, rail = null, idle = null } = {}) {
   if (flash) {
     return { ...flash, flash: true };
+  }
+  if (rail) {
+    return { ...rail, flash: false };
   }
   if (aim) {
     return { ...aim, flash: false };

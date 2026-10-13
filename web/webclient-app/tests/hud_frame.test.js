@@ -377,17 +377,46 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     });
   });
 
-  it("gates the choices anchor to dialogue mode and bounds it above the scene caption row", () => {
+  it("gates the choices anchor to dialogue mode or an open exploration card and bounds it above the scene caption row", () => {
     const css = styleBlock("components/HudFrame.vue");
     const anchor = extractRule(css, '.elosern-stage [data-anchor="choices"]');
     expect(anchor).toMatch(/width: min\(560px \* var\(--ui-scale\), 40%\)/);
     expect(anchor).toMatch(/left: calc\(50% - min\(280px \* var\(--ui-scale\), 20%\)\)/);
     expect(anchor).toMatch(/bottom: calc\(var\(--stage-caption-top\) \+ 8px \* var\(--ui-scale\)\)/);
     expect(anchor).toMatch(/z-index: 4/);
-    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
+    // Hidden outside dialogue unless an exploration card is open
+    // (exploration-presence-rail task 2.0).
+    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\):not\(\[data-card-open="true"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
     const frame = mount(HudFrame, { props: { mode: "dialogue" }, slots: { choices: () => h("div", { class: "probe" }) } });
     expect(frame.get('[data-testid="anchor-choices"]').attributes("data-anchor")).toBe("choices");
     expect(frame.find('[data-anchor="choices"] .probe').exists()).toBe(true);
+    frame.unmount();
+  });
+
+  it("stands the presence anchor on the stage floor and steps the cockpit away under person focus", async () => {
+    // exploration-presence-rail design D4: the rail's anchor is right-aligned
+    // left of the island column with its baseline above the band, exploration
+    // only; person focus inerts the map anchor and the command region.
+    const css = styleBlock("components/HudFrame.vue");
+    const anchor = extractRule(css, '.elosern-stage [data-anchor="presence"]');
+    expect(anchor).toMatch(/right: calc\(var\(--right-column/);
+    expect(anchor).toMatch(/bottom: calc\(var\(--band-h\)/);
+    expect(anchor).toMatch(/z-index: 4/);
+    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="exploration"\]\) \[data-anchor="presence"\]\s*\{\s*display: none;/);
+    expect(css).toMatch(/\[data-person-focus="true"\] \[data-anchor="band-command"\]\s*\{\s*opacity: 0\.35;/);
+    const frame = mount(HudFrame, {
+      props: { mode: "exploration" },
+      slots: { presence: () => h("div", { class: "rail-probe" }) },
+    });
+    expect(frame.find('[data-anchor="presence"] .rail-probe').exists()).toBe(true);
+    const order = Array.from(frame.element.querySelectorAll("[data-anchor]")).map((el) => el.getAttribute("data-anchor"));
+    expect(order.indexOf("presence")).toBeLessThan(order.indexOf("choices"));
+    expect(frame.get('[data-anchor="map"]').attributes("inert")).toBeUndefined();
+    await frame.setProps({ cardOpen: true, personFocus: true });
+    expect(frame.get('[data-testid="elosern-stage"]').attributes("data-card-open")).toBe("true");
+    expect(frame.get('[data-testid="elosern-stage"]').attributes("data-person-focus")).toBe("true");
+    expect(frame.get('[data-anchor="map"]').attributes("inert")).toBeDefined();
+    expect(frame.get('[data-anchor="band-command"]').attributes("inert")).toBeDefined();
     frame.unmount();
   });
 

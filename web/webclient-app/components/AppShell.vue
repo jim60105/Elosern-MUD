@@ -94,6 +94,14 @@ const props = defineProps({
   // webclient-combat-beat-choreography D6), forwarded to HudFrame.
   beatHold: { type: Boolean, default: false },
   modeHydrating: { type: Boolean, default: false },
+  // An exploration card is open in the `choices` anchor, and whether it is a
+  // person's verb card (exploration-presence-rail design D4), forwarded to
+  // HudFrame.
+  cardOpen: { type: Boolean, default: false },
+  personFocus: { type: Boolean, default: false },
+  // The person in focus, named as the speaker line of the message window
+  // while the verb card is open (null otherwise).
+  speaker: { type: String, default: null },
   connectionStatus: {
     type: String,
     default: "connecting",
@@ -380,7 +388,7 @@ watch(
 // the dock itself or fell out of the layout moves to the compass. Focus the
 // player put elsewhere (the command field, a drawer, an overlay) stays. Every
 // other return path keeps the dock as the focus home, so the router's arrow
-// keys keep walking the overview's chips after a popover or drawer closes.
+// keys keep walking the overview's chips after a child frame or drawer closes.
 async function focusExplorationEntry() {
   await nextTick();
   if (props.mode !== "exploration") {
@@ -425,8 +433,8 @@ onBeforeUnmount(() => {
 // Expose the command-line focus API (H5, design D6): the store-driven
 // freeform dialogue entry point (a freeform affordance activation) focuses
 // the field via `focusCommandField`, a successful borrowed send returns focus
-// to the mode's focus home via `releaseCommandField(true)`, and the dock's
-// popover-close watcher re-homes focus through `restoreFocusHome`.
+// to the mode's focus home via `releaseCommandField(true)`, and every other
+// return path re-homes focus through `restoreFocusHome`.
 defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMessagePage });
 </script>
 
@@ -441,6 +449,8 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       :mode="mode"
       :mode-change="modeChange"
       :beat-hold="beatHold"
+      :card-open="cardOpen"
+      :person-focus="personFocus"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
       :command-line-expanded="commandLineExpanded"
@@ -464,6 +474,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       <template #choices>
         <slot name="choices" />
       </template>
+      <template #presence>
+        <slot name="presence" />
+      </template>
       <template #band-message>
         <MessageWindow
           ref="messageWindow"
@@ -471,6 +484,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
           :marks="props.responseMarks"
           :mode="props.mode"
           :dialogue="props.dialogue"
+          :speaker="props.speaker"
           :font-scale="props.fontScale"
           :text-speed="props.textSpeed"
           :auto-advance="props.autoAdvance"
