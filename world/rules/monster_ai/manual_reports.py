@@ -23,6 +23,15 @@ configuration fingerprints, Python/Evennia versions, host/clock details for
 performance, the synthetic scenario declarations, the documented seeds, the
 initial observation memory, the intelligence settings, raw paired results,
 approximation flags, candidate-budget omissions and unresolved encounters.
+
+Every encounter keeps its materialized scenario declaration and a per-decision
+replay record (the decision's effective selector seed, temperature,
+configuration fingerprint, effective and session execution identities, the
+scored plans it sampled from, its selected plan, its measured
+examined/accepted/omitted proposal counters and its own initial observation
+snapshot). Target metrics are keyed by encounter-local role and concentrated
+per encounter before aggregation. The normalized detailed decision trace is an
+explicit opt-in export (``detailed_trace``), never part of the compact report.
 """
 
 from __future__ import annotations
@@ -89,10 +98,10 @@ PERFORMANCE_MEASUREMENTS = 50
 PERFORMANCE_P95_BUDGET_MS = 50.0
 #: The two modes the performance operation measures.
 PERFORMANCE_MODES: tuple[str, ...] = ("legacy", "utility")
-#: The enemy-participant counts whose ORM work the scaling probe compares,
-#: always inside the same 16-participant envelope (allies trade for enemies):
-#: the candidate count varies while the actor/participant data does not.
-PERFORMANCE_SCALING_COUNTS: tuple[int, ...] = (1, 8, 15)
+#: The examined-proposal budgets the scaling probe compares on ONE fixed
+#: battlefield: the enumeration work the decision is allowed varies while the
+#: actor/participant data, the roster and the state do not.
+PERFORMANCE_SCALING_BUDGETS: tuple[int, ...] = (16, 64, 256)
 
 #: The 95% normal quantile the Wilson interval is computed at.
 WILSON_Z = 1.959963984540054
@@ -114,6 +123,36 @@ def stable_seed(kind: str, *parts: Any) -> int:
 def scenario_seed(situation: str, archetype: str, seed_index: int) -> int:
     """Return the documented campaign seed of one encounter."""
     return stable_seed("campaign", situation, archetype, int(seed_index))
+
+
+#: The documented prefix of one manual encounter's session identity: the
+#: manual selection seam's own scenario identity, never the durable
+#: ``hostile:<pk>:<tick>`` identity a scratch database would invent.
+MANUAL_SESSION_PREFIX = "manual"
+#: The documented prefix of one decision's encounter-local actor identity.
+MANUAL_ACTOR_PREFIX = "role"
+
+
+def manual_session_id(situation: str, archetype: str, seed_index: int) -> str:
+    """Return the documented session identity one encounter decides under.
+
+    The identity names the scenario (situation, archetype, documented seed
+    index) and NOT the intelligence, so a paired pair of variants decides
+    under one shared session identity; the encounter's own durable record is
+    rewritten to it before the first round, so the round engine, the
+    session-owned observation memory and the decision scope all agree on it.
+    """
+    return f"{MANUAL_SESSION_PREFIX}:{situation}:{archetype}:{int(seed_index)}"
+
+
+def manual_actor_id(role: str) -> str:
+    """Return the documented actor identity of one encounter-local role.
+
+    A decision's scope actor is its encounter-local role (``monster-0``,
+    ``player``), not a dbref the scratch database happened to allocate, so
+    corresponding paired decisions carry the same actor input.
+    """
+    return f"{MANUAL_ACTOR_PREFIX}:{role}"
 
 
 def selector_seed(seed_index: int) -> int:
@@ -179,6 +218,9 @@ class SelectorReport:
     difference: float
     margin_required: float
     margin_met: bool
+    low_temperature: float = 0.0
+    high_temperature: float = 0.0
+    candidate_order: tuple[str, ...] = ()
 
 
 def _selector_candidates(gap: float) -> tuple[ScoredCandidate, ScoredCandidate]:
@@ -259,6 +301,9 @@ def run_selector_operation(
         difference=difference,
         margin_required=SELECTOR_MIN_MARGIN,
         margin_met=difference >= SELECTOR_MIN_MARGIN,
+        low_temperature=low_temperature,
+        high_temperature=high_temperature,
+        candidate_order=tuple(item.identity.skill_key for item in ordered),
     )
 
 
@@ -298,35 +343,212 @@ def classify_no_action(candidates: Any, scored: Sequence[Any]) -> str | None:
 
 @dataclass(frozen=True, slots=True)
 class DecisionSample:
-    """One recorded monster decision, as the report's metrics consume it."""
+    """One recorded monster decision: its choice AND its replay inputs.
 
-    skill_key: str | None
-    target_ids: tuple[str, ...]
-    highest_utility: bool
-    selected_illegal: bool
-    no_action: str | None
+    Besides the metrics the report aggregates, every decision carries the
+    inputs its selection actually used, so one decision can be replayed from
+    the report alone: the effective selector ``seed``, the ``temperature``,
+    the configuration fingerprint the seed was derived with, the effective
+    execution identity (``scope``, the manual seam's own scope) beside the
+    session's own identity (``session_scope``), the scored ``plans`` that were
+    sampled from, the ``selected_plan``, and the decision's own initial
+    observation snapshot. ``examined``/``accepted``/``omitted_estimates``/
+    ``omitted_families``/``omitted_targets`` are the decision's measured
+    proposal counters, so enumeration work is never inferred from the
+    accepted set.
+    """
+
+    skill_key: str | None = None
+    target_ids: tuple[str, ...] = ()
+    highest_utility: bool = False
+    selected_illegal: bool = False
+    no_action: str | None = None
+    index: int = 0
+    actor_role: str = ""
+    target_roles: tuple[str, ...] = ()
+    seed: int = 0
+    temperature: float = 0.0
+    configuration_fingerprint: str = ""
+    scope: tuple[str, int, str, int, str] = ("", 0, "", 0, "normal")
+    session_scope: tuple[str, int, str, int, str] = ("", 0, "", 0, "normal")
+    plans: tuple[Mapping[str, Any], ...] = ()
+    selected_plan: Mapping[str, Any] | None = None
+    examined: int = 0
+    accepted: int = 0
     rejections: int = 0
     exclusions: int = 0
     omitted_estimates: int = 0
     omitted_families: int = 0
+    omitted_targets: int = 0
     exhausted: bool = False
     approximation_flags: tuple[str, ...] = ()
     initial_observations: tuple[tuple[Any, ...], ...] = ()
+    trace: Mapping[str, Any] | None = None
+
+    def to_payload(self, *, include_trace: bool = False) -> dict[str, Any]:
+        """Return this decision's replay record as a JSON-safe mapping.
+
+        The opt-in detailed trace is the normalized
+        :meth:`~world.rules.monster_ai.trace.DecisionTrace.to_payload`
+        projection, which never carries queued or private intent.
+        """
+        record: dict[str, Any] = {
+            "index": self.index,
+            "seed": self.seed,
+            "temperature": self.temperature,
+            "configuration_fingerprint": self.configuration_fingerprint,
+            "scope": _scope_payload(self.scope),
+            "session_scope": _scope_payload(self.session_scope),
+            "actor_role": self.actor_role,
+            "skill_key": self.skill_key,
+            "target_roles": list(self.target_roles),
+            "target_ids": list(self.target_ids),
+            "highest_utility": self.highest_utility,
+            "selected_illegal": self.selected_illegal,
+            "no_action": self.no_action,
+            "examined": self.examined,
+            "accepted": self.accepted,
+            "rejections": self.rejections,
+            "exclusions": self.exclusions,
+            "omitted_estimates": self.omitted_estimates,
+            "omitted_families": self.omitted_families,
+            "omitted_targets": self.omitted_targets,
+            "exhausted": self.exhausted,
+            "approximation_flags": list(self.approximation_flags),
+            "plans": [dict(plan) for plan in self.plans],
+            "selected_plan": None if self.selected_plan is None else dict(self.selected_plan),
+            "observations": [list(record) for record in self.initial_observations],
+        }
+        if include_trace and self.trace is not None:
+            record["trace"] = self.trace
+        return record
+
+
+def _scope_payload(scope: tuple[str, int, str, int, str]) -> dict[str, Any]:
+    """Return one ``(session, round, actor, slot, mode)`` scope as a mapping."""
+    session_id, round_index, actor_id, slot_index, context_mode = scope
+    return {
+        "session": session_id,
+        "round": round_index,
+        "actor": actor_id,
+        "slot": slot_index,
+        "context_mode": context_mode,
+    }
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioDeclaration:
+    """One situation's materialized declaration, exactly as the run built it.
+
+    Maximum and initial HP are separate fields, so an intentionally injured
+    opponent is a declared (maximum, initial) pair rather than a low maximum
+    pretend-healthy one. Every entity field is a plain scalar or tuple: the
+    declaration can never carry a live entity.
+    """
+
+    name: str
+    monsters: int
+    monsters_hp: tuple[int, ...]
+    monsters_hp_max: tuple[int, ...]
+    monster_mp: int
+    monster_atk: int
+    initiator_hp: int
+    initiator_hp_max: int
+    companion_hp: tuple[int, ...]
+    companion_hp_max: tuple[int, ...]
+    seal_opponents: int
+    displaced_opponents: int
+    seal_key: str
+    positional_key: str
+    driver_skill_key: str
+    monster_skills: tuple[str, ...]
+    support_skills: tuple[str, ...] = ()
+    monster_effect: str | None = None
+    allied_support: bool = False
+
+    def to_payload(self) -> dict[str, Any]:
+        """Return this declaration as a JSON-safe mapping."""
+        return {
+            "name": self.name,
+            "monsters": self.monsters,
+            "monsters_hp": list(self.monsters_hp),
+            "monsters_hp_max": list(self.monsters_hp_max),
+            "monster_mp": self.monster_mp,
+            "monster_atk": self.monster_atk,
+            "initiator_hp": self.initiator_hp,
+            "initiator_hp_max": self.initiator_hp_max,
+            "companion_hp": list(self.companion_hp),
+            "companion_hp_max": list(self.companion_hp_max),
+            "seal_opponents": self.seal_opponents,
+            "displaced_opponents": self.displaced_opponents,
+            "seal_key": self.seal_key,
+            "positional_key": self.positional_key,
+            "driver_skill_key": self.driver_skill_key,
+            "monster_skills": list(self.monster_skills),
+            "support_skills": list(self.support_skills),
+            "monster_effect": self.monster_effect,
+            "allied_support": self.allied_support,
+        }
 
 
 @dataclass(frozen=True, slots=True)
 class EncounterOutcome:
-    """One encounter's outcome and the decisions it recorded."""
+    """One encounter's outcome, its declaration and the decisions it recorded.
+
+    ``scenario_seed`` is the documented scenario/archetype seed encoding of
+    this encounter and ``combat_seed`` the process dice seed derived from it;
+    neither is presented as a decision's selector seed, which every decision
+    records for itself. ``session_id`` is the documented manual identity the
+    encounter decided under and ``origin_session_id`` the durable identity the
+    scratch database's own engagement computed before it was rewritten.
+    """
 
     archetype: str
     situation: str
     seed_index: int
     intelligence: int
-    decision_seed: int
-    combat_seed: int
     outcome: str
     rounds: int
     decisions: tuple[DecisionSample, ...]
+    scenario_seed: int = 0
+    combat_seed: int = 0
+    session_id: str = ""
+    origin_session_id: str = ""
+    scenario: ScenarioDeclaration | None = None
+    roles: Mapping[str, str] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class EncounterConcentration:
+    """One encounter's target concentration over its encounter-local roles.
+
+    The counts are keyed by the encountering roles the decisions named
+    (``player``, ``companion-1``, ``monster-0``) rather than by dbrefs a
+    scratch database happened to allocate, so focus on one opponent role is
+    distinguishable from choices spread across unrelated entities -- both
+    within one encounter and across a batch.
+    """
+
+    archetype: str
+    situation: str
+    seed_index: int
+    intelligence: int
+    roles: Mapping[str, int]
+    targeted_decisions: int
+    top_role: str | None
+    top_share: float
+
+    def to_payload(self) -> dict[str, Any]:
+        """Return this encounter's concentration as a JSON-safe mapping."""
+        return {
+            "situation": self.situation,
+            "seed_index": self.seed_index,
+            "intelligence": self.intelligence,
+            "roles": dict(self.roles),
+            "targeted_decisions": self.targeted_decisions,
+            "top_role": self.top_role,
+            "top_share": self.top_share,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -353,6 +575,7 @@ class EncounterMetrics:
     no_action_budget_omission: int
     no_action_capability_blocked: int
     approximation_flags: tuple[str, ...]
+    concentration: tuple[EncounterConcentration, ...] = ()
 
     @property
     def mean_rounds(self) -> float:
@@ -364,9 +587,61 @@ class EncounterMetrics:
         """The fraction of decisions whose choice had the highest utility."""
         return (self.highest_utility / self.decisions) if self.decisions else 0.0
 
+    @property
+    def mean_target_concentration(self) -> float:
+        """The mean per-encounter top-role share over encounters with targets."""
+        focused = [item.top_share for item in self.concentration if item.targeted_decisions]
+        return (sum(focused) / len(focused)) if focused else 0.0
+
+    @property
+    def concentrated_encounters(self) -> int:
+        """How many encounters put at least half their choices on one role."""
+        return sum(
+            1
+            for item in self.concentration
+            if item.targeted_decisions and item.top_share >= 0.5
+        )
+
+
+def _concentration(row: EncounterOutcome) -> EncounterConcentration:
+    """Return one encounter's encounter-local target concentration."""
+    roles: dict[str, int] = {}
+    for decision in row.decisions:
+        for role in decision.target_roles:
+            roles[role] = roles.get(role, 0) + 1
+    decisions = sum(1 for decision in row.decisions if decision.target_roles)
+    if not roles:
+        return EncounterConcentration(
+            archetype=row.archetype,
+            situation=row.situation,
+            seed_index=row.seed_index,
+            intelligence=row.intelligence,
+            roles={},
+            targeted_decisions=0,
+            top_role=None,
+            top_share=0.0,
+        )
+    top_role, top_count = sorted(roles.items(), key=lambda item: (-item[1], item[0]))[0]
+    return EncounterConcentration(
+        archetype=row.archetype,
+        situation=row.situation,
+        seed_index=row.seed_index,
+        intelligence=row.intelligence,
+        roles=dict(sorted(roles.items())),
+        targeted_decisions=decisions,
+        top_role=top_role,
+        top_share=top_count / decisions if decisions else 0.0,
+    )
+
 
 def aggregate_encounters(outcomes: Iterable[EncounterOutcome]) -> EncounterMetrics:
-    """Aggregate a batch of encounters into one report-ready metric block."""
+    """Aggregate a batch of encounters into one report-ready metric block.
+
+    Target counts are keyed by the encounter-local role a decision named, and
+    the per-encounter concentration is computed before aggregation, so a
+    batch's target distribution can never be read as repeated focus on one
+    opponent when the dbrefs merely came from different encounters.
+    """
     rows = tuple(outcomes)
     skills: dict[str, int] = {}
     targets: dict[str, int] = {}
@@ -397,8 +672,8 @@ def aggregate_encounters(outcomes: Iterable[EncounterOutcome]) -> EncounterMetri
             flags.extend(decision.approximation_flags)
             if decision.skill_key is not None:
                 skills[decision.skill_key] = skills.get(decision.skill_key, 0) + 1
-            for target in decision.target_ids:
-                targets[target] = targets.get(target, 0) + 1
+            for role in decision.target_roles:
+                targets[role] = targets.get(role, 0) + 1
             if decision.no_action == NO_ACTION_LEGAL_RESTRICTION:
                 counters["legal"] += 1
             elif decision.no_action == NO_ACTION_ESTIMATOR_EXCLUSION:
@@ -428,6 +703,7 @@ def aggregate_encounters(outcomes: Iterable[EncounterOutcome]) -> EncounterMetri
         no_action_budget_omission=counters["budget"],
         no_action_capability_blocked=counters["blocked"],
         approximation_flags=tuple(sorted(set(flags))),
+        concentration=tuple(_concentration(row) for row in rows),
     )
 
 
@@ -453,11 +729,20 @@ class PolicyTiming:
 
 @dataclass(frozen=True, slots=True)
 class ScalingSample:
-    """One candidate-count scaling probe on fixed actor/participant data."""
+    """One examined-proposal-budget probe on ONE fixed battlefield.
 
-    candidates: int
+    The probe varies only the decision's examined-proposal budget on the
+    reference roster's own actor/participant data, and reports the measured
+    work: ORM ``queries``, the ``examined`` proposals (accepted candidates
+    plus rejections plus mandatory-filter exclusions), the ``accepted`` plans
+    that reached scoring and the proposals the budget ``omitted``.
+    """
+
+    budget: int
     queries: int
     examined: int
+    accepted: int
+    omitted: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -560,8 +845,14 @@ def selector_report_payload(report: SelectorReport) -> dict[str, Any]:
             SELECTOR_HIGH_KEY: SELECTOR_HIGH_KEY,
             SELECTOR_LOW_KEY: SELECTOR_LOW_KEY,
             "utility_gap": SELECTOR_UTILITY_GAP,
+            "canonical_order": list(report.candidate_order),
         },
         "intelligences": list(INTELLIGENCE_VALUES),
+        "temperatures": {
+            "low": report.low_temperature,
+            "high": report.high_temperature,
+        },
+        "seed_encoding_version": SEED_ENCODING_VERSION,
         "seeds": [pair.seed_index for pair in report.pairs],
         "replicates": [
             {
@@ -606,6 +897,11 @@ def encounter_metrics_payload(metrics: EncounterMetrics) -> dict[str, Any]:
         "highest_utility_fraction": metrics.highest_utility_fraction,
         "skill_distribution": dict(metrics.skill_distribution),
         "target_distribution": dict(metrics.target_distribution),
+        "target_concentration": {
+            "encounters": [item.to_payload() for item in metrics.concentration],
+            "mean_top_role_share": metrics.mean_target_concentration,
+            "concentrated_encounters": metrics.concentrated_encounters,
+        },
         "rejections": metrics.rejections,
         "exclusions": metrics.exclusions,
         "omitted_estimates": metrics.omitted_estimates,
@@ -649,7 +945,13 @@ def performance_report_payload(report: PerformanceReport) -> dict[str, Any]:
             for timing in report.timings
         ],
         "scaling": [
-            {"candidates": item.candidates, "queries": item.queries, "examined": item.examined}
+            {
+                "budget": item.budget,
+                "queries": item.queries,
+                "examined": item.examined,
+                "accepted": item.accepted,
+                "omitted": item.omitted,
+            }
             for item in report.scaling
         ],
         "budget_met": report.budget_met,
@@ -661,8 +963,17 @@ def archetype_report_payload(
     archetype: str,
     encounters: Sequence[EncounterOutcome],
     header: Mapping[str, Any],
+    include_traces: bool = False,
 ) -> dict[str, Any]:
-    """Return one named archetype campaign as a JSON-safe mapping."""
+    """Return one named archetype campaign as a JSON-safe mapping.
+
+    The report serializes the materialized scenario declarations the run
+    built, and every encounter keeps a per-decision replay record (effective
+    seed, execution identity, sampled plans, selected plan and the decision's
+    own initial observation snapshot). ``include_traces`` adds the opt-in
+    normalized decision trace to each record; the default report stays the
+    compact machine-readable evidence.
+    """
     grouped: dict[tuple[str, int], EncounterMetrics] = {}
     for situation in SITUATION_NAMES:
         for intelligence in INTELLIGENCE_VALUES:
@@ -672,15 +983,23 @@ def archetype_report_payload(
                 if row.situation == situation and row.intelligence == intelligence
             ]
             grouped[(situation, intelligence)] = aggregate_encounters(rows)
+    scenarios: dict[str, Any] = {}
+    for row in encounters:
+        if row.scenario is not None and row.scenario.name not in scenarios:
+            scenarios[row.scenario.name] = row.scenario.to_payload()
     raw = [
         {
             "situation": row.situation,
             "seed_index": row.seed_index,
-            "decision_seed": row.decision_seed,
+            "scenario_seed": row.scenario_seed,
             "combat_seed": row.combat_seed,
             "intelligence": row.intelligence,
+            "session_id": row.session_id,
+            "engine_session_id": row.origin_session_id,
             "outcome": row.outcome,
             "rounds": row.rounds,
+            "scenario": None if row.scenario is None else row.scenario.name,
+            "roles": dict(row.roles),
             "decisions": len(row.decisions),
             "highest_utility": sum(1 for item in row.decisions if item.highest_utility),
             "selected_illegal": sum(1 for item in row.decisions if item.selected_illegal),
@@ -695,9 +1014,9 @@ def archetype_report_payload(
                     1 for item in row.decisions if item.no_action == NO_ACTION_BUDGET_OMISSION
                 ),
             },
-            "initial_observations": [list(item) for item in row.decisions[0].initial_observations]
-            if row.decisions
-            else [],
+            "decision_records": [
+                item.to_payload(include_trace=include_traces) for item in row.decisions
+            ],
         }
         for row in encounters
     ]
@@ -712,6 +1031,24 @@ def archetype_report_payload(
             "encounters": len(encounters),
             "round_cap": ROUND_CAP,
         },
+        "manual_selection_seam": {
+            "session_identity": f"{MANUAL_SESSION_PREFIX}:<situation>:<archetype>:<seed_index>",
+            "actor_identity": f"{MANUAL_ACTOR_PREFIX}:<encounter-role>",
+            "seed_inputs": [
+                "session id",
+                "actual round index",
+                "actor id",
+                "action slot",
+                "configuration fingerprint",
+            ],
+            "paired_intelligence_shared_inputs": [
+                "session id",
+                "round index",
+                "actor id",
+                "action slot",
+            ],
+        },
+        "scenarios": scenarios,
         "metrics": {
             f"{situation}@{intelligence}": encounter_metrics_payload(metrics)
             for (situation, intelligence), metrics in grouped.items()
@@ -729,6 +1066,55 @@ def archetype_report_payload(
         ],
         "raw": raw,
     }
+
+
+def trace_export_payload(
+    *, archetype: str, encounters: Sequence[EncounterOutcome]
+) -> dict[str, Any]:
+    """Return the opt-in detailed-trace export of one archetype campaign.
+
+    Every recorded decision's normalized
+    :meth:`~world.rules.monster_ai.trace.DecisionTrace.to_payload` projection,
+    identified by the encounter and decision identity it belongs to. The
+    projection is the decision's own read-only record -- observations, plans,
+    rejections, counters and the selected plan -- and never a queued or
+    private intent.
+    """
+    records: list[dict[str, Any]] = []
+    for row in encounters:
+        for decision in row.decisions:
+            if decision.trace is None:
+                continue
+            records.append(
+                {
+                    "situation": row.situation,
+                    "seed_index": row.seed_index,
+                    "intelligence": row.intelligence,
+                    "session_id": row.session_id,
+                    "decision_index": decision.index,
+                    "seed": decision.seed,
+                    "scope": _scope_payload(decision.scope),
+                    "trace": decision.trace,
+                }
+            )
+    return {
+        "schema": "monster-ai-manual-evidence/1",
+        "operation": "traces",
+        "archetype": archetype,
+        "decisions": records,
+    }
+
+
+def write_trace_export(directory: Path | str, payload: Mapping[str, Any], *, stem: str) -> Path:
+    """Write the opt-in detailed-trace export beside one report and return its path."""
+    target = Path(directory)
+    target.mkdir(parents=True, exist_ok=True)
+    path = target / f"{stem}-traces.json"
+    path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return path
 
 
 def _selector_markdown(report: dict[str, Any]) -> list[str]:
@@ -785,6 +1171,13 @@ def _encounters_markdown(report: dict[str, Any]) -> list[str]:
         f"{overall['no_action']['estimator_exclusion']} / "
         f"{overall['no_action']['budget_omission']}.",
         "",
+        "Target concentration over encounter-local roles: mean top-role share "
+        f"{overall['target_concentration']['mean_top_role_share']:.3f}, "
+        f"{overall['target_concentration']['concentrated_encounters']} encounter(s) "
+        "put at least half their choices on one role. Every decision's effective "
+        "seed, execution identity, sampled plans, selected plan and initial "
+        "observation snapshot are recorded in `raw[].decision_records`.",
+        "",
         "| situation | intelligence | win/loss/capped | mean rounds | highest-utility |",
         "| --- | ---: | --- | ---: | ---: |",
     ]
@@ -834,15 +1227,22 @@ def _performance_markdown(report: dict[str, Any]) -> list[str]:
         f"Warm p95 budget {envelope['budget_ms']:.0f} ms: "
         f"{'met' if report['budget_met'] else 'NOT met'}.",
         "",
-        "| candidates | queries | examined |",
-        "| ---: | ---: | ---: |",
+        "| examined-proposal budget | queries | examined | accepted | omitted |",
+        "| ---: | ---: | ---: | ---: | ---: |",
     ]
     for item in report["scaling"]:
-        lines.append(f"| {item['candidates']} | {item['queries']} | {item['examined']} |")
+        lines.append(
+            f"| {item['budget']} | {item['queries']} | {item['examined']} | "
+            f"{item['accepted']} | {item['omitted']} |"
+        )
     lines += [
         "",
-        "Query work may scale with the initial participant/owned-skill read but "
-        "never with per-candidate target-plan enumeration. This is a manual "
+        "One fixed reference battlefield is probed at three examined-proposal "
+        "budgets: `examined` counts every proposal the decision examined "
+        "(accepted candidates, rejections and mandatory-filter exclusions) and "
+        "`omitted` the proposals the budget left unexamined. Query work may "
+        "scale with the initial participant/owned-skill read but never with "
+        "the proposals a decision examined or omitted. This is a manual "
         "measurement on the recorded host, never a permanent timing assertion.",
     ]
     return lines
@@ -889,7 +1289,7 @@ class OperationResult:
     """One operation's report payload and its written report paths."""
 
     report: Mapping[str, Any]
-    paths: tuple[Path, Path] = field(default=())
+    paths: tuple[Path, ...] = field(default=())
 
 
 SelectorEngine = Callable[..., SelectorReport]
@@ -905,14 +1305,18 @@ def run_operation(
     output: Path | str,
     archetype: str | None = None,
     selector_count: int = SELECTOR_SEED_COUNT,
+    detailed_trace: bool = False,
 ) -> OperationResult:
     """Run exactly one explicit operation and write its report.
 
     A single invocation never implicitly runs the other operations or every
     archetype: the selector check, one named archetype campaign and the
     performance scenario are independent, and the named archetype is required
-    for the campaign.
+    for the campaign. ``detailed_trace`` is the opt-in trace export: it never
+    enlarges the compact report's arithmetic, it writes the campaign's
+    normalized per-decision traces as their own JSON document beside it.
     """
+    paths: tuple[Path, ...] = ()
     if operation == "selector":
         result = run_selector_operation(seed_count=selector_count)
         payload = {**dict(header), "operation": "selector", **selector_report_payload(result)}
@@ -925,6 +1329,16 @@ def run_operation(
             archetype=archetype, encounters=outcomes, header=header
         )
         stem = f"archetype-{archetype}"
+        paths = write_reports(output, payload, stem=stem)
+        if detailed_trace:
+            paths = paths + (
+                write_trace_export(
+                    output,
+                    trace_export_payload(archetype=archetype, encounters=outcomes),
+                    stem=stem,
+                ),
+            )
+        return OperationResult(report=payload, paths=paths)
     elif operation == "performance":
         result = harness.run_performance_scenario()
         payload = {**dict(header), "operation": "performance", **performance_report_payload(result)}

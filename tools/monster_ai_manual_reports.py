@@ -5,6 +5,8 @@ Run one explicit operation by hand against an isolated scratch database:
 
     uv run --locked python tools/monster_ai_manual_reports.py selector
     uv run --locked python tools/monster_ai_manual_reports.py archetype --archetype brute
+    uv run --locked python tools/monster_ai_manual_reports.py archetype --archetype brute \
+        --detailed-trace
     uv run --locked python tools/monster_ai_manual_reports.py performance
 
 The scratch database is a fresh temporary SQLite file (override with
@@ -120,6 +122,13 @@ def build_parser() -> argparse.ArgumentParser:
         "--selector-seeds", type=int, default=None,
         help="override the documented 128-seed selector replicate count",
     )
+    parser.add_argument(
+        "--detailed-trace", action="store_true",
+        help=(
+            "also write the campaign's normalized per-decision decision traces "
+            "as <stem>-traces.json (opt-in; the compact report is unchanged)"
+        ),
+    )
     return parser
 
 
@@ -153,14 +162,15 @@ def main(argv: list[str] | None = None) -> int:
             output=args.output,
             archetype=args.archetype,
             selector_count=args.selector_seeds or reports.SELECTOR_SEED_COUNT,
+            detailed_trace=args.detailed_trace,
         )
     finally:
         if harness is not None:
             harness.__exit__(None, None, None)
 
     print(f"scratch database: {scratch}")
-    print(f"report: {result.paths[0]}")
-    print(f"interpretation: {result.paths[1]}")
+    for path in result.paths:
+        print(f"report: {path}")
     return 0
 
 

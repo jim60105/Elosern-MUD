@@ -19,13 +19,15 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.rules import monster_behaviour as behaviour
 from world.rules import traits
-from world.rules.action import ActionRequest
+from world.rules.action import ActionRequest, ActionResult, ActionResolver, RejectReason
+from world.rules.buffs import entity_active_buffs, has_positional_marker
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
@@ -34,9 +36,14 @@ from world.rules.combat import (
     run_round,
     stable_actor_id,
 )
+from world.rules.combat_session import read_session
 from world.rules.monster_ai import manual_campaign
 from world.rules.monster_ai import manual_reports as reports
-from world.rules.overwhelm import resolve_overwhelm
+from world.rules.monster_ai.candidates import Candidate, CandidateIdentity
+from world.rules.monster_ai.models import PlannedAction
+from world.rules.monster_ai.selection import select_candidate
+from world.rules.monster_ai.utility import ScoredCandidate
+from world.rules.overwhelm import classify_overwhelm, resolve_overwhelm
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -59,7 +66,7 @@ def _outcome(**overrides) -> reports.EncounterOutcome:
         "situation": "finishing_choice",
         "seed_index": 0,
         "intelligence": 10,
-        "decision_seed": 1,
+        "scenario_seed": 1,
         "combat_seed": 2,
         "outcome": reports.OUTCOME_WIN,
         "rounds": 4,
@@ -254,8 +261,18 @@ class EncounterAggregationTests(unittest.TestCase):
                 outcome=reports.OUTCOME_WIN,
                 rounds=4,
                 decisions=(
-                    _sample(skill_key="a", target_ids=("x",), highest_utility=True),
-                    _sample(skill_key="a", target_ids=("y",), highest_utility=False),
+                    _sample(
+                        skill_key="a",
+                        target_ids=("dbref:1",),
+                        target_roles=("x",),
+                        highest_utility=True,
+                    ),
+                    _sample(
+                        skill_key="a",
+                        target_ids=("dbref:2",),
+                        target_roles=("y",),
+                        highest_utility=False,
+                    ),
                 ),
             ),
             _outcome(
@@ -296,6 +313,15 @@ class EncounterAggregationTests(unittest.TestCase):
         self.assertAlmostEqual(metrics.highest_utility_fraction, 0.25)
         self.assertEqual(metrics.skill_distribution, {"a": 2})
         self.assertEqual(metrics.target_distribution, {"x": 1, "y": 1})
+        # Concentration is computed per encounter over the encounter-local
+        # roles before it is aggregated, so one encounter's focus on one role
+        # is never confused with dbrefs from another encounter.
+        self.assertAlmostEqual(metrics.mean_target_concentration, 0.5)
+        self.assertEqual(metrics.concentrated_encounters, 1)
+        concentration = metrics.concentration[0]
+        self.assertEqual(concentration.top_role, "x")
+        self.assertEqual(concentration.targeted_decisions, 2)
+        self.assertEqual(concentration.roles, {"x": 1, "y": 1})
         self.assertEqual(metrics.rejections, 2)
         self.assertEqual(metrics.no_action_estimator_exclusion, 1)
         self.assertEqual(metrics.no_action_budget_omission, 1)
@@ -335,9 +361,15 @@ class TimingAssemblyTests(unittest.TestCase):
             warmups=5,
             measurements=50,
             timings=(timing,),
-            scaling=(reports.ScalingSample(candidates=8, queries=3, examined=4),),
+            scaling=(
+                reports.ScalingSample(
+                    budget=64, queries=3, examined=4, accepted=4, omitted=0
+                ),
+            ),
             budget_ms=reports.PERFORMANCE_P95_BUDGET_MS,
         )
+        self.assertEqual(report.scaling[0].budget, 64)
+        self.assertEqual(report.scaling[0].examined, 4)
         self.assertTrue(report.budget_met)
         over = reports.build_policy_timing(
             mode="utility", cold_ms=1.0, samples_ms=[100.0], queries=0,
@@ -375,7 +407,16 @@ class ReportPayloadTests(unittest.TestCase):
         encounters = (
             _outcome(
                 decisions=(
-                    _sample(skill_key="a", target_ids=("x",), highest_utility=True),
+                    _sample(
+                        skill_key="a",
+                        target_ids=("dbref:1",),
+                        target_roles=("x",),
+                        highest_utility=True,
+                        seed=11,
+                        temperature=0.62,
+                        plans=({"skill_key": "a", "score": 1.0},),
+                        selected_plan={"skill_key": "a", "score": 1.0},
+                    ),
                     _sample(
                         skill_key=None,
                         target_ids=(),
@@ -383,13 +424,34 @@ class ReportPayloadTests(unittest.TestCase):
                         no_action=reports.NO_ACTION_LEGAL_RESTRICTION,
                         initial_observations=((1, 0, "dbref:1", "faction", "skill", ("dbref:2",), (), ()),),
                     ),
-                )
+                ),
+                scenario=reports.ScenarioDeclaration(
+                    name="finishing_choice",
+                    monsters=1,
+                    monsters_hp=(90,),
+                    monsters_hp_max=(90,),
+                    monster_mp=80,
+                    monster_atk=25,
+                    initiator_hp=300,
+                    initiator_hp_max=300,
+                    companion_hp=(12,),
+                    companion_hp_max=(90,),
+                    seal_opponents=0,
+                    displaced_opponents=0,
+                    seal_key="lamb_seal",
+                    positional_key="displaced_apotheosis",
+                    driver_skill_key="t_campaign_driver",
+                    monster_skills=("t_campaign_strike_0",),
+                ),
             ),
         )
         archetype_payload = reports.archetype_report_payload(
             archetype="brute", encounters=encounters, header=header
         )
-        for key in ("allocation", "metrics", "overall", "unresolved", "raw"):
+        for key in (
+            "allocation", "metrics", "overall", "unresolved", "raw",
+            "scenarios", "manual_selection_seam",
+        ):
             self.assertIn(key, archetype_payload)
         self.assertEqual(archetype_payload["allocation"]["encounters"], 1)
         self.assertIn(
@@ -398,7 +460,27 @@ class ReportPayloadTests(unittest.TestCase):
         self.assertEqual(
             archetype_payload["overall"]["no_action"]["legal_restriction"], 1
         )
-        self.assertIn("initial_observations", archetype_payload["raw"][0])
+        # The materialized declaration is serialized with maximum and initial
+        # hit points kept apart, and every decision keeps its own replay record.
+        scenario = archetype_payload["scenarios"]["finishing_choice"]
+        self.assertEqual(scenario["companion_hp"], [12])
+        self.assertEqual(scenario["companion_hp_max"], [90])
+        self.assertEqual(scenario["monster_atk"], 25)
+        record = archetype_payload["raw"][0]["decision_records"][0]
+        for key in (
+            "seed", "temperature", "scope", "session_scope", "plans",
+            "selected_plan", "examined", "accepted", "observations",
+        ):
+            self.assertIn(key, record)
+        self.assertEqual(record["seed"], 11)
+        self.assertEqual(record["target_roles"], ["x"])
+        self.assertNotIn("trace", record)
+        # The detailed trace is the separate, opt-in export: this fixture
+        # carries no normalized trace, so the export is empty and never
+        # silently invents one.
+        export = reports.trace_export_payload(archetype="brute", encounters=encounters)
+        self.assertEqual(export["operation"], "traces")
+        self.assertEqual(export["decisions"], [])
         self.assertIn("Manual archetype campaign", reports.render_markdown(archetype_payload))
 
         performance = reports.PerformanceReport(
@@ -410,7 +492,11 @@ class ReportPayloadTests(unittest.TestCase):
                     examined=3, accepted=3, omitted=0, dice_isolated=True,
                 ),
             ),
-            scaling=(reports.ScalingSample(candidates=8, queries=0, examined=9),),
+            scaling=(
+                reports.ScalingSample(
+                    budget=256, queries=0, examined=9, accepted=8, omitted=1
+                ),
+            ),
             budget_ms=50.0,
         )
         performance_payload = {
@@ -504,12 +590,21 @@ class OperationIsolationTests(unittest.TestCase):
 class CampaignEncounterTests(EvenniaTestCase):
     """One real encounter through the production session boundary."""
 
-    def _harness(self) -> manual_campaign.CampaignHarness:
+    def _harness(self, situation: str = "finishing_choice") -> manual_campaign.CampaignHarness:
         harness = manual_campaign.CampaignHarness(
-            situations=("finishing_choice",), seed_indices=(0,), intelligences=(10,)
+            situations=(situation,), seed_indices=(0,), intelligences=(10,)
         )
         self.addCleanup(harness.__exit__, None, None, None)
         return harness.__enter__()
+
+    @staticmethod
+    def _fresh_rows() -> dict:
+        """Return fresh rows for the encounter's entities, caches dropped."""
+        cached = tuple(ObjectDB.objects.filter(db_key__startswith="campaign-"))
+        return {
+            entity.key: entity
+            for entity in manual_campaign.CampaignHarness.reload_participants(*cached)
+        }
 
     @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
     def test_one_named_encounter_settles_and_reloads_committed_state(self):
@@ -526,12 +621,223 @@ class CampaignEncounterTests(EvenniaTestCase):
         self.assertTrue(outcome.decisions)
         for decision in outcome.decisions:
             self.assertEqual(decision.selected_illegal, False)
-        # Committed reload: every entity the round wrote is readable from a
-        # fresh row, and the encounter's own outcome is a settled or capped
-        # state rather than an uncommitted in-flight one.
-        monster = ObjectDB.objects.filter(db_key__startswith="campaign-monster").first()
-        if monster is not None:
-            self.assertIsNotNone(monster.attributes.get("traits", category="traits"))
+        # The encounter decides under one documented session identity, while
+        # the identity the scratch database's own engagement allocated is kept
+        # beside it as evidence; every decision records both, and its real
+        # round identity advances one committed round at a time.
+        self.assertEqual(
+            outcome.session_id,
+            reports.manual_session_id("finishing_choice", harness.archetypes[0], 0),
+        )
+        self.assertNotEqual(outcome.origin_session_id, outcome.session_id)
+        self.assertTrue(outcome.origin_session_id.startswith("hostile:"))
+        self.assertEqual(
+            sorted({sample.session_scope[1] for sample in outcome.decisions}),
+            list(range(1, len({sample.session_scope[1] for sample in outcome.decisions}) + 1)),
+        )
+        # Committed reload: the instance cache is dropped and every participant
+        # is re-acquired from its own row before the encounter's durable
+        # effects are asserted -- damage really landed, the injured opponent
+        # really started and stayed injured, and the terminal settlement really
+        # cleared the durable session.
+        rows = self._fresh_rows()
+        monster = rows["campaign-monster-0"]
+        self.assertLess(monster.traits.hp.current, monster.traits.hp.base)
+        self.assertLessEqual(monster.traits.mp.current, monster.traits.mp.base)
+        # The opponent really is an injured one: a healthy maximum with a low
+        # declared initial value. (Its remaining hit points are read before the
+        # victory's own post-settlement regeneration, which is what a durable
+        # terminal read legitimately shows.)
+        self.assertEqual(rows["campaign-companion-0"].traits.hp.base, 90)
+        self.assertEqual(outcome.scenario.companion_hp, (12, 400))
+        self.assertEqual(outcome.scenario.companion_hp_max, (90, 400))
+        self.assertIsNone(read_session(rows["campaign-player-0"]))
+        self.assertEqual(
+            {sample.session_scope[0] for sample in outcome.decisions},
+            {outcome.session_id},
+        )
+
+    @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
+    def test_paired_variants_decide_under_one_shared_identity(self):
+        harness = manual_campaign.CampaignHarness(
+            situations=("finishing_choice",), seed_indices=(0,), intelligences=(10, 90)
+        )
+        self.addCleanup(harness.__exit__, None, None, None)
+        harness.__enter__()
+        low = harness.run_single_encounter(
+            "finishing_choice", harness.archetypes[0], intelligence=10
+        )
+        high = harness.run_single_encounter(
+            "finishing_choice", harness.archetypes[0], intelligence=90
+        )
+        # Corresponding paired decisions share the documented session identity,
+        # the real round index, the encounter-local actor identity and the
+        # action slot AND the tuning fingerprint, so their selector seeds are
+        # identical: the only difference between the two variants is the
+        # intelligence-derived sampling temperature, which is the paired
+        # treatment itself.
+        self.assertEqual(low.session_id, high.session_id)
+        self.assertEqual(low.combat_seed, high.combat_seed)
+        first_low, first_high = low.decisions[0], high.decisions[0]
+        for index in (0, 1, 2, 3):
+            self.assertEqual(first_low.scope[index], first_high.scope[index])
+        self.assertEqual(first_low.scope[2], reports.manual_actor_id("monster-0"))
+        self.assertEqual(
+            first_low.configuration_fingerprint, first_high.configuration_fingerprint
+        )
+        self.assertEqual(first_low.seed, first_high.seed)
+        self.assertNotEqual(first_low.temperature, first_high.temperature)
+        common = min(len(low.decisions), len(high.decisions))
+        for index in range(common):
+            self.assertEqual(
+                low.decisions[index].seed, high.decisions[index].seed
+            )
+
+    @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
+    def test_mandatory_targeting_keeps_its_constraint_at_the_decision_boundary(self):
+        harness = self._harness("mandatory_targeting")
+        outcome = harness.run_single_encounter(
+            "mandatory_targeting", harness.archetypes[0]
+        )
+        self.assertTrue(outcome.decisions)
+        bearer_id = f"dbref:{self._fresh_rows()['campaign-player-0'].pk}"
+        strike_keys = manual_campaign._strike_class_keys()
+        alternatives = manual_campaign._nonstrike_hostile_single_keys()
+        self.assertTrue(alternatives)
+        offered = False
+        for sample in outcome.decisions:
+            self.assertEqual(sample.actor_role, "monster-0")
+            # The constraint is live at the decision boundary, not merely
+            # before initiative: no strike-class plan names the displaced,
+            # sealed bearer even though its displacement survives the round.
+            for plan in sample.plans:
+                if plan["skill_key"] in strike_keys:
+                    self.assertNotIn(bearer_id, plan["target_ids"])
+            if any(
+                plan["skill_key"] in alternatives and bearer_id in plan["target_ids"]
+                for plan in sample.plans
+            ):
+                offered = True
+        self.assertTrue(offered)
+        # And the terminal settlement sweeps the mounted constraint durably.
+        rows = self._fresh_rows()
+        player = rows["campaign-player-0"]
+        self.assertFalse(has_positional_marker(player))
+        self.assertNotIn("lamb_seal", entity_active_buffs(player))
+        self.assertIsNone(read_session(player))
+
+    @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
+    def test_a_recorded_decision_replays_from_its_own_recorded_inputs(self):
+        harness = self._harness()
+        outcome = harness.run_single_encounter("finishing_choice", harness.archetypes[0])
+        replayed = 0
+        for sample in outcome.decisions:
+            if sample.selected_plan is None or len(sample.plans) < 2:
+                continue
+            scored = tuple(
+                ScoredCandidate(
+                    candidate=Candidate(
+                        identity=CandidateIdentity(
+                            skill_key=plan["skill_key"],
+                            scale=plan["scale"],
+                            target_ids=tuple(plan["target_ids"]),
+                        ),
+                        plan=PlannedAction(
+                            skill_key=plan["skill_key"],
+                            scale=plan["scale"],
+                            target_ids=tuple(plan["target_ids"]),
+                            shorthand=plan["shorthand"],
+                        ),
+                    ),
+                    score=plan["score"],
+                    damage=plan["damage"],
+                    healing=plan["healing"],
+                    control=plan["control"],
+                    focus=plan["focus"],
+                    preference=plan["preference"],
+                    finishing=plan["finishing"],
+                    cost=plan["cost"],
+                    waste=plan["waste"],
+                )
+                for plan in sample.plans
+            )
+            chosen = select_candidate(
+                scored, temperature=sample.temperature, seed=sample.seed
+            )
+            self.assertEqual(chosen.identity.skill_key, sample.skill_key)
+            self.assertEqual(tuple(chosen.identity.target_ids), sample.target_ids)
+            replayed += 1
+        self.assertGreater(replayed, 0)
+
+    @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
+    def test_a_refused_monster_action_aborts_the_batch(self):
+        harness = self._harness()
+        monster = harness.build_monster("refused-monster")
+        player = harness.build_player("refused-player", 120)
+        encounter = manual_campaign._Encounter(
+            situation=harness.situations[0],
+            session_id="test:refusal",
+            initiator=player,
+            companions=(),
+            monsters=(monster,),
+        )
+        rejected = ActionResult.rejected(RejectReason.CAST_CONDITION_UNMET, "displaced")
+
+        def refuse(request, *args, **kwargs):
+            return rejected
+
+        with patch.object(ActionResolver, "resolve", refuse):
+            with harness._recording(encounter, [], [], [], {monster.key}, {}, []):
+                with self.assertRaises(manual_campaign.RefusedMonsterAction) as raised:
+                    ActionResolver.resolve(
+                        SimpleNamespace(actor=monster, skill_key="basic_attack")
+                    )
+        self.assertIn(monster.key, str(raised.exception))
+        self.assertIn("basic_attack", str(raised.exception))
+        self.assertIn("cast_condition_unmet", str(raised.exception))
+        # A refusal is a batch failure, so no operation can publish a report
+        # from it: the exception travels out of the orchestration unchanged.
+        class _Refusing:
+            def run_archetype_campaign(self, archetype):
+                raise manual_campaign.RefusedMonsterAction("refused")
+
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaises(manual_campaign.RefusedMonsterAction):
+                reports.run_operation(
+                    operation="archetype",
+                    harness=_Refusing(),
+                    header={},
+                    output=directory,
+                    archetype="brute",
+                )
+            self.assertEqual(list(Path(directory).iterdir()), [])
+
+    @covers_requirement("monster-ai-manual-validation::manual-reports-preserve-evidence-and-uncertainty")
+    def test_detailed_trace_export_is_opt_in(self):
+        harness = self._harness()
+        with tempfile.TemporaryDirectory() as directory:
+            result = reports.run_operation(
+                operation="archetype",
+                harness=harness,
+                header={"baseline_commit": "deadbeef"},
+                output=directory,
+                archetype=harness.archetypes[0],
+                detailed_trace=True,
+            )
+            self.assertEqual(len(result.paths), 3)
+            report = json.loads(Path(result.paths[0]).read_text(encoding="utf-8"))
+            record = report["raw"][0]["decision_records"][0]
+            self.assertNotIn("trace", record)
+            export = json.loads(Path(result.paths[2]).read_text(encoding="utf-8"))
+            self.assertEqual(export["operation"], "traces")
+            self.assertEqual(
+                export["decisions"][0]["decision_index"],
+                record["index"],
+            )
+            trace = export["decisions"][0]["trace"]
+            for key in ("scope", "seed", "plans", "observations", "selected"):
+                self.assertIn(key, trace)
+            self.assertTrue(trace["plans"])
 
     @covers_requirement("monster-ai-manual-validation::manual-campaign-has-the-approved-finite-allocation")
     def test_intelligence_pairs_share_stats_ownership_and_kit(self):
@@ -608,29 +914,30 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
     @covers_requirement("monster-ai-manual-validation::manual-operations-remain-separate-from-default-verification")
     def test_overwhelm_round_records_its_own_internal_round_identity(self):
         harness = self._harness()
-        # A genuinely decided encounter: the monster's team overwhelms the
-        # party, which is exactly when compression is authorized to run.
+        # A genuinely decided encounter: the monster's team overwhelmingly
+        # out-powers the party, which is exactly when compression is authorized
+        # to run, while the party can absorb the monster's offense long enough
+        # that the encounter really spans its three internal rounds.
         player, monster, battlefield = self._field(
-            harness, player_hp=20, monster_hp=5000
+            harness, player_hp=400, monster_hp=6000
         )
-        monster.traits.atk_phys.base = 100
-        monster.traits.atk_phys.current = 100
+        monster.traits.atk_phys.base = 200
+        monster.traits.atk_phys.current = 200
         monster.traits.defense.base = 120
         monster.traits.defense.current = 120
+        self.assertEqual(classify_overwhelm(battlefield), "monsters")
         seen: list = []
+        traces: list = []
 
         def provider(entity, field):
             scope = current_decision_scope()
             if scope is not None:
                 seen.append(scope)
-            if entity.key != monster.key:
-                return None
-            target = BattlefieldActionContext(field)
-            return ActionRequest(
-                monster,
-                manual_campaign._ENCOUNTER_SKILL_KEYS[0],
-                [player],
-                target,
+            return behaviour.monster_behaviour_policy(
+                entity,
+                field,
+                context=BattlefieldActionContext(field),
+                trace=traces,
             )
 
         resolve_overwhelm(
@@ -639,21 +946,27 @@ class ScopeIdentitySmokeTests(EvenniaTestCase):
             max_rounds=3,
             decision_scope_base=ExecutionScopeBase(session_id="smoke:ovw", round_index=1),
         )
-        self.assertTrue(seen)
+        self.assertTrue(seen and traces)
         for scope in seen:
             self.assertEqual(scope.session_id, "smoke:ovw")
             self.assertEqual(scope.context_mode, "overwhelm")
-            self.assertGreaterEqual(scope.round_index, 1)
         monster_scopes = [
             scope for scope in seen if scope.actor_id == stable_actor_id(monster)
         ]
         self.assertTrue(monster_scopes)
         self.assertEqual(monster_scopes[0].slot_index, 0)
-        first_round = min(scope.round_index for scope in seen)
-        distinct = {scope.round_index for scope in seen}
-        self.assertEqual(min(distinct), first_round)
-        for scope in seen:
-            self.assertIn(scope.round_index, distinct)
+        # Every internal round is its own actual round of the encounter: the
+        # real utility policy decides once per round, its own traces record
+        # those decisions, and the round identities advance one by one from the
+        # base the caller supplied instead of every round sharing one identity.
+        self.assertEqual(
+            sorted(scope.round_index for scope in monster_scopes), [1, 2, 3]
+        )
+        self.assertEqual([trace.scope[1] for trace in traces], [1, 2, 3])
+        self.assertEqual({trace.scope[4] for trace in traces}, {"overwhelm"})
+        self.assertTrue(all(trace.plans for trace in traces))
+        self.assertTrue(any(trace.selected is not None for trace in traces))
+        self.assertTrue(all(trace.candidates > 0 for trace in traces))
 
 
 class PerformanceHarnessTests(EvenniaTestCase):
@@ -680,7 +993,17 @@ class PerformanceHarnessTests(EvenniaTestCase):
         self.assertTrue(utility.dice_isolated)
         self.assertFalse(legacy.dice_isolated)
         self.assertGreater(utility.examined, 0)
-        self.assertEqual(len(report.scaling), len(reports.PERFORMANCE_SCALING_COUNTS))
+        # The scaling probe holds ONE fixed battlefield and varies only the
+        # examined-proposal budget, reporting the real examined/accepted/
+        # omitted counters at each setting.
+        self.assertEqual(
+            [item.budget for item in report.scaling],
+            list(reports.PERFORMANCE_SCALING_BUDGETS),
+        )
+        for item in report.scaling:
+            self.assertEqual(item.examined, item.accepted + 0)
+            self.assertGreaterEqual(item.examined, item.accepted)
+            self.assertGreaterEqual(item.queries, 1)
         # The measured call is a read of fixed state (simulation design
         # section 6): one complete utility policy call over the reference
         # envelope leaves every participant's stored traits byte-identical,
