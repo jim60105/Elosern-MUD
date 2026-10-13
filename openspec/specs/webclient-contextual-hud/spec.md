@@ -11,7 +11,7 @@ frame, the bounded skill master-detail, and the two-step destructive confirmatio
 ## Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
 #### Scenario: The requirement carries its amendments
 - **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
@@ -42,7 +42,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
 #### Scenario: The bottom band keeps one height whatever it holds
-- **WHEN** the shell renders at 1451x790 and the player moves through the exploration scene overview, a target's verb popover, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **WHEN** the shell renders at 1451x790 and the player moves through the exploration scene overview, a person's verb card, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
 - **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
 
 #### Scenario: The band splits two thirds and one third
@@ -177,7 +177,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
   stage, crossfading over the scene duration at `full` and switching in one frame at `off`
 
 #### Scenario: Focus is rescued before its surface is hidden
-- **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip when the incoming mode is dialogue
+- **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip or a person's verb card when the incoming mode is dialogue
 - **THEN** focus is moved to the incoming mode's focus home before the surface is removed, and no focus is lost to the document body
 
 #### Scenario: Creation mode presents only the creation surfaces
@@ -956,7 +956,7 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 
 #### Scenario: Digits pick and confirm the frame's first nine entries
 - **WHEN** the dock owns keyboard focus (the key target is not editable) and the player presses `1`–`9`
-- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order — for the scene overview, its first nine chips in reading order: people, then objects, then the footer; exits belong to the separate compass; a frame's `back` row takes the slot of its rendered position) and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
+- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order; a frame's `back` row takes the slot of its rendered position) — except in the exploration screen, where the presence rail owns the digits as `webclient-presence-rail` defines: they pick its visible entries, never the overview's footer chips or the rows of its waiting and suggestions frames, and exits belong to the separate compass and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
 
 #### Scenario: Digits outside the dock's claim fall through
 - **WHEN** dialogue mode holds — or a digit's entry does not exist (a frame with fewer rendered entries, dialogue mode, or the pre-session empty stack)
@@ -972,13 +972,13 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
   styled `<kbd>` elements and no other key named
 
 #### Scenario: A digit picks its row
-- **WHEN** the scene overview holds two person chips and one object chip beside a compass with three exit targets, and the player presses `2`, then after Escape presses `3`
-- **THEN** `2` opens the second person's popover once and `3` submits the object's `explore.look` once; compass targets occupy no digit slot
+- **WHEN** the presence rail holds two people and one object beside a compass with three exit targets, and the player presses `2`, then after Escape presses `3`
+- **THEN** `2` opens the second person's verb card once and `3` submits the object's `explore.look` once; compass targets and footer chips occupy no digit slot
 
 #### Scenario: A digit beyond the frame's rows is unclaimed
 - **WHEN** the current dock frame has fewer rendered entries than the pressed digit and the command
   field is not focused
-- **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits
+- **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits; in the exploration screen the presence rail instead claims every digit while it is on the stage, so a digit past its entries does nothing and none falls through to the footer
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
 - **WHEN** the dialogue choice list shows four picks with focus on the list, the command region is
@@ -992,8 +992,8 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 The dock SHALL render a breadcrumb line whenever the router's menu stack is deeper than its root frame, and SHALL hide it entirely at the root frame. The breadcrumb SHALL name the parent frame and the current frame, with the current frame visually distinguished, and SHALL carry a back control. Activating the back control SHALL perform exactly the same operation the Escape key performs — it SHALL pop exactly one menu level and SHALL NOT dispatch any action.
 
 #### Scenario: The verb popover names its target once
-- **WHEN** a target's verb popover (the scene overview's person-target frame) is current
-- **THEN** the breadcrumb does not render and the target is stated exactly once, because the popover's own heading already names the target; the popover's `back` row, Escape, and a pointer press outside the popover card remain its back paths, and every other submenu keeps the breadcrumb
+- **WHEN** a person's verb card is open over the stage
+- **THEN** the breadcrumb does not render, because the card is client-local and pushes no router frame, and the person is named once, by the message window's speaker line; the card's `✕ 返回` row and Escape are its back paths, and every submenu keeps the breadcrumb
 
 #### Scenario: The breadcrumb cannot disagree with Escape
 - **WHEN** the breadcrumb's contents and visibility are computed
@@ -1024,14 +1024,14 @@ The dock SHALL render a breadcrumb line whenever the router's menu stack is deep
 #### Scenario: A focused `back` row keeps a visible focus carrier
 - **WHEN** keyboard focus moves onto the suggestions frame's `back` item
 - **THEN** that `back` item is rendered as a row carrying the focused state (fill and border change together, not color alone), the breadcrumb's back control carries no focused state, and Enter on the row or a click on the breadcrumb control pops exactly one level back to the parent frame
-- **WHEN** keyboard focus moves onto a verb popover's `back` item
-- **THEN** that `back` item carries the same focused row treatment, and Enter or a click on the row pops exactly one level back to the scene overview
+- **WHEN** a person's verb card's `✕ 返回` row is the card's active row
+- **THEN** it carries the card's active-row treatment, and Enter or a click on the row closes the card without popping a router level and returns focus to the rail entry that opened it
 
 #### Scenario: The breadcrumb tracks a target frame's own name
-- **WHEN** the player opens a frame scoped to one target other than the verb popover
+- **WHEN** the player opens a frame scoped to one target
 - **THEN** the breadcrumb's current segment is that target's server-authored display name
-- **WHEN** the player opens an interact target's verb popover from the scene overview
-- **THEN** the popover's heading is that target's server-authored display name, no breadcrumb is rendered, and the target's name appears once in the command region
+- **WHEN** the player opens an interact target's verb card from the presence rail
+- **THEN** the message window's speaker line names that target's server-authored display name, no breadcrumb is rendered, and the command region states no name
 
 #### Scenario: The breadcrumb cannot drift from the router
 - **WHEN** a panel replacement pops or replaces the current frame
@@ -1043,7 +1043,7 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 
 #### Scenario: The form set is fixed
 - **WHEN** the row region selects a form
-- **THEN** the forms are: person, object, and footer chips for the scene overview beside the exit compass; the verb popover's rows under a target head; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
+- **THEN** the forms are: footer chips for the scene overview beside the exit compass; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
 
 #### Scenario: Exploration frames never regress to grids or nav lists
 - **WHEN** any exploration frame renders
@@ -1078,8 +1078,8 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** it is decorative, hidden from assistive technology, always accompanies a real text label, and is selected only from stable server-authored keys or the direction table — never from free text such as a display name
 
 #### Scenario: The verb popover heads with its target
-- **WHEN** a target's verb popover renders
-- **THEN** it renders a head naming the target it is scoped to, taken from the frame's own server-authored display name, above that target's rows
+- **WHEN** a person's verb card renders over the stage
+- **THEN** the message window's speaker line names the person it is scoped to, taken from the committed panel's server-authored display name, while the card lists that person's rows
 
 #### Scenario: The disabled contract holds in every form
 - **WHEN** a disabled entry renders in any row or chip form
@@ -1110,12 +1110,12 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** the compass occupies the left side and the shared readout and overview occupy the right column; no exit-outlet grid or detail aside renders
 
 #### Scenario: A row renders only backed fields
-- **WHEN** the scene overview renders a look-only chip for a present entity
-- **THEN** the chip shows the entity's display name only, and shows no statistics line and no portrait, because the exploration payload carries no such field
+- **WHEN** the presence rail renders a look-only entry for a present entity
+- **THEN** the entry shows the entity's display name and its initial, and shows no statistics line, because the exploration payload carries no such field; a face crop shows only when the committed panel names a portrait the art catalog resolves
 
 #### Scenario: A target-affordance frame names its target
-- **WHEN** the player opens an interact target's verb popover
-- **THEN** the popover renders a head naming that target above the target's server-authored rows
+- **WHEN** the player opens an interact target's verb card
+- **THEN** the message window names that target as the speaker above the page while the card lists the target's server-authored rows
 
 #### Scenario: A disabled row in any pane stays readable
 - **WHEN** a disabled row or chip is focused in any form, by arrow key or by pointer
@@ -2232,7 +2232,7 @@ The skill book, the bag and equipment, the shop, the quest board, the lore refer
 The action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation mode and for every frame, and no surface outside the band SHALL be positioned from the frame the dock currently carries.
 
 #### Scenario: No frame moves or resizes the dock
-- **WHEN** the dock carries the scene overview, a target's verb popover, the waiting frame, the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
+- **WHEN** the dock carries the scene overview (with or without a person's verb card open over the stage), the waiting frame, the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
 - **THEN** no frame widens, heightens, shortens, or moves its box
 
 #### Scenario: Dialogue hides the dock with the region
@@ -2244,8 +2244,8 @@ The action dock SHALL fill the bottom band's command region — the right third 
 - **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
 
 #### Scenario: Popovers and wide frames stay inside the region
-- **WHEN** a target's verb popover renders, or a frame's content does not fit the region's width
-- **THEN** the popover renders as a card laid over the region's visible box, inside the command region, scrolling inside its own card when its rows exceed it, and the wide frame wraps or collapses its own columns inside the region, never overflowing it horizontally
+- **WHEN** a person's verb card renders, or a frame's content does not fit the region's width
+- **THEN** the card renders centred over the stage in the `choices` anchor, outside the command region, scrolling inside its own card when its rows exceed it, while the command region keeps its box, and the wide frame wraps or collapses its own columns inside the region, never overflowing it horizontally
 
 #### Scenario: One dock element persists across every mode
 - **WHEN** the committed mode changes, including into or out of dialogue
@@ -2260,8 +2260,8 @@ The action dock SHALL fill the bottom band's command region — the right third 
 - **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
 
 #### Scenario: No frame resizes the command region
-- **WHEN** the dock moves at 1451x790 from the scene overview to a target's verb popover, to the waiting frame, and, in combat, to the deepest skill target frame
-- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and the verb popover's card lies inside the command region
+- **WHEN** the dock moves at 1451x790 from the scene overview to a person's verb card over the stage, to the waiting frame, and, in combat, to the deepest skill target frame
+- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and the verb card lies centred over the stage above the band
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
@@ -2437,12 +2437,12 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 - **THEN** the keyboard router claims only `/` (the command-line opener); every other key is unclaimed by the dock router, so no key moves the hidden dock's focus, pushes or pops a frame, or activates a hidden entry; the keys the dialogue choice list handles never reach the router, and Enter and Space on the focused page surface keep their reading meaning
 
 #### Scenario: Entering dialogue collapses the command region
-- **WHEN** the player activates 交談 in a host's verb popover at 1451x790 and the commit makes the mode `dialogue`
+- **WHEN** the player activates 交談 on a host's verb card at 1451x790 and the commit makes the mode `dialogue`
 - **THEN** from the commit's frame the band's command region and the `#action-dock` element are out of the accessibility tree and the tab order, the message region spans the band's whole width at 220px (±1px) height, the region is `visibility: hidden` once its slide ends, focus is on the message window's page surface while the greeting is read, and focus moves to the dialogue choice list when the greeting's last page is fully shown
 
 #### Scenario: Leaving dialogue restores the overview without a remount
 - **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
-- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the scene overview with no popover open, and focus is on the exit compass
+- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the scene overview with no card open, and focus is on the exit compass
 
 #### Scenario: Keys never drive the hidden dock
 - **WHEN** the mode is dialogue, focus is on the document body, and the player presses ArrowRight, Enter, and Escape
@@ -2991,11 +2991,11 @@ Standing portraits SHALL retain their supplied image contours and align their fe
 - **THEN** the silhouette identity and state are not occluded by vitals or the command line and all HUD controls remain reachable
 
 ### Requirement: The bottom band separates material and focus without obscuring controls
-The fixed bottom band SHALL provide a continuous ink-and-gold reading surface with a decorative stage seam and aligned message-control and shortcut rows. Page text, command rows and popovers SHALL never paint over these reserved controls. Only the active control SHALL carry the strongest focus treatment; the command field SHALL expose one clear focus frame.
+The fixed bottom band SHALL provide a continuous ink-and-gold reading surface with a decorative stage seam and aligned message-control and shortcut rows. Page text, command rows and cards SHALL never paint over these reserved controls. Only the active control SHALL carry the strongest focus treatment; the command field SHALL expose one clear focus frame.
 
 #### Scenario: Popover text is isolated
-- **WHEN** a verb popover opens over populated scene chips
-- **THEN** no chip text shows through it, the target heading is stated once, and background chips cannot activate
+- **WHEN** a person's verb card opens over the stage with populated scene chips in the command panel
+- **THEN** no stage or chip text shows through the card, the person is named once by the speaker line, and the inert command panel's chips cannot activate
 
 #### Scenario: Dense command content is bounded
 - **WHEN** a frame contains more rows than fit

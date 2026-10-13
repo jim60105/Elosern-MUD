@@ -109,7 +109,7 @@ Playwright SHALL verify required surface visibility at 1451x790 and 2560x1440; t
 - **THEN** every node marker is inside the map canvas, no two node markers overlap, and the island renders no legend
 
 #### Scenario: The dialogue stage journey completes by keyboard
-- **WHEN** the acceptance journey at 1451x790 opens a scripted host's conversation with 交談 from the scene overview, reads every page with Enter, presses `1`, reads the reply, activates `⌨ 自由對話` and sends a line, activates `↦ 移動…` and presses Escape, activates `✕ 結束對話`, and then aims and moves through the exit compass
+- **WHEN** the acceptance journey at 1451x790 opens a scripted host's conversation with 交談 from the host's verb card (opened from the presence rail), reads every page with Enter, presses `1`, reads the reply, activates `⌨ 自由對話` and sends a line, activates `↦ 移動…` and presses Escape, activates `✕ 結束對話`, and then aims and moves through the exit compass
 - **THEN** the browser submits exactly `explore.talk_open`, `explore.talk_scripted`, `explore.talk_freeform`, `explore.dialogue_leave`, and `explore.move` in that order, the command region is hidden and both stage actors are rendered from the conversation's first commit to its end, the choice list is absent whenever a page is typing or unread, `document.activeElement` is never the body during the conversation, and focus is on the exit compass once it ends
 
 #### Scenario: Command-line expand, send, and cancel are exercised

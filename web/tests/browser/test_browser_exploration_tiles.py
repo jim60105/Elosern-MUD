@@ -67,7 +67,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
+    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
     def test_crowded_room_folds_into_the_rail_at_a_narrow_viewport(self):
         """A crowded room at the minimum supported viewport: the overview
         keeps only its footer chips, the twelve exits stay on the compass,

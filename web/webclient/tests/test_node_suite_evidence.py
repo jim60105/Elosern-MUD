@@ -272,7 +272,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
+        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
     )
     def test_exploration_menu_node_suite_passes(self):
         result = subprocess.run(
@@ -1326,6 +1326,70 @@ class ExitCompassEvidenceTest(unittest.TestCase):
             "exit-compass gate/surfaces Vitest evidence failed:\n" + result.stdout + result.stderr,
         )
         self.assertIn("pass", result.stdout)
+
+
+class PresenceRailEvidenceTest(unittest.TestCase):
+    """Vitest evidence for exploration-presence-rail (rail, verb card, ChoiceCard)."""
+
+    def _run_vitest(self, *relative_paths):
+        result = subprocess.run(
+            ["npx", "--no-install", "vitest", "run"]
+            + [str(REPO_ROOT / rel) for rel in relative_paths],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "presence-rail Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
+        "webclient-presence-rail::the-presence-rail-shows-people-and-objects-on-the-stage-floor",
+        "webclient-presence-rail::the-rail-shows-at-most-six-entries-and-folds-the-rest-into-a-count",
+        "webclient-presence-rail::rail-entries-activate-by-the-payload-each-entry-already-carries",
+        "webclient-presence-rail::the-rail-is-one-keyboard-composite-and-digits-pick-entries",
+    )
+    def test_presence_rail_component_vitest_evidence_passes(self):
+        self._run_vitest("web/webclient-app/tests/world/presence_rail.test.js")
+
+    @covers_requirement(
+        "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover",
+        "webclient-presence-rail::verb-card-rows-submit-the-payloads-the-popover-rows-submitted",
+        "webclient-presence-rail::a-departed-person-closes-the-card",
+        "webclient-presence-rail::rail-entries-activate-by-the-payload-each-entry-already-carries",
+    )
+    def test_presence_card_store_vitest_evidence_passes(self):
+        self._run_vitest("web/webclient-app/tests/store/presence_card.test.js")
+
+    @covers_requirement(
+        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview",
+        "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover",
+        "webclient-presence-rail::a-departed-person-closes-the-card",
+        "webclient-presence-rail::the-presence-rail-shows-people-and-objects-on-the-stage-floor",
+    )
+    def test_presence_rail_app_client_vitest_evidence_passes(self):
+        self._run_vitest("web/webclient-app/tests/app_client_presence_rail.test.js")
+
+    @covers_requirement(
+        "webclient-presence-rail::choicecard-is-the-one-centred-card-shell",
+        "webclient-presence-rail::the-dialogue-screen-does-not-change-when-it-renders-through-choicecard",
+    )
+    def test_choice_card_vitest_evidence_passes(self):
+        self._run_vitest(
+            "web/webclient-app/tests/components/choice_card.test.js",
+            "web/webclient-app/tests/app_client_dialogue_choices.test.js",
+        )
+
+    @covers_requirement(
+        "webclient-presence-rail::rail-digits-are-claimed-and-never-fall-through-to-the-footer",
+        "webclient-presence-rail::the-rail-shows-at-most-six-entries-and-folds-the-rest-into-a-count",
+    )
+    def test_rail_digit_claims_vitest_evidence_passes(self):
+        self._run_vitest("web/webclient-app/tests/store/digit_row_picks.test.js")
 
 
 if __name__ == "__main__":

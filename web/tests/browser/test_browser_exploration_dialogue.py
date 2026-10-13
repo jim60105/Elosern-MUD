@@ -182,7 +182,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
+        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
     )
     @covers_requirement(
         "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
@@ -1053,3 +1053,83 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # Ensure standing humanoid SVG is absent from the stage
         svg_count = page.locator('[data-anchor="actor-right"] [data-testid="reference-artwork"] svg').count()
         self.assertEqual(svg_count, 0, "legacy standing humanoid SVG must not be rendered")
+
+    @covers_requirement(
+        "webclient-presence-rail::the-presence-rail-and-verb-card-are-verified-in-the-live-client-at-two-viewports"
+    )
+    def test_presence_rail_and_verb_card_hold_at_both_reference_viewports(self):
+        """exploration-presence-rail: geometry and the standee handover at
+        1451x790 and 1920x1080.
+
+        The rail sits above the band without overlapping the local-map
+        island column, the verb card is centred and fully visible, and 交談
+        hands the very same standee element on to the dialogue surface.
+        """
+        for viewport in ((1451, 790), (1920, 1080)):
+            page = self.logged_in_page(viewport)
+            self._wait_exploration_available(page)
+            host = overview_target_with_affordance(page, "explore.talk_open")
+            page.wait_for_selector(
+                '[data-anchor="presence"] [data-entry-key="target-%s"]' % host["identity"],
+                state="attached",
+            )
+            page.wait_for_timeout(300)
+            geometry = page.evaluate(
+                """() => {
+                  const box = (el) => {
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+                  };
+                  return {
+                    rail: box(document.querySelector('[data-anchor="presence"] [data-testid="presence-rail"]')),
+                    band: box(document.querySelector('[data-testid="stage-band"]')),
+                    island: box(document.querySelector('[data-testid="local-map"]')),
+                    width: window.innerWidth,
+                  };
+                }"""
+            )
+            self.assertLessEqual(geometry["rail"]["bottom"], geometry["band"]["top"] + 1, str(viewport))
+            self.assertGreater(geometry["rail"]["left"], geometry["width"] / 2, str(viewport))
+            if geometry["island"]:
+                overlaps = not (
+                    geometry["rail"]["right"] <= geometry["island"]["left"]
+                    or geometry["island"]["right"] <= geometry["rail"]["left"]
+                    or geometry["rail"]["bottom"] <= geometry["island"]["top"]
+                    or geometry["island"]["bottom"] <= geometry["rail"]["top"]
+                )
+                self.assertFalse(overlaps, "the rail overlaps the island column at %s" % (viewport,))
+
+            activate_overview_chip(page, "target-%s" % host["identity"])
+            page.wait_for_selector('[data-anchor="choices"] [data-testid="presence-card"]')
+            page.wait_for_timeout(200)
+            card = page.evaluate(
+                """() => {
+                  const r = document.querySelector('[data-anchor="choices"] [data-testid="presence-card"]')
+                    .getBoundingClientRect();
+                  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+                           width: window.innerWidth, height: window.innerHeight };
+                }"""
+            )
+            self.assertGreaterEqual(card["left"], 0, str(viewport))
+            self.assertLessEqual(card["right"], card["width"], str(viewport))
+            self.assertGreaterEqual(card["top"], 0, str(viewport))
+            self.assertLessEqual(card["bottom"], card["height"], str(viewport))
+            self.assertAlmostEqual((card["left"] + card["right"]) / 2, card["width"] / 2, delta=2)
+
+            standee = '[data-anchor="actor-right"] [data-testid="stage-actor"]'
+            page.wait_for_selector(standee)
+            page.evaluate("(sel) => { document.querySelector(sel).__presenceMark = true; }", standee)
+            _press(page, "Enter")  # 交談 -> explore.talk_open
+            self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+            wait_for_store_state(page, lambda s: s.get("mode") == "dialogue")
+            page.wait_for_selector(standee)
+            self.assertTrue(
+                page.evaluate("(sel) => document.querySelector(sel).__presenceMark === true", standee),
+                "the standee was remounted between the card and the dialogue at %s" % (viewport,),
+            )
+            # Leave the conversation so the next viewport starts in exploration.
+            open_dialogue_choices(page)
+            page.click('[data-testid="dialogue-exit"]')
+            wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
+            page.close()
