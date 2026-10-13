@@ -184,21 +184,25 @@ def consume_climax_charges(entity) -> int:
     return dispelled
 
 
-def active_buff_keys_from_storage(entity) -> set[str]:
-    """Return active definition keys from stored buff cache without a handler.
+def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
+    """Return the LIVE persisted buff-cache entries, without a handler.
 
-    Presentation and preview paths must never materialize ``entity.buffs``.
-    This read-only accessor mirrors :func:`entity_active_buffs` against the
-    persisted buff attribute, skipping paused, zero-stack, and expired entries.
+    The ONE non-mutating expression of buff liveness (unpaused, positive
+    stacks, game-time unexpired) against the persisted buff attribute, shared
+    by the key reader below, the positional-marker fact and the monster-AI
+    buff projection: presentation and preview paths must never materialize
+    ``entity.buffs`` or refresh its instances, and no two readers may disagree
+    about which persisted entries are active. A malformed cache or entry still
+    fails closed with the historical ``TypeError``.
     """
     from collections.abc import Mapping
 
     cache = entity.attributes.get("buffs", default={})
     if cache is None:
-        return set()
+        return ()
     if not isinstance(cache, Mapping):
         raise TypeError("buff cache storage is malformed")
-    active: set[str] = set()
+    live: list[dict] = []
     for buff_cache in cache.values():
         if not isinstance(buff_cache, Mapping):
             raise TypeError("buff cache entry is malformed")
@@ -210,20 +214,46 @@ def active_buff_keys_from_storage(entity) -> set[str]:
         remaining = buff_cache.get("remaining_seconds")
         if isinstance(remaining, int) and remaining <= 0:
             continue
+        live.append(buff_cache)
+    return tuple(live)
+
+
+def active_buff_keys_from_storage(entity) -> set[str]:
+    """Return active definition keys from stored buff cache without a handler.
+
+    Presentation and preview paths must never materialize ``entity.buffs``.
+    This read-only accessor mirrors :func:`entity_active_buffs` against the
+    persisted buff attribute through the shared liveness reader above, so the
+    key set and the projected entries can never disagree.
+    """
+    active: set[str] = set()
+    for buff_cache in active_buff_entries_from_storage(entity):
         definition_key = buff_cache.get("definition_key")
         if isinstance(definition_key, str):
             active.add(definition_key)
     return active
 
 
-def has_positional_marker(entity: Any) -> bool:
+def has_positional_marker(
+    entity: Any,
+    *,
+    active_keys: Any = None,
+) -> bool:
     """Return the canonical out-of-position fact (design D1/D2).
 
     True iff the entity carries a live (unpaused, unexpired) instance of a
     definition declaring ``marker: positional`` — the fact consults only the
     clause, never element/skill/definition-key identity.
+
+    ``active_keys`` may pre-supply the entity's live definition keys -- the
+    decision-local read set a caller already took -- so a per-plan validation
+    reuses one buff read instead of re-reading the marker question per
+    candidate. It is the same key set :func:`active_buff_keys_from_storage`
+    returns.
     """
-    if hasattr(entity, "attributes") and entity.attributes.has("buffs"):
+    if active_keys is not None:
+        active_keys = set(active_keys)
+    elif hasattr(entity, "attributes") and entity.attributes.has("buffs"):
         active_keys = active_buff_keys_from_storage(entity)
     elif hasattr(entity, "buffs"):
         active_keys = entity_active_buffs(entity)
