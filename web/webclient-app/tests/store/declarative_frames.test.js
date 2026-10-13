@@ -213,6 +213,62 @@ describe("declarative frame stack (store contract)", () => {
   });
 
   describe("frame loss", () => {
+    // A frame bound to one server-authored subject (here a combat skill
+    // frame bound to its skill key) whose subject vanishes pops exactly one
+    // level, and the parent restores focus toward the vanished row.
+    function skillCategory(keys) {
+      return [
+        {
+          category: "martial_arts",
+          label: "武技",
+          groups: [
+            {
+              group: null,
+              label: null,
+              skills: keys.map((key, index) => ({
+                key,
+                label: `招式${index + 1}`,
+                description: `第 ${index + 1} 式的合成描述。`,
+                cost: { mp: index },
+                target_spec: "self",
+                element: null,
+                enabled: true,
+                disabled_reason: null,
+                targets: [],
+                shorthands: [],
+              })),
+            },
+          ],
+        },
+      ];
+    }
+
+    function combatCommit(revision, keys) {
+      return fx.update({
+        revision,
+        mode: "combat",
+        panels: { context_actions: fx.combatActions({ skills: skillCategory(keys) }) },
+      });
+    }
+
+    it("a vanished subject pops exactly one level and restores the opener row", () => {
+      openExploration(store);
+      store.receive(1, "ui_update", [combatCommit(2, ["t_one", "t_two", "t_three"])], {});
+      expect(store.focusItemByKey("skills")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.focusItemByKey("skill-cat-0")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      const parentDepth = store.router.depth();
+      expect(store.focusItemByKey("t_two")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.router.currentDescriptor()).toEqual({ source: "combat.skill", params: { skillKey: "t_two" } });
+
+      // The committed panel no longer lists t_two: its frame pops one level.
+      store.receive(1, "ui_update", [combatCommit(3, ["t_one", "t_three"])], {});
+      expect(store.router.depth()).toBe(parentDepth);
+      expect(store.view.focus.key).toBe("t_three");
+    });
+
     it("consecutive unresolvable frames cascade in one access down to the parent", () => {
       openExploration(store);
       // The waiting frame, plus the suggestions frame pushed directly on top:

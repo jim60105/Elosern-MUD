@@ -298,7 +298,6 @@ describe("the presence slice (exploration-presence-rail)", () => {
       open();
       store.activatePresence("target-7");
       store.resetFramesToRoot();
-      store.refreshView();
       expect(store.view.presenceCard).toBe(null);
     });
 

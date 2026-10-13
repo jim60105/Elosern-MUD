@@ -396,12 +396,22 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 self.assertTrue(isinstance(menu.get("items"), list) and menu["items"])
         identities = [row["identity"] for row in table["identities"]]
         if identities:
+            # A person's verbs are the client-local verb card's, never a frame
+            # (exploration-presence-rail): the retired `exploration.target`
+            # source is unregistered and degrades to the shared marker, and
+            # the rail's entries carry every interact identity.
             target_menu = page.evaluate(
                 "(id) => window.__elosernBridge.resolveFrame("
                 "{ source: 'exploration.target', params: { identity: id } })",
                 identities[0],
             )
-            self.assertFalse(target_menu.get("unresolvable", False))
+            self.assertEqual(target_menu, {"unresolvable": True, "reason": None})
+            rail_identities = [
+                entry.get("identity")
+                for entry in store_state(page).get("presenceEntries") or []
+                if entry.get("presence") == "target"
+            ]
+            self.assertEqual(rail_identities, identities)
         # Purity: a second resolve deep-equals the first, and the committed
         # state is byte-identical across the resolution storm. The capture and
         # both resolutions must share ONE evaluate round-trip: the live server
@@ -427,8 +437,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             purity["after"], purity["before"],
             "resolution mutated committed state",
         )
-        # Degradation is data: an unregistered source and a lost identity
-        # return the shared marker (null reason; no authored message here).
+        # Degradation is data: an unregistered source (the retired target
+        # frame among them) returns the shared marker (null reason; no
+        # authored message here).
         # (services.* are UNREGISTERED sources since the keyboard service frames
         # were retired — any services.* descriptor resolves to the shared marker;
         # the unregistered-source leg names a

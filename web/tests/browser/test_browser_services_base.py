@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_card_row,
+    activate_presence_entry,
     focus_action_dock,
     store_state,
     wait_for_store_state,
@@ -113,15 +115,12 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         frameless (make-inventory-drawer-frameless): no keyboard frame is
         pushed and the router's stack is unchanged.
 
-        The target's verb popover carries the host's single 交談
-        `explore.talk_open` row followed by its navigate-kind service entry
-        (exploration_menu.js targetMenuFor; the panel's per-host keyword list
-        left the wire in exploration panel v3), so both hops are focused by
-        their stable keys through the store (focusItemByKey + Enter: the same
-        keyboard-parity path tabToRootAndConfirm uses, through the frozen
-        KeyboardRouter façade members — no pointer path and no OOB emission
-        beyond the journey's own later steps). The host's chip key is read from
-        the committed exploration panel, never guessed.
+        The host's verb card (exploration-presence-rail) carries its single
+        交談 `explore.talk_open` row followed by its navigate-kind service
+        entry (exploration_menu.js verbMenuFor), so both hops are reached by
+        their stable keys with the keyboard (no OOB emission beyond the
+        journey's own later steps). The host's medallion key is read from the
+        committed exploration panel, never guessed.
         """
         # Close any open drawer first so its scrim does not cover the stage or
         # block the dock arrow walk.
@@ -151,12 +150,13 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 },
             )
             return self._services_panel(page)
-        # guild/shop: the overview's person chip -> the host's verb popover ->
-        # the navigate-kind service entry. Both hops are addressed by their
-        # stable keys through the store (focusItemByKey + Enter) because the
-        # popover's row order is server-authored (交談 leads, then the target's
-        # own affordances), so a fixed arrow walk cannot name the service row.
-        # The chip's identity is read from the committed panel, never guessed.
+        # guild/shop: the host's medallion on the presence rail -> the
+        # host's verb card -> the navigate-kind service row
+        # (exploration-presence-rail). Both hops are addressed by their stable
+        # keys with the keyboard (the rail's and the card's arrow walks) because
+        # the card's row order is server-authored (交談 leads, then the
+        # target's own affordances). The medallion's identity is read from the
+        # committed panel, never guessed.
         target_key = page.evaluate(
             """(surface) => {
                 const s = window.__elosernBridge && window.__elosernBridge.store;
@@ -177,33 +177,9 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             target_key,
             f"no committed interact target carries the {surface_key} service entry",
         )
-        opened = page.evaluate(
-            """(key) => {
-                const s = window.__elosernBridge && window.__elosernBridge.store;
-                return s && s.focusItemByKey(key);
-            }""",
-            target_key,
-        )
-        self.assertTrue(
-            opened,
-            f"the {surface_key} host's overview chip ({target_key}) is not in "
-            "the current frame",
-        )
-        _press(page, "Enter")  # open the host's verb popover (no dispatch)
+        activate_presence_entry(page, target_key)  # open the verb card (no dispatch)
         item_key = "service-" + surface_key
-        focused = page.evaluate(
-            """(key) => {
-                const s = window.__elosernBridge && window.__elosernBridge.store;
-                return s && s.focusItemByKey(key);
-            }""",
-            item_key,
-        )
-        self.assertTrue(
-            focused,
-            f"the {surface_key} host's navigate row ({item_key}) is not in the "
-            "open target's verb popover",
-        )
-        _press(page, "Enter")  # open the frameless service drawer
+        activate_card_row(page, item_key)  # open the frameless service drawer
         if surface_key == "shop":
             wait_for_store_state(
                 page,
@@ -228,17 +204,11 @@ class ServicesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                     "description": "frameless quest drawer rendered",
                 },
             )
-        # Reaching the navigate row needed the host's verb popover, which is a
-        # pushed frame; the drawer's own open pushes nothing. Restore the
-        # committed root before returning so the helper's postcondition is the
-        # one the journeys assert — opening a frameless surface leaves the
-        # router's frame and trail untouched (resetFramesToRoot is the
-        # browser-helper stack normalizer; it never closes a drawer). This
-        # normalization is why those journeys can only catch a drawer that
-        # pushes a frame through the OTHER frameless entry points, which open no
-        # popover: the inventory branch below and the quest-drawer journey in
-        # test_browser_exploration_nav.py, both of which assert the invariance
-        # un-normalized.
+        # Reaching the navigate row opened the host's verb card (client-local,
+        # no frame); the drawer's own open pushes nothing either. Normalize to
+        # the committed root with no card before returning, so the helper's
+        # postcondition is the one the journeys assert (resetFramesToRoot is
+        # the browser-helper normalizer; it never closes a drawer).
         page.evaluate("window.__elosernBridge.store.resetFramesToRoot()")
         page.wait_for_timeout(80)
         return self._services_panel(page)

@@ -6,6 +6,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
+    CARD_SELECTOR,
     activate_overview_chip,
     focus_action_dock,
     install_outbound_recorder,
@@ -1107,16 +1108,16 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         store = "window.__elosernBridge.store"
         states = {"root": page.evaluate(measure)}
 
-        # A target's verb popover over the inert overview (webclient-scene-
-        # overview-swap), then the waiting frame: the scenario's "a target's
-        # verb popover" state.
+        # A person's verb card over the stage (exploration-presence-rail),
+        # then the waiting frame: the scenario's "a person's verb card"
+        # state.
         activate_overview_chip(page, "target-11")
-        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
-        states["popover"] = page.evaluate(measure)
-        # Close the popover (one Escape pops exactly one level) so the
-        # overview's footer chip is addressable again.
-        page.evaluate(f"() => {store}.focusPress('Escape')")
-        page.wait_for_selector('[data-testid="verb-popover"]', state="detached", timeout=15000)
+        page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        states["verb-card"] = page.evaluate(measure)
+        # Close the card (Escape, or its ✕ 返回) so the overview's footer
+        # chip is addressable again.
+        page.evaluate(f"() => {store}.closePresenceCard()")
+        page.wait_for_selector(CARD_SELECTOR, state="detached", timeout=15000)
 
         activate_overview_chip(page, "wait")
         page.wait_for_selector(".waiting-screen", timeout=15000)

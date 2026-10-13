@@ -409,7 +409,6 @@ defineExpose({ menuOpen });
   z-index: 4;
   display: flex;
   justify-content: flex-end;
-  max-width: calc(100% - var(--right-column, 258px * var(--ui-scale)) - var(--vitals-dock-w) - 64px * var(--ui-scale));
   pointer-events: none;
 }
 .elosern-stage:not([data-elosern-mode="exploration"]) [data-anchor="presence"] {

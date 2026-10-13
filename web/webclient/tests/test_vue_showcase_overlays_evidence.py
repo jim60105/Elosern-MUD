@@ -178,9 +178,7 @@ PREVIOUS_MANIFEST_KEYS = {
     # The AVG message window (webclient-message-window-component),
     # built and story-documented before C6c mounts it.
     "Core/MessageWindow",
-    # The AVG scene overview and its verb popover
-    # (webclient-scene-overview-component), built and story-documented
-    # before C8b mounts them.
+    # The AVG scene overview (webclient-scene-overview-component).
     "Action/SceneOverview",
     "Action/ExitCompass",
     # The dialogue stage actor (webclient-dialogue-stage-actors), the

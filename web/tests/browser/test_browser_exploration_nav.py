@@ -6,13 +6,17 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    CARD_SELECTOR,
     activate_compass_exit,
     activate_overview_chip,
+    card_row_keys,
     compass_target_refs,
     fixture_home_node_id,
     focus_action_dock,
     install_outbound_recorder,
+    open_verb_card,
     outbound_messages,
+    presence_entry_keys,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -176,49 +180,44 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # Pointer: open a person chip's verb popover, then click its final
-        # back cell (webclient-scene-overview-swap: the popover is the
-        # overview's one child frame; the retired Look submenu is gone).
+        # Pointer: open a person's verb card from the presence rail, then
+        # click its trailing ✕ 返回 row (exploration-presence-rail: the card
+        # is client-local, never a router frame).
         panel = self._live_exploration_panel(page)
         targets = panel.get("interact") or []
         self.assertTrue(targets, "the fixture room must offer an interact target")
         chip_key = "target-%s" % targets[0]["identity"]
+        medallion = '[data-anchor="presence"] [data-entry-key="%s"]' % chip_key
         wait_for_store_state(
             page,
             lambda s: ((s.get("panels") or {}).get("exploration") or {}).get("available") is True,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="%s"]' % chip_key,
-                "predicate": (
-                    "() => !!document.querySelector("
-                    "'#action-dock [data-item-key=\"%s\"]')" % chip_key
-                ),
-                "description": "the person chip rendered in the exploration dock",
+                "selector": medallion,
+                "predicate": "() => !!document.querySelector(%r)" % medallion,
+                "description": "the person's medallion rendered on the presence rail",
             },
         )
-        page.locator('#action-dock [data-item-key="%s"]' % chip_key).click()
+        page.locator(medallion).click()
+        back_row = '[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="back"]'
         wait_for_store_state(
             page,
-            lambda s: s.get("dockSource") == "exploration.target",
+            lambda s: (s.get("presenceCard") or {}).get("kind") == "verbs",
             dom_readiness={
-                "selector": '[data-testid="verb-popover"] [data-item-key="back"]',
-                "predicate": (
-                    "() => !!document.querySelector("
-                    "'[data-testid=\"verb-popover\"] [data-item-key=\"back\"]')"
-                ),
-                "description": "the popover's back cell rendered",
+                "selector": back_row,
+                "predicate": "() => !!document.querySelector(%r)" % back_row,
+                "description": "the verb card's back row rendered",
             },
         )
-        page.locator('[data-testid="verb-popover"] [data-item-key="back"]').click()
+        self.assertEqual(self._depth(page), 1, "opening the verb card pushes no router frame")
+        page.locator(back_row).click()
         wait_for_store_state(
             page,
-            lambda s: s.get("dockSource") == "exploration.root",
+            lambda s: s.get("presenceCard") is None,
             dom_readiness={
-                "selector": "#action-dock [data-testid=\"scene-overview\"]",
-                "predicate": (
-                    "() => !!document.querySelector("
-                    "'#action-dock [data-testid=\"scene-overview\"]')"
-                ),
-                "description": "the scene overview rendered in the dock",
+                "selector": medallion,
+                "predicate": "() => document.activeElement === document.querySelector(%r)"
+                % '[data-anchor="presence"] [data-testid="presence-rail"]',
+                "description": "focus back on the presence rail",
             },
         )
         # The overview's chips render again, no ui_action was sent, and the
@@ -228,7 +227,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
-        self.assertIn(chip_key, keys, "the overview renders the person chip again")
+        self.assertNotIn(chip_key, keys, "the person stands on the rail, not in the overview")
+        self.assertIn(chip_key, presence_entry_keys(page), "the rail renders the person again")
         self.assertIn("look-room", keys, "the overview renders its footer again")
         self.assertIn("wait", keys, "the overview renders its footer again")
         for gone in ("move", "look", "interact"):
@@ -237,7 +237,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(
             page.evaluate("window.__elosernBridge.router.depth()"),
             1,
-            "the back cell pops exactly one router frame",
+            "the card never pushed a router frame",
         )
 
     @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
@@ -246,51 +246,33 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's host chip -> the verb popover: two levels deep
-        # (webclient-scene-overview-swap). 交談 dispatches explore.talk_open
-        # from the popover itself, so the popover is the deepest frame.
+        # The rail's host medallion -> the verb card: client-local, so the
+        # router stays at the overview (exploration-presence-rail). 交談
+        # dispatches explore.talk_open from the card itself.
         panel = self._live_exploration_panel(page)
         host_identity = panel["interact"][0]["identity"]
-        activate_overview_chip(page, "target-%s" % host_identity)
-        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 2)
-        # H3 (design D2): at depth >= 2 the dock renders both the root tab
-        # bar (8 root tabs) and the scrolling pane (the active frame's rows).
-        # The test's cell assertions target the pane's rows only.
-        target_keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll("
-            "'[data-testid=\"verb-popover\"] [data-item-key]'))"
-            ".map((el) => el.getAttribute('data-item-key'))"
-        )
-        # The host's verb popover: the 交談 conversation entry plus 查看 and
-        # the final back cell (the exploration fixture carries no guild
-        # navigate entry). The card renders in the dock's overlay layer, over
-        # the inert overview (webclient-scene-overview-swap).
+        open_verb_card(page, host_identity)
+        self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
+        # The host's verb card: the 交談 conversation entry, the author
+        # editor entry, 查看, and the trailing ✕ 返回 (the exploration
+        # fixture carries no guild navigate entry), centred over the stage.
         self.assertEqual(
-            target_keys,
+            card_row_keys(page),
             ["talk-open", "service-npc_persona", "look-target", "back"],
-            "the popover's cells must render at depth 2",
+            "the verb card's rows",
         )
-        self.assertEqual(
-            page.evaluate(
-                "window.__elosernBridge.router.currentItem() && "
-                "window.__elosernBridge.router.currentItem().key"
-            ),
-            "talk-open",
-        )
-        _press(page, "Escape")  # back to the scene overview
+        _press(page, "Escape")  # closes the card
         page.wait_for_timeout(80)
+        self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
         root_keys = page.evaluate(
             "() => Array.from(document.querySelectorAll("
             "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
-        # The exits are the exit compass's (exploration-exit-compass): the
-        # overview's chips start with the people.
-        expected_root = [
-            "target-" + str(target["identity"]) for target in panel["interact"]
-        ]
-        expected_root += ["look-room", "wait"]
+        # The exits are the exit compass's (exploration-exit-compass) and the
+        # people the presence rail's: the overview is the footer.
+        expected_root = ["look-room", "wait"]
         # The footer's 建議 chip renders whenever the committed envelope's
         # status is not `unavailable`.
         suggestions = (
@@ -300,15 +282,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         if suggestions.get("status") not in (None, "unavailable"):
             expected_root.append("suggestions")
-        self.assertEqual(
-            root_keys,
-            expected_root,
-            "the overview's chips must render after the second Escape",
-        )
+        self.assertEqual(root_keys, expected_root, "the overview's chips")
+        # Escape returned focus to the medallion that opened the card.
         self.assertEqual(
             page.evaluate(
-                "window.__elosernBridge.router.currentItem() && "
-                "window.__elosernBridge.router.currentItem().key"
+                """() => {
+                  const rail = document.querySelector('[data-anchor="presence"] [data-testid="presence-rail"]');
+                  const el = rail && document.getElementById(rail.getAttribute('aria-activedescendant'));
+                  return document.activeElement === rail && el ? el.getAttribute('data-entry-key') : null;
+                }"""
             ),
             "target-" + str(host_identity),
         )
@@ -368,10 +350,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     )
     def test_keyboard_only_journey_walks_the_overview(self):
         """A pure arrows-and-Enter journey at 1451x790: the overview's chips
-        are reachable, the exit compass moves, a person chip opens the verb
-        popover (Escape returns with that chip focused), and a move from the
-        minimap returns the dock to the new room's overview
-        (webclient-scene-overview-swap, design D2/D6)."""
+        are reachable, the exit compass moves, a rail medallion opens the
+        verb card (Escape returns with that medallion focused), and a move
+        from the minimap returns the dock to the new room's overview
+        (webclient-scene-overview-swap, design D2/D6; exploration-presence-
+        rail)."""
         page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -386,23 +369,28 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(targets, "the fixture room must offer an interact target")
         person = targets[0]
 
-        # Arrows reach a person chip; Enter opens the popover; Escape returns
-        # with that chip focused.
-        activate_overview_chip(page, "target-%s" % person["identity"])
-        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+        # Arrows reach a medallion on the rail; Enter opens the verb card;
+        # Escape closes it with that medallion focused.
+        open_verb_card(page, person["identity"])
         self.assertEqual(
-            store_state(page)["dockSource"],
-            "exploration.target",
-            "the person chip must open the verb popover",
+            (store_state(page).get("presenceCard") or {}).get("identity"),
+            person["identity"],
+            "the medallion must open the person's verb card",
         )
         _press(page, "Escape")
-        wait_for_store_state(page, lambda s: s.get("dockSource") == "exploration.root")
+        wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
         self.assertEqual(
-            store_state(page)["focus"]["key"],
+            page.evaluate(
+                """() => {
+                  const rail = document.querySelector('[data-anchor="presence"] [data-testid="presence-rail"]');
+                  const el = rail && document.getElementById(rail.getAttribute('aria-activedescendant'));
+                  return document.activeElement === rail && el ? el.getAttribute('data-entry-key') : null;
+                }"""
+            ),
             "target-%s" % person["identity"],
-            "Escape must restore the chip that opened the popover",
+            "Escape must restore the medallion that opened the card",
         )
-        self.assertEqual(page.locator('[data-testid="verb-popover"]').count(), 0)
+        self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
         # The exits are on the exit compass beside the overview
         # (exploration-exit-compass): every committed exit is a compass
@@ -436,7 +424,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "exploration.root",
             "the dock must be back at the overview after a move",
         )
-        self.assertEqual(page.locator('[data-testid="verb-popover"]').count(), 0)
+        self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
         # Opening 等待／休息 and then moving by activating a minimap node
         # returns the dock to the overview (design D2: a minimap move

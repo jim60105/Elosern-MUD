@@ -226,7 +226,16 @@ export const useElosernStore = defineStore("elosern", () => {
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
     // one-frame stack. Browser helpers use it to normalize the stack.
-    resetFramesToRoot: ctx.resetFramesToRoot,
+    // A presence card is not a frame, but the reset leaves none open; the
+    // public entry publishes that at once (the internal reset runs inside
+    // the publish window and must not publish itself).
+    resetFramesToRoot: () => {
+      const hadCard = ctx.presenceCard !== null;
+      ctx.resetFramesToRoot();
+      if (hadCard) {
+        ctx.publishView();
+      }
+    },
     clearUncertain: ctx.clearUncertain,
     partyAvailable: ctx.computed.partyAvailable,
     partySlots: ctx.computed.partySlots,
