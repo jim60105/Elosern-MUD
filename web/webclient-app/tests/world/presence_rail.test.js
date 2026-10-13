@@ -22,7 +22,7 @@ function entriesFor(options) {
 
 const ROOM = {
   targets: [
-    { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
+    { identity: 11, name: "合成職員", affordances: [AFFORDANCES.talk, AFFORDANCES.guild] },
     { identity: 12, name: "霧狼", affordances: [AFFORDANCES.engage] },
   ],
   entities: [{ identity: 21, name: "旅人" }],
@@ -59,7 +59,7 @@ describe("PresenceRail", () => {
       ["object-32", "object"],
     ]);
     expect(slots(w).map((slot) => slot.get('[data-testid="presence-entry-name"]').text())).toEqual([
-      "葛里安‧衛登",
+      "合成職員",
       "霧狼",
       "旅人",
       "任務板",
@@ -94,7 +94,7 @@ describe("PresenceRail", () => {
     const w = mountRail({ entries, artPanel: { portrait_catalog: { npc_11: FACE } } });
     await slots(w)[0].get('[data-testid="presence-entry-face"]').trigger("error");
     expect(slots(w)[0].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
-    expect(slots(w)[0].get('[data-testid="presence-entry-initial"]').text()).toBe("葛");
+    expect(slots(w)[0].get('[data-testid="presence-entry-initial"]').text()).toBe("合");
   });
 
   it("seven entries show five and a ＋2 slot", () => {
@@ -157,7 +157,7 @@ describe("PresenceRail", () => {
     await slots(w)[3].trigger("mouseenter");
     await slots(w)[3].trigger("mouseleave");
     expect(w.emitted("hover")).toEqual([
-      [{ lead: "葛里安‧衛登", text: "交談／公會服務", tone: "normal" }],
+      [{ lead: "合成職員", text: "交談／公會服務", tone: "normal" }],
       [{ lead: "任務板", text: "查看", tone: "normal" }],
       [null],
     ]);
