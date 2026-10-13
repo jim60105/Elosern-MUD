@@ -184,7 +184,7 @@ def consume_climax_charges(entity) -> int:
     return dispelled
 
 
-def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
+def active_buff_entries_keyed(entity) -> tuple[tuple[str, dict], ...]:
     """Return the LIVE persisted buff-cache entries, without a handler.
 
     The ONE non-mutating expression of buff liveness (unpaused, positive
@@ -194,6 +194,11 @@ def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
     ``entity.buffs`` or refresh its instances, and no two readers may disagree
     about which persisted entries are active. A malformed cache or entry still
     fails closed with the historical ``TypeError``.
+
+    Each entry travels with its own cache key -- the instance key settlement
+    addresses the mounted buff by -- because an effect that must consume a
+    per-instance budget in settlement's own instance order (the damage
+    diversion budget) needs that identity, not just the definition key.
     """
     from collections.abc import Mapping
 
@@ -202,8 +207,8 @@ def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
         return ()
     if not isinstance(cache, Mapping):
         raise TypeError("buff cache storage is malformed")
-    live: list[dict] = []
-    for buff_cache in cache.values():
+    live: list[tuple[str, dict]] = []
+    for instance_key, buff_cache in cache.items():
         if not isinstance(buff_cache, Mapping):
             raise TypeError("buff cache entry is malformed")
         if buff_cache.get("paused"):
@@ -214,8 +219,15 @@ def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
         remaining = buff_cache.get("remaining_seconds")
         if isinstance(remaining, int) and remaining <= 0:
             continue
-        live.append(buff_cache)
+        live.append((str(instance_key), buff_cache))
     return tuple(live)
+
+
+def active_buff_entries_from_storage(entity) -> tuple[dict, ...]:
+    """Return the live persisted buff-cache entries, without their keys."""
+    return tuple(
+        buff_cache for _instance_key, buff_cache in active_buff_entries_keyed(entity)
+    )
 
 
 def active_buff_keys_from_storage(entity) -> set[str]:

@@ -69,8 +69,10 @@ MONSTER_BEHAVIOUR_YAML = _load_rulebook(
 )
 
 #: The decision-algorithm version a fingerprint covers. Bump it whenever a
-#: selection change alters what an identical resolved tuning decides.
-AI_ALGORITHM_VERSION = 1
+#: selection change alters what an identical resolved tuning decides. Version 2
+#: is the effect-estimation slice: a decision now also reads the shared combat
+#: rulebook's damage, heal and to-hit leaves and the candidate set it produces.
+AI_ALGORITHM_VERSION = 2
 
 #: The authored candidate-budget bounds (attack design section 4).
 MIN_CANDIDATE_BUDGET = 1
@@ -463,6 +465,29 @@ def _validate_utility_coverage(
                 )
 
 
+def _estimation_rules_payload() -> dict[str, Any]:
+    """Return the shared combat-rulebook leaves an effect estimate averages over.
+
+    The multiplier ladder, the defender constant, the two floors and the heal
+    multiplier are the rulebook inputs every estimate consumes. They are authored
+    balance data in their own rulebook rather than AI tuning, but a change to any
+    of them changes what an identical resolved tuning decides, so the fingerprint
+    carries them the same way it carries an authored weight.
+    """
+    damage = combat.COMBAT_YAML["damage"]
+    heal = combat.COMBAT_YAML["heal"]
+    return {
+        "base_multiplier": damage["base_multiplier"],
+        "crit_multiplier": damage["crit_multiplier"],
+        "damage_floor": damage["floor"],
+        "defender_constant": combat.COMBAT_YAML["to_hit"]["defender_constant"],
+        "heal_floor": heal["floor"],
+        "heal_multiplier": heal["multiplier"],
+        "solid_hit_margin": damage["solid_hit_margin"],
+        "solid_hit_multiplier": damage["solid_hit_multiplier"],
+    }
+
+
 def _tuning_fingerprint(
     *,
     candidate_budget: int,
@@ -481,13 +506,14 @@ def _tuning_fingerprint(
     value, a tier default, a behaviour leaf or a referenced variant's binding
     always changes it. It is the complete set of decision-relevant rulebook
     inputs this process consumes today (design section 5): the archetype
-    decision leaves, the tier defaults and the referenced variant bindings.
-    Estimator-side inputs join the same projection when the estimator itself
-    lands.
+    decision leaves, the tier defaults, the referenced variant bindings, and --
+    since the effect-estimation slice landed -- the shared combat rulebook
+    leaves every estimate averages over.
     """
     payload = {
         "algorithm_version": AI_ALGORITHM_VERSION,
         "candidate_budget": candidate_budget,
+        "estimation_rules": _estimation_rules_payload(),
         "tier_default_archetype": dict(sorted(defaults.items())),
         "archetypes": {
             key: {

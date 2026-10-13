@@ -88,6 +88,27 @@ class BuffProjection:
 
 
 @dataclass(frozen=True, slots=True)
+class DivertLimit:
+    """One active damage-diversion budget settlement would consume.
+
+    Projected from the persisted buff cache without mounting a handler, so an
+    estimate can subtract a known shield without running the damage handler:
+    ``instance_key`` is the buff identity settlement orders diversion
+    instances by (its own definition key then instance key order decides which
+    budget absorbs first), ``gauge`` is the pool the diverted amount is paid
+    from, ``fraction`` is the authored share of each strike's residual, and
+    ``remaining_cap`` is the instance's authored cap minus what it has already
+    spent.
+    """
+
+    instance_key: str
+    definition_key: str
+    gauge: str
+    fraction: float
+    remaining_cap: int
+
+
+@dataclass(frozen=True, slots=True)
 class ParticipantSnapshot:
     """One participant's immutable, no-create projection.
 
