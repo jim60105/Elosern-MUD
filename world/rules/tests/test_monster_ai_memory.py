@@ -677,7 +677,14 @@ class ObservationRoundIntegrationTests(EvenniaTestCase):
                 context=BattlefieldActionContext(battlefield),
             )
 
-        with self.captureOnCommitCallbacks(execute=True):
+        # Pin every roll site: the round must resolve one landed strike so the
+        # compact record's signed health magnitude is exercised deterministically.
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            self.captureOnCommitCallbacks(execute=True),
+        ):
             run_round(
                 field,
                 provider,
