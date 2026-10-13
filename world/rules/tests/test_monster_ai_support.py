@@ -101,6 +101,8 @@ EXPIRED_KEY = "t_sup_expired"
 DOT_KEY = "t_sup_dot"
 OPAQUE_KEY = "t_sup_opaque"
 OPAQUE_MODIFIER = "t_sup_opaque_modifier"
+REGEN_KEY = "t_sup_regen_lock"
+PAIR_KEY = "t_sup_pair"
 
 _DEFINITIONS = (
     BuffDefinition(
@@ -140,6 +142,14 @@ _DEFINITIONS = (
         key=OPAQUE_KEY, duration=60, tick_interval=None, stacking="refresh",
         polarity="debuff", modifiers={},
     ),
+    BuffDefinition(
+        key=REGEN_KEY, duration=60, tick_interval=None, stacking="refresh",
+        polarity="debuff", modifiers={},
+    ),
+    BuffDefinition(
+        key=PAIR_KEY, duration=30, tick_interval=None, stacking="refresh",
+        polarity="debuff", modifiers={},
+    ),
 )
 
 _RULES_EXTRA = (
@@ -175,6 +185,25 @@ _RULES_EXTRA = (
         id="t_sup_opaque_rule",
         when={"buff_active": OPAQUE_KEY},
         then={OPAQUE_MODIFIER: 3},
+    ),
+    # The shipped regeneration lock's shape: the meter's own reader multiplies
+    # by this scale and falls back to one when it is absent.
+    Rule(
+        id="t_sup_regen_rule",
+        when={"buff_active": REGEN_KEY},
+        then={"mp_regen_scale": 0},
+    ),
+    # Two probabilistic locks for one key: settlement rolls the largest of the
+    # declared chances, never their sum.
+    Rule(
+        id="t_sup_pair_first_rule",
+        when={"buff_active": PAIR_KEY},
+        then={"actions_per_turn": 0, "chance": 40},
+    ),
+    Rule(
+        id="t_sup_pair_second_rule",
+        when={"buff_active": PAIR_KEY},
+        then={"actions_per_turn": 0, "chance": 70},
     ),
 )
 
@@ -223,6 +252,10 @@ CHANCE = replace(LOCK, key="t_sup_chance_skill", effects=[f"buff_apply:{CHANCE_K
 EXPIRED = replace(LOCK, key="t_sup_expired_skill", effects=[f"buff_apply:{EXPIRED_KEY}"])
 #: A hostile mount that declares a health effect over time as well.
 DOT = replace(LOCK, key="t_sup_dot_skill", effects=[f"buff_apply:{DOT_KEY}"])
+#: A hostile regeneration lock: the shipped economy-lock shape.
+REGEN = replace(LOCK, key="t_sup_regen_skill", effects=[f"buff_apply:{REGEN_KEY}"])
+#: A hostile lock whose key carries two probabilistic rules.
+PAIR = replace(LOCK, key="t_sup_pair_skill", effects=[f"buff_apply:{PAIR_KEY}"])
 #: The actor-bound self heal: the implicit binding shape.
 SELF_MEND = replace(
     HEAL, key="t_sup_self_mend", effects=["self_heal"], target_spec=TargetSpec.SELF
@@ -266,6 +299,8 @@ _ROWS = (
     CHANCE,
     EXPIRED,
     DOT,
+    REGEN,
+    PAIR,
     SELF_MEND,
     PENALTY,
     FREE_MEND,
@@ -845,6 +880,66 @@ class ControlValuationTests(SupportFixture):
         estimate = _only(_estimate(self.actor, (), (self.enemy,))[1])
         self.assertGreater(estimate.control.magnitude, 0.0)
         self.assertIn(EstimationLimit.OVER_TIME_EFFECT_UNMODELED, estimate.limits)
+
+    @covers_requirement(
+        "monster-ai-tactical-support::control-value-is-concrete-marginal-opportunity-value"
+    )
+    def test_a_regeneration_lock_is_valued_by_the_regeneration_it_removes(self):
+        # The meter's own reader multiplies regeneration by this scale and
+        # falls back to one when the scale is absent, so a lock that sets it to
+        # zero removes the whole regeneration: one full economy point against
+        # the recipient, and never a silent zero.
+        _owned(self.actor, REGEN.key)
+        estimate = _only(_estimate(self.actor, (), (self.enemy,))[1])
+        projection = next(
+            item
+            for item in estimate.controls
+            if item.identity == stable_identity(self.enemy)
+        )
+        self.assertAlmostEqual(projection.economy, 1.0)
+        self.assertAlmostEqual(estimate.control.magnitude, 1.0)
+
+    @covers_requirement(
+        "monster-ai-tactical-support::control-value-is-concrete-marginal-opportunity-value"
+    )
+    def test_a_probabilistic_lock_is_weighted_by_the_rule_settlement_rolls_for(self):
+        # Two rules for one mount key declare a skip chance of forty and
+        # seventy; settlement rolls the larger one, so the denial of the single
+        # baseline opportunity is weighted by 0.7 and never by an additive
+        # certainty.
+        _owned(self.actor, PAIR.key)
+        estimate = _only(_estimate(self.actor, (), (self.enemy,))[1])
+        self.assertAlmostEqual(estimate.control.magnitude, 0.7)
+        self.assertIn(EstimationLimit.CONTROL_CHANCE_WEIGHTED, estimate.limits)
+
+    @covers_requirement(
+        "monster-ai-tactical-support::control-value-is-concrete-marginal-opportunity-value"
+    )
+    def test_a_mount_the_merge_caps_is_worth_zero(self):
+        # The friendly armor is worth the five protected health of a two-hundred
+        # point own side -- until the recipient's examination ceiling caps the
+        # bonus to nothing, and the marginal difference disappears with it.
+        _owned(self.actor, WARD.key)
+        uncapped = next(
+            item
+            for item in _estimate(self.actor, (self.ally,), (self.enemy,))[1].estimates
+            if item.identity.target_ids == (stable_identity(self.ally),)
+        )
+        self.assertAlmostEqual(uncapped.control.magnitude, 5.0 / 200)
+        self.ally.db.guild_exam_restriction = {
+            "host_id": self.ally.pk,
+            "exam_id": "t_sup_examination",
+            "allowed_skills": [WARD.key],
+            "ceilings": {"defense": 0},
+            "neutral_ceilings": {},
+        }
+        capped = next(
+            item
+            for item in _estimate(self.actor, (self.ally,), (self.enemy,))[1].estimates
+            if item.identity.target_ids == (stable_identity(self.ally),)
+        )
+        self.assertAlmostEqual(capped.control.magnitude, 0.0)
+        self.assertIn(EstimationLimit.CONTROL_ZERO_MARGINAL, capped.limits)
 
 
 class SupportScoreTests(SupportFixture):

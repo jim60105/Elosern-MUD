@@ -70,8 +70,10 @@ from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import (
     agility_with_bundle,
     attack_with_bundle,
+    build_no_create_condition_context,
     defense_with_bundle,
     evaluate_combat_modifiers_no_create,
+    matched_combat_modifiers,
 )
 from world.rules.combat.scalars import (
     damage_multiplier,
@@ -157,9 +159,17 @@ _BUFF_POLARITY = "buff"
 
 #: The merged-bundle key that changes how many actions a participant may take.
 _CONTROL_ACTION_KEY = "actions_per_turn"
-#: The action allowance an unassigned bundle means: the same one the decision
-#: read set's capability projection falls back to.
-_CONTROL_ACTION_DEFAULT = 1.0
+#: The merged-bundle keys whose *absence* means a unit rather than zero, because
+#: their settlement reader falls back to one: an unassigned action allowance is
+#: the capability projection's own default, and an unassigned gauge-regeneration
+#: scale means full regeneration (``clock._settle_gauge_regen`` reads
+#: ``f"{gauge}_regen_scale"`` with a ``1.0`` default, and a zero scale is what
+#: stops the regeneration entirely). Comparing either as an absent zero would
+#: make the mount that assigns it indistinguishable from no rule at all.
+_CONTROL_UNIT_DEFAULTS: dict[str, float] = {_CONTROL_ACTION_KEY: 1.0}
+#: The suffix a merged-bundle key carries when it scales one gauge's
+#: regeneration, whose absence therefore means the unit.
+_CONTROL_UNIT_DEFAULT_SUFFIX = "_regen_scale"
 #: The merged-bundle keys that change a participant's offensive magnitude.
 _CONTROL_ATTACK_KEYS = ("atk_phys", "magic_power")
 #: The merged-bundle keys that change how often a participant's offense lands.
@@ -516,6 +526,20 @@ def _control_number(value: Any) -> float | None:
     return None
 
 
+def _control_unit_default(key: str) -> float:
+    """Return what one merged-bundle key's absence means to settlement.
+
+    Zero for an ordinary additive modifier, and one for the keys whose reader
+    falls back to the unit (:data:`_CONTROL_UNIT_DEFAULTS` plus the
+    gauge-regeneration scale family).
+    """
+    if key in _CONTROL_UNIT_DEFAULTS:
+        return _CONTROL_UNIT_DEFAULTS[key]
+    if key.endswith(_CONTROL_UNIT_DEFAULT_SUFFIX):
+        return 1.0
+    return 0.0
+
+
 def _control_delta(
     before: Mapping[str, Any], after: Mapping[str, Any]
 ) -> tuple[dict[str, float], bool]:
@@ -527,16 +551,17 @@ def _control_delta(
     valuing the mount at its supported part alone.
 
     Absent keys compare as the value that absence means, which for an absolute
-    action allowance (:data:`_CONTROL_ACTION_KEY`) is the one action the
-    capability projection reads when no rule assigns it. Comparing it as zero
-    would make a lock indistinguishable from having no rule at all.
+    action allowance or a gauge-regeneration scale is the unit its settlement
+    reader falls back to (:data:`_CONTROL_UNIT_DEFAULTS`), not zero. Comparing
+    either as zero would make the mount that assigns it indistinguishable from
+    having no rule at all.
     """
     delta: dict[str, float] = {}
     unsupported = False
     for key in sorted(set(before) | set(after)):
         if key in _CONTROL_BOOKKEEPING_KEYS:
             continue
-        absent = _CONTROL_ACTION_DEFAULT if key == _CONTROL_ACTION_KEY else 0.0
+        absent = _control_unit_default(key)
         first = _control_number(before.get(key, absent))
         second = _control_number(after.get(key, absent))
         if first is None or second is None:
@@ -552,20 +577,41 @@ def _control_delta(
     return delta, unsupported
 
 
-def _control_chance(before: Mapping[str, Any], after: Mapping[str, Any]) -> float:
-    """Return the probability one chance-bearing mount actually applies.
+def _control_mount_probability(
+    before: Sequence[tuple[str, Mapping[str, Any]]],
+    after: Sequence[tuple[str, Mapping[str, Any]]],
+) -> tuple[float, bool]:
+    """Return the probability one mount's own action lock actually applies.
 
     The rule table's ``chance`` makes a lock probabilistic (the lightning
-    micro-stuns are the shipped example), so a mount that newly declares one is
-    weighted by it instead of being valued as a certain denial. Every other
-    mount is certain.
+    micro-stuns are the shipped example), and settlement's own reader decides
+    it rule by rule: every matched rule assigning ``actions_per_turn: 0``
+    without a ``chance`` is a certain skip, and otherwise the skip fires with
+    the *largest* declared chance (``combat.rounds``). The probability here is
+    therefore read from the matching half of the same engine, one rule at a
+    time, over exactly the rules this mount newly satisfies -- never from an
+    additive merge total, which could turn two probabilistic locks into a
+    certainty the consumer would never roll for.
+
+    The returned flag says whether this mount's own lock was the probabilistic
+    kind, so the caller reports the limitation. A mount that adds no zero-action
+    rule is certain, and so is one whose lock rule declares no probability.
     """
-    if after.get("chance") == before.get("chance"):
-        return 1.0
-    declared = _control_number(after.get("chance"))
-    if declared is None:
-        return 0.0
-    return min(1.0, max(0.0, declared / _D100_FACES))
+    held = {rule_id for rule_id, _adjustments in before}
+    locks = [
+        adjustments
+        for rule_id, adjustments in after
+        if rule_id not in held and adjustments.get("actions_per_turn") == 0
+    ]
+    if not locks:
+        return 1.0, False
+    if any("chance" not in adjustments for adjustments in locks):
+        return 1.0, False
+    chances = [
+        int(min(100.0, max(0.0, _control_number(adjustments.get("chance")) or 0.0)))
+        for adjustments in locks
+    ]
+    return min(1.0, max(chances) / _D100_FACES), True
 
 
 def _control_economy(delta: Mapping[str, float]) -> float:
@@ -843,6 +889,9 @@ class _Decision:
         self._gates: dict[int, dict[str, float]] = {}
         self._controls: list[ControlProjection] = []
         self._control_bundles: dict[tuple[str, frozenset[str]], Mapping[str, Any]] = {}
+        self._matched: dict[
+            tuple[str, frozenset[str]], tuple[tuple[str, Mapping[str, Any]], ...]
+        ] = {}
         self._limits: set[EstimationLimit] = set()
         self._diagnostics: set[str] = set()
 
@@ -1861,8 +1910,11 @@ class _Decision:
             self._limits.add(EstimationLimit.CONTROL_ZERO_MARGINAL)
             self._diagnostics.add(f"{definition.key} changes no supported modifier")
             return empty
-        probability = _control_chance(before, after)
-        if probability < 1.0:
+        probability, probabilistic = _control_mount_probability(
+            self._matched_rules(entity, identity, active),
+            self._matched_rules(entity, identity, active | {definition.key}),
+        )
+        if probabilistic:
             self._limits.add(EstimationLimit.CONTROL_CHANCE_WEIGHTED)
         scale = weight * probability
         hostility = -1.0 if relation is Relation.ENEMY else 1.0
@@ -1925,6 +1977,24 @@ class _Decision:
                 entity, active_buffs=keys
             )
         return self._control_bundles[cache_key]
+
+    def _matched_rules(
+        self, entity: Any, identity: str, keys: frozenset[str]
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Return one hypothetical mount set's per-rule matches, read once.
+
+        The matching half of the same engine the merged bundle comes from, kept
+        rule by rule so a rule that declares a probability can be weighted by
+        settlement's own reading of it instead of by an additive merge total.
+        """
+        cache_key = (identity, keys)
+        if cache_key not in self._matched:
+            context = build_no_create_condition_context(entity)
+            context["active_buffs"] = keys
+            self._matched[cache_key] = matched_combat_modifiers(
+                entity, context=context
+            )
+        return self._matched[cache_key]
 
     def _baseline_opportunities(self, relation: Relation) -> float:
         """Return one faction's eligible baseline action opportunities.
