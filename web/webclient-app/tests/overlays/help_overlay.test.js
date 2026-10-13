@@ -55,8 +55,10 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(keys("compass-move")).toEqual(["Enter", "Space"]);
     expect(rowText("compass-hold")).toContain("按住");
     expect(rowText("compass-escape")).toContain("清除羅盤的瞄準");
-    // The digits now address the overview's people, objects, and footer.
+    // The exploration root's digits are the presence rail's
+    // (exploration-presence-rail), the exits the compass's.
     expect(rowText("digits")).toContain("出口改由出口羅盤操作");
+    expect(rowText("digits")).toContain("在場列");
   });
 
   it("reads in Traditional Chinese apart from literal key names and command syntax", () => {
@@ -76,5 +78,18 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     wrapper = mount(HelpOverlay);
     expect(wrapper.emitted().update).toBeUndefined();
     expect(wrapper.html()).not.toContain("guide");
+  });
+
+  it("lists the presence rail's and its cards' bindings", () => {
+    // exploration-presence-rail: ←/→ and Enter on the rail, the rail
+    // digits, and the card's digits, arrows, Enter, and Escape.
+    wrapper = mount(HelpOverlay);
+    const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());
+    expect(keys("rail-move")).toEqual(["←", "→"]);
+    expect(keys("rail-activate")).toEqual(["Enter"]);
+    expect(rowText("rail-digits")).toContain("在場列的第 1 至 9 項");
+    expect(keys("card-keys")).toEqual(["↑", "↓", "1", "9"]);
+    expect(keys("card-escape")).toEqual(["Esc"]);
+    expect(rowText("card-escape")).toContain("焦點回到打開它的人物");
   });
 });
