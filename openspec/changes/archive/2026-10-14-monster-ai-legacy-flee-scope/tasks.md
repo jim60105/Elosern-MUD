@@ -32,3 +32,25 @@
 ## Apply conventions
 
 The downstream apply owner uses `feat/monster-ai-legacy-flee-scope` and `.worktrees/monster-ai-legacy-flee-scope`. This proposal creates neither. Apply has no prerequisite change: the monster-AI program is complete and archived. Shared conflict ownership is recorded in proposal.md. Archive and sync are a later workflow and are outside tracked implementation tasks; that later workflow owns the green aggregate in 4.5.
+
+## Implementation Notes
+
+- Archive and sync ran as `openspec archive monster-ai-legacy-flee-scope --yes --json` in the
+  feature worktree: the delta synced into `openspec/specs/monster-flee-policy/spec.md` (1 added,
+  3 modified) and the artifacts moved to
+  `openspec/changes/archive/2026-10-14-monster-ai-legacy-flee-scope/`. The synced main spec keeps
+  its `## Purpose` untouched, carries no delta headers, and holds all eight requirements.
+- Synced main requirement statements keep the concise form required by strict validation (500
+  characters per requirement description), with detail carried by the delta scenarios: the three
+  `MODIFIED` statements are 489, 491 and 487 characters and the archived delta text is unchanged.
+  Every scoped clause survives in the synced statements or their scenarios — legacy scope, the
+  utility decision never deriving flee, the configured typed-invalid-state fallback exemption, the
+  inclusive boundary and the flee-first priority.
+- 4.5's phase boundary is closed: the post-sync gate reports `2190 requirements, 9120
+  associations, 2190 covered, 0 uncovered, 0 errors`, `openspec validate --all --strict` reports
+  `330 passed, 0 failed`, and `uv run --locked python -m tools.contract_gate` passed
+  (traceability, observability, test-data, manifests, contracts).
+- Behavior evidence re-run at archive: `world.rules.tests.test_monster_ai_flee_scope` with
+  `world.rules.tests.test_monster_flee_decision`, 19 tests, OK. `world/rules/monster_behaviour.py`
+  stays byte-identical to `master`: `git diff master` lists only the new test module, the shard
+  registration, the changelog line and this change's own `tasks.md`.
