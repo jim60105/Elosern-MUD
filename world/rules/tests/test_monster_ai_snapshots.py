@@ -13,6 +13,8 @@ raises), and one decision reads its registry, owned metadata, costs, traits and
 buff projections once and refreshes them for the next action.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from collections import defaultdict
 from dataclasses import FrozenInstanceError, replace
@@ -401,6 +403,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         self.registry.start()
         self.addCleanup(self.registry.stop)
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_the_snapshot_reads_storage_without_touching_a_handler(self):
         snapshot, reads, _roster, _context = _probe_decision(
             self.actor, self.target
@@ -420,6 +423,8 @@ class DecisionSnapshotReadTests(unittest.TestCase):
             "only the row this decision's registry carries is projected",
         )
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
+    @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
     def test_building_a_snapshot_reads_each_input_once_per_participant(self):
         reads = DecisionReads()
         context = BattlefieldActionContext(_probe_field(self.actor, self.target))
@@ -447,6 +452,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         )
         self.assertEqual(self.actor.trait_reads, 0, "storage first, handler never")
 
+    @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
     def test_validation_reuses_one_read_set_across_every_plan(self):
         participants = tuple(
             _ProbeParticipant(f"t_snap_rival_{index}") for index in range(4)
@@ -492,6 +498,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
                 f"member{index} must never expose its trait handler",
             )
 
+    @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
     def test_the_next_decision_sees_intervening_state_and_the_old_one_does_not(self):
         snapshot, _reads, _roster, _context = _probe_decision(
             self.actor, self.target
@@ -514,6 +521,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         self.assertTrue(snapshot.participants[0].alive)
         self.assertNotEqual(snapshot.fingerprint, later.fingerprint)
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_queued_intent_and_disguised_stats_cannot_reach_the_snapshot(self):
         teammate = _ProbeParticipant("t_snap_teammate", skills=(STRIKE.key,))
         first, _reads, _roster, _context = _probe_decision(
@@ -533,6 +541,7 @@ class DecisionSnapshotReadTests(unittest.TestCase):
             [item.identity for item in first.participants],
         )
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_the_fingerprint_is_the_snapshot_and_is_read_only(self):
         snapshot, _reads, _roster, _context = _probe_decision(
             self.actor, self.target
@@ -582,6 +591,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
             reads=reader,
         )
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_cast_prerequisite_rejects_before_scoring_with_settlement_reason(self):
         self._own(SEALED_STRIKE.key)
         rejected = self._verdict(SEALED_STRIKE.key)
@@ -592,6 +602,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertTrue(accepted.legal, accepted.detail)
         self.assertIsNone(accepted.reason)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_contact_prerequisite_rejects_the_self_plan_and_accepts_the_solo_one(self):
         self._own(CONTACT_SELF.key, CONTACT_SELF_SOLO.key)
         rejected = self._verdict(CONTACT_SELF.key, target_ids=())
@@ -600,12 +611,14 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         accepted = self._verdict(CONTACT_SELF_SOLO.key, target_ids=())
         self.assertTrue(accepted.legal, accepted.detail)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_forbidden_self_target_is_a_shape_mismatch(self):
         self._own(PAIRED_ACT.key)
         verdict = self._verdict(PAIRED_ACT.key, target_ids=(stable_identity(self.actor),))
         self.assertFalse(verdict.legal)
         self.assertIs(verdict.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_plan_outside_the_decision_scope_is_rejected(self):
         self._own(STRIKE.key)
         outsider = _ProbeParticipant("t_snap_outsider")
@@ -613,6 +626,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertFalse(verdict.legal)
         self.assertIs(verdict.reason, RejectReason.TARGET_SPEC_MISMATCH)
 
+    @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
     def test_a_drained_resource_rejects_the_next_decision(self):
         self._own(STRIKE.key)
         self.assertTrue(self._verdict(STRIKE.key).legal)
@@ -622,6 +636,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertIs(verdict.reason, RejectReason.INSUFFICIENT_RESOURCE)
         self.assertEqual(verdict.detail, "mp")
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_lost_capability_rejects_the_plan(self):
         self._own(STRIKE.key)
         with (
@@ -638,6 +653,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertFalse(verdict.legal)
         self.assertIs(verdict.reason, RejectReason.ACTION_FORBIDDEN)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_dead_target_rejects_the_plan_before_scoring(self):
         self._own(STRIKE.key)
         self.target.attributes.values["traits"]["hp"]["current"] = 0
@@ -645,6 +661,7 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertFalse(verdict.legal)
         self.assertIs(verdict.reason, RejectReason.TARGET_DEAD)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_vanished_participant_is_reported_missing(self):
         self._own(STRIKE.key)
         snapshot, reads, _roster, context = _probe_decision(
@@ -788,6 +805,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         )
         return snapshot, reader, roster_index((self.actor, *pool)), context
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_the_snapshot_writes_nothing_and_attaches_no_handler(self):
         # The hardest premise: a COMPLETE persisted sexual state and a mounted
         # handler, then every handler unmounted. The ownership authority used
@@ -897,6 +915,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             "a decision over fixed data re-reads nothing from the database",
         )
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_a_stale_gauge_timestamp_is_never_regenerated(self):
         records = self._stored_traits(self.actor)
         records["hp"] = {
@@ -913,6 +932,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         self.assertEqual(snapshot.actor.resources["hp"][0], records["hp"]["current"])
         self.assertNotIn("traits", self.actor.__dict__)
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_a_persisted_buff_projects_without_mounting_the_handler(self):
         self.target.attributes.add("buffs", {WARD: _buff_record(WARD)})
         self.target.__dict__.pop("buffs", None)
@@ -932,6 +952,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             {buff.key for buff in snapshot.participants[0].buffs}, from_storage
         )
 
+    @covers_requirement("monster-ai-decision-inputs::decision-snapshots-are-read-only-and-public")
     def test_two_participants_sharing_a_display_key_keep_distinct_identities(self):
         twin = _monster(self.actor.key, hp=25)
         twin.location = self.room
@@ -942,6 +963,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             {item.resources["hp"][0] for item in snapshot.participants}, {60, 25}
         )
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_preview_submission_and_preflight_reject_the_same_cast(self):
         context = self._context()
         preview = preview_skill(
@@ -973,6 +995,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             "success",
         )
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_contact_prerequisite_rejects_the_self_cast_for_every_surface(self):
         self.actor.db.skills = {
             "active": [CONTACT_SELF.key],
@@ -991,6 +1014,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         self.assertIs(submission.reason, RejectReason.CAST_CONDITION_UNMET)
         self.assertIs(preflight.reason, RejectReason.CAST_CONDITION_UNMET)
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_stale_plan_is_refused_by_the_resolver_without_payment(self):
         self.target.attributes.add("buffs", {SEAL: _buff_record(SEAL)})
         snapshot, reads, roster, context = self._decision()
@@ -1019,6 +1043,7 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             RejectReason.TARGET_DEAD,
         )
 
+    @covers_requirement("monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates")
     def test_a_legal_plan_settles_through_the_resolver(self):
         self.actor.db.skills = {"active": [STRIKE.key], "passive": []}
         plan = PlannedAction(STRIKE.key, target_ids=(stable_identity(self.target),))
