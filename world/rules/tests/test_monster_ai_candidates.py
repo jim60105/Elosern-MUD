@@ -19,6 +19,8 @@ authored budget, allocates slots round-robin from a scope-derived ring offset,
 and never draws selection or combat RNG.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from collections import defaultdict
 from dataclasses import replace
@@ -359,6 +361,7 @@ class CandidateShapeTests(unittest.TestCase):
         self.enemy = _ProbeParticipant("t_cand_enemy", pk=7)
         self.other = _ProbeParticipant("t_cand_other", pk=9)
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_single_enumerates_one_plan_per_valid_target_in_declared_order(self):
         result = _enumerate(
             self.actor,
@@ -373,6 +376,7 @@ class CandidateShapeTests(unittest.TestCase):
         self.assertEqual(result.examined, 2)
         self.assertFalse(result.exhausted)
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_an_order_tie_falls_back_to_stable_identifiers(self):
         result = _enumerate(self.actor, (self.other, self.enemy))
         self.assertEqual(
@@ -380,6 +384,8 @@ class CandidateShapeTests(unittest.TestCase):
             sorted((stable_identity(self.enemy), stable_identity(self.other))),
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
+    @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_enemy_area_uses_exactly_one_legal_group_and_keeps_its_shorthand(self):
         _owned(self.actor, AREA.key)
         result = _enumerate(self.actor, (self.enemy, self.other))
@@ -395,6 +401,7 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual(result.examined, 1)
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_a_bounded_audience_set_is_enumerated_for_a_mixed_skill(self):
         _owned(self.actor, MIXED.key)
         ally = _ProbeParticipant("t_cand_ally", pk=3)
@@ -417,6 +424,7 @@ class CandidateShapeTests(unittest.TestCase):
         self.assertEqual(routed[0], [self.enemy])
         self.assertEqual(routed[1], [self.actor])
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_a_group_without_hostile_damage_is_excluded_with_a_reason(self):
         _owned(self.actor, MIXED.key)
         ally = _ProbeParticipant("t_cand_ally", pk=3)
@@ -431,6 +439,7 @@ class CandidateShapeTests(unittest.TestCase):
             any("hostile recipient" in (item.detail or "") for item in refused)
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_equivalent_routed_combinations_collapse_to_one_candidate(self):
         # Two different submitted rosters whose effects reach exactly the same
         # recipients are one audience combination, so they are one candidate.
@@ -445,6 +454,7 @@ class CandidateShapeTests(unittest.TestCase):
             ["supported hostile damage reaches no hostile recipient"],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_an_unresolved_buff_reference_excludes_the_skill_with_a_reason(self):
         _owned(self.actor, ABSENT_BUFF.key, MAGIC.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -454,6 +464,7 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_an_unresolved_act_reference_excludes_the_skill_with_a_reason(self):
         _owned(self.actor, ABSENT_ACT.key, MAGIC.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -463,6 +474,7 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_a_roster_sensitive_skill_keeps_its_submitted_identity(self):
         # The same routed effects over two different submitted rosters are not
         # equivalent when settlement contests each submitted target: both
@@ -475,6 +487,7 @@ class CandidateShapeTests(unittest.TestCase):
             ["all", "all-enemies"],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_a_catalog_resistible_act_keeps_its_submitted_identity(self):
         # Settlement's other resist branch reads the act catalog, not an
         # authored interaction: the same skill with that row stays two
@@ -499,6 +512,7 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual([plan.shorthand for plan in plain.plans], ["all-enemies"])
 
+    @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_a_roster_scoped_condition_keeps_the_least_constrained_group(self):
         # The complete roster would fail the per-target prerequisite (the ally
         # is not sealed) while the hostile roster passes it. The retained
@@ -533,6 +547,7 @@ class CandidateShapeTests(unittest.TestCase):
             {RejectReason.CAST_CONDITION_UNMET},
         )
 
+    @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_two_single_targets_are_never_one_action(self):
         # A SINGLE plan is its submitted target, so two different hostile
         # targets stay two proposals even when every effect routes the same
@@ -547,6 +562,7 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual((result.examined, result.omitted_targets), (1, 1))
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_implicit_self_and_none_bindings_are_not_widened(self):
         _owned(self.actor, NONE.key, SELF.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -562,6 +578,7 @@ class CandidateShapeTests(unittest.TestCase):
             )
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_an_unresolvable_harmful_effect_excludes_the_skill_with_a_reason(self):
         _owned(self.actor, UNRESOLVED.key, MAGIC.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -572,6 +589,7 @@ class CandidateShapeTests(unittest.TestCase):
         self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
         self.assertEqual(result.examined, 1)
 
+    @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_a_non_default_scale_is_preserved_on_the_shorthand_request(self):
         freeform = replace(
             AREA,
@@ -589,6 +607,7 @@ class CandidateShapeTests(unittest.TestCase):
         self.assertEqual(plan.shorthand, "all-enemies")
         self.assertEqual(result.candidates[0].identity.scale, SCALE)
 
+    @covers_requirement("monster-ai-legal-candidates::canonical-deduplication-preserves-executable-representation")
     def test_one_shorthand_and_one_explicit_roster_share_one_identity(self):
         # The complete group collapses onto the hostile one, but only the
         # hostile group's shorthand expands to exactly the decision's group, so
@@ -634,6 +653,7 @@ class CandidateBudgetTests(unittest.TestCase):
             for index in range(4)
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_the_authored_default_budget_is_the_rulebook_value(self):
         _owned(self.actor, STRIKE.key)
         result = _enumerate(self.actor, self.enemies)
@@ -641,6 +661,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.examined, len(self.enemies))
         self.assertFalse(result.exhausted)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_the_budget_is_configurable_inside_the_integer_bound(self):
         _owned(self.actor, STRIKE.key)
         for budget in (1, 2, 4096):
@@ -652,6 +673,7 @@ class CandidateBudgetTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     _enumerate(self.actor, self.enemies, budget=budget)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_exhaustion_reports_the_omitted_families_and_targets(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
         result = _enumerate(self.actor, self.enemies, budget=3)
@@ -660,6 +682,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.omitted_families, 2)
         self.assertEqual(result.omitted_targets, 5)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_rejected_proposals_consume_the_budget(self):
         _owned(self.actor, GUARDED.key)
         first = _ProbeParticipant("t_cand_first", pk=1)
@@ -674,6 +697,7 @@ class CandidateBudgetTests(unittest.TestCase):
             result.rejections[0].reason, RejectReason.CAST_CONDITION_UNMET
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_the_mandatory_filter_probe_shares_the_candidate_budget(self):
         # The alternative-attack search and the ring draw from one budget and
         # one examination ledger, so every examined proposal is reported once
@@ -706,6 +730,7 @@ class CandidateBudgetTests(unittest.TestCase):
             len(wide.candidates) + len(wide.rejections) + len(wide.exclusions),
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_an_unfinished_capability_search_never_erases_displaced_targets(self):
         # The budget runs out while the capabilities are still being checked,
         # so the search cannot prove the absence of an alternative: the
@@ -722,6 +747,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.omitted_targets, 3)
         self.assertEqual(result.omitted_families, 2)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_an_examined_plan_is_never_reported_as_omitted(self):
         # Two plans exist, the budget allows one examination: that proposal is
         # reported once as rejected and only the other one counts as omitted.
@@ -735,6 +761,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.exclusions, ())
         self.assertEqual(len(result.rejections), 1)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_paid_examination_is_never_lost_to_a_later_proposal(self):
         # The family proposes the other target first and the budget is spent,
         # so the ring cannot reach the plan it already paid for: that plan is
@@ -761,6 +788,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertTrue(result.exhausted)
         self.assertEqual(result.omitted_families, 1)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_paid_candidate_survives_every_scope_offset(self):
         # An unexamined family precedes the family whose plan the capability
         # search already paid for, whatever the ring offset: that plan is
@@ -792,6 +820,7 @@ class CandidateBudgetTests(unittest.TestCase):
             {(((stable_identity(self.enemies[0]),),), (), 1, 3, 2)},
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_mandatory_filter_removed_plan_is_an_exclusion(self):
         # The mandatory seal narrowing drops the other hostile target from
         # every family, so the plan the capability search had already paid for
@@ -816,6 +845,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.rejections, ())
         self.assertEqual(result.examined, 2)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
         result = _enumerate(self.actor, self.enemies, budget=2)
@@ -824,6 +854,7 @@ class CandidateBudgetTests(unittest.TestCase):
             [MAGIC.key, STRIKE.key],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_the_ring_offset_is_derived_from_the_decision_scope(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
         firsts = {
@@ -844,6 +875,7 @@ class CandidateBudgetTests(unittest.TestCase):
         ]
         self.assertEqual(sets, [sets[0]] * len(sets))
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_an_empty_legal_set_returns_no_plan(self):
         _owned(self.actor, HEAL_SELF.key)
         result = _enumerate(self.actor, self.enemies)
@@ -851,6 +883,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertIsNone(canonical_plan(result))
         self.assertEqual(result.examined, 0)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_single_enemy_still_yields_the_one_legal_plan(self):
         _owned(self.actor, STRIKE.key)
         result = _enumerate(self.actor, (self.enemies[0],), budget=1)
@@ -859,6 +892,7 @@ class CandidateBudgetTests(unittest.TestCase):
         )
         self.assertIsNotNone(canonical_plan(result))
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_enumeration_draws_no_selection_or_combat_dice(self):
         _owned(self.actor, STRIKE.key, AREA.key)
         with (
@@ -875,6 +909,7 @@ class CandidateBudgetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             _enumerate(self.actor, self.enemies, order=("ok", 3))
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_enumerating_many_plans_issues_no_database_queries(self):
         _owned(self.actor, STRIKE.key, MAGIC.key, AREA.key)
         snapshot, reads, roster, context = _decision(self.actor, self.enemies)
@@ -892,6 +927,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(list(captured.captured_queries), [])
         self.assertTrue(result.candidates)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_the_default_read_set_is_decision_local(self):
         _owned(self.actor, STRIKE.key)
         snapshot, _reads, roster, context = _decision(self.actor, self.enemies)
@@ -963,6 +999,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
     def _own(self, *keys):
         self.monster.db.skills = {"active": list(keys), "passive": []}
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_the_seal_narrows_to_the_first_bearer_in_player_first_order(self):
         self._own(STRIKE.key)
         first = self._participant("t_cand_first")
@@ -975,6 +1012,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
             [(stable_identity(first),)],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_a_displaced_first_bearer_yields_the_next_remaining_bearer(self):
         self._own(STRIKE.key, HEAL_SELF.key)
         first = self._participant("t_cand_first")
@@ -988,6 +1026,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
             [(stable_identity(second),)],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_a_castable_nonstrike_alternative_keeps_the_displaced_target(self):
         self._own(MAGIC.key, STRIKE.key)
         displaced = self._participant("t_cand_displaced")
@@ -1000,6 +1039,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
         )
         self.assertEqual(grouped[STRIKE.key], {stable_identity(ordinary)})
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_a_self_heal_is_not_a_castable_attack_alternative(self):
         self._own(STRIKE.key, HEAL_SELF.key)
         displaced = self._participant("t_cand_displaced")
@@ -1011,6 +1051,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
             [(stable_identity(ordinary),)],
         )
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_only_a_supported_hostile_plan_counts_as_the_attack_alternative(self):
         # The non-strike skill submits a legal plan whose damage only ever
         # reaches its own side, so it is no attack at all: the displaced first
@@ -1033,6 +1074,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
         evaluate_combat_modifiers_no_create(self.monster)
         self.assertNotIn("skills", self.monster.__dict__)
 
+    @covers_requirement("monster-ai-legal-candidates::mandatory-single-target-restrictions-precede-utility")
     def test_area_groups_are_not_seal_restricted(self):
         self._own(AREA.key)
         first = self._participant("t_cand_first")
@@ -1045,6 +1087,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
             tuple(sorted((stable_identity(first), stable_identity(second)))),
         )
 
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
     def test_a_shorthand_never_reaches_outside_the_decision(self):
         self._own(AREA.key)
         covered = self._participant("t_cand_covered")
@@ -1073,6 +1116,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
             stable_identity(outsider), result.candidates[0].identity.target_ids
         )
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_legal_candidate_settles_through_the_resolver_and_commits(self):
         self._own(MAGIC.key)
         target = self._participant("t_cand_target")
@@ -1090,6 +1134,7 @@ class CandidateRestrictionTests(EvenniaTestCase):
         self.assertEqual(settlement.outcome, "success", settlement.detail)
         self.assertLess(self._reloaded_hp(target), before)
 
+    @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_enumerating_on_real_entities_writes_nothing(self):
         self._own(MAGIC.key, STRIKE.key)
         target = self._participant("t_cand_target")
