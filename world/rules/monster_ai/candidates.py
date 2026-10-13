@@ -68,10 +68,14 @@ from world.skills.effects import (
     BuffApplyEffect,
     DamageEffect,
     EffectAudience,
+    PairEventEffect,
+    PleasureEffect,
     RiteBlessingEffect,
     SelfBuffApplyEffect,
+    SexualCounterEffect,
 )
 from world.skills.registry import FactionConstraint, SkillDef, SkillKind, TargetSpec
+from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 #: The authored initial candidate budget (the rulebook's ``candidate_budget``).
 DEFAULT_CANDIDATE_BUDGET = MONSTER_AI_TUNING.candidate_budget
@@ -114,8 +118,41 @@ _BUFF_REFERENCE_EFFECTS = (
     SelfBuffApplyEffect,
 )
 
+#: The parsed effects whose payload names a sexual act definition the registry
+#: must carry before the plan can resolve anything.
+_ACT_REFERENCE_EFFECTS = (
+    PairEventEffect,
+    PleasureEffect,
+    SexualCounterEffect,
+)
+
+#: The reason an examined, legal plan was removed by the mandatory single-target
+#: restriction rather than refused by the shared gates.
+MANDATORY_RESTRICTION = "mandatory_single_target_restriction"
+
 #: One cached legality verdict per distinct proposed action.
 _VerdictKey = tuple[str, float, str | None, tuple[str, ...]]
+
+
+@dataclass
+class _Budget:
+    """One decision's shared examination budget and the slots it spent.
+
+    The mandatory-filter capability search and the family ring draw from the
+    same budget, and every plan examined by either is one entry of the one
+    examination ledger, so the bound in the specification covers all of the
+    decision's examination work rather than one phase of it.
+    """
+
+    limit: int
+    spent: int = 0
+
+    def take(self) -> bool:
+        """Consume one examination slot; ``False`` when the budget is spent."""
+        if self.spent >= self.limit:
+            return False
+        self.spent += 1
+        return True
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +196,22 @@ class CandidateRejection:
 
 
 @dataclass(frozen=True, slots=True)
+class CandidateExclusion:
+    """One examined, legal plan the mandatory single-target restriction removed.
+
+    An applicable seal narrows a hostile single-target base to one bearer and a
+    displaced target is removed without a genuinely castable non-strike
+    alternative. A plan the capability search examined against a target the
+    restriction then removed is reported here rather than disappearing: it was
+    a legitimate examination, and the restriction -- not the plan -- is why it
+    is not a candidate.
+    """
+
+    identity: CandidateIdentity
+    reason: str
+
+
+@dataclass(frozen=True, slots=True)
 class SkillObservation:
     """One owned damage skill that contributed no proposal, with its reason.
 
@@ -176,16 +229,20 @@ class SkillObservation:
 class CandidateSet:
     """One decision's bounded candidate enumeration.
 
-    ``examined`` is the number of deduplicated proposals the family ring
-    actually examined, rejected ones included, and never exceeds the budget.
-    ``exhausted`` is true when the ring stopped at the bound with distinct
-    proposals still unexamined; ``omitted_families`` and ``omitted_targets``
-    count what was left. A duplicate representation is not a proposal, so it
-    can neither consume a slot nor report exhaustion.
+    ``examined`` is the number of deduplicated proposals the decision actually
+    examined -- the mandatory-filter capability search and the family ring
+    together -- and never exceeds the budget. Every examined proposal is
+    reported exactly once, as a candidate, a rejection or a mandatory-filter
+    exclusion, so ``examined`` is their sum. ``exhausted`` is true when the
+    budget stopped the examination with distinct proposals still unexamined;
+    ``omitted_families`` and ``omitted_targets`` count what was left. A
+    duplicate representation is not a proposal, so it can neither consume a
+    slot nor report exhaustion.
     """
 
     candidates: tuple[Candidate, ...] = ()
     rejections: tuple[CandidateRejection, ...] = ()
+    exclusions: tuple[CandidateExclusion, ...] = ()
     unavailable: tuple[SkillObservation, ...] = ()
     examined: int = 0
     exhausted: bool = False
@@ -334,7 +391,8 @@ def enumerate_candidates(
         skills.append(skill)
 
     verdicts: dict[_VerdictKey, PlanVerdict] = {}
-    outcomes: dict[_VerdictKey, Candidate | CandidateRejection] = {}
+    ledger: dict[_VerdictKey, Candidate | CandidateRejection] = {}
+    budget_state = _Budget(limit)
 
     def verdict(skill: SkillDef, plan: PlannedAction) -> PlanVerdict:
         key = (skill.key, plan.scale, plan.shorthand, plan.target_ids)
@@ -349,12 +407,16 @@ def enumerate_candidates(
             )
         return verdicts[key]
 
-    def examine(proposal: _Proposal) -> Candidate | CandidateRejection:
+    def outcome(proposal: _Proposal) -> Candidate | CandidateRejection:
         """One proposal's outcome, computed once per submitted action."""
         key = _proposal_key(proposal)
-        if key not in outcomes:
-            outcomes[key] = _examine(proposal, actor, context, verdict)
-        return outcomes[key]
+        if key not in ledger:
+            ledger[key] = _examine(proposal, actor, context, verdict)
+        return ledger[key]
+
+    def admit(proposal: _Proposal) -> bool:
+        """Charge one examination slot, unless the plan was already examined."""
+        return _proposal_key(proposal) in ledger or budget_state.take()
 
     singles = [skill for skill in skills if skill.target_spec is TargetSpec.SINGLE]
     displaced = frozenset(
@@ -372,15 +434,15 @@ def enumerate_candidates(
             key=_canonical_seal_order,
         )
     )
-    alternative = _has_castable_nonstrike_alternative(
+    alternative, conclusive = _has_castable_nonstrike_alternative(
         singles,
         hostile,
         actor,
         context,
         reader,
         magnitude,
-        examine,
-        limit,
+        outcome,
+        admit,
     )
 
     families: dict[tuple[str, str], list[_Proposal]] = {}
@@ -403,8 +465,33 @@ def enumerate_candidates(
             families.setdefault(proposal.family, []).append(proposal)
 
     distinct = _deduplicate(families)
-    return _allocate(
-        distinct, limit, snapshot, examine, unavailable
+    candidates, cursors = _allocate(
+        distinct, snapshot, outcome, admit
+    )
+    rejections = tuple(
+        item for item in ledger.values() if isinstance(item, CandidateRejection)
+    )
+    exclusions = tuple(
+        CandidateExclusion(item.identity, MANDATORY_RESTRICTION)
+        for item in ledger.values()
+        if isinstance(item, Candidate) and item not in candidates
+    )
+    omitted = [
+        proposal
+        for family in _family_order(distinct)
+        for position, proposal in enumerate(distinct[family])
+        if position >= cursors.get(family, 0)
+        and _proposal_key(proposal) not in ledger
+    ]
+    return CandidateSet(
+        candidates=candidates,
+        rejections=rejections,
+        exclusions=exclusions,
+        unavailable=tuple(unavailable),
+        examined=len(ledger),
+        exhausted=bool(omitted) or not conclusive,
+        omitted_families=len({proposal.family for proposal in omitted}),
+        omitted_targets=len(omitted),
     )
 
 
@@ -587,10 +674,10 @@ def _has_castable_nonstrike_alternative(
     context: Any,
     reads: DecisionReads,
     scale: float,
-    examine: Callable[[_Proposal], Candidate | CandidateRejection],
-    limit: int,
-) -> bool:
-    """Return whether a genuinely castable non-strike hostile alternative exists.
+    outcome: Callable[[_Proposal], Candidate | CandidateRejection],
+    admit: Callable[[_Proposal], bool],
+) -> tuple[bool, bool]:
+    """Return ``(alternative, conclusive)`` for the mandatory displacement rule.
 
     "Genuinely castable" means the same thing an accepted candidate means: the
     shared settlement gates accept the plan *and* its supported damage reaches a
@@ -599,27 +686,38 @@ def _has_castable_nonstrike_alternative(
     damage never routes to an enemy is not an attack, so none of them satisfies
     the alternative-attack condition that keeps displaced targets reachable.
 
-    The search is bounded by the same candidate budget as the enumeration: it
-    examines at most ``limit`` distinct single-target plans and, when the bound
-    is reached without an answer, reports no alternative -- an exhausted search
-    never claims an attack the kit may not have. The probed plans are the same
-    objects the single-target families propose, so the examination is shared and
-    never paid twice.
+    The search draws from the decision's one examination budget, walks the
+    targets round-robin across the relevant skills (so one skill with many
+    targets cannot consume the allowance before another is looked at), and
+    reports whether it finished. An unfinished search reports an alternative
+    that may not exist: nothing is removed on an incomplete answer, while a
+    displaced target is only removed when every candidate plan against the
+    hostile domain was examined and none of them was an attack.
+
+    The probed plans are the same objects the single-target families propose, so
+    an examination is shared with the ring and never paid twice.
     """
-    probed = 0
-    for skill in singles:
-        if is_strike_class(skill):
-            continue
-        for target in hostile:
-            if probed >= limit:
-                return False
-            probed += 1
-            if isinstance(
-                examine(_single_proposal(skill, target, actor, context, reads, scale)),
-                Candidate,
-            ):
-                return True
-    return False
+    queues = [
+        (
+            skill,
+            [
+                _single_proposal(skill, target, actor, context, reads, scale)
+                for target in hostile
+            ],
+        )
+        for skill in singles
+        if not is_strike_class(skill)
+    ]
+    for index in range(len(hostile)):
+        for _skill, proposals in queues:
+            if index >= len(proposals):
+                continue
+            proposal = proposals[index]
+            if not admit(proposal):
+                return True, False
+            if isinstance(outcome(proposal), Candidate):
+                return True, True
+    return False, True
 
 
 def _is_hostile_damage(skill: SkillDef | None) -> bool:
@@ -786,12 +884,27 @@ def _collapse_key(proposal: _Proposal) -> Any:
     The actual audience combination when the audience planner routed the plan,
     and the submitted identity otherwise (so refused plans are never collapsed
     together). Skill and scale always participate: a scaled request is a
-    different action even over the same recipients.
+    different action even over the same recipients. A roster-sensitive skill
+    keeps its submitted identity too, because settlement gates it on the
+    submitted roster rather than on the routed recipients alone.
     """
     signature = _routed_signature(proposal)
-    if signature is None:
+    if signature is None or _roster_sensitive(proposal.skill):
         return proposal.identity
     return (proposal.identity.skill_key, proposal.identity.scale, signature)
+
+
+def _roster_sensitive(skill: SkillDef) -> bool:
+    """Return whether settlement gates one skill on its submitted roster.
+
+    A resistible interaction is contested once per non-actor submitted target
+    and a resisting target cancels the whole action, so two plans whose effects
+    route to the same recipients can still settle differently when their
+    submitted rosters differ; such actions keep their submitted identity and are
+    never collapsed onto each other.
+    """
+    interaction = skill.interaction
+    return bool(interaction is not None and interaction.resistible)
 
 
 def _supports_every_harmful_effect(skill: SkillDef) -> bool:
@@ -799,11 +912,12 @@ def _supports_every_harmful_effect(skill: SkillDef) -> bool:
 
     Two unresolvable harms make a skill unrepresentable for this slice: a damage
     effect naming an element the element registry does not carry can never
-    settle (the cast-time parser raises on it), and an effect naming a buff
-    definition the buff registry does not carry can never mount one. Excluding
-    the skill here keeps an unknown harmful outcome out of scoring instead of
-    letting it fail at settlement; the outcome models themselves belong to
-    ``monster-ai-damage-estimation``, which extends this boundary.
+    settle (the cast-time parser raises on it), and an effect naming a buff or
+    sexual-act definition the owning registry does not carry can never mount or
+    resolve anything. Excluding the skill here keeps an unknown harmful outcome
+    out of scoring instead of letting it fail at settlement; the outcome models
+    themselves belong to ``monster-ai-damage-estimation``, which extends this
+    boundary.
     """
     for effect in skill.parsed_effects:
         if isinstance(effect, DamageEffect) and (
@@ -812,6 +926,10 @@ def _supports_every_harmful_effect(skill: SkillDef) -> bool:
             return False
         if isinstance(effect, _BUFF_REFERENCE_EFFECTS) and (
             effect.buff_key not in BUFF_DEFINITIONS
+        ):
+            return False
+        if isinstance(effect, _ACT_REFERENCE_EFFECTS) and (
+            effect.act_key not in SEXUAL_ACT_REGISTRY
         ):
             return False
     return True
@@ -838,18 +956,17 @@ def _family_order(
 
 def _allocate(
     families: dict[tuple[str, str], list[_Proposal]],
-    limit: int,
     snapshot: DecisionSnapshot,
-    examine: Callable[[_Proposal], Candidate | CandidateRejection],
-    unavailable: list[SkillObservation],
-) -> CandidateSet:
-    """Examine deduplicated proposals round-robin until the budget is spent.
+    outcome: Callable[[_Proposal], Candidate | CandidateRejection],
+    admit: Callable[[_Proposal], bool],
+) -> tuple[tuple[Candidate, ...], dict[tuple[str, str], int]]:
+    """Examine deduplicated proposals round-robin while the budget allows.
 
-    Every examined proposal is exactly one of a candidate or a rejection, and
-    ``examined`` counts them, so it never exceeds the budget and always equals
-    the two reported lists together. Proposals the mandatory-filter capability
-    probe already resolved are examined again here (they are proposals of this
-    ring) but are never validated twice.
+    Returns the ring's legal candidates in ring order and how far each family
+    was walked, so the caller can report what the budget left unexamined. A
+    proposal the mandatory-filter capability search already examined is admitted
+    without charging another slot -- it is the same examination, and the ledger
+    already reports it.
     """
     canonical = _family_order(families)
     if canonical:
@@ -859,40 +976,22 @@ def _allocate(
         ring = []
     cursors = dict.fromkeys(ring, 0)
     candidates: list[Candidate] = []
-    rejections: list[CandidateRejection] = []
-    examined = 0
-    while examined < limit:
+    while True:
         progressed = False
         for family in ring:
-            if examined >= limit:
-                break
             position = cursors[family]
             if position >= len(families[family]):
                 continue
+            if not admit(families[family][position]):
+                return tuple(candidates), cursors
             progressed = True
             cursors[family] = position + 1
-            examined += 1
-            outcome = examine(families[family][position])
-            if isinstance(outcome, Candidate):
-                candidates.append(outcome)
-            else:
-                rejections.append(outcome)
+            examined = outcome(families[family][position])
+            if isinstance(examined, Candidate):
+                candidates.append(examined)
         if not progressed:
             break
-    omitted = [
-        family for family in canonical if cursors[family] < len(families[family])
-    ]
-    return CandidateSet(
-        candidates=tuple(candidates),
-        rejections=tuple(rejections),
-        unavailable=tuple(unavailable),
-        examined=examined,
-        exhausted=bool(omitted),
-        omitted_families=len(omitted),
-        omitted_targets=sum(
-            len(families[family]) - cursors[family] for family in omitted
-        ),
-    )
+    return tuple(candidates), cursors
 
 
 def _examine(

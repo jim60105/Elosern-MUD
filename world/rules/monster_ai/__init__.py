@@ -20,6 +20,7 @@ decision body in :mod:`world.rules.monster_behaviour` is unchanged.
 from world.rules.monster_ai.candidates import (
     DEFAULT_CANDIDATE_BUDGET,
     Candidate,
+    CandidateExclusion,
     CandidateIdentity,
     CandidateRejection,
     CandidateSet,
@@ -48,6 +49,7 @@ from world.rules.monster_ai.snapshot import (
 __all__ = [
     "BuffProjection",
     "Candidate",
+    "CandidateExclusion",
     "CandidateIdentity",
     "CandidateRejection",
     "CandidateSet",

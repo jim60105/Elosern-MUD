@@ -57,7 +57,7 @@ from world.rules.monster_ai import (
 from world.rules.monster_ai.candidates import SEAL_BUFF_KEY
 from world.rules.progression import FREEFORM_SCALE_VALUES
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
-from world.skills.effects import EffectAudience, EffectPolicy
+from world.skills.effects import EffectAudience, EffectPolicy, InteractionPolicy
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
 
 from ._combat_session_helpers import (
@@ -169,6 +169,24 @@ ABSENT_BUFF = replace(
         "buff_apply:t_cand_no_such_buff",
     ],
 )
+#: A damage skill naming a sexual act the act registry does not carry.
+ABSENT_ACT = replace(
+    MAGIC,
+    key="t_cand_absent_act",
+    effects=[
+        f"damage:{SYNTH_GLOW_ELEMENT}:magic",
+        "pleasure:t_cand_no_such_act",
+    ],
+)
+#: The same round as ENEMY_AUDIENCE, but resumed per submitted target: its
+#: submitted roster decides whether a resisting ally can cancel the action.
+RESISTIBLE = replace(
+    ENEMY_AUDIENCE,
+    key="t_cand_resistible",
+    interaction=InteractionPolicy(
+        contact=False, distinct_participants=False, resistible=True
+    ),
+)
 #: The element-mastery row that entitles the freeform (non-default scale) cast.
 MASTERY = f"{SYNTH_GLOW_ELEMENT}_mastery"
 
@@ -197,6 +215,8 @@ def _candidate_rows() -> dict[str, object]:
             ALLY_DAMAGE,
             ENEMY_AUDIENCE,
             ABSENT_BUFF,
+            ABSENT_ACT,
+            RESISTIBLE,
         )
     }
 
@@ -403,6 +423,27 @@ class CandidateShapeTests(unittest.TestCase):
         )
         self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
 
+    def test_an_unresolved_act_reference_excludes_the_skill_with_a_reason(self):
+        _owned(self.actor, ABSENT_ACT.key, MAGIC.key)
+        result = _enumerate(self.actor, (self.enemy,))
+        self.assertEqual(
+            [observation.skill_key for observation in result.unavailable],
+            [ABSENT_ACT.key],
+        )
+        self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
+
+    def test_a_roster_sensitive_skill_keeps_its_submitted_identity(self):
+        # The same routed effects over two different submitted rosters are not
+        # equivalent when settlement contests each submitted target: both
+        # submissions stay separate candidates.
+        _owned(self.actor, RESISTIBLE.key)
+        ally = _ProbeParticipant("t_cand_ally", pk=3)
+        result = _enumerate(self.actor, (self.enemy,), extra_participants=(ally,))
+        self.assertEqual(
+            sorted(plan.shorthand for plan in result.plans),
+            ["all", "all-enemies"],
+        )
+
     def test_implicit_self_and_none_bindings_are_not_widened(self):
         _owned(self.actor, NONE.key, SELF.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -531,9 +572,9 @@ class CandidateBudgetTests(unittest.TestCase):
         )
 
     def test_the_mandatory_filter_probe_shares_the_candidate_budget(self):
-        # The alternative-attack search is bounded by the same budget and its
-        # examinations are the same proposals the ring examines, so no plan is
-        # ever validated twice and the total stays inside the bound.
+        # The alternative-attack search and the ring draw from one budget and
+        # one examination ledger, so every examined proposal is reported once
+        # and no plan is ever validated twice.
         _owned(self.actor, GUARDED.key, MAGIC.key)
         counted = []
         real = candidates.validate_plan
@@ -544,12 +585,52 @@ class CandidateBudgetTests(unittest.TestCase):
 
         with patch.object(candidates, "validate_plan", counting):
             result = _enumerate(self.actor, self.enemies, budget=1)
-        self.assertEqual(result.examined, 1)
-        self.assertLessEqual(len(counted), 2)
+        self.assertEqual(result.examined, len(counted))
+        self.assertLessEqual(result.examined, 1)
+        self.assertEqual(
+            result.examined,
+            len(result.candidates) + len(result.rejections) + len(result.exclusions),
+        )
+        self.assertTrue(result.exhausted)
+        self.assertGreater(result.omitted_targets, 0)
+        counted.clear()
         with patch.object(candidates, "validate_plan", counting):
             wide = _enumerate(self.actor, self.enemies, budget=4)
-        self.assertLessEqual(len(counted), 8)
+        self.assertEqual(wide.examined, len(counted))
         self.assertLessEqual(wide.examined, 4)
+        self.assertEqual(
+            wide.examined,
+            len(wide.candidates) + len(wide.rejections) + len(wide.exclusions),
+        )
+
+    def test_an_unfinished_capability_search_never_erases_displaced_targets(self):
+        # The budget runs out while the capabilities are still being checked,
+        # so the search cannot prove the absence of an alternative: the
+        # displaced targets stay in the families and the work left over is
+        # reported rather than silently erased.
+        _owned(self.actor, GUARDED.key, MAGIC.key)
+        displaced = _ProbeParticipant("t_cand_displaced", pk=1)
+        also = _ProbeParticipant("t_cand_also_displaced", pk=2)
+        _displaced(displaced)
+        _displaced(also)
+        result = _enumerate(self.actor, (displaced, also), budget=1)
+        self.assertEqual(result.examined, 1)
+        self.assertTrue(result.exhausted)
+        self.assertEqual(result.omitted_targets, 3)
+        self.assertEqual(result.omitted_families, 2)
+
+    def test_an_examined_plan_is_never_reported_as_omitted(self):
+        # Two plans exist, the budget allows one examination: that proposal is
+        # reported once as rejected and only the other one counts as omitted.
+        _owned(self.actor, GUARDED.key)
+        first = _ProbeParticipant("t_cand_first", pk=1)
+        second = _ProbeParticipant("t_cand_second", pk=2)
+        result = _enumerate(self.actor, (first, second), budget=1)
+        self.assertEqual(result.examined, 1)
+        self.assertEqual(result.omitted_targets, 1)
+        self.assertEqual(result.candidates, ())
+        self.assertEqual(result.exclusions, ())
+        self.assertEqual(len(result.rejections), 1)
 
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
@@ -562,7 +643,7 @@ class CandidateBudgetTests(unittest.TestCase):
     def test_the_ring_offset_is_derived_from_the_decision_scope(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
         firsts = {
-            _enumerate(self.actor, self.enemies, budget=1, scope_index=index)
+            _enumerate(self.actor, self.enemies, budget=2, scope_index=index)
             .candidates[0]
             .identity.skill_key
             for index in range(8)
