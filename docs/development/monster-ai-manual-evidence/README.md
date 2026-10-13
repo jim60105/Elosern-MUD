@@ -11,6 +11,14 @@ commit these reports were generated from). Host: `Jim-Fedora`,
 `Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43`, CPython 3.13.14, Evennia
 `6.1.0 (rev ab8b457d)`.
 
+The six archetype campaigns and the performance report were generated from that
+baseline, and their recorded configuration fingerprint is their own harness
+tuning, which the staged activation does not enter. `selector-check.json` /
+`.md` were regenerated for `monster-ai-staged-activation` (baseline commit
+`0970ab84a61732037cdce478c05854c66e81057c`), because that operation records the
+process's *startup* fingerprint and the activation moved it; the recorded
+measurements are unchanged.
+
 ## Exact operations
 
 Each operation is one explicit command, run from the repository root, and each
@@ -124,8 +132,14 @@ counter: accepted candidates plus rejections plus mandatory-filter exclusions.
 
 Configuration fingerprint (all campaign and performance reports):
 `e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232`
-(algorithm version 5). Selector-check fingerprint:
-`a29fd4fac5f07d65eb40377ee4dafe400c977738a321e8028852c9169cefe9c4`.
+(algorithm version 5): the campaigns build their own synthetic variant pairs and
+copy only the archetypes from the shipped rulebook, so the shipped variant maps
+never enter this fingerprint. Selector-check fingerprint:
+`23e711e9bb93a0c9c0e0b66a72f5c17bb4c9bb78c6693b540b34ad54b7da37ba` -- that
+operation records the process's startup fingerprint, which this value now is;
+the pre-activation value `a29fd4fa...` describes a tuning production no longer
+loads and is superseded, not evidence for the changed tuning. See
+`docs/development/monster-ai-activation-evidence/`.
 
 ## Results
 

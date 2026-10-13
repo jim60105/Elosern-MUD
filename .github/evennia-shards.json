@@ -136,6 +136,7 @@
         "world.rules.tests.test_map_knowledge_integration",
         "world.rules.tests.test_church_lamb_seal",
         "world.rules.tests.test_monster_ai_candidates",
+        "world.rules.tests.test_monster_ai_activation",
         "world.rules.tests.test_monster_ai_coordination",
         "world.rules.tests.test_monster_ai_estimation",
         "world.rules.tests.test_monster_ai_manual_reports",

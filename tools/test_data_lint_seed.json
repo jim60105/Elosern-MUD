@@ -281,6 +281,10 @@
       "reason": "human combat calibration evidence exercises shipped gear, skill, and monster rows through the real resolver"
     },
     {
+      "path": "world/rules/tests/test_monster_ai_activation.py",
+      "reason": "staged activation of the named production variant set: real registry binding, one settled production encounter, the release record and the legacy rollback restart seam"
+    },
+    {
       "path": "world/rules/tests/test_monster_behaviour_profile.py",
       "reason": "monster behaviour rulebook contract"
     },
