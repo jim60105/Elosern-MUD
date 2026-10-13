@@ -139,6 +139,7 @@
         "world.rules.tests.test_monster_ai_activation",
         "world.rules.tests.test_monster_ai_coordination",
         "world.rules.tests.test_monster_ai_estimation",
+        "world.rules.tests.test_monster_ai_flee_scope",
         "world.rules.tests.test_monster_ai_manual_reports",
         "world.rules.tests.test_monster_ai_memory",
         "world.rules.tests.test_monster_ai_selection",
