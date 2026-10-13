@@ -11,6 +11,7 @@ context method in this module inspects the identity, category, or effect list
 of whatever produced the requirement.
 """
 
+from collections.abc import Container
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Protocol, runtime_checkable
@@ -20,6 +21,52 @@ from world.skills.registry import FactionConstraint, SkillCategory, SkillDef, Ta
 
 # The approved deterministic AREA shorthands accepted in combat.
 AREA_SHORTHANDS = ("all-enemies", "all-allies", "all")
+
+
+@runtime_checkable
+class StoredReadings(Protocol):
+    """Decision-local, non-mutating stored reads shared by the gate twins.
+
+    One decision (a monster-AI decision or one frozen preview) reads the
+    registry, the owned-skill metadata, the adjusted costs, the participant
+    traits and the buff projections once, and passes that single read set to
+    every plan it validates instead of re-reading live state per candidate.
+    The reads are deliberately narrow and pure: they never materialize a lazy
+    handler, regenerate a gauge, refresh a timestamp or write state, and they
+    are never carried across decisions -- the next decision reads again, so an
+    earlier action's resource, health or status change is always visible.
+
+    Consumers: :func:`candidate_rejection` and :func:`resolve_targets` (the
+    aliveness fact), and the ordered gate twins in
+    :mod:`world.rules.action.gates` (registry, owned keys, modifiers, adjusted
+    costs and stored trait values).
+    """
+
+    def skill(self, skill_key: str) -> Any:
+        """Return the registered definition behind one key, or ``None``.
+
+        The resolver pipeline still consumes a plain requirement value, never
+        a definition: this protocol stays definition-agnostic (``Any``), so
+        no resolver function acquires the definition vocabulary.
+        """
+
+    def owned_keys(self, entity: Any) -> Container[str]:
+        """Return the entity's owned skill keys."""
+
+    def modifiers(self, entity: Any) -> dict[str, Any]:
+        """Return the entity's merged combat-modifier bundle."""
+
+    def blocked_by_buff(self, entity: Any) -> bool:
+        """Return whether a blocking buff forbids the entity's action."""
+
+    def trait_value(self, entity: Any, trait_key: str) -> float:
+        """Return one stored trait value, or ``0.0`` when it is absent."""
+
+    def hp(self, entity: Any) -> float:
+        """Return one participant's stored hp for the aliveness gate."""
+
+    def costs(self, entity: Any, skill: Any, scale: float) -> dict[str, int]:
+        """Return one skill's adjusted costs at ``scale`` for the entity."""
 
 
 @dataclass(frozen=True)
@@ -155,6 +202,7 @@ def _validate_presence(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    readings: StoredReadings | None = None,
 ) -> None:
     if not context.is_present(actor, target):
         _rejection("target_not_present", getattr(target, "key", repr(target)))
@@ -165,13 +213,17 @@ def _validate_alive(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    readings: StoredReadings | None = None,
 ) -> None:
-    try:
-        from world.rules.action import _stored_trait_value
+    if readings is not None:
+        alive = readings.hp(target) > 0
+    else:
+        try:
+            from world.rules.action import _stored_trait_value
 
-        alive = _stored_trait_value(target.traits.hp) > 0
-    except (AttributeError, KeyError):
-        alive = False
+            alive = _stored_trait_value(target.traits.hp) > 0
+        except (AttributeError, KeyError):
+            alive = False
     if not alive:
         _rejection("target_dead", getattr(target, "key", repr(target)))
 
@@ -181,6 +233,7 @@ def _validate_range(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    readings: StoredReadings | None = None,
 ) -> None:
     if not context.is_in_range(actor, target):
         _rejection("target_out_of_range", getattr(target, "key", repr(target)))
@@ -191,6 +244,7 @@ def _validate_faction(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    readings: StoredReadings | None = None,
 ) -> None:
     relation = context.relation_to(actor, target)
     if not validate_faction(relation, requirement.faction):
@@ -210,9 +264,10 @@ def _validate_candidate(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    readings: StoredReadings | None = None,
 ) -> None:
     for validator in _VALIDATORS:
-        validator(actor, context, requirement, target)
+        validator(actor, context, requirement, target, readings)
 
 
 def candidate_rejection(
@@ -220,6 +275,8 @@ def candidate_rejection(
     context: ActionContext,
     requirement: TargetRequirement,
     target: Any,
+    *,
+    readings: StoredReadings | None = None,
 ) -> tuple[Any, str] | None:
     """Return the first ordered validation failure for one target, or ``None``.
 
@@ -231,10 +288,35 @@ def candidate_rejection(
 
     for validator in _VALIDATORS:
         try:
-            validator(actor, context, requirement, target)
+            validator(actor, context, requirement, target, readings)
         except RejectedAction as rejection:
             return rejection.reason, rejection.detail
     return None
+
+
+def forbidden_self_failure(
+    actor: Any,
+    requirement: TargetRequirement,
+    candidate: Any,
+) -> tuple[Any, str] | None:
+    """Return the SINGLE forbid-self shape rejection, or ``None``.
+
+    The ONE expression of the requirement's own prohibition on naming the
+    actor as a single target (every ``SEXUAL_ACT`` skill and the sexual-ministry
+    ``HOLY_RITE`` declare it), consumed by final target resolution and by
+    ``revalidate_submission`` so a submission never accepts a shape the
+    resolver rejects.
+    """
+    if requirement.spec is not TargetSpec.SINGLE or not requirement.forbid_self:
+        return None
+    if candidate is not actor:
+        return None
+    from world.rules.action import RejectReason
+
+    return (
+        RejectReason.TARGET_SPEC_MISMATCH,
+        "a sexual act targeting another entity requires a target other than the actor",
+    )
 
 
 def _target_identity(target: Any) -> tuple[str, int]:
@@ -250,6 +332,8 @@ def resolve_targets(
     context: ActionContext,
     requirement: TargetRequirement,
     candidates: list[Any],
+    *,
+    readings: StoredReadings | None = None,
 ) -> list[Any]:
     """Validate target cardinality and candidates in the required order.
 
@@ -257,6 +341,9 @@ def resolve_targets(
     candidates; SELF accepts normalized empty input or exactly the actor;
     SINGLE requires exactly one explicit candidate; AREA requires a nonempty
     unique list (empty or duplicate explicit input is malformed).
+
+    ``readings`` is the optional decision-local stored-read set; a caller that
+    omits it keeps the historical per-candidate live reads.
     """
     if requirement.spec is TargetSpec.NONE:
         if candidates:
@@ -270,16 +357,16 @@ def resolve_targets(
     elif requirement.spec is TargetSpec.SINGLE:
         if len(candidates) != 1:
             _rejection("target_spec_mismatch", "single-target skill requires one target")
-        if requirement.forbid_self and candidates[0] is actor:
-            # A requirement that forbids the actor as its own SINGLE target
-            # states the prohibition itself (every sexual-act skill's
-            # requirement does: a two-participant act credited with no
-            # partner present would skew lifetime counters). The resolver
-            # only enforces the flag it was given.
-            _rejection(
-                "target_spec_mismatch",
-                "a sexual act targeting another entity requires a target other than the actor",
-            )
+        # A requirement that forbids the actor as its own SINGLE target states
+        # the prohibition itself (every sexual-act skill's requirement does: a
+        # two-participant act credited with no partner present would skew
+        # lifetime counters). The resolver only enforces the flag it was
+        # given; the shared helper keeps submission revalidation identical.
+        forbidden_self = forbidden_self_failure(actor, requirement, candidates[0])
+        if forbidden_self is not None:
+            from world.rules.action import RejectedAction
+
+            raise RejectedAction(*forbidden_self)
     elif requirement.spec is TargetSpec.AREA:
         if not candidates:
             _rejection("no_valid_targets_in_area", "area skill has no candidates")
@@ -295,13 +382,13 @@ def resolve_targets(
 
     if requirement.spec is not TargetSpec.AREA:
         for target in candidates:
-            _validate_candidate(actor, context, requirement, target)
+            _validate_candidate(actor, context, requirement, target, readings)
         return list(candidates)
 
     valid = []
     for target in candidates:
         try:
-            _validate_candidate(actor, context, requirement, target)
+            _validate_candidate(actor, context, requirement, target, readings)
         except Exception as error:
             from world.rules.action import RejectedAction
 

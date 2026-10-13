@@ -49,7 +49,12 @@ def _race_learning_multiplier(entity: Any) -> float:
     return float(race.learning_multiplier) if race is not None else 1.0
 
 
-def can_use_skill(entity: Any, skill: SkillDef) -> bool:
+def can_use_skill(
+    entity: Any,
+    skill: SkillDef,
+    *,
+    owned_keys: Any = None,
+) -> bool:
     """Return whether the entity may USE one skill right now (the ONE gate).
 
     Pure, side-effect-free predicate (DC2): ownership of the skill, then every
@@ -60,7 +65,7 @@ def can_use_skill(entity: Any, skill: SkillDef) -> bool:
     affordability and every other check stay in the resolver; this answers
     lineage eligibility only.
     """
-    owned = entity.skills.owned_keys()
+    owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
     if (
         skill.key not in owned
         or not skill_identity_eligible(entity, skill)
@@ -75,14 +80,19 @@ def can_use_skill(entity: Any, skill: SkillDef) -> bool:
     return True
 
 
-def missing_prerequisite(entity: Any, skill: SkillDef) -> SkillPrerequisite | None:
+def missing_prerequisite(
+    entity: Any,
+    skill: SkillDef,
+    *,
+    owned_keys: Any = None,
+) -> SkillPrerequisite | None:
     """Return the first unmet prerequisite edge of ``skill``, or ``None``.
 
     Reports in declared edge order so rejection text is deterministic. The
     caller owns the ownership check for the skill itself; this only walks the
     prerequisite list (an already-usable skill yields ``None``).
     """
-    owned = entity.skills.owned_keys()
+    owned = entity.skills.owned_keys() if owned_keys is None else owned_keys
     for prereq in skill.prerequisites:
         if prereq.skill_key not in owned:
             return prereq
