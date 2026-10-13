@@ -191,9 +191,10 @@ export function applyPresence(ctx) {
   };
 
   // The rail's digit picks (design D5): `null` when the press is not the
-  // rail's (the router path decides), else whether it was claimed. Only at
-  // the exploration root: a child frame of the dock (the waiting or the
-  // suggestions frame) keeps its own digits, as a card does. While a card is
+  // rail's (the router path decides), else whether it was claimed. In every
+  // exploration frame of the dock (the root and its waiting and suggestions
+  // frames, whose rows keep arrows, Enter, and the pointer — the interim
+  // the footer chips share until change 3 turns them into cards). While a card is
   // open its rows own the digits; the card's keydown handles them first, and
   // this covers a digit that reaches the store with focus elsewhere. With
   // the rail on the stage every digit is claimed — one beyond the slots does
@@ -205,7 +206,7 @@ export function applyPresence(ctx) {
       return null;
     }
     const descriptor = ctx.router.currentDescriptor();
-    if (!descriptor || descriptor.source !== "exploration.root") {
+    if (!descriptor || typeof descriptor.source !== "string" || !descriptor.source.startsWith("exploration.")) {
       return null;
     }
     const slot = Number(key) - 1;

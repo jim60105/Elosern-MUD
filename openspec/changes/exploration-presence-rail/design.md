@@ -53,6 +53,19 @@ Six slots; with more than six entries, five show and the sixth is `＋N`. The ov
 
 Grep `styles/app-shell.css` for `.elosern-root` duplicates of every restyled class (`.action-dock*`, `.scene-overview*`, dialogue choice classes touched by the extraction) and update them in the same commit.
 
+## Implementation Notes
+
+Recorded during apply; each refines a decision above without changing the delta specs.
+
+- **D2, where the state lives.** The focus slice (`presenceCard`: the verb card `{identity, name, openerKey}` or the overflow card) is client-local state on the store, not refs inside the composable, because the store's digit path must open a card and must know whether one is open, and because a departed person or a committed move must close the card in the commit that publishes it. It is never a router frame and opening it sends nothing. `composables/use-person-focus.js` derives everything else (card rows, the standee subject, the speaker line, focus restoration, the departed flash, the Tab chain). The settle checks, in order: mode not exploration → close; committed location key (room identity plus current node) changed → close quietly; the exploration panel unavailable → keep; departed interact target → close with the `<name> 已經離開了。` notice, deferred while a submission is in flight or awaiting its revision (so 交談's intermediate commit never closes the card or flashes).
+- **D2, one gate.** `activateExplorationRow(row)` is the generalized gate (`activateExit` delegates to it); it gates every row, local drawer opens included, exactly as the router's `confirm` does.
+- **D5, digits.** The rail claims digits 1–9 in every `exploration.*` dock frame (the root and its waiting and suggestions frames) while it is on the stage (`view.railVisible`: exploration mode, entries present, no card, no held combat round, no degraded root, no drawer or overlay); an empty or hidden rail claims none and the router digit path is not used there, so nothing falls through to the footer chips or the child frames' rows. While a card is open its own keydown takes the digits, and the store routes a digit that reaches it with focus elsewhere to the card's rows.
+- **D3/D4, the rail under a card.** The rail stays mounted (hidden with `v-show` and `inert`) while a card is open, so closing the card returns focus to the opener entry in the same tick; a card reached through `＋N` returns focus to the `＋N` slot.
+- **D5, Tab chain.** Compass → rail → footer is stitched with keydown handlers (the rail's anchor precedes the band in DOM order); a hidden rail leaves Tab native.
+- **D6, readout order.** The rail joins the aimed-or-hovered tier above the compass aim (hovering or focusing the rail is the latest attention; focusing it blurs the compass): flash, rail, compass aim, idle.
+- **Portraits.** The exploration panel's schema v3 publishes `portrait_ref: null` on every interact target and look entity, so in the live client every medallion shows its initial and the focus standee uses the dialogue silhouette treatment. The face-crop path is implemented and covered at the component level and in Storybook, and lights up without client change once the presenter publishes refs (out of scope: no server change).
+- **Live-client check (7.2).** See the task's notes for the screenshots taken; deviations from the prototype are recorded there.
+
 ## Risks / Trade-offs
 
 - **Extraction regressions in the dialogue screen.** Mitigation: D1 ordering and unchanged existing tests, plus a live dialogue screenshot compared before and after at both viewports.

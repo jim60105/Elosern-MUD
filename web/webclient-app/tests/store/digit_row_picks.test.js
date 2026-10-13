@@ -14,8 +14,9 @@
 // presence rail, which owns the exploration root's digits — a digit picks
 // the Nth visible rail slot, a digit past the slots is claimed and does
 // nothing, an empty rail claims none, and none falls through to the footer
-// chips. A card owns the digits while it is open; the dock's child frames
-// (the waiting frame) and every other family keep the router's digit picks.
+// chips. The rail keeps the digits while the dock's waiting or suggestions
+// frame is open too; a card owns them while it is open; every other family
+// keeps the router's digit picks.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -234,16 +235,17 @@ describe("dock digit row picks (1–9)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the waiting frame keeps its own digits", () => {
+  it("the rail keeps the digits while the waiting frame is open", () => {
     openSession();
     openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
     expect(store.focusItemByKey("wait")).toBe(true);
     expect(store.focusConfirm("keyboard")).toBe(true);
     expect(store.view.dockSource).toBe("exploration.wait");
-    // 1 -> 等待直到黎明 through the router's confirm path.
-    expect(store.focusPress("1")).toBe(true);
+    // `2` is the rail's object, never the waiting frame's second row.
+    expect(store.focusPress("2")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.wait", payload: { daypart: "dawn" } });
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 3 } });
+    expect(store.view.dockSource).toBe("exploration.wait");
   });
 
   it("a combat skill frame's sixth row is reachable by digit 6", () => {
