@@ -13,7 +13,11 @@ invoked by startup/CI/contract gates.
 Every encounter uses fresh entities and clears the session-owned observation
 and AI-tuning stores first, so a previous run cannot influence one; each
 encounter seeds the process dice from its recorded combat seed and records the
-decision seed it was scoped with.
+decision seed it was scoped with. The player side of an encounter is a real
+production roster — the initiating player plus the companion NPCs bound to it
+through ``join_party`` — so a multi-opponent situation is engaged through the
+same collection production uses, and a refused monster action is recorded
+against the decision that made it rather than asserted away.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from django.conf import settings
 
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
+from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 
 # Eagerly imported outside any synthetic scope (the shared helper precedent):
@@ -40,15 +45,27 @@ import world.rules.cross_lineage_unlock  # noqa: F401
 import world.rules.defeat_aftermath  # noqa: F401
 from world.rules import monster_behaviour as behaviour
 from world.rules.action import ActionResolver
-from world.rules.buffs import apply_buff
-from world.rules.combat import Battlefield, BattlefieldActionContext
-from world.rules.combat_session import engage_group, read_session, submit_player_action
+from world.rules.buffs import (
+    BUFF_DEFINITIONS,
+    apply_buff,
+    entity_active_buffs,
+    has_positional_marker,
+)
+from world.rules.combat import COMBAT_YAML, Battlefield, BattlefieldActionContext
+from world.rules.combat_session import (
+    BASIC_ATTACK_KEY,
+    engage_group,
+    read_session,
+    reconstruct_battlefield,
+    submit_player_action,
+)
 from world.rules.combat_session import ai_tuning as ai_tuning_module
 from world.rules.combat_session import observations as observations_module
 from world.rules.combat_session import policies as policies_module
 from world.rules.monster_ai import manual_reports as reports
 from world.rules.monster_individual import construct_species_individual
 from world.lore.races import RACE_REGISTRY
+from world.rules.party import combat_companions, join_party
 from world.skills.registry import TargetSpec
 from world.tests.synthetic_data import (
     SYNTH_GLOWMIRE_ELEMENT,
@@ -158,48 +175,96 @@ _ENCOUNTER_SKILL_KEYS = (
 )
 #: The legacy decider's synthetic variant (never declared utility).
 LEGACY_VARIANT_KEY = "t_campaign_legacy"
+#: The synthetic row registered under the production basic-attack key, so the
+#: non-deciding party members' own default-attack policy resolves.
+_BASIC_ATTACK_ROW = _skill(
+    BASIC_ATTACK_KEY, "合成基本攻擊", effects=[f"damage:{_ELEMENT}:physical"], cost={}
+)
+
+
+def _positional_buff_key() -> str:
+    """Return one shipped buff definition declaring the positional marker."""
+    for key in sorted(BUFF_DEFINITIONS):
+        if getattr(BUFF_DEFINITIONS[key], "marker", None) == "positional":
+            return key
+    raise ValueError("no positional-marker buff is authored")
+
+
+def _timed_buff_key() -> str:
+    """Return one shipped buff definition with a short finite duration.
+
+    Applied to the long-lifecycle monster so a real mounted effect expires
+    inside the encounter's own committed round count.
+    """
+    for key in sorted(BUFF_DEFINITIONS):
+        duration = getattr(BUFF_DEFINITIONS[key], "duration", None)
+        if isinstance(duration, int) and not isinstance(duration, bool):
+            if 0 < duration <= 30:
+                return key
+    raise ValueError("no short-duration buff is authored")
 
 
 @dataclass(frozen=True, slots=True)
 class SituationSpec:
     """One synthetic situation's battlefield configuration.
 
-    Every field is a plain scalar/list so a situation declaration can never
-    carry a live entity; the harness materializes them per encounter.
+    Every field is a plain scalar/tuple so a situation declaration can never
+    carry a live entity; the harness materializes them per encounter. The
+    initiating player is always the session's own requester, so their hit
+    points stay high enough to keep driving rounds while the bound companions
+    carry the opponent pressure the situation exercises: production
+    engagement collects exactly the initiating player and its bound
+    companions, never other characters merely sharing the room.
     """
 
     name: str
     monsters: int
-    players: int
     monster_hp: int
     monster_mp: int
-    player_hp: tuple[int, ...]
-    seal_players: int = 0
+    initiator_hp: int = 300
+    companion_hp: tuple[int, ...] = ()
+    seal_opponents: int = 0
+    displaced_opponents: int = 0
+    monster_effect: str | None = None
     allied_support: bool = False
 
 
 def _situations() -> tuple[SituationSpec, ...]:
-    """Return the six distinct synthetic situations the allocation requires."""
+    """Return the six distinct synthetic situations the allocation requires.
+
+    Each declaration names the one boundary the approved simulation design
+    assigns to it and materializes it with real production entities and
+    shipped effects: the player-side roster is the initiating player plus
+    companions bound through ``join_party``, the mandatory-targeting boundary
+    mounts the shipped seal and the shipped positional marker instead of
+    declaring them, and the long-lifecycle boundary mounts a shipped finite
+    effect that expires inside the encounter's own committed rounds.
+    """
     return (
         # Finishing choice: a credible knockout against a healthy opponent.
-        SituationSpec("finishing_choice", monsters=1, players=2, monster_hp=30,
-                      monster_mp=80, player_hp=(12, 300)),
+        SituationSpec("finishing_choice", monsters=1, monster_hp=90, monster_mp=80,
+                      companion_hp=(12,)),
         # Area versus single target: three opponents with uneven remaining HP.
-        SituationSpec("area_versus_single", monsters=1, players=3, monster_hp=45,
-                      monster_mp=80, player_hp=(300, 150, 40)),
+        SituationSpec("area_versus_single", monsters=1, monster_hp=160, monster_mp=80,
+                      companion_hp=(150, 40)),
         # Resource exhaustion: useful choices competing for a finite MP pool.
-        SituationSpec("resource_exhaustion", monsters=1, players=2, monster_hp=40,
-                      monster_mp=13, player_hp=(300, 300)),
-        # Mandatory targeting: two sealed opponents plus a legal non-strike
-        # alternative (the monster's own self-heal).
-        SituationSpec("mandatory_targeting", monsters=1, players=3, monster_hp=40,
-                      monster_mp=60, player_hp=(300, 250, 200), seal_players=2),
+        SituationSpec("resource_exhaustion", monsters=1, monster_hp=110, monster_mp=13,
+                      companion_hp=(300,)),
+        # Mandatory targeting: two sealed opponents, the leading one also
+        # displaced, plus the monster's genuinely legal non-strike
+        # alternative (its own actor-bound self-heal).
+        SituationSpec("mandatory_targeting", monsters=1, monster_hp=160, monster_mp=60,
+                      companion_hp=(250, 200), seal_opponents=2,
+                      displaced_opponents=1),
         # Tactical support and focus: two allied deciders, one able to heal.
-        SituationSpec("support_and_focus", monsters=2, players=2, monster_hp=45,
-                      monster_mp=60, player_hp=(300, 300), allied_support=True),
-        # Long encounter and lifecycle: repeated rounds against a durable pair.
-        SituationSpec("long_lifecycle", monsters=1, players=2, monster_hp=150,
-                      monster_mp=200, player_hp=(400, 400)),
+        SituationSpec("support_and_focus", monsters=2, monster_hp=45, monster_mp=60,
+                      companion_hp=(300,), allied_support=True),
+        # Long encounter and lifecycle: repeated rounds against a durable
+        # opponent pair with a real mounted effect expiring inside the
+        # encounter's own committed round count.
+        SituationSpec("long_lifecycle", monsters=1, monster_hp=150, monster_mp=200,
+                      initiator_hp=400, companion_hp=(400,),
+                      monster_effect=_timed_buff_key()),
     )
 
 
@@ -273,7 +338,12 @@ class CampaignHarness:
 
     def _enter_scope(self) -> None:
         """Enter the synthetic catalog scope and build the campaign rows."""
-        self.skills = {row.key: row for row in _CAMPAIGN_SKILLS}
+        # The production basic-attack row is registered beside the campaign kit
+        # so every non-deciding party member's own default-attack policy
+        # resolves inside the synthetic catalog.
+        self.skills = {
+            row.key: row for row in (*_CAMPAIGN_SKILLS, _BASIC_ATTACK_ROW)
+        }
         first_variant = _variant_key(self.archetypes[0], reports.INTELLIGENCE_VALUES[0])
         self.species = {
             SPECIES_KEY: make_monster_species(SPECIES_KEY, default_variant_key=first_variant)
@@ -354,6 +424,7 @@ class CampaignHarness:
 
     # -- entity construction ----------------------------------------------
     def _player(self, key: str, hp: int) -> Any:
+        """Create the initiating player of one encounter in the arena."""
         player = create_object(PlayerCharacter, key=key)
         player.race = next(iter(RACE_REGISTRY))
         player.apply_race_baseline()
@@ -366,6 +437,29 @@ class CampaignHarness:
         player.traits.defense.current = 15
         player.location = self.room
         return player
+
+    def _companion(self, key: str, hp: int) -> Any:
+        """Create one real binding-ready companion NPC of the player's side.
+
+        Production engagement collects exactly the initiating player's bound,
+        co-located, living companions as the rest of the player-side roster
+        (``combat_companions``), so a multi-opponent situation is materialized
+        by binding real companions rather than by inventing extra stand-in
+        players. A companion owns the production ``basic_attack`` key, so its
+        own default-attack policy resolves inside the synthetic catalog.
+        """
+        companion = create_object(NPC, key=key)
+        companion.race = next(iter(RACE_REGISTRY))
+        companion.apply_race_baseline()
+        companion.db.skills = {"active": [BASIC_ATTACK_KEY], "passive": []}
+        companion.traits.hp.base = hp
+        companion.traits.hp.current = hp
+        companion.traits.atk_phys.base = 25
+        companion.traits.atk_phys.current = 25
+        companion.traits.defense.base = 15
+        companion.traits.defense.current = 15
+        companion.location = self.room
+        return companion
 
     def _monster(
         self,
@@ -458,16 +552,19 @@ class CampaignHarness:
         observations_module.clear_session_memory()
         ai_tuning_module.clear_session_ai_tuning()
         decision_seed = reports.scenario_seed(situation.name, archetype, seed_index)
-        combat_seed = reports.stable_seed(
-            "combat", situation.name, archetype, seed_index, intelligence
-        )
+        # The paired variants share one combat seed: only the synthetic
+        # variant's intelligence differs between the two paired encounters.
+        combat_seed = reports.stable_seed("combat", situation.name, archetype, seed_index)
         random.seed(combat_seed)
         variant_key = _variant_key(archetype, intelligence)
 
-        players = [
-            self._player(f"campaign-player-{index}", hp)
-            for index, hp in enumerate(situation.player_hp)
+        initiator = self._player("campaign-player-0", situation.initiator_hp)
+        companions = [
+            self._companion(f"campaign-companion-{index}", hp)
+            for index, hp in enumerate(situation.companion_hp)
         ]
+        for companion in companions:
+            join_party(companion, initiator)
         monsters = []
         for index in range(situation.monsters):
             monster = self._monster(
@@ -485,12 +582,24 @@ class CampaignHarness:
                     ],
                     "passive": [],
                 }
+            if situation.monster_effect is not None and index == 0:
+                apply_buff(monster, situation.monster_effect)
             monsters.append(monster)
-        for player in players[: situation.seal_players]:
-            apply_buff(player, _SEAL_BUFF_KEY)
+        # The player-side roster production engagement will collect: the
+        # initiating player first, then its bound companions in party order.
+        opponents = (initiator, *companions)
+        for opponent in opponents[: situation.seal_opponents]:
+            apply_buff(opponent, _SEAL_BUFF_KEY)
+        for opponent in opponents[: situation.displaced_opponents]:
+            apply_buff(opponent, _positional_buff_key())
 
-        engage_group(players[0], monsters)
-        samples, rounds, outcome = self._play(players, monsters)
+        self._verify_preconditions(situation, initiator, companions)
+        engage_group(initiator, monsters)
+        samples, rounds, outcome = self._play(initiator, monsters)
+        if situation.monster_effect is not None:
+            self._verify_effect_expired(
+                monsters[0], situation.monster_effect, rounds
+            )
 
         return reports.EncounterOutcome(
             archetype=archetype,
@@ -504,51 +613,133 @@ class CampaignHarness:
             decisions=tuple(samples),
         )
 
+    @staticmethod
+    def _verify_preconditions(
+        situation: SituationSpec, initiator: Any, companions: Sequence[Any]
+    ) -> None:
+        """Fail the encounter unless its situation's roster really materialized.
+
+        The scenario boundaries are properties of the engaged roster, not of a
+        declaration: production engagement must have collected exactly the
+        bound companions, and the mounted seal and displacement markers must be
+        live on the opponents the situation names. A mismatch is a simulator
+        bug that fails the batch rather than a silently weaker scenario.
+        """
+        engaged = tuple(int(entity.pk) for entity in combat_companions(initiator))
+        expected = tuple(int(entity.pk) for entity in companions)
+        if engaged != expected:
+            raise RuntimeError(
+                f"{situation.name}: engaged companions {engaged} do not match the "
+                f"bound roster {expected}"
+            )
+        for position, opponent in enumerate((initiator, *companions)):
+            if position < situation.seal_opponents:
+                if _SEAL_BUFF_KEY not in entity_active_buffs(opponent):
+                    raise RuntimeError(
+                        f"{situation.name}: opponent {opponent.key} carries no live seal"
+                    )
+            if position < situation.displaced_opponents:
+                if not has_positional_marker(opponent):
+                    raise RuntimeError(
+                        f"{situation.name}: opponent {opponent.key} carries no live "
+                        "positional marker"
+                    )
+
+    @staticmethod
+    def _verify_effect_expired(monster: Any, effect: str, rounds: int) -> None:
+        """Fail the encounter unless its finite mounted effect really expired."""
+        seconds = int(COMBAT_YAML["round"]["seconds"]) * rounds
+        duration = BUFF_DEFINITIONS[effect].duration or 0
+        if seconds <= duration:
+            raise RuntimeError(
+                f"the encounter ran {seconds}s, too short to expire the mounted "
+                f"effect {effect!r} ({duration}s)"
+            )
+        if effect in entity_active_buffs(monster):
+            raise RuntimeError(
+                f"the mounted effect {effect!r} outlived the encounter's {rounds} rounds"
+            )
+
     def _play(
-        self, players: Sequence[Any], monsters: Sequence[Any]
+        self, initiator: Any, monsters: Sequence[Any]
     ) -> tuple[list[reports.DecisionSample], int, str]:
-        """Drive one session round-by-round until terminal settlement or the cap."""
+        """Drive one session round-by-round until terminal settlement or the cap.
+
+        The initiating player is the session's own requester, so every round
+        submits one ordinary action from it against a currently legal living
+        opponent. A submission that settlement refuses, or an active session
+        with no legal living opponent left, is a simulator failure reported
+        loudly rather than a capped encounter; only the session's own terminal
+        outcome or this run's actual round bound classifies the encounter.
+        """
         traces: list[Any] = []
-        illegal = {"count": 0}
+        refused: set[int] = set()
         monster_keys = {monster.key for monster in monsters}
         rounds = 0
         last_outcome = "round"
-        with self._recording(traces, illegal, monster_keys):
+        with self._recording(traces, refused, monster_keys):
             for _ in range(reports.ROUND_CAP):
-                record = read_session(players[0])
+                record = read_session(initiator)
                 if record is None:
                     break
-                actor = next(
-                    (player for player in players if player.traits.hp.current > 0), None
-                )
-                if actor is None:
-                    break
-                result = submit_player_action(actor, PLAYER_STRIKE_KEY, [monsters[0]])
+                target = self._legal_opponent(initiator, record, monster_keys)
+                if target is None:
+                    raise RuntimeError(
+                        f"{initiator.key} has no legal living opponent left while its "
+                        "session is still active"
+                    )
+                result = submit_player_action(initiator, PLAYER_STRIKE_KEY, [target])
                 rounds += 1
-                last_outcome = result.get("outcome", "round")
-                if last_outcome not in ("round", "overwhelm"):
+                last_outcome = result.get("outcome")
+                if last_outcome not in ("round", "victory", "defeat", "fled", "cap"):
+                    raise RuntimeError(
+                        f"unexpected submission outcome {last_outcome!r}: {result!r}"
+                    )
+                if last_outcome != "round":
                     break
-        if read_session(players[0]) is None and last_outcome not in (
-            "victory", "defeat", "fled", "forfeit",
-        ):
-            last_outcome = "settled"
         if last_outcome == "victory":
             outcome = reports.OUTCOME_WIN
-        elif last_outcome in ("defeat", "fled", "forfeit"):
-            outcome = reports.OUTCOME_LOSS
-        elif rounds >= reports.ROUND_CAP:
-            outcome = reports.OUTCOME_CAPPED
-        elif read_session(players[0]) is None:
+        elif last_outcome in ("defeat", "fled"):
             outcome = reports.OUTCOME_LOSS
         else:
+            # The session's own terminal cap or this run's actual round bound:
+            # an unresolved encounter, never a terminal win or loss.
             outcome = reports.OUTCOME_CAPPED
         samples = [
-            self._sample(trace, index) for index, trace in enumerate(traces)
+            self._sample(trace, index, refused)
+            for index, trace in enumerate(traces)
         ]
         return samples, rounds, outcome
 
-    def _sample(self, trace: Any, index: int) -> reports.DecisionSample:
-        """Project one recorded decision trace into a report sample."""
+    @staticmethod
+    def _legal_opponent(initiator: Any, record: Any, monster_keys: set[str]) -> Any:
+        """Return one currently legal, living opponent of the live session.
+
+        The target is read from the session's own reconstructed battlefield
+        (the same boundary settlement validates against), so a dead, fled or
+        knocked-out monster is never submitted against.
+        """
+        battlefield = reconstruct_battlefield(initiator, record)
+        for key in sorted(monster_keys):
+            entity = battlefield.roster.get(key)
+            if (
+                entity is not None
+                and key not in battlefield.fled
+                and not battlefield.is_knocked_out(key)
+                and entity.traits.hp.current > 0
+            ):
+                return entity
+        return None
+
+    def _sample(
+        self, trace: Any, index: int, refused: set[int]
+    ) -> reports.DecisionSample:
+        """Project one recorded decision trace into a report sample.
+
+        ``refused`` carries the zero-based decision indices whose selected
+        action settlement refused, so the report's selected-illegal count is
+        measured from the encounter rather than asserted.
+        """
         selected = trace.selected
         highest = False
         if selected is not None and trace.plans:
@@ -570,7 +761,7 @@ class CampaignHarness:
             skill_key=skill_key,
             target_ids=target_ids,
             highest_utility=highest,
-            selected_illegal=False,
+            selected_illegal=index in refused,
             no_action=no_action,
             rejections=len(trace.rejections),
             exclusions=len(trace.exclusions),
@@ -583,14 +774,17 @@ class CampaignHarness:
 
     @contextmanager
     def _recording(
-        self, traces: list[Any], illegal: dict[str, int], monster_keys: set[str]
+        self, traces: list[Any], refused: set[int], monster_keys: set[str]
     ) -> Iterator[None]:
         """Record every monster decision's trace and settlement rejection.
 
         The production session provider is wrapped for the duration of one
         encounter only: the wrapper forwards the decision's own trace sink, and
-        the resolver wrapper counts a monster request settlement refused. Both
-        wrappers restore the original binding on exit whatever the body raises.
+        the resolver wrapper flags the decision whose selected action settlement
+        refused. The round resolves each request immediately after the provider
+        call that produced it, so the decision just recorded IS the refused one.
+        Both wrappers restore the original binding on exit whatever the body
+        raises.
         """
         original_policy = policies_module.monster_behaviour_policy
 
@@ -604,8 +798,8 @@ class CampaignHarness:
             result = original_resolve(request, *args, **kwargs)
             actor = getattr(request, "actor", None)
             if actor is not None and getattr(actor, "key", None) in monster_keys:
-                if getattr(result, "outcome", None) != "success":
-                    illegal["count"] += 1
+                if getattr(result, "outcome", None) != "success" and traces:
+                    refused.add(len(traces) - 1)
             return result
 
         policies_module.monster_behaviour_policy = policy

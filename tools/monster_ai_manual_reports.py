@@ -36,10 +36,21 @@ os.chdir(REPO_ROOT)
 
 
 def _scratch_path() -> Path:
-    """Return the isolated scratch database path, refusing a live/retained one."""
+    """Return a fresh isolated scratch database path.
+
+    A named override must not already exist (never migrate someone else's
+    database) and may never be the live game database or the retained Evennia
+    test database; without one, this run gets its own private temporary
+    directory.
+    """
     override = os.environ.get("MUD_MANUAL_REPORT_DB")
     if override:
         path = Path(override).resolve()
+        if path.exists():
+            raise SystemExit(
+                f"refusing to migrate an existing database: {path}; "
+                "name a fresh path or unset MUD_MANUAL_REPORT_DB"
+            )
     else:
         directory = Path(tempfile.mkdtemp(prefix="monster-ai-manual-"))
         path = directory / "scratch.sqlite3"
@@ -50,23 +61,33 @@ def _scratch_path() -> Path:
 
 
 def _bootstrap() -> Path:
-    """Configure the isolated scratch database and initialize Django."""
+    """Point Django at the fresh scratch database, then initialize it.
+
+    The scratch path is published through ``MUD_MANUAL_REPORT_DB`` and the
+    ``DJANGO_SETTINGS_MODULE`` is the tool's own scratch settings module, so the
+    default connection is the scratch database before ``django.setup()`` and
+    ``evennia._init()`` run. The resolved connection name is verified before any
+    migration, so a misconfiguration fails loudly instead of touching a real
+    database.
+    """
     scratch = _scratch_path()
-    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "server.conf.settings")
+    os.environ["MUD_MANUAL_REPORT_DB"] = str(scratch)
+    os.environ["DJANGO_SETTINGS_MODULE"] = "tools.monster_ai_manual_reports_settings"
     import django
 
     django.setup()
+    from django.db import connection
+
+    resolved = Path(str(connection.settings_dict["NAME"])).resolve()
+    if resolved != scratch.resolve():
+        raise SystemExit(
+            f"scratch isolation failed: the default connection is {resolved}"
+        )
     # Evennia's API (including the command/contrib bindings ``world.rules.dice``
     # reaches) is only published by ``_init()`` after Django models load.
     import evennia
 
     evennia._init()
-    from django.conf import settings
-
-    settings.DATABASES["default"]["NAME"] = str(scratch)
-    from django.db import connections
-
-    connections["default"].close()
     from django.core.management import call_command
 
     call_command("migrate", verbosity=0, interactive=False, run_syncdb=True)

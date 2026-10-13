@@ -24,6 +24,7 @@ from evennia.objects.models import ObjectDB
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.rules import monster_behaviour as behaviour
+from world.rules import traits
 from world.rules.action import ActionRequest
 from world.rules.combat import (
     Battlefield,
@@ -153,10 +154,14 @@ class SelectorOperationTests(unittest.TestCase):
     """The standalone paired selection check over its documented seeds."""
 
     @covers_requirement("monster-ai-manual-validation::paired-selector-evidence-measures-a-fixed-utility-gap")
-    def test_selector_check_is_paired_reproducible_and_meets_the_margin(self):
-        first = reports.run_selector_operation(seed_count=reports.SELECTOR_SEED_COUNT)
-        second = reports.run_selector_operation(seed_count=reports.SELECTOR_SEED_COUNT)
-        self.assertEqual(first.total, 128)
+    def test_selector_check_is_paired_and_replays_every_choice(self):
+        # The 128-seed acceptance run is an explicit manual operation
+        # (simulation design section 3): full-suite discovery must never run
+        # it, so this regression replays a small fixed replicate count and
+        # asserts the pairing arithmetic instead of the manual margin.
+        first = reports.run_selector_operation(seed_count=8)
+        second = reports.run_selector_operation(seed_count=8)
+        self.assertEqual(first.total, 8)
         self.assertEqual(first.pairs, second.pairs)
         self.assertEqual(
             [pair.seed for pair in first.pairs], [pair.seed for pair in second.pairs]
@@ -168,11 +173,34 @@ class SelectorOperationTests(unittest.TestCase):
         for pair in first.pairs:
             self.assertIn(pair.low_choice, (reports.SELECTOR_HIGH_KEY, reports.SELECTOR_LOW_KEY))
             self.assertIn(pair.high_choice, (reports.SELECTOR_HIGH_KEY, reports.SELECTOR_LOW_KEY))
-        self.assertTrue(first.margin_met)
-        self.assertGreaterEqual(first.difference, reports.SELECTOR_MIN_MARGIN)
-        self.assertGreater(first.high_probability, first.low_probability)
-        self.assertEqual(first.high_high_utility + (first.total - first.high_high_utility), 128)
-        self.assertLess(first.low_wilson[0], first.high_wilson[1])
+            self.assertEqual(pair.seed, reports.selector_seed(pair.seed_index))
+        # The aggregates are derived from the raw paired replicates.
+        self.assertEqual(
+            first.low_high_utility,
+            sum(
+                1 for pair in first.pairs if pair.low_choice == reports.SELECTOR_HIGH_KEY
+            ),
+        )
+        self.assertEqual(
+            first.high_high_utility,
+            sum(
+                1
+                for pair in first.pairs
+                if pair.high_choice == reports.SELECTOR_HIGH_KEY
+            ),
+        )
+        self.assertEqual(first.margin_required, reports.SELECTOR_MIN_MARGIN)
+        self.assertEqual(
+            first.margin_met, first.difference >= reports.SELECTOR_MIN_MARGIN
+        )
+        # Each Wilson interval brackets its own observed proportion.
+        for successes, interval in (
+            (first.low_high_utility, first.low_wilson),
+            (first.high_high_utility, first.high_wilson),
+        ):
+            observed = successes / first.total
+            self.assertLessEqual(interval[0], observed)
+            self.assertGreaterEqual(interval[1], observed)
         # The check is an isolated selector measurement: it runs no encounter.
         self.assertFalse(hasattr(first, "encounters"))
 
@@ -653,4 +681,26 @@ class PerformanceHarnessTests(EvenniaTestCase):
         self.assertFalse(legacy.dice_isolated)
         self.assertGreater(utility.examined, 0)
         self.assertEqual(len(report.scaling), len(reports.PERFORMANCE_SCALING_COUNTS))
-        self.assertTrue(report.budget_met)
+        # The measured call is a read of fixed state (simulation design
+        # section 6): one complete utility policy call over the reference
+        # envelope leaves every participant's stored traits byte-identical,
+        # and the warm p95 budget is reported rather than asserted, so no
+        # host-speed gate ever enters permanent tests.
+        decider, battlefield = harness._performance_field("utility", enemies=8)
+        before = {
+            entity.key: traits.stored_trait_records(entity)
+            for entity in battlefield.roster.values()
+        }
+        call = harness._timing_callable(
+            decider, battlefield, BattlefieldActionContext(battlefield), []
+        )
+        for _ in range(3):
+            call()
+        self.assertEqual(
+            {
+                entity.key: traits.stored_trait_records(entity)
+                for entity in battlefield.roster.values()
+            },
+            before,
+        )
+        self.assertEqual(report.budget_ms, reports.PERFORMANCE_P95_BUDGET_MS)
