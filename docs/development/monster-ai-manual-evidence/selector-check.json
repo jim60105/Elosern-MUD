@@ -1,7 +1,11 @@
 {
   "algorithm_version": 5,
-  "baseline_commit": "143b28d6f2cb07090f88753eacd4ea0c32e0246c",
+  "baseline_commit": "ab8b457ddc4265482766d601d99a6555e3f88e82",
   "candidates": {
+    "canonical_order": [
+      "highest",
+      "lowest"
+    ],
     "highest": "highest",
     "lowest": "lowest",
     "utility_gap": 0.5
@@ -12,8 +16,8 @@
     "low": 74,
     "total": 128
   },
-  "evennia_version": "unknown",
-  "generated_at": "2026-10-13T15:47:55.520543+00:00",
+  "evennia_version": "6.1.0 (rev ab8b457d)",
+  "generated_at": "2026-10-13T17:31:02.508585+00:00",
   "host": {
     "clock": "monotonic",
     "node": "Jim-Fedora",
@@ -804,6 +808,7 @@
     }
   ],
   "schema": "monster-ai-manual-evidence/1",
+  "seed_encoding_version": 1,
   "seeds": [
     0,
     1,
@@ -934,6 +939,10 @@
     126,
     127
   ],
+  "temperatures": {
+    "high": 0.19700000000000006,
+    "low": 1.133
+  },
   "wilson": {
     "high": [
       0.8621530681952095,
