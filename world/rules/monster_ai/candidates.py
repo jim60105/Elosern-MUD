@@ -1,7 +1,8 @@
-"""Semantically legal, deduplicated damage candidates under a hard budget.
+"""Semantically legal, deduplicated action candidates under a hard budget.
 
-One monster decision asks this module which attack plans actually exist. The
-producer reads the owned active hostile damage skills, expands each into the
+One monster decision asks this module which plans actually exist. The producer
+reads the owned active skills that carry a supported outcome -- hostile damage,
+owned healing, supported buffs and hostile control -- expands each into the
 skill's own authored target shape (one plan per valid SINGLE target, the
 bounded legal group set of an AREA or mixed-audience skill, the implicit
 SELF/NONE binding), applies the two mandatory single-target restrictions (the
@@ -10,15 +11,20 @@ validates every plan through the shared settlement legality, deduplicates by
 canonical identity, and examines at most one authored candidate budget's worth
 of proposals.
 
+The mandatory restrictions are hostile *single-target damage* restrictions and
+apply to nothing else: friendly support is never narrowed to a seal bearer or
+stripped of a displaced target, and a skill whose every effect binds the actor
+presents the implicit binding rather than a per-target shape it cannot use.
+
 The rules that decide legality are never restated here. ``validate_plan`` is
 the same seam the decision inputs expose and it runs settlement's own ordered
 gates. This module adds only what settlement does not answer:
 
 - which proposals exist at all (the skill's authored shape and audiences);
 - the unrepresentable-plan exclusions -- a harm the damage model cannot
-  resolve, or a plan whose damage reaches no hostile recipient -- so a plan the
-  AI cannot model never enters scoring while supported alternatives stay
-  eligible;
+  resolve, damage that reaches no hostile recipient, or a support plan that
+  mutates no recipient at all -- so a plan the AI cannot model never enters
+  scoring while supported alternatives stay eligible;
 - the canonical identity (skill, scale and the sorted stable identifiers of
   the plan's own recipients), so two representations of one action cannot be
   sampled twice and the retained representation stays executable;
@@ -73,10 +79,13 @@ from world.skills.effects import (
     BuffApplyEffect,
     DamageEffect,
     EffectAudience,
+    GaugeTransferEffect,
+    HealEffect,
     PairEventEffect,
     PleasureEffect,
     RiteBlessingEffect,
     SelfBuffApplyEffect,
+    SelfHealEffect,
     SexualCounterEffect,
 )
 from world.skills.registry import FactionConstraint, SkillDef, SkillKind, TargetSpec
@@ -119,6 +128,13 @@ _GROUP_SHORTHANDS = {
 #: The reason an examined plan the shared gates allow is still unusable: the
 #: AI cannot resolve its effects into a supported hostile damage outcome.
 _UNREPRESENTABLE = RejectReason.EFFECT_RESOLUTION_FAILED
+#: The detail of a plan whose supported damage reaches no hostile recipient.
+_NO_HOSTILE_DAMAGE_DETAIL = "supported hostile damage reaches no hostile recipient"
+#: The detail of a support plan that mutates no recipient at all.
+_NO_RECIPIENT_DETAIL = "supported plan reaches no recipient"
+
+#: The buff polarity that takes something away from its holder.
+_DEBUFF_POLARITY = "debuff"
 
 #: The parsed effects whose payload names a buff definition the registry must
 #: carry before the plan can mount anything.
@@ -134,6 +150,19 @@ _ACT_REFERENCE_EFFECTS = (
     PairEventEffect,
     PleasureEffect,
     SexualCounterEffect,
+)
+
+#: The parsed effects settlement binds to the actor whatever audience policy
+#: they declare, so a skill made only of them has no target to choose.
+_ACTOR_BOUND_EFFECTS = (SelfHealEffect, SelfBuffApplyEffect)
+#: The parsed effect classes a candidate's own value can be modelled from: a
+#: health or resource occurrence, or a definition-keyed buff/control mount.
+_SUPPORTED_EFFECTS = (
+    DamageEffect,
+    HealEffect,
+    SelfHealEffect,
+    GaugeTransferEffect,
+    *_BUFF_REFERENCE_EFFECTS,
 )
 
 #: The reason an examined, legal plan was removed by the mandatory single-target
@@ -391,7 +420,7 @@ def enumerate_candidates(
     unavailable: list[SkillObservation] = []
     for skill_key in sorted(reader.owned_keys(actor)):
         skill = reader.skill(skill_key)
-        if not _is_hostile_damage(skill):
+        if not _is_candidate_skill(skill):
             continue
         if not _supports_every_harmful_effect(skill):
             unavailable.append(
@@ -437,7 +466,15 @@ def enumerate_candidates(
         """Charge one examination slot, unless the plan was already examined."""
         return _proposal_key(proposal) in ledger or budget_state.take()
 
-    singles = [skill for skill in skills if skill.target_spec is TargetSpec.SINGLE]
+    # Only a hostile single-target *damage* skill can satisfy the alternative
+    # attack the displacement rule asks about: a support single is not an
+    # attack at all, and probing one against the hostile domain would both
+    # spend the shared budget and answer the wrong question.
+    singles = [
+        skill
+        for skill in skills
+        if skill.target_spec is TargetSpec.SINGLE and _is_hostile_damage(skill)
+    ]
     displaced = frozenset(
         stable_identity(entity)
         for entity in hostile
@@ -551,28 +588,55 @@ def _skill_proposals(
     alternative: bool,
 ) -> list[_Proposal]:
     """Return one skill's proposals for the decision's own target shapes."""
+    if _is_actor_bound_only(skill):
+        return [_implicit_proposal(skill, actor, context, reads, scale)]
     if skill.target_spec is TargetSpec.SINGLE:
-        return [
-            _single_proposal(skill, target, actor, context, reads, scale)
-            for target in _single_base(
+        if _is_hostile_damage(skill):
+            base = _single_base(
                 skill, hostile, declared, sealed, displaced, alternative
             )
+        elif _hostile_intent(skill):
+            # A hostile single that deals no damage -- a lock or a slow -- is
+            # still aimed at the hostile domain, but the two mandatory
+            # restrictions are damage restrictions and never narrow it.
+            base = hostile
+        else:
+            base = _friendly_base(skill, actor, snapshot, pool)
+        return [
+            _single_proposal(skill, target, actor, context, reads, scale)
+            for target in base
         ]
     if skill.target_spec is TargetSpec.AREA:
         return _group_proposals(
-            skill, snapshot, pool, actor, context, reads, scale, _is_mixed(skill)
-        )
-    recipients: tuple[Any, ...] = ()
-    return [
-        _Proposal(
-            (skill.key, KIND_IMPLICIT),
             skill,
-            PlannedAction(skill.key, scale),
-            CandidateIdentity(skill.key, scale, ()),
-            recipients,
-            _routed(actor, context, skill, recipients, reads),
+            snapshot,
+            pool,
+            actor,
+            context,
+            reads,
+            scale,
+            _group_kinds(skill),
         )
-    ]
+    return [_implicit_proposal(skill, actor, context, reads, scale)]
+
+
+def _implicit_proposal(
+    skill: SkillDef,
+    actor: Any,
+    context: Any,
+    reads: DecisionReads,
+    scale: float,
+) -> _Proposal:
+    """Return one skill's implicit SELF/NONE binding, with its own routing."""
+    recipients: tuple[Any, ...] = ()
+    return _Proposal(
+        (skill.key, KIND_IMPLICIT),
+        skill,
+        PlannedAction(skill.key, scale),
+        CandidateIdentity(skill.key, scale, ()),
+        recipients,
+        _routed(actor, context, skill, recipients, reads),
+    )
 
 
 def _single_proposal(
@@ -604,6 +668,9 @@ def _single_base(
     alternative: bool,
 ) -> tuple[Any, ...]:
     """Return one hostile SINGLE damage skill's mandatory-filtered target base.
+
+    Only a hostile damage skill reaches here; a single-target support skill's
+    own-side base is :func:`_friendly_base` and is never narrowed.
 
     Both mandatory restrictions run before any scoring: an applicable
     ``lamb_seal`` narrows the base to its bearers in canonical order, and
@@ -645,20 +712,18 @@ def _group_proposals(
     context: Any,
     reads: DecisionReads,
     scale: float,
-    mixed: bool,
+    kinds: tuple[str, ...],
 ) -> list[_Proposal]:
     """Return one AREA skill's bounded semantic group proposals.
 
-    An enemy-only skill contributes exactly one legal group (the hostile one);
-    a mixed skill contributes the bounded hostile, friendly and complete groups
-    its target policies permit. Each group's runtime representation is the
-    approved AREA shorthand exactly when that shorthand expands to precisely
-    the group -- never when it would reach a participant outside the decision
-    -- and the group's own explicit identities otherwise.
+    ``kinds`` is the skill's own group set (see :func:`_group_kinds`): an
+    enemy-only skill contributes exactly one legal group (the hostile one), a
+    pure support skill its friendly group, and a mixed skill the bounded
+    hostile, friendly and complete groups. Each group's runtime representation
+    is the approved AREA shorthand exactly when that shorthand expands to
+    precisely the group -- never when it would reach a participant outside the
+    decision -- and the group's own explicit identities otherwise.
     """
-    kinds = (
-        (KIND_HOSTILE, KIND_FRIENDLY, KIND_COMPLETE) if mixed else (KIND_HOSTILE,)
-    )
     proposals: list[_Proposal] = []
     for kind in kinds:
         members = group_members(kind, snapshot, pool)
@@ -772,8 +837,102 @@ def _is_hostile_damage(skill: SkillDef | None) -> bool:
         and skill.kind is SkillKind.ACTIVE
         and skill.faction_constraint
         in (FactionConstraint.ANY, FactionConstraint.ENEMY)
-        and any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects)
+        and _deals_damage(skill)
     )
+
+
+def _deals_damage(skill: SkillDef) -> bool:
+    """Return whether one skill carries a damage occurrence."""
+    return any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects)
+
+
+def _is_candidate_skill(skill: SkillDef | None) -> bool:
+    """Return whether one skill can contribute a supported candidate here.
+
+    A candidate's own value has to be modelable: a health or resource
+    occurrence, or a buff/control mount whose definition the registry carries.
+    A ``SELF_ONLY`` skill cannot name another participant at all, so only a
+    support shape (no damage occurrence) is representable for it; ``ANY`` and
+    ``ENEMY`` skills keep the hostile-damage and support reach they authored.
+    """
+    if skill is None or skill.kind is not SkillKind.ACTIVE:
+        return False
+    if not any(
+        isinstance(effect, _SUPPORTED_EFFECTS) for effect in skill.parsed_effects
+    ):
+        return False
+    if skill.faction_constraint is FactionConstraint.SELF_ONLY:
+        return not _deals_damage(skill)
+    return skill.faction_constraint in (FactionConstraint.ANY, FactionConstraint.ENEMY)
+
+
+def _hostile_intent(skill: SkillDef) -> bool:
+    """Return whether one skill takes something away from a non-actor recipient.
+
+    A damage occurrence, a drain, or a mount of a ``debuff``-polarity
+    definition is hostile intent: the plan's supported outcome is harm to
+    whoever it reaches. Everything else -- healing, restores and
+    ``buff``-polarity mounts -- is support intent. The classification decides
+    which target domain a single-target skill offers, and whether an area
+    skill's hostile group is even a candidate at all.
+    """
+    for effect in skill.parsed_effects:
+        if isinstance(effect, DamageEffect):
+            return True
+        if isinstance(effect, GaugeTransferEffect):
+            if effect.direction == "drain":
+                return True
+            continue
+        if isinstance(effect, _BUFF_REFERENCE_EFFECTS):
+            definition = BUFF_DEFINITIONS.get(effect.buff_key)
+            if definition is not None and definition.polarity == _DEBUFF_POLARITY:
+                return True
+    return False
+
+
+def _is_actor_bound_only(skill: SkillDef) -> bool:
+    """Return whether every parsed effect of one skill binds the actor.
+
+    Such a skill has nothing to target: settlement's own handlers mutate the
+    actor whatever the audience policy says, so its one runtime shape is the
+    implicit binding -- and a per-target shape would enumerate several
+    behaviorally identical candidates for one action.
+    """
+    return bool(skill.parsed_effects) and all(
+        isinstance(effect, _ACTOR_BOUND_EFFECTS) for effect in skill.parsed_effects
+    )
+
+
+def _group_kinds(skill: SkillDef) -> tuple[str, ...]:
+    """Return the semantic group kinds one AREA skill contributes here.
+
+    A skill with no hostile intent presents only its friendly group. A hostile
+    skill keeps the audience-derived mixed set it has always used, so an area
+    damage skill's group set is unchanged by this slice.
+    """
+    if not _hostile_intent(skill):
+        return (KIND_FRIENDLY,)
+    if _is_mixed(skill):
+        return (KIND_HOSTILE, KIND_FRIENDLY, KIND_COMPLETE)
+    return (KIND_HOSTILE,)
+
+
+def _friendly_base(
+    skill: SkillDef,
+    actor: Any,
+    snapshot: DecisionSnapshot,
+    pool: tuple[Any, ...],
+) -> tuple[Any, ...]:
+    """Return one hostile-free SINGLE skill's own-side target base.
+
+    The decision's applicable self and allies in stable order, narrowed to the
+    actor alone when the skill itself is ``SELF_ONLY`` -- so a self-only
+    support skill never spends a plan (or a budget slot) on an ally the shared
+    gates would reject.
+    """
+    if skill.faction_constraint is FactionConstraint.SELF_ONLY:
+        return (actor,)
+    return group_members(KIND_FRIENDLY, snapshot, pool)
 
 
 def _is_mixed(skill: SkillDef) -> bool:
@@ -1087,18 +1246,44 @@ def _examine(
     result = verdict(proposal.skill, proposal.plan)
     if not result.legal:
         return CandidateRejection(proposal.identity, result.reason, result.detail)
-    if not _reaches_hostile(actor, context, proposal.skill, proposal.routed):
-        return CandidateRejection(
-            proposal.identity,
-            _UNREPRESENTABLE,
-            "supported hostile damage reaches no hostile recipient",
-        )
+    detail = _unrepresentable_detail(actor, context, proposal.skill, proposal.routed)
+    if detail is not None:
+        return CandidateRejection(proposal.identity, _UNREPRESENTABLE, detail)
     return Candidate(
         proposal.identity,
         proposal.plan,
         recipients=proposal.recipients,
         routed=proposal.routed,
     )
+
+
+def _unrepresentable_detail(
+    actor: Any,
+    context: Any,
+    skill: SkillDef,
+    routed: tuple[tuple[Any, ...], ...] | None,
+) -> str | None:
+    """Return why one examined plan is unrepresentable, or ``None``.
+
+    A plan the shared audience planner refused (``routed`` is ``None``) reaches
+    nobody at all, so the model has nothing to value. A plan carrying a damage
+    occurrence must deliver that damage to a hostile recipient, because a damage
+    plan whose damage never lands on an enemy is not an attack. Every other
+    supported plan is representable exactly when it mutates someone: its
+    routing reaches a recipient, or it carries an effect settlement binds to
+    the actor whatever the audience policy says.
+    """
+    if _deals_damage(skill):
+        if routed is None or not _reaches_hostile(actor, context, skill, routed):
+            return _NO_HOSTILE_DAMAGE_DETAIL
+        return None
+    if routed is not None and any(reached for reached in routed):
+        return None
+    if any(
+        isinstance(effect, _ACTOR_BOUND_EFFECTS) for effect in skill.parsed_effects
+    ):
+        return None
+    return _NO_RECIPIENT_DETAIL
 
 
 def _reaches_hostile(

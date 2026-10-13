@@ -3,11 +3,12 @@
 The implemented slices are the decision *inputs* -- the immutable no-write
 snapshot and the shared deterministic legality every planned action passes
 before it is scored -- the bounded candidate enumeration that expands the owned
-hostile damage skills into legal, deduplicated, budgeted proposals, and the
-analytic effect estimation that projects each candidate's health effects with
-settlement's own arithmetic, and the utility decision itself: the bounded score
-of every supported candidate and the stable, independently seeded softmax
-sampling that selects one. Every production variant is still authored
+damage, healing, buff and control skills into legal, deduplicated, budgeted
+proposals, and the analytic effect estimation that projects each candidate's
+health effects with settlement's own arithmetic plus the bounded marginal value
+of the control it mounts, and the utility decision itself: the bounded score of
+every supported candidate and the stable, independently seeded softmax sampling
+that selects one. Every production variant is still authored
 ``legacy``, so the legacy decision body in
 :mod:`world.rules.monster_behaviour` returns exactly what it returned before;
 activating a variant is the separate staged-activation change's decision.
@@ -18,9 +19,10 @@ activating a variant is the separate staged-activation change's decision.
   and the snapshot builder.
 - :mod:`world.rules.monster_ai.legality` -- the shared plan legality.
 - :mod:`world.rules.monster_ai.candidates` -- the bounded, deduplicated,
-  semantically legal damage candidates.
+  semantically legal damage, support and control candidates.
 - :mod:`world.rules.monster_ai.estimation` -- the signed, bounded health
-  features of one candidate plan, with no dice, handlers, costs or events.
+  and control features of one candidate plan, with no dice, handlers, costs or
+  events.
 - :mod:`world.rules.monster_ai.utility` -- the bounded utility score of one
   candidate, with its three stable preference ranks.
 - :mod:`world.rules.monster_ai.selection` -- canonical ordering, the stable
@@ -41,6 +43,7 @@ from world.rules.monster_ai.candidates import (
 )
 from world.rules.monster_ai.estimation import (
     ApproximationClass,
+    ControlProjection,
     EffectDirection,
     EstimateSet,
     EstimationLimit,
@@ -102,6 +105,7 @@ __all__ = [
     "CandidateRejection",
     "CandidateSet",
     "CapabilityState",
+    "ControlProjection",
     "DEFAULT_CANDIDATE_BUDGET",
     "DecisionReads",
     "DecisionScope",

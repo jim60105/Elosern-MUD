@@ -835,12 +835,22 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertIn("hostile recipient", estimate.detail)
 
     @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
-    def test_an_enemy_side_status_is_unvalued_but_never_refused(self):
+    def test_an_enemy_side_status_is_valued_but_its_own_health_effect_is_not(self):
+        # The mount's concrete modifier is the agility penalty the shipped rule
+        # table declares, so the plan now carries a real marginal control value;
+        # the health over time the same definition also declares stays outside
+        # the model and is still reported as such.
+        _set(self.enemy, "magic_power", 40)
+        _set(self.enemy, "agility", 20)
         _owned(self.actor, CURSED.key)
         estimate = _only(_estimate(self.actor, (self.enemy,)))
         self.assertNotIsInstance(estimate, InvalidEstimate)
         self.assertTrue(estimate.diagnostics)
-        self.assertIn(EstimationLimit.UNMODELED_BENEFIT_ZERO, estimate.limits)
+        self.assertIn(EstimationLimit.OVER_TIME_EFFECT_UNMODELED, estimate.limits)
+        # A ten-percent agility penalty on a forty-power, twenty-agility
+        # recipient is 40 x 0.02 = 0.8 points of offense, normalized by the
+        # forty-health faction that offense threatens.
+        self.assertAlmostEqual(estimate.control.magnitude, 0.8 / 40)
         self.assertGreater(_recipient(estimate, self.enemy).damage, 0.0)
 
     @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")

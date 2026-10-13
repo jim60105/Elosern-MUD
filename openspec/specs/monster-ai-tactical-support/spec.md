@@ -1,8 +1,9 @@
-## Purpose
+# monster-ai-tactical-support Specification
 
+## Purpose
 Choose useful existing healing and calculable control through the shared utility selector. This capability defines observable behavior at the monster decision boundary.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Support uses existing legal audience plans
 Owned active healing, supported buffs and hostile control SHALL enter the same candidate pipeline and legality gates. Estimates SHALL follow the submitted effect audience plan, including implicit SELF/NONE binding. Full-HP heals SHALL remain legal when settlement allows them with zero recovery benefit and real cost/waste.
@@ -20,7 +21,7 @@ Healing SHALL use shared magnitude, potency, proficiency, scale and conditional 
 
 #### Scenario: HP cost before self heal
 - **WHEN** a full-HP actor pays HP and then self-heals
-- **THEN** benefit reflects missing HP after payment rather than ignoring payment
+- **THEN** the projection reflects the actor's missing HP after that payment (the payment is a real projected own-side loss) rather than being evaluated as if the actor still held it, while settlement's own staging-time restoration cap still applies so no recovery is credited that the resolver would not apply
 
 #### Scenario: Conditional combined effect
 - **WHEN** ordered damage, drain and healing can miss or exceed remaining capacity
@@ -47,4 +48,3 @@ The score SHALL add w_heal*useful_healing as a baseline and i*w_control*marginal
 #### Scenario: Simple survival
 - **WHEN** low and high intelligence variants have a legal useful heal with identical resources
 - **THEN** both may value immediate healing; control, finishing, cost and waste scale continuously without granting new capabilities
-

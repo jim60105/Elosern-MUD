@@ -876,11 +876,30 @@ class CandidateBudgetTests(unittest.TestCase):
 
     @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_an_empty_legal_set_returns_no_plan(self):
-        _owned(self.actor, HEAL_SELF.key)
+        # A skill the model cannot resolve contributes one availability
+        # observation and never a proposal, so an empty legal set still costs
+        # no examination at all.
+        _owned(self.actor, UNRESOLVED.key)
         result = _enumerate(self.actor, self.enemies)
         self.assertEqual(result.candidates, ())
         self.assertEqual(result.plans, ())
         self.assertEqual(result.examined, 0)
+
+    @covers_requirement("monster-ai-legal-candidates::candidate-plans-preserve-actual-skill-semantics")
+    def test_an_actor_bound_skill_proposes_the_implicit_binding(self):
+        # A skill whose every effect binds the actor has no target to choose:
+        # its one proposal is the implicit binding, and a target shape that
+        # demands an explicit target is then refused by the shared gates rather
+        # than expanded into one identical actor-bound plan per ally.
+        _owned(self.actor, HEAL_SELF.key)
+        result = _enumerate(self.actor, self.enemies)
+        self.assertEqual(result.candidates, ())
+        self.assertEqual(
+            [item.reason for item in result.rejections],
+            [RejectReason.TARGET_SPEC_MISMATCH],
+        )
+        self.assertEqual((result.examined, result.omitted_targets), (1, 0))
+        self.assertFalse(result.exhausted)
 
     @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_a_single_enemy_still_yields_the_one_legal_plan(self):

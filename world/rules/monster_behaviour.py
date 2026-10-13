@@ -45,11 +45,13 @@ from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.observability import log_warn
 from world.rules import combat, dice
 from world.rules.action import ActionRequest, _stored_trait_value
+from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat.decision_scope import (
     current_decision_scope,
     stable_actor_id,
 )
+from world.rules.combat_modifiers import combat_modifier_rules
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_individual import _registered_variant
 from world.rules.progression import can_use_skill
@@ -90,8 +92,12 @@ MONSTER_BEHAVIOUR_YAML = _load_rulebook(
 #: Version 3 is the attack-selection slice: a utility variant's decision now
 #: scores those estimates and samples one candidate with an independent,
 #: scope-seeded RNG, so the same resolved tuning decides through one more
-#: implemented stage.
-AI_ALGORITHM_VERSION = 3
+#: implemented stage. Version 4 is the support-valuation slice: a decision now
+#: also enumerates owned healing, buff and control skills, projects the
+#: actor's own health payment and the marginal value of every mount it would
+#: apply, and scores recovery as a baseline term beside an intelligence-scaled
+#: control term.
+AI_ALGORITHM_VERSION = 4
 
 #: The authored candidate-budget bounds (attack design section 4).
 MIN_CANDIDATE_BUDGET = 1
@@ -494,6 +500,13 @@ def _estimation_rules_payload() -> dict[str, Any]:
     balance data in their own rulebook rather than AI tuning, but a change to any
     of them changes what an identical resolved tuning decides, so the fingerprint
     carries them the same way it carries an authored weight.
+
+    The same is true of the two rulebook inputs the control model adds: the
+    modifier rule table a hypothetical mount is projected from, and the buff
+    definitions whose duration and polarity decide whether a mount has any
+    marginal value at all. Both are carried in full rather than by name, so
+    editing a shipped modifier or a shipped duration invalidates a recorded
+    fingerprint instead of silently changing a decision.
     """
     damage = combat.COMBAT_YAML["damage"]
     heal = combat.COMBAT_YAML["heal"]
@@ -506,6 +519,20 @@ def _estimation_rules_payload() -> dict[str, Any]:
         "heal_multiplier": heal["multiplier"],
         "solid_hit_margin": damage["solid_hit_margin"],
         "solid_hit_multiplier": damage["solid_hit_multiplier"],
+        "buff_definitions": [
+            {
+                "key": key,
+                "duration": definition.duration,
+                "polarity": definition.polarity,
+                "stacking": definition.stacking,
+                "modifiers": definition.modifiers,
+            }
+            for key, definition in sorted(BUFF_DEFINITIONS.items())
+        ],
+        "modifier_rules": [
+            {"id": rule_id, "when": when, "then": then}
+            for rule_id, when, then in combat_modifier_rules()
+        ],
     }
 
 

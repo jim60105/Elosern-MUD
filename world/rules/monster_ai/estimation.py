@@ -38,7 +38,21 @@ every effect. A heal, moreover, has its restoration capped at *staging* time
 against the recipient's pre-action health gap, so an effect that damages a
 full-health recipient in the same action does not hand a later heal a fresh
 allowance. Both facts are modeled here. The attack design's prose that payment
-precedes effects does not match settlement, and settlement wins.
+precedes effects does not match settlement, and settlement wins -- except that
+the payment itself is projected rather than ignored: the actor's *health*
+payment is applied to its projected health before the ordered effects, so a
+skill spending health before healing itself is never valued as if the actor
+still held it, and the amount is a real loss of the actor's own side.
+
+**Control is a marginal projection, never a face value.** A mounted buff or
+debuff is worth what it changes: the shared modifier engine evaluates the
+recipient's bundle now and with that one effect mounted, and the difference --
+over one next action opportunity -- is what the plan's control feature
+reports. A mount that is already active, is dominated by what the recipient
+already holds, is capped by the merge, or lands on a recipient who cannot act
+inside its window is worth exactly zero; a mount whose projected modifiers
+include a key this model cannot value contributes its supported part and says
+so through ``limits``. A generic effect name establishes nothing.
 
 **Uncertainty is explicit.** Every limit the model could not represent is named
 in ``limits``, and every unmodeled effect that contributed nothing to the health
@@ -56,7 +70,10 @@ from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.combat_modifiers import (
     agility_with_bundle,
     attack_with_bundle,
+    build_no_create_condition_context,
     defense_with_bundle,
+    evaluate_combat_modifiers_no_create,
+    matched_combat_modifiers,
 )
 from world.rules.combat.scalars import (
     damage_multiplier,
@@ -140,6 +157,56 @@ _DEBUFF_POLARITY = "debuff"
 #: The buff polarity that helps its holder.
 _BUFF_POLARITY = "buff"
 
+#: The merged-bundle key that changes how many actions a participant may take.
+_CONTROL_ACTION_KEY = "actions_per_turn"
+#: The merged-bundle keys whose *absence* means a unit rather than zero, because
+#: their settlement reader falls back to one: an unassigned action allowance is
+#: the capability projection's own default, and an unassigned gauge-regeneration
+#: scale means full regeneration (``clock._settle_gauge_regen`` reads
+#: ``f"{gauge}_regen_scale"`` with a ``1.0`` default, and a zero scale is what
+#: stops the regeneration entirely). Comparing either as an absent zero would
+#: make the mount that assigns it indistinguishable from no rule at all.
+_CONTROL_UNIT_DEFAULTS: dict[str, float] = {_CONTROL_ACTION_KEY: 1.0}
+#: The suffix a merged-bundle key carries when it scales one gauge's
+#: regeneration, whose absence therefore means the unit.
+_CONTROL_UNIT_DEFAULT_SUFFIX = "_regen_scale"
+#: The merged-bundle keys that change a participant's offensive magnitude.
+_CONTROL_ATTACK_KEYS = ("atk_phys", "magic_power")
+#: The merged-bundle keys that change how often a participant's offense lands.
+_CONTROL_HIT_KEYS = ("accuracy", "agility", "agility_flat")
+#: The merged-bundle key that changes the health a participant prevents.
+_CONTROL_DEFENSE_KEYS = ("defense",)
+#: The percentage-shaped merged-bundle keys that change a participant's
+#: resource *cost*, where a reduction is the increase.
+_CONTROL_COST_PERCENT_KEYS = ("mp_cost", "sp_cost")
+#: The percentage-shaped merged-bundle keys that change a participant's
+#: output, where an increase is the increase.
+_CONTROL_OUTPUT_PERCENT_KEYS = ("heal_gain",)
+#: The absolute-shaped merged-bundle keys that change the same economy.
+_CONTROL_ECONOMY_ABSOLUTE_KEYS = (
+    "blessing_arousal_scale",
+    "mp_regen_scale",
+    "recovery_arousal_scale",
+    "recovery_share_bonus",
+)
+#: Every merged-bundle key the control model can value.
+_CONTROL_KEYS = frozenset(
+    (
+        _CONTROL_ACTION_KEY,
+        *_CONTROL_ATTACK_KEYS,
+        *_CONTROL_HIT_KEYS,
+        *_CONTROL_DEFENSE_KEYS,
+        *_CONTROL_COST_PERCENT_KEYS,
+        *_CONTROL_OUTPUT_PERCENT_KEYS,
+        *_CONTROL_ECONOMY_ABSOLUTE_KEYS,
+    )
+)
+#: The merged-bundle keys that describe a rule rather than a modifier.
+_CONTROL_BOOKKEEPING_KEYS = frozenset({"chance"})
+#: The empty mount set: the bundle a participant reads with no buff at all,
+#: which isolates what its own active mounts already contribute.
+_NO_MOUNTS: frozenset[str] = frozenset()
+
 
 class EffectDirection(StrEnum):
     """Which way one bounded feature's magnitude counts in utility."""
@@ -199,6 +266,20 @@ class EstimationLimit(StrEnum):
     DIVERSION_SHARED_BUDGET = "diversion_shared_budget"
     #: A stack-counted restore bonus was omitted instead of being invented.
     RESTORE_BONUS_OMITTED = "restore_bonus_omitted"
+    #: A mounted effect's projected modifiers include a key this model cannot
+    #: value, so that part contributed zero instead of an invented amount.
+    CONTROL_MODIFIER_UNSUPPORTED = "control_modifier_unsupported"
+    #: A mounted effect projected no supported marginal change -- it is already
+    #: active, an equivalent or stronger effect already holds, or the merge
+    #: capped it -- so its marginal value is zero rather than its face value.
+    CONTROL_ZERO_MARGINAL = "control_zero_marginal"
+    #: A control beneficiary has no action opportunity inside the effect's
+    #: modeled window (expired, or with no action left to take), so nothing was
+    #: credited.
+    CONTROL_NO_OPPORTUNITY = "control_no_opportunity"
+    #: A chance-bearing rule was weighted by the probability it applies instead
+    #: of being valued as a certain denial.
+    CONTROL_CHANCE_WEIGHTED = "control_chance_weighted"
 
 
 class InvalidEstimateReason(StrEnum):
@@ -275,6 +356,40 @@ class ResourceProjection:
 
 
 @dataclass(frozen=True, slots=True)
+class ControlProjection:
+    """One recipient's projected marginal control value under this plan.
+
+    Every field is a beneficial change, so it is zero when the mounted effect
+    takes nothing away from (or adds nothing to) that quantity, and it is the
+    difference between the recipient's modifier bundle now and with this one
+    effect mounted over the recipient's next action opportunity:
+
+    - ``opportunity`` is the change in the recipient's available action
+      opportunities, in opportunities;
+    - ``offense`` is the change in the recipient's per-opportunity offensive
+      health impact, in unmitigated damage points;
+    - ``defense`` is the change in the health the recipient prevents, in
+      damage points per incoming strike;
+    - ``economy`` is the change in the recipient's resource and output economy
+      as a fraction.
+
+    Each is only the *beneficial* part of its quantity, against a hostile
+    recipient for the actor's own side and for a friendly recipient for its own
+    side; a not-yet-mounted effect whose direction is mixed therefore
+    contributes its helpful half rather than a net figure. The plan's own
+    bounded control feature normalizes these sums by the faction the change
+    helps or threatens.
+    """
+
+    identity: str
+    relation: Relation
+    opportunity: float
+    offense: float
+    defense: float
+    economy: float
+
+
+@dataclass(frozen=True, slots=True)
 class PlanEstimate:
     """One candidate plan's complete, decision-local estimate.
 
@@ -295,8 +410,12 @@ class PlanEstimate:
     waste: HealthFeature = field(
         default_factory=lambda: HealthFeature(0.0, EffectDirection.HARM)
     )
+    control: HealthFeature = field(
+        default_factory=lambda: HealthFeature(0.0, EffectDirection.BENEFIT)
+    )
     finishing: float = 0.0
     cost: float = 0.0
+    controls: tuple[ControlProjection, ...] = ()
     classification: ApproximationClass = ApproximationClass.EXACT
     limits: tuple[EstimationLimit, ...] = ()
     diagnostics: tuple[str, ...] = ()
@@ -382,6 +501,162 @@ def _is_benign(effect: Any, polarity: str | None) -> bool:
     if polarity is not None:
         return polarity == _BUFF_POLARITY
     return isinstance(effect, _BENIGN_EFFECTS)
+
+
+def _control_number(value: Any) -> float | None:
+    """Return one merged-bundle value as a number, or ``None`` when it is not.
+
+    A modifier is either a real number or a signed percentage string (the rule
+    table's ``agility: "-15%"`` shape), which is returned in percentage points
+    so a caller decides whether it is a magnitude or a fraction.
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        result = float(value)
+        return result if isfinite(result) else None
+    if isinstance(value, str):
+        stripped = value.strip()
+        if stripped.endswith("%"):
+            try:
+                result = float(stripped[:-1])
+            except ValueError:
+                return None
+            return result if isfinite(result) else None
+    return None
+
+
+def _control_unit_default(key: str) -> float:
+    """Return what one merged-bundle key's absence means to settlement.
+
+    Zero for an ordinary additive modifier, and one for the keys whose reader
+    falls back to the unit (:data:`_CONTROL_UNIT_DEFAULTS` plus the
+    gauge-regeneration scale family).
+    """
+    if key in _CONTROL_UNIT_DEFAULTS:
+        return _CONTROL_UNIT_DEFAULTS[key]
+    if key.endswith(_CONTROL_UNIT_DEFAULT_SUFFIX):
+        return 1.0
+    return 0.0
+
+
+def _control_delta(
+    before: Mapping[str, Any], after: Mapping[str, Any]
+) -> tuple[dict[str, float], bool]:
+    """Return one hypothetical mount's modifier difference and its gaps.
+
+    Every key either bundle carries is compared: a supported key's difference
+    is the model's own input, and a key the model cannot value that *changed*
+    is reported so the caller records the limitation instead of silently
+    valuing the mount at its supported part alone.
+
+    Absent keys compare as the value that absence means, which for an absolute
+    action allowance or a gauge-regeneration scale is the unit its settlement
+    reader falls back to (:data:`_CONTROL_UNIT_DEFAULTS`), not zero. Comparing
+    either as zero would make the mount that assigns it indistinguishable from
+    having no rule at all.
+    """
+    delta: dict[str, float] = {}
+    unsupported = False
+    for key in sorted(set(before) | set(after)):
+        if key in _CONTROL_BOOKKEEPING_KEYS:
+            continue
+        absent = _control_unit_default(key)
+        first = _control_number(before.get(key, absent))
+        second = _control_number(after.get(key, absent))
+        if first is None or second is None:
+            if before.get(key) != after.get(key):
+                unsupported = True
+            continue
+        if first == second:
+            continue
+        if key in _CONTROL_KEYS:
+            delta[key] = second - first
+        else:
+            unsupported = True
+    return delta, unsupported
+
+
+def _control_mount_probability(
+    before: Sequence[tuple[str, Mapping[str, Any]]],
+    after: Sequence[tuple[str, Mapping[str, Any]]],
+) -> tuple[float, bool]:
+    """Return the probability one mount's own action lock actually applies.
+
+    The rule table's ``chance`` makes a lock probabilistic (the lightning
+    micro-stuns are the shipped example), and settlement's own reader decides
+    it rule by rule: every matched rule assigning ``actions_per_turn: 0``
+    without a ``chance`` is a certain skip, and otherwise the skip fires with
+    the *largest* declared chance (``combat.rounds``). The probability here is
+    therefore read from the matching half of the same engine, one rule at a
+    time, over exactly the rules this mount newly satisfies -- never from an
+    additive merge total, which could turn two probabilistic locks into a
+    certainty the consumer would never roll for.
+
+    The returned flag says whether this mount's own lock was the probabilistic
+    kind, so the caller reports the limitation. A mount that adds no zero-action
+    rule is certain, and so is one whose lock rule declares no probability.
+    """
+    held = {rule_id for rule_id, _adjustments in before}
+    locks = [
+        adjustments
+        for rule_id, adjustments in after
+        if rule_id not in held and adjustments.get("actions_per_turn") == 0
+    ]
+    if not locks:
+        return 1.0, False
+    if any("chance" not in adjustments for adjustments in locks):
+        return 1.0, False
+    chances = [
+        int(min(100.0, max(0.0, _control_number(adjustments.get("chance")) or 0.0)))
+        for adjustments in locks
+    ]
+    return min(1.0, max(chances) / _D100_FACES), True
+
+
+def _control_economy(delta: Mapping[str, float]) -> float:
+    """Return one modifier difference's combined resource and output economy.
+
+    A percentage-shaped key counts as its fraction (a ten-percent cost
+    reduction is a tenth of the pool it saves) and an absolute-shaped key as
+    itself. The result states how much *better off* the recipient is, so a
+    reduced cost and a raised output or recovery all come out positive and the
+    caller applies the recipient's own direction.
+    """
+    total = 0.0
+    for key in _CONTROL_COST_PERCENT_KEYS:
+        total -= delta.get(key, 0.0) / _D100_FACES
+    for key in _CONTROL_OUTPUT_PERCENT_KEYS:
+        total += delta.get(key, 0.0) / _D100_FACES
+    for key in _CONTROL_ECONOMY_ABSOLUTE_KEYS:
+        total += delta.get(key, 0.0)
+    return total
+
+
+def _bounded_unit(value: float) -> float:
+    """Return one signed quantity clamped into the closed unit interval."""
+    if not isfinite(value):
+        raise _NonFinite(f"a control quantity is not finite: {value!r}")
+    return min(1.0, max(-1.0, value))
+
+
+def _dominated(
+    delta: Mapping[str, float], held: Mapping[str, float]
+) -> set[str]:
+    """Return the modifier keys an already-held mount outweighs.
+
+    ``held`` is what the recipient's *own active mounts* already contribute to
+    each key, so a key whose held contribution is larger in the same direction
+    is one this mount cannot usefully add to: it is not a marginal improvement
+    over what the recipient already carries. A held contribution of the
+    opposite direction, or none at all, never dominates.
+    """
+    return {
+        key
+        for key, change in delta.items()
+        if (held.get(key, 0.0) * change > 0)
+        and abs(held.get(key, 0.0)) > abs(change)
+    }
 
 
 def estimate_candidates(
@@ -601,6 +876,7 @@ class _Decision:
         self.actor = actor
         self.context = context
         self.reads = reads
+        self.snapshot = snapshot
         event_context = getattr(context, "event_context", {}) or {}
         self.nonlethal = bool(event_context.get("nonlethal", False))
         self.nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
@@ -611,6 +887,11 @@ class _Decision:
         self._pools: dict[str, dict[str, float]] = {}
         self._paid: dict[tuple[str, str], float] = {}
         self._gates: dict[int, dict[str, float]] = {}
+        self._controls: list[ControlProjection] = []
+        self._control_bundles: dict[tuple[str, frozenset[str]], Mapping[str, Any]] = {}
+        self._matched: dict[
+            tuple[str, frozenset[str]], tuple[tuple[str, Mapping[str, Any]], ...]
+        ] = {}
         self._limits: set[EstimationLimit] = set()
         self._diagnostics: set[str] = set()
 
@@ -697,6 +978,11 @@ class _Decision:
                                 "from a friendly recipient"
                             )
                 continue
+            if isinstance(effect, _BUFF_REFERENCE_EFFECTS):
+                exclusion = self._classify_mount(skill, ordinal, effect, targets)
+                if exclusion is not None:
+                    return exclusion
+                continue
             polarity = _polarity(effect)
             benign = _is_benign(effect, polarity)
             for target in targets:
@@ -710,22 +996,54 @@ class _Decision:
                 if not own_side and benign:
                     return f"{skill.effects[ordinal]} benefits a hostile recipient"
             if targets:
-                self._note_unmodeled(skill, ordinal, effect)
+                self._note_unmodeled(skill, ordinal)
         return None
 
-    def _note_unmodeled(self, skill: SkillDef, ordinal: int, effect: Any) -> None:
-        """Record one unmodeled effect's zero contribution and its limit label."""
+    def _classify_mount(
+        self,
+        skill: SkillDef,
+        ordinal: int,
+        effect: Any,
+        targets: tuple[Any, ...],
+    ) -> str | None:
+        """Return the exclusion detail of one buff/control mount, or ``None``.
+
+        A mount is now valued from its definition's own polarity and the
+        modifier rules the mounted key would newly satisfy, so the two
+        exclusions that keep an unknown outcome off the wrong side of the
+        battlefield are unchanged -- a ``debuff`` mount on the actor's own side
+        and a ``buff`` mount on a hostile side are still refused -- while a
+        mount that can be valued is no longer reported as an unmodeled zero.
+        """
+        definition = BUFF_DEFINITIONS.get(effect.buff_key)
+        if definition is None:
+            return f"{skill.effects[ordinal]} names an unknown definition"
+        for target in targets:
+            participant = self.participant(target)
+            own_side = participant.relation in (Relation.SELF, Relation.ALLY)
+            if own_side and definition.polarity == _DEBUFF_POLARITY:
+                return (
+                    f"{skill.effects[ordinal]} has an unvaluable outcome "
+                    "for a friendly recipient"
+                )
+            if not own_side and definition.polarity == _BUFF_POLARITY:
+                return f"{skill.effects[ordinal]} benefits a hostile recipient"
+        if not targets:
+            return None
+        self._diagnostics.add(f"{skill.effects[ordinal]} control projected")
+        if isinstance(definition.modifiers.get("rate"), Mapping):
+            self._limits.add(EstimationLimit.OVER_TIME_EFFECT_UNMODELED)
+            self._diagnostics.add(f"{skill.effects[ordinal]} is an over-time effect")
+        return None
+
+    def _note_unmodeled(self, skill: SkillDef, ordinal: int) -> None:
+        """Record one unmodeled effect's zero contribution and its limit label.
+
+        Only an effect outside the mount classes reaches here: a buff/control
+        mount is valued by :meth:`_classify_mount` and :meth:`_apply_control`.
+        """
         self._diagnostics.add(f"{skill.effects[ordinal]} not modeled")
         self._limits.add(EstimationLimit.UNMODELED_BENEFIT_ZERO)
-        definition = (
-            BUFF_DEFINITIONS.get(effect.buff_key)
-            if isinstance(effect, _BUFF_REFERENCE_EFFECTS)
-            else None
-        )
-        if definition is not None and isinstance(
-            definition.modifiers.get("rate"), Mapping
-        ):
-            self._limits.add(EstimationLimit.OVER_TIME_EFFECT_UNMODELED)
 
     # -- effect recipient binding -------------------------------------------
 
@@ -756,6 +1074,7 @@ class _Decision:
         """Estimate one candidate plan, or report the typed reason it has none."""
         self._pools = {}
         self._paid = {}
+        self._controls = []
         self._limits = set()
         self._diagnostics = set()
         skill = self.reads.skill(candidate.plan.skill_key)
@@ -781,20 +1100,56 @@ class _Decision:
         """Walk one plan in commit order and assemble its features.
 
         Settlement applies the staged effects first and the actor's resource
-        deduction *last*, so the projection does the same: a recovery is clamped
-        by its own pool bound before the cost is taken out of that pool.
+        deduction *last*, so every non-health pool is projected the same way: a
+        recovery is clamped by its own pool bound before the cost is taken out
+        of that pool. The actor's *health* payment is projected before the
+        ordered effects, because the resource the action spends is gone by the
+        time settlement commits it: a plan that pays health is therefore never
+        valued as if the actor still held it, while settlement's own
+        staging-time restoration cap is untouched (the healer is still staged
+        against the pre-action gap settlement reads).
         """
         routed = candidate.routed or ()
         ledgers = self._ledgers(skill, routed)
-        self._settle(skill, routed, ledgers, _finite(candidate.plan.scale, "scale"))
         cost = self.reads.costs(self.actor, skill, candidate.plan.scale)
+        self._project_health_payment(ledgers, cost)
+        self._settle(skill, routed, ledgers, _finite(candidate.plan.scale, "scale"))
         self._pay_cost(cost)
         return self._assemble(candidate, ledgers, cost)
 
+    def _project_health_payment(
+        self, ledgers: dict[str, _Ledger], cost: Mapping[str, int]
+    ) -> None:
+        """Charge the actor's own health payment onto its projected health.
+
+        The charged amount is a real projected loss of the actor's own side, so
+        it is recorded on the actor's ledger exactly like any other loss and
+        never as a nominal effect or as waste: nothing was applied to anybody,
+        the actor simply no longer holds that health when the effects run.
+        """
+        amount = int(cost.get("hp", 0))
+        if amount <= 0:
+            return
+        actor = self.participant(self.actor)
+        ledger = self._ledger_for(ledgers, actor)
+        before = ledger.recipient.expected_capacity_loss()
+        branch = ledger.recipient.copy()
+        branch.apply_loss(amount, actor.hp)
+        ledger.recipient.mix([(1.0, branch)])
+        ledger.paid_loss += ledger.recipient.expected_capacity_loss() - before
+        self._sync_health(ledger)
+
     def _pay_cost(self, cost: Mapping[str, int]) -> None:
-        """Deduct the actor's charged amounts from its projected pools."""
+        """Deduct the actor's charged amounts from its projected pools.
+
+        A charged health pool was already projected onto the actor's health by
+        :meth:`_project_health_payment`, so only the remaining pools are taken
+        out here.
+        """
         pools = self.pools(self.participant(self.actor))
         for resource_key, amount in cost.items():
+            if resource_key == "hp":
+                continue
             if resource_key in pools:
                 pools[resource_key] = max(
                     0.0, pools[resource_key] - float(amount)
@@ -862,6 +1217,8 @@ class _Decision:
                 )
             elif isinstance(effect, GaugeTransferEffect):
                 self._apply_transfer(effect, policy, targets, ledgers, weights)
+            elif isinstance(effect, _BUFF_REFERENCE_EFFECTS):
+                self._apply_control(effect, targets, weights)
 
     def _gate_weights(
         self, policy: EffectPolicy, gates: Mapping[int, Mapping[str, float]]
@@ -1462,6 +1819,200 @@ class _Decision:
         room = max(maximum - current, 0.0)
         pools[gauge] = min(maximum, current + min(float(amount), room) * weight)
 
+
+    # -- control -------------------------------------------------------------
+
+    def _apply_control(
+        self,
+        effect: Any,
+        targets: tuple[Any, ...],
+        weights: Mapping[str, float] | None,
+    ) -> None:
+        """Value one buff/control mount over each recipient's next opportunity.
+
+        The definition comes from the owning registry; a reference the registry
+        does not carry contributes nothing and says so. Each recipient's value
+        is the marginal difference between its modifier bundle *now* and with
+        this one effect mounted, so a mount that is already active, is
+        dominated by what the recipient already holds, or is capped by the
+        merge is worth exactly zero instead of its face value.
+        """
+        definition = BUFF_DEFINITIONS.get(effect.buff_key)
+        if definition is None:
+            self._limits.add(EstimationLimit.CONTROL_MODIFIER_UNSUPPORTED)
+            self._diagnostics.add(f"control definition {effect.buff_key!r} is unknown")
+            return
+        for target in targets:
+            participant = self.participant(target)
+            weight = self._weight(weights, participant.identity)
+            if weight <= 0:
+                continue
+            self._controls.append(
+                self._control_projection(participant, definition, weight)
+            )
+
+    def _control_projection(
+        self, participant: _Participant, definition: Any, weight: float
+    ) -> ControlProjection:
+        """Return one recipient's marginal control value under one definition.
+
+        The horizon is the recipient's one next action opportunity: a mount the
+        recipient cannot act under, one already mounted, and one whose effect
+        has run out are each worth nothing rather than a repeated full value.
+        So is a mount whose projected change an already-active mount of the
+        same key outweighs, because it adds nothing the recipient does not
+        already hold. A mount whose key the model cannot value contributes its
+        supported part and reports the gap instead of inventing one.
+        """
+        identity = participant.identity
+        relation = participant.relation
+        empty = ControlProjection(identity, relation, 0.0, 0.0, 0.0, 0.0)
+        entity = participant.entity
+        duration = definition.duration
+        if duration is not None and int(duration) <= 0:
+            self._limits.add(EstimationLimit.CONTROL_NO_OPPORTUNITY)
+            self._diagnostics.add(f"{definition.key} has expired on {identity}")
+            return empty
+        if definition.key in self.reads.buff_keys(entity):
+            self._limits.add(EstimationLimit.CONTROL_ZERO_MARGINAL)
+            self._diagnostics.add(f"{definition.key} is already active on {identity}")
+            return empty
+        facts = self.snapshot.participant(identity)
+        if (
+            facts is None
+            or not facts.alive
+            or not facts.present
+            or not facts.in_range
+            or self.reads.capability(entity).actions_per_turn <= 0
+        ):
+            self._limits.add(EstimationLimit.CONTROL_NO_OPPORTUNITY)
+            self._diagnostics.add(f"{identity} has no opportunity before expiry")
+            return empty
+        active = self.reads.buff_keys(entity)
+        before = self.reads.modifiers(entity)
+        after = self._hypothetical_modifiers(
+            entity, identity, active | {definition.key}
+        )
+        delta, unsupported = _control_delta(before, after)
+        if unsupported:
+            self._limits.add(EstimationLimit.CONTROL_MODIFIER_UNSUPPORTED)
+            self._diagnostics.add(f"{definition.key} projects an unmodeled modifier")
+        held = _control_delta(
+            self._hypothetical_modifiers(entity, identity, _NO_MOUNTS), before
+        )[0]
+        dominated = _dominated(delta, held)
+        if dominated:
+            self._diagnostics.add(
+                f"{definition.key} adds nothing over what {identity} already holds"
+            )
+            delta = {key: value for key, value in delta.items() if key not in dominated}
+        if not delta:
+            self._limits.add(EstimationLimit.CONTROL_ZERO_MARGINAL)
+            self._diagnostics.add(f"{definition.key} changes no supported modifier")
+            return empty
+        probability, probabilistic = _control_mount_probability(
+            self._matched_rules(entity, identity, active),
+            self._matched_rules(entity, identity, active | {definition.key}),
+        )
+        if probabilistic:
+            self._limits.add(EstimationLimit.CONTROL_CHANCE_WEIGHTED)
+        scale = weight * probability
+        hostility = -1.0 if relation is Relation.ENEMY else 1.0
+        before_attack, before_hit = self._control_offense(participant, before)
+        after_attack, after_hit = self._control_offense(participant, after)
+        offense = (after_attack - before_attack) + before_attack * _bounded_unit(
+            (after_hit - before_hit) / _D100_FACES
+        )
+        defense = defense_with_bundle(
+            self._real(participant, "defense"), after
+        ) - defense_with_bundle(self._real(participant, "defense"), before)
+        economy = _control_economy(delta)
+        return ControlProjection(
+            identity=identity,
+            relation=relation,
+            opportunity=scale
+            * max(0.0, hostility * delta.get(_CONTROL_ACTION_KEY, 0.0)),
+            offense=scale * max(0.0, hostility * offense),
+            defense=scale * max(0.0, hostility * defense),
+            economy=scale * max(0.0, hostility * economy),
+        )
+
+    def _control_offense(
+        self, participant: _Participant, modifiers: Mapping[str, Any]
+    ) -> tuple[float, float]:
+        """Return one participant's attack magnitude and to-hit score.
+
+        ``attack`` is the higher of the two attack traits after its own flat
+        bundle addend, and ``hit`` is the accuracy plus adjusted agility the
+        shared to-hit margin consumes. Neither is turned into a damage
+        probability: a decision does not project the opponent's own agility or
+        mitigation, so the pair stands for what a changed hit score scales
+        rather than for a claimed outcome.
+        """
+        attack = max(
+            max(
+                attack_with_bundle(self._real(participant, key), modifiers, key)
+                for key in _CONTROL_ATTACK_KEYS
+            ),
+            0.0,
+        )
+        hit = _finite(modifiers.get("accuracy", 0), "accuracy") + agility_with_bundle(
+            self._real(participant, "agility"), modifiers
+        )
+        return attack, hit
+
+    def _hypothetical_modifiers(
+        self, entity: Any, identity: str, keys: frozenset[str]
+    ) -> Mapping[str, Any]:
+        """Return one hypothetical active-buff bundle, evaluated once per key set.
+
+        The shared modifier engine evaluates it with the same merge authority
+        the recipient's real bundle uses -- grant scaling, restriction ceilings
+        and the equipment fold included -- so a projection can never disagree
+        with what settlement reads once the effect is mounted.
+        """
+        cache_key = (identity, keys)
+        if cache_key not in self._control_bundles:
+            self._control_bundles[cache_key] = evaluate_combat_modifiers_no_create(
+                entity, active_buffs=keys
+            )
+        return self._control_bundles[cache_key]
+
+    def _matched_rules(
+        self, entity: Any, identity: str, keys: frozenset[str]
+    ) -> tuple[tuple[str, Mapping[str, Any]], ...]:
+        """Return one hypothetical mount set's per-rule matches, read once.
+
+        The matching half of the same engine the merged bundle comes from, kept
+        rule by rule so a rule that declares a probability can be weighted by
+        settlement's own reading of it instead of by an additive merge total.
+        """
+        cache_key = (identity, keys)
+        if cache_key not in self._matched:
+            context = build_no_create_condition_context(entity)
+            context["active_buffs"] = keys
+            self._matched[cache_key] = matched_combat_modifiers(
+                entity, context=context
+            )
+        return self._matched[cache_key]
+
+    def _baseline_opportunities(self, relation: Relation) -> float:
+        """Return one faction's eligible baseline action opportunities.
+
+        The denominator the opportunity term is normalized by: every eligible
+        member's current action allowance, which already folds whatever locks
+        it carries. A faction with none left is floored at one, so a fully
+        locked side contributes no denial rather than dividing by zero.
+        """
+        members = self.enemies if relation is Relation.ENEMY else self.allies
+        total = 0.0
+        for entity in members:
+            total += max(
+                float(self.reads.capability(entity).actions_per_turn), 0.0
+            )
+        return max(total, 1.0)
+
+
     # -- features ------------------------------------------------------------
 
     def _assemble(
@@ -1507,6 +2058,7 @@ class _Decision:
                 own_restore / ally_capacity - enemy_restore / enemy_capacity
             ),
             waste=_feature(wasted / nominal if nominal > 0 else 0.0, harm=True),
+            control=_feature(self._control_feature(enemy_capacity, ally_capacity)),
             finishing=_clamped(finishing / count if count else 0.0),
             cost=self._cost_feature(cost),
             classification=(
@@ -1516,6 +2068,37 @@ class _Decision:
             ),
             limits=tuple(sorted(self._limits)),
             diagnostics=tuple(sorted(self._diagnostics)),
+            controls=tuple(self._controls),
+        )
+
+    def _control_feature(self, enemy_capacity: float, ally_capacity: float) -> float:
+        """Return this plan's bounded marginal control over one opportunity.
+
+        Each recipient contributes the beneficial part of its own projection,
+        and each sum is normalized the way the health features are: the
+        opportunity term by the faction's own baseline opportunities, and the
+        offensive, defensive and economy terms by the faction capacity the
+        change helps or threatens. The result is bounded by the feature itself,
+        so no mount can claim more than a whole faction's worth of value.
+        """
+        if not self._controls:
+            return 0.0
+        hostile = [
+            item for item in self._controls if item.relation is Relation.ENEMY
+        ]
+        friendly = [
+            item for item in self._controls if item.relation is not Relation.ENEMY
+        ]
+        return (
+            sum(item.opportunity for item in hostile)
+            / self._baseline_opportunities(Relation.ENEMY)
+            + sum(item.opportunity for item in friendly)
+            / self._baseline_opportunities(Relation.ALLY)
+            + sum(item.offense for item in hostile) / ally_capacity
+            + sum(item.offense for item in friendly) / enemy_capacity
+            + sum(item.defense for item in hostile) / enemy_capacity
+            + sum(item.defense for item in friendly) / ally_capacity
+            + sum(item.economy for item in self._controls)
         )
 
     def _resource_projections(self) -> tuple[ResourceProjection, ...]:

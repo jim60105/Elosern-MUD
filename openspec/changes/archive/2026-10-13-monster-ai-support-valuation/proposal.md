@@ -19,7 +19,8 @@ Choose useful existing healing and calculable control through the shared utility
 
 ### Modified Capabilities
 
-None.
+- `monster-ai-utility-selection`: the completed score adds the unscaled recovery baseline and the intelligence-scaled control term, so its authored formula requirement is restated with both.
+- `monster-ai-effect-estimation`: a supported buff or control mount whose definition projects concrete supported modifiers is now valued by its marginal modifier difference instead of contributing zero as an unknown benefit, and the bounded signed feature contract now also covers the control feature.
 
 ## Impact
 
