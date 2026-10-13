@@ -74,7 +74,7 @@ export function applyRoomActions(ctx) {
       return false;
     }
     const source = kind === "wait" ? ctx.frameResolver.explorationWait() : ctx.frameResolver.explorationSuggestions();
-    if (!source) {
+    if (!source || (kind === "suggestions" && ctx.activeSubDock.value)) {
       return false;
     }
     ctx.presenceCard = null;
@@ -138,7 +138,8 @@ export function applyRoomActions(ctx) {
   // exploration, a committed move, or an unavailable exploration panel
   // closes the card; the suggestions card also closes once the committed
   // envelope no longer presents one (`unavailable`, withdrawn, or a
-  // transport reset's empty panels).
+  // transport reset's empty panels) and while a re-homed sub-dock owns the
+  // surface (the options-surface rule the 建議 pill follows too).
   ctx.settleRoomCard = function settleRoomCard(rs) {
     const card = ctx.roomCard;
     if (card === null) {
@@ -154,7 +155,7 @@ export function applyRoomActions(ctx) {
       return;
     }
     card.location = { room: location.room, node: location.node ?? (card.location ? card.location.node : null) };
-    if (card.kind === "suggestions" && !ctx.frameResolver.explorationSuggestions()) {
+    if (card.kind === "suggestions" && (!ctx.frameResolver.explorationSuggestions() || ctx.activeSubDock.value)) {
       ctx.roomCard = null;
     }
   };

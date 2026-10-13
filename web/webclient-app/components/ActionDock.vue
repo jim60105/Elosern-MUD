@@ -60,10 +60,11 @@ const props = defineProps({
 const emit = defineEmits(["action", "back", "skip"]);
 
 // Creation mode renders the panel with no bar and no crumb (task 4.8):
-// exactly one `#action-dock` persists across every mode change.
-const showChrome = computed(
-  () => props.mode !== "creation" && props.rootItems.length > 0,
-);
+// exactly one `#action-dock` persists across every mode change. Every other
+// mode keeps the crumb, even over the exploration root, whose router menu is
+// empty (exploration-room-actions): a pushed child frame there (the
+// SkillBook casting flow) still names its trail.
+const showChrome = computed(() => props.mode !== "creation");
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
 // Every submenu frame keeps the breadcrumb; a person's verbs are the stage's

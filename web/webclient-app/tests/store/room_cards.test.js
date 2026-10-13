@@ -176,6 +176,16 @@ describe("the room card slice (exploration-room-actions)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
+  it("the suggestions card yields to a re-homed sub-dock", () => {
+    open(READY);
+    store.openRoomCard("suggestions");
+    store.setActiveSubDock("character");
+    expect(store.view.roomCard).toBeNull();
+    expect(store.openRoomCard("suggestions")).toBe(false);
+    store.setActiveSubDock(null);
+    expect(store.openRoomCard("suggestions")).toBe(true);
+  });
+
   it("a root reset leaves no room card open", () => {
     open();
     store.openRoomCard("wait");
