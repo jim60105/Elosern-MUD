@@ -12,10 +12,10 @@
 
 import { RAIL_MAX, RAIL_MORE_KEY, railOverflow, railSlots } from "../../components/presence-rail.js";
 
-// The committed location key: the room identity plus the committed current
-// node (wilderness rooms are reused across coordinates). Null while the
+// The committed location: the room identity plus the committed current node
+// (wilderness rooms are reused across coordinates). Null while the
 // exploration panel is absent or unavailable, which never counts as a move.
-function locationKey(rs, currentNode) {
+function locationOf(rs, currentNode) {
   const panel = (rs && rs.panels && rs.panels.exploration) || null;
   if (!panel || panel.available === false) {
     return null;
@@ -24,7 +24,20 @@ function locationKey(rs, currentNode) {
   if (!room || room.identity === undefined || room.identity === null) {
     return null;
   }
-  return `${room.identity}:${currentNode ?? ""}`;
+  return { room: String(room.identity), node: currentNode == null || currentNode === "" ? null : String(currentNode) };
+}
+
+// A move: the room identity changed, or both current nodes are known and
+// differ. A node that merely appears or disappears (the local map becoming
+// available or unavailable in the same room) is not a move.
+function isMove(from, to) {
+  if (!from || !to) {
+    return false;
+  }
+  if (from.room !== to.room) {
+    return true;
+  }
+  return from.node !== null && to.node !== null && from.node !== to.node;
 }
 
 export function applyPresence(ctx) {
@@ -36,7 +49,7 @@ export function applyPresence(ctx) {
   ctx.presenceNoticeSeq = 0;
 
   function currentLocation(rs) {
-    return locationKey(rs, ctx.frameResolver.explorationExits().currentNode);
+    return locationOf(rs, ctx.frameResolver.explorationExits().currentNode);
   }
 
   // The committed entries, or null when the panel is unavailable.
@@ -74,7 +87,9 @@ export function applyPresence(ctx) {
       return { sent: true, handled: true, requestId: ctx.lastSubmittedRequestId };
     }
     // A local open (a drawer, the persona editor) handles the row without a
-    // request; an action the dispatch gate refused handles nothing.
+    // request; an action the dispatch gate refused handles nothing. The row
+    // shape decides which: every local-open row of the builders carries no
+    // `actionId`, and every row that carries one is a submission.
     return { sent: false, handled: !!handled && !item.actionId, reason: item.actionId ? "refused" : "local" };
   };
 
@@ -205,12 +220,14 @@ export function applyPresence(ctx) {
     if (rs.mode !== "exploration" || ctx.router.depth() === 0) {
       return null;
     }
-    const descriptor = ctx.router.currentDescriptor();
-    if (!descriptor || typeof descriptor.source !== "string" || !descriptor.source.startsWith("exploration.")) {
-      return null;
-    }
     const slot = Number(key) - 1;
+    // An open card owns the digits whatever frame the dock shows, except
+    // under a drawer or an overlay (the card stays open beneath a drawer its
+    // navigate row opened): those digits are not the card's and not claimed.
     if (ctx.presenceCard !== null) {
+      if (ctx.hudDrawer.value || ctx.hudOverlay.value) {
+        return false;
+      }
       if (!repeat) {
         const keys = cardPickKeys();
         if (slot < keys.length) {
@@ -222,6 +239,10 @@ export function applyPresence(ctx) {
         }
       }
       return true;
+    }
+    const descriptor = ctx.router.currentDescriptor();
+    if (!descriptor || typeof descriptor.source !== "string" || !descriptor.source.startsWith("exploration.")) {
+      return null;
     }
     if (!ctx.railVisible(rs)) {
       return false;
@@ -255,12 +276,16 @@ export function applyPresence(ctx) {
       return;
     }
     const location = currentLocation(rs);
-    if (location !== null && card.location !== null && location !== card.location) {
+    if (isMove(card.location, location)) {
       ctx.presenceCard = null;
       return;
     }
-    if (location !== null && card.location === null) {
-      card.location = location;
+    if (location !== null) {
+      // Learn the room or node the card did not know yet, never forget one.
+      card.location = {
+        room: location.room,
+        node: location.node ?? (card.location ? card.location.node : null),
+      };
     }
     const entries = ctx.presenceEntries();
     if (entries === null) {

@@ -234,6 +234,38 @@ describe("the presence slice (exploration-presence-rail)", () => {
       expect(store.view.presenceNotice).toBe(null);
     });
 
+    it("the local map flapping in the same room is not a move", () => {
+      open();
+      store.activatePresence("target-7");
+      const unavailableMap = {
+        schema_version: 1,
+        available: false,
+        reason: { code: "map_unavailable", message: "區域地圖目前無法顯示" },
+      };
+      revision += 1;
+      store.receive(1, "ui_update", [fx.update({ revision, panels: { exploration: panelWith([CLERK]), local_map: unavailableMap } })], {});
+      expect(store.view.explorationCurrentNode).toBe(null);
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      commit(panelWith([CLERK]));
+      expect(store.view.explorationCurrentNode).not.toBe(null);
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    });
+
+    it("a departure while an unrelated submission is pending closes the card once the lock releases", () => {
+      open();
+      store.activatePresence("object-3");
+      store.activatePresence("target-7");
+      // The look is in flight: the departure waits.
+      commit(panelWith([], { look: { entities: [] } }));
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+      // The look is rejected: the release publishes, and the settle closes
+      // the card with the notice.
+      store.receive(1, "ui_action_result", [fx.actionResult({ outcome: "rejected", code: "invalid", message: "不行。" })], {});
+      expect(store.view.dispatch.inFlight).toBe(null);
+      expect(store.view.presenceCard).toBe(null);
+      expect(store.view.presenceNotice).toMatchObject({ name: "店長" });
+    });
+
     it("an unavailable panel never reads as a departure", () => {
       open();
       store.activatePresence("target-7");
@@ -309,6 +341,42 @@ describe("the presence slice (exploration-presence-rail)", () => {
     });
   });
 
+  describe("digits while a card is open", () => {
+    it("a held repeat and a digit past the rows are claimed and do nothing", () => {
+      open();
+      store.activatePresence("target-7");
+      expect(store.focusPress("1", true)).toBe(true);
+      expect(store.focusPress("9")).toBe(true);
+      expect(sender.sent.actions).toHaveLength(0);
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
+    });
+
+    it("a drawer over the card takes its digits away", () => {
+      open();
+      store.activatePresence("target-7");
+      expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
+      expect(store.view.hudDrawer).toBe("quest");
+      expect(store.focusPress("1")).toBe(false);
+      expect(sender.sent.actions).toHaveLength(0);
+      store.closeHudDrawer();
+      expect(store.focusPress("1")).toBe(true);
+      expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.talk_open" });
+    });
+
+    it("the card owns the digits whatever dock frame is open beneath it", () => {
+      open();
+      expect(store.focusItemByKey("wait")).toBe(true);
+      expect(store.focusConfirm("keyboard")).toBe(true);
+      expect(store.view.dockSource).toBe("exploration.wait");
+      store.activatePresence("target-7");
+      // The card lists 交談 … 查看; its digit picks never reach the waiting frame.
+      const lookSlot = String(store.view.presenceVerbs.findIndex((item) => item.key === "look-target") + 1);
+      expect(store.focusPress(lookSlot)).toBe(true);
+      expect(sender.sent.actions).toHaveLength(1);
+      expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 7 } });
+    });
+  });
+
   describe("the overflow card", () => {
     const crowd = (count) =>
       Array.from({ length: count }, (_, n) => ({
@@ -333,6 +401,14 @@ describe("the presence slice (exploration-presence-rail)", () => {
       store.activatePresence("presence-more");
       expect(store.activatePresence("object-3").sent).toBe(true);
       expect(store.view.presenceCard).toBe(null);
+    });
+
+    it("a verb card opened from ＋N survives the fold disappearing", () => {
+      open(crowd(7));
+      store.activatePresence("presence-more");
+      store.activatePresence("target-105");
+      commit(panelWith([...crowd(7)].slice(4)));
+      expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 105, openerKey: "presence-more" });
     });
 
     it("closes quietly when nothing is folded any more, and ＋N does nothing without overflow", () => {

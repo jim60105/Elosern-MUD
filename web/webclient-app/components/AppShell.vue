@@ -336,8 +336,13 @@ watch(
       }
       await nextTick();
       const now = document.activeElement;
+      // A person's verb card (exploration-presence-rail) that held focus
+      // when 交談 committed is gone from the `choices` anchor, or leaving it.
+      const onExplorationCard =
+        !!now?.closest?.("[data-anchor='choices']") && !now?.matches?.('[data-testid="dialogue-choices"]');
       if (
         focusIsLost(now) ||
+        onExplorationCard ||
         now?.matches?.('[data-testid="message-page"]') ||
         now?.closest?.(HIDDEN_BY_MODE.dialogue)
       ) {

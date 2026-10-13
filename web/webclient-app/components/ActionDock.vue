@@ -61,9 +61,8 @@ const showChrome = computed(
 );
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
-// Every submenu frame keeps the breadcrumb (the verb popover that named its
-// own target is gone: a person's verbs are the stage's verb card,
-// exploration-presence-rail).
+// Every submenu frame keeps the breadcrumb; a person's verbs are the stage's
+// verb card (exploration-presence-rail), never a dock frame.
 const showCrumb = computed(() => showChrome.value);
 
 

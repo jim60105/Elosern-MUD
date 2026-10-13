@@ -279,6 +279,13 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(card().exists()).toBe(false);
     expect(standee().element).toBe(before);
     expect(wrapper.findAll('[data-testid="anchor-actor-right"] [data-testid="stage-actor"]')).toHaveLength(1);
+    // The card held focus when 交談 committed: focus goes to the dialogue's
+    // focus home (the message page or the choice list), never the body.
+    const active = document.activeElement;
+    expect(active).not.toBe(document.body);
+    expect(
+      active.matches('[data-testid="message-page"]') || active.matches('[data-testid="dialogue-choices"]'),
+    ).toBe(true);
   });
 
   it("the overflow card lists the rest, objects marked ◇, and a pick opens that person's card", async () => {
