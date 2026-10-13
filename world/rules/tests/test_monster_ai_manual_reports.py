@@ -36,7 +36,7 @@ from world.rules.combat import (
     run_round,
     stable_actor_id,
 )
-from world.rules.combat_session import read_session
+from world.rules.combat_session import BASIC_ATTACK_KEY, read_session
 from world.rules.monster_ai import manual_campaign
 from world.rules.monster_ai import manual_reports as reports
 from world.rules.monster_ai.candidates import Candidate, CandidateIdentity
@@ -790,10 +790,10 @@ class CampaignEncounterTests(EvenniaTestCase):
             with harness._recording(encounter, [], [], [], {monster.key}, {}, []):
                 with self.assertRaises(manual_campaign.RefusedMonsterAction) as raised:
                     ActionResolver.resolve(
-                        SimpleNamespace(actor=monster, skill_key="basic_attack")
+                        SimpleNamespace(actor=monster, skill_key=BASIC_ATTACK_KEY)
                     )
         self.assertIn(monster.key, str(raised.exception))
-        self.assertIn("basic_attack", str(raised.exception))
+        self.assertIn(BASIC_ATTACK_KEY, str(raised.exception))
         self.assertIn("cast_condition_unmet", str(raised.exception))
         # A refusal is a batch failure, so no operation can publish a report
         # from it: the exception travels out of the orchestration unchanged.
