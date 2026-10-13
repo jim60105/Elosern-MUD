@@ -378,16 +378,6 @@ export function applyFrames(ctx) {
     ctx.publishView();
   };
 
-  // The exploration-family push map: a root `openSubmenu` key -> the
-  // descriptor of its declarative frame. Empty since the wait and suggestions
-  // frames became the client-local wait and suggestions cards
-  // (exploration-room-actions design D1): the exploration root is the only
-  // exploration frame.
-  ctx.EXPLORATION_SUBMENU_PUSHES = {};
-  // Per-source degradation policy for pushed exploration frames (none left;
-  // every pushed frame pops one level).
-  ctx.UNRESOLVABLE_ACTION = {};
-
   // The declarative-frame mutation window (webclient-declarative-frame-stack
   // D-A): the ONE commit hook for the exploration dock. A committed push
   // never re-pushes anything — the next access re-resolves. This window only
@@ -470,12 +460,4 @@ export function applyFrames(ctx) {
     }
   };
 
-  // One declarative exploration push: the store mutation window covers the
-  // push itself (the push-time resolve focuses the first item; an
-  // immediately-unresolvable push settles per its policy before the focus
-  // event reaches the store). `openerKey` is the activated row's key so a
-  // later degradation restores focus to it.
-  ctx.pushExplorationFrame = function pushExplorationFrame(descriptor, openerKey) {
-    ctx.pushFrame(descriptor, openerKey, ctx.UNRESOLVABLE_ACTION[descriptor.source] || "pop");
-  };
 }

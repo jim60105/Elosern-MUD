@@ -110,7 +110,12 @@ export function applyRoomActions(ctx) {
         ? { ...found, payload: { ...(found.payload || {}), dream: true } }
         : found;
     const outcome = ctx.activateExplorationRow(row);
-    if (outcome.sent) {
+    // A card row's action takes the surface over, so the card closes with its
+    // dispatch; the dismiss row keeps the card exactly as last committed —
+    // the committed `unavailable` envelope closes it (`settleRoomCard`), so a
+    // stale/busy rejection never tears down a surface the commit still backs
+    // (webclient-context-actions-suggestions' preserved dismiss invariant).
+    if (outcome.sent && row.actionId !== "options.dismiss") {
       ctx.closeRoomCard();
     }
     return outcome;

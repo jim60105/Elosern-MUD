@@ -70,8 +70,10 @@ or pops a frame.
 The rendered rows SHALL form one composite widget: the row container SHALL carry the listbox role, be the row
 region's single tab stop, and name the focused row through an active-descendant association, with each row
 carrying the option role and its selected state. The exploration compass SHALL be a separate single tab stop
-with `role="application"`; no exit is a router row. A pointer press on a row SHALL NOT move DOM focus off
-that container.
+with `role="application"`; no exit is a router row. At the exploration root the dock renders no row container
+at all — its composite is the presence rail's, and the place-card buttons and the 建議 pill are native
+buttons — so the row-container clauses below hold for every row-bearing frame. A pointer press on a row SHALL
+NOT move DOM focus off that container.
 
 #### Scenario: Enter on a focused row emits one action, not two
 - **WHEN** the player moves focus to an enabled row with the arrow keys and presses Enter
@@ -90,20 +92,20 @@ that container.
 - **THEN** the router closes the open frames one level at a time back to the root, focuses that tab's row, and opens its frame with exactly one deliberate activation, emitting no unexpected `ui_action`
 
 #### Scenario: Only one container is the listbox at a time
-- **WHEN** the dock is inspected at the root frame and again at a deeper frame
-- **THEN** exactly one row container carries the listbox role, the tab stop and the active-descendant reference in each case, and the other container is neither focusable by Tab nor exposed as a listbox
+- **WHEN** the dock is inspected at the exploration root and again at a row-bearing frame
+- **THEN** the exploration root renders no dock row container, and a row-bearing frame renders exactly one row container carrying the listbox role, the tab stop and the active-descendant reference, with any other container neither focusable by Tab nor exposed as a listbox
 
 #### Scenario: Focus indication stays with the router
 - **WHEN** the player clicks a row
 - **THEN** the row container retains DOM focus, the active-descendant association names the clicked row, and the visible focus indicator is on that row
 
 #### Scenario: Composite roles are present and machine-checkable
-- **WHEN** the rendered action dock is inspected in the browser
-- **THEN** the row container exposes the listbox role with a tab stop and an active-descendant reference, each row exposes the option role with its selected and disabled state, and no row is reachable by sequential keyboard navigation
+- **WHEN** the rendered action dock is inspected in the browser at the exploration root and at a row-bearing frame
+- **THEN** the exploration root renders no dock row container, the presence rail carrying the listbox role, one tab stop, and an active-descendant reference on the stage, while at a row-bearing frame the row container exposes the listbox role with a tab stop and an active-descendant reference, each row exposes the option role with its selected and disabled state, and no row is reachable by sequential keyboard navigation
 
 #### Scenario: Exactly one container holds the listbox role
-- **WHEN** the dock is at the root frame, where the root frame renders as a tab bar, and at any deeper frame
-- **THEN** exactly one row container holds the role — the tab bar's container at the root frame and the rows region's container at every deeper frame — and the other is neither a tab stop nor a listbox
+- **WHEN** the dock is at the exploration root and again at any row-bearing frame
+- **THEN** no dock row container holds the role at the exploration root, and every row-bearing frame renders exactly one, its rows region's, with any other container neither a tab stop nor a listbox
 
 #### Scenario: The action-dock element forwards focus
 - **WHEN** an active row container is mounted

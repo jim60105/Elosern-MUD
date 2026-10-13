@@ -33,7 +33,7 @@ In exploration mode the screen SHALL be composed of the exit compass, the shared
 - **THEN** the compass, rail, place-card buttons, and pill are not rendered and the dock keeps its existing degraded root
 
 ### Requirement: The place card carries 查看房間 and 等待 in exploration only
-`PlaceCard` SHALL stay display-first and, only in exploration mode while the exploration panel is available, render a 查看房間 icon button (`aria-label="查看房間"`) beside the location heading and a 等待 button (hourglass icon plus label) beside the world time. In every other mode and state the place card SHALL render no button.
+`PlaceCard` SHALL stay display-first and, only in exploration mode while the exploration panel is available and the exploration dock is at its root frame (no sub-dock or deeper frame owning the surface), render a 查看房間 icon button (`aria-label="查看房間"`) beside the location heading and a 等待 button (hourglass icon plus label) beside the world time. In every other mode and state the place card SHALL render no button.
 
 #### Scenario: Buttons appear in exploration
 - **WHEN** the mode is exploration and the exploration panel is available

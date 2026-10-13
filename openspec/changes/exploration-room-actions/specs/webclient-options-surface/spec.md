@@ -163,8 +163,10 @@ dispatched envelopes are exactly:
 
 #### Scenario: The dismiss control hides the suggestions surface
 - **WHEN** the player activates "清除建議" while the card shows `ready` or `degraded` cards
-- **THEN** the client submits `options.dismiss` with an empty payload and the card closes, and once
-  the published `unavailable` state arrives the 建議 pill disappears
+- **THEN** the client submits `options.dismiss` with an empty payload, and once the published
+  `unavailable` state arrives the card and the 建議 pill leave together — the committed envelope,
+  never the local dispatch, decides the removal (the preserved dismiss invariant
+  `webclient-context-actions-suggestions` restates)
 
 #### Scenario: A dock-hosted card submits exactly what its keyboard confirmation submits
 - **WHEN** the player activates a card on the suggestions card with the pointer, and then confirms

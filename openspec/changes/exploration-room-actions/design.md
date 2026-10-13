@@ -30,7 +30,7 @@ The root frame must stay resolvable, because "only an unresolvable ROOT frame de
 
 ### D3. Place-card buttons
 
-Two real `<button>`s inside `PlaceCard`, each a tab stop, emitting `look-room` and `wait`. The card stays `pointer-events` aware: today it is display-only, so only the buttons receive pointer events. Buttons mount only when `AppClient` passes `actionsEnabled` (mode exploration and exploration panel available). The heading keeps its full accessible name; the button group must not truncate it (ellipsis applies to the visible text only).
+Two real `<button>`s inside `PlaceCard`, each a tab stop, emitting `look-room` and `wait`. The card stays `pointer-events` aware: today it is display-only, so only the buttons receive pointer events. Buttons mount only when `AppClient` passes `actionsEnabled`, which the store gates on exploration mode, an available exploration panel, and the exploration root being the live frame (`dockSource === "exploration.root"`, not degraded) — so a re-homed sub-dock or a deeper frame takes the buttons and the 建議 pill away together. The heading keeps its full accessible name; the button group must not truncate it (ellipsis applies to the visible text only).
 
 ### D4. Suggestions card rows
 

@@ -44,14 +44,6 @@ export function applyInteraction(ctx) {
       ctx.openNpcPersonaEditor(item.openNpcPersona);
       return true;
     }
-    if (item.openSubmenu && ctx.EXPLORATION_SUBMENU_PUSHES[item.openSubmenu]) {
-      // Declarative push (webclient-declarative-frame-stack): the frame is
-      // ONLY the descriptor — the submenu content resolves at access time,
-      // so a later commit reaches this open frame without any re-push.
-      ctx.pushExplorationFrame(ctx.EXPLORATION_SUBMENU_PUSHES[item.openSubmenu], item.key);
-      ctx.publishView();
-      return true;
-    }
     if (item.openCharacter) {
       ctx.setActiveSubDock("character");
       // H4 (task 4.2): the Character root opens the character-status drawer
