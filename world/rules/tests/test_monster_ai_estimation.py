@@ -20,6 +20,8 @@ honestly labeled, with unvaluable harms refused rather than zeroed; and the
 estimator's own rulebook inputs join the recorded tuning fingerprint.
 """
 
+from tools.spec_traceability import covers_requirement
+
 import unittest
 from dataclasses import replace
 from unittest.mock import patch
@@ -420,11 +422,13 @@ def _hand(skill, recipients, routed, *, scale=1.0):
 class ScalarExpressionTests(unittest.TestCase):
     """The shared scalar arithmetic settlement and estimation both call."""
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_multiplier_ladder_is_banded_by_margin_with_a_critical_face(self):
         self.assertEqual(damage_multiplier(100, 0.0), 2.0)
         self.assertEqual(damage_multiplier(60, 40.0), 1.5)
         self.assertEqual(damage_multiplier(50, 39.0), 1.0)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_margin_is_the_roll_plus_agility_over_the_defender_threshold(self):
         # 51 is the rulebook's defender constant: this roll lands exactly.
         self.assertEqual(
@@ -448,6 +452,7 @@ class ScalarExpressionTests(unittest.TestCase):
             6.0,
         )
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_strike_amount_composes_potency_defense_rider_and_scale(self):
         # 30 x 1.0 x 2.0 rounds to 60, minus 10 defense.
         self.assertEqual(
@@ -478,6 +483,7 @@ class ScalarExpressionTests(unittest.TestCase):
             4,
         )
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_heal_amount_is_floored_and_amplified_in_that_order(self):
         self.assertEqual(heal_amount(magic_power=35.0), 35)
         self.assertEqual(heal_amount(magic_power=1.0, coefficient=0.01), 1)
@@ -486,6 +492,7 @@ class ScalarExpressionTests(unittest.TestCase):
             heal_amount(magic_power=33.0, coefficient=2.0, heal_gain="+15%"), 75
         )
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_capacity_caps_and_the_floor_are_the_settlement_ones(self):
         self.assertEqual(staged_restoration(amount=10, current=5.0, maximum=8.0), 3)
         self.assertEqual(staged_restoration(amount=10, current=0.0, maximum=8.0), 0)
@@ -494,6 +501,7 @@ class ScalarExpressionTests(unittest.TestCase):
         self.assertFalse(crosses_knockout(current=10.0, loss=4.0))
         self.assertEqual(nonlethal_projection(current=10.0, loss=4.0), 6.0)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_settlement_handlers_stage_the_shared_expressions(self):
         attacker = FakeEntity("actor", atk_phys=30, agility=0, magic_power=11)
         defender = FakeEntity("target", defense=10, agility=0)
@@ -534,6 +542,8 @@ class SpreadProjectionTests(unittest.TestCase):
         _set(self.enemy, "agility", 0)
         _set(self.enemy, "hp", 30, current=30)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_one_strike_averages_the_range_inside_every_capacity_branch(self):
         # Faces 1..50 miss; 51..90 land round(30) - 10 = 20; 91..99 land
         # round(45) - 10 = 35; face 100 crits for round(60) - 10 = 50. Capped by
@@ -556,6 +566,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.cost, 0.6)
         self.assertEqual(_deltas(estimate, self.actor)["mp"], -12.0)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_two_strike_occurrence_caps_the_sum_not_the_average(self):
         # Each strike lands half the time for 10, 20 or 30 damage on a 5-health
         # target, so any landing strike already crosses it. Averaging the capped
@@ -572,6 +583,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertEqual(estimate.classification, ApproximationClass.CONSERVATIVE)
         self.assertIn(EstimationLimit.HIT_REACTIONS_UNMODELED, estimate.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_ordered_occurrences_bill_the_remaining_health_once(self):
         # Two identical 30.1-average occurrences against 50 health: every branch
         # of the second acts on what the first left, so the total is the 50
@@ -589,6 +601,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(projection.finishing, 1.0)
         self.assertAlmostEqual(estimate.waste.magnitude, 10.2 / 60.2)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_recipient_floor_caps_the_loss_at_one_stored_point(self):
         _owned(self.actor, DOUBLE.key)
         _set(self.actor, "magic_power", 20)
@@ -609,6 +622,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertIn(EstimationLimit.NONLETHAL_FLOOR_APPLIED, protected.limits)
         self.assertNotIn(EstimationLimit.NONLETHAL_FLOOR_APPLIED, lethal.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_hit_dependent_effect_reads_the_occurrences_own_gate(self):
         # Both rows land half the time per strike for a ten-mana request. The
         # one-strike row drains 0.5 x 10 = 5. The two-strike row's dependent
@@ -638,6 +652,7 @@ class SpreadProjectionTests(unittest.TestCase):
                 )
                 self.assertIn(EstimationLimit.GATED_EFFECT_WEIGHTED, estimate.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_full_share_drain_credits_the_projected_actual_removal(self):
         # A target holding three mana, a ten-mana request and a full recovery
         # share, with the actor at twenty mana and a ten-mana cost: crediting
@@ -656,6 +671,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertEqual(_deltas(estimate, self.actor)["mp"], -7.0)
         self.assertNotIn(EstimationLimit.GATED_EFFECT_WEIGHTED, estimate.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_missed_prerequisite_credits_nothing_at_all(self):
         # The actor can never land on this defender, so the occurrence's gate
         # never opens: the dependent drain credits no recovery, and nothing
@@ -674,6 +690,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.healing.magnitude, 0.0)
         self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 0.0)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_recovery_is_clamped_before_the_cost_is_deducted(self):
         # Settlement applies the staged effects first and the payment last, so a
         # full pool absorbs the credit into its own bound before the cost comes
@@ -689,6 +706,7 @@ class SpreadProjectionTests(unittest.TestCase):
         estimate = _only(_estimate(self.actor, (self.enemy,)))
         self.assertEqual(_deltas(estimate, self.actor)["mp"], -10.0)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_known_diversion_budget_reduces_the_estimate(self):
         # The recipient's live diversion absorbs the authored fraction of each
         # landing strike's residual, clamped by what is left of its budget and
@@ -724,6 +742,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(_recipient(spent, self.enemy).damage, 30.1)
         self.assertNotIn(EstimationLimit.DIVERSION_ABSORBED, spent.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_allied_healing_moves_the_feature_the_other_way(self):
         _owned(self.actor, WARD.key)
         _set(self.actor, "hp", 40, current=30)
@@ -740,6 +759,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertAlmostEqual(estimate.healing.magnitude, 10.0 / 40)
         self.assertEqual(estimate.healing.direction.name, "BENEFIT")
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_enemy_healing_is_a_harm(self):
         _owned(self.actor, FOE_MEND.key)
         _set(self.actor, "magic_power", 10)
@@ -751,6 +771,8 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertGreater(_recipient(estimate, self.enemy).healing, 0.0)
         self.assertEqual(estimate.healing.direction.name, "HARM")
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_a_staged_heal_never_exceeds_the_pre_action_gap(self):
         _owned(self.actor, PENANCE.key)
         _set(self.actor, "magic_power", 10)
@@ -765,6 +787,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertEqual(_recipient(estimate, self.actor).healing, 0.0)
         self.assertGreater(_recipient(estimate, self.enemy).damage, 0.0)
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_own_side_damage_is_a_negative_term(self):
         _owned(self.actor, WARD.key)
         _set(self.actor, "hp", 40, current=40)
@@ -794,6 +817,7 @@ class SpreadProjectionTests(unittest.TestCase):
         )
         self.assertLess(estimate.damage.magnitude, enemy_loss / 100.0)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_an_unvaluable_harm_is_refused_instead_of_zeroed(self):
         _owned(self.actor, SELF_HARM.key)
         estimate = _only(_estimate(self.actor, (self.enemy,)))
@@ -803,12 +827,14 @@ class SpreadProjectionTests(unittest.TestCase):
         )
         self.assertIn("friendly recipient", estimate.detail)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_hostile_benefit_is_refused_too(self):
         _owned(self.actor, FOE_WARD.key)
         estimate = _only(_estimate(self.actor, (self.enemy,)))
         self.assertIsInstance(estimate, InvalidEstimate)
         self.assertIn("hostile recipient", estimate.detail)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_an_enemy_side_status_is_unvalued_but_never_refused(self):
         _owned(self.actor, CURSED.key)
         estimate = _only(_estimate(self.actor, (self.enemy,)))
@@ -817,6 +843,7 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertIn(EstimationLimit.UNMODELED_BENEFIT_ZERO, estimate.limits)
         self.assertGreater(_recipient(estimate, self.enemy).damage, 0.0)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_candidate_that_takes_from_a_friend_is_refused_while_others_survive(self):
         _owned(self.actor, FRIEND_LEECH.key)
         estimates = _estimate(self.actor, (self.enemy,))
@@ -830,6 +857,7 @@ class SpreadProjectionTests(unittest.TestCase):
             any(not isinstance(item, InvalidEstimate) for item in estimates.estimates)
         )
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_a_non_finite_read_is_a_typed_state_not_an_exception(self):
         _owned(self.actor, STRIKE.key)
         # A non-finite number reaches the estimator only through a read, and the
@@ -852,6 +880,7 @@ class SpreadProjectionTests(unittest.TestCase):
                 )
                 self.assertIn("accuracy", estimate.detail)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_estimate_rolls_nothing_mounts_nothing_and_writes_nothing(self):
         _owned(self.actor, STRIKE.key)
         before = {
@@ -876,6 +905,7 @@ class SpreadProjectionTests(unittest.TestCase):
             }
             self.assertEqual(stored, before[label])
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_an_evidence_conditional_strike_is_not_credited(self):
         _owned(self.actor, CONDITIONAL.key)
         estimate = _only(_estimate(self.actor, (self.enemy,)))
@@ -883,6 +913,7 @@ class SpreadProjectionTests(unittest.TestCase):
         # The unconditional strike is still modeled, so the row keeps a body.
         self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 11.0)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_plan_that_omits_nothing_classifies_as_exact(self):
         _set(self.actor, "magic_power", 10)
         _set(self.actor, "hp", 40, current=30)
@@ -929,6 +960,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
             reads=reads,
         )
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_non_default_scale_scales_the_effects_and_their_cost(self):
         # Faces 1..50 miss; 51..90 land round(30) - 10 = 20, 91..99 land
         # round(45) - 10 = 35 and face 100 crits for 50. Halved, the same faces
@@ -939,6 +971,8 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 5.87)
         self.assertAlmostEqual(estimate.cost, 6.0 / 20.0)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_gated_damage_occurrence_is_omitted_rather_than_marginalized(self):
         # The second occurrence reads the first one's gate, so half the time it
         # would act on a recipient the first already hit. Crediting it on every
@@ -948,6 +982,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 11.65)
         self.assertIn(EstimationLimit.GATED_EFFECT_OMITTED, estimate.limits)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_independent_drain_gates_sum_rather_than_multiply(self):
         # Two enemies, each holding ten mana and each reached half the time by
         # the damage occurrence its drain depends on: the actor recovers
@@ -979,6 +1014,8 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         self.assertAlmostEqual(_deltas(estimate, second)["mp"], -5.0)
         self.assertAlmostEqual(_deltas(estimate, self.actor)["mp"], -2.0)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_health_drain_credits_only_the_projected_loss(self):
         # The actor starts ten points below its maximum, so a five-point health
         # drain against a healthy recipient credits five. Against a recipient
@@ -1001,6 +1038,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         identities = {item.identity for item in spent.recipients}
         self.assertNotIn(stable_identity(self.actor), identities)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_same_recipient_heal_gets_no_fresh_allowance(self):
         # The restoration is staged against the recipient's *pre-action* gap, so
         # an enemy at full health stages nothing even though the same action
@@ -1013,6 +1051,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         self.assertEqual(projection.healing, 0.0)
         self.assertGreater(projection.nominal_healing, 0.0)
 
+    @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_the_cost_feature_spans_every_charged_pool(self):
         # Two charged pools make the feature their mean: ten of twenty mana and
         # four of twenty stamina is 0.35. A pool holding nothing contributes
@@ -1024,6 +1063,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         empty = self._plan(COSTLY, (self.enemy,), ((self.enemy,),))
         self.assertAlmostEqual(empty.cost, 0.5 / 2)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_an_unclassified_own_side_outcome_is_refused(self):
         # Revoking grants from the actor's own side takes something away, and
         # this model does not know that class's outcome: the plan is refused
@@ -1037,6 +1077,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         )
         self.assertIn("friendly recipient", estimate.detail)
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_cleansing_a_hostile_recipient_is_refused(self):
         # A cleanse removes its recipient's debuffs, which on a hostile
         # recipient hands the enemy a benefit the estimate cannot value.
@@ -1116,6 +1157,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
             .attributes.get("traits", default={}, category="traits")[trait_key]["current"]
         )
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_estimate_matches_the_settled_range_over_every_face(self):
         self.monster.db.skills = {"active": [STRIKE.key], "passive": []}
         self.monster.traits.atk_phys.base = 40
@@ -1139,6 +1181,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
             settled += 500 - self._committed(target, "hp")
         self.assertAlmostEqual(settled / 100, projection.damage, places=4)
 
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_drain_projection_matches_the_committed_pools(self):
         self.monster.db.skills = {"active": [DRAIN.key], "passive": []}
         self.monster.traits.magic_power.base = 20
@@ -1162,6 +1205,7 @@ class EstimationIntegrationTests(EvenniaTestCase):
 class EstimationTuningTests(unittest.TestCase):
     """The estimator's own rulebook inputs are part of the recorded tuning."""
 
+    @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_the_estimation_rulebook_leaves_move_the_fingerprint(self):
         base = behaviour.MONSTER_AI_TUNING.fingerprint
         with patch.dict(COMBAT_YAML["damage"], {"crit_multiplier": 3.0}):
