@@ -35,7 +35,8 @@
 // Passive: activation calls `beforeActivate` (the shell parks focus on the
 // message page so the list's removal never drops it) and emits the row's
 // intent; the parent owns every dispatch.
-import { computed, nextTick, ref, useId, watch } from "vue";
+import { computed, ref } from "vue";
+import ChoiceCard from "./ChoiceCard.vue";
 import { directionGlyph, disabledRowReason, exitLabel } from "./dock-exits.js";
 
 const props = defineProps({
@@ -58,16 +59,11 @@ const props = defineProps({
 
 const emit = defineEmits(["pick", "freeform", "move", "leave"]);
 
-const listRef = ref(null);
-const scrollRef = ref(null);
-const idPrefix = useId();
+const cardRef = ref(null);
 const view = ref("choices");
-// The entrance is decided once, at mount (a later prop change must never
-// re-apply the animation and replay it). The rows' stillness ends at the
-// first view swap, whose new rows stagger in.
-const cardStill = !props.entrance;
-const rowsStill = ref(!props.entrance);
 
+// The card's view model (exploration-presence-rail D1): the shell is
+// ChoiceCard; this component keeps the rows, the view swap, and the emits.
 const rows = computed(() => {
   if (view.value === "exits") {
     const exitRows = props.exits.map((item, index) => {
@@ -76,6 +72,7 @@ const rows = computed(() => {
         kind: "exit",
         key: `exit-${item.key ?? index}`,
         testId: "dialogue-exit-row",
+        reasonTestId: "dialogue-exit-reason",
         badge: directionGlyph(item.direction) || "↦",
         label: exitLabel(item, props.localMap),
         enabled,
@@ -85,7 +82,7 @@ const rows = computed(() => {
     });
     return [
       ...exitRows,
-      { kind: "back", key: "back", testId: "dialogue-exits-back", badge: "↩", label: "返回對話", enabled: true },
+      { kind: "back", key: "back", testId: "dialogue-exits-back", badge: "↩", label: "返回對話", enabled: true, back: true },
     ];
   }
   return [
@@ -99,73 +96,37 @@ const rows = computed(() => {
       enabled: true,
       pick,
     })),
-    { kind: "freeform", key: "freeform", testId: "dialogue-freeform", badge: "⌨", label: "自由對話", enabled: true },
+    { kind: "freeform", key: "freeform", testId: "dialogue-freeform", badge: "⌨", icon: "keyboard", label: "自由對話", enabled: true },
     { kind: "move", key: "move", testId: "dialogue-move", badge: "↦", label: "移動…", enabled: true },
-    { kind: "leave", key: "leave", testId: "dialogue-exit", badge: "✕", label: "結束對話", enabled: true },
+    { kind: "leave", key: "leave", testId: "dialogue-exit", badge: "✕", icon: "close", label: "結束對話", enabled: true },
   ];
 });
-
-// The first enabled choice, or the first row when no choice is enabled —
-// the exits' back row is a way out, not a choice — so a disabled exit stays
-// reachable with its explanation, as before.
-function firstEnabled(list) {
-  const index = list.findIndex((row) => row.enabled && row.kind !== "back");
-  return index < 0 ? 0 : index;
-}
-
-const activeIndex = ref(firstEnabled(rows.value));
 
 // The trailing rows of the choice view open with a divider after the picks.
 const firstTrailing = computed(() => (view.value === "choices" ? props.picks.length : props.exits.length));
 
-function rowId(index) {
-  return `${idPrefix}-row-${index}`;
-}
-
-function reasonId(index) {
-  return `${idPrefix}-reason-${index}`;
-}
-
-// A committed update that shortens the rows keeps the active row in range.
-watch(
-  () => rows.value.length,
-  (length) => {
-    if (activeIndex.value > length - 1) {
-      activeIndex.value = Math.max(0, length - 1);
-    }
-  },
-);
-
-function setActive(index) {
-  activeIndex.value = index;
-  void nextTick(() => {
-    const el = Array.from(scrollRef.value?.children || []).find((child) => child.id === rowId(index));
-    el?.scrollIntoView?.({ block: "nearest" });
-  });
-}
-
 // Swaps the rows; with no index, the new view's first enabled row is active.
 function showView(next, index = null) {
-  rowsStill.value = false;
   view.value = next;
-  setActive(index ?? firstEnabled(rows.value));
+  if (index === null) {
+    // The first enabled row that is not the way back, else the first row.
+    const first = rows.value.findIndex((row) => row.enabled && !row.back);
+    index = first < 0 ? 0 : first;
+  }
+  cardRef.value?.setActive(index);
 }
 
-function activate(index) {
-  const row = rows.value[index];
+function onPick(key) {
+  const row = rows.value.find((entry) => entry.key === key);
   if (!row) {
     return;
   }
-  // The exits swap and the way back are local: they dispatch nothing.
+  // The exits swap is local: it dispatches nothing.
   if (row.kind === "move") {
     showView("exits");
     return;
   }
-  if (row.kind === "back") {
-    showView("choices", props.picks.length + 1);
-    return;
-  }
-  if (props.locked || !row.enabled) {
+  if (props.locked) {
     return;
   }
   props.beforeActivate?.();
@@ -180,525 +141,35 @@ function activate(index) {
   }
 }
 
-function consume(event) {
-  event.preventDefault();
-  event.stopPropagation();
-}
-
-function onKeydown(event) {
-  if (event.ctrlKey || event.altKey || event.metaKey) {
-    return;
+// The way back from the exits (its back row or Escape) is local too.
+function onBack() {
+  if (view.value === "exits") {
+    showView("choices", props.picks.length + 1);
   }
-  const count = rows.value.length;
-  const key = event.key;
-  if (key === "ArrowDown" || key === "ArrowUp") {
-    consume(event);
-    if (count > 0) {
-      const step = key === "ArrowDown" ? 1 : -1;
-      setActive((activeIndex.value + step + count) % count);
-    }
-    return;
-  }
-  if (key === "Home" || key === "End") {
-    consume(event);
-    if (count > 0) {
-      setActive(key === "Home" ? 0 : count - 1);
-    }
-    return;
-  }
-  // Shift+Enter / Shift+Space are not the list's activation keys: they pass
-  // through like every other modified key.
-  if ((key === "Enter" || key === " ") && !event.shiftKey) {
-    consume(event);
-    if (!event.repeat) {
-      activate(activeIndex.value);
-    }
-    return;
-  }
-  if (key === "Escape") {
-    if (view.value === "exits") {
-      consume(event);
-      showView("choices", props.picks.length + 1);
-    }
-    return;
-  }
-  if (view.value === "choices" && key.length === 1 && key >= "1" && key <= "9") {
-    const index = Number(key) - 1;
-    if (index < props.picks.length) {
-      consume(event);
-      if (!event.repeat) {
-        setActive(index);
-        activate(index);
-      }
-    }
-  }
-}
-
-function onRowClick(index) {
-  listRef.value?.focus({ preventScroll: true });
-  setActive(index);
-  activate(index);
 }
 
 function focus() {
-  listRef.value?.focus({ preventScroll: true });
+  cardRef.value?.focus();
 }
 
 defineExpose({ focus });
 </script>
 
 <template>
-  <div
-    ref="listRef"
-    class="dialogue-choices"
-    :class="{ 'dialogue-choices--still': cardStill, 'dialogue-choices--rows-still': rowsStill }"
-    role="menu"
+  <ChoiceCard
+    ref="cardRef"
+    block="dialogue-choices"
+    test-id="dialogue-choices"
+    :rows="rows"
+    :view-key="view"
+    :trailing-index="firstTrailing"
+    :caption="view === 'exits' ? '移動' : null"
     :aria-label="view === 'exits' ? '移動：選擇出口' : '對話選項'"
-    tabindex="0"
-    data-testid="dialogue-choices"
-    :data-view="view"
-    :aria-activedescendant="rows.length ? rowId(activeIndex) : null"
-    @keydown="onKeydown"
-  >
-    <span class="dialogue-choices__corners" aria-hidden="true"></span>
-    <div v-if="view === 'exits'" class="dialogue-choices__caption" aria-hidden="true">移動</div>
-    <div :key="view" ref="scrollRef" class="dialogue-choices__rows" :style="{ '--row-count': rows.length }">
-    <div
-      v-for="(row, index) in rows"
-      :id="rowId(index)"
-      :key="`${view}-${row.key}`"
-      class="dialogue-choices__row"
-      :class="[
-        `dialogue-choices__row--${row.kind}`,
-        {
-          'dialogue-choices__row--active': index === activeIndex,
-          'dialogue-choices__row--trailing': index === firstTrailing,
-        },
-      ]"
-      role="menuitem"
-      :data-testid="row.testId"
-      :data-keyword-id="row.keywordId"
-      :data-active="index === activeIndex ? 'true' : 'false'"
-      :style="{ '--row-index': index }"
-      :aria-disabled="row.enabled ? null : 'true'"
-      :aria-describedby="row.reason ? reasonId(index) : null"
-      @click="onRowClick(index)"
-    >
-      <span class="dialogue-choices__badge" aria-hidden="true" :data-badge="row.badge">
-        <!-- The keyboard glyph draws tiny in the loaded text faces, so the
-             free row's ⌨ badge is drawn as a small keyboard. -->
-        <svg
-          v-if="row.kind === 'freeform'"
-          class="dialogue-choices__badge-icon"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.6"
-          stroke-linecap="round"
-        >
-          <rect x="2.5" y="6" width="19" height="12" rx="2.2" />
-          <path d="M6.5 10h.01M10 10h.01M14 10h.01M17.5 10h.01M8 14h8" stroke-width="2" />
-        </svg>
-        <!-- The leave badge's ✕ is drawn too: two fine strokes in the seal
-             tint, where the text glyph read as a heavy Latin X. -->
-        <svg
-          v-else-if="row.kind === 'leave'"
-          class="dialogue-choices__badge-icon dialogue-choices__badge-icon--leave"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-        >
-          <path d="M7 7l10 10M17 7L7 17" />
-        </svg>
-        <template v-else>{{ row.badge }}</template>
-      </span>
-      <span class="dialogue-choices__text">
-        <span class="dialogue-choices__label">{{ row.label }}</span>
-        <span
-          v-if="row.reason"
-          :id="reasonId(index)"
-          class="dialogue-choices__reason"
-          data-testid="dialogue-exit-reason"
-        >{{ row.reason }}</span>
-      </span>
-    </div>
-    </div>
-  </div>
+    :entrance="entrance"
+    :escape-back="view === 'exits'"
+    :digit-rows="view === 'choices' ? picks.length : 0"
+    :claim-digits="false"
+    @pick="onPick"
+    @back="onBack"
+  />
 </template>
-
-<style>
-/* The choice card (design D6): the reference's caption-panel treatment. */
-.dialogue-choices {
-  position: relative;
-  box-sizing: border-box;
-  max-height: 100%;
-  display: flex;
-  flex-direction: column;
-  background:
-    radial-gradient(120% 60% at 50% 0%, rgba(185, 154, 96, 0.1), transparent 70%),
-    linear-gradient(180deg, rgba(27, 25, 29, 0.95), rgba(12, 13, 17, 0.95));
-  border: 1px solid rgba(185, 154, 96, 0.45);
-  border-radius: var(--radius);
-  box-shadow:
-    var(--shadow-lg),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 1px rgba(238, 221, 180, 0.06);
-  backdrop-filter: blur(calc(6px * var(--ui-scale)));
-  outline: none;
-  pointer-events: auto;
-}
-
-/* The entrance (webclient-mode-transitions D5). The card surfaces first;
-   the rows follow one stagger step apart, each fading up as it rises the
-   small shift into place on a decelerating curve. `backwards` holds a row at
-   its starting pose through its delay; after the animation nothing is
-   filled, so hover, focus, and the active row's styles are untouched. The
-   reduced level keeps the fades (stagger and rise are 0); the off level
-   resolves every duration and delay to 0. */
-.dialogue-choices {
-  animation: elosern-choice-card-in var(--motion-reveal) var(--ease-standard) backwards;
-}
-.dialogue-choices__row {
-  animation: elosern-choice-row-in var(--motion-reveal) var(--ease-enter)
-    calc(var(--motion-stagger) * var(--row-index, 0)) backwards;
-}
-/* While the rows rise, the last ones sit a shift below their rest, which a
-   tight stage (1280x720) would turn into a scrollbar flashing on and off;
-   the scroller clips instead for exactly the entrance's length. */
-.dialogue-choices__rows {
-  animation: elosern-choice-rows-clip
-    calc(var(--motion-stagger) * var(--row-count, 1) + var(--motion-reveal)) linear;
-}
-.dialogue-choices--still,
-.dialogue-choices--rows-still .dialogue-choices__rows,
-.dialogue-choices--rows-still .dialogue-choices__row {
-  animation: none;
-}
-.dialogue-choices__caption {
-  animation: elosern-choice-card-in var(--motion-reveal) var(--ease-standard) backwards;
-}
-
-@keyframes elosern-choice-rows-clip {
-  from,
-  to {
-    overflow-y: hidden;
-  }
-}
-
-@keyframes elosern-choice-card-in {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes elosern-choice-row-in {
-  from {
-    opacity: 0;
-    transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));
-  }
-}
-
-/* The exits view's quiet caption: it names what the rows now are. */
-.dialogue-choices__caption {
-  flex: none;
-  padding: calc(12px * var(--ui-scale)) calc(20px * var(--ui-scale)) 0;
-  font: var(--text-xs)/1.4 var(--f-sans);
-  letter-spacing: 0.3em;
-  color: var(--gold-500);
-  text-align: center;
-}
-
-.dialogue-choices__caption + .dialogue-choices__rows {
-  padding-top: calc(8px * var(--ui-scale));
-}
-
-/* Keyboard focus on the one tab stop: the card keeps its drop shadow (the
-   global `:focus-visible` ring would replace it with a hard double ring) and
-   its gold frame brightens; the active row's fill and caret carry the rest. */
-.dialogue-choices:focus-visible {
-  border-color: rgba(228, 200, 142, 0.72);
-  box-shadow:
-    var(--shadow-lg),
-    0 0 0 1px rgba(228, 200, 142, 0.18),
-    0 0 calc(22px * var(--ui-scale)) calc(-6px * var(--ui-scale)) var(--gold-glow),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
-    inset 0 1px 0 1px rgba(238, 221, 180, 0.06);
-}
-
-/* The rows scroll inside the card when the stage is too short for them;
-   the card's frame and crest stay put. */
-.dialogue-choices__rows {
-  min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  padding: clamp(8px * var(--ui-scale), 1.3vh, 14px * var(--ui-scale)) calc(10px * var(--ui-scale)) clamp(6px * var(--ui-scale), 0.93vh, 10px * var(--ui-scale));
-  display: flex;
-  flex-direction: column;
-  gap: clamp(2px, 0.37vh, 4px * var(--ui-scale));
-  scrollbar-color: var(--ink-600) transparent;
-  scrollbar-width: thin;
-}
-
-/* The card's crest: a gold hairline across the top edge with a small
-   lozenge at its centre (decorative, like the reference caption card). */
-.dialogue-choices::before {
-  content: "";
-  position: absolute;
-  left: 18%;
-  right: 18%;
-  top: 0;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--gold-400), transparent);
-  pointer-events: none;
-}
-
-.dialogue-choices::after {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: calc(-3px * var(--ui-scale));
-  width: calc(6px * var(--ui-scale));
-  height: calc(6px * var(--ui-scale));
-  margin-left: calc(-3px * var(--ui-scale));
-  transform: rotate(45deg);
-  background: var(--gold-400);
-  box-shadow: 0 0 calc(8px * var(--ui-scale)) var(--gold-glow);
-  pointer-events: none;
-}
-
-/* The card's corner ornaments (webclient-message-typesetting): four small
-   gold brackets just inside the frame, the dock's focus-frame vocabulary
-   (webclient-band-material-pass) at rest strength. They brighten with the
-   frame while the list holds keyboard focus. Decorative and pointer-inert. */
-.dialogue-choices__corners {
-  position: absolute;
-  inset: calc(3px * var(--ui-scale));
-  z-index: 1;
-  pointer-events: none;
-  opacity: 0.55;
-  --corner: rgba(185, 154, 96, 0.9);
-  background:
-    linear-gradient(var(--corner), var(--corner)) top left / calc(8px * var(--ui-scale)) 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top left / 1px calc(8px * var(--ui-scale)) no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top right / calc(8px * var(--ui-scale)) 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) top right / 1px calc(8px * var(--ui-scale)) no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom left / calc(8px * var(--ui-scale)) 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom left / 1px calc(8px * var(--ui-scale)) no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom right / calc(8px * var(--ui-scale)) 1px no-repeat,
-    linear-gradient(var(--corner), var(--corner)) bottom right / 1px calc(8px * var(--ui-scale)) no-repeat;
-  transition: opacity var(--motion-fast) var(--ease-standard);
-}
-
-.dialogue-choices:focus-visible .dialogue-choices__corners {
-  opacity: 1;
-}
-
-.dialogue-choices__row {
-  position: relative;
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: calc(14px * var(--ui-scale));
-  box-sizing: border-box;
-  /* 36px at the 1451x790 reference height and below, growing to 44px on a
-     taller stage, so the seven rows of a four-pick conversation fit the
-     reference stage unscrolled. */
-  min-height: clamp(36px * var(--ui-scale), 4.075vh, 44px * var(--ui-scale));
-  padding: calc(4px * var(--ui-scale)) calc(14px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(26px * var(--ui-scale));
-  border: 1px solid transparent;
-  border-radius: var(--radius-sm);
-  color: var(--paper-100);
-  cursor: pointer;
-  transition:
-    background-color var(--motion-fast) var(--ease-standard),
-    border-color var(--motion-fast) var(--ease-standard);
-}
-
-.dialogue-choices__row:hover {
-  background: rgba(231, 224, 209, 0.05);
-}
-
-/* The trailing rows (or the exits' back row) open under a hairline. */
-.dialogue-choices__row--trailing:not(:first-child) {
-  margin-top: calc(7px * var(--ui-scale));
-}
-
-.dialogue-choices__row--trailing:not(:first-child)::after {
-  content: "";
-  position: absolute;
-  left: calc(12px * var(--ui-scale));
-  right: calc(12px * var(--ui-scale));
-  top: calc(-6px * var(--ui-scale));
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(185, 154, 96, 0.34), transparent);
-  pointer-events: none;
-}
-
-.dialogue-choices__badge {
-  flex: none;
-  display: grid;
-  place-items: center;
-  box-sizing: border-box;
-  width: clamp(24px * var(--ui-scale), 2.593vh, 28px * var(--ui-scale));
-  height: clamp(24px * var(--ui-scale), 2.593vh, 28px * var(--ui-scale));
-  border: 1px solid rgba(185, 154, 96, 0.7);
-  border-radius: var(--radius);
-  background: rgba(185, 154, 96, 0.08);
-  color: var(--gold-400);
-  font: var(--text-md)/1 var(--f-mono);
-}
-
-/* The glyph badges (↦ ✕, exit arrows) read better in the sans face. */
-.dialogue-choices__row:not(.dialogue-choices__row--pick) .dialogue-choices__badge {
-  font: var(--text-base)/1 var(--f-sans);
-}
-
-.dialogue-choices__badge-icon {
-  width: calc(17px * var(--ui-scale));
-  height: calc(17px * var(--ui-scale));
-}
-
-.dialogue-choices__text {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-/* A pick is something the player says: the serif reading face. The
-   trailing rows are commands, set quieter in the sans face. */
-.dialogue-choices__label {
-  font-family: var(--f-serif);
-  font-size: clamp(17px * var(--ui-scale), 1.852vh, 20px * var(--ui-scale));
-  line-height: 1.4;
-  color: var(--paper-50);
-  overflow-wrap: anywhere;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
-}
-
-.dialogue-choices__row:not(.dialogue-choices__row--pick) .dialogue-choices__label {
-  font-family: var(--f-sans);
-  /* The command rows' lower bound is the shared 16px floor
-     (retarget-desktop-viewport-contract D4): a 15px bound would render below
-     it at the reference. */
-  font-size: clamp(16px * var(--ui-scale), 1.574vh, 17px * var(--ui-scale));
-  letter-spacing: 0.04em;
-  color: var(--paper-300);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active .dialogue-choices__label {
-  color: var(--paper-50);
-}
-
-.dialogue-choices__reason {
-  font-family: var(--f-sans);
-  font-size: var(--text-sm);
-  line-height: 1.45;
-  color: var(--seal-400);
-}
-
-/* Leaving is marked on its icon only (webclient-message-typesetting): a
-   seal-tinted badge and cross, never a red frame around the whole row. */
-.dialogue-choices__row--leave .dialogue-choices__badge {
-  border-color: rgba(169, 50, 42, 0.8);
-  background: rgba(169, 50, 42, 0.1);
-  color: var(--seal-400);
-}
-
-.dialogue-choices__badge-icon--leave {
-  width: calc(14px * var(--ui-scale));
-  height: calc(14px * var(--ui-scale));
-}
-
-.dialogue-choices__row[aria-disabled="true"] {
-  cursor: default;
-}
-
-.dialogue-choices__row[aria-disabled="true"] .dialogue-choices__label {
-  color: var(--paper-500);
-}
-
-.dialogue-choices__row[aria-disabled="true"] .dialogue-choices__badge {
-  border-style: dashed;
-  border-color: var(--ink-600);
-  background: transparent;
-  color: var(--paper-500);
-}
-
-/* The initial highlight while the list does not hold focus
-   (webclient-message-typesetting): the active row carries a quiet version
-   of the focused treatment — a faint fill, a hairline frame, and a dim
-   caret — so it reads as where the keys will start, not as a choice made. */
-.dialogue-choices:not(:focus) .dialogue-choices__row--active:not([aria-disabled="true"]) {
-  background: linear-gradient(90deg, rgba(185, 154, 96, 0.12), rgba(185, 154, 96, 0.02));
-  border-color: rgba(185, 154, 96, 0.32);
-}
-
-.dialogue-choices:not(:focus) .dialogue-choices__row--active::before {
-  content: "▸";
-  position: absolute;
-  left: calc(9px * var(--ui-scale));
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--gold-500);
-  font-size: var(--text-sm);
-  opacity: 0.7;
-}
-
-.dialogue-choices:not(:focus) .dialogue-choices__row--active[aria-disabled="true"]::before {
-  color: var(--paper-500);
-}
-
-/* The active row (focus shown by shape and fill, never colour alone): the
-   dock's muted-gold fill and its leading ▸ caret, while the list holds
-   focus. */
-.dialogue-choices:focus .dialogue-choices__row--active {
-  background: linear-gradient(90deg, rgba(185, 154, 96, 0.3), rgba(185, 154, 96, 0.08));
-  border-color: rgba(185, 154, 96, 0.75);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active::before {
-  content: "▸";
-  position: absolute;
-  left: calc(9px * var(--ui-scale));
-  top: 50%;
-  transform: translateY(-50%);
-  color: var(--gold-400);
-  font-size: var(--text-sm);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active .dialogue-choices__badge {
-  border-color: var(--gold-400);
-  background: linear-gradient(180deg, var(--gold-400), var(--gold-500));
-  color: var(--ink-950);
-}
-
-/* A disabled exit keeps its shape when active: a quiet frame and the
-   dashed badge, never the gold fill that promises an action. */
-.dialogue-choices:focus .dialogue-choices__row--active[aria-disabled="true"] {
-  background: rgba(231, 224, 209, 0.05);
-  border-color: var(--ink-600);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active[aria-disabled="true"]::before {
-  color: var(--paper-500);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active[aria-disabled="true"] .dialogue-choices__badge {
-  border-color: var(--paper-700);
-  background: transparent;
-  color: var(--paper-400);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--active[aria-disabled="true"] .dialogue-choices__label {
-  color: var(--paper-300);
-}
-
-.dialogue-choices:focus .dialogue-choices__row--leave.dialogue-choices__row--active .dialogue-choices__badge {
-  border-color: var(--seal-500);
-  background: var(--seal-600);
-  color: var(--paper-50);
-}
-</style>
