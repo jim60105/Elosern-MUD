@@ -33,6 +33,7 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.rooms import Room
 
+import world.rules.monster_ai.candidates as candidates
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -41,6 +42,7 @@ from world.rules.action import (
 )
 from world.rules.buffs import BUFF_DEFINITIONS, apply_buff
 from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.monster_ai import (
     DEFAULT_CANDIDATE_BUDGET,
@@ -136,6 +138,37 @@ GUARDED = replace(
         CastCondition(CastConditionSubject.EACH_TARGET, {"buff_active": SEAL_BUFF_KEY}),
     ),
 )
+#: A damage skill whose damage only ever routes to its own side: its plan is
+#: legal (the self-bound effect still resolves) but it is not an attack.
+ALLY_DAMAGE = replace(
+    MAGIC,
+    key="t_cand_ally_damage",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic", "heal:single"],
+    effect_policies=(
+        EffectPolicy(audience=EffectAudience.ALLIES),
+        EffectPolicy(audience=EffectAudience.SELF),
+    ),
+)
+#: An area skill whose damage audience is the enemy side while its second
+#: effect is self-bound: several submitted rosters route to one combination.
+ENEMY_AUDIENCE = replace(
+    AREA,
+    key="t_cand_enemy_audience",
+    effects=[f"damage:{SYNTH_GLOW_ELEMENT}:magic", "heal:area"],
+    effect_policies=(
+        EffectPolicy(audience=EffectAudience.ENEMIES),
+        EffectPolicy(audience=EffectAudience.SELF),
+    ),
+)
+#: A damage skill naming a buff definition the buff registry does not carry.
+ABSENT_BUFF = replace(
+    MAGIC,
+    key="t_cand_absent_buff",
+    effects=[
+        f"damage:{SYNTH_GLOW_ELEMENT}:magic",
+        "buff_apply:t_cand_no_such_buff",
+    ],
+)
 #: The element-mastery row that entitles the freeform (non-default scale) cast.
 MASTERY = f"{SYNTH_GLOW_ELEMENT}_mastery"
 
@@ -161,6 +194,9 @@ def _candidate_rows() -> dict[str, object]:
             UNRESOLVED,
             HEAL_SELF,
             GUARDED,
+            ALLY_DAMAGE,
+            ENEMY_AUDIENCE,
+            ABSENT_BUFF,
         )
     }
 
@@ -344,6 +380,29 @@ class CandidateShapeTests(unittest.TestCase):
             any("hostile recipient" in (item.detail or "") for item in refused)
         )
 
+    def test_equivalent_routed_combinations_collapse_to_one_candidate(self):
+        # Two different submitted rosters whose effects reach exactly the same
+        # recipients are one audience combination, so they are one candidate.
+        _owned(self.actor, ENEMY_AUDIENCE.key)
+        ally = _ProbeParticipant("t_cand_ally", pk=3)
+        result = _enumerate(self.actor, (self.enemy,), extra_participants=(ally,))
+        self.assertEqual(len(result.candidates), 1)
+        self.assertEqual(result.candidates[0].plan.shorthand, "all-enemies")
+        self.assertEqual(result.examined, 2)
+        self.assertEqual(
+            [item.detail for item in result.rejections],
+            ["supported hostile damage reaches no hostile recipient"],
+        )
+
+    def test_an_unresolved_buff_reference_excludes_the_skill_with_a_reason(self):
+        _owned(self.actor, ABSENT_BUFF.key, MAGIC.key)
+        result = _enumerate(self.actor, (self.enemy,))
+        self.assertEqual(
+            [observation.skill_key for observation in result.unavailable],
+            [ABSENT_BUFF.key],
+        )
+        self.assertEqual([plan.skill_key for plan in result.plans], [MAGIC.key])
+
     def test_implicit_self_and_none_bindings_are_not_widened(self):
         _owned(self.actor, NONE.key, SELF.key)
         result = _enumerate(self.actor, (self.enemy,))
@@ -470,6 +529,27 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertIs(
             result.rejections[0].reason, RejectReason.CAST_CONDITION_UNMET
         )
+
+    def test_the_mandatory_filter_probe_shares_the_candidate_budget(self):
+        # The alternative-attack search is bounded by the same budget and its
+        # examinations are the same proposals the ring examines, so no plan is
+        # ever validated twice and the total stays inside the bound.
+        _owned(self.actor, GUARDED.key, MAGIC.key)
+        counted = []
+        real = candidates.validate_plan
+
+        def counting(*args, **kwargs):
+            counted.append(args)
+            return real(*args, **kwargs)
+
+        with patch.object(candidates, "validate_plan", counting):
+            result = _enumerate(self.actor, self.enemies, budget=1)
+        self.assertEqual(result.examined, 1)
+        self.assertLessEqual(len(counted), 2)
+        with patch.object(candidates, "validate_plan", counting):
+            wide = _enumerate(self.actor, self.enemies, budget=4)
+        self.assertLessEqual(len(counted), 8)
+        self.assertLessEqual(wide.examined, 4)
 
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
@@ -665,6 +745,28 @@ class CandidateRestrictionTests(EvenniaTestCase):
             [plan.target_ids for plan in result.plans],
             [(stable_identity(ordinary),)],
         )
+
+    def test_only_a_supported_hostile_plan_counts_as_the_attack_alternative(self):
+        # The non-strike skill submits a legal plan whose damage only ever
+        # reaches its own side, so it is no attack at all: the displaced first
+        # bearer is removed and the next remaining bearer stays attackable.
+        self._own(ALLY_DAMAGE.key, STRIKE.key)
+        first = self._participant("t_cand_first")
+        second = self._participant("t_cand_second")
+        apply_buff(first, SEAL_BUFF_KEY)
+        apply_buff(second, SEAL_BUFF_KEY)
+        apply_buff(first, DISPLACER)
+        result = self._enumerate((first, second))
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(second),)],
+        )
+
+    def test_a_cold_modifier_read_mounts_no_skill_handler(self):
+        self._own(MAGIC.key)
+        self.monster.__dict__.pop("skills", None)
+        evaluate_combat_modifiers_no_create(self.monster)
+        self.assertNotIn("skills", self.monster.__dict__)
 
     def test_area_groups_are_not_seal_restricted(self):
         self._own(AREA.key)

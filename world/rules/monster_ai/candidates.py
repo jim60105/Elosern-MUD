@@ -48,7 +48,7 @@ from typing import Any, Callable
 from world.lore.elements import ELEMENT_REGISTRY
 from world.rules.action import RejectReason, RejectedAction, plan_effect_audiences
 from world.rules.action_preview import preview_skill
-from world.rules.buffs import has_positional_marker
+from world.rules.buffs import BUFF_DEFINITIONS, has_positional_marker
 from world.rules.monster_ai.legality import validate_plan
 from world.rules.monster_ai.models import (
     DecisionSnapshot,
@@ -64,7 +64,13 @@ from world.rules.monster_behaviour import (
 )
 from world.rules.spell_conditions import is_strike_class
 from world.rules.targeting import Relation, expand_target_shorthand
-from world.skills.effects import DamageEffect, EffectAudience
+from world.skills.effects import (
+    BuffApplyEffect,
+    DamageEffect,
+    EffectAudience,
+    RiteBlessingEffect,
+    SelfBuffApplyEffect,
+)
 from world.skills.registry import FactionConstraint, SkillDef, SkillKind, TargetSpec
 
 #: The authored initial candidate budget (the rulebook's ``candidate_budget``).
@@ -99,6 +105,14 @@ _GROUP_SHORTHANDS = {
 #: The reason an examined plan the shared gates allow is still unusable: the
 #: AI cannot resolve its effects into a supported hostile damage outcome.
 _UNREPRESENTABLE = RejectReason.EFFECT_RESOLUTION_FAILED
+
+#: The parsed effects whose payload names a buff definition the registry must
+#: carry before the plan can mount anything.
+_BUFF_REFERENCE_EFFECTS = (
+    BuffApplyEffect,
+    RiteBlessingEffect,
+    SelfBuffApplyEffect,
+)
 
 #: One cached legality verdict per distinct proposed action.
 _VerdictKey = tuple[str, float, str | None, tuple[str, ...]]
@@ -186,13 +200,67 @@ class CandidateSet:
 
 @dataclass(frozen=True, slots=True)
 class _Proposal:
-    """One deduplicated proposal the family ring may examine."""
+    """One deduplicated proposal the family ring may examine.
+
+    ``routed`` is the plan's per-effect recipient routing (``None`` when the
+    shared audience planner refuses the plan outright). It is what decides both
+    whether the plan reaches a hostile recipient and whether two submissions
+    are actually the same audience combination.
+    """
 
     family: tuple[str, str]
     skill: SkillDef
     plan: PlannedAction
     identity: CandidateIdentity
     recipients: tuple[Any, ...]
+    routed: tuple[tuple[Any, ...], ...] | None
+
+
+def _routed(
+    actor: Any,
+    context: Any,
+    skill: SkillDef,
+    recipients: tuple[Any, ...],
+    reads: DecisionReads,
+) -> tuple[tuple[Any, ...], ...] | None:
+    """Return one plan's per-effect routed recipients, or ``None`` when refused.
+
+    The shared audience planner is the one routing authority: a ``SELF``
+    audience binds the actor, ``ALLIES``/``ENEMIES`` filter the plan's own
+    recipients and an audience condition filters them further. A plan whose
+    every routed audience is empty has no representable outcome at all, which
+    the planner reports by refusing it.
+    """
+    try:
+        return plan_effect_audiences(
+            actor, context, skill, list(recipients), readings=reads
+        )
+    except RejectedAction:
+        # observability: ignore R2: an empty routing is the unrepresentable
+        # outcome this module reports through the plan's own legality
+        return None
+
+
+def _proposal_key(proposal: _Proposal) -> _VerdictKey:
+    """Return the deduplication key of one proposal's submitted action."""
+    plan = proposal.plan
+    return (plan.skill_key, plan.scale, plan.shorthand, plan.target_ids)
+
+
+def _routed_signature(proposal: _Proposal) -> tuple[tuple[str, ...], ...] | None:
+    """Return one plan's actual audience combination, or ``None`` when refused.
+
+    Two submissions that route every effect to the same recipients are the same
+    observable action, however different their submitted rosters are. A refused
+    routing returns ``None`` so the caller falls back to the submitted identity
+    and never collapses unrelated refused plans.
+    """
+    if proposal.routed is None:
+        return None
+    return tuple(
+        tuple(sorted(stable_identity(target) for target in reached))
+        for reached in proposal.routed
+    )
 
 
 def canonical_plan(candidates: CandidateSet) -> PlannedAction | None:
@@ -249,12 +317,13 @@ def enumerate_candidates(
         skill = reader.skill(skill_key)
         if not _is_hostile_damage(skill):
             continue
-        if not _resolves_every_harmful_effect(skill):
+        if not _supports_every_harmful_effect(skill):
             unavailable.append(
                 SkillObservation(
                     skill.key,
                     _UNREPRESENTABLE,
-                    "a potentially harmful effect names an unregistered element",
+                    "a potentially harmful effect names an unregistered "
+                    "element or definition",
                 )
             )
             continue
@@ -265,6 +334,7 @@ def enumerate_candidates(
         skills.append(skill)
 
     verdicts: dict[_VerdictKey, PlanVerdict] = {}
+    outcomes: dict[_VerdictKey, Candidate | CandidateRejection] = {}
 
     def verdict(skill: SkillDef, plan: PlannedAction) -> PlanVerdict:
         key = (skill.key, plan.scale, plan.shorthand, plan.target_ids)
@@ -278,6 +348,13 @@ def enumerate_candidates(
                 reads=reader,
             )
         return verdicts[key]
+
+    def examine(proposal: _Proposal) -> Candidate | CandidateRejection:
+        """One proposal's outcome, computed once per submitted action."""
+        key = _proposal_key(proposal)
+        if key not in outcomes:
+            outcomes[key] = _examine(proposal, actor, context, verdict)
+        return outcomes[key]
 
     singles = [skill for skill in skills if skill.target_spec is TargetSpec.SINGLE]
     displaced = frozenset(
@@ -295,7 +372,16 @@ def enumerate_candidates(
             key=_canonical_seal_order,
         )
     )
-    alternative = _has_castable_nonstrike_alternative(singles, hostile, magnitude, verdict)
+    alternative = _has_castable_nonstrike_alternative(
+        singles,
+        hostile,
+        actor,
+        context,
+        reader,
+        magnitude,
+        examine,
+        limit,
+    )
 
     families: dict[tuple[str, str], list[_Proposal]] = {}
     for skill in skills:
@@ -306,6 +392,7 @@ def enumerate_candidates(
             hostile,
             actor,
             context,
+            reader,
             magnitude,
             declared,
             sealed,
@@ -317,7 +404,7 @@ def enumerate_candidates(
 
     distinct = _deduplicate(families)
     return _allocate(
-        distinct, limit, snapshot, actor, context, roster, reader, verdict, unavailable
+        distinct, limit, snapshot, examine, unavailable
     )
 
 
@@ -328,6 +415,7 @@ def _skill_proposals(
     hostile: tuple[Any, ...],
     actor: Any,
     context: Any,
+    reads: DecisionReads,
     scale: float,
     declared: tuple[str, ...],
     sealed: tuple[Any, ...],
@@ -337,32 +425,46 @@ def _skill_proposals(
     """Return one skill's proposals for the decision's own target shapes."""
     if skill.target_spec is TargetSpec.SINGLE:
         return [
-            _Proposal(
-                (skill.key, KIND_SINGLE),
-                skill,
-                PlannedAction(
-                    skill.key, scale, target_ids=(stable_identity(target),)
-                ),
-                CandidateIdentity(skill.key, scale, (stable_identity(target),)),
-                (target,),
-            )
+            _single_proposal(skill, target, actor, context, reads, scale)
             for target in _single_base(
                 skill, hostile, declared, sealed, displaced, alternative
             )
         ]
     if skill.target_spec is TargetSpec.AREA:
         return _group_proposals(
-            skill, snapshot, pool, actor, context, scale, _is_mixed(skill)
+            skill, snapshot, pool, actor, context, reads, scale, _is_mixed(skill)
         )
+    recipients: tuple[Any, ...] = ()
     return [
         _Proposal(
             (skill.key, KIND_IMPLICIT),
             skill,
             PlannedAction(skill.key, scale),
             CandidateIdentity(skill.key, scale, ()),
-            (),
+            recipients,
+            _routed(actor, context, skill, recipients, reads),
         )
     ]
+
+
+def _single_proposal(
+    skill: SkillDef,
+    target: Any,
+    actor: Any,
+    context: Any,
+    reads: DecisionReads,
+    scale: float,
+) -> _Proposal:
+    """Return one single-target plan for one skill, with its own routing."""
+    recipients = (target,)
+    return _Proposal(
+        (skill.key, KIND_SINGLE),
+        skill,
+        PlannedAction(skill.key, scale, target_ids=(stable_identity(target),)),
+        CandidateIdentity(skill.key, scale, (stable_identity(target),)),
+        recipients,
+        _routed(actor, context, skill, recipients, reads),
+    )
 
 
 def _single_base(
@@ -413,6 +515,7 @@ def _group_proposals(
     pool: tuple[Any, ...],
     actor: Any,
     context: Any,
+    reads: DecisionReads,
     scale: float,
     mixed: bool,
 ) -> list[_Proposal]:
@@ -444,6 +547,7 @@ def _group_proposals(
                     tuple(sorted(stable_identity(entity) for entity in members)),
                 ),
                 members,
+                _routed(actor, context, skill, members, reads),
             )
         )
     return proposals
@@ -479,24 +583,41 @@ def _group_plan(
 def _has_castable_nonstrike_alternative(
     singles: list[SkillDef],
     hostile: tuple[Any, ...],
+    actor: Any,
+    context: Any,
+    reads: DecisionReads,
     scale: float,
-    verdict: Callable[[SkillDef, PlannedAction], PlanVerdict],
+    examine: Callable[[_Proposal], Candidate | CandidateRejection],
+    limit: int,
 ) -> bool:
     """Return whether a genuinely castable non-strike hostile alternative exists.
 
-    "Genuinely castable" is a legal plan, not skill metadata: a self-heal is
-    not a damage skill at all, and an uncastable magic skill has no legal plan
-    against a hostile target, so neither satisfies the alternative-attack
-    condition that keeps displaced targets reachable.
+    "Genuinely castable" means the same thing an accepted candidate means: the
+    shared settlement gates accept the plan *and* its supported damage reaches a
+    hostile recipient. A self-heal is not a damage skill at all, an uncastable
+    magic skill has no accepted plan against a hostile target, and a plan whose
+    damage never routes to an enemy is not an attack, so none of them satisfies
+    the alternative-attack condition that keeps displaced targets reachable.
+
+    The search is bounded by the same candidate budget as the enumeration: it
+    examines at most ``limit`` distinct single-target plans and, when the bound
+    is reached without an answer, reports no alternative -- an exhausted search
+    never claims an attack the kit may not have. The probed plans are the same
+    objects the single-target families propose, so the examination is shared and
+    never paid twice.
     """
+    probed = 0
     for skill in singles:
         if is_strike_class(skill):
             continue
         for target in hostile:
-            plan = PlannedAction(
-                skill.key, scale, target_ids=(stable_identity(target),)
-            )
-            if verdict(skill, plan).legal:
+            if probed >= limit:
+                return False
+            probed += 1
+            if isinstance(
+                examine(_single_proposal(skill, target, actor, context, reads, scale)),
+                Candidate,
+            ):
                 return True
     return False
 
@@ -513,21 +634,6 @@ def _is_hostile_damage(skill: SkillDef | None) -> bool:
         and skill.faction_constraint
         in (FactionConstraint.ANY, FactionConstraint.ENEMY)
         and any(isinstance(effect, DamageEffect) for effect in skill.parsed_effects)
-    )
-
-
-def _resolves_every_harmful_effect(skill: SkillDef) -> bool:
-    """Return whether every damage effect resolves against the live elements.
-
-    A damage effect naming an element the element registry does not carry can
-    never settle (the cast-time parser raises on it), so the skill is
-    unrepresentable: excluding it here keeps an unknown harmful outcome out of
-    scoring instead of letting it fail at settlement.
-    """
-    return all(
-        effect.element is None or effect.element in ELEMENT_REGISTRY
-        for effect in skill.parsed_effects
-        if isinstance(effect, DamageEffect)
     )
 
 
@@ -645,26 +751,70 @@ def _deduplicate(
 ) -> dict[tuple[str, str], list[_Proposal]]:
     """Drop duplicate representations before any slot is allocated.
 
-    One identity keeps exactly one representation, preferring the authored AREA
-    shorthand, so a duplicate can never increase sampling probability and no
-    ring offset can decide which representation survives: the retained shape is
-    chosen here, before allocation and independently of family rotation.
+    Two proposals are the same candidate when they submit the same skill and
+    scale for the same actual audience combination, which is the per-effect
+    routing the shared audience planner derives -- so two different submitted
+    rosters that reach the same recipients (an ``all`` group over an enemy-only
+    roster, or an audience-filtered subset) collapse to one sampling identity.
+    The retained proposal keeps its own submitted identity and runtime
+    representation; only the authored AREA shorthand is preferred, so a
+    duplicate can never increase sampling probability and no ring offset can
+    decide which representation survives. Proposals whose routing the planner
+    refuses collapse by submitted identity instead, never with each other.
     """
     ordered = [
         (family, proposal)
         for family in _family_order(families)
         for proposal in families[family]
     ]
-    best: dict[CandidateIdentity, _Proposal] = {}
+    best: dict[Any, _Proposal] = {}
     for _family, proposal in ordered:
-        current = best.get(proposal.identity)
+        key = _collapse_key(proposal)
+        current = best.get(key)
         if current is None or _representation_rank(proposal) < _representation_rank(current):
-            best[proposal.identity] = proposal
+            best[key] = proposal
     surviving: dict[tuple[str, str], list[_Proposal]] = {}
     for family, proposal in ordered:
-        if best[proposal.identity] is proposal:
+        if best[_collapse_key(proposal)] is proposal:
             surviving.setdefault(family, []).append(proposal)
     return surviving
+
+
+def _collapse_key(proposal: _Proposal) -> Any:
+    """Return the key two proposals are the same candidate under.
+
+    The actual audience combination when the audience planner routed the plan,
+    and the submitted identity otherwise (so refused plans are never collapsed
+    together). Skill and scale always participate: a scaled request is a
+    different action even over the same recipients.
+    """
+    signature = _routed_signature(proposal)
+    if signature is None:
+        return proposal.identity
+    return (proposal.identity.skill_key, proposal.identity.scale, signature)
+
+
+def _supports_every_harmful_effect(skill: SkillDef) -> bool:
+    """Return whether every potentially harmful effect resolves to a definition.
+
+    Two unresolvable harms make a skill unrepresentable for this slice: a damage
+    effect naming an element the element registry does not carry can never
+    settle (the cast-time parser raises on it), and an effect naming a buff
+    definition the buff registry does not carry can never mount one. Excluding
+    the skill here keeps an unknown harmful outcome out of scoring instead of
+    letting it fail at settlement; the outcome models themselves belong to
+    ``monster-ai-damage-estimation``, which extends this boundary.
+    """
+    for effect in skill.parsed_effects:
+        if isinstance(effect, DamageEffect) and (
+            effect.element is not None and effect.element not in ELEMENT_REGISTRY
+        ):
+            return False
+        if isinstance(effect, _BUFF_REFERENCE_EFFECTS) and (
+            effect.buff_key not in BUFF_DEFINITIONS
+        ):
+            return False
+    return True
 
 
 def _representation_rank(proposal: _Proposal) -> tuple[int, int, str]:
@@ -690,14 +840,17 @@ def _allocate(
     families: dict[tuple[str, str], list[_Proposal]],
     limit: int,
     snapshot: DecisionSnapshot,
-    actor: Any,
-    context: Any,
-    roster: dict[str, Any],
-    reads: DecisionReads,
-    verdict: Callable[[SkillDef, PlannedAction], PlanVerdict],
+    examine: Callable[[_Proposal], Candidate | CandidateRejection],
     unavailable: list[SkillObservation],
 ) -> CandidateSet:
-    """Examine deduplicated proposals round-robin until the budget is spent."""
+    """Examine deduplicated proposals round-robin until the budget is spent.
+
+    Every examined proposal is exactly one of a candidate or a rejection, and
+    ``examined`` counts them, so it never exceeds the budget and always equals
+    the two reported lists together. Proposals the mandatory-filter capability
+    probe already resolved are examined again here (they are proposals of this
+    ring) but are never validated twice.
+    """
     canonical = _family_order(families)
     if canonical:
         offset = int(_scope_digest(snapshot), 16) % len(canonical)
@@ -719,14 +872,7 @@ def _allocate(
             progressed = True
             cursors[family] = position + 1
             examined += 1
-            outcome = _examine(
-                families[family][position],
-                actor,
-                context,
-                roster,
-                reads,
-                verdict,
-            )
+            outcome = examine(families[family][position])
             if isinstance(outcome, Candidate):
                 candidates.append(outcome)
             else:
@@ -753,15 +899,13 @@ def _examine(
     proposal: _Proposal,
     actor: Any,
     context: Any,
-    roster: dict[str, Any],
-    reads: DecisionReads,
     verdict: Callable[[SkillDef, PlannedAction], PlanVerdict],
 ) -> Candidate | CandidateRejection:
     """Validate one proposal and refuse a plan the damage model cannot represent."""
     result = verdict(proposal.skill, proposal.plan)
     if not result.legal:
         return CandidateRejection(proposal.identity, result.reason, result.detail)
-    if not _reaches_hostile(actor, context, proposal.skill, proposal.recipients, reads):
+    if not _reaches_hostile(actor, context, proposal.skill, proposal.routed):
         return CandidateRejection(
             proposal.identity,
             _UNREPRESENTABLE,
@@ -774,8 +918,7 @@ def _reaches_hostile(
     actor: Any,
     context: Any,
     skill: SkillDef,
-    recipients: tuple[Any, ...],
-    reads: DecisionReads,
+    routed: tuple[tuple[Any, ...], ...] | None,
 ) -> bool:
     """Return whether one plan delivers supported damage to a hostile recipient.
 
@@ -785,15 +928,7 @@ def _reaches_hostile(
     or an ally -- is a plan the damage model cannot represent, so it is excluded
     rather than scored as if it dealt damage.
     """
-    if not recipients:
-        return False
-    try:
-        routed = plan_effect_audiences(
-            actor, context, skill, list(recipients), readings=reads
-        )
-    except RejectedAction:
-        # observability: ignore R2: every routed audience is empty, which is
-        # exactly the unrepresentable plan this predicate reports
+    if routed is None:
         return False
     for effect, reached in zip(skill.parsed_effects, routed):
         if isinstance(effect, DamageEffect) and any(
