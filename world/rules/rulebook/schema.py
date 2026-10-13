@@ -115,6 +115,38 @@ def load_sectioned_rules(path: Path) -> list[SectionedRule]:
     return rows
 
 
+def owned_keys_for_condition(
+    entity: Any, context: Mapping[str, Any] | None = None
+) -> Any:
+    """Return the owned skill keys a ``skill_owned`` condition resolves against.
+
+    A context that already supplies ``owned_keys`` -- the decision-local read
+    set always does -- answers directly, so the decision path builds nothing
+    and materializes no handler. The resolution is lazy on purpose: ``dict.get``
+    evaluates its default eagerly, so the previous
+    ``context.get("owned_keys", SkillHandler(entity).owned_keys())`` built a
+    skill handler for every ``skill_owned`` condition even when the key set was
+    already supplied.
+
+    A context that declares no ``owned_keys`` resolves through a directly
+    constructed handler, which never mounts the entity's lazy handler. An
+    entity carrying no persisted ``skills`` attribute at all -- a pure fixture
+    with its own skills double -- is read through that double instead, which is
+    the read this condition used before the persisted read was introduced.
+    """
+    if context is not None:
+        supplied = context.get("owned_keys")
+        if supplied is not None:
+            return supplied
+    entity_skills = getattr(entity, "skills", None)
+    persisted = getattr(getattr(entity, "db", None), "skills", None)
+    if persisted is None and entity_skills is not None:
+        return entity_skills.owned_keys()
+    from world.skills.handler import SkillHandler
+
+    return SkillHandler(entity).owned_keys()
+
+
 def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     """Evaluate all recognized conditions in *when* with implicit AND."""
     recognized = {
@@ -153,7 +185,6 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
     if "buff_active" in when:
         checks.append(when["buff_active"] in context.get("active_buffs", set()))
     if "skill_owned" in when:
-        from world.skills.handler import SkillHandler
         from world.skills.restrictions import skill_effect_allowed
 
         entity = context.get("entity")
@@ -166,8 +197,7 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
             entity is not None
             and skill_effect_allowed(entity, when["skill_owned"])
             and (
-                when["skill_owned"]
-                in context.get("owned_keys", SkillHandler(entity).owned_keys())
+                when["skill_owned"] in owned_keys_for_condition(entity, context)
                 or when["skill_owned"] in granted_keys
             )
         )

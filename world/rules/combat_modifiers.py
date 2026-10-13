@@ -21,7 +21,12 @@ from world.rules.equipment_effects import (
     equipment_adjustments,
     worn_item_keys,
 )
-from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
+from world.rules.rulebook.schema import (
+    Rule,
+    evaluate_condition,
+    load_rules,
+    owned_keys_for_condition,
+)
 from world.rules.sexual_state import PLEASURE_CONFIG
 from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
 from world.skills.equipment import dual_wielding_from_storage
@@ -324,10 +329,13 @@ def _conferred_grants(entity: Any) -> Any:
 
 
 def _owned_keys(entity: Any) -> Any:
-    """Read one entity's owned keys without mounting its skill handler."""
-    from world.skills.handler import SkillHandler
+    """Read one entity's owned keys without mounting its skill handler.
 
-    return SkillHandler(entity).owned_keys()
+    Shares the ``skill_owned`` condition's own resolver, so an entity whose
+    persisted store carries no ``skills`` attribute reads through its skills
+    double instead of a directly constructed handler.
+    """
+    return owned_keys_for_condition(entity)
 
 
 def matched_combat_modifiers(
