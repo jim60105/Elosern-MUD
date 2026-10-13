@@ -530,6 +530,12 @@ def environment_header(*, baseline_commit: str, configuration_fingerprint: str,
     """
     import evennia
 
+    # The installed package publishes its version as ``__version__`` (the
+    # historical ``VERSION`` attribute is absent), so the header records the
+    # real dependency version instead of an "unknown" placeholder.
+    version = getattr(evennia, "__version__", None) or getattr(
+        evennia, "VERSION", "unknown"
+    )
     return {
         "schema": "monster-ai-manual-evidence/1",
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -537,7 +543,7 @@ def environment_header(*, baseline_commit: str, configuration_fingerprint: str,
         "algorithm_version": algorithm_version,
         "configuration_fingerprint": configuration_fingerprint,
         "python_version": platform.python_version(),
-        "evennia_version": getattr(evennia, "VERSION", "unknown"),
+        "evennia_version": str(version),
         "host": {
             "node": platform.node(),
             "platform": platform.platform(),
