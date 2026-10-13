@@ -632,6 +632,49 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(result.exclusions, ())
         self.assertEqual(len(result.rejections), 1)
 
+    def test_a_paid_examination_is_never_lost_to_a_later_proposal(self):
+        # The family proposes the other target first and the budget is spent,
+        # so the ring cannot reach the plan it already paid for: that plan is
+        # still a candidate, and no restriction removed it.
+        _owned(self.actor, MAGIC.key)
+        first = _ProbeParticipant("t_cand_first", pk=1)
+        second = _ProbeParticipant("t_cand_second", pk=2)
+        result = _enumerate(
+            self.actor,
+            (first, second),
+            order=(stable_identity(second), stable_identity(first)),
+            budget=1,
+        )
+        self.assertEqual(result.examined, 1)
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(first),)],
+        )
+        self.assertEqual(result.exclusions, ())
+        self.assertEqual(result.omitted_targets, 1)
+
+    def test_a_paid_candidate_survives_every_scope_offset(self):
+        _owned(self.actor, MAGIC.key, STRIKE.key)
+        reported = {
+            tuple(
+                sorted(
+                    candidate.identity.target_ids[0]
+                    for candidate in _enumerate(
+                        self.actor, self.enemies[:2], budget=1, scope_index=index
+                    ).candidates
+                )
+            )
+            for index in range(8)
+        }
+        self.assertEqual(len(reported), 1)
+        self.assertTrue(next(iter(reported)))
+        for index in range(8):
+            result = _enumerate(
+                self.actor, self.enemies[:2], budget=1, scope_index=index
+            )
+            self.assertEqual(result.exclusions, (), index)
+            self.assertEqual(result.examined, 1)
+
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
         result = _enumerate(self.actor, self.enemies, budget=2)

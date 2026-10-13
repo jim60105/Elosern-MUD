@@ -298,10 +298,15 @@ def _routed(
         return None
 
 
+def _plan_key(plan: PlannedAction) -> _VerdictKey:
+    """Return the deduplication key of one submitted action."""
+    return (plan.skill_key, plan.scale, plan.shorthand, plan.target_ids)
+
+
 def _proposal_key(proposal: _Proposal) -> _VerdictKey:
     """Return the deduplication key of one proposal's submitted action."""
     plan = proposal.plan
-    return (plan.skill_key, plan.scale, plan.shorthand, plan.target_ids)
+    return _plan_key(plan)
 
 
 def _routed_signature(proposal: _Proposal) -> tuple[tuple[str, ...], ...] | None:
@@ -468,13 +473,31 @@ def enumerate_candidates(
     candidates, cursors = _allocate(
         distinct, snapshot, outcome, admit
     )
+    # An examined, legal plan stays a candidate even when the budget ran out
+    # before the ring reached its family: reporting it as a mandatory-filter
+    # exclusion would blame a restriction that never removed it.
+    seen = {_plan_key(candidate.plan) for candidate in candidates}
+    for family in _family_order(distinct):
+        for proposal in distinct[family]:
+            key = _proposal_key(proposal)
+            examined = ledger.get(key)
+            if isinstance(examined, Candidate) and key not in seen:
+                seen.add(key)
+                candidates += (examined,)
+
+    proposed = {
+        _proposal_key(proposal)
+        for family in distinct
+        for proposal in distinct[family]
+    }
     rejections = tuple(
         item for item in ledger.values() if isinstance(item, CandidateRejection)
     )
     exclusions = tuple(
         CandidateExclusion(item.identity, MANDATORY_RESTRICTION)
         for item in ledger.values()
-        if isinstance(item, Candidate) and item not in candidates
+        if isinstance(item, Candidate)
+        and _plan_key(item.plan) not in proposed
     )
     omitted = [
         proposal
@@ -897,12 +920,17 @@ def _collapse_key(proposal: _Proposal) -> Any:
 def _roster_sensitive(skill: SkillDef) -> bool:
     """Return whether settlement gates one skill on its submitted roster.
 
-    A resistible interaction is contested once per non-actor submitted target
-    and a resisting target cancels the whole action, so two plans whose effects
-    route to the same recipients can still settle differently when their
-    submitted rosters differ; such actions keep their submitted identity and are
-    never collapsed onto each other.
+    A resist contest runs once per non-actor submitted target and a resisting
+    target cancels the whole action, so two plans whose effects route to the
+    same recipients can still settle differently when their submitted rosters
+    differ; such actions keep their submitted identity and are never collapsed
+    onto each other. The condition mirrors the settlement gate's own: the
+    skill's key in ``SEXUAL_ACT_REGISTRY`` with ``resistible``, or a generic
+    resistible interaction.
     """
+    act = SEXUAL_ACT_REGISTRY.get(skill.key)
+    if act is not None and act.resistible:
+        return True
     interaction = skill.interaction
     return bool(interaction is not None and interaction.resistible)
 
@@ -966,7 +994,10 @@ def _allocate(
     was walked, so the caller can report what the budget left unexamined. A
     proposal the mandatory-filter capability search already examined is admitted
     without charging another slot -- it is the same examination, and the ledger
-    already reports it.
+    already reports it. A proposal the budget cannot pay for is skipped in
+    place (its cursor stays put, so it is reported as unexamined) rather than
+    ending the walk: a later family may still hold an examination that was
+    already paid for.
     """
     canonical = _family_order(families)
     if canonical:
@@ -983,7 +1014,7 @@ def _allocate(
             if position >= len(families[family]):
                 continue
             if not admit(families[family][position]):
-                return tuple(candidates), cursors
+                continue
             progressed = True
             cursors[family] = position + 1
             examined = outcome(families[family][position])
