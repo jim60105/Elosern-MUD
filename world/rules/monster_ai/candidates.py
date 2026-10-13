@@ -46,7 +46,12 @@ from math import isfinite
 from typing import Any, Callable
 
 from world.lore.elements import ELEMENT_REGISTRY
-from world.rules.action import RejectReason, RejectedAction, plan_effect_audiences
+from world.rules.action import (
+    RejectReason,
+    RejectedAction,
+    plan_effect_audiences,
+    resist_contest,
+)
 from world.rules.action_preview import preview_skill
 from world.rules.buffs import BUFF_DEFINITIONS, has_positional_marker
 from world.rules.monster_ai.legality import validate_plan
@@ -98,6 +103,11 @@ _FAMILY_KINDS: tuple[str, ...] = (
     KIND_SINGLE,
     KIND_IMPLICIT,
 )
+#: The family kinds whose one skill contributes several representations of the
+#: same action, so their submissions may collapse onto one audience
+#: combination. The implicit binding and every SINGLE target keep their
+#: submitted identity: a single plan's target *is* what settlement gates.
+_GROUP_KINDS: frozenset[str] = frozenset((KIND_HOSTILE, KIND_FRIENDLY, KIND_COMPLETE))
 
 #: The approved AREA shorthand whose expansion is exactly each group kind.
 _GROUP_SHORTHANDS = {
@@ -251,7 +261,11 @@ class CandidateSet:
 
     @property
     def plans(self) -> tuple[PlannedAction, ...]:
-        """Every legal candidate's runtime request, in ring order."""
+        """Every legal candidate's runtime request, in ring order.
+
+        The ring's own walk first, then the already-examined plans an exhausted
+        budget left behind a blocked cursor, in ring order as well.
+        """
         return tuple(candidate.plan for candidate in self.candidates)
 
 
@@ -470,15 +484,19 @@ def enumerate_candidates(
             families.setdefault(proposal.family, []).append(proposal)
 
     distinct = _deduplicate(families)
-    candidates, cursors = _allocate(
-        distinct, snapshot, outcome, admit
-    )
+    ring = _ring_order(distinct, snapshot)
+    candidates, cursors = _allocate(distinct, ring, outcome, admit)
     # An examined, legal plan stays a candidate even when the budget ran out
     # before the ring reached its family: reporting it as a mandatory-filter
-    # exclusion would blame a restriction that never removed it.
+    # exclusion would blame a restriction that never removed it. The walk above
+    # already collects every already-paid outcome its cursors can reach; this
+    # fallback collects the paid plans a cursor hides, in ring order and without
+    # examining anything fresh or advancing a cursor (an unaffordable proposal
+    # at a cursor blocks the rest of its family, and that hole must keep
+    # counting as unexamined).
     seen = {_plan_key(candidate.plan) for candidate in candidates}
-    for family in _family_order(distinct):
-        for proposal in distinct[family]:
+    for family in ring:
+        for proposal in distinct[family][cursors[family] :]:
             key = _proposal_key(proposal)
             examined = ledger.get(key)
             if isinstance(examined, Candidate) and key not in seen:
@@ -904,15 +922,26 @@ def _deduplicate(
 def _collapse_key(proposal: _Proposal) -> Any:
     """Return the key two proposals are the same candidate under.
 
-    The actual audience combination when the audience planner routed the plan,
-    and the submitted identity otherwise (so refused plans are never collapsed
-    together). Skill and scale always participate: a scaled request is a
-    different action even over the same recipients. A roster-sensitive skill
-    keeps its submitted identity too, because settlement gates it on the
-    submitted roster rather than on the routed recipients alone.
+    A group representation (hostile, friendly or complete, the AREA audiences
+    one skill authors several times over) collapses onto the actual audience
+    combination the planner routed, so two submitted group rosters that route
+    every effect to the same recipients are one candidate. Every other
+    proposal keeps its submitted identity: a refused routing is never
+    collapsed, a SINGLE plan is gated on its own submitted target, a scaled
+    request is a different action even over the same recipients, and a
+    roster-sensitive skill settles on its submitted roster rather than on the
+    routed recipients alone.
+
+    Restricting the routing equivalence to group kinds is what makes the
+    retained representation's legality establishable: the group kinds rank
+    hostile before friendly before complete, and each later kind's submitted
+    roster is a superset of an earlier one's, so the surviving representation
+    of a collapsed class is its least constrained member.
     """
+    if proposal.family[1] not in _GROUP_KINDS or _roster_sensitive(proposal.skill):
+        return proposal.identity
     signature = _routed_signature(proposal)
-    if signature is None or _roster_sensitive(proposal.skill):
+    if signature is None:
         return proposal.identity
     return (proposal.identity.skill_key, proposal.identity.scale, signature)
 
@@ -920,19 +949,17 @@ def _collapse_key(proposal: _Proposal) -> Any:
 def _roster_sensitive(skill: SkillDef) -> bool:
     """Return whether settlement gates one skill on its submitted roster.
 
-    A resist contest runs once per non-actor submitted target and a resisting
-    target cancels the whole action, so two plans whose effects route to the
-    same recipients can still settle differently when their submitted rosters
-    differ; such actions keep their submitted identity and are never collapsed
-    onto each other. The condition mirrors the settlement gate's own: the
-    skill's key in ``SEXUAL_ACT_REGISTRY`` with ``resistible``, or a generic
-    resistible interaction.
+    A resist contest runs once per non-actor submitted target, and a resisting
+    target either has its own effects withheld or cancels the whole action, so
+    two plans whose effects route to the same recipients can still settle
+    differently when their submitted rosters differ; such actions keep their
+    submitted identity and are never collapsed onto each other. The
+    classification is settlement's own -- ``world.rules.action.resist_contest``
+    reads the same catalog and generic branches the step-4b gate does -- rather
+    than a second copy that could drift from it.
     """
-    act = SEXUAL_ACT_REGISTRY.get(skill.key)
-    if act is not None and act.resistible:
-        return True
-    interaction = skill.interaction
-    return bool(interaction is not None and interaction.resistible)
+    catalog_act, generic_resistible = resist_contest(skill)
+    return catalog_act or generic_resistible
 
 
 def _supports_every_harmful_effect(skill: SkillDef) -> bool:
@@ -964,10 +991,18 @@ def _supports_every_harmful_effect(skill: SkillDef) -> bool:
 
 
 def _representation_rank(proposal: _Proposal) -> tuple[int, int, str]:
-    """Return one proposal's representation preference (shorthand first)."""
+    """Return one proposal's representation preference.
+
+    The family kind ranks first, so a collapsed class keeps its least
+    constrained group: the hostile roster is a subset of the complete one and
+    the friendly roster is too, so settlement's per-submitted-target gates
+    cannot reject the retained representation while accepting a collapsed
+    sibling. Within one kind the authored AREA shorthand wins over an
+    equivalent explicit roster, and explicit identifiers order the remainder.
+    """
     return (
-        0 if proposal.plan.shorthand is not None else 1,
         _FAMILY_KINDS.index(proposal.family[1]),
+        0 if proposal.plan.shorthand is not None else 1,
         proposal.plan.shorthand or ",".join(proposal.identity.target_ids),
     )
 
@@ -982,29 +1017,44 @@ def _family_order(
     )
 
 
-def _allocate(
+def _ring_order(
     families: dict[tuple[str, str], list[_Proposal]],
     snapshot: DecisionSnapshot,
+) -> list[tuple[str, str]]:
+    """Return the canonical family order rotated by the scope's digest offset.
+
+    A rotation visits every family exactly once per pass whatever the offset,
+    so the ring decides only which family a spent budget reaches first. The
+    offset is the execution scope's deterministic digest -- never a selection
+    or combat RNG draw.
+    """
+    canonical = _family_order(families)
+    if not canonical:
+        return []
+    offset = int(_scope_digest(snapshot), 16) % len(canonical)
+    return canonical[offset:] + canonical[:offset]
+
+
+def _allocate(
+    families: dict[tuple[str, str], list[_Proposal]],
+    ring: list[tuple[str, str]],
     outcome: Callable[[_Proposal], Candidate | CandidateRejection],
     admit: Callable[[_Proposal], bool],
 ) -> tuple[tuple[Candidate, ...], dict[tuple[str, str], int]]:
     """Examine deduplicated proposals round-robin while the budget allows.
 
-    Returns the ring's legal candidates in ring order and how far each family
+    ``ring`` is the family order the decision walks (see :func:`_ring_order`).
+    Returns that walk's legal candidates in ring order and how far each family
     was walked, so the caller can report what the budget left unexamined. A
     proposal the mandatory-filter capability search already examined is admitted
     without charging another slot -- it is the same examination, and the ledger
     already reports it. A proposal the budget cannot pay for is skipped in
     place (its cursor stays put, so it is reported as unexamined) rather than
     ending the walk: a later family may still hold an examination that was
-    already paid for.
+    already paid for. A paid plan behind such a hole is out of the walk's reach,
+    because the cursor never leaves the first proposal a family cannot pay for;
+    the caller collects that one without advancing any cursor.
     """
-    canonical = _family_order(families)
-    if canonical:
-        offset = int(_scope_digest(snapshot), 16) % len(canonical)
-        ring = canonical[offset:] + canonical[:offset]
-    else:
-        ring = []
     cursors = dict.fromkeys(ring, 0)
     candidates: list[Candidate] = []
     while True:
