@@ -54,7 +54,7 @@ from world.rules.monster_ai import (
     roster_index,
     stable_identity,
 )
-from world.rules.monster_ai.candidates import SEAL_BUFF_KEY
+from world.rules.monster_ai.candidates import MANDATORY_RESTRICTION, SEAL_BUFF_KEY
 from world.rules.progression import FREEFORM_SCALE_VALUES
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
 from world.skills.effects import EffectAudience, EffectPolicy, InteractionPolicy
@@ -758,6 +758,8 @@ class CandidateBudgetTests(unittest.TestCase):
             ([(stable_identity(first),)], (), 1),
         )
         self.assertEqual(result.examined, 1)
+        self.assertTrue(result.exhausted)
+        self.assertEqual(result.omitted_families, 1)
 
     def test_a_paid_candidate_survives_every_scope_offset(self):
         # An unexamined family precedes the family whose plan the capability
@@ -789,6 +791,30 @@ class CandidateBudgetTests(unittest.TestCase):
             outcomes,
             {(((stable_identity(self.enemies[0]),),), (), 1, 3, 2)},
         )
+
+    def test_a_mandatory_filter_removed_plan_is_an_exclusion(self):
+        # The mandatory seal narrowing drops the other hostile target from
+        # every family, so the plan the capability search had already paid for
+        # against it is the one genuine restriction exclusion -- the
+        # counterpart of a paid plan that stays a candidate.
+        _owned(self.actor, MAGIC.key)
+        removed = _ProbeParticipant("t_cand_first", pk=1)
+        sealed = _ProbeParticipant("t_cand_second", pk=2)
+        _sealed(sealed)
+        result = _enumerate(self.actor, (removed, sealed))
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(sealed),)],
+        )
+        self.assertEqual(
+            [
+                (exclusion.identity.target_ids, exclusion.reason)
+                for exclusion in result.exclusions
+            ],
+            [((stable_identity(removed),), MANDATORY_RESTRICTION)],
+        )
+        self.assertEqual(result.rejections, ())
+        self.assertEqual(result.examined, 2)
 
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
