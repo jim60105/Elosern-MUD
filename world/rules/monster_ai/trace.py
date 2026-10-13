@@ -40,6 +40,8 @@ class TracePlan:
     target_ids: tuple[str, ...]
     score: float
     damage: float
+    healing: float
+    control: float
     preference: float
     finishing: float
     cost: float
@@ -55,6 +57,8 @@ class TracePlan:
             "target_ids": list(self.target_ids),
             "score": self.score,
             "damage": self.damage,
+            "healing": self.healing,
+            "control": self.control,
             "preference": self.preference,
             "finishing": self.finishing,
             "cost": self.cost,
@@ -177,6 +181,8 @@ def trace_plan(scored: ScoredCandidate) -> TracePlan:
         target_ids=tuple(scored.identity.target_ids),
         score=scored.score,
         damage=scored.damage,
+        healing=scored.healing,
+        control=scored.control,
         preference=scored.preference,
         finishing=scored.finishing,
         cost=scored.cost,

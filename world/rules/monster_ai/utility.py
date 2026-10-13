@@ -3,13 +3,18 @@
 One monster decision asks this module which of its legal, estimated candidates
 is worth taking. The score is exactly the authored one:
 
-``U = w_damage * damage + w_preference * preference
-     + i * (w_kill * finishing - w_cost * cost - w_waste * waste)``
+``U = w_damage * damage + w_heal * healing + w_preference * preference
+     + i * (w_kill * finishing + w_control * control
+            - w_cost * cost - w_waste * waste)``
 
 with ``i = intelligence / 100``. The health terms are the estimator's own
 signed, bounded features, so the damage term is positive for harm dealt to the
 enemy side and negative for harm dealt to the actor's own side, and the
-discipline term (finishing, cost, waste) scales with how clever the variant is:
+recovery term is positive for health restored to the actor's own side and
+negative for health handed to the enemy. Recovery is deliberately *unscaled*:
+a useful heal is worth taking however instinctive its caster is. The recovery
+and control features are the estimator's own, and the discipline term
+(finishing, control, cost, waste) scales with how clever the variant is:
 intelligence buys no stats, no ownership, no legality and no power, it only
 changes how the same legal options are valued.
 
@@ -102,6 +107,8 @@ class ScoredCandidate:
     candidate: Candidate
     score: float
     damage: float
+    healing: float
+    control: float
     preference: float
     finishing: float
     cost: float
@@ -147,6 +154,8 @@ def normalized_ranks(
 def attack_utility(
     *,
     damage: float,
+    healing: float = 0.0,
+    control: float = 0.0,
     preference: float,
     finishing: float,
     cost: float,
@@ -159,11 +168,19 @@ def attack_utility(
     ``weights`` is the archetype's authored :class:`UtilityWeights` (every
     weight finite and non-negative, validated at startup); ``intelligence`` is
     the variant's resolved explicit 0..100 value. ``damage`` is the estimator's
-    signed health feature, while ``finishing``, ``cost`` and ``waste`` are the
-    positive magnitudes the formula subtracts or credits.
+    signed health feature and ``healing`` the estimator's signed recovery
+    feature, while ``control`` is its bounded marginal control feature,
+    ``finishing``, ``cost`` and ``waste`` are the positive magnitudes the
+    formula subtracts or credits and ``preference`` is the archetype's own soft
+    bias.
+
+    Recovery is valued as an unscaled baseline -- a heal is useful however
+    instinctive its caster is -- while control joins finishing, cost and waste
+    inside the intelligence-scaled discipline term, so only a cleverer variant
+    weighs a denial or a buff more heavily.
     """
     initiative = _unit_intelligence(intelligence)
-    terms = (damage, preference, finishing, cost, waste)
+    terms = (damage, healing, control, preference, finishing, cost, waste)
     if not all(isfinite(term) for term in terms):
         raise MonsterAIStateError(f"a utility term is not finite: {terms!r}")
     if min(finishing, cost, waste) < 0:
@@ -173,10 +190,12 @@ def attack_utility(
         )
     score = (
         _weight(weights, "damage") * damage
+        + _weight(weights, "heal") * healing
         + _weight(weights, "preference") * preference
         + initiative
         * (
             _weight(weights, "kill") * finishing
+            + _weight(weights, "control") * control
             - _weight(weights, "cost") * cost
             - _weight(weights, "waste") * waste
         )
@@ -277,6 +296,8 @@ def _score(
     damage = estimate.damage.value
     score = attack_utility(
         damage=damage,
+        healing=estimate.healing.value,
+        control=estimate.control.value,
         preference=preference,
         finishing=estimate.finishing,
         cost=estimate.cost,
@@ -288,6 +309,8 @@ def _score(
         candidate=candidate,
         score=score,
         damage=damage,
+        healing=estimate.healing.value,
+        control=estimate.control.value,
         preference=preference,
         finishing=estimate.finishing,
         cost=estimate.cost,

@@ -9,7 +9,7 @@ of equipment contributions.
 """
 
 import math
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 import re
 from typing import Any
@@ -174,17 +174,31 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     return context
 
 
-def evaluate_combat_modifiers_no_create(entity: Any) -> dict[str, Any]:
+def evaluate_combat_modifiers_no_create(
+    entity: Any,
+    *,
+    active_buffs: Iterable[str] | None = None,
+) -> dict[str, Any]:
     """Return the merged matching bundle from stored state without handlers.
 
     The equipment fold reads only ``entity.db.equipment`` through the
     accessor's fail-closed normalization, so the no-create contract (no
     handler materialization, no writes) holds for the equipment contribution
     too.
+
+    ``active_buffs`` overrides the stored active-buff key set for one
+    hypothetical evaluation (a decision asking what a not-yet-mounted effect
+    would change). Everything else -- including the grant scaling, the
+    restriction ceilings and the equipment fold -- stays the one merge this
+    module owns, so a hypothetical bundle can never drift from the real one.
     """
-    bundles = [adjustments for _, adjustments in matched_combat_modifiers(
-        entity, context=build_no_create_condition_context(entity)
-    )]
+    context = build_no_create_condition_context(entity)
+    if active_buffs is not None:
+        context["active_buffs"] = frozenset(active_buffs)
+    bundles = [
+        adjustments
+        for _, adjustments in matched_combat_modifiers(entity, context=context)
+    ]
     return _restriction_aware_merge(entity, bundles)
 
 
@@ -396,6 +410,17 @@ def matched_combat_modifiers(
 def combat_modifier_predicates() -> dict[str, dict[str, Any]]:
     """Return current rule predicates for read-only source attribution."""
     return {rule.id: dict(rule.when) for rule in _RULES}
+
+
+def combat_modifier_rules() -> tuple[tuple[str, dict[str, Any], dict[str, Any]], ...]:
+    """Return every rule's id with its predicate and assignment, read-only.
+
+    The whole validated table, for a consumer that has to reason about what a
+    rule *would* assign rather than what an entity currently reads through it
+    (the monster-AI tuning fingerprint, which has to cover the table a
+    hypothetical mount is projected from).
+    """
+    return tuple((rule.id, dict(rule.when), dict(rule.then)) for rule in _RULES)
 
 
 def evaluate_combat_modifiers(entity) -> dict[str, Any]:
