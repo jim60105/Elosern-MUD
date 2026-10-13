@@ -1,15 +1,16 @@
 // The shared derived-shape helper for the scene overview family
 // (webclient-scene-overview-component design D7; the showcase rule that a
 // story is bound to the same reducer-derived shape the live wiring passes).
-// Every SceneOverview, PresenceRail, and ChoiceCard story builds its args
-// here, by running the real `overviewMenu` / `presenceEntries` /
+// Every PresenceRail, ExitCompass, and ChoiceCard story builds its args
+// here, by running the real `presenceEntries` /
 // `verbMenuFor` / `waitItems` / `suggestionsMenu` of the exploration-menu
 // model over a synthesized `exploration` panel. Every value is a fixed
 // literal: no live server, LLM, or image data.
 import ExplorationMenu from "../../lib/exploration_menu.js";
 import { resolveTargets } from "../../components/compass-model.js";
 import { localMapModelFor } from "./local_map.js";
-import { BACK_ROW, overflowCardRows, verbCardRows } from "../../composables/use-person-focus.js";
+import { overflowCardRows, verbCardRows } from "../../composables/use-person-focus.js";
+import { suggestionsCardContent, waitCardRows } from "../../composables/use-room-actions.js";
 
 const DIRECTION_LABELS = ["北", "東", "南", "西", "東北", "西北", "東南", "西南", "上", "下"];
 
@@ -65,16 +66,6 @@ export function localMapFixture(nodes) {
   return { nodes: nodes.map(([id, label]) => ({ id, label })) };
 }
 
-// SceneOverview args: the overview menu exactly as the exploration root's
-// resolver will return it.
-export function overviewArgs(panel, { currentNode = "room:900", suggestions = null, focusedKey = null, active = true } = {}) {
-  return {
-    menu: ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }),
-    focusedKey,
-    active,
-  };
-}
-
 // PresenceRail args (exploration-presence-rail): the rail entries exactly as
 // the store publishes them. `portraits` maps an identity to a committed
 // catalog key (the exploration panel's schema v3 still publishes
@@ -102,32 +93,25 @@ export function overflowCardArgs(panel) {
   return { rows, trailingIndex: rows.length - 1, caption: "在場", ariaLabel: "其餘在場者與物件" };
 }
 
-// A builder menu's rows on the card (the wait and suggestions menus, whose
-// own back row becomes the trailing `✕ 返回`).
-function menuCardRows(items) {
-  const rows = items
-    .filter((item) => !item.goBack)
-    .map((item, index) => ({
-      key: item.key,
-      label: item.label,
-      badge: String(index + 1),
-      kind: "verb",
-      enabled: item.enabled !== false,
-      reason: item.enabled === false ? (item.disabledReason && item.disabledReason.message) || item.description : null,
-    }));
-  return [...rows, BACK_ROW];
-}
-
-// ChoiceCard args for the wait menu (the card change 3 opens from the place
-// card) and the suggestions list.
-export function waitCardArgs() {
-  const rows = menuCardRows(ExplorationMenu.waitItems());
-  return { rows, trailingIndex: rows.length - 1, caption: "等待", ariaLabel: "等待與休息" };
+// ChoiceCard args for the wait card and the suggestions card
+// (exploration-room-actions): the builders' rows mapped exactly as the room
+// actions' wiring maps them.
+export function waitCardArgs({ locked = false } = {}) {
+  const rows = waitCardRows(ExplorationMenu.waitItems().filter((item) => !item.goBack), locked);
+  return { rows, trailingIndex: rows.length - 1, caption: "等待", ariaLabel: "等待與休息", testId: "wait-card" };
 }
 
 export function suggestionsCardArgs(suggestions) {
-  const rows = menuCardRows(ExplorationMenu.suggestionsMenu(suggestions).items);
-  return { rows, trailingIndex: rows.length - 1, caption: "建議", ariaLabel: "建議" };
+  const items = ExplorationMenu.suggestionsMenu(suggestions).items.filter((item) => !item.goBack);
+  const content = suggestionsCardContent({ status: suggestions.status, items });
+  return {
+    rows: content.rows,
+    notes: content.notes,
+    trailingIndex: content.trailingIndex,
+    caption: "建議",
+    ariaLabel: "建議",
+    testId: "suggestions-card",
+  };
 }
 
 // ExitCompass args (exploration-exit-compass): the compass targets exactly as
