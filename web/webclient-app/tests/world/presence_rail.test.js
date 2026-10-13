@@ -87,6 +87,16 @@ describe("PresenceRail", () => {
     expect(wolf.get('[data-testid="presence-entry-initial"]').text()).toBe("霧");
   });
 
+  it("a portrait that fails to load falls back to the initial", async () => {
+    const entries = entriesFor(ROOM).map((entry) =>
+      entry.key === "target-11" ? { ...entry, portraitRef: "npc_11" } : entry,
+    );
+    const w = mountRail({ entries, artPanel: { portrait_catalog: { npc_11: FACE } } });
+    await slots(w)[0].get('[data-testid="presence-entry-face"]').trigger("error");
+    expect(slots(w)[0].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(slots(w)[0].get('[data-testid="presence-entry-initial"]').text()).toBe("葛");
+  });
+
   it("seven entries show five and a ＋2 slot", () => {
     const crowd = {
       targets: [1, 2, 3, 4, 5].map((n) => ({ identity: n, name: `旅人${n}`, affordances: [] })),

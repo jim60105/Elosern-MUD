@@ -1344,6 +1344,17 @@ export default {
   overflow: hidden;
 }
 
+/* In exploration the plate names the person in focus (exploration-presence-
+   rail) above the centred reading column, so it takes the page's own
+   geometry: the same centred measure and side padding, its name starting
+   where the text starts. */
+.message-window[data-mode="exploration"] .message-window__plate {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: calc(24px * var(--ui-scale));
+}
+
 /* The name's underline (webclient-message-typesetting): it starts exactly
    at the name's left edge, where the text column starts, holds gold under
    the name, and fades out a little past the bond stage, so the rule belongs

@@ -36,6 +36,13 @@ const idPrefix = useId();
 const slots = computed(() => railSlots(props.entries));
 const activeIndex = ref(0);
 const focused = ref(false);
+// Portrait URLs that failed to load: their medallion falls back to the
+// initial instead of an empty circle.
+const failedUrls = ref(new Set());
+
+function onFaceError(url) {
+  failedUrls.value = new Set([...failedUrls.value, url]);
+}
 
 // The rendered items: every slot, with the separator standing before the
 // first object slot (when anything precedes it).
@@ -70,7 +77,7 @@ function portrait(slot) {
     return null;
   }
   const entry = portraitFor(props.artPanel, slot.portraitRef);
-  return entry && entry.url ? entry : null;
+  return entry && entry.url && !failedUrls.value.has(entry.url) ? entry : null;
 }
 
 function initial(slot) {
@@ -242,6 +249,7 @@ defineExpose({ focus, focusEntry });
               :src="portrait(item.slot).url"
               alt=""
               :style="faceStyle(portrait(item.slot))"
+              @error="onFaceError(portrait(item.slot).url)"
             />
             <span v-else class="presence-rail__initial" data-testid="presence-entry-initial">{{ initial(item.slot) }}</span>
           </span>
