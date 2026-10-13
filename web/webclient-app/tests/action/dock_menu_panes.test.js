@@ -42,10 +42,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     );
   }
 
-  const cardItems = [
-    { key: "action-explore.talk_freeform", label: "交談", enabled: true, action_id: "explore.talk_freeform" },
-    { key: "action-options.dismiss", label: "✕ 清除建議", enabled: true, action_id: "options.dismiss" },
-  ];
   const skillItems = [
     { key: "skill-fire", label: "火球術", enabled: true, action_id: "open-skill", cost_text: "MP 20" },
     { key: "skill-heal", label: "治癒", enabled: false, action_id: "open-skill", cost_text: "MP 8", disabled_reason: { code: "cooldown", message: "冷卻中" } },
@@ -68,11 +64,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "trait-hp", label: "HP 100 / 100", enabled: true, navigation: true, surface: "trait-hp" },
     { key: "trait-mp", label: "MP 40 / 40", enabled: true, navigation: true, surface: "trait-mp" },
   ];
-
-  it("cards: rows equal the committed suggestion-card items in order", () => {
-    const w = mountMenu(cardItems, "exploration-row");
-    assertRowsInOrder(w, cardItems, "exploration-row");
-  });
 
   it("skills: rows equal the committed skill items in order, disabled row keeps its reason", () => {
     // The detail pane (combat-detail) renders only with a focused skill; the
@@ -141,7 +132,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
   // rendered element (the script-setup computed is closed, so `wrapper.vm` is
   // not relied upon).
   const PANE_SELECTORS = {
-    cards: ".dock-menu__cards",
     skills: ".dock-menu__skills",
     targets: ".dock-menu__targets",
     scales: ".dock-menu__scales",
@@ -161,7 +151,6 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
 
   it("every kind with gridCols emits repeat(n, 1fr); no gridCols emits none", () => {
     const stretchCases = [
-      { items: cardItems, sel: PANE_SELECTORS.cards, expected: "repeat(2, 1fr)" },
       { items: skillItems, sel: PANE_SELECTORS.skills, expected: "repeat(2, 1fr)" },
       { items: targetItems, sel: PANE_SELECTORS.targets, expected: "repeat(2, 1fr)" },
       { items: scaleItems, sel: PANE_SELECTORS.scales, expected: "repeat(2, 1fr)" },

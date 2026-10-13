@@ -9,10 +9,18 @@
 // location); the card only renders it, with the `位置：--` / `時間：--`
 // placeholders when nothing is committed.
 //
-// Display-only: no control, no tab stop, no dispatch. The card sizes to its
-// content (heading, rule, time) at the column's width; an overlong label is
-// truncated with an ellipsis while the heading keeps the full text for
-// assistive technology (and as its `title`).
+// Display-first (exploration-room-actions design D3): the card states the
+// place and the time, and only while `actionsEnabled` (exploration mode with
+// the exploration panel available) it carries two room actions — a 查看房間
+// magnifier button beside the heading and a 等待 hourglass button beside the
+// time. They emit `look-room` and `wait`; the card dispatches nothing itself.
+// Each reports its readout content through `hover` (null when the pointer or
+// focus leaves) and Tab / Shift+Tab through `tab`, so the exploration screen
+// can chain its zones. In every other state the card has no control and no
+// tab stop. The card sizes to its content (heading, rule, time) at the
+// column's width; an overlong label is truncated with an ellipsis while the
+// heading keeps the full text for assistive technology (and as its
+// `title`); the buttons never squeeze the heading's accessible name.
 //
 // A new location (webclient-scene-transitions, design D3) slides the new
 // heading in from the left while the previous one fades out in the same grid
@@ -20,6 +28,7 @@
 // change of the world time alone never animates.
 import { computed } from "vue";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
+import { PLACE_LOOK_READOUT, PLACE_WAIT_READOUT } from "./exploration-readout.js";
 
 const props = defineProps({
   locationLabel: { type: String, default: null },
@@ -29,7 +38,18 @@ const props = defineProps({
   // phase, so the final state is on screen in the commit's frame (a CSS
   // phase would outlive the commit by a double frame even at 0s).
   motionLevel: { type: String, default: "full" },
+  // The room actions render only while true (exploration-room-actions).
+  actionsEnabled: { type: Boolean, default: false },
 });
+
+const emit = defineEmits(["look-room", "wait", "hover", "tab"]);
+
+function onTab(event, which) {
+  if (event.key !== "Tab" || event.ctrlKey || event.altKey || event.metaKey) {
+    return;
+  }
+  emit("tab", { event, which, backward: event.shiftKey });
+}
 
 const location = computed(() => props.locationLabel || "位置：--");
 const time = computed(() => props.timeLabel || "時間：--");
@@ -38,7 +58,12 @@ const transitionCss = computed(() => props.motionLevel !== "off");
 </script>
 
 <template>
-  <section class="place-card" data-testid="place-card" aria-label="目前位置">
+  <section
+    class="place-card"
+    :class="{ 'place-card--actions': actionsEnabled }"
+    data-testid="place-card"
+    aria-label="目前位置"
+  >
     <Transition name="place-card" :css="transitionCss" v-bind="inertWhileLeaving">
       <h1
         :key="location"
@@ -47,8 +72,48 @@ const transitionCss = computed(() => props.motionLevel !== "off");
         :title="location"
       >{{ location }}</h1>
     </Transition>
+    <button
+      v-if="actionsEnabled"
+      type="button"
+      class="place-card__action place-card__action--look"
+      data-testid="place-card-look"
+      aria-label="查看房間"
+      title="查看房間"
+      @click="emit('look-room')"
+      @keydown.enter.stop
+      @keydown.space.stop
+      @keydown="onTab($event, 'look')"
+      @mouseenter="emit('hover', PLACE_LOOK_READOUT)"
+      @mouseleave="emit('hover', null)"
+      @focus="emit('hover', PLACE_LOOK_READOUT)"
+      @blur="emit('hover', null)"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6" />
+        <path d="M15 15l5.5 5.5" />
+      </svg>
+    </button>
     <span class="place-card__rule" data-testid="place-card__rule" aria-hidden="true"></span>
     <p class="place-card__time" data-testid="place-card__time">{{ time }}</p>
+    <button
+      v-if="actionsEnabled"
+      type="button"
+      class="place-card__action place-card__action--wait"
+      data-testid="place-card-wait"
+      @click="emit('wait', $event.currentTarget)"
+      @keydown.enter.stop
+      @keydown.space.stop
+      @keydown="onTab($event, 'wait')"
+      @mouseenter="emit('hover', PLACE_WAIT_READOUT)"
+      @mouseleave="emit('hover', null)"
+      @focus="emit('hover', PLACE_WAIT_READOUT)"
+      @blur="emit('hover', null)"
+    >
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9" />
+      </svg>
+      <span class="place-card__action-label">等待</span>
+    </button>
   </section>
 </template>
 
@@ -112,10 +177,69 @@ const transitionCss = computed(() => props.motionLevel !== "off");
    clock never jitters as the minutes turn. */
 .place-card__time {
   grid-area: 3 / 1;
+  align-self: center;
   font: var(--text-sm)/1.35 var(--f-num);
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: 0.06em;
   color: var(--paper-500);
+}
+
+/* The room actions (exploration-room-actions design D3): a second column
+   holds the 查看房間 magnifier beside the heading and the 等待 hourglass
+   beside the time. The heading and the time keep the first column, so the
+   buttons never truncate the heading's accessible name (its ellipsis is the
+   visible text only). Quiet outlined controls with the band's 3:1 rule. */
+.place-card--actions {
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: calc(8px * var(--ui-scale));
+}
+.place-card--actions .place-card__rule {
+  grid-column: 1 / -1;
+}
+.place-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(4px * var(--ui-scale));
+  box-sizing: border-box;
+  height: calc(30px * var(--ui-scale));
+  min-width: calc(30px * var(--ui-scale));
+  padding: 0 calc(6px * var(--ui-scale));
+  background: transparent;
+  border: 1px solid #736b5c;
+  border-radius: var(--radius-sm);
+  color: var(--paper-200);
+  font: var(--text-xs)/1 var(--f-sans);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.place-card__action--look {
+  grid-area: 1 / 2;
+  align-self: center;
+}
+.place-card__action--wait {
+  grid-area: 3 / 2;
+  align-self: center;
+  padding-right: calc(8px * var(--ui-scale));
+}
+.place-card__action svg {
+  flex: none;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+}
+.place-card__action:hover,
+.place-card__action:focus-visible {
+  border-color: var(--gold-500);
+  background: var(--gold-glow);
+  color: var(--paper-50);
+  outline: none;
+}
+.place-card__action:focus-visible {
+  box-shadow: 0 0 0 1px var(--gold-400);
 }
 
 /* The location change (webclient-scene-transitions, design D3). The two

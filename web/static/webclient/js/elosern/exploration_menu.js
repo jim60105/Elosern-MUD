@@ -2,9 +2,9 @@
  * Elosern DOM-independent exploration-menu model.
  *
  * Reduces a validated `exploration` panel into the logical keyboard menus
- * consumed by KeyboardRouter: the bounded exit list and look room/entity/
- * object rows (the scene overview's chip builders), the wait/rest submenu,
- * the suggestions frame, and each interact target's server-authored
+ * builders the exploration screen reads outside the keyboard router: the
+ * bounded exit list and look room/entity/object rows, the wait card's rows,
+ * the suggestions card's rows, and each interact target's server-authored
  * affordances (交談, engage, party, delivery, or a navigate-kind guild/shop
  * service entry). Move payloads carry the canonical
  * `current_node` supplied by the local-map panel so `explore.move` passes its
@@ -20,15 +20,15 @@
  * a dock frame, so `navigationItems` is the bar's own builder and outlives the
  * retired tab root (webclient-retire-exploration-submenus).
  *
- * The AVG scene overview (webclient-scene-overview-component, AVG stage
- * design §7): `overviewMenu` is the footer (查看房間 ‧ 等待／休息 ‧ 建議) as
- * ONE menu with a `sections` index and `geometry: "sections"` for the
- * router; it is the exploration root the resolver serves. The exits are the
- * exit compass's (`exitTargets`, exploration-exit-compass), and the people
- * and objects are the presence rail's (`presenceEntries`,
- * exploration-presence-rail), both outside the router's root frame.
- * `verbMenuFor` is an interact target's verb card (the target's affordances
- * plus 查看).
+ * The exploration screen (scene overview redesign; exploration-room-actions):
+ * the router's exploration root is an empty menu, and every exploration row
+ * lives outside it. The exits are the exit compass's (`exitTargets`,
+ * exploration-exit-compass); the people and objects are the presence rail's
+ * (`presenceEntries`, exploration-presence-rail); the room's 查看房間 row
+ * (`lookItems`), the wait rows (`waitItems`), and the suggestions rows
+ * (`suggestionsMenu`) are the place card's, the wait card's, and the
+ * suggestions card's (exploration-room-actions). `verbMenuFor` is an
+ * interact target's verb card (the target's affordances plus 查看).
  *
  * No `document` or `window` access at load time; Node tests exercise the model
  * directly and the GoldenLayout exploration dock binds it to the keyboard
@@ -45,10 +45,8 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  // The final cell of every pushed exploration frame: a pointer affordance
-  // that pops exactly one router frame back to the parent menu (Escape remains
-  // the keyboard fast path). The scene overview is the root frame and carries
-  // no back row.
+  // The trailing back cell the builders append (the verb card and the cards
+  // drop it and draw their own `✕ 返回` row).
   function backItem() {
     return {
       key: "back",
@@ -165,7 +163,7 @@
   }
 
   // -------------------------------------------------------------------------
-  // Wait/rest submenu.
+  // Wait rows (the wait card, exploration-room-actions design D5).
   // -------------------------------------------------------------------------
 
   function waitItems() {
@@ -491,12 +489,11 @@
   }
 
   // -------------------------------------------------------------------------
-  // Suggestions menu (H3 webclient-hud-03-action-dock): the `建議` root
-  // entry's frame — the committed `context_actions.suggestions` envelope
-  // becomes a keyboard-reachable router frame: cards as rows, the `✕ 清除建議`
-  // dismiss row (`options.dismiss`, `{}`), and a back row. `generating` is
-  // one disabled row; `degraded` keeps its muted note and the zero-card
-  // empty-state line; `unavailable` means the root entry is absent.
+  // Suggestions rows (the suggestions card, exploration-room-actions design
+  // D4): the committed `context_actions.suggestions` envelope's cards as
+  // rows, the dismiss row (`options.dismiss`, `{}`), and a back row.
+  // `generating` is one disabled row; `degraded` keeps the zero-card
+  // empty-state line; `unavailable` means no card and no 建議 pill.
   // -------------------------------------------------------------------------
 
   function cardItems(suggestions) {
@@ -592,75 +589,6 @@
   }
 
   // -------------------------------------------------------------------------
-  // Scene overview (webclient-scene-overview-component design D1).
-  // -------------------------------------------------------------------------
-
-  // One flat menu: the label-less footer (the exits left for the exit
-  // compass, exploration-exit-compass; the people and objects for the
-  // presence rail, exploration-presence-rail), with `sections: [{key, label,
-  // count}]` naming it. Item shapes reuse the existing builders so payloads
-  // stay byte-identical. `geometry: "sections"` tells the router how the
-  // arrow keys cross rows; the menu carries no `grid` flag, so focus projects
-  // as a list (the focus index is the reading-order index).
-  function overviewMenu(panel, options) {
-    options = options || {};
-    var suggestions = options.suggestions || null;
-    var sections = [];
-    var items = [];
-
-    function addSection(key, label, rows) {
-      if (rows.length === 0) {
-        return;
-      }
-      sections.push({ key: key, label: label, count: rows.length });
-      Array.prototype.push.apply(items, rows);
-    }
-
-    var lookRows = lookItems(panel);
-
-    // Footer: 查看房間, 等待／休息, and 建議 (N) while suggestions are not
-    // `unavailable`. The 查看房間 chip is `lookItems`' room row, which needs
-    // `look.room`: the OOB v2 schema guarantees a non-null room on every
-    // available panel (`validateExplorationLook` requires the exact room
-    // fields), and `wait` is unconditional, so the footer is never empty.
-    var footer = lookRows.filter(function (item) {
-      return item.key === "look-room";
-    });
-    footer.push({
-      key: "wait",
-      label: "等待／休息",
-      enabled: true,
-      actionId: null,
-      payload: null,
-      openSubmenu: "wait",
-    });
-    var status = suggestions && suggestions.status;
-    if (status && status !== "unavailable") {
-      var cards =
-        (status === "ready" || status === "degraded") && Array.isArray(suggestions.cards)
-          ? suggestions.cards.length
-          : 0;
-      footer.push({
-        key: "suggestions",
-        label: cards > 0 ? "建議 (" + cards + ")" : "建議",
-        enabled: true,
-        actionId: null,
-        payload: null,
-        openSubmenu: "suggestions",
-      });
-    }
-    addSection("footer", null, footer);
-
-    return {
-      items: items,
-      sections: sections,
-      geometry: "sections",
-      focusKey: null,
-      title: "場景",
-    };
-  }
-
-  // -------------------------------------------------------------------------
   // Presence rail (exploration-presence-rail design D2/D7; scene overview
   // redesign §4.1): who and what is in the room, in the retired 人物 / 物件
   // rows' reading order — every interact target, then each present entity
@@ -735,29 +663,15 @@
 
   function buildMenus(panel, options) {
     options = options || {};
-    var currentNode = options.currentNode || null;
-    var suggestions = options.suggestions || null;
-    // The exploration root is the scene overview (`overviewMenu`, resolved as
-    // `exploration.root`), so this model carries only the pushed frames: the
-    // wait/rest submenu and — when the envelope is not `unavailable` — the
-    // suggestions frame.
-    var model = {
+    // The router frames this model once carried (the wait and suggestions
+    // frames) are retired (exploration-room-actions): the model keeps the
+    // committed panel and current node the verb card and the target lookup
+    // read.
+    return {
       panel: panel,
-      currentNode: currentNode,
-      menus: {
-        wait: {
-          items: waitItems(),
-          focusKey: null,
-          grid: true,
-          gridCols: 2,
-          title: "等待",
-        },
-      },
+      currentNode: options.currentNode || null,
+      menus: {},
     };
-    if (suggestions && suggestions.status && suggestions.status !== "unavailable") {
-      model.menus.suggestions = suggestionsMenu(suggestions);
-    }
-    return model;
   }
 
   function targetById(model, identity) {
@@ -779,7 +693,6 @@
      waitItems: waitItems,
      targetMenuFor: targetMenuFor,
      verbMenuFor: verbMenuFor,
-     overviewMenu: overviewMenu,
      presenceEntries: presenceEntries,
      targetById: targetById,
      normalizeDirection: normalizeDirection,

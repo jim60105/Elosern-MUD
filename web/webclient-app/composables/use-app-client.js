@@ -16,6 +16,7 @@ import { useDrawers } from "./use-drawers.js";
 import { useDock } from "./use-dock.js";
 import { useExitCompass } from "./use-exit-compass.js";
 import { usePersonFocus } from "./use-person-focus.js";
+import { useRoomActions } from "./use-room-actions.js";
 import { useModeChange } from "./use-mode-change.js";
 import { useNpcPersonaEditor } from "./use-npc-persona-editor.js";
 import { useSkillUse } from "./use-skill-use.js";
@@ -46,12 +47,7 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
     ...restWait,
     ...useOverlays(store, { panelAvailable }),
     ...useDrawers(store, { panel, panelAvailable }),
-    ...useDock(store, {
-      panel,
-      dispatchIntent,
-      openRestForm: restWait.openRestForm,
-      shellRef,
-    }),
+    ...useDock(store, { panel, dispatchIntent }),
     ...useIntentHandlers(store, dispatchIntent),
     // The NPC author editor (npc-persona-editor-window): its own correlated
     // read/update state machine over the single store dispatch entry.
@@ -68,6 +64,16 @@ export function useAppClient(store, shellRef, sceneBackdropRef) {
       compassRef,
       onRailHover: compass.onRailHover,
       showReadoutFlash: compass.showReadoutFlash,
+    }),
+    // The place card's room actions, the 建議 pill, the wait and suggestions
+    // cards, and the exploration Tab chain (exploration-room-actions).
+    ...useRoomActions(store, {
+      panelAvailable,
+      dispatchIntent,
+      skipDisabled: restWait.skipDisabled,
+      compassRef,
+      onPlaceHover: compass.onPlaceHover,
+      onPillHover: compass.onPillHover,
     }),
   };
 }

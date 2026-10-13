@@ -11,8 +11,6 @@ import { createPinia, setActivePinia } from "pinia";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import ActionDock from "../components/ActionDock.vue";
-import SceneOverview from "../components/SceneOverview.vue";
-import ExplorationMenu from "../lib/exploration_menu.js";
 import { useElosernStore } from "../stores/elosern.js";
 import * as fx from "./store/protocol_fixtures.js";
 
@@ -77,9 +75,11 @@ describe("the command region collapses in dialogue mode (store keys)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("keeps the exploration overview as the dock's only frame and shows it again on leaving", () => {
+  it("keeps the exploration root as the dock's only frame and shows it again on leaving", () => {
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.rootMenu.items.map((item) => item.key)).toContain("look-room");
+    expect(store.view.dockSource).toBe("exploration.root");
+    // The root carries no row (exploration-room-actions).
+    expect(store.view.rootMenu.items).toEqual([]);
     expect(store.view.rootMenu.items.map((item) => item.key)).not.toContain("exit-east");
     expect(store.view.explorationExits.map((item) => item.key)).toContain("exit-east");
     store.receive(
@@ -95,8 +95,10 @@ describe("the command region collapses in dialogue mode (store keys)", () => {
     );
     expect(store.view.mode).toBe("exploration");
     expect(store.view.dockDepth).toBe(1);
-    // Back in exploration the router owns the arrows again.
-    expect(store.focusPress("ArrowRight", false)).toBe(true);
+    // Back in exploration the router owns its keys again (Escape at the
+    // root), while no root row claims an arrow.
+    expect(store.focusPress("Escape", false)).toBe(true);
+    expect(store.focusPress("ArrowRight", false)).toBe(false);
   });
 });
 
@@ -106,10 +108,6 @@ describe("the collapsed dock keeps its ordinary form", () => {
     { key: "wait", label: "等待／休息", enabled: true },
   ];
   const VIEW = { dockDepth: 1, dockTrail: [], activeSubDock: null };
-  const OVERVIEW = ExplorationMenu.overviewMenu(fx.explorationPanel(), {
-    currentNode: "room:42",
-    suggestions: null,
-  });
   let wrapper;
 
   afterEach(() => {
@@ -117,13 +115,13 @@ describe("the collapsed dock keeps its ordinary form", () => {
     wrapper = null;
   });
 
-  it("renders the overview and the single ordinary legend, never a dialogue form", () => {
+  it("renders the exploration pane and the single ordinary legend, never a dialogue form", () => {
     wrapper = mount(ActionDock, {
       props: { mode: "dialogue", rootItems: ROOT_ITEMS, view: VIEW },
-      slots: { default: () => [h(SceneOverview, { menu: OVERVIEW })] },
+      slots: { default: () => [h("div", { "data-testid": "exploration-root" })] },
     });
     expect(wrapper.find('[data-pane-kind="commands"]').exists()).toBe(false);
-    expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="exploration-root"]').exists()).toBe(true);
     const legends = wrapper.findAll('[data-testid="action-dock-description"]');
     expect(legends).toHaveLength(1);
     expect(legends[0].text()).toBe("數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回");

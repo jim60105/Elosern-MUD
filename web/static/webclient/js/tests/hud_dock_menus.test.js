@@ -192,20 +192,12 @@ test("router.trail() lists every stacked frame title in push order", () => {
 
 // ---------------------------------------------------------------- titles
 
-test("exploration menus carry fixed breadcrumb titles", () => {
-  const model = ExplorationMenu.buildMenus(explorationPanel(), {
-    currentNode: "room:3",
-    suggestions: suggestionsEnvelope("unavailable"),
-  });
-  // The exploration root is the scene overview (webclient-scene-overview-swap)
-  // and the retired move/look/interact frames are gone
-  // (webclient-retire-exploration-submenus): the model carries the pushed
-  // wait/rest submenu.
-  assert.equal(
-    ExplorationMenu.overviewMenu(model.panel, { currentNode: "room:3" }).title,
-    "場景"
-  );
-  assert.equal(model.menus.wait.title, "等待");
+test("exploration builders carry fixed titles", () => {
+  // exploration-room-actions: the exploration root is an empty router menu
+  // (the resolver's), and the wait and suggestions frames are retired; the
+  // suggestions builder keeps its title for the card it feeds.
+  const model = ExplorationMenu.buildMenus(explorationPanel(), { currentNode: "room:3" });
+  assert.deepEqual(model.menus, {});
   assert.equal(ExplorationMenu.suggestionsMenu(suggestionsEnvelope("generating")).title, "建議");
 });
 
@@ -271,9 +263,9 @@ test("creation and character menus carry fixed breadcrumb titles", () => {
   assert.equal(walletRow.label, "錢包：1234 銅");
 });
 
-// ---------------------------------------------------------------- suggestions frame
+// ---------------------------------------------------------------- suggestions rows
 
-test("suggestions frame: generating shows one disabled row", () => {
+test("suggestions rows: generating shows one disabled row", () => {
   const menu = ExplorationMenu.suggestionsMenu(suggestionsEnvelope("generating"));
   assert.deepEqual(
     menu.items.map((item) => item.key),
@@ -284,7 +276,7 @@ test("suggestions frame: generating shows one disabled row", () => {
   assert.equal(menu.title, "建議");
 });
 
-test("suggestions frame: ready lists card rows plus dismiss", () => {
+test("suggestions rows: ready lists card rows plus dismiss", () => {
   const cards = [
     {
       kind: "known_action",
@@ -305,39 +297,15 @@ test("suggestions frame: ready lists card rows plus dismiss", () => {
   assert.deepEqual(menu.items[1].payload, { npc_id: 5, speech: "和南門守衛交談" });
   assert.equal(menu.items[2].actionId, "options.dismiss");
   assert.deepEqual(menu.items[2].payload, {});
-  // The footer's 建議 chip appears for the non-unavailable statuses (the
-  // scene overview is the root frame; the retired tab root carried the entry
-  // before webclient-scene-overview-swap).
-  const root = ExplorationMenu.overviewMenu(explorationPanel(), {
-    currentNode: "room:3",
-    suggestions: suggestionsEnvelope("ready", cards),
-  });
-  const keys = root.items.map((item) => item.key);
-  assert.ok(keys.includes("suggestions"));
-  const suggItem = root.items.find((item) => item.key === "suggestions");
-  assert.equal(suggItem.openSubmenu, "suggestions");
 });
 
-test("suggestions frame: degraded with zero cards keeps the muted empty line", () => {
+test("suggestions rows: degraded with zero cards keeps the muted empty line", () => {
   const menu = ExplorationMenu.suggestionsMenu(suggestionsEnvelope("degraded"));
   assert.deepEqual(
     menu.items.map((item) => item.key),
     ["suggestions-empty", "action-options.dismiss", "back"]
   );
   assert.equal(menu.items[0].enabled, false);
-});
-
-test("suggestions unavailable: no root entry, no menu", () => {
-  const root = ExplorationMenu.overviewMenu(explorationPanel(), {
-    currentNode: "room:3",
-    suggestions: suggestionsEnvelope("unavailable"),
-  });
-  assert.ok(!root.items.some((item) => item.key === "suggestions"));
-  const model = ExplorationMenu.buildMenus(explorationPanel(), {
-    currentNode: "room:3",
-    suggestions: suggestionsEnvelope("unavailable"),
-  });
-  assert.equal(model.menus.suggestions, undefined);
 });
 
 // ---------------------------------------------------------------- geometry

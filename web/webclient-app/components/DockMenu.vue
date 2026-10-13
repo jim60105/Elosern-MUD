@@ -3,12 +3,12 @@
 // row container carries the listbox role, the single tab stop,
 // `aria-activedescendant`, and `data-testid="dock-menu"`. The pane renders
 // its rows by pane kind (task 5.1): `commands` (the combat root, category,
-// and group lists — webclient-combat-command-window) / `cards` / `skills` /
-// `targets` / `scales` / `confirm` / `plain`. The exploration root is not a DockMenu frame at all —
-// it is the scene overview component (webclient-scene-overview-swap), whose
-// exit chips replaced the retired move frame's exit outlet; a target's
-// affordances render on the stage's verb card, not here
-// (exploration-presence-rail).
+// and group lists — webclient-combat-command-window) / `skills` /
+// `targets` / `scales` / `confirm` / `plain`. The exploration root is not a
+// DockMenu frame at all — it is the exit compass's pane, an empty router
+// menu (exploration-room-actions); a target's affordances render on the
+// stage's verb card (exploration-presence-rail), and the suggestions on the
+// centred suggestions card, not here.
 //
 // Every row keeps the preserved `#<idPrefix>-<i>` row id and the
 // `data-item-key` identity (defined in exactly one place, task 5.2). The
@@ -18,7 +18,6 @@ import { computed, nextTick, watch } from "vue";
 import { classifyPane } from "./dock-panes.js";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
-import OptionCard from "./OptionCard.vue";
 
 const props = defineProps({
   items: { type: Array, required: true },
@@ -180,34 +179,6 @@ watch(
           <span v-if="row.item.enabled === false" class="dock-menu__command-unavailable" aria-hidden="true">無法使用</span>
           <span v-if="row.item.enabled === false && row.reason" class="visually-hidden">{{ row.reason }}</span>
         </button>
-      </div>
-
-      <!-- CARDS: the suggestions frame (task 5.7): the `.sug` card in row
-           mode (`role="option"` + row id) — a card is a listbox option. -->
-      <div v-else-if="paneKind === 'cards'" class="dock-menu__cards" :style="paneGridStyle">
-        <template v-for="row in rows" :key="row.key">
-          <OptionCard
-            v-if="row.intent"
-            :id="row.rowId"
-            :item-key="row.key"
-            :card="row.item"
-            :focused="row.key === focusedKey"
-            :row-mode="true"
-            @focus="onCellFocus"
-            @activate="(k) => onCellActivate(k, row)"
-          />
-          <button
-            v-else
-            :id="row.rowId"
-            type="button"
-            role="option"
-            :aria-selected="row.key === focusedKey"
-            :data-item-key="row.key"
-            tabindex="-1"
-            class="dock-menu__card-nav"
-            @click="onCellClick(row)"
-          >{{ row.item.label }}</button>
-        </template>
       </div>
 
       <!-- SKILLS: the master-detail skill rows (task 6.4): label and cost
@@ -391,20 +362,6 @@ watch(
   outline-offset: 2px;
 }
 
-.dock-menu__card-nav {
-  min-height: calc(36px * var(--ui-scale));
-  padding: calc(8px * var(--ui-scale)) calc(12px * var(--ui-scale));
-  color: var(--paper-300);
-  background: var(--panel-hi);
-  border: var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.dock-menu__card-nav[aria-selected="true"] {
-  color: var(--gold-400);
-  border-color: var(--gold-500);
-}
-
 /* COMMANDS (webclient-combat-command-window): the JRPG command window — a
    single column of glyph + label rows set in the serif face, the focused row
    in a muted-gold wash with a gold caret, a neutral tabular count. */
@@ -520,13 +477,6 @@ watch(
   font-family: var(--f-sans);
   font-size: var(--text-xs);
   letter-spacing: 0;
-}
-
-/* CARDS (task 5.7): the `.sug` card in row mode (OptionCard). */
-.dock-menu__cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(210px * var(--ui-scale), 100%), 1fr));
-  gap: calc(10px * var(--ui-scale));
 }
 
 /* SKILLS (task 6.4): the draft's `.sk` rows beside the detail pane. */

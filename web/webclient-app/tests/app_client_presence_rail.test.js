@@ -226,7 +226,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(wrapper.get('[data-testid="exploration-readout"]').attributes("data-flash")).toBe("true");
   });
 
-  it("a committed move closes the card and returns the dock to the new room's overview", async () => {
+  it("a committed move closes the card and leaves the dock on the new room's exploration root", async () => {
     await mountWith();
     store.activatePresence("target-7");
     await settle();
@@ -236,7 +236,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     });
     expect(card().exists()).toBe(false);
     expect(store.view.dockSource).toBe("exploration.root");
-    expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(true);
+    expect(wrapper.find('#action-dock [data-testid="exploration-root"]').exists()).toBe(true);
   });
 
   it("交談 hands the same standee element to the dialogue screen", async () => {
@@ -325,18 +325,52 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(compass.classes()).not.toContain("exit-compass--inactive");
   });
 
-  it("Tab walks compass → rail → footer, and Shift+Tab walks back", async () => {
+  it("Tab walks compass → rail → 查看房間 → 等待 → 建議, and Shift+Tab walks back", async () => {
     await mountWith();
     const compass = wrapper.get('[data-testid="exit-compass"]').element;
-    const list = wrapper.get('#action-dock [data-testid="scene-overview"] [role="listbox"]').element;
+    const look = wrapper.get('[data-anchor="map"] [data-testid="place-card-look"]').element;
+    const wait = wrapper.get('[data-anchor="map"] [data-testid="place-card-wait"]').element;
+    const pill = wrapper.get('#action-dock [data-testid="suggestions-pill"]').element;
     compass.focus();
     key(compass, "Tab");
     expect(document.activeElement).toBe(rail().element);
     key(rail().element, "Tab");
-    expect(document.activeElement).toBe(list);
-    key(list, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(look);
+    key(look, "Tab");
+    expect(document.activeElement).toBe(wait);
+    key(wait, "Tab");
+    expect(document.activeElement).toBe(pill);
+    key(pill, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(wait);
+    key(wait, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(look);
+    key(look, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(rail().element);
     key(rail().element, "Tab", { shiftKey: true });
     expect(document.activeElement).toBe(compass);
+  });
+
+  it("the Tab chain skips a zone that is absent or inert", async () => {
+    await mountWith();
+    const compass = wrapper.get('[data-testid="exit-compass"]').element;
+    const look = wrapper.get('[data-anchor="map"] [data-testid="place-card-look"]').element;
+    // An empty room: no rail, so the compass hands over to 查看房間.
+    await commit({ exploration: exploration({ interact: [], look: { ...exploration().look, entities: [], objects: [] } }) });
+    expect(rail().exists()).toBe(false);
+    compass.focus();
+    key(compass, "Tab");
+    expect(document.activeElement).toBe(look);
+    key(look, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(compass);
+    // An inert map anchor (person focus takes the place card away): the
+    // chain skips the place card's buttons.
+    wrapper.get('[data-anchor="map"]').element.setAttribute("inert", "");
+    const pill = wrapper.get('#action-dock [data-testid="suggestions-pill"]').element;
+    compass.focus();
+    key(compass, "Tab");
+    expect(document.activeElement).toBe(pill);
+    key(pill, "Tab", { shiftKey: true });
+    expect(document.activeElement).toBe(compass);
+    wrapper.get('[data-anchor="map"]').element.removeAttribute("inert");
   });
 });

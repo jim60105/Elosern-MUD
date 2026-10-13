@@ -63,26 +63,18 @@ describe("frameless 背包 drawer (composition contract)", () => {
     store.setSender(fx.createFakeSender());
   });
 
-  it("keeps keyboard traversal on visible overview chips after moving reference entries", async () => {
+  it("keeps the reference entries on the top bar and no row in the exploration dock", async () => {
     mountAppClient();
     commitPanels();
     await wrapper.vm.$nextTick();
     const dock = wrapper.get("#action-dock");
-    // The exploration root is the scene overview (webclient-scene-overview-
-    // swap): its chips are the dock's rendered rows in reading order.
-    // The exits are the exit compass's (exploration-exit-compass), the
-    // people and objects the presence rail's (exploration-presence-rail).
-    const keys = ["look-room", "wait", "suggestions"];
-    expect(dock.findAll('[role="option"]').map((item) => item.attributes("data-item-key"))).toEqual(keys);
-    for (const key of keys.slice(0, -1)) {
-      expect(store.view.focus.key).toBe(key);
-      expect(dock.find(`[data-item-key="${key}"][aria-selected="true"]`).exists()).toBe(true);
-      store.focusPress("ArrowRight");
-      await wrapper.vm.$nextTick();
-    }
-    expect(store.view.focus.key).toBe("suggestions");
-    store.focusPress("ArrowLeft");
-    expect(store.view.focus.key).toBe("wait");
+    // The exploration root is an empty router menu (exploration-room-
+    // actions): the exits are the exit compass's, the people and objects the
+    // presence rail's, and the room actions the place card's and the 建議
+    // pill's, so the dock renders no row and no reference entry.
+    expect(dock.findAll('[role="option"]')).toHaveLength(0);
+    expect(dock.find('[data-item-key="inventory"]').exists()).toBe(false);
+    expect(store.view.focus.key).toBeNull();
     expect(wrapper.get(".desktop-navigation").text()).toContain("角色狀態");
     expect(wrapper.get(".desktop-navigation").text()).toContain("任務");
     expect(wrapper.get(".desktop-navigation").text()).toContain("背包");

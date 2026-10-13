@@ -1,9 +1,8 @@
 import { mount } from "@vue/test-utils";
-import { h, nextTick, ref } from "vue";
+import { h, nextTick } from "vue";
 import { afterEach, describe, expect, it } from "vitest";
 import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
-import ExplorationMenu from "../../lib/exploration_menu.js";
 
 const AFFORDANCES = [
   {
@@ -35,50 +34,6 @@ const COMBAT_ROOT_ITEMS = [
   { key: "forfeit", label: "投降", enabled: true },
 ];
 
-
-function normalizeItems(items) {
-  return items.map((item) => {
-    const norm = {
-      key: item.key,
-      label: item.label,
-      enabled: item.enabled !== false,
-      hint: item.hint,
-    };
-    if (item.actionId) {
-      norm.action_id = item.actionId;
-      norm.params = item.payload || {};
-    } else {
-      norm.navigation = true;
-      norm.surface = item.key;
-    }
-    return norm;
-  });
-}
-
-const READY = {
-  status: "ready",
-  cards: [
-    {
-      kind: "known_action",
-      action_code: "explore.look",
-      label: "查看房間",
-      params: { room: true },
-    },
-    {
-      kind: "known_action",
-      action_code: "explore.wait",
-      label: "等到黃昏",
-      params: { daypart: "dusk" },
-      hint: "先休息一會兒再行動",
-    },
-    {
-      kind: "freeform",
-      action_code: "explore.talk_freeform",
-      label: "我們聊聊好嗎？",
-      params: { npc_id: 9 },
-    },
-  ],
-};
 
 describe("ActionDock (B2 action-dock family)", () => {
   let wrapper;
@@ -223,135 +178,6 @@ describe("ActionDock (B2 action-dock family)", () => {
     const w = mountDock({ rootItems: ROOT_ITEMS }, []);
     expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
     expect(w.findAll('[data-testid="option-card"]')).toHaveLength(0);
-  });
-
-  it("renders ready suggestions solely inside the 建議 router pane with dismiss control", () => {
-    const menu = ExplorationMenu.suggestionsMenu(READY);
-    const w = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(menu.items));
-
-    // No legacy root section exists
-    expect(w.find('[data-testid="suggestions-section"]').exists()).toBe(false);
-
-    // Cards render inside the pane
-    const cards = w.findAll('.dock-menu__cards [data-item-key^="action-explore"]');
-    expect(cards).toHaveLength(3);
-    expect(cards[0].text()).toContain("查看房間");
-    expect(cards[1].text()).toContain("等到黃昏");
-    expect(cards[1].text()).toContain("先休息一會兒再行動");
-    expect(cards[2].text()).toContain("我們聊聊好嗎？");
-
-    // Clear suggestions row exists in the pane
-    const dismissRow = w.find('[data-item-key="action-options.dismiss"]');
-    expect(dismissRow.exists()).toBe(true);
-    expect(dismissRow.text()).toContain("✕ 清除建議");
-  });
-
-  it("emits the exact OOB action intent when a card or dismiss in the 建議 pane is activated", async () => {
-    const menu = ExplorationMenu.suggestionsMenu(READY);
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-
-    let emittedAction = null;
-    wrapper = mount({
-      components: { ActionDock, DockMenu },
-      setup: () => ({
-        items: normalizeItems(menu.items),
-        onActivate: (ev) => { emittedAction = ev; },
-      }),
-      template: `
-        <ActionDock :root-items="['suggestions']" mode="exploration">
-          <DockMenu :items="items" :depth="2" @activate="onActivate" />
-        </ActionDock>
-      `,
-    }, { attachTo: host });
-
-    const cards = wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]');
-    expect(cards).toHaveLength(3);
-
-    // Click card 0: known_action explore.look
-    await cards[0].trigger("click");
-    expect(emittedAction.intent).toEqual({
-      action_id: "explore.look",
-      payload: { room: true },
-    });
-
-    // Click card 2: freeform explore.talk_freeform
-    await cards[2].trigger("click");
-    expect(emittedAction.intent).toEqual({
-      action_id: "explore.talk_freeform",
-      payload: { npc_id: 9, speech: "我們聊聊好嗎？" },
-    });
-
-    // Click dismiss control
-    const dismissRow = wrapper.find('[data-item-key="action-options.dismiss"]');
-    await dismissRow.trigger("click");
-    expect(emittedAction.intent).toEqual({
-      action_id: "options.dismiss",
-      payload: {},
-    });
-  });
-
-  it("renders generating state in the 建議 pane as one disabled row with no cards", () => {
-    const menu = ExplorationMenu.suggestionsMenu({ status: "generating" });
-    const w = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(menu.items));
-
-    expect(w.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
-    const generatingRow = w.find('[data-item-key="suggestions-generating"]');
-    expect(generatingRow.exists()).toBe(true);
-    expect(generatingRow.text()).toContain("AI 正在構思建議…");
-  });
-
-  it("renders degraded state in the 建議 pane with rule cards or empty note", () => {
-    // Degraded with 0 cards: empty note
-    const emptyMenu = ExplorationMenu.suggestionsMenu({ status: "degraded", cards: [] });
-    const w1 = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(emptyMenu.items));
-    expect(w1.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
-    const emptyRow = w1.find('[data-item-key="suggestions-empty"]');
-    expect(emptyRow.exists()).toBe(true);
-    expect(emptyRow.text()).toContain("現在沒有什麼值得做的動作");
-
-    w1.unmount();
-    document.body.innerHTML = "";
-
-    // Degraded with 1 rule card: card present
-    const ruleMenu = ExplorationMenu.suggestionsMenu({
-      status: "degraded",
-      cards: [READY.cards[0]],
-    });
-    const w2 = mountDock({ rootItems: ROOT_ITEMS }, normalizeItems(ruleMenu.items));
-    expect(w2.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(1);
-    expect(w2.find('[data-item-key="action-options.dismiss"]').exists()).toBe(true);
-  });
-
-  it("replaces generating line in place with ready cards inside the 建議 pane", async () => {
-    const genMenu = ExplorationMenu.suggestionsMenu({ status: "generating" });
-    const readyMenu = ExplorationMenu.suggestionsMenu(READY);
-
-    const host = document.createElement("div");
-    document.body.appendChild(host);
-
-    const itemsRef = ref(normalizeItems(genMenu.items));
-    wrapper = mount({
-      components: { ActionDock, DockMenu },
-      setup: () => ({ items: itemsRef }),
-      template: `
-        <ActionDock :root-items="['suggestions']" mode="exploration">
-          <DockMenu :items="items" :depth="2" />
-        </ActionDock>
-      `,
-    }, { attachTo: host });
-
-    const paneBefore = wrapper.get(".action-dock__pane").element;
-    expect(wrapper.find('[data-item-key="suggestions-generating"]').exists()).toBe(true);
-    expect(wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(0);
-
-    itemsRef.value = normalizeItems(readyMenu.items);
-    await nextTick();
-
-    const paneAfter = wrapper.get(".action-dock__pane").element;
-    expect(paneAfter).toBe(paneBefore);
-    expect(wrapper.find('[data-item-key="suggestions-generating"]').exists()).toBe(false);
-    expect(wrapper.findAll('.dock-menu__cards [data-item-key^="action-explore"]')).toHaveLength(3);
   });
 
   it("retires suggestion presentation on transport reset", () => {

@@ -74,13 +74,11 @@ export function applyInteraction(ctx) {
       ctx.publishView();
       return true;
     }
-    // The rest-duration item (openRestForm): opens the bounded custom-duration
-    // form before any OOB action (webclient-exploration-menu: the form is the
-    // sole local UI exception — confirm opens the form, no dispatch yet).
+    // The rest-duration row (`openRestForm`) opens the bounded form in the
+    // wait card's view (exploration-room-actions design D5); it is never a
+    // router row and never submits, so it is handled as nothing here.
     if (item.openRestForm) {
-      ctx.restFormRequest += 1;
-      ctx.publishView();
-      return true;
+      return false;
     }
     // A real OOB exploration action (explore.move / look / wait / talk_open /
     // engage / party / deliver): one dispatch through the single entry. The

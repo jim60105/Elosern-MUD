@@ -103,7 +103,9 @@ describe("classifyPane (task 5.1)", () => {
     expect(classifyPane(frame)).toBe("confirm");
   });
 
-  it("classifies the suggestions frame (action-* cards, dismiss, back) as cards", () => {
+  it("has no cards kind: the suggestions are the centred card's, so suggestion-shaped rows are plain", () => {
+    // exploration-room-actions: the suggestions frame and its `cards` pane
+    // are retired with the router frame.
     const frame = {
       items: [
         { key: "action-explore.talk_freeform", label: "交談", action_id: "explore.talk_freeform" },
@@ -111,7 +113,7 @@ describe("classifyPane (task 5.1)", () => {
         { key: "back", label: "戻る", navigation: true, surface: "back" },
       ],
     };
-    expect(classifyPane(frame)).toBe("cards");
+    expect(classifyPane(frame)).toBe("plain");
   });
 
   it("classifies a frame of target-affordance rows (engage / party invite) as plain", () => {

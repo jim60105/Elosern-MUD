@@ -119,12 +119,12 @@ describe("bridge + AppShell key-routing coexistence (one effect per keypress)", 
   it("Escape from the focused field returns focus to the dock; the menu depth is unchanged", async () => {
     const store = mountAll();
     openActiveSession(store);
-    // Navigate the router into a child frame (depth 2) so the dock's menu
-    // level state is non-trivial. H4 re-homed "character" into a reference
-    // drawer (no router push); the overview's 等待／休息 chip opens a real
-    // child frame (webclient-scene-overview-swap).
-    store.focusItemByKey("wait");
-    store.focusConfirm();
+    // Push a child frame (depth 2) so the dock's menu level state is
+    // non-trivial. The exploration family pushes no frame of its own since
+    // exploration-room-actions, so the top navigation's resolvable source
+    // stands in for one.
+    store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+    store.refreshView();
     await wrapper.vm.$nextTick();
     expect(store.view.dockDepth).toBe(2);
 

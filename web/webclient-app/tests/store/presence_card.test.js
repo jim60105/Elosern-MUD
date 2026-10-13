@@ -363,13 +363,16 @@ describe("the presence slice (exploration-presence-rail)", () => {
       expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.talk_open" });
     });
 
-    it("the card owns the digits whatever dock frame is open beneath it", () => {
+    it("the card owns the digits whatever dock frame is open beneath it, and replaces an open room card", () => {
       open();
-      expect(store.focusItemByKey("wait")).toBe(true);
-      expect(store.focusConfirm("keyboard")).toBe(true);
-      expect(store.view.dockSource).toBe("exploration.wait");
+      store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+      store.refreshView();
+      expect(store.view.dockDepth).toBe(2);
+      expect(store.openRoomCard("wait")).toBe(true);
       store.activatePresence("target-7");
-      // The card lists 交談 … 查看; its digit picks never reach the waiting frame.
+      // One centred card at a time: the person's card replaced the room card.
+      expect(store.view.roomCard).toBeNull();
+      // The card lists 交談 … 查看; its digit picks never reach the frame beneath.
       const lookSlot = String(store.view.presenceVerbs.findIndex((item) => item.key === "look-target") + 1);
       expect(store.focusPress(lookSlot)).toBe(true);
       expect(sender.sent.actions).toHaveLength(1);
