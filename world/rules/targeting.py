@@ -65,6 +65,18 @@ class StoredReadings(Protocol):
     def hp(self, entity: Any) -> float:
         """Return one participant's stored hp for the aliveness gate."""
 
+    def gauge_maximum(self, entity: Any, gauge_key: str) -> int | None:
+        """Return one participant's stored gauge maximum, or ``None``."""
+
+    def buff_keys(self, entity: Any) -> Container[str]:
+        """Return one participant's live buff definition keys."""
+
+    def condition_context(self, entity: Any) -> dict[str, Any]:
+        """Return one participant's stored condition context, read once."""
+
+    def proficiency(self, entity: Any) -> Any:
+        """Return one participant's stored practice-XP mapping, read once."""
+
     def costs(self, entity: Any, skill: Any, scale: float) -> dict[str, int]:
         """Return one skill's adjusted costs at ``scale`` for the entity."""
 

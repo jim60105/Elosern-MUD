@@ -26,10 +26,21 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     return _base_builder(entity)
 
 
-def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None:
+def evaluate_cast_conditions(
+    actor: Any,
+    targets: list[Any],
+    skill: Any,
+    *,
+    readings: Any = None,
+) -> None:
     """Evaluate all declared SkillDef.cast_conditions.
 
     Raises RejectedAction(RejectReason.CAST_CONDITION_UNMET) if any condition is unsatisfied.
+
+    ``readings`` may pre-supply the stored condition context per subject, so a
+    caller validating many plans reuses one context per participant instead of
+    rebuilding it, and never re-reads buff, sexual or equipment inputs for a
+    plan it already judged.
     """
     from world.rules.action import RejectReason, RejectedAction
 
@@ -37,12 +48,17 @@ def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None
     if not conditions:
         return
 
+    def subject_context(entity: Any) -> dict[str, Any]:
+        if readings is None:
+            return build_no_create_condition_context(entity)
+        return readings.condition_context(entity)
+
     actor_context: dict[str, Any] | None = None
 
     for cond in conditions:
         if cond.subject is CastConditionSubject.ACTOR:
             if actor_context is None:
-                actor_context = build_no_create_condition_context(actor)
+                actor_context = subject_context(actor)
             if not evaluate_condition(cond.condition, actor_context):
                 raise RejectedAction(
                     RejectReason.CAST_CONDITION_UNMET,
@@ -50,7 +66,7 @@ def evaluate_cast_conditions(actor: Any, targets: list[Any], skill: Any) -> None
                 )
         elif cond.subject is CastConditionSubject.EACH_TARGET:
             for target in targets:
-                target_context = build_no_create_condition_context(target)
+                target_context = subject_context(target)
                 if not evaluate_condition(cond.condition, target_context):
                     raise RejectedAction(
                         RejectReason.CAST_CONDITION_UNMET,

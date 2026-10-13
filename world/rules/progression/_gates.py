@@ -22,10 +22,19 @@ from world.skills.restrictions import skill_effect_allowed
 from world.skills.eligibility import skill_identity_eligible
 
 
-def skill_proficiency_level(entity: Any, skill_key: str) -> int:
-    """Return the whole proficiency level derived from stored practice XP."""
-    proficiency = entity.db.skill_proficiency or {}
-    return int(float(proficiency.get(skill_key, 0.0)) // SKILL_PROFICIENCY_XP_PER_LEVEL)
+def skill_proficiency_level(
+    entity: Any,
+    skill_key: str,
+    *,
+    proficiency: Any = None,
+) -> int:
+    """Return the whole proficiency level derived from stored practice XP.
+
+    ``proficiency`` may pre-supply the persisted ``db.skill_proficiency``
+    mapping a decision already read, so a per-plan gate reuses it.
+    """
+    stored = entity.db.skill_proficiency or {} if proficiency is None else proficiency
+    return int(float(stored.get(skill_key, 0.0)) // SKILL_PROFICIENCY_XP_PER_LEVEL)
 
 
 def proficiency_cap(skill_key: str) -> int:

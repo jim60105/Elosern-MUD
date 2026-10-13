@@ -161,6 +161,7 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     # so equipment_worn rules resolve identically here and in the handler
     # path without materializing the equipment handler (P5 D1).
     context["worn_item_keys"] = worn_item_keys(entity)
+    context["owned_keys"] = _owned_keys(entity)
     return context
 
 
@@ -249,7 +250,7 @@ def _conferred_rule_scale(entity: Any, skill_key: str) -> float:
     if not skill_effect_allowed(entity, skill_key):
         return 0.0
     total = 0.0
-    for grant in entity.skills.conferred_grants():
+    for grant in _conferred_grants(entity):
         if grant.skill_key != skill_key:
             continue
         skill = SKILL_REGISTRY.get(grant.skill_key)
@@ -315,6 +316,20 @@ def _church_martial_blessing_adjustments(base_adjustments: dict[str, Any]) -> di
         return base_adjustments
 
 
+def _conferred_grants(entity: Any) -> Any:
+    """Read one entity's conferred grants without mounting its skill handler."""
+    from world.skills.handler import SkillHandler
+
+    return SkillHandler(entity).conferred_grants()
+
+
+def _owned_keys(entity: Any) -> Any:
+    """Read one entity's owned keys without mounting its skill handler."""
+    from world.skills.handler import SkillHandler
+
+    return SkillHandler(entity).owned_keys()
+
+
 def matched_combat_modifiers(
     entity, context: dict[str, Any] | None = None
 ) -> tuple[tuple[str, dict[str, Any]], ...]:
@@ -347,7 +362,10 @@ def matched_combat_modifiers(
             continue
         adjustments = dict(rule.then)
         skill_key = rule.when.get("skill_owned")
-        if skill_key is not None and skill_key not in entity.skills.owned_keys():
+        owned = context.get("owned_keys")
+        if skill_key is not None and skill_key not in (
+            _owned_keys(entity) if owned is None else owned
+        ):
             scale = _conferred_rule_scale(entity, skill_key)
             if scale <= 0:
                 continue

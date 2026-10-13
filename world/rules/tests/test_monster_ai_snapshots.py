@@ -19,6 +19,8 @@ from dataclasses import FrozenInstanceError, replace
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
 from evennia.objects.models import ObjectDB
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
@@ -36,6 +38,8 @@ from world.rules.buffs import (
 )
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
+from world.rules.progression import FREEFORM_SCALE_VALUES, SKILL_PROFICIENCY_XP_PER_LEVEL
+from world.rules.progression import _scaling as scaling
 from world.rules.monster_ai import (
     DecisionReads,
     DecisionScope,
@@ -47,11 +51,12 @@ from world.rules.monster_ai import (
     validate_plan,
 )
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
-from world.skills.effects import InteractionPolicy
+from world.skills.effects import EffectAudience, EffectPolicy, InteractionPolicy
 from world.skills.handler import SkillHandler
-from world.skills.registry import SkillCategory, TargetSpec
+from world.skills.registry import SkillCategory, SkillKind, TargetSpec
 
 from ._combat_session_helpers import (
+    SYNTH_GLOW_ELEMENT,
     _monster,
     _player,
     open_synthetic_scope,
@@ -93,6 +98,34 @@ CONTACT_SELF_SOLO = replace(
     key="t_snap_contact_solo",
     interaction=InteractionPolicy(contact=True, distinct_participants=False),
 )
+#: A skill whose only effect is routed to the actor: the SELF audience arm.
+AUDIENCE_SELF = replace(
+    STRIKE,
+    key="t_snap_audience_self",
+    effect_policies=(EffectPolicy(audience=EffectAudience.SELF),),
+)
+#: A skill whose effect counts only targets with a positive MP maximum.
+AUDIENCE_CONDITION = replace(
+    STRIKE,
+    key="t_snap_audience_condition",
+    effect_policies=(EffectPolicy(audience_condition="mp_positive"),),
+)
+#: An AREA damage skill, for the group-plan reason.
+AREA_STRIKE = replace(STRIKE, key="t_snap_area_strike", target_spec=TargetSpec.AREA)
+#: A NONE-target skill with a real actor-scoped cast prerequisite.
+NONE_SEALED = replace(
+    SEALED_STRIKE,
+    key="t_snap_none_sealed",
+    target_spec=TargetSpec.NONE,
+    cast_conditions=(
+        CastCondition(CastConditionSubject.ACTOR, {"buff_active": SEAL}),
+    ),
+)
+#: A freeform-eligible elemental skill and the mastery passive that entitles it.
+FREE_SCALE_KEY = "t_snap_free_scale"
+#: The highest non-default freeform rung the closed table allows.
+SCALE = max(scale for scale in FREEFORM_SCALE_VALUES if scale != 1.0)
+
 #: A two-participant act: its requirement forbids the actor as its own target.
 PAIRED_ACT = replace(
     synth_damage_skill("t_snap_paired_act", "測試雙人術", effects=(), cost={}),
@@ -101,7 +134,11 @@ PAIRED_ACT = replace(
 
 
 def _skill_rows() -> dict[str, object]:
-    """The file-local skill rows one test registers."""
+    """The file-local skill rows one test registers.
+
+    Built inside the kit scope, because a string element only resolves
+    against the scoped ``ELEMENT_REGISTRY``.
+    """
     return {
         row.key: row
         for row in (
@@ -110,6 +147,10 @@ def _skill_rows() -> dict[str, object]:
             CONTACT_SELF,
             CONTACT_SELF_SOLO,
             PAIRED_ACT,
+            AUDIENCE_SELF,
+            AUDIENCE_CONDITION,
+            AREA_STRIKE,
+            NONE_SEALED,
         )
     }
 
@@ -320,11 +361,22 @@ def _probe_decision(actor, *others, reads=None):
     return _entry(actor, BattlefieldActionContext(_probe_field(actor, *others)), others, reads=reads)
 
 
-def _read_counters(probe: _ProbeParticipant) -> dict[str, int]:
-    """Every counted read one probe participant answered, flattened."""
-    counters = {f"attr:{name}": count for name, count in probe.attributes.calls.items()}
-    counters["owned_keys"] = probe.skills.owned_key_calls
-    counters["trait_reads"] = probe.trait_reads
+def _read_counters(label: str, probe: _ProbeParticipant) -> dict[str, int]:
+    """Every counted read one probe participant answered, keyed by label."""
+    counters = {
+        f"{label}.attr:{name}": count
+        for name, count in probe.attributes.calls.items()
+    }
+    counters[f"{label}.owned_keys"] = probe.skills.owned_key_calls
+    counters[f"{label}.trait_reads"] = probe.trait_reads
+    return counters
+
+
+def _counters_by_member(members) -> dict[str, int]:
+    """Every counted read, nested per participant so none overwrites another."""
+    counters: dict[str, int] = {}
+    for index, member in enumerate(members):
+        counters.update(_read_counters(f"member{index}", member))
     return counters
 
 
@@ -399,37 +451,46 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         participants = tuple(
             _ProbeParticipant(f"t_snap_rival_{index}") for index in range(4)
         )
-        self.actor.db.skills = {"active": [STRIKE.key], "passive": []}
-        context = BattlefieldActionContext(
-            _probe_field(self.actor, *participants)
-        )
+        members = (self.actor, *participants)
+        for member in members:
+            member.db.skills = {
+                "active": [SEALED_STRIKE.key],
+                "passive": [],
+            }
+        context = BattlefieldActionContext(_probe_field(self.actor, *participants))
         reads = DecisionReads()
         snapshot, reads, roster, context = _entry(
             self.actor, context, participants, reads=reads
         )
-        before = {
-            **_read_counters(self.actor),
-            **_read_counters(participants[0]),
-        }
-        for participant in participants:
-            verdict = validate_plan(
-                snapshot,
-                PlannedAction(STRIKE.key, target_ids=(participant.identity,)),
-                actor=self.actor,
-                context=context,
-                roster=roster,
-                reads=reads,
-            )
-            self.assertTrue(verdict.legal, verdict.detail)
-        after = {
-            **_read_counters(self.actor),
-            **_read_counters(participants[0]),
-        }
+        def round_of_plans() -> None:
+            for participant in participants:
+                verdict = validate_plan(
+                    snapshot,
+                    PlannedAction(
+                        SEALED_STRIKE.key, target_ids=(participant.identity,)
+                    ),
+                    actor=self.actor,
+                    context=context,
+                    roster=roster,
+                    reads=reads,
+                )
+                self.assertFalse(verdict.legal)
+                self.assertIs(verdict.reason, RejectReason.CAST_CONDITION_UNMET)
+
+        round_of_plans()
+        before = _counters_by_member(members)
+        round_of_plans()
         self.assertEqual(
-            _counter_delta(before, after),
+            _counter_delta(before, _counters_by_member(members)),
             {},
-            "enumerating more plans must not re-read the decision's inputs",
+            "a repeated plan must not re-read any participant's inputs",
         )
+        for index, member in enumerate(members):
+            self.assertEqual(
+                member.trait_reads,
+                0,
+                f"member{index} must never expose its trait handler",
+            )
 
     def test_the_next_decision_sees_intervening_state_and_the_old_one_does_not(self):
         snapshot, _reads, _roster, _context = _probe_decision(
@@ -602,6 +663,84 @@ class DecisionPlanLegalityTests(unittest.TestCase):
         self.assertEqual(verdict.detail, self.target.identity)
 
 
+    def test_mixed_and_conditional_audiences_use_the_decision_reads(self):
+        self._own(AUDIENCE_SELF.key, AUDIENCE_CONDITION.key)
+        accepted = self._verdict(AUDIENCE_SELF.key)
+        self.assertTrue(accepted.legal, accepted.detail)
+        self.assertEqual(self.actor.trait_reads, 0)
+        self.assertEqual(self.target.trait_reads, 0)
+        self.assertTrue(self._verdict(AUDIENCE_CONDITION.key).legal)
+        self.target.attributes.values["traits"]["mp"] = {
+            "base": 0,
+            "mod": 0,
+            "mult": 1,
+            "current": 0,
+        }
+        rejected = self._verdict(AUDIENCE_CONDITION.key)
+        self.assertFalse(rejected.legal)
+        self.assertIs(rejected.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+        self.assertEqual(self.target.trait_reads, 0)
+
+    def test_the_first_rejection_follows_the_resolver_order(self):
+        self._own(STRIKE.key)
+        self.target.attributes.values["traits"]["hp"]["current"] = 0
+        with (
+            patch(
+                "world.rules.monster_ai.snapshot.evaluate_combat_modifiers_no_create",
+                return_value={"actions_per_turn": 0},
+            ),
+            patch(
+                "world.rules.action.gates.evaluate_combat_modifiers_no_create",
+                return_value={"actions_per_turn": 0},
+            ),
+        ):
+            verdict = self._verdict(STRIKE.key)
+        self.assertFalse(verdict.legal)
+        self.assertIs(
+            verdict.reason,
+            RejectReason.TARGET_DEAD,
+            "target resolution runs before the capability gate, as in the resolver",
+        )
+
+    def test_an_invalid_area_group_reports_the_resolver_detail(self):
+        self._own(AREA_STRIKE.key)
+        self.target.attributes.values["traits"]["hp"]["current"] = 0
+        verdict = self._verdict(
+            AREA_STRIKE.key, target_ids=(self.target.identity,)
+        )
+        self.assertFalse(verdict.legal)
+        self.assertIs(verdict.reason, RejectReason.NO_VALID_TARGETS_IN_AREA)
+        self.assertEqual(verdict.detail, "all area candidates were invalid")
+
+    def test_a_none_skill_reports_its_actor_condition_in_every_form(self):
+        self._own(NONE_SEALED.key)
+        _snapshot, _reads, _roster, context = _probe_decision(
+            self.actor, self.target
+        )
+        for candidates in (None, []):
+            with self.subTest(candidates=candidates):
+                preview = preview_skill(
+                    self.actor, NONE_SEALED.key, context, candidates
+                )
+                self.assertFalse(preview.enabled)
+                self.assertIs(preview.reason, RejectReason.CAST_CONDITION_UNMET)
+        self.assertIs(
+            revalidate_submission(
+                self.actor, NONE_SEALED.key, context, []
+            ).reason,
+            RejectReason.CAST_CONDITION_UNMET,
+        )
+        self.actor.attributes.values["buffs"] = {SEAL: _buff_record(SEAL)}
+        self.assertTrue(
+            preview_skill(self.actor, NONE_SEALED.key, context, []).enabled
+        )
+        self.assertTrue(
+            revalidate_submission(
+                self.actor, NONE_SEALED.key, context, []
+            ).enabled
+        )
+
+
 class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
     """The decision boundary on real entities writes nothing and attaches none."""
 
@@ -650,14 +789,16 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         return snapshot, reader, roster_index((self.actor, *pool)), context
 
     def test_the_snapshot_writes_nothing_and_attaches_no_handler(self):
-        # The spec's own premise: an entity whose handlers were never
-        # materialized. A persisted ``sexual_traits`` record only exists once
-        # the sexual handler ran, so removing it (and any mounted handler)
-        # models exactly that state.
+        # The hardest premise: a COMPLETE persisted sexual state and a mounted
+        # handler, then every handler unmounted. The ownership authority used
+        # to re-mount the sexual handler here (and a partial record made
+        # SexualState write a whole new baseline), and the modifier conditions
+        # used to mount the skill handler.
+        self.actor.sexual
+        self.actor.skills
         context = self._context()
         for entity in (self.actor, self.target):
-            entity.attributes.remove("sexual_traits", category="traits")
-            for handler in ("traits", "buffs", "sexual", "equipment"):
+            for handler in ("traits", "buffs", "sexual", "equipment", "skills"):
                 entity.__dict__.pop(handler, None)
         before = {
             "attributes": {
@@ -676,17 +817,19 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
             participants=(self.target,),
             reads=reads,
         )
-        roster = roster_index((self.actor, self.target))
         for entity in (self.actor, self.target):
             for handler in ("traits", "buffs", "sexual", "equipment"):
                 self.assertNotIn(
                     handler,
                     entity.__dict__,
-                    "building a snapshot must not attach a lazy handler",
+                    "building a snapshot must not attach a materializing handler",
                 )
+        roster = roster_index((self.actor, self.target))
         verdict = validate_plan(
             snapshot,
-            PlannedAction(SEALED_STRIKE.key, target_ids=(stable_identity(self.target),)),
+            PlannedAction(
+                SEALED_STRIKE.key, target_ids=(stable_identity(self.target),)
+            ),
             actor=self.actor,
             context=context,
             roster=roster,
@@ -705,41 +848,123 @@ class MonsterAIDecisionBoundaryTests(EvenniaTestCase):
         self.assertEqual(ObjectDB.objects.count(), before["rows"])
         for entity in (self.actor, self.target):
             for handler in ("traits", "buffs", "sexual", "equipment"):
-                self.assertNotIn(handler, entity.__dict__)
+                self.assertNotIn(
+                    handler,
+                    entity.__dict__,
+                    "validation must not attach a materializing handler",
+                )
 
-    def test_a_materialized_entity_gains_no_persistent_state(self):
-        # A decision about an entity that already carries persisted sexual
-        # traits may re-mount the handler the ownership authority reads its
-        # live unlocked-act counters through; that re-attach derives nothing
-        # new. What must never change is persistent state.
-        for entity in (self.actor, self.target):
-            for handler in ("buffs", "equipment"):
-                entity.__dict__.pop(handler, None)
-        before = {
-            "attributes": {
-                str(row.key): row.value for row in self.actor.attributes.all()
-            },
-            "stored_hp": self._stored_hp(self.target),
-            "rows": ObjectDB.objects.count(),
+    def test_a_scaled_plan_reuses_the_decision_proficiency(self):
+        # Authored inside the kit scope: a string element only resolves
+        # against the scoped element registry.
+        free = replace(
+            STRIKE,
+            key=FREE_SCALE_KEY,
+            cost={"mp": 8},
+            element=SYNTH_GLOW_ELEMENT,
+        )
+        mastery = replace(
+            STRIKE,
+            key=f"{SYNTH_GLOW_ELEMENT}_mastery",
+            kind=SkillKind.PASSIVE,
+            effects=[],
+            cost={},
+            target_spec=TargetSpec.SELF,
+            element=SYNTH_GLOW_ELEMENT,
+        )
+        self.actor.db.skills = {
+            "active": [free.key],
+            "passive": [mastery.key],
         }
-        snapshot, reads, roster, context = self._decision()
-        validate_plan(
-            snapshot,
-            PlannedAction(SEALED_STRIKE.key, target_ids=(stable_identity(self.target),)),
-            actor=self.actor,
-            context=context,
-            roster=roster,
+        self.actor.db.skill_proficiency = {
+            free.key: 8 * SKILL_PROFICIENCY_XP_PER_LEVEL
+        }
+        reads = DecisionReads()
+        context = self._context()
+        with patch.dict(
+            "world.skills.registry.SKILL_REGISTRY",
+            {free.key: free, mastery.key: mastery},
+        ):
+            snapshot = build_decision_snapshot(
+                self.actor,
+                context,
+                scope=DecisionScope(SCOPE, ROUND, 0),
+                participants=(self.target,),
+                reads=reads,
+            )
+            roster = roster_index((self.actor, self.target))
+            seen: list[bool] = []
+            original = scaling.skill_proficiency_level
+
+            def counting(entity, skill_key, **kwargs):
+                seen.append(kwargs.get("proficiency") is not None)
+                return original(entity, skill_key, **kwargs)
+
+            with patch(
+                "world.rules.progression._scaling.skill_proficiency_level",
+                side_effect=counting,
+            ):
+                for _ in range(3):
+                    verdict = validate_plan(
+                        snapshot,
+                        PlannedAction(
+                            free.key,
+                            scale=SCALE,
+                            target_ids=(stable_identity(self.target),),
+                        ),
+                        actor=self.actor,
+                        context=context,
+                        roster=roster,
+                        reads=reads,
+                    )
+        self.assertEqual(len(seen), 3)
+        self.assertTrue(
+            all(seen), "every ladder call reuses the decision's stored mapping"
+        )
+        self.assertTrue(verdict.legal, verdict.detail)
+
+    def test_validating_plans_issues_no_database_queries(self):
+        self.target.attributes.add("buffs", {SEAL: _buff_record(SEAL)})
+        reads = DecisionReads()
+        context = self._context()
+        snapshot = build_decision_snapshot(
+            self.actor,
+            context,
+            scope=DecisionScope(SCOPE, ROUND, 0),
+            participants=(self.target,),
             reads=reads,
         )
-        self.assertEqual(
-            {str(row.key): row.value for row in self.actor.attributes.all()},
-            before["attributes"],
+        roster = roster_index((self.actor, self.target))
+        plan = PlannedAction(
+            SEALED_STRIKE.key, target_ids=(stable_identity(self.target),)
         )
-        self.assertEqual(self._stored_hp(self.target), before["stored_hp"])
-        self.assertEqual(ObjectDB.objects.count(), before["rows"])
-        for entity in (self.actor, self.target):
-            for handler in ("buffs", "equipment"):
-                self.assertNotIn(handler, entity.__dict__)
+        self.assertTrue(
+            validate_plan(
+                snapshot,
+                plan,
+                actor=self.actor,
+                context=context,
+                roster=roster,
+                reads=reads,
+            ).legal
+        )
+        with CaptureQueriesContext(connection) as captured:
+            for _ in range(4):
+                self.assertTrue(
+                    validate_plan(
+                        snapshot,
+                        plan,
+                        actor=self.actor,
+                        context=context,
+                        roster=roster,
+                        reads=reads,
+                    ).legal
+                )
+        self.assertEqual(
+            list(captured.captured_queries),
+            [],
+            "a decision over fixed data re-reads nothing from the database",
+        )
 
     def test_a_stale_gauge_timestamp_is_never_regenerated(self):
         records = self._stored_traits(self.actor)

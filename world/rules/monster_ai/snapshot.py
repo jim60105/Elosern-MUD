@@ -30,7 +30,10 @@ from world.rules.buffs import (
     active_buff_keys_from_storage,
     entity_active_buffs,
 )
-from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+from world.rules.combat_modifiers import (
+    build_no_create_condition_context,
+    evaluate_combat_modifiers_no_create,
+)
 from world.rules.monster_ai.models import (
     BuffProjection,
     CapabilityState,
@@ -102,6 +105,8 @@ class DecisionReads:
         self._buffs: dict[Any, frozenset[str]] = {}
         self._projections: dict[Any, tuple[BuffProjection, ...]] = {}
         self._capability: dict[Any, CapabilityState] = {}
+        self._conditions: dict[Any, dict[str, Any]] = {}
+        self._proficiency: dict[Any, Mapping[str, float]] = {}
         self._costs: dict[tuple[Any, str, float], dict[str, int]] = {}
 
     def skill(self, skill_key: str) -> SkillDef | None:
@@ -134,11 +139,53 @@ class DecisionReads:
         return self._costs[key]
 
     def _trait_records(self, entity: Any) -> Mapping[str, Any]:
-        """Return the entity's persisted trait mapping, read once."""
+        """Return DETACHED copies of the entity's persisted trait records.
+
+        The persisted mapping is read once and then copied record by record, so
+        a later write to entity storage can never change an answer this read
+        set already gave. The old read set answers the old values even though
+        the snapshot scalars were already projected from them.
+        """
         key = _memo_key(entity)
         if key not in self._records:
-            self._records[key] = stored_trait_records(entity)
+            self._records[key] = MappingProxyType(
+                {
+                    name: MappingProxyType(dict(record))
+                    for name, record in stored_trait_records(entity).items()
+                    if isinstance(record, Mapping)
+                }
+            )
         return self._records[key]
+
+    def condition_context(self, entity: Any) -> dict[str, Any]:
+        """Return the entity's stored condition context, read once.
+
+        The shared no-create condition builder (buff cache, stored sexual
+        levels, effective exposure, worn items) behind the cast-condition
+        mini-language, so a decision evaluates every plan's conditions against
+        one build per participant.
+        """
+        key = _memo_key(entity)
+        if key not in self._conditions:
+            self._conditions[key] = build_no_create_condition_context(entity)
+        return self._conditions[key]
+
+    def proficiency(self, entity: Any) -> Mapping[str, float]:
+        """Return a detached copy of the entity's stored practice XP."""
+        key = _memo_key(entity)
+        if key not in self._proficiency:
+            stored = getattr(getattr(entity, "db", None), "skill_proficiency", None)
+            self._proficiency[key] = MappingProxyType(
+                dict(stored) if isinstance(stored, Mapping) else {}
+            )
+        return self._proficiency[key]
+
+    def gauge_maximum(self, entity: Any, gauge_key: str) -> int | None:
+        """Return one stored gauge maximum, or ``None`` when unreadable."""
+        pair = trait_record_gauge_pair(
+            self._trait_records(entity).get(gauge_key)
+        )
+        return None if pair is None else pair[1]
 
     def trait_value(self, entity: Any, trait_key: str) -> float:
         """Return one stored trait value, or ``0.0`` when it is absent."""
@@ -168,12 +215,9 @@ class DecisionReads:
         """Return the static combat traits after the owned-passive fold."""
         key = _memo_key(entity)
         if key not in self._effective:
-            handler = SkillHandler(entity)
+            folded = SkillHandler(entity).stored_effective_values(STATIC_KEYS)
             self._effective[key] = MappingProxyType(
-                {
-                    trait_key: float(handler.stored_effective_value(trait_key))
-                    for trait_key in STATIC_KEYS
-                }
+                {trait_key: float(value) for trait_key, value in folded.items()}
             )
         return self._effective[key]
 

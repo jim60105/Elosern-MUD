@@ -27,6 +27,24 @@ attaches each one to the tests named here.
 | `monster-ai-decision-inputs::utility-legality-shares-all-deterministic-settlement-gates` | `test_a_cast_prerequisite_rejects_before_scoring_with_settlement_reason`, `test_a_contact_prerequisite_rejects_the_self_plan_and_accepts_the_solo_one`, `test_a_forbidden_self_target_is_a_shape_mismatch`, `test_a_dead_target_rejects_the_plan_before_scoring`, `test_a_vanished_participant_is_reported_missing`, `test_lost_capability_rejects_the_plan`, `test_a_plan_outside_the_decision_scope_is_rejected`, `...test_preview_submission_and_preflight_reject_the_same_cast`, `...test_a_contact_prerequisite_rejects_the_self_cast_for_every_surface`, `...test_a_stale_plan_is_refused_by_the_resolver_without_payment`, `...test_a_legal_plan_settles_through_the_resolver` | A skill that passes the older preview subset but fails a real cast or interaction prerequisite is excluded before scoring with `CAST_CONDITION_UNMET`, and the preview, the submission revalidation and `ActionResolver.preflight` all agree on it; the satisfied pair is enabled or successful on all three. A forbidden self target is a shape mismatch, a dead or missing target and a lost capability reject, and a plan that was legal when decided is refused by the resolver after an earlier action kills the target, with no resource paid. |
 | `monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision` | `test_validation_reuses_one_read_set_across_every_plan`, `...test_building_a_snapshot_reads_each_input_once_per_participant`, `...test_the_next_decision_sees_intervening_state_and_the_old_one_does_not`, `...test_a_drained_resource_rejects_the_next_decision` | Enumerating more plans on one decision's read set moves no read counter at all, while the decision's own owned-skill metadata is read once and reused and the live trait handler is never read; the next decision is built from fresh reads, so it sees the intervening health, resource and buff changes while the earlier snapshot stays frozen. |
 
+## Post-implementation review corrections
+
+The review of the finished diff found the decision reads still attaching
+handlers and bypassing cached inputs. Adopted: `SkillHandler.owned_keys()` now
+resolves the unlocked sexual acts from persisted counters, so it never mounts
+`sexual` (and never triggers `SexualState`'s baseline write on a partial
+record); `evaluate_condition`, `matched_combat_modifiers` and
+`_conferred_rule_scale` read ownership through a directly constructed handler;
+the audience planner and its condition reader take the decision read set, so a
+`SELF` audience or an `mp_max_zero`/`mp_positive` condition uses the stored
+projection; cast conditions reuse one stored condition context per participant;
+the lineage, proficiency and freeform-ladder gates reuse the cached owned keys
+and practice-XP mapping; the effective-trait fold reads the persisted traits
+attribute once. Submission validation now runs the resolver's own order
+(ownership, resources, shared target resolution, capability, cast/interaction,
+audiences) instead of its own target pipeline, and a NONE-target preview
+evaluates the actor-scoped cast conditions for both argument forms.
+
 ## Shared-legality boundary
 
 The ordered gates live once, in `world/rules/action/gates.py`, and are consumed

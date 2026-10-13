@@ -7,7 +7,7 @@ check and the step-6 deduction so preflight and deduction can never drift.
 
 Every *deterministic* gate is also exposed as a pair-returning twin
 (``ownership_failure``, ``resource_failure``, ``capability_failure``,
-``skill_wide_failure``, ``spell_condition_failure``) so a side-effect-free
+``spell_condition_failure``) so a side-effect-free
 reader -- the frozen action preview and the monster-AI decision inputs -- gets
 the identical ordered conditions and the identical ``(reason, detail)`` pair
 the resolver raises, instead of a hand-mirrored copy that can drift. The
@@ -25,7 +25,7 @@ from typing import Any
 
 from world.skills.eligibility import skill_identity_eligible
 from world.rules.action_gates import damage_requires_battlefield
-from world.rules.buffs import BLOCKING_BUFF_KEYS, active_buff_keys_from_storage, blocks_action
+from world.rules.buffs import blocks_action
 from world.rules.combat_modifiers import (
     apply_cost_modifier,
     evaluate_combat_modifiers_no_create,
@@ -92,6 +92,9 @@ def _freeform_gate_failure(
     actor: Any,
     skill: SkillDef,
     scale: float,
+    *,
+    proficiency: Any = None,
+    owned_keys: Any = None,
 ) -> tuple[RejectReason, str] | None:
     """Return the freeform-casting rejection ``(reason, detail)`` or ``None``.
 
@@ -110,7 +113,9 @@ def _freeform_gate_failure(
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
     if not is_freeform_eligible(skill):
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
-    if scale not in freeform_scales_for(actor, skill):
+    if scale not in freeform_scales_for(
+        actor, skill, proficiency=proficiency, owned_keys=owned_keys
+    ):
         return RejectReason.SCALED_CAST_FORBIDDEN, skill.key
     return None
 
@@ -185,7 +190,13 @@ def ownership_failure(
         return RejectReason.DAMAGE_REQUIRES_MONSTER_TARGET, skill_key
     # The "proficiency" gate of the same order: the freeform rung ladder the
     # actor's current proficiency unlocks (use-driven-skill-lineage DC5).
-    return _freeform_gate_failure(actor, skill, scale)
+    return _freeform_gate_failure(
+        actor,
+        skill,
+        scale,
+        proficiency=None if readings is None else readings.proficiency(actor),
+        owned_keys=None if readings is None else owned,
+    )
 
 
 def _step1_ownership(request: ActionRequest) -> SkillDef:
@@ -331,56 +342,6 @@ def _step4_capability(actor: Any) -> None:
         raise RejectedAction(*failure)
 
 
-def skill_wide_failure(
-    actor: Any,
-    skill_key: str,
-    context: Any,
-    scale: float = 1.0,
-    *,
-    readings: Any = None,
-) -> tuple[RejectReason, str] | None:
-    """Return the first skill-wide rejection of the ordered shared gates.
-
-    The complete deterministic skill-wide legality of one cast in the
-    resolver's own order — ownership, identity, lineage and proficiency
-    (:func:`ownership_failure`), the capability gates
-    (:func:`capability_failure`), then resource availability
-    (:func:`resource_failure`) — read once for one decision. Target-dependent
-    legality is separate (:func:`spell_condition_failure` and the shared
-    target pipeline) because it needs the candidate set.
-
-    The order is the preview's historical order, which the resolver splits
-    across its steps 1, 2 and 4 with the target resolution in between; every
-    reason and detail string is the resolver's own.
-    """
-    failure = ownership_failure(
-        actor, skill_key, context, scale, readings=readings
-    )
-    if failure is not None:
-        return failure
-    skill = (
-        SKILL_REGISTRY[skill_key]
-        if readings is None
-        else readings.skill(skill_key)
-    )
-    modifiers = (
-        evaluate_combat_modifiers_no_create(actor)
-        if readings is None
-        else readings.modifiers(actor)
-    )
-    blocked = (
-        bool(active_buff_keys_from_storage(actor) & BLOCKING_BUFF_KEYS)
-        if readings is None
-        else readings.blocked_by_buff(actor)
-    )
-    failure = resource_failure(
-        actor, skill, scale, modifiers=modifiers, readings=readings
-    )
-    if failure is not None:
-        return failure
-    return capability_failure(actor, blocked, modifiers=modifiers)
-
-
 def _spell_condition_gates(
     actor: Any,
     skill: SkillDef,
@@ -400,7 +361,7 @@ def _spell_condition_gates(
         evaluate_interaction_policy,
     )
 
-    evaluate_cast_conditions(actor, targets, skill)
+    evaluate_cast_conditions(actor, targets, skill, readings=readings)
     evaluate_interaction_policy(
         actor, targets, context, skill, readings=readings
     )
