@@ -7,6 +7,7 @@ import unittest
 from numbers import Real
 
 from world.lore.monsters import MONSTER_TIER_REGISTRY
+from world.lore.monster_species import MONSTER_VARIANT_REGISTRY
 from world.rules.monster_behaviour import (
     BEHAVIOUR_PROFILES,
     MONSTER_AI_TUNING,
@@ -74,7 +75,7 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
             self.assertIn(values["decision_mode"], {"legacy", "utility"})
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
-    def test_all_six_archetypes_stay_available_with_all_legacy_production_modes(self):
+    def test_all_six_archetypes_stay_available_with_their_own_legacy_modes(self):
         self.assertEqual(set(MONSTER_AI_TUNING.behaviour_profiles), _SIX_ARCHETYPES)
         self.assertEqual(set(BEHAVIOUR_PROFILES), _SIX_ARCHETYPES)
         for key, profile in BEHAVIOUR_PROFILES.items():
@@ -90,10 +91,28 @@ class MonsterBehaviourProfileTests(unittest.TestCase):
                 self.assertEqual(
                     profile.flee_hp_fraction, authored["flee_hp_fraction"]
                 )
-        # No production variant authors intelligence or a mode override yet,
-        # and no tier, species or archetype supplies one.
-        self.assertEqual(dict(MONSTER_AI_TUNING.variant_intelligence), {})
-        self.assertEqual(dict(MONSTER_AI_TUNING.variant_decision_mode), {})
+        # Every archetype keeps its own legacy mode, so the ONLY way a
+        # production variant leaves the legacy decision is its own registered
+        # override: each mapped key is a registered variant with a recorded
+        # binding and an explicit intelligence. Which variants those are, and
+        # that every other registered variant still resolves legacy, is
+        # established behaviourally by
+        # ``world.rules.tests.test_monster_ai_activation``.
+        for key, mode in MONSTER_AI_TUNING.variant_decision_mode.items():
+            with self.subTest(variant=key):
+                self.assertIn(key, MONSTER_VARIANT_REGISTRY)
+                self.assertIsInstance(mode, DecisionMode)
+                self.assertIn(key, MONSTER_AI_TUNING.variant_bindings)
+        for key, value in MONSTER_AI_TUNING.variant_intelligence.items():
+            with self.subTest(variant=key):
+                self.assertIn(key, MONSTER_VARIANT_REGISTRY)
+                self.assertIsInstance(value, int)
+                self.assertNotIsInstance(value, bool)
+        self.assertEqual(
+            set(MONSTER_AI_TUNING.variant_bindings),
+            set(MONSTER_AI_TUNING.variant_decision_mode)
+            | set(MONSTER_AI_TUNING.variant_intelligence),
+        )
         self.assertEqual(MONSTER_AI_TUNING.candidate_budget, 256)
         self.assertRegex(MONSTER_AI_TUNING.fingerprint, r"^[0-9a-f]{64}$")
 
