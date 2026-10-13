@@ -1,7 +1,6 @@
 import { h } from "vue";
 import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
-import DockVerbPopover from "../../components/DockVerbPopover.vue";
 import SceneOverview from "../../components/SceneOverview.vue";
 import CombatMenu from "../../lib/combat_menu.js";
 import {
@@ -16,7 +15,6 @@ import {
   explorationPanelFixture,
   localMapFixture,
   overviewArgs,
-  verbArgs,
 } from "../fixtures/scene_overview.js";
 
 // ActionDock: the non-closable bottom action surface. Props: mode (the
@@ -25,7 +23,7 @@ import {
 // (the committed slice), and playback (a combat round playing by itself: the
 // waiting cue with its skip). Slots: default (the active frame's rows — the
 // scene overview, a submenu, or a combat frame's command list) and overlay (a
-// target's verb popover card). Events: action (the exact OOB action intent
+// layer over the pane's visible box). Events: action (the exact OOB action intent
 // for a row activation), back, skip.
 
 // The exploration root's scene overview, from the shared derived-shape helper
@@ -84,33 +82,6 @@ const renderOverview = (args) => ({
     ]),
 });
 
-// A target's verb popover: the overview stays rendered (inert) in the pane and
-// the popover's card renders in the dock's overlay slot, over the pane box.
-const renderPopover = (args) => ({
-  render: () =>
-    h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;" }, [
-      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 16px;" },
-        "（上方為敘事區域）"),
-      h(ActionDock, args, {
-        default: () => [
-          h(SceneOverview, {
-            ...overviewArgs(OVERVIEW_PANEL, {
-              currentNode: "room:900",
-              localMap: OVERVIEW_MAP,
-              focusedKey: "target-11",
-              active: false,
-            }),
-          }),
-        ],
-        overlay: () => [
-          h(DockVerbPopover, {
-            ...verbArgs(OVERVIEW_PANEL, 11, { focusedKey: "talk-scripted" }),
-          }),
-        ],
-      }),
-    ]),
-});
-
 export default {
   title: "Action/ActionDock",
   component: ActionDock,
@@ -123,16 +94,6 @@ export const SceneOverviewRoot = {
     guidancePrefix: "場景",
     rootItems: [],
     focusedKey: "exit-0",
-  },
-};
-
-export const VerbPopoverOverOverview = {
-  render: renderPopover,
-  args: {
-    mode: "exploration",
-    guidancePrefix: "場景",
-    rootItems: [],
-    focusedKey: "talk-scripted",
   },
 };
 

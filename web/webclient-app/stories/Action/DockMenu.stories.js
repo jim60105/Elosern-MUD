@@ -13,9 +13,9 @@ import {
 // focus-change(key), activate({ key, item, intent }).
 //
 // The exploration dock's own frames do not render here: the root is the
-// SceneOverview component and a target's affordances are the DockVerbPopover
-// card (webclient-talk-open-dock retired the `nav` and `affordance` panes
-// with their last producers).
+// SceneOverview component and a target's affordances are the stage's verb
+// card (exploration-presence-rail; webclient-talk-open-dock retired the
+// `nav` and `affordance` panes with their last producers).
 
 const renderMenu = (args) => ({
   render: () =>

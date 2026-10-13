@@ -195,7 +195,6 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # story-documented before C8b mounts them.
                 "Action/SceneOverview",
                 "Action/ExitCompass",
-                "Action/DockVerbPopover",
                 # The dialogue stage actor (webclient-dialogue-stage-actors), the
                 # standing portrait that wraps Core/ReferenceArtwork on the stage.
                 "Core/StageActor",
@@ -205,6 +204,11 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The dialogue choice list (webclient-dialogue-choices-overlay), centred
                 # over the stage once the session line is read.
                 "Core/DialogueChoices",
+                # The centred card shell, the presence rail, and the exploration-screen
+                # story joined, and the verb popover left, with exploration-presence-rail.
+                "Core/ChoiceCard",
+                "Core/PresenceRail",
+                "Core/ExplorationScreen",
                 # The correspondence folio and the gallery stage-transform
                 # drawer refroze the manifest after this baseline was
                 # pinned: World/LettersPanel and

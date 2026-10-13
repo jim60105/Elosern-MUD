@@ -183,7 +183,6 @@ PREVIOUS_MANIFEST_KEYS = {
     # before C8b mounts them.
     "Action/SceneOverview",
     "Action/ExitCompass",
-    "Action/DockVerbPopover",
     # The dialogue stage actor (webclient-dialogue-stage-actors), the
     # standing portrait that wraps Core/ReferenceArtwork on the stage.
     "Core/StageActor",
@@ -193,6 +192,11 @@ PREVIOUS_MANIFEST_KEYS = {
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",
+    # The centred card shell, the presence rail, and the exploration-screen
+    # story joined, and the verb popover left, with exploration-presence-rail.
+    "Core/ChoiceCard",
+    "Core/PresenceRail",
+    "Core/ExplorationScreen",
     # The settings overlay's local reading preview
     # (webclient-settings-reading-preview).
     "Overlays/ReadingSample",
