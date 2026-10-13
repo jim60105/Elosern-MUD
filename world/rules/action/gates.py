@@ -420,6 +420,31 @@ def _resist_pending_effect(target: Any, verdict: Any) -> PendingEffect:
     )
 
 
+def resist_contest(skill: SkillDef | None) -> tuple[bool, bool]:
+    """Classify one cast skill's resist contest: ``(catalog_act, generic)``.
+
+    The ONE expression of which casts settlement contests against their
+    submitted targets, shared by the resolver's step-4b gate, the
+    out-of-combat settlement guard and the monster-AI submitted-roster guard,
+    so no consumer can drift from the gate it mirrors. ``catalog_act`` is a
+    ``SEXUAL_ACT_REGISTRY`` row declaring ``resistible=True``; ``generic`` is a
+    resistible ``SkillDef.interaction`` on any other skill, and is never
+    reported together with ``catalog_act`` because the two have different
+    settlement semantics: a resisting target of a catalog act leaves only its
+    own effects withheld, while a resisting target of a generic resistible
+    interaction cancels the whole action. ``None`` (a skill key the registry
+    does not carry) contests nothing.
+    """
+    act = SEXUAL_ACT_REGISTRY.get(skill.key) if skill is not None else None
+    catalog_act = act is not None and act.resistible
+    generic = not catalog_act and (
+        skill is not None
+        and skill.interaction is not None
+        and skill.interaction.resistible
+    )
+    return catalog_act, generic
+
+
 def _step4b_sexual_resist_gate(
     request: ActionRequest,
     skill: SkillDef,
@@ -436,11 +461,7 @@ def _step4b_sexual_resist_gate(
     per-call lookup is the same fresh-name pattern the module-level
     ``roll_d100`` binding provides for testability (design D-6).
     """
-    act = SEXUAL_ACT_REGISTRY.get(skill.key)
-    is_catalog_act = act is not None and act.resistible
-    is_generic_resistible = not is_catalog_act and (
-        skill.interaction is not None and skill.interaction.resistible
-    )
+    is_catalog_act, is_generic_resistible = resist_contest(skill)
     if not is_catalog_act and not is_generic_resistible:
         return targets, [], False
     from world.rules.sexual_resist import resist_verdict

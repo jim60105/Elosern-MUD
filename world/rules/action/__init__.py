@@ -122,6 +122,7 @@ from world.rules.action.gates import (
     _step4a_spell_conditions,
     _step4b_sexual_resist_gate,
     _stored_trait_value,
+    resist_contest,
     stored_gauge_pair,
 )
 from world.rules.action.resolver import ActionResolver
@@ -169,6 +170,7 @@ __all__ = [
     "parse_effect_key",
     "register_effect_handler",
     "register_event_effect_planner",
+    "resist_contest",
     "resolve_source_tier",
     "recovery_snapshot_kwargs",
     "source_attribution_kwargs",
