@@ -69,8 +69,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
     def test_crowded_room_folds_into_the_rail_at_a_narrow_viewport(self):
-        """A crowded room at the minimum supported viewport: the overview
-        keeps only its footer chips, the twelve exits stay on the compass,
+        """A crowded room at the minimum supported viewport: the dock holds no
+        row (its room actions are the place card's, exploration-room-actions),
+        the twelve exits stay on the compass,
         and the ten people stand on the presence rail as five medallions and
         a ``＋5`` slot (exploration-presence-rail), right-aligned on the stage
         floor above the band, left of the right-hand island column, and fully
@@ -94,10 +95,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
         keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll('#action-dock .scene-chip'))"
+            "() => Array.from(document.querySelectorAll('#action-dock [data-item-key]'))"
             ".map((el) => el.getAttribute('data-item-key'))"
         )
-        self.assertEqual(keys, ["look-room", "wait"], "the overview keeps only its footer")
+        self.assertEqual(keys, [], "the exploration root renders no dock row")
+        self.assertEqual(
+            page.locator('[data-anchor="map"] [data-testid="place-card-wait"]').count(),
+            1,
+            "the room actions stand on the place card",
+        )
         self.assertEqual(
             page.locator('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').count(),
             len(exits),

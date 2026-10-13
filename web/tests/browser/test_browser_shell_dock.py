@@ -83,32 +83,31 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
             self.assertGreaterEqual(geometry["compassTop"], geometry["paneTop"] - 0.5, f"{viewport} {geometry}")
             self.assertLessEqual(geometry["compassBottom"], geometry["paneBottom"] + 0.5, f"{viewport} {geometry}")
             self.assertAlmostEqual(geometry["compassWidth"], geometry["compassHeight"], delta=1)
-            # The exploration root is the exit compass beside the scene
-            # overview: one frame of chips (people, objects, and the footer)
-            # and NO combat list. The chip count varies with the room's
-            # occupants, so only the floor is pinned.
+            # The exploration root is the exit compass beside the 建議 pill
+            # and the readout (exploration-room-actions): no chip row, no
+            # combat list, and no dock row at all.
             self.assertEqual(
                 page.locator('#action-dock [data-pane-kind="commands"]').count(),
                 0,
-                "exploration renders the overview, never the combat command list",
+                "exploration renders the compass pane, never the combat command list",
             )
+            # A negative check read through `evaluate`, so the frozen-contract
+            # scanner does not re-register the retired hook.
+            self.assertEqual(page.evaluate("() => document.querySelectorAll('.scene-overview').length"), 0)
             self.assertEqual(
-                page.locator('[data-testid="scene-overview"]').count(),
+                page.locator('#action-dock [data-testid="exploration-root"]').count(),
                 1,
-                "the exploration root renders exactly one scene overview",
+                "the exploration root renders exactly one compass pane",
             )
-            cells = page.locator("#action-dock [data-item-key]")
-            self.assertGreaterEqual(cells.count(), 2, "the overview renders its chips")
-            # The focused chip carries the muted-gold fill (the `--focused`
-            # class; webclient-desktop-shell: "The focused row or chip SHALL be
-            # marked by a muted-gold fill plus a leading glyph") — the
-            # obsidian-gold wave re-pointed the draft's seal-red gradient to
-            # the flat --gold-glow token. Assert the computed fill against the
-            # token resolved through a probe node inside the dock subtree (the
-            # token is declared on .elosern-root, not :root, so a
-            # documentElement read resolves to nothing; and the raw token text
-            # is not the computed color string).
-            focused = page.locator("#action-dock .dock-menu-item--focused").first
+            self.assertEqual(page.locator("#action-dock [data-item-key]").count(), 0)
+            # A pointed-at room action carries the muted-gold fill
+            # (webclient-desktop-shell: the focused or hovered control is
+            # marked by a muted-gold fill) — the flat --gold-glow token,
+            # resolved through a probe node inside the client root (the token
+            # is declared on .elosern-root, not :root).
+            wait_button = page.locator('[data-anchor="map"] [data-testid="place-card-wait"]')
+            wait_button.hover()
+            page.wait_for_timeout(200)
             gold_glow = page.evaluate(
                 """() => {
                     const probe = document.createElement('span');
@@ -120,34 +119,38 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
                 }"""
             )
             self.assertEqual(
-                focused.evaluate("el => getComputedStyle(el).backgroundColor"),
+                wait_button.evaluate("el => getComputedStyle(el).backgroundColor"),
                 gold_glow,
-                "the focused chip carries the muted-gold --gold-glow fill",
+                "the hovered 等待 button carries the muted-gold --gold-glow fill",
             )
-            # The overview draws no visible detail pane, and its reason strip
-            # appears only while a disabled chip is focused.
+            page.mouse.move(0, 0)
+            # The exploration screen draws no detail pane: server-authored
+            # reasons appear in the shared readout.
             self.assertEqual(page.locator('[data-testid="exploration-detail"]').count(), 0)
-            # The footer's 等待／休息 chip opens the waiting frame inside the
-            # command region; the row region keeps its pane layout.
+            # The place card's 等待 opens the wait card over the stage; the
+            # command region keeps its geometry.
             activate_overview_chip(page, "wait")
-            page.wait_for_selector(".waiting-screen", timeout=15000)
+            page.wait_for_selector('[data-anchor="choices"] [data-testid="wait-card"]', timeout=15000)
             pane_display = page.evaluate(
-                "() => { const v = document.querySelector('.waiting-screen');"
+                "() => { const v = document.querySelector('[data-anchor=\"choices\"] [data-testid=\"wait-card\"]');"
                 " return v ? getComputedStyle(v).display : null; }"
             )
-            self.assertIn(
-                pane_display,
-                ("grid", "block", "flex"),
-                "the waiting frame's container uses its pane kind's CSS layout",
-            )
-            # Escape pops exactly one level and returns the dock to the
-            # overview with the 等待／休息 chip focused.
+            self.assertEqual(pane_display, "flex", "the wait card uses the card frame's layout")
+            # Escape closes the card and returns focus to 等待; the router never
+            # left its root.
             page.keyboard.press("Escape")
             page.wait_for_timeout(150)
             self.assertEqual(store_state(page)["dockDepth"], 1)
-            self.assertEqual(store_state(page)["focus"]["key"], "wait")
-            self.assertEqual(page.locator(".waiting-screen").count(), 0)
- 
+            self.assertIsNone(store_state(page)["roomCard"])
+            self.assertTrue(
+                page.evaluate(
+                    "() => document.activeElement === document.querySelector("
+                    "'[data-anchor=\"map\"] [data-testid=\"place-card-wait\"]')"
+                ),
+                "Escape returns focus to the 等待 button",
+            )
+            self.assertEqual(page.locator('[data-anchor="choices"] [data-testid="wait-card"]').count(), 0)
+
     @covers_requirement(
         "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
     )

@@ -7,6 +7,9 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     CARD_SELECTOR,
+    SUGGESTIONS_CARD_SELECTOR,
+    WAIT_CARD_SELECTOR,
+    exploration_root_controls,
     activate_card_row,
     card_row_keys,
     presence_entry_keys,
@@ -66,8 +69,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         paints the draft's `.dockwrap` chrome (gradient, hairline top border,
         upward shadow); its right third is the command region, which holds
         ``#action-dock`` — a content column that paints nothing itself. No
-        frame (the interaction workspace with a target selected, the waiting
-        frame) moves or resizes the region. Verified across the scenario's
+        card (a person's verb card, the wait card) moves or resizes the
+        region. Verified across the scenario's
         viewport range (1451x790 through 2560x1440).
         """
         measure = """() => {
@@ -152,22 +155,25 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertEqual(geometry["dockBorderTopWidth"], "0px")
             self.assertEqual(geometry["dockBoxShadow"], "none")
 
-            # No frame or card moves or resizes the region: a person's verb
-            # card over the stage (the command region inert and dimmed beneath
-            # it, exploration-presence-rail), then the waiting frame.
+            # No card moves or resizes the region: a person's verb card over
+            # the stage (the command region inert and dimmed beneath it,
+            # exploration-presence-rail), then the wait card
+            # (exploration-room-actions).
             baseline = (geometry["regionLeft"], geometry["regionTop"],
                         geometry["regionRight"], geometry["regionBottom"],
                         geometry["bandHeight"])
             activate_overview_chip(page, "target-11")
             page.wait_for_selector(CARD_SELECTOR, timeout=15000)
             after_interact = page.evaluate(measure)
-            # Escape closes the card, and the overview's 等待／休息 chip then
-            # opens the waiting frame.
+            # Escape closes the card, and the place card's 等待 then opens
+            # the wait card.
             _press(page, "Escape")
             wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
             activate_overview_chip(page, "wait")
-            page.wait_for_selector(".waiting-screen", timeout=15000)
+            page.wait_for_selector(WAIT_CARD_SELECTOR, timeout=15000)
             after_wait = page.evaluate(measure)
+            _press(page, "Escape")
+            wait_for_store_state(page, lambda s: s.get("roomCard") is None)
             for label, state in (("verb card", after_interact), ("wait", after_wait)):
                 box = (state["regionLeft"], state["regionTop"], state["regionRight"],
                        state["regionBottom"], state["bandHeight"])
@@ -308,10 +314,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "exploration renders no combat root list",
         )
         self.assertEqual(
-            page.locator('[data-testid="scene-overview"]').count(),
+            page.locator('#action-dock [data-testid="exploration-root"]').count(),
             1,
-            "the exploration root is the scene overview",
+            "the exploration root is the compass pane",
         )
+        # A negative check read through `evaluate`, so the frozen-contract
+        # scanner does not re-register the retired hook.
+        self.assertEqual(page.evaluate("() => document.querySelectorAll('.scene-overview').length"), 0)
 
     @covers_requirement(
         "webclient-contextual-hud::a-breadcrumb-derived-from-the-router-names-the-player-s-position-at-depth",
@@ -319,7 +328,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     )
     def test_breadcrumb_tracks_router_depth(self):
         """The breadcrumb appears below the root and names parent + current;
-        a person's verb card is no router frame and adds none."""
+        a person's verb card and the suggestions card are no router frames
+        and add none (exploration-presence-rail, exploration-room-actions)."""
         page = self.logged_in_page()
         exploration = _exploration_panel(
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
@@ -360,15 +370,32 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
         self.assertEqual(sent_action_count(page), 0, "the card's back row dispatches no ui_action")
 
-        # Any other submenu keeps the breadcrumb naming parent + current.
+        # The suggestions card is client-local too: no router frame, no
+        # breadcrumb; its ✕ 返回 closes it with no ui_action.
         activate_overview_chip(page, "suggestions")
-        page.wait_for_timeout(150)
-        self.assertEqual(_dock_depth(page), 2, "the suggestions frame is depth 2")
+        page.wait_for_selector(SUGGESTIONS_CARD_SELECTOR, timeout=15000)
+        self.assertEqual(_dock_depth(page), 1, "the suggestions card pushes no router frame")
+        self.assertTrue(
+            crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
+            "no breadcrumb is rendered under the suggestions card",
+        )
+        activate_card_row(page, "back", selector=SUGGESTIONS_CARD_SELECTOR)
+        wait_for_store_state(page, lambda s: s.get("roomCard") is None)
+        self.assertEqual(sent_action_count(page), 0, "the card's back row dispatches no ui_action")
+
+        # A real submenu keeps the breadcrumb naming parent + current: the
+        # combat root's 技能 opens the category frame.
+        _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
+        _wait_mode(page, "combat")
+        focus_action_dock(page)
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('skills')"))
+        _press(page, "Enter", 150)
+        self.assertEqual(_dock_depth(page), 2, "the category frame is depth 2")
         self.assertFalse(
             crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
             "the breadcrumb is visible at depth >= 2",
         )
-        self.assertIn("場景", crumb.inner_text(), "the breadcrumb names the parent frame")
+        self.assertIn("戰鬥", crumb.inner_text(), "the breadcrumb names the parent frame")
 
         # The back control pops exactly one level and dispatches no ui_action.
         crumb.locator(".dock-crumb__back").click()
@@ -391,7 +418,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         """`數字鍵 1–9` is real behaviour. At the exploration root the presence
         rail owns the digits (exploration-presence-rail): a digit activates
         the Nth rail entry exactly like Enter, a digit past the rail is
-        claimed and does nothing, and none reaches the footer chips; while a
+        claimed and does nothing, and none reaches a dock row; while a
         card is open its rows own the digits (webclient-align-01, widened by
         webclient-retire-exploration-submenus).
         """
@@ -416,24 +443,21 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # The exploration root is the scene overview's footer [look-room,
-        # wait] (the suggestions envelope is unavailable); the person stands
-        # on the presence rail and the three exits on the exit compass
-        # (exploration-exit-compass), neither taking a footer slot.
-        self.assertEqual(_dock_depth(page), 1, "the overview is the root frame")
-        self.assertEqual(
-            page.evaluate(
-                "() => Array.from(document.querySelectorAll("
-                "'#action-dock .scene-chip')).map((el) => el.getAttribute('data-item-key'))"
-            ),
-            ["look-room", "wait"],
-            "the overview's rendered chips",
-        )
+        # The exploration root is empty (exploration-room-actions): the
+        # room actions are the place card's (the suggestions envelope is
+        # unavailable, so no 建議 pill); the person stands on the presence
+        # rail and the three exits on the exit compass
+        # (exploration-exit-compass), none taking a dock row.
+        self.assertEqual(_dock_depth(page), 1, "the exploration root is the only frame")
+        controls = exploration_root_controls(page)
+        self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
+        self.assertTrue(controls["look"] and controls["wait"])
+        self.assertFalse(controls["pill"])
         self.assertEqual(presence_entry_keys(page), ["target-11"])
         self.assertEqual(sorted(compass_target_refs(page)), ["ex-a", "ex-b", "ex-c"])
 
         # `9` is past the rail's one entry: claimed (its default prevented),
-        # nothing opens or submits, and no footer chip runs.
+        # nothing opens or submits.
         claimed = page.evaluate(
             """() => {
           const event = new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true });
@@ -498,11 +522,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # The exploration root renders the exit compass beside the scene
-        # overview, and no exit-outlet grid or exit chip exists anywhere in
-        # the dock (exploration-exit-compass).
+        # The exploration root renders the exit compass beside the readout,
+        # and no exit-outlet grid or exit chip exists anywhere in the dock
+        # (exploration-exit-compass, exploration-room-actions).
         self.assertEqual(_dock_depth(page), 1)
-        self.assertEqual(page.locator('[data-testid="scene-overview"]').count(), 1)
+        self.assertEqual(page.locator('#action-dock [data-testid="exploration-root"]').count(), 1)
         # A NEGATIVE assertion (the retired outlet grid must not exist). It is
         # read through `evaluate` so the frozen-contract scanner — which cannot
         # tell a positive target from a retired-hook absence check — does not

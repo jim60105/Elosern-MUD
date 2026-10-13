@@ -87,12 +87,12 @@ class ActionLockingTest(BrowserAcceptanceTest):
     def test_disabled_controls_do_not_send(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # The scene-overview root (webclient-scene-overview-swap) carries no
-        # disabled chip in this fixture, and Enter on the focused chip now
-        # legitimately activates it — so the "controls must not send" half is
-        # demonstrated on the deterministic lock: the reload-required
-        # protocol error locks every dock control (frames and the connection
-        # stay intact), so keyboard activation of any chip must refuse.
+        # The exploration root carries no row (exploration-room-actions), and
+        # the place card's 查看房間 legitimately submits when free — so the
+        # "controls must not send" half is demonstrated on the deterministic
+        # lock: the reload-required protocol error locks every control
+        # (frames and the connection stay intact), so keyboard activation of
+        # the dock and of 查看房間 must refuse.
         generation = store_state(page)["generation"]
         accepted = page.evaluate(
             """(args) => window.__elosernBridge.store.receive(
@@ -109,6 +109,10 @@ class ActionLockingTest(BrowserAcceptanceTest):
         focus_action_dock(page)
         for key in ("ArrowDown", "Enter", " "):
             page.keyboard.press(key)
+        look = page.locator('[data-anchor="map"] [data-testid="place-card-look"]')
+        if look.count() > 0:
+            look.focus()
+            page.keyboard.press("Enter")
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
 

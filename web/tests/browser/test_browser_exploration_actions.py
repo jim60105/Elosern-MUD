@@ -86,14 +86,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # At the South Gate a living goblin makes every skip unsafe; the
         # daypart boundary rejects before any clock advance.
         time_before = store_state(page)["serverTime"]
-        # The desktop redesign re-homed Wait to the dock root's fourth tab
-        # (webclient-exploration-menu: the capability-driven root
-        # [move, look, interact, wait, suggestions]) and re-cut the wait
-        # frame into the three-operation row [等待直到黎明, 睡眠至完全恢復,
-        # 休息 N 小時] — the direct daypart wait dispatches from the first
-        # column, and the safety gate rejects it while the goblin stands at
-        # the gate (the daypart value is irrelevant to the rejection).
-        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
+        # The place card's 等待 opens the wait card (exploration-room-actions)
+        # with its three operations [等待直到黎明, 睡眠至完全恢復, 休息 N 小時]
+        # and the first row active — the direct daypart wait dispatches from
+        # it, and the safety gate rejects it while the goblin stands at the
+        # gate (the daypart value is irrelevant to the rejection).
+        activate_overview_chip(page, "wait")  # the place card's 等待
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -106,15 +104,12 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # The bounded custom-duration form is parsed server-side and rejected
         # by the same safety gate.
-        # 休息 N 小時 is the third card of the shipped row (stores/elosern.js
-        # resolves exploration.wait with gridCols: 3): two ArrowRight steps
-        # reach it.
-        # The rejection leaves the dock inside the wait submenu frame, so
-        # normalise back to the scene overview before re-opening it.
+        # 休息 N 小時 is the wait card's third row: two ArrowDown steps reach
+        # it. The sent dawn wait closed the card, so it re-opens from 等待.
         self._reset_root(page)
-        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
-        _press(page, "ArrowRight")  # 睡眠至完全恢復
-        _press(page, "ArrowRight")  # 休息 N 小時
+        activate_overview_chip(page, "wait")  # the place card's 等待
+        _press(page, "ArrowDown")  # 睡眠至完全恢復
+        _press(page, "ArrowDown")  # 休息 N 小時
         _press(page, "Enter")
         wait_for_store_state(
             page,
@@ -158,15 +153,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             lambda p: p.get("available") is True and p["current_node"] != fixture_home_node_id(),
         )
         time_before = store_state(page)["serverTime"]
-        # The shipped three-operation frame (webclient-exploration-menu,
-        # 298bc61): 等待直到黎明 / 睡眠至完全恢復 dispatch their daypart wait
-        # directly — a no-op at the fixture's midnight clock — while 休息 N
-        # 小時 (wait-rest, the third card of the gridCols: 3 row) opens the
-        # custom-duration form. Confirm the form's default one-hour wait so
-        # the SKIP advance moves the fixture clock off midnight.
-        activate_overview_chip(page, "wait")  # 等待／休息 footer chip
-        _press(page, "ArrowRight")  # 睡眠至完全恢復
-        _press(page, "ArrowRight")  # 休息 N 小時
+        # The wait card's three operations (exploration-room-actions): 等待
+        # 直到黎明 dispatches its daypart wait directly — a no-op at the
+        # fixture's midnight clock — while 休息 N 小時 (wait-rest, the third
+        # row) opens the custom-duration form. Confirm the form's default
+        # one-hour wait so the SKIP advance moves the fixture clock off
+        # midnight.
+        activate_overview_chip(page, "wait")  # the place card's 等待
+        _press(page, "ArrowDown")  # 睡眠至完全恢復
+        _press(page, "ArrowDown")  # 休息 N 小時
         _press(page, "Enter")
         wait_for_store_state(
             page,

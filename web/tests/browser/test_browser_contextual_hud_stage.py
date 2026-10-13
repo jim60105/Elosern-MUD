@@ -1109,21 +1109,21 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         states = {"root": page.evaluate(measure)}
 
         # A person's verb card over the stage (exploration-presence-rail),
-        # then the waiting frame: the scenario's "a person's verb card"
-        # state.
+        # then the wait card (exploration-room-actions): the scenario's "a
+        # person's verb card" state.
         activate_overview_chip(page, "target-11")
         page.wait_for_selector(CARD_SELECTOR, timeout=15000)
         states["verb-card"] = page.evaluate(measure)
-        # Close the card (Escape, or its ✕ 返回) so the overview's footer
-        # chip is addressable again.
+        # Close the card (Escape, or its ✕ 返回) so the place card's 等待 is
+        # in reach again.
         page.evaluate(f"() => {store}.closePresenceCard()")
         page.wait_for_selector(CARD_SELECTOR, state="detached", timeout=15000)
 
         activate_overview_chip(page, "wait")
-        page.wait_for_selector(".waiting-screen", timeout=15000)
+        page.wait_for_selector('[data-anchor="choices"] [data-testid="wait-card"]', timeout=15000)
         states["wait"] = page.evaluate(measure)
 
-        page.evaluate(f"() => {store}.focusPress('Escape')")
+        page.evaluate(f"() => {store}.closeRoomCard()")
         _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
         _wait_mode(page, "combat")
         states["combat-root"] = page.evaluate(measure)

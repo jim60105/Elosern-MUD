@@ -287,15 +287,15 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # The scene overview's 查看房間 chip submits ``explore.look``.
-        # Rapidly double-activating it submits once; the immediate second
-        # activation is rejected (the in-flight lock, or the stale-row guard
-        # once the dock re-renders), so exactly one action crosses the wire
-        # and no duplicated chips ever render. (The exits are the exit
-        # compass's, whose rapid clicks queue one step by design.)
+        # The place card's 查看房間 submits ``explore.look``
+        # (exploration-room-actions). Rapidly double-activating it submits
+        # once; the immediate second activation is rejected by the in-flight
+        # lock, so exactly one action crosses the wire and no duplicated
+        # control ever renders. (The exits are the exit compass's, whose
+        # rapid clicks queue one step by design.)
         del panel
-        exit_key = "look-room"
-        page.wait_for_selector(f'[data-item-key="{exit_key}"]', timeout=15000)
+        look = '[data-anchor="map"] [data-testid="place-card-look"]'
+        page.wait_for_selector(look, timeout=15000)
         # Both clicks dispatch inside ONE synchronous task: the first click
         # marks the mutation in flight before the second runs, so the rapid
         # second activation is rejected by the lock. Two separate evaluates
@@ -303,22 +303,22 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # turning the race (which row state the second click sees) into the
         # variable under test.
         page.evaluate(
-            """() => {
-              const row = document.querySelector('[data-item-key="EXITKEY"]');
-              window.__staleRow = row;
-              row.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
+            """(selector) => {
+              const button = document.querySelector(selector);
+              window.__staleRow = button;
+              button.dispatchEvent(new MouseEvent('click', {bubbles: true, detail: 1}));
               if (window.__staleRow) {
                 window.__staleRow.dispatchEvent(
                   new MouseEvent('click', {bubbles: true, detail: 1})
                 );
               }
-            }""".replace("EXITKEY", exit_key)
+            }""",
+            look,
         )
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        rows = self._rows(page)
-        self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
-        self.assertGreaterEqual(len(rows), 1)
+        self.assertEqual(page.locator(look).count(), 1, "the control never renders twice")
+        self.assertEqual(self._rows(page), [], "the exploration root renders no dock row")
 
     @covers_requirement(
         "webclient-pointer-activation::the-action-dock-is-a-single-composite-widget-that-cannot-double-activate"
@@ -328,20 +328,19 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # A genuine browser double-click on the overview's 查看房間 chip: the
+        # A genuine browser double-click on the place card's 查看房間: the
         # first click (detail 1) submits ``explore.look`` once; the second
         # click of the gesture is suppressed by the in-flight lock (no second
         # submit), so exactly one action crosses the wire.
         del panel
-        page.wait_for_selector('[data-item-key="look-room"]', timeout=15000)
-        look_row = page.locator('[data-item-key="look-room"]')
+        look = '[data-anchor="map"] [data-testid="place-card-look"]'
+        page.wait_for_selector(look, timeout=15000)
+        look_row = page.locator(look)
         self.assertEqual(look_row.count(), 1)
         look_row.dblclick()
         page.wait_for_timeout(400)
         self.assertEqual(sent_action_count(page, "explore.look"), 1)
-        rows = self._rows(page)
-        self.assertEqual(len(rows), len(set(rows)), "no row may render twice")
-        self.assertGreaterEqual(len(rows), 1)
+        self.assertEqual(look_row.count(), 1, "the control never renders twice")
 
     @covers_requirement(
         "webclient-pointer-activation::pointer-activation-traverses-the-identical-path-as-keyboard-confirmation"
@@ -410,30 +409,34 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 login_and_open(page, self.webclient_url, self.base_url)
                 self._wait_exploration_available(page)
 
-                # The row container exposes the listbox role with one tab stop
-                # and an active-descendant reference.
-                container = page.locator("#action-dock [role='listbox']")
+                # The exploration root holds no row of its own
+                # (exploration-room-actions); its composite is the presence
+                # rail: the listbox role with one tab stop and an
+                # active-descendant reference.
+                self.assertEqual(page.locator("#action-dock [role='listbox']").count(), 0)
+                container = page.locator('[data-anchor="presence"] [role="listbox"]')
+                container.wait_for(state="visible", timeout=15000)
                 self.assertEqual(container.count(), 1)
                 self.assertEqual(container.get_attribute("tabindex"), "0")
                 active_id = container.get_attribute("aria-activedescendant")
                 self.assertTrue(active_id, "aria-activedescendant must name a row")
-                named = page.locator(f"#{active_id}")
+                named = page.locator(f'[id="{active_id}"]')
                 self.assertEqual(named.count(), 1)
 
-                # Rows expose option role with selected state; none is
+                # Entries expose option role with selected state; none is
                 # reachable by sequential keyboard navigation.
-                rows = page.locator("#action-dock [role='option']")
+                rows = container.locator("[role='option']")
                 self.assertGreaterEqual(rows.count(), 1)
                 for index in range(rows.count()):
-                    self.assertEqual(rows.nth(index).get_attribute("tabindex"), "-1")
+                    self.assertIn(rows.nth(index).get_attribute("tabindex"), (None, "-1"))
                     self.assertIn(
                         rows.nth(index).get_attribute("aria-selected"),
                         ("true", "false"),
                     )
-                # The active-descendant row is marked focused and selected.
-                focused = page.locator("#action-dock .dock-menu-item--focused")
-                self.assertEqual(focused.count(), 1)
-                self.assertEqual(focused.get_attribute("aria-selected"), "true")
+                # Exactly the active-descendant entry is selected.
+                selected = container.locator("[role='option'][aria-selected='true']")
+                self.assertEqual(selected.count(), 1)
+                self.assertEqual(selected.get_attribute("id"), active_id)
                 page.close()
 
     @covers_requirement(
