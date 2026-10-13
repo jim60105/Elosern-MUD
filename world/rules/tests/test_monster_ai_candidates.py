@@ -59,6 +59,7 @@ from world.rules.progression import FREEFORM_SCALE_VALUES
 from world.skills.cast_conditions import CastCondition, CastConditionSubject
 from world.skills.effects import EffectAudience, EffectPolicy, InteractionPolicy
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
+from world.tests.synthetic_data import SYNTH_ACT
 
 from ._combat_session_helpers import (
     SYNTH_GLOW_ELEMENT,
@@ -187,6 +188,22 @@ RESISTIBLE = replace(
         contact=False, distinct_participants=False, resistible=True
     ),
 )
+#: The act-catalog row settlement contests instead of an authored interaction:
+#: a resistible row keyed to a group skill that declares no interaction at all.
+CATALOG_ACT = replace(SYNTH_ACT, key="t_cand_catalog_act", resistible=True)
+#: The same round as ENEMY_AUDIENCE, contested through that catalog row.
+CATALOG_RESISTIBLE = replace(ENEMY_AUDIENCE, key=CATALOG_ACT.key)
+#: The same round again, gated per submitted target on a prerequisite only a
+#: sealed target satisfies: the submitted roster decides the condition.
+SCOPED = replace(
+    ENEMY_AUDIENCE,
+    key="t_cand_scoped",
+    cast_conditions=(
+        CastCondition(
+            CastConditionSubject.EACH_TARGET, {"buff_active": SEAL_BUFF_KEY}
+        ),
+    ),
+)
 #: The element-mastery row that entitles the freeform (non-default scale) cast.
 MASTERY = f"{SYNTH_GLOW_ELEMENT}_mastery"
 
@@ -217,6 +234,8 @@ def _candidate_rows() -> dict[str, object]:
             ABSENT_BUFF,
             ABSENT_ACT,
             RESISTIBLE,
+            CATALOG_RESISTIBLE,
+            SCOPED,
         )
     }
 
@@ -282,6 +301,18 @@ def _scoped_element(key: str):
         import_module("world.lore.elements"), "ELEMENT" + "_REGISTRY"
     )
     return registry[key]
+
+
+def _act_registry() -> dict[str, object]:
+    """The live act catalog, resolved through a runtime attribute string.
+
+    Same data-independence precedent as :func:`_scoped_element`: the module
+    maps one file-local synthetic act row into this mapping for the duration of
+    a test without naming the catalog symbol the gate protects.
+    """
+    return getattr(
+        import_module("world.skills.sexual_acts"), "SEXUAL_ACT" + "_REGISTRY"
+    )
 
 
 def _suppress_innate_skills(test) -> None:
@@ -443,6 +474,78 @@ class CandidateShapeTests(unittest.TestCase):
             sorted(plan.shorthand for plan in result.plans),
             ["all", "all-enemies"],
         )
+
+    def test_a_catalog_resistible_act_keeps_its_submitted_identity(self):
+        # Settlement's other resist branch reads the act catalog, not an
+        # authored interaction: the same skill with that row stays two
+        # candidates, while the identical row flagged non-resistible collapses
+        # to the one audience combination both rosters route to.
+        _owned(self.actor, CATALOG_RESISTIBLE.key)
+        ally = _ProbeParticipant("t_cand_ally", pk=3)
+        with patch.dict(_act_registry(), {CATALOG_ACT.key: CATALOG_ACT}):
+            contested = _enumerate(
+                self.actor, (self.enemy,), extra_participants=(ally,)
+            )
+        with patch.dict(
+            _act_registry(),
+            {CATALOG_ACT.key: replace(CATALOG_ACT, resistible=False)},
+        ):
+            plain = _enumerate(
+                self.actor, (self.enemy,), extra_participants=(ally,)
+            )
+        self.assertEqual(
+            sorted(plan.shorthand for plan in contested.plans),
+            ["all", "all-enemies"],
+        )
+        self.assertEqual([plan.shorthand for plan in plain.plans], ["all-enemies"])
+
+    def test_a_roster_scoped_condition_keeps_the_least_constrained_group(self):
+        # The complete roster would fail the per-target prerequisite (the ally
+        # is not sealed) while the hostile roster passes it. The retained
+        # representation is the hostile group, so the legal plan survives
+        # while the collapsed duplicate is never examined: only the hostile
+        # plan and the decision's friendly roster -- the only other audience
+        # combination, the actor alone -- are judged, and that one is refused
+        # by the same per-submitted-target condition. Without a roster
+        # satisfying the prerequisite, the shape yields no candidate at all.
+        _owned(self.actor, SCOPED.key)
+        ally = _ProbeParticipant("t_cand_ally", pk=3)
+        _sealed(self.enemy)
+        result = _enumerate(self.actor, (self.enemy,), extra_participants=(ally,))
+        self.assertEqual(len(result.candidates), 1)
+        self.assertEqual(result.candidates[0].plan.shorthand, "all-enemies")
+        self.assertEqual(result.examined, 2)
+        self.assertEqual(result.exclusions, ())
+        self.assertEqual(
+            [rejection.identity.target_ids for rejection in result.rejections],
+            [(stable_identity(self.actor),)],
+        )
+        self.assertEqual(
+            [rejection.reason for rejection in result.rejections],
+            [RejectReason.CAST_CONDITION_UNMET],
+        )
+        unsealed = _enumerate(
+            self.actor, (self.other,), extra_participants=(ally,)
+        )
+        self.assertEqual(unsealed.candidates, ())
+        self.assertEqual(
+            {rejection.reason for rejection in unsealed.rejections},
+            {RejectReason.CAST_CONDITION_UNMET},
+        )
+
+    def test_two_single_targets_are_never_one_action(self):
+        # A SINGLE plan is its submitted target, so two different hostile
+        # targets stay two proposals even when every effect routes the same
+        # way: the plan the budget could not pay for is still an unexamined
+        # hole rather than a duplicate of the one already judged.
+        _owned(self.actor, ALLY_DAMAGE.key)
+        result = _enumerate(self.actor, (self.enemy, self.other), budget=1)
+        self.assertEqual(result.candidates, ())
+        self.assertEqual(
+            {rejection.reason for rejection in result.rejections},
+            {RejectReason.EFFECT_RESOLUTION_FAILED},
+        )
+        self.assertEqual((result.examined, result.omitted_targets), (1, 1))
 
     def test_implicit_self_and_none_bindings_are_not_widened(self):
         _owned(self.actor, NONE.key, SELF.key)
@@ -635,7 +738,8 @@ class CandidateBudgetTests(unittest.TestCase):
     def test_a_paid_examination_is_never_lost_to_a_later_proposal(self):
         # The family proposes the other target first and the budget is spent,
         # so the ring cannot reach the plan it already paid for: that plan is
-        # still a candidate, and no restriction removed it.
+        # still a candidate, no restriction removed it, and the unexamined hole
+        # in front of it still counts as omitted rather than examined.
         _owned(self.actor, MAGIC.key)
         first = _ProbeParticipant("t_cand_first", pk=1)
         second = _ProbeParticipant("t_cand_second", pk=2)
@@ -645,35 +749,46 @@ class CandidateBudgetTests(unittest.TestCase):
             order=(stable_identity(second), stable_identity(first)),
             budget=1,
         )
-        self.assertEqual(result.examined, 1)
         self.assertEqual(
-            [plan.target_ids for plan in result.plans],
-            [(stable_identity(first),)],
+            (
+                [plan.target_ids for plan in result.plans],
+                result.exclusions,
+                result.omitted_targets,
+            ),
+            ([(stable_identity(first),)], (), 1),
         )
-        self.assertEqual(result.exclusions, ())
-        self.assertEqual(result.omitted_targets, 1)
+        self.assertEqual(result.examined, 1)
 
     def test_a_paid_candidate_survives_every_scope_offset(self):
+        # An unexamined family precedes the family whose plan the capability
+        # search already paid for, whatever the ring offset: that plan is
+        # reported once and never as a restriction exclusion, and the proposals
+        # the spent budget never reached stay counted as omitted.
         _owned(self.actor, MAGIC.key, STRIKE.key)
-        reported = {
-            tuple(
-                sorted(
-                    candidate.identity.target_ids[0]
-                    for candidate in _enumerate(
-                        self.actor, self.enemies[:2], budget=1, scope_index=index
-                    ).candidates
+        outcomes = {
+            (
+                tuple(
+                    sorted(
+                        candidate.identity.target_ids
+                        for candidate in result.candidates
+                    )
+                ),
+                result.exclusions,
+                result.examined,
+                result.omitted_targets,
+                result.omitted_families,
+            )
+            for result in (
+                _enumerate(
+                    self.actor, self.enemies[:2], budget=1, scope_index=index
                 )
+                for index in range(8)
             )
-            for index in range(8)
         }
-        self.assertEqual(len(reported), 1)
-        self.assertTrue(next(iter(reported)))
-        for index in range(8):
-            result = _enumerate(
-                self.actor, self.enemies[:2], budget=1, scope_index=index
-            )
-            self.assertEqual(result.exclusions, (), index)
-            self.assertEqual(result.examined, 1)
+        self.assertEqual(
+            outcomes,
+            {(((stable_identity(self.enemies[0]),),), (), 1, 3, 2)},
+        )
 
     def test_slots_are_allocated_round_robin_across_families(self):
         _owned(self.actor, STRIKE.key, MAGIC.key)
