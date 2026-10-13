@@ -196,6 +196,17 @@ class SkillHandlerTests(EvenniaTestCase):
         traitless = SimpleNamespace(db=SimpleNamespace(skills=None, skill_grants=None))
         self.assertEqual(handler.SkillHandler(traitless).stored_effective_value("atk_phys"), 0)
 
+    def test_a_store_without_the_skills_attributes_reads_as_empty(self):
+        # A store object carrying neither skills nor skill_grants -- a pure
+        # fixture rather than a persisted typeclass -- contributes no stored
+        # skills and no grants instead of raising from inside the store read.
+        partial = SimpleNamespace(db=SimpleNamespace())
+        self.assertEqual(
+            handler.SkillHandler(partial).base_owned_keys(),
+            list(handler.INNATE_SKILL_ORDER),
+        )
+        self.assertEqual(handler.SkillHandler(partial).conferred_grants(), [])
+
     def test_handler_source_never_assigns_to_traits(self):
         tree = ast.parse(inspect.getsource(handler))
         for node in ast.walk(tree):

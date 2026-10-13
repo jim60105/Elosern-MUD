@@ -51,11 +51,6 @@ grants read shares the same resolver. The regression is
 attaches no skill handler), and the three labels above plus
 `test_combat_modifiers` stay green.
 
-The same commit's eager `SkillHandler(entity)` read in
-`combat_modifiers.build_no_create_condition_context` also breaks a further pre-
-existing master victim outside this change's delta scope:
-`world.rules.tests.test_sexual_resist` gives ten errors on this branch and the
-same ten on pristine `master` (the pure `SimpleNamespace` fixtures carry
-neither an attribute store nor a skills double). It is recorded here as
-pre-existing master breakage, not as this change's regression, and remains
-outside this change's delta and label set.
+The same commit left four further labels red on pristine `master`, and the repair is now complete. `world.rules.tests.test_sexual_resist` gave ten errors: its `FakeEntity` fixtures carry an attribute store and a skills double but a store object with no `skills` attribute, so the condition context's eager `SkillHandler(entity)` read raised. `test_skill_handler_has_no_rules_dependency` (`world.skills.tests.test_handler`) and `test_handler_imports_nothing_from_world_rules` (`world.skills.sexual_acts.tests.test_registry_structure`) failed on the handler's own shape: the ownership read had grown an import from the rules layer and dropped the duck-typed `getattr(entity, "sexual", None)` read the skill-handler spec requires. And the ownership read attached the sexual handler on a materialized entity, which the monster-AI snapshot contract forbids.
+
+The repair is its own commit. The condition-ownership resolvers read an accessor that mounts nothing -- an instance or class-level skills double, or a class-declared `property` such as the status facade's view -- and own nothing when the entity carries no persisted store. The handler's store reads tolerate a store with no `skills` or `skill_grants` attribute, and its counter vocabulary lives with the catalogue rows that declare it. The counters then come from the mounted `sexual` handler when one exists and from storage otherwise, so no read path attaches it. The two store-tolerance regressions are `test_a_store_without_the_skills_attributes_reads_as_empty` (`world.skills.tests.test_handler`) and `test_condition_ownership_reads_a_fixture_without_mounting_a_handler` (`world.rules.tests.test_rulebook_schema`).

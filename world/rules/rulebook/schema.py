@@ -13,6 +13,7 @@ The future ``sexual.yaml`` table is expected to import ``Condition``,
 Effects remain opaque to this module and are interpreted by each table owner.
 """
 
+import inspect
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -115,6 +116,28 @@ def load_sectioned_rules(path: Path) -> list[SectionedRule]:
     return rows
 
 
+def _own_skills_accessor(entity: Any) -> Any:
+    """Return the entity's own skills accessor when reading it mounts nothing.
+
+    A real typeclass carries ``skills`` as a lazily mounted handler descriptor,
+    so reading it from a read-only condition path would attach a handler -- the
+    very materialization these resolvers exist to avoid. An accessor reachable
+    without running a mounting descriptor -- a test fixture's skills double,
+    whether it sits on the instance or on the fixture's own class, or a
+    class-declared ``property`` such as the stored snapshot facade's pure view
+    -- is returned. ``getattr_static`` classifies it without materializing
+    anything.
+    """
+    accessor = inspect.getattr_static(entity, "skills", None)
+    if accessor is None:
+        return None
+    if isinstance(accessor, property):
+        return getattr(entity, "skills", None)
+    if hasattr(type(accessor), "__get__"):
+        return None
+    return accessor
+
+
 def owned_keys_for_condition(
     entity: Any, context: Mapping[str, Any] | None = None
 ) -> Any:
@@ -128,41 +151,43 @@ def owned_keys_for_condition(
     skill handler for every ``skill_owned`` condition even when the key set was
     already supplied.
 
-    A context that declares no ``owned_keys`` resolves through a directly
-    constructed handler, which never mounts the entity's lazy handler: a
-    persisted entity is detected by its attribute store BEFORE its lazy
-    ``skills`` property is touched, so a cold read attaches nothing. An entity
-    with no persisted store at all -- a pure fixture with its own skills double
-    -- is read through that double, which is the read this condition used before
-    the persisted read was introduced.
+    A context that declares no ``owned_keys`` lets the entity answer for
+    itself: an accessor already present on the instance (a pure fixture's skills
+    double, or an already mounted handler) is read through, and only a
+    persisted entity is read through a directly constructed handler, whose
+    store read never touches the lazy ``skills`` property. An entity with no
+    persisted store at all owns nothing, so no path forces a handler into
+    existence.
     """
     if context is not None:
         supplied = context.get("owned_keys")
         if supplied is not None:
             return supplied
+    own = _own_skills_accessor(entity)
+    if own is not None:
+        return own.owned_keys()
+    if getattr(entity, "attributes", None) is None:
+        return frozenset()
     from world.skills.handler import SkillHandler
 
-    if getattr(entity, "attributes", None) is None:
-        entity_skills = getattr(entity, "skills", None)
-        if entity_skills is not None:
-            return entity_skills.owned_keys()
     return SkillHandler(entity).owned_keys()
 
 
 def conferred_grants_for_condition(entity: Any) -> Any:
     """Return one entity's conferred skill grants without mounting a handler.
 
-    Same contract as :func:`owned_keys_for_condition`: a persisted entity is
-    detected by its attribute store BEFORE its lazy ``skills`` property is
-    touched, and only an entity with no persisted store at all -- a pure
-    fixture with its own skills double -- is read through that double.
+    Same contract as :func:`owned_keys_for_condition`: an accessor already
+    present on the instance answers, a persisted entity is read through a
+    directly constructed handler, and an entity with no persisted store at all
+    has no grants.
     """
+    own = _own_skills_accessor(entity)
+    if own is not None:
+        return own.conferred_grants()
+    if getattr(entity, "attributes", None) is None:
+        return ()
     from world.skills.handler import SkillHandler
 
-    if getattr(entity, "attributes", None) is None:
-        entity_skills = getattr(entity, "skills", None)
-        if entity_skills is not None:
-            return entity_skills.conferred_grants()
     return SkillHandler(entity).conferred_grants()
 
 

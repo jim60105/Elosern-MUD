@@ -35,7 +35,13 @@ class SkillHandler:
 
     @property
     def _raw(self) -> dict[str, list[str]]:
-        raw = self.entity.db.skills
+        """The persisted skill record, or the empty baseline.
+
+        The read is store-tolerant: a store object carrying no ``skills``
+        attribute at all -- a pure fixture rather than a persisted typeclass --
+        reads as no stored skills instead of raising from inside the read.
+        """
+        raw = getattr(getattr(self.entity, "db", None), "skills", None)
         return raw or {"active": [], "passive": []}
 
     def base_owned_keys(self) -> list[str]:
@@ -55,31 +61,54 @@ class SkillHandler:
         """Return base owned keys plus the entity's unlocked sexual acts.
 
         Unlocked act keys are appended sorted for deterministic iteration.
-        The unlocked set resolves from PERSISTED counter values, so reading
-        ownership never mounts the sexual handler: ``SexualState.__init__``
-        writes a complete baseline whenever the stored records are
-        incomplete, and a no-create consumer must not trigger that write.
-        The unmaterialized case is the same read with every counter absent,
-        which ``unlocked_act_keys_for`` takes as zero.
+        The unlocked set resolves from the entity's lifetime counters, read
+        without ever attaching the sexual handler: an already mounted handler
+        answers through the duck-typed ``getattr(self.entity, "sexual", None)``
+        and an unmounted entity reads the same counters out of storage.
+        ``SexualState.__init__`` writes a complete baseline whenever the stored
+        records are incomplete, so a decision, preview or status read must
+        never touch the property, and the unmaterialized case is the storage
+        read with every counter absent, which ``unlocked_act_keys_for`` takes
+        as zero. No import from the rules layer is involved.
         """
         base = self.base_owned_keys()
         from world.skills.sexual_acts import unlocked_act_keys_for
 
-        return [
-            *base,
-            *sorted(unlocked_act_keys_for(base, self._stored_counter_values())),
-        ]
+        return [*base, *sorted(unlocked_act_keys_for(base, self._counter_values()))]
+
+    def _counter_values(self) -> dict[str, int]:
+        """Return this entity's lifetime counters without attaching a handler.
+
+        An already mounted handler is read through the duck-typed
+        ``getattr(self.entity, "sexual", None)`` -- the live authority for the
+        entity's sexual state -- while an unmounted entity falls back to the
+        persisted storage read, because reading the ``sexual`` property would
+        mount the handler and create its records.
+        """
+        if "sexual" in getattr(self.entity, "__dict__", {}):
+            from world.skills.sexual_acts import gated_counter_keys
+
+            mounted = getattr(self.entity, "sexual", None)
+            if mounted is not None:
+                return {
+                    name: int(getattr(mounted, name))
+                    for name in gated_counter_keys()
+                }
+        return self._stored_counter_values()
 
     def _stored_counter_values(self) -> dict[str, int]:
-        """Return the persisted lifetime sexual counters, handler-free.
+        """Return the persisted lifetime counters, handler-free.
 
+        Exactly the counters the catalogue's own unlock maps read, so this
+        module needs no vocabulary from the layer that materializes them as
+        traits: a counter no act gates on cannot change the unlocked set.
         Counter traits store their value as ``base``; a missing record and a
         malformed record both read as absent, which the unlock rule treats as
         the zero baseline.
         """
         from collections.abc import Mapping
 
-        from world.rules.sexual_state.lifecycle import _LIFETIME_COUNTER_KEYS
+        from world.skills.sexual_acts import gated_counter_keys
 
         attributes = getattr(self.entity, "attributes", None)
         if attributes is None:
@@ -90,7 +119,7 @@ class SkillHandler:
         if not isinstance(records, Mapping):
             return {}
         values: dict[str, int] = {}
-        for name in _LIFETIME_COUNTER_KEYS:
+        for name in gated_counter_keys():
             record = records.get(name)
             if not isinstance(record, Mapping):
                 continue
@@ -99,33 +128,6 @@ class SkillHandler:
                 continue
             values[name] = int(base)
         return values
-
-    def _sexual_state_materialized(self) -> bool:
-        """Return whether the entity's sexual handler was already mounted.
-
-        The handler's trait storage is created on first mount, so its
-        presence is the canonical materialization marker — the same
-        attribute the no-create read paths check.
-        """
-        attributes = getattr(self.entity, "attributes", None)
-        if attributes is None:
-            return False
-        return (
-            attributes.get("sexual_traits", default=None, category="traits")
-            is not None
-        )
-
-    def _unlocked_act_keys_without_sexual(self) -> tuple[str, ...]:
-        """Return the unlocked act keys of an unmaterialized entity.
-
-        Pure registry data only: an unmaterialized sexual state means every
-        lifetime counter is at zero, which ``unlocked_act_keys_for`` reads
-        as the seed acts (or the whole catalogue for a directly owned
-        mastery skill) without creating any persistent state.
-        """
-        from world.skills.sexual_acts import unlocked_act_keys_for
-
-        return tuple(sorted(unlocked_act_keys_for(self.base_owned_keys(), {})))
 
     def effective_value(self, trait_key: str) -> int:
         """Return a derived multiplied value without mutating stored traits."""
@@ -196,8 +198,13 @@ class SkillHandler:
         )
 
     def conferred_grants(self) -> list[ConferredSkillGrant]:
-        """Return explicitly recorded partial skill grants."""
-        return list(self.entity.db.skill_grants or [])
+        """Return explicitly recorded partial skill grants.
+
+        Store-tolerant like :attr:`_raw`: a store carrying no ``skill_grants``
+        attribute reads as no grants rather than raising.
+        """
+        grants = getattr(getattr(self.entity, "db", None), "skill_grants", None)
+        return list(grants or [])
 
 
 def _matching_multiplier(
