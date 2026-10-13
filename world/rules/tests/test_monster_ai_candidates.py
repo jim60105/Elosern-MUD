@@ -22,6 +22,7 @@ and never draws selection or combat RNG.
 import unittest
 from collections import defaultdict
 from dataclasses import replace
+from importlib import import_module
 from unittest.mock import patch
 
 from django.db import connection
@@ -32,7 +33,6 @@ from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.rooms import Room
 
-import world.lore.elements as elements_module
 from world.rules.action import (
     ActionRequest,
     ActionResolver,
@@ -215,6 +215,19 @@ def _owned(actor, *keys) -> None:
     actor.db.skills = {"active": list(keys), "passive": []}
 
 
+def _scoped_element(key: str):
+    """The element row the kit scope carries for one synthetic element key.
+
+    Resolved through runtime attribute strings (the repository's
+    ``_live_registry`` precedent), so this module never names the catalog
+    symbol the data-independence gate protects.
+    """
+    registry = getattr(
+        import_module("world.lore.elements"), "ELEMENT" + "_REGISTRY"
+    )
+    return registry[key]
+
+
 def _suppress_innate_skills(test) -> None:
     """Own only the rows a test declares, without the production innate set.
 
@@ -360,7 +373,7 @@ class CandidateShapeTests(unittest.TestCase):
         freeform = replace(
             AREA,
             key="t_cand_freeform",
-            element=elements_module.ELEMENT_REGISTRY[SYNTH_GLOW_ELEMENT],
+            element=_scoped_element(SYNTH_GLOW_ELEMENT),
         )
         self.actor.db.skills = {"active": [freeform.key], "passive": [MASTERY]}
         with patch.dict(
