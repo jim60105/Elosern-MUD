@@ -23,6 +23,7 @@ from world.rules.equipment_effects import (
 )
 from world.rules.rulebook.schema import (
     Rule,
+    conferred_grants_for_condition,
     evaluate_condition,
     load_rules,
     owned_keys_for_condition,
@@ -322,10 +323,13 @@ def _church_martial_blessing_adjustments(base_adjustments: dict[str, Any]) -> di
 
 
 def _conferred_grants(entity: Any) -> Any:
-    """Read one entity's conferred grants without mounting its skill handler."""
-    from world.skills.handler import SkillHandler
+    """Read one entity's conferred grants without mounting its skill handler.
 
-    return SkillHandler(entity).conferred_grants()
+    Shares the condition evaluator's own resolver, so an entity whose persisted
+    store carries no ``skills`` attribute reads through its skills double
+    instead of a directly constructed handler.
+    """
+    return conferred_grants_for_condition(entity)
 
 
 def _owned_keys(entity: Any) -> Any:

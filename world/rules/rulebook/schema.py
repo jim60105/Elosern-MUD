@@ -129,22 +129,41 @@ def owned_keys_for_condition(
     already supplied.
 
     A context that declares no ``owned_keys`` resolves through a directly
-    constructed handler, which never mounts the entity's lazy handler. An
-    entity carrying no persisted ``skills`` attribute at all -- a pure fixture
-    with its own skills double -- is read through that double instead, which is
-    the read this condition used before the persisted read was introduced.
+    constructed handler, which never mounts the entity's lazy handler: a
+    persisted entity is detected by its attribute store BEFORE its lazy
+    ``skills`` property is touched, so a cold read attaches nothing. An entity
+    with no persisted store at all -- a pure fixture with its own skills double
+    -- is read through that double, which is the read this condition used before
+    the persisted read was introduced.
     """
     if context is not None:
         supplied = context.get("owned_keys")
         if supplied is not None:
             return supplied
-    entity_skills = getattr(entity, "skills", None)
-    persisted = getattr(getattr(entity, "db", None), "skills", None)
-    if persisted is None and entity_skills is not None:
-        return entity_skills.owned_keys()
     from world.skills.handler import SkillHandler
 
+    if getattr(entity, "attributes", None) is None:
+        entity_skills = getattr(entity, "skills", None)
+        if entity_skills is not None:
+            return entity_skills.owned_keys()
     return SkillHandler(entity).owned_keys()
+
+
+def conferred_grants_for_condition(entity: Any) -> Any:
+    """Return one entity's conferred skill grants without mounting a handler.
+
+    Same contract as :func:`owned_keys_for_condition`: a persisted entity is
+    detected by its attribute store BEFORE its lazy ``skills`` property is
+    touched, and only an entity with no persisted store at all -- a pure
+    fixture with its own skills double -- is read through that double.
+    """
+    from world.skills.handler import SkillHandler
+
+    if getattr(entity, "attributes", None) is None:
+        entity_skills = getattr(entity, "skills", None)
+        if entity_skills is not None:
+            return entity_skills.conferred_grants()
+    return SkillHandler(entity).conferred_grants()
 
 
 def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
@@ -189,7 +208,10 @@ def evaluate_condition(when: Condition, context: Mapping[str, Any]) -> bool:
 
         entity = context.get("entity")
         granted_keys = (
-            {grant.skill_key for grant in entity.skills.conferred_grants()}
+            {
+                grant.skill_key
+                for grant in conferred_grants_for_condition(entity)
+            }
             if entity is not None
             else set()
         )
