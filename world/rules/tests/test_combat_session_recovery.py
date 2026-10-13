@@ -698,7 +698,11 @@ class PreflightSideEffectTests(BattlefieldIsolation, EvenniaTestCase):
             ),
         ):
             result = submit_player_action(
-                self.player, _T_DISGUISE.key, [self.monster]
+                # A SELF-spec skill is submitted with an empty target list: an
+                # explicit target (even the actor) is a shape mismatch under the
+                # shared gates, which would report TARGET_SPEC_MISMATCH before
+                # the missing-handler-context rejection this case establishes.
+                self.player, _T_DISGUISE.key, []
             )
             self.assertEqual(result["outcome"], "rejected")
             self.assertIs(

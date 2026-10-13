@@ -369,9 +369,9 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         real_policy = monster_behaviour_policy
         calls: list[str] = []
 
-        def spy(entity, field):
+        def spy(entity, field, **kwargs):
             calls.append(str(entity.key))
-            return real_policy(entity, field)
+            return real_policy(entity, field, **kwargs)
 
         with (
             patch(
