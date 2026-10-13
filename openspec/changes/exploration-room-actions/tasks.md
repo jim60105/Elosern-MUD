@@ -20,7 +20,7 @@
 
 ## 4. Styles, manifest, reference
 
-- [ ] 4.1 Grep `styles/app-shell.css` for `.elosern-root` duplicates of every removed or restyled class (`.scene-overview*`, `.waiting-*`, `.action-dock*`, `.place-card*`, `.sugs*`) and update or remove them. Verify with `grep -n "elosern-root" web/webclient-app/styles/app-shell.css` and the live client in 6.2.
+- [x] 4.1 Grep `styles/app-shell.css` for `.elosern-root` duplicates of every removed or restyled class (`.scene-overview*`, `.waiting-*`, `.action-dock*`, `.place-card*`, `.sugs*`) and update or remove them. Verify with `grep -n "elosern-root" web/webclient-app/styles/app-shell.css` and the live client in 6.2. Done: the only `.elosern-root` rules in the file target classes that still exist (`.action-dock__pane`, the bands, the islands, the drawers), and the removed families have none (`scene-overview*` and `sugs*` were never there, the `.waiting-*` block went with `f1fc0e18`, and the wait card's rest form is neutralized by `AppClient.vue`'s `.rest-card .exploration-rest-form` rule). The one restyled class is the place card, whose short-viewport compaction in the `max-height: 820px` query still governs it: the live client at 1451×790 renders the card 291×82 with the buttons as its two 30px rows and the `map` column at `scrollHeight == clientHeight`, so no rule needed changing.
 - [x] 4.2 Update `component-manifest.json` (register the new stories and any new components, drop `Action/SceneOverview`, and drop `Action/OptionCard` / `Action/ChoiceCardRow` if design D4 removed them) and the showcase evidence key sets. Verify with `node scripts/component-coverage.mjs`.
 - [x] 4.3 Update `lib/controls-reference.js` (place-card actions, pill, tab order across zones, card keys) and its test.
 
