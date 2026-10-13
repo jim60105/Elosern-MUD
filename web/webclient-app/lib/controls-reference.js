@@ -8,8 +8,9 @@
 // path, and states it).
 //
 // Every row names a binding the code implements (AppShell `/` and ⌨,
-// CommandLine, the exit compass, the presence rail and its cards, the dock's
-// keyboard router and digit picks, MessageWindow, FullLogOverlay,
+// CommandLine, the exit compass, the presence rail and its cards, the place
+// card's room actions, the 建議 pill and the wait and suggestions cards, the
+// dock's keyboard router and digit picks, MessageWindow, FullLogOverlay,
 // DialogueChoices). `keys` are literal key names shown as key
 // caps; `id` is the stable hook for the row.
 export const CONTROLS_REFERENCE = [
@@ -109,7 +110,7 @@ export const CONTROLS_REFERENCE = [
         keys: ["←", "→"],
         label: "在場列中移動",
         detail:
-          "舞台右下方的在場列有焦點時，← → 在人物與物件之間循環移動；Tab 從出口羅盤依序來到在場列，再到指令面板的底列。滑鼠移到項目上也會在訊息列說明。",
+          "舞台右下方的在場列有焦點時，← → 在人物與物件之間循環移動；Tab 從出口羅盤依序來到在場列，再到地點卡的「查看房間」與「等待」，最後是「建議」。滑鼠移到項目上也會在訊息列說明。",
       },
       {
         id: "rail-activate",
@@ -140,6 +141,55 @@ export const CONTROLS_REFERENCE = [
     ],
   },
   {
+    // The room actions (exploration-room-actions): the place card's two
+    // buttons, the 建議 pill, and the centred wait and suggestions cards they
+    // open, with the exploration screen's tab order across its zones.
+    id: "room",
+    title: "地點與建議",
+    entries: [
+      {
+        id: "tab-order",
+        keys: ["Tab"],
+        label: "在探索畫面的區塊間移動",
+        detail:
+          "依序為出口羅盤、在場列、地點卡的「查看房間」、「等待」，最後是指令面板右上角的「建議」；Shift+Tab 反向。沒有顯示的區塊會跳過。",
+      },
+      {
+        id: "place-look",
+        keys: ["查看房間"],
+        label: "重新觀察四周",
+        detail: "地點卡上地名旁的放大鏡按鈕，重新查看目前所在的房間；只在探索中出現。",
+      },
+      {
+        id: "place-wait",
+        keys: ["等待"],
+        label: "讓時間流逝、休息或睡眠",
+        detail:
+          "地點卡上時間旁的按鈕，打開等待卡片：等待直到黎明、睡眠至完全恢復、休息 N 小時。選擇睡眠時會先詢問是否進入夢境協作，按「是」或「否」才開始睡眠，按右上角的關閉或 Esc 取消。",
+      },
+      {
+        id: "pill",
+        keys: ["建議"],
+        label: "查看建議",
+        detail:
+          "指令面板右上角的按鈕，數字是目前的建議數；打開建議卡片，選擇一項就執行，「清除建議」移除整組建議。沒有建議可用時不會出現。",
+      },
+      {
+        id: "room-card-keys",
+        keys: ["↑", "↓", "1", "…", "9", "Enter"],
+        label: "等待與建議卡片",
+        detail:
+          "卡片開著時，↑ ↓ 循環移動、數字鍵選擇對應編號，Enter 或 Space 選定；行動進行中時選項暫時停用並說明原因。",
+      },
+      {
+        id: "room-card-escape",
+        keys: ["Esc"],
+        label: "關閉卡片",
+        detail: "關閉等待或建議卡片（與「✕ 返回」相同），焦點回到「等待」或「建議」。",
+      },
+    ],
+  },
+  {
     id: "dock",
     title: "指令面板",
     entries: [
@@ -148,14 +198,14 @@ export const CONTROLS_REFERENCE = [
         keys: ["↑", "↓", "←", "→"],
         label: "移動焦點",
         detail:
-          "探索時 ← → 依閱讀順序移動，↑ ↓ 移到上一列或下一列的相同位置；戰鬥指令為單欄清單，↑ ↓ 循環移動；範圍目標的格狀清單四個方向都能移動。",
+          "戰鬥指令為單欄清單，↑ ↓ 循環移動；範圍目標的格狀清單四個方向都能移動。探索畫面的方向鍵由出口羅盤與在場列使用。",
       },
       {
         id: "digits",
         keys: ["1", "…", "9"],
         label: "依位置執行",
         detail:
-          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。探索畫面中數字鍵改由在場列使用，出口改由出口羅盤操作，底列與等待、建議清單的項目以方向鍵或滑鼠操作。",
+          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。探索畫面中數字鍵改由在場列使用，出口改由出口羅盤操作，等待與建議卡片開著時由卡片使用。",
       },
       {
         id: "confirm",

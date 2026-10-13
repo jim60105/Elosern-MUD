@@ -92,4 +92,19 @@ describe("HelpOverlay (H5 body, webclient-hud-05-overlays-and-command-line)", ()
     expect(keys("card-escape")).toEqual(["Esc"]);
     expect(rowText("card-escape")).toContain("焦點回到打開它的人物");
   });
+
+  it("lists the place card's actions, the 建議 pill, the zones' tab order, and the card keys", () => {
+    // exploration-room-actions: the help overlay documents the room actions.
+    wrapper = mount(HelpOverlay);
+    const keys = (id) => wrapper.get(`[data-testid="help-controls-row-${id}"]`).findAll("kbd").map((key) => key.text());
+    expect(rowText("tab-order")).toContain("出口羅盤、在場列、地點卡的「查看房間」、「等待」");
+    expect(rowText("tab-order")).toContain("「建議」");
+    expect(rowText("place-look")).toContain("重新查看目前所在的房間");
+    expect(rowText("place-wait")).toContain("等待直到黎明、睡眠至完全恢復、休息 N 小時");
+    expect(rowText("place-wait")).toContain("夢境協作");
+    expect(rowText("pill")).toContain("清除建議");
+    expect(keys("room-card-keys")).toEqual(["↑", "↓", "1", "9", "Enter"]);
+    expect(keys("room-card-escape")).toEqual(["Esc"]);
+    expect(rowText("room-card-escape")).toContain("焦點回到「等待」或「建議」");
+  });
 });
