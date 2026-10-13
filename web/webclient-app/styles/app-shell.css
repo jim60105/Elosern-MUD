@@ -279,19 +279,13 @@ body {
    corners, a hairline gold top edge, and no seam against the band. */
 .elosern-root [data-anchor="command-line"] { display: flex; align-items: flex-end; }
 .elosern-root [data-anchor="command-line"] > * { flex: 1; min-width: 0; }
-/* The waiting frame renders inside the band's narrow command region: its
-   three cards stack in one column (design D5). */
-.waiting-screen { width: 100%; min-width: 0; overflow-y: auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: calc(10px * var(--ui-scale)); align-content: start; }
-.waiting-card { min-width: 0; padding: calc(14px * var(--ui-scale)); background: #141719; border: 1px solid #746342; border-radius: var(--radius-sm); display: flex; flex-direction: column; gap: calc(12px * var(--ui-scale)); }
-.waiting-card--focused { border-color: var(--gold-400); }
-.waiting-card h3, .practice-screen h2 { margin: 0; color: var(--gold-400); font-family: var(--f-serif); }
-.waiting-card p, .practice-screen p { margin: 0; color: var(--paper-300); font-size: var(--text-sm); line-height: 1.6; }
-.waiting-card > button { margin-top: auto; }
-.waiting-screen button, .practice-screen select { padding: calc(9px * var(--ui-scale)); border: 1px solid var(--gold-600); border-radius: var(--radius-sm); background: var(--gold-glow); color: var(--gold-400); }
-.waiting-screen button:focus-visible, .practice-screen select:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
-.waiting-screen button:disabled { opacity: .5; }
-.waiting-back { grid-column: 1 / -1; }
-.elosern-root .waiting-card .exploration-rest-form { padding: 0; border: 0; background: transparent; }
+/* The skill practice view's heading, copy, and duration selector (the
+   waiting frame's cards that shared these rules are gone with the frame:
+   exploration-room-actions moved waiting onto the centred wait card). */
+.practice-screen h2 { margin: 0; color: var(--gold-400); font-family: var(--f-serif); }
+.practice-screen p { margin: 0; color: var(--paper-300); font-size: var(--text-sm); line-height: 1.6; }
+.practice-screen select { padding: calc(9px * var(--ui-scale)); border: 1px solid var(--gold-600); border-radius: var(--radius-sm); background: var(--gold-glow); color: var(--gold-400); }
+.practice-screen select:focus-visible { outline: 2px solid var(--gold-400); outline-offset: 2px; }
 .practice-screen { display: grid; gap: calc(12px * var(--ui-scale)); max-width: calc(640px * var(--ui-scale)); margin: auto; }
 .practice-screen label { display: grid; gap: calc(10px * var(--ui-scale)); color: var(--gold-400); }
 .elosern-root .action-dock__pane {
