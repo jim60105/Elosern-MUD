@@ -101,10 +101,11 @@ class SkillHandler:
 
         Exactly the counters the catalogue's own unlock maps read, so this
         module needs no vocabulary from the layer that materializes them as
-        traits: a counter no act gates on cannot change the unlocked set.
-        Counter traits store their value as ``base``; a missing record and a
-        malformed record both read as absent, which the unlock rule treats as
-        the zero baseline.
+        traits: a counter no act gates on cannot change the unlocked set. Each
+        record's ``current`` wins over its ``base``, the same precedence the
+        status read model's stored facade applies, so every no-create reader
+        agrees; a missing record and a malformed record both read as absent,
+        which the unlock rule treats as the zero baseline.
         """
         from collections.abc import Mapping
 
@@ -123,10 +124,10 @@ class SkillHandler:
             record = records.get(name)
             if not isinstance(record, Mapping):
                 continue
-            base = record.get("base")
-            if isinstance(base, bool) or not isinstance(base, (int, float)):
+            value = record.get("current", record.get("base"))
+            if isinstance(value, bool) or not isinstance(value, (int, float)):
                 continue
-            values[name] = int(base)
+            values[name] = int(value)
         return values
 
     def effective_value(self, trait_key: str) -> int:

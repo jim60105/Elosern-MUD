@@ -138,7 +138,9 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     accepted by :func:`matched_combat_modifiers` so preview and revalidation
     never create a persistent attribute or write state. The entity itself is
     passed through for ``skill_owned`` conditions, which resolve against
-    ``entity.skills.owned_keys()`` (a pure stored-data read).
+    the shared no-mount resolver (``rulebook.schema.owned_keys_for_condition``),
+    so the key set comes from stored data and an already present accessor
+    without attaching a handler.
 
     The exposure slot carries the EFFECTIVE level (stored ordinal plus the
     summed equipment ``exposure_bias``, clamped) from the pure
@@ -291,12 +293,10 @@ def _church_mitigation_scale(entity: Any, rule_id: str) -> float:
         rules = get_church_rules()
     except Exception:
         return 1.0
-    skills = getattr(entity, "skills", None)
-    if skills is not None:
-        owned = set(skills.owned_keys())
-    else:
-        raw_skills = getattr(getattr(entity, "db", None), "skills", None) or {}
-        owned = set(raw_skills.get("passive", [])) | set(raw_skills.get("active", []))
+    # The shared no-mount resolver answers with the entity's owned keys without
+    # attaching a handler, so this read stays inside the no-create contract even
+    # when reached from ``evaluate_combat_modifiers_no_create``.
+    owned = set(_owned_keys(entity))
     scale = 1.0
     for effect in rules.passive_effects:
         if effect.skill_key in owned and skill_effect_allowed(entity, effect.skill_key) and "mitigation" in effect.effects:
