@@ -18,7 +18,12 @@ from django.db import transaction
 from typeclasses.npcs import NPC
 from world.observability import log_warn
 from world.quests.transitions import restore_quest_log, snapshot_quest_log
-from world.rules.action import ActionRequest, ActionResult, ActionResolver
+from world.rules.action import (
+    ActionRequest,
+    ActionResult,
+    ActionResolver,
+    resist_contest,
+)
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
 from world.rules.clock import (
@@ -43,7 +48,6 @@ from world.rules.progression import (
     snapshot_practice_dedupe,
 )
 from world.rules.surfaces import attribute_snapshot
-from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
 
 # The action- and clock-touched attribute surfaces of one actor or target: the
@@ -433,14 +437,11 @@ def settle_out_of_combat_cast(
             "settle_out_of_combat_cast requires explicit targets, got "
             f"{request.targets!r}"
         )
-    act = SEXUAL_ACT_REGISTRY.get(request.skill_key)
     from world.skills.registry import SKILL_REGISTRY
+
     skill = SKILL_REGISTRY.get(request.skill_key)
-    is_resistible = (
-        (act is not None and act.resistible)
-        or (skill is not None and skill.interaction is not None and skill.interaction.resistible)
-    )
-    if is_resistible:
+    is_catalog_act, is_generic_resistible = resist_contest(skill)
+    if is_catalog_act or is_generic_resistible:
         target_keys = [str(target.key) for target in request.targets]
         if len(target_keys) != len(set(target_keys)):
             # The ``sexual_resist`` entry contract is key-keyed, so a target

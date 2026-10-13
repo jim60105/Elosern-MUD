@@ -21,7 +21,13 @@ from world.rules.equipment_effects import (
     equipment_adjustments,
     worn_item_keys,
 )
-from world.rules.rulebook.schema import Rule, evaluate_condition, load_rules
+from world.rules.rulebook.schema import (
+    Rule,
+    conferred_grants_for_condition,
+    evaluate_condition,
+    load_rules,
+    owned_keys_for_condition,
+)
 from world.rules.sexual_state import PLEASURE_CONFIG
 from world.rules.stored_sexual_reads import StoredLevel, stored_sexual_level
 from world.skills.equipment import dual_wielding_from_storage
@@ -132,7 +138,9 @@ def build_no_create_condition_context(entity: Any) -> dict[str, Any]:
     accepted by :func:`matched_combat_modifiers` so preview and revalidation
     never create a persistent attribute or write state. The entity itself is
     passed through for ``skill_owned`` conditions, which resolve against
-    ``entity.skills.owned_keys()`` (a pure stored-data read).
+    the shared no-mount resolver (``rulebook.schema.owned_keys_for_condition``),
+    so the key set comes from stored data and an already present accessor
+    without attaching a handler.
 
     The exposure slot carries the EFFECTIVE level (stored ordinal plus the
     summed equipment ``exposure_bias``, clamped) from the pure
@@ -285,12 +293,10 @@ def _church_mitigation_scale(entity: Any, rule_id: str) -> float:
         rules = get_church_rules()
     except Exception:
         return 1.0
-    skills = getattr(entity, "skills", None)
-    if skills is not None:
-        owned = set(skills.owned_keys())
-    else:
-        raw_skills = getattr(getattr(entity, "db", None), "skills", None) or {}
-        owned = set(raw_skills.get("passive", [])) | set(raw_skills.get("active", []))
+    # The shared no-mount resolver answers with the entity's owned keys without
+    # attaching a handler, so this read stays inside the no-create contract even
+    # when reached from ``evaluate_combat_modifiers_no_create``.
+    owned = set(_owned_keys(entity))
     scale = 1.0
     for effect in rules.passive_effects:
         if effect.skill_key in owned and skill_effect_allowed(entity, effect.skill_key) and "mitigation" in effect.effects:
@@ -317,17 +323,23 @@ def _church_martial_blessing_adjustments(base_adjustments: dict[str, Any]) -> di
 
 
 def _conferred_grants(entity: Any) -> Any:
-    """Read one entity's conferred grants without mounting its skill handler."""
-    from world.skills.handler import SkillHandler
+    """Read one entity's conferred grants without mounting its skill handler.
 
-    return SkillHandler(entity).conferred_grants()
+    Shares the condition evaluator's own resolver, so an entity whose persisted
+    store carries no ``skills`` attribute reads through its skills double
+    instead of a directly constructed handler.
+    """
+    return conferred_grants_for_condition(entity)
 
 
 def _owned_keys(entity: Any) -> Any:
-    """Read one entity's owned keys without mounting its skill handler."""
-    from world.skills.handler import SkillHandler
+    """Read one entity's owned keys without mounting its skill handler.
 
-    return SkillHandler(entity).owned_keys()
+    Shares the ``skill_owned`` condition's own resolver, so an entity whose
+    persisted store carries no ``skills`` attribute reads through its skills
+    double instead of a directly constructed handler.
+    """
+    return owned_keys_for_condition(entity)
 
 
 def matched_combat_modifiers(

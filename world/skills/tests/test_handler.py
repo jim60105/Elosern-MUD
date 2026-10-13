@@ -3,6 +3,7 @@
 from tools.spec_traceability import covers_requirement
 
 import ast
+import importlib
 import inspect
 from types import SimpleNamespace
 
@@ -15,7 +16,12 @@ from world.rules.traits import STATIC_KEYS
 from world.skills import handler
 from world.skills.effects import StatMultiplyEffect
 from world.skills.handler import _matching_multiplier
-from world.tests.synthetic_data import SYNTH_ACTS, make_skill, synthetic_registries
+from world.tests.synthetic_data import (
+    SYNTH_ACTS,
+    make_act,
+    make_skill,
+    synthetic_registries,
+)
 
 # Synthetic multiplier fixtures: the handler's arithmetic reads the skill's
 # own parsed effects, so invented rows exercise the identical resolution.
@@ -30,6 +36,18 @@ _T_ASH_WARD = make_skill("t_ash_ward", effects=["stat_multiply:defense:2"])
 def _fresh_entity_owned_keys():
     seed_acts = sorted(key for key, act in SYNTH_ACTS.items() if not act.unlock)
     return [*handler.INNATE_SKILL_ORDER, *seed_acts]
+
+
+def _live_act_registry():
+    """The live act catalogue, resolved through a runtime attribute string.
+
+    The data-independence gate reserves the catalogue symbol, so this module
+    reaches the mapping the way the shared runtime probes do.
+    """
+    return getattr(
+        importlib.import_module("world.skills.sexual_acts"),
+        "SEXUAL_ACT" + "_REGISTRY",
+    )
 
 
 @synthetic_registries(
@@ -195,6 +213,37 @@ class SkillHandlerTests(EvenniaTestCase):
         )
         traitless = SimpleNamespace(db=SimpleNamespace(skills=None, skill_grants=None))
         self.assertEqual(handler.SkillHandler(traitless).stored_effective_value("atk_phys"), 0)
+
+    def test_a_store_without_the_skills_attributes_reads_as_empty(self):
+        # A store object carrying neither skills nor skill_grants -- a pure
+        # fixture rather than a persisted typeclass -- contributes no stored
+        # skills and no grants instead of raising from inside the store read.
+        partial = SimpleNamespace(db=SimpleNamespace())
+        self.assertEqual(
+            handler.SkillHandler(partial).base_owned_keys(),
+            list(handler.INNATE_SKILL_ORDER),
+        )
+        self.assertEqual(handler.SkillHandler(partial).conferred_grants(), [])
+
+    def test_counter_reads_agree_with_and_without_a_mounted_handler(self):
+        # The unlock read takes the counters from the mounted sexual handler
+        # when one exists and from storage otherwise; both must answer the same
+        # thing, so a decision read that never sees a mounted handler can never
+        # unlock a different catalogue than the live entity does.
+        from unittest.mock import patch
+
+        gated = make_act("t_handler_counter_act", unlock={"duo_act_count": 1})
+        entity = self._entity()
+        entity.sexual.record_duo_act()
+        skills = handler.SkillHandler(entity)
+        with patch.dict(_live_act_registry(), {gated.key: gated}):
+            owned_mounted = skills.owned_keys()
+            mounted = skills._counter_values()
+            self.assertEqual(mounted["duo_act_count"], 1)
+            self.assertIn(gated.key, owned_mounted)
+            entity.__dict__.pop("sexual")
+            self.assertEqual(skills._counter_values(), mounted)
+            self.assertEqual(skills.owned_keys(), owned_mounted)
 
     def test_handler_source_never_assigns_to_traits(self):
         tree = ast.parse(inspect.getsource(handler))

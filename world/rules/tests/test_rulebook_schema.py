@@ -10,8 +10,10 @@ from unittest import TestCase
 from world.rules.rulebook.schema import (
     DuplicateRuleIdError,
     MissingRuleIdError,
+    conferred_grants_for_condition,
     evaluate_condition,
     load_rules,
+    owned_keys_for_condition,
 )
 
 
@@ -90,6 +92,51 @@ class RulebookSchemaTests(TestCase):
         self.assertTrue(
             evaluate_condition(combined, {"level": 4, "active_buffs": {"fear"}})
         )
+
+    def test_condition_ownership_reads_a_fixture_without_mounting_a_handler(self):
+        # A fixture's own skills accessor answers -- on the fixture's class in
+        # the helper above, and on the instance in fixtures whose store object
+        # cannot answer the skills read at all -- while an entity with neither
+        # an accessor nor a persisted store owns nothing rather than being
+        # forced through a materialized handler.
+        self.assertEqual(
+            owned_keys_for_condition(_entity_owning("t_rule_own")), ["t_rule_own"]
+        )
+        self.assertEqual(
+            conferred_grants_for_condition(_entity_owning("t_rule_own")), []
+        )
+
+        class _StoreWithoutSkills:
+            def __init__(self):
+                self.skills = _entity_owning("t_rule_instance").skills
+                self.attributes = object()
+
+        self.assertEqual(
+            owned_keys_for_condition(_StoreWithoutSkills()), ["t_rule_instance"]
+        )
+        self.assertEqual(owned_keys_for_condition(object()), frozenset())
+        self.assertEqual(conferred_grants_for_condition(object()), ())
+
+    def test_condition_ownership_never_runs_a_mounting_descriptor(self):
+        # A class-level data descriptor is what a lazily mounting handler looks
+        # like from this resolver's view, so reading it would attach an accessor.
+        # The resolver answers from the persisted store instead -- here: nothing.
+        class _MountingAccessor:
+            class _Descriptor:
+                def __get__(self, instance, owner=None):
+                    if instance is None:
+                        return self
+                    instance.mounted = True
+                    return _entity_owning("t_rule_descriptor").skills
+
+                def __set__(self, instance, value):
+                    raise AttributeError("read-only accessor")
+
+            skills = _Descriptor()
+
+        entity = _MountingAccessor()
+        self.assertEqual(owned_keys_for_condition(entity), frozenset())
+        self.assertFalse(hasattr(entity, "mounted"))
 
     @covers_requirement("rulebook-schema::evaluate-condition-is-the-one-shared-matcher-for-event-field-threshold", "rulebook-schema::every-rule-carries-a-required-unique-id")
     def test_missing_context_is_false_and_unknown_key_raises(self):

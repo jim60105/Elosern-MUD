@@ -125,10 +125,25 @@ def unlocked_act_keys_for(
     )
 
 
+def gated_counter_keys() -> frozenset[str]:
+    """Return every counter name the catalogue's unlock rules read.
+
+    :func:`unlocked_act_keys_for` consults ``counter_values`` only for the
+    counters an act's own ``unlock`` map names, so this is exactly the set a
+    no-create ownership read has to supply. Owning it here keeps the vocabulary
+    with the rows that declare it, so the skills layer never reaches into the
+    rules layer that materializes those counters as traits.
+    """
+    return frozenset(
+        counter for act in SEXUAL_ACT_REGISTRY.values() for counter in act.unlock
+    )
+
+
 __all__ = [
     "SEXUAL_ACT_REGISTRY",
     "SexualActDef",
     "_act_family",
     "_register_rows",
+    "gated_counter_keys",
     "unlocked_act_keys_for",
 ]
