@@ -557,6 +557,15 @@ def _submit_request(
                     hp_before=round_hp_before,
                     hp_after=round_hp_after,
                 )
+            # Mark every observation journal entry whose savepoint rolled back
+            # as dead while the transaction is still open, so the commit-time
+            # publication never resurrects failed work
+            # (monster-ai-observation-lifecycle).
+            from world.rules.combat_session.observations import (
+                reconcile_session_memory,
+            )
+
+            reconcile_session_memory(record.session_id)
     except Exception:
         # A defeat settled inside this transaction armed its undo; run it
         # BEFORE the round restore below so the pre-round values win (the

@@ -999,7 +999,11 @@ class MonsterAISessionBoundaryTests(EvenniaTestCase):
         record_session_ai_tuning(
             OTHER_SESSION, self.opponent, tuning=self.tuning
         )
-        clear_session(self.monster, None, record)
+        # Terminal cleanup is commit-only (monster-ai-observation-lifecycle):
+        # the recording survives until the enclosing transaction commits and
+        # the on_commit discard fires.
+        with self.captureOnCommitCallbacks(execute=True):
+            clear_session(self.monster, None, record)
         self.assertEqual(session_ai_tuning(SESSION), {})
         self.assertTrue(session_ai_tuning(OTHER_SESSION))
         discard_session_ai_tuning(OTHER_SESSION)

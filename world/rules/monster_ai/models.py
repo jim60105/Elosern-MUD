@@ -154,10 +154,14 @@ class PublicObservation:
 
     Only settled, publicly observable facts are representable: where the fact
     happened (round and sequence), who published it, which skill or item it
-    was, who received it and which outcome statuses were observed. A queued
-    player request, an unresolved teammate choice, hidden intent and a
-    disguised stat have no field here, which is what keeps them out of a
-    snapshot, its fingerprint and every input derived from it.
+    was, who received it, which signed health magnitudes were observed and
+    which outcome statuses were recorded, plus the publisher's resolved
+    battlefield faction. A queued player request, an unresolved teammate
+    choice, hidden intent and a disguised stat have no field here, which is
+    what keeps them out of a snapshot, its fingerprint and every input
+    derived from it. ``magnitudes`` and ``recipient_ids`` are bounded
+    recipient summaries: a large group contributes at most the configured
+    number of recipients, in observed order.
     """
 
     round_index: int
@@ -166,6 +170,8 @@ class PublicObservation:
     action_key: str
     recipient_ids: tuple[str, ...]
     statuses: tuple[str, ...]
+    source_faction: str = ""
+    magnitudes: tuple[tuple[str, float], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -274,8 +280,10 @@ def _observation_payload(observation: PublicObservation) -> list[Any]:
         observation.round_index,
         observation.sequence,
         observation.source_id,
+        observation.source_faction,
         observation.action_key,
         list(observation.recipient_ids),
+        [list(pair) for pair in observation.magnitudes],
         list(observation.statuses),
     ]
 

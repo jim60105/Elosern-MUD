@@ -236,6 +236,24 @@ def run_round(
     single combatant execute sequentially inside that same transaction.
     """
     logs: list[EventLog] = []
+    session_id = "" if decision_scope_base is None else decision_scope_base.session_id
+    round_index = 0 if decision_scope_base is None else decision_scope_base.round_index
+    observe = None
+    if session_id:
+        # Local import: the session-owned observation memory lives in
+        # ``world.rules.combat_session``, which already depends on this
+        # package, so the dependency may only be resolved at call time.
+        from world.rules.combat_session.observations import observe_action
+
+        def observe(event_log: EventLog) -> None:
+            observe_action(
+                session_id,
+                round_index,
+                event_log,
+                roster=battlefield.roster,
+                battlefield=battlefield,
+            )
+
     order = roll_initiative(battlefield)
     if first_actor is not None and first_actor in order:
         order = [first_actor] + [key for key in order if key != first_actor]
@@ -318,10 +336,14 @@ def run_round(
                         journal_sink.append(item_result.journal)
                     if item_result.event_log is not None:
                         logs.append(item_result.event_log)
+                        if observe is not None:
+                            observe(item_result.event_log)
                 continue
             result = ActionResolver.resolve(request)
             if result.outcome == "success" and result.event_log is not None:
                 logs.append(result.event_log)
+                if observe is not None:
+                    observe(result.event_log)
             # The action provider is a duck-typed seam: a result without the
             # notification field (an injected double, or a pre-notification
             # provider) simply stages nothing.
@@ -329,14 +351,16 @@ def run_round(
             if notifications and notifications_sink is not None:
                 notifications_sink.extend(notifications)
     records_by_key = _end_of_round_upkeep(battlefield)
-    logs.extend(
-        settle_upkeep(
-            battlefield,
-            records_by_key,
-            simulated=simulated,
-            nonlethal_keys=nonlethal_keys,
-        )
+    upkeep_logs = settle_upkeep(
+        battlefield,
+        records_by_key,
+        simulated=simulated,
+        nonlethal_keys=nonlethal_keys,
     )
+    if observe is not None:
+        for log in upkeep_logs:
+            observe(log)
+    logs.extend(upkeep_logs)
     return logs
 
 
