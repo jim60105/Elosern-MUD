@@ -55,7 +55,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 
 #### Scenario: A retired exploration source degrades instead of resolving
 
-- **WHEN** `exploration.move`, `exploration.look`, or `exploration.interact` is resolved (their frames were retired with the exploration tab root, whose root frame is now the people/object/footer scene overview beside the separate compass)
+- **WHEN** `exploration.move`, `exploration.look`, `exploration.interact`, or `exploration.target` is resolved (the first three frames were retired with the exploration tab root, whose root frame is now the footer scene overview beside the separate compass, and the target frame with the verb popover, whose place the client-local verb card took)
 - **THEN** each returns the shared unresolvable marker and produces no menu, so a stray push of one pops instead of resurrecting a pane
 
 #### Scenario: A withdrawn suggestions envelope degrades like a lost identity
@@ -76,7 +76,7 @@ The registry SHALL implement exactly the exploration-family source table and not
 #### Scenario: The exploration table is exactly five sources
 
 - **WHEN** the exploration-family source table is declared
-- **THEN** its sources (panel `exploration`; `exploration.root` reads the committed overview without exit rows; the independent compass and dialogue exit-row source read `local_map.current_node`; `exploration.suggestions` reads `context_actions.suggestions`) are exactly `exploration.root` `{}`, `exploration.wait` `{}`, `exploration.target` `{identity}`, `exploration.keywords` `{identity}`, `exploration.suggestions` `{}`
+- **THEN** its live sources (panel `exploration`; `exploration.root` reads the committed overview without exit, person, or object rows; `exploration.suggestions` reads `context_actions.suggestions`) are exactly `exploration.root` `{}`, `exploration.navigation` `{}`, `exploration.wait` `{}`, and `exploration.suggestions` `{}` — of the five sources this scenario once named, `exploration.target` and `exploration.keywords` are retired and degrade like every unregistered source — the independent compass and dialogue exit rows (reading `local_map.current_node`), the presence rail's entries, and an interact target's verb rows are read through accessors outside the table and are never frames
 
 ### Requirement: Dynamic rows and payloads are verbatim from the panel while client-owned navigation rows are reproduced
 
@@ -89,12 +89,12 @@ Domain rows — entity lists, exits, targets, quest/board/shop entries, skill de
 
 #### Scenario: Domain relabeling is absent by construction
 
-- **WHEN** a look or target frame resolves against a panel whose rows carry server-authored labels and disabled reasons
+- **WHEN** the presence rail's look entries or a target's verb rows resolve against a panel whose rows carry server-authored labels and disabled reasons
 - **THEN** every domain row's label, sub-line, action identifier, payload, and disabled reason equal the committed panel's values
 
 #### Scenario: Required navigation rows are reproduced, not fabricated
 
-- **WHEN** a resolved menu needs the client-owned navigation and presentation rows that the shipped dock contract requires — the exploration overview's footer entries and its people/object chip builders' rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows
+- **WHEN** a resolved menu needs the client-owned navigation and presentation rows that the shipped dock contract requires — the exploration overview's footer entries, the presence rail's and the verb card's builder rows, the services/creation root entries, `back` rows of submenus, the combat forfeit confirm/cancel pair, and disabled explanatory rows
 - **THEN** those rows are reproduced by the same builders, and reproducing them does not count as fabrication
 
 ### Requirement: An unresolvable descriptor yields the shared degradation marker with the server-authored reason
@@ -185,8 +185,8 @@ When a declarative frame resolves to the unresolvable marker as the current fram
 
 #### Scenario: A vanished target pops back to its parent
 
-- **WHEN** the interact target frame for an `identity` is open and a committed snapshot no longer lists that identity
-- **THEN** the stack pops exactly one level and the interact root frame restores focus to the vanished target's former row position by the nearest-row rule
+- **WHEN** a frame bound to one server-authored subject (a combat skill frame bound to its skill key) is open and a committed snapshot no longer lists that subject
+- **THEN** the stack pops exactly one level and the parent frame restores focus to the vanished subject's former row position by the nearest-row rule
 
 #### Scenario: Cascading loss returns to the root
 

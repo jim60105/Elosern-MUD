@@ -24,9 +24,9 @@
 // decorative sweep that states no progress and stands still at reduced/off.
 //
 // The body is `position: relative`, so an `overlay` child positioned
-// `absolute; inset: 0` covers exactly the visible pane box — that is how a
-// target's verb popover (DockVerbPopover) is laid over the inert scene
-// overview inside the command region.
+// `absolute; inset: 0` covers exactly the visible pane box (the retired
+// verb popover used it; a person's verbs are now the stage's verb card,
+// exploration-presence-rail).
 //
 // The `context_actions.suggestions` envelope is a keyboard-reachable router
 // frame: the overview's footer `建議` chip opens it, and the pane renders its
@@ -61,12 +61,9 @@ const showChrome = computed(
 );
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
-// A target's verb popover states its target in its own heading
-// (webclient-band-material-pass), so the breadcrumb stays out of that one
-// frame; every other submenu keeps it.
-const showCrumb = computed(
-  () => showChrome.value && props.view?.dockSource !== "exploration.target",
-);
+// Every submenu frame keeps the breadcrumb; a person's verbs are the stage's
+// verb card (exploration-presence-rail), never a dock frame.
+const showCrumb = computed(() => showChrome.value);
 
 
 function onBack() {
@@ -107,9 +104,8 @@ function onPaneActivate(payload) {
     />
     <!-- The body: the scrolling pane plus the overlay layer. The pane holds
          the active menu frame (the scene overview, a sub-menu, or a
-         target/skill/scale/confirm frame); the named `overlay` slot renders
-         after it and covers exactly the pane's visible box (the verb
-         popover). -->
+         skill/scale/confirm frame); the named `overlay` slot renders after
+         it and covers exactly the pane's visible box. -->
     <div class="action-dock__body" :class="{ 'action-dock__body--playback': playback }">
       <!-- The waiting cue (webclient-combat-command-window): it veils the
            body, so the rows never move when playback starts or ends. The button is a real control, so its own Enter / Space never

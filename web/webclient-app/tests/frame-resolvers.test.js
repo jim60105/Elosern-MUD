@@ -105,10 +105,11 @@ describe("frame resolver — committed-state following and purity", () => {
 
   it("a resolver throwing mid-build degrades to the marker without an exception", () => {
     const state = committedState();
-    // A committed panel whose interact list read raises: the registry's
-    // exception guard converts the throw to the shared marker (available
-    // panel, so no authored reason).
-    Object.defineProperty(state.panels.exploration, "interact", {
+    // A committed panel whose look read raises: the registry's exception
+    // guard converts the throw to the shared marker (available panel, so no
+    // authored reason).
+    const look = state.panels.exploration.look;
+    Object.defineProperty(state.panels.exploration, "look", {
       configurable: true,
       get() {
         throw new Error("boom");
@@ -122,9 +123,22 @@ describe("frame resolver — committed-state following and purity", () => {
     });
     // The guard converts every call over the poisoned panel; deleting the
     // poison restores resolution (the marker is not sticky).
-    delete state.panels.exploration.interact;
-    state.panels.exploration.interact = [];
+    delete state.panels.exploration.look;
+    state.panels.exploration.look = look;
     expect(resolver.resolve({ source: "exploration.root" }).unresolvable).toBeUndefined();
+  });
+
+  it("a throwing presence build reads as unavailable, never as an empty room", () => {
+    const state = committedState();
+    Object.defineProperty(state.panels.exploration, "interact", {
+      configurable: true,
+      get() {
+        throw new Error("boom");
+      },
+    });
+    const resolver = resolverFor(state);
+    expect(resolver.explorationPresence()).toBeNull();
+    expect(resolver.explorationVerbs(7)).toBeNull();
   });
 
   it("a throwing exit build degrades to no exits without an exception", () => {
@@ -185,12 +199,8 @@ describe("frame resolver — the finite exploration table", () => {
       }),
     );
     expect(overview.geometry).toBe("sections");
-    expect(overview.sections.map((section) => section.key)).toEqual([
-      "people",
-      "objects",
-      "footer",
-    ]);
-    expect(overview.sections.map((section) => section.count)).toEqual([1, 1, 3]);
+    expect(overview.sections.map((section) => section.key)).toEqual(["footer"]);
+    expect(overview.sections.map((section) => section.count)).toEqual([3]);
     // The exits are the exit compass's, outside the root: the builder's rows
     // for the same current node.
     expect(resolver.explorationExits()).toEqual({
@@ -199,10 +209,17 @@ describe("frame resolver — the finite exploration table", () => {
       }),
       currentNode: state.panels.local_map.current_node,
     });
-    // The target frame resolves through the same target seam the push sites
-    // use: it is the verb popover (`verbMenuFor`), not the affordance grid
-    // (`targetMenuFor`).
-    const verbMenu = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
+    // The people and objects are the presence rail's, outside the root:
+    // the builder's entries (exploration-presence-rail).
+    expect(resolver.explorationPresence()).toEqual(ExplorationMenu.presenceEntries(state.panels.exploration));
+    // A target's verbs resolve through the target seam outside the router:
+    // the verb card (`verbMenuFor`), not the affordance grid
+    // (`targetMenuFor`). The retired `exploration.target` source degrades.
+    expect(resolver.resolve({ source: "exploration.target", params: { identity: 7 } })).toEqual({
+      unresolvable: true,
+      reason: null,
+    });
+    const verbMenu = resolver.explorationVerbs(7);
     expect(verbMenu).toEqual(
       ExplorationMenu.verbMenuFor(direct, ExplorationMenu.targetById(direct, 7)),
     );
@@ -331,7 +348,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     expect(enabledChip.payload).toEqual({ exit_ref: "east", current_node: "room:42" });
   });
 
-  it("look chips and the target popover reproduce labels, actions, payloads, and disabled reasons verbatim", () => {
+  it("look rows and the verb card reproduce labels, actions, payloads, and disabled reasons verbatim", () => {
     const state = committedState();
     const resolver = resolverFor(state);
     const panel = state.panels.exploration;
@@ -351,7 +368,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
       expect(lookRow.payload).toEqual({ target_id: entity.identity });
     }
 
-    const target = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
+    const target = resolver.explorationVerbs(7);
     const talk = target.items.find((i) => i.key === "talk-open");
     expect(talk.label).toBe("交談");
     const party = panel.interact[0].affordances.find((a) => a.action_id === "explore.party_invite");
@@ -399,20 +416,17 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     });
   });
 
-  it("the root is the scene overview: chip rows, a footer, and no tab or navigation entry", () => {
+  it("the root is the scene overview: the footer, and no tab or navigation entry", () => {
     const resolver = resolverFor(committedState());
     const root = resolver.resolve({ source: "exploration.root" });
     const keys = root.items.map((i) => i.key);
-    // The reading order: people, objects, then the label-less footer; the
-    // exits are the exit compass's (exploration-exit-compass).
-    expect(root.sections.map((section) => section.key)).toEqual([
-      "people",
-      "objects",
-      "footer",
-    ]);
+    // The label-less footer only: the exits are the exit compass's
+    // (exploration-exit-compass), the people and objects the presence
+    // rail's (exploration-presence-rail).
+    expect(root.sections.map((section) => section.key)).toEqual(["footer"]);
     expect(keys).not.toContain("exit-east");
-    expect(keys).toContain("target-7");
-    expect(keys).toContain("object-3");
+    expect(keys).not.toContain("target-7");
+    expect(keys).not.toContain("object-3");
     expect(keys).toContain("look-room");
     expect(keys).toContain("wait");
     // A generating envelope adds the footer suggestions chip (builder-owned).
@@ -442,7 +456,7 @@ describe("frame resolver — ownership isolation", () => {
       },
     });
     const resolver = resolverFor(state);
-    const target = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
+    const target = resolver.explorationVerbs(7);
     const cleanTargetJson = JSON.stringify(target);
     const before = JSON.stringify(state.panels, (k, v) => v);
     // Write through every reference the builder handed out.
@@ -457,7 +471,7 @@ describe("frame resolver — ownership isolation", () => {
     expect(JSON.stringify(state.panels, (k, v) => v)).toBe(before);
     // A subsequent resolve derives from untouched committed state — the
     // poisoned copy is the caller's own, not the registry's.
-    const after = resolver.resolve({ source: "exploration.target", params: { identity: 7 } });
+    const after = resolver.explorationVerbs(7);
     expect(JSON.stringify(after)).toBe(cleanTargetJson);
     expect(JSON.stringify(state.panels, (k, v) => v)).toBe(before);
   });
@@ -518,13 +532,14 @@ describe("frame resolver — the degradation marker", () => {
 });
 
 describe("frame resolver — (legacy) the degradation marker", () => {
-  it("a lost target identity yields the marker with a null reason", () => {
+  it("a lost target identity resolves no verb card", () => {
     const state = committedState();
     const resolver = resolverFor(state);
-    expect(resolver.resolve({ source: "exploration.target", params: { identity: 999 } })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
+    expect(resolver.explorationVerbs(999)).toBeNull();
+    // An unavailable panel lists no presence at all (null, not an empty room).
+    state.panels.exploration = { schema_version: 3, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } };
+    expect(resolver.explorationPresence()).toBeNull();
+    expect(resolver.explorationVerbs(7)).toBeNull();
   });
 
   it("an unavailable exploration panel reports its server message verbatim", () => {

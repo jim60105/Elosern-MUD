@@ -201,6 +201,8 @@ export function applyTransport(ctx) {
   };
 
   ctx.beginTransport = function beginTransport(nextGeneration) {
+    // A new transport generation leaves no presence card open.
+    ctx.resetPresence();
     const res = ctx.reducer.beginTransport(nextGeneration);
     // A new transport generation is a fresh failure episode: clear the
     // presentation-rejection signal so the next generation's malformed initial

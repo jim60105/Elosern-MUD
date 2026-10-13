@@ -41,6 +41,7 @@ import { applyFrames } from "./elosern/frames.js";
 import { applyCombat } from "./elosern/combat.js";
 import { applyCreation } from "./elosern/creation.js";
 import { applyInteraction } from "./elosern/interaction.js";
+import { applyPresence } from "./elosern/presence.js";
 import { applyTransport } from "./elosern/transport.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
@@ -154,6 +155,7 @@ export const useElosernStore = defineStore("elosern", () => {
   applyCombat(ctx);
   applyCreation(ctx);
   applyInteraction(ctx);
+  applyPresence(ctx);
   applySkillUse(ctx);
   applyTransport(ctx);
   // The combat beat playback (webclient-combat-beat-queue, design D5) sits
@@ -213,6 +215,10 @@ export const useElosernStore = defineStore("elosern", () => {
     tabToRootAndConfirm: ctx.tabToRootAndConfirm,
     // The exit compass's gated activation (exploration-exit-compass D2).
     activateExit: ctx.activateExit,
+    // The presence rail and its client-local cards (exploration-presence-rail).
+    activatePresence: ctx.activatePresence,
+    activatePresenceVerb: ctx.activatePresenceVerb,
+    closePresenceCard: ctx.closePresenceCard,
     chooseScale: ctx.chooseScale,
     // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,
@@ -220,7 +226,16 @@ export const useElosernStore = defineStore("elosern", () => {
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
     // one-frame stack. Browser helpers use it to normalize the stack.
-    resetFramesToRoot: ctx.resetFramesToRoot,
+    // A presence card is not a frame, but the reset leaves none open; the
+    // public entry publishes that at once (the internal reset runs inside
+    // the publish window and must not publish itself).
+    resetFramesToRoot: () => {
+      const hadCard = ctx.presenceCard !== null;
+      ctx.resetFramesToRoot();
+      if (hadCard) {
+        ctx.publishView();
+      }
+    },
     clearUncertain: ctx.clearUncertain,
     partyAvailable: ctx.computed.partyAvailable,
     partySlots: ctx.computed.partySlots,

@@ -23,7 +23,8 @@
 // chips, which that component renders itself.
 // The retired `nav` kind went with the scripted-keyword frame, and the
 // `affordance` kind with the exploration target frame, which the verb popover
-// replaced (webclient-talk-open-dock): a frame that once classified as either
+// replaced (webclient-talk-open-dock) and the stage's verb card replaced in
+// turn (exploration-presence-rail): a frame that once classified as either
 // now falls through to `plain`, which renders the same rows through the shared
 // row renderer.
 export function classifyPane(frame) {
@@ -69,8 +70,8 @@ export function classifyPane(frame) {
   }
   // The combat target frame: the AREA candidate rows carry the `toggle-target`
   // action or a client-local `selected` flag. The exploration interact target
-  // rows are not a DockMenu frame at all any more (the verb popover replaced
-  // them), so the `target-` key prefix alone must not be used here.
+  // rows are not a DockMenu frame at all any more (the presence rail and its
+  // verb card replaced them), so the `target-` key prefix alone must not be used here.
   if (items.some((i) => i.action_id === "toggle-target" || i.selected === true)) {
     return "targets";
   }

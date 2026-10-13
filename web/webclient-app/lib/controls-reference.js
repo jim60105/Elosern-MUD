@@ -8,8 +8,9 @@
 // path, and states it).
 //
 // Every row names a binding the code implements (AppShell `/` and ⌨,
-// CommandLine, the exit compass, the dock's keyboard router and digit picks,
-// MessageWindow, FullLogOverlay, DialogueChoices). `keys` are literal key names shown as key
+// CommandLine, the exit compass, the presence rail and its cards, the dock's
+// keyboard router and digit picks, MessageWindow, FullLogOverlay,
+// DialogueChoices). `keys` are literal key names shown as key
 // caps; `id` is the stable hook for the row.
 export const CONTROLS_REFERENCE = [
   {
@@ -97,6 +98,48 @@ export const CONTROLS_REFERENCE = [
     ],
   },
   {
+    // The presence rail and its centred cards (exploration-presence-rail):
+    // one tab stop on the stage floor after the compass, and the verb or
+    // overflow card it opens.
+    id: "presence",
+    title: "在場人物與物件",
+    entries: [
+      {
+        id: "rail-move",
+        keys: ["←", "→"],
+        label: "在場列中移動",
+        detail:
+          "舞台右下方的在場列有焦點時，← → 在人物與物件之間循環移動；Tab 從出口羅盤依序來到在場列，再到指令面板的底列。滑鼠移到項目上也會在訊息列說明。",
+      },
+      {
+        id: "rail-activate",
+        keys: ["Enter"],
+        label: "選擇人物或物件",
+        detail: "人物打開行動卡片；旁觀者與物件直接查看；「＋N」列出其餘在場者與物件。",
+      },
+      {
+        id: "rail-digits",
+        keys: ["1", "…", "9"],
+        label: "依位置選擇在場項目",
+        detail:
+          "探索畫面中沒有卡片開著時，數字鍵直接選擇在場列的第 1 至 9 項，效果與 Enter 相同；超出項目數的數字不作用，在輸入欄或抽屜中不作用。",
+      },
+      {
+        id: "card-keys",
+        keys: ["↑", "↓", "1", "…", "9"],
+        label: "卡片選項",
+        detail:
+          "行動卡片或其餘在場卡片開著時，↑ ↓ 循環移動、數字鍵選擇對應編號，Enter 或 Space 選定；停用的選項只顯示原因。",
+      },
+      {
+        id: "card-escape",
+        keys: ["Esc"],
+        label: "關閉卡片",
+        detail: "關閉卡片（與「✕ 返回」相同），焦點回到打開它的人物或「＋N」。",
+      },
+    ],
+  },
+  {
     id: "dock",
     title: "指令面板",
     entries: [
@@ -112,7 +155,7 @@ export const CONTROLS_REFERENCE = [
         keys: ["1", "…", "9"],
         label: "依位置執行",
         detail:
-          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；探索時依序對應人物、物件與底列的項目，出口改由出口羅盤操作；超出項目數的數字不作用。",
+          "直接執行目前清單的第 1 至 9 項，效果與按 Enter 相同；超出項目數的數字不作用。探索畫面中數字鍵改由在場列使用，出口改由出口羅盤操作，底列與等待、建議清單的項目以方向鍵或滑鼠操作。",
       },
       {
         id: "confirm",

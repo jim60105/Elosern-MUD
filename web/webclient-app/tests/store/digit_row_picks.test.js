@@ -10,8 +10,13 @@
 // person chip's verb popover is the root's one child frame.
 //
 // exploration-exit-compass: the exits left the root frame for the exit
-// compass, so the digits address the people, the objects, and the footer
-// only; no digit ever moves.
+// compass. exploration-presence-rail: the people and objects left it for the
+// presence rail, which owns the exploration root's digits — a digit picks
+// the Nth visible rail slot, a digit past the slots is claimed and does
+// nothing, an empty rail claims none, and none falls through to the footer
+// chips. The rail keeps the digits while the dock's waiting or suggestions
+// frame is open too; a card owns them while it is open; every other family
+// keeps the router's digit picks.
 import { beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
 
@@ -49,9 +54,8 @@ function sixSkillCategory() {
   ];
 }
 
-// The six-chip overview: two person chips, one object chip, and the three
-// footer chips (查看房間 ‧ 等待／休息 ‧ 建議), in reading order. The three
-// exits are the compass's and take no slot.
+// A room with two people and one object on the rail, three exits on the
+// compass, and the three footer chips (查看房間 ‧ 等待／休息 ‧ 建議).
 const SIX_CHIP_OVERRIDES = {
   move: [
     { exit_ref: "east", label: "東", destination: "room:43", enabled: true, disabled_reason: null },
@@ -83,22 +87,6 @@ const SIX_CHIP_OVERRIDES = {
   ],
 };
 
-const SIX_CHIP_KEYS = [
-  "target-7",
-  "target-8",
-  "object-3",
-  "look-room",
-  "wait",
-  "suggestions",
-];
-
-const FOUR_CHIP_KEYS = [
-  "target-7",
-  "object-3",
-  "look-room",
-  "wait",
-];
-
 describe("dock digit row picks (1–9)", () => {
   let store;
   let sender;
@@ -109,9 +97,9 @@ describe("dock digit row picks (1–9)", () => {
     expect(store.receive(1, "ui_snapshot", [fx.snapshot()], {}).accepted).toBe(true);
   }
 
-  // The exploration root: the scene overview, whose chips are the root
-  // frame's rendered rows — target-7, object-3, look-room, wait,
-  // suggestions (the exits are the compass's).
+  // The exploration root: the footer-only overview, with the room's people
+  // and objects on the presence rail (exploration-presence-rail) and its
+  // exits on the compass.
   function openOverview(explorationOverrides = undefined, contextActions = undefined) {
     const panels = {
       exploration: fx.explorationPanel(explorationOverrides),
@@ -125,19 +113,7 @@ describe("dock digit row picks (1–9)", () => {
     expect(store.view.dockDepth).toBe(1);
   }
 
-  // A person chip whose target maps to no affordance: the popover then holds
-  // exactly [查看, 返回上一層].
-  function openLookOnlyPopover() {
-    openOverview({
-      interact: [
-        { identity: 9001, display_name: "石像", portrait_ref: null, affordances: [] },
-      ],
-    });
-    expect(store.focusItemByKey("target-9001")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
-    expect(store.view.dockDepth).toBe(2);
-    expect(store.view.dockSource).toBe("exploration.target");
-  }
+  const railKeys = () => store.view.presenceEntries.map((entry) => entry.key);
 
   beforeEach(() => {
     setActivePinia(createPinia());
@@ -146,113 +122,130 @@ describe("dock digit row picks (1–9)", () => {
     store.setSender(sender);
   });
 
-  it("digit 2 picks the object chip and submits it exactly as Enter would", () => {
+  it("digit 2 picks the rail's object entry and submits its look exactly as the old chip did", () => {
     openSession();
     openOverview();
+    expect(railKeys()).toEqual(["target-7", "object-3"]);
     expect(store.focusPress("2")).toBe(true);
-    expect(store.view.focus.key).toBe("object-3");
     expect(sender.sent.actions).toHaveLength(1);
     expect(sender.sent.actions[0]).toMatchObject({
       action_id: "explore.look",
       payload: { target_id: 3 },
     });
+    // The overview's own focus never moved: the rail is outside the router.
+    expect(store.view.focus.key).toBe("look-room");
   });
 
-  it("no digit addresses an exit: the root frame carries none", () => {
+  it("no digit addresses an exit or a footer chip", () => {
     openSession();
     openOverview(SIX_CHIP_OVERRIDES, fx.explorationActions());
     const keys = store.router.currentMenu().items.map((i) => i.key);
-    expect(keys.some((key) => key.startsWith("exit-"))).toBe(false);
+    expect(keys).toEqual(["look-room", "wait", "suggestions"]);
     for (const digit of ["1", "2", "3", "4", "5", "6"]) {
       store.focusPress(digit);
-      store.focusEscape();
+      store.closePresenceCard();
     }
     expect(sender.sent.actions.some((action) => action.action_id === "explore.move")).toBe(false);
-  });
-
-  it("a digit beyond the frame's row count is unclaimed and submits nothing", () => {
-    openSession();
-    openLookOnlyPopover();
-    // The popover renders exactly two rows (查看 and 返回上一層), so `3`–`9`
-    // are unclaimed.
-    for (const digit of ["3", "4", "5", "6", "7", "8", "9"]) {
-      expect(store.focusPress(digit), digit).toBe(false);
-    }
-    // An untouched digit does not consume the key: focus stays where it was.
-    expect(store.view.focus.key).toBe("look-target");
-    expect(sender.sent.actions).toHaveLength(0);
-  });
-
-  it("the digit slots follow the rendered rows: the popover's back row takes a slot", () => {
-    openSession();
-    openLookOnlyPopover();
-    // The popover's `back` row is a rendered row of its listbox, so `2`
-    // addresses it and pops exactly one level with no dispatch.
-    expect(store.focusPress("2")).toBe(true);
-    expect(store.view.dockDepth).toBe(1);
     expect(store.view.dockSource).toBe("exploration.root");
-    expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the overview's chips follow reading order: digit 1 opens the person's verb popover", () => {
+  it("digit 1 opens the person's verb card: no frame, no action", () => {
     openSession();
     openOverview();
-    // The overview renders people, then objects, then the footer, so slot 1
-    // is the person chip.
-    expect(store.router.currentMenu().items[0].key).toBe("target-7");
     expect(store.focusPress("1")).toBe(true);
-    expect(store.view.dockSource).toBe("exploration.target");
-    expect(store.view.dockDepth).toBe(2);
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7, openerKey: "target-7" });
+    expect(store.view.presenceVerbs.map((item) => item.key)).toEqual(["talk-open", "look-target", "back"]);
+    expect(store.view.dockSource).toBe("exploration.root");
+    expect(store.view.dockDepth).toBe(1);
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("digits 2–6 pick the overview's later chips in reading order", () => {
+  it("digits 1–3 pick the rail's entries in order: two people, then the object", () => {
     openSession();
-    // The default envelope is `generating`, so the footer carries the 建議
-    // chip and the overview holds exactly six chips.
     openOverview(SIX_CHIP_OVERRIDES, fx.explorationActions());
-    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(SIX_CHIP_KEYS);
-
-    // 2 -> the second person chip: its verb popover opens, nothing submits.
+    expect(railKeys()).toEqual(["target-7", "target-8", "object-3"]);
     expect(store.focusPress("2")).toBe(true);
-    expect(store.view.dockSource).toBe("exploration.target");
-    expect(store.view.dockDepth).toBe(2);
-    // The popover is scoped to the chip's own target.
-    expect(store.view.combatMenu.target.identity).toBe(8);
-    expect(sender.sent.actions).toHaveLength(0);
-    expect(store.focusEscape()).toBe(true);
-    expect(store.view.dockDepth).toBe(1);
-
-    // 6 -> the sixth chip is the footer's 建議 chip: it pushes the
-    // suggestions frame through the ordinary confirmation path.
-    expect(store.focusPress("6")).toBe(true);
-    expect(store.view.dockSource).toBe("exploration.suggestions");
-    expect(store.view.dockDepth).toBe(2);
-    expect(sender.sent.actions).toHaveLength(0);
-    expect(store.focusEscape()).toBe(true);
-
-    // 3 -> the object chip submits its explore.look once.
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 8 });
+    expect(store.closePresenceCard()).toBe(true);
     expect(store.focusPress("3")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({
-      action_id: "explore.look",
-      payload: { target_id: 3 },
-    });
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 3 } });
   });
 
-  it("digits 5 and 9 on a four-chip overview are unclaimed", () => {
+  it("a digit beyond the rail's slots is claimed and does nothing", () => {
     openSession();
-    openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
-    expect(store.router.currentMenu().items.map((i) => i.key)).toEqual(FOUR_CHIP_KEYS);
-    // No fifth or ninth chip: the press is unclaimed and nothing submits.
-    expect(store.focusPress("5")).toBe(false);
-    expect(store.focusPress("9")).toBe(false);
+    openOverview();
+    for (const digit of ["3", "4", "9"]) {
+      expect(store.focusPress(digit), digit).toBe(true);
+    }
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.presenceCard).toBe(null);
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.focus.key).toBe("look-room");
+  });
+
+  it("an empty rail claims no digit and never falls through to the footer", () => {
+    openSession();
+    openOverview({ interact: [], look: { entities: [], objects: [] } });
+    expect(store.view.presenceEntries).toEqual([]);
+    expect(store.view.railVisible).toBe(false);
+    for (const digit of ["1", "2", "3"]) {
+      expect(store.focusPress(digit), digit).toBe(false);
+    }
     expect(store.view.dockDepth).toBe(1);
     expect(sender.sent.actions).toHaveLength(0);
-    // The fourth chip is real: 等待／休息 pushes the waiting frame.
-    expect(store.focusPress("4")).toBe(true);
-    expect(store.view.dockSource).toBe("exploration.wait");
+  });
+
+  it("while a card is open its rows own the digits", () => {
+    openSession();
+    openOverview();
+    expect(store.focusPress("1")).toBe(true);
+    // The verb card lists 交談 then 查看: `2` is 查看, `5` is past its rows.
+    expect(store.focusPress("5")).toBe(true);
     expect(sender.sent.actions).toHaveLength(0);
+    expect(store.focusPress("1")).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.talk_open", payload: { npc_id: 7 } });
+  });
+
+  it("seven entries fold the sixth slot into ＋2, whose digit opens the overflow card", () => {
+    openSession();
+    const people = [1, 2, 3, 4, 5, 6].map((n) => ({
+      identity: 100 + n,
+      display_name: `旅人${n}`,
+      portrait_ref: null,
+      affordances: [],
+    }));
+    openOverview({ interact: people, look: { entities: [], objects: [{ identity: 3, display_name: "木箱" }] } });
+    expect(railKeys()).toHaveLength(7);
+    expect(store.focusPress("6")).toBe(true);
+    expect(store.view.presenceCard).toMatchObject({ kind: "overflow", openerKey: "presence-more" });
+    // The overflow card lists 旅人6 and 木箱: its `1` opens 旅人6's verb card.
+    expect(store.focusPress("1")).toBe(true);
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 106, openerKey: "presence-more" });
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("a drawer over the stage hides the rail and its digits", () => {
+    openSession();
+    openOverview();
+    store.openHudDrawer("inventory");
+    expect(store.view.railVisible).toBe(false);
+    expect(store.focusPress("2")).toBe(false);
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("the rail keeps the digits while the waiting frame is open", () => {
+    openSession();
+    openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
+    expect(store.focusItemByKey("wait")).toBe(true);
+    expect(store.focusConfirm("keyboard")).toBe(true);
+    expect(store.view.dockSource).toBe("exploration.wait");
+    // `2` is the rail's object, never the waiting frame's second row.
+    expect(store.focusPress("2")).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 3 } });
+    expect(store.view.dockSource).toBe("exploration.wait");
   });
 
   it("a combat skill frame's sixth row is reachable by digit 6", () => {

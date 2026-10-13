@@ -79,7 +79,7 @@ describe("the command region collapses in dialogue mode (store keys)", () => {
 
   it("keeps the exploration overview as the dock's only frame and shows it again on leaving", () => {
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.rootMenu.items.map((item) => item.key)).toContain("target-7");
+    expect(store.view.rootMenu.items.map((item) => item.key)).toContain("look-room");
     expect(store.view.rootMenu.items.map((item) => item.key)).not.toContain("exit-east");
     expect(store.view.explorationExits.map((item) => item.key)).toContain("exit-east");
     store.receive(

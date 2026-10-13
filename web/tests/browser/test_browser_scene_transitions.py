@@ -34,7 +34,7 @@ _PNG = base64.b64decode(
 )
 
 # The leaving copies this change's transitions can leave behind (other
-# surfaces, such as the scene overview behind a verb popover, use `inert`
+# surfaces, such as the command panel under a verb card, use `inert`
 # for their own reasons).
 _LEAVING = ", ".join(
     f'[data-testid="{testid}"][inert]'

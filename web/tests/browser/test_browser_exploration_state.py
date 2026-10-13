@@ -130,7 +130,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
+    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -265,64 +265,81 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
+    @staticmethod
+    def _ready_context(*cards) -> dict:
+        """A ready suggestions envelope carrying ``cards`` (each
+        ``(action_code, label, params)``), on an affordance-free panel."""
+        return {
+            "context_actions": {
+                "schema_version": 5,
+                "available": True,
+                "kind": "exploration",
+                "affordances": [],
+                "suggestions": {
+                    "status": "ready",
+                    "cards": [
+                        {"kind": "known_action", "action_code": code, "label": label, "params": params}
+                        for code, label, params in cards
+                    ],
+                },
+            },
+        }
+
     @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
-        """Focus tracks the item KEY (webclient-declarative-frame-stack):
-        at the scene overview, a commit that REORDERS the objects keeps the
-        focus on the same key at its new index, and a commit that drops the
-        focused object lands focus on a surviving row — never on the frozen
-        copy's old row. Activation then submits the NEW committed payload.
-        (The exits are the exit compass's since exploration-exit-compass, so
-        the object chips carry the reorderable rows.)"""
+        """Focus tracks the item KEY (webclient-declarative-frame-stack): in
+        the open suggestions frame, a commit that REORDERS the cards keeps
+        the focus on the same key at its new index, and a commit that drops
+        the focused card lands focus on a surviving row — never on the
+        frozen copy's old row. Activation then submits the NEW committed
+        payload. (The exits are the exit compass's and the people and objects
+        the presence rail's, so the suggestions frame carries the
+        reorderable rows.)"""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            objects=[self._object(9101, "木箱"), self._object(9102, "石碑"),
-                     self._object(9103, "水井")])})
+        look = ("explore.look", "看看石碑", {"target_id": 9102})
+        wait = ("explore.wait", "等到天亮", {"daypart": "dawn"})
+        talk = ("explore.talk_open", "找哨衛聊聊", {"npc_id": 9001})
+        scripted = ("explore.talk_scripted", "問候哨衛", {"npc_id": 9001, "keyword_id": "問候"})
+        accepted = self._inject_panels(page, self._ready_context(look, wait, talk))
         self.assertTrue(accepted["accepted"], accepted)
 
-        # The exploration root is the scene overview, so the fabricated room's
-        # object chips are the root frame's rendered rows.
-        self.assertEqual(self._depth(page), 1)
+        activate_overview_chip(page, "suggestions")
+        self.assertEqual(self._depth(page), 2)
         self.assertEqual(
-            page.evaluate(
-                "() => window.__elosernBridge.router.currentDescriptor().source"
-            ),
-            "exploration.root",
+            page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
+            "exploration.suggestions",
         )
         self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('object-9102')")
+            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('action-explore.wait')")
         )
-        self.assertEqual(store_state(page)["focus"]["key"], "object-9102")
+        self.assertEqual(store_state(page)["focus"]["key"], "action-explore.wait")
 
         # Reordered + extended commit: the same key survives at a new index.
-        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            objects=[self._object(9103, "水井"), self._object(9102, "石碑"),
-                     self._object(9101, "木箱"), self._object(9104, "篝火")])})
+        accepted = self._inject_panels(page, self._ready_context(talk, scripted, wait, look))
         self.assertTrue(accepted["accepted"], accepted)
         self.assertEqual(
             store_state(page)["focus"]["key"],
-            "object-9102",
+            "action-explore.wait",
             "the same-key focus did not survive the re-resolution",
         )
 
         # The focused key vanishes: focus lands on a SURVIVING row (the
         # nearest-row rule itself is pinned at store level; here it must land
         # somewhere real, never on the vanished key).
-        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            objects=[self._object(9103, "水井"), self._object(9104, "篝火")])})
+        accepted = self._inject_panels(page, self._ready_context(talk, look, scripted))
         self.assertTrue(accepted["accepted"], accepted)
         focused = store_state(page)["focus"]["key"]
         self.assertIn(
             focused,
-            ("object-9103", "object-9104"),
+            ("action-explore.talk_open", "action-explore.look", "action-explore.talk_scripted", "action-options.dismiss"),
             "the lost-key fallback did not land on a surviving row",
         )
-        self.assertEqual(self._depth(page), 1, "the overview did not stay current")
+        self.assertEqual(self._depth(page), 2, "the suggestions frame did not stay current")
 
-        # Activating the focused row submits the NEW committed row's payload.
+        # Activating the focused row submits the NEW committed row's action.
         self.assertTrue(
             page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
         )
@@ -330,65 +347,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # cannot be accepted by the server (its own result/lock behaviour is
         # covered elsewhere), so the recorder — written synchronously at
         # dispatch — is the assertion source, not the in-flight gate.
+        expected_action = focused[len("action-"):]
         page.wait_for_function(
-            "() => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
-            " && m[1][0] && m[1][0].action_id === 'explore.look').length === 1",
+            "(id) => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
+            " && m[1][0] && m[1][0].action_id === id).length === 1",
+            arg=expected_action,
             timeout=10000,
         )
-        looks = [
+        actions = [
             args[0]
             for cmdname, args, _kw in outbound_messages(page)
-            if cmdname == "ui_action" and args and args[0].get("action_id") == "explore.look"
+            if cmdname == "ui_action" and args
         ]
-        self.assertEqual(len(looks), 1, "the activation dispatched exactly one look")
-        self.assertEqual(
-            str((looks[0].get("payload") or {}).get("target_id")),
-            focused[len("object-"):],
-            "the activation submitted a payload from a superseded row",
-        )
-
-    @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
-    def test_identity_loss_pops_one_level_and_restores_opener_focus(self):
-        """A target frame whose identity vanishes from the committed panel
-        pops EXACTLY one level (never cascades past a surviving parent) and
-        restores focus toward the vanished target's former row."""
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        self._wait_exploration_available(page)
-        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            interact=[self._target(9001, "哨衛士兵"), self._target(9002, "吟遊詩人")])})
-        self.assertTrue(accepted["accepted"], accepted)
-
-        # The overview's 人物 chip opens the target's verb popover
-        # (webclient-scene-overview-swap): one level, not two.
-        activate_overview_chip(page, "target-9001")
-        self.assertEqual(self._depth(page), 2, "the verb popover did not open")
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
-            {"source": "exploration.target", "params": {"identity": 9001}},
-        )
-
-        # The committed panel no longer lists 9001: the target frame
-        # degrades at the next access and pops exactly one level.
-        accepted = self._inject_panels(page, {"exploration": self._fabricated_exploration_panel(
-            interact=[self._target(9002, "吟遊詩人")])})
-        self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(self._depth(page), 1)
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
-            {"source": "exploration.root", "params": {}},
-        )
-        # The popover closed and the overview is current; focus lands on the
-        # nearest surviving chip — the only surviving target's chip — in the
-        # committed view AND the rendered pane's aria-selected cell.
-        self.assertEqual(store_state(page)["focus"]["key"], "target-9002")
-        self.assertEqual(
-            page.locator(
-                '#action-dock [data-item-key="target-9002"][aria-selected="true"]'
-            ).count(),
-            1,
-            "the restored opener focus did not reach the rendered pane",
-        )
+        self.assertEqual(len(actions), 1, "the activation dispatched exactly one action")
+        self.assertEqual(actions[0].get("action_id"), expected_action)
 
     @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
     def test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers(self):
@@ -417,7 +389,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         })
         self.assertTrue(accepted["accepted"], accepted)
 
-        activate_overview_chip(page, "target-9001")  # the person chip -> popover
+        activate_overview_chip(page, "wait")  # the 等待／休息 chip -> the waiting frame
         self.assertEqual(self._depth(page), 2)
 
         withdrawn = "這片區域暫時無法操作"

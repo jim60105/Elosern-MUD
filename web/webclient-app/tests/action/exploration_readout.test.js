@@ -11,6 +11,7 @@ import {
   NO_EXIT_TEXT,
   aimReadout,
   blockedReadout,
+  departedReadout,
   idleReadout,
   presentCount,
   readoutContent,
@@ -87,6 +88,18 @@ describe("idle summary and priority", () => {
     expect(readoutContent({ flash, aim, idle })).toEqual({ ...flash, flash: true });
     expect(readoutContent({ aim, idle })).toEqual({ ...aim, flash: false });
     expect(readoutContent({ idle })).toEqual({ ...idle, flash: false });
+  });
+
+  it("gains the rail as an input: a hovered rail entry sits below the flash and above the compass aim", () => {
+    // exploration-presence-rail design D6.
+    const flash = departedReadout("店長");
+    const rail = { lead: "店長", text: "交談／公會服務", tone: "normal" };
+    const aim = { lead: "前往 ↑", text: "y", tone: "normal" };
+    const idle = idleReadout(1, 1);
+    expect(flash).toEqual({ lead: "", text: "店長 已經離開了。", tone: "warn" });
+    expect(readoutContent({ flash, rail, aim, idle })).toEqual({ ...flash, flash: true });
+    expect(readoutContent({ rail, aim, idle })).toEqual({ ...rail, flash: false });
+    expect(readoutContent({ aim, idle })).toEqual({ ...aim, flash: false });
   });
 });
 

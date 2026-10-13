@@ -129,10 +129,10 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         panel = self._wait_exploration_available(page)
 
-        # The scene overview renders the room's people as target chips keyed
-        # ``target-<identity>`` directly at the root; clicking the
+        # The presence rail renders the room's people as medallions keyed
+        # ``target-<identity>`` (exploration-presence-rail); clicking the
         # live-hostile target (the one whose engage affordance is ENABLED —
-        # the defeated fixture monster's is disabled) opens its verb popover,
+        # the defeated fixture monster's is disabled) opens its verb card,
         # whose ``engage`` row dispatches ``explore.engage``.
         hostile = next(
             (
@@ -147,10 +147,12 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertIsNotNone(hostile, "enabled-engage target not found in the interact panel")
         target_key = "target-" + str(hostile["identity"])
-        page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
-        self._click_row(page, target_key)
-        page.wait_for_selector('[data-item-key="engage"]', timeout=15000)
-        self._click_row(page, "engage")
+        medallion = f'[data-anchor="presence"] [data-entry-key="{target_key}"]'
+        page.wait_for_selector(medallion, timeout=15000)
+        page.locator(medallion).click()
+        engage_row = '[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="engage"]'
+        page.wait_for_selector(engage_row, timeout=15000)
+        page.locator(engage_row).click()
         self._wait_mode(page, "combat")
 
         # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
@@ -224,9 +226,9 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         panel = self._wait_exploration_available(page)
 
         # The exploration fixture leaves a defeated wolf beside the living
-        # goblin. Under the scene overview the wolf's root person chip opens its
-        # verb popover, whose ``engage`` affordance is a disabled row
-        # (``target_dead``).
+        # goblin. The wolf's medallion on the presence rail opens its verb
+        # card (exploration-presence-rail), whose ``engage`` affordance is a
+        # disabled row (``target_dead``).
         wolf = None
         for t in (panel.get("interact") or []):
             if any(
@@ -237,34 +239,38 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 break
         self.assertIsNotNone(wolf, "disabled-engage target not found in the interact panel")
         target_key = "target-" + str(wolf["identity"])
-        page.wait_for_selector(f'[data-item-key="{target_key}"]', timeout=15000)
-        self._click_row(page, target_key)
-        # The wolf's verb popover renders the disabled ``engage`` row.
-        page.wait_for_selector(
-            '[data-testid="verb-popover"] [data-item-key][aria-disabled="true"]',
-            timeout=15000,
-        )
+        medallion = f'[data-anchor="presence"] [data-entry-key="{target_key}"]'
+        page.wait_for_selector(medallion, timeout=15000)
+        page.locator(medallion).click()
+        # The wolf's verb card renders the disabled ``engage`` row.
+        card = '[data-anchor="choices"] [data-testid="presence-card"]'
+        page.wait_for_selector(f'{card} [data-row-key][aria-disabled="true"]', timeout=15000)
         disabled_key = page.evaluate(
-            "() => document.querySelector('[data-testid=\"verb-popover\"] "
-            "[data-item-key][aria-disabled=\"true\"]').getAttribute('data-item-key')"
+            "(card) => document.querySelector(card + ' [data-row-key][aria-disabled=\"true\"]')"
+            ".getAttribute('data-row-key')",
+            card,
         )
         before = sent_action_count(page)
-        row = page.locator(f'[data-testid="verb-popover"] [data-item-key="{disabled_key}"]')
-        row.scroll_into_view_if_needed()
+        row = page.locator(f'{card} [data-row-key="{disabled_key}"]')
         row.click(force=True)
-        wait_for_store_state(
-            page,
-            lambda s: (s.get("focus") or {}).get("key") == disabled_key,
+        # The click focused the card and made the disabled row its active
+        # descendant, and nothing was submitted.
+        page.wait_for_function(
+            """([card, key]) => {
+              const host = document.querySelector(card);
+              const el = host && document.getElementById(host.getAttribute('aria-activedescendant'));
+              return document.activeElement === host && el && el.getAttribute('data-row-key') === key;
+            }""",
+            arg=[card, disabled_key],
             timeout=5000,
         )
         self.assertEqual(sent_action_count(page), before)
         # The row's own accessible description carries the server-authored
-        # reason (the overview's reason strip only explains a focused root
-        # chip, never a popover row).
+        # reason.
         reason = page.evaluate(
             """() => {
               const row = document.querySelector(
-                '[data-testid="verb-popover"] [data-item-key="%s"]');
+                '[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="%s"]');
               const id = row.getAttribute('aria-describedby');
               const el = id && document.getElementById(id);
               return el ? el.textContent : '';

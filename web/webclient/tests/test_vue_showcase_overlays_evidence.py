@@ -178,12 +178,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The AVG message window (webclient-message-window-component),
     # built and story-documented before C6c mounts it.
     "Core/MessageWindow",
-    # The AVG scene overview and its verb popover
-    # (webclient-scene-overview-component), built and story-documented
-    # before C8b mounts them.
+    # The AVG scene overview (webclient-scene-overview-component).
     "Action/SceneOverview",
     "Action/ExitCompass",
-    "Action/DockVerbPopover",
     # The dialogue stage actor (webclient-dialogue-stage-actors), the
     # standing portrait that wraps Core/ReferenceArtwork on the stage.
     "Core/StageActor",
@@ -193,6 +190,11 @@ PREVIOUS_MANIFEST_KEYS = {
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",
+    # The centred card shell, the presence rail, and the exploration-screen
+    # story joined, and the verb popover left, with exploration-presence-rail.
+    "Core/ChoiceCard",
+    "Core/PresenceRail",
+    "Core/ExplorationScreen",
     # The settings overlay's local reading preview
     # (webclient-settings-reading-preview).
     "Overlays/ReadingSample",

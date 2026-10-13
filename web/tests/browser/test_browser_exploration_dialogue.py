@@ -116,10 +116,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # The scripted host is both a look entity and a committed interact
-        # target, so the overview renders it only as the stable
-        # `target-<identity>` person chip (webclient-scene-overview-swap:
-        # 人物-row entity chips exist for look-only entities); 查看 in the
-        # chip's verb popover submits explore.look for that host.
+        # target, so the presence rail renders it only as the stable
+        # `target-<identity>` medallion (exploration-presence-rail: bystander
+        # entries exist for look-only entities); 查看 on the medallion's verb
+        # card submits explore.look for that host.
         host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
         activate_overview_chip(page, "target-%s" % host_identity)
         activate_overview_chip(page, "look-target")  # 查看 -> explore.look
@@ -137,8 +137,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 chip for the scripted host opens its verb
-        # popover; 交談 opens the conversation in one dispatch (no topic
+        # The rail's medallion for the scripted host opens its verb card;
+        # 交談 opens the conversation in one dispatch (no topic
         # first), and the choice list over the stage carries the authored
         # picks once the greeting is read.
         host_identity = self._live_exploration_panel(page)["interact"][0]["identity"]
@@ -160,7 +160,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the opened conversation must present the authored picks",
         )
         # The dock returned to the overview in the commit that opened the
-        # conversation (webclient-talk-open-dock): no popover stays open over
+        # conversation (webclient-talk-open-dock): no frame stays open over
         # the dialogue surface.
         wait_for_store_state(
             page,
@@ -182,7 +182,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly"
+        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
     )
     @covers_requirement(
         "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
@@ -190,8 +190,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def test_talk_open_enters_the_dialogue_in_one_step(self):
         """webclient-talk-open-dock: 交談 is one step.
 
-        A keyboard-driven journey at 1451x790: the overview's person chip
-        opens the host's verb popover, ONE Enter on 交談 submits exactly one
+        A keyboard-driven journey at 1451x790: the rail's medallion opens the
+        host's verb card (exploration-presence-rail), ONE Enter on 交談
+        submits exactly one
         `explore.talk_open` and never a scripted-keyword dispatch, and the
         commit that opens the conversation carries mode `dialogue`, the
         committed dialogue panel's greeting line, and the dock back at the
@@ -204,16 +205,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         host = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % host["identity"])
-        # The popover is one child frame of the overview and 交談 is its
-        # focused first row: no keyword list sits between the chip and the
-        # conversation.
+        # The verb card is client-local (no router frame) and 交談 is its
+        # focused first row: no keyword list sits between the medallion and
+        # the conversation.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
         self.assertEqual(
             page.evaluate(
-                "window.__elosernBridge.router.currentItem() && "
-                "window.__elosernBridge.router.currentItem().key"
+                """() => {
+                  const card = document.querySelector('[data-anchor="choices"] [data-testid="presence-card"]');
+                  const row = card && document.getElementById(card.getAttribute('aria-activedescendant'));
+                  return document.activeElement === card && row ? row.getAttribute('data-row-key') : null;
+                }"""
             ),
             "talk-open",
-            "交談 must be the popover's focused row",
+            "交談 must be the verb card's focused row",
         )
         _press(page, "Enter")  # 交談 -> explore.talk_open
         self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
@@ -523,8 +528,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertGreater(dom_shape["picks"], 0)
         self.assertTrue(dom_shape["listFocused"])
 
-        # The dock is back at the overview in that commit: the popover that
-        # carried 交談 closed with it (webclient-talk-open-dock).
+        # The dock is at the overview in that commit, and the verb card that
+        # carried 交談 closed with it (exploration-presence-rail).
         wait_for_store_state(
             page,
             lambda state: (state.get("dockDepth") or 0) == 1,
@@ -820,9 +825,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         host = overview_target_with_affordance(page, "explore.talk_open")
-        page.click('#action-dock [data-item-key="target-%s"]' % host["identity"])
-        page.wait_for_selector('[data-testid="verb-popover"] [data-item-key="talk-open"]', timeout=15000)
-        page.click('[data-testid="verb-popover"] [data-item-key="talk-open"]')
+        page.click('[data-anchor="presence"] [data-entry-key="target-%s"]' % host["identity"])
+        card_row = '[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="talk-open"]'
+        page.wait_for_selector(card_row, timeout=15000)
+        page.click(card_row)
         self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
         self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
 
@@ -878,7 +884,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # The rail's medallion for the bard opens its verb card; 交談
         # opens the conversation, whose choice list carries the free row.
         bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
@@ -923,7 +929,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
 
         # Open free-form dialogue but cancel with Escape without sending.
-        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # The rail's medallion for the bard opens its verb card; 交談
         # opens the conversation, whose choice list carries the free row.
         bard = overview_target_with_affordance(page, "explore.talk_open")
         activate_overview_chip(page, "target-%s" % bard["identity"])
@@ -1047,3 +1053,83 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # Ensure standing humanoid SVG is absent from the stage
         svg_count = page.locator('[data-anchor="actor-right"] [data-testid="reference-artwork"] svg').count()
         self.assertEqual(svg_count, 0, "legacy standing humanoid SVG must not be rendered")
+
+    @covers_requirement(
+        "webclient-presence-rail::the-presence-rail-and-verb-card-are-verified-in-the-live-client-at-two-viewports"
+    )
+    def test_presence_rail_and_verb_card_hold_at_both_reference_viewports(self):
+        """exploration-presence-rail: geometry and the standee handover at
+        1451x790 and 1920x1080.
+
+        The rail sits above the band without overlapping the local-map
+        island column, the verb card is centred and fully visible, and 交談
+        hands the very same standee element on to the dialogue surface.
+        """
+        for viewport in ((1451, 790), (1920, 1080)):
+            page = self.logged_in_page(viewport)
+            self._wait_exploration_available(page)
+            host = overview_target_with_affordance(page, "explore.talk_open")
+            page.wait_for_selector(
+                '[data-anchor="presence"] [data-entry-key="target-%s"]' % host["identity"],
+                state="attached",
+            )
+            page.wait_for_timeout(300)
+            geometry = page.evaluate(
+                """() => {
+                  const box = (el) => {
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+                  };
+                  return {
+                    rail: box(document.querySelector('[data-anchor="presence"] [data-testid="presence-rail"]')),
+                    band: box(document.querySelector('[data-testid="stage-band"]')),
+                    island: box(document.querySelector('[data-testid="local-map"]')),
+                    width: window.innerWidth,
+                  };
+                }"""
+            )
+            self.assertLessEqual(geometry["rail"]["bottom"], geometry["band"]["top"] + 1, str(viewport))
+            self.assertGreater(geometry["rail"]["left"], geometry["width"] / 2, str(viewport))
+            if geometry["island"]:
+                overlaps = not (
+                    geometry["rail"]["right"] <= geometry["island"]["left"]
+                    or geometry["island"]["right"] <= geometry["rail"]["left"]
+                    or geometry["rail"]["bottom"] <= geometry["island"]["top"]
+                    or geometry["island"]["bottom"] <= geometry["rail"]["top"]
+                )
+                self.assertFalse(overlaps, "the rail overlaps the island column at %s" % (viewport,))
+
+            activate_overview_chip(page, "target-%s" % host["identity"])
+            page.wait_for_selector('[data-anchor="choices"] [data-testid="presence-card"]')
+            page.wait_for_timeout(200)
+            card = page.evaluate(
+                """() => {
+                  const r = document.querySelector('[data-anchor="choices"] [data-testid="presence-card"]')
+                    .getBoundingClientRect();
+                  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom,
+                           width: window.innerWidth, height: window.innerHeight };
+                }"""
+            )
+            self.assertGreaterEqual(card["left"], 0, str(viewport))
+            self.assertLessEqual(card["right"], card["width"], str(viewport))
+            self.assertGreaterEqual(card["top"], 0, str(viewport))
+            self.assertLessEqual(card["bottom"], card["height"], str(viewport))
+            self.assertAlmostEqual((card["left"] + card["right"]) / 2, card["width"] / 2, delta=2)
+
+            standee = '[data-anchor="actor-right"] [data-testid="stage-actor"]'
+            page.wait_for_selector(standee)
+            page.evaluate("(sel) => { document.querySelector(sel).__presenceMark = true; }", standee)
+            _press(page, "Enter")  # 交談 -> explore.talk_open
+            self._wait_panel(page, "dialogue", lambda p: p.get("available") is True)
+            wait_for_store_state(page, lambda s: s.get("mode") == "dialogue")
+            page.wait_for_selector(standee)
+            self.assertTrue(
+                page.evaluate("(sel) => document.querySelector(sel).__presenceMark === true", standee),
+                "the standee was remounted between the card and the dialogue at %s" % (viewport,),
+            )
+            # Leave the conversation so the next viewport starts in exploration.
+            open_dialogue_choices(page)
+            page.click('[data-testid="dialogue-exit"]')
+            wait_for_store_state(page, lambda s: s.get("mode") == "exploration")
+            page.close()

@@ -55,7 +55,7 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("keeps top navigation subject to both submission and revision locks", () => {
     openSession();
-    expect(store.focusItemByKey("target-7")).toBe(true);
+    expect(store.focusItemByKey("wait")).toBe(true);
     expect(store.focusConfirm("pointer")).toBe(true);
     expect(store.router.depth()).toBe(2);
     store.router.setMutationInFlight(true);
@@ -89,7 +89,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.view.activeSubDock).toBe(null);
   });
 
-  it("activating the service-guild navigate row in an open target frame opens the quest drawer with router unchanged", () => {
+  it("activating the service-guild navigate row on the verb card opens the quest drawer with router unchanged", () => {
     const snap = snapshotWithServices();
     snap.panels.exploration.interact[0].affordances.push({
       kind: "navigate",
@@ -102,18 +102,16 @@ describe("frameless 背包 drawer (store contract)", () => {
     store.setConnected(true);
     expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
 
-    // The overview's 店長 chip opens the verb popover (the dock root is the
-    // scene overview, webclient-scene-overview-swap).
-    expect(store.focusItemByKey("target-7")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // The rail's 店長 entry opens the client-local verb card
+    // (exploration-presence-rail): no router frame.
+    expect(store.activatePresence("target-7").handled).toBe(true);
 
     const depthBefore = store.router.depth();
     const descriptorBefore = store.router.currentDescriptor();
     const trailBefore = trailTitles(store.router);
 
     // Activate service-guild navigate row
-    expect(store.focusItemByKey("service-guild")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
 
     // The quest drawer opens frameless: no frame pushed, no dock switch, no service surface
     expect(store.view.hudDrawer).toBe("quest");
@@ -140,7 +138,7 @@ describe("frameless 背包 drawer (store contract)", () => {
     expect(store.router.currentDescriptor()).toEqual(descriptorBefore);
   });
 
-  it("activating the service-shop navigate row in an open target frame opens the shop drawer with router unchanged", () => {
+  it("activating the service-shop navigate row on the verb card opens the shop drawer with router unchanged", () => {
    const snap = snapshotWithServices();
    snap.panels.exploration.interact[0].affordances.push({
      kind: "navigate",
@@ -153,17 +151,16 @@ describe("frameless 背包 drawer (store contract)", () => {
    store.setConnected(true);
    expect(store.receive(1, "ui_snapshot", [snap], {}).accepted).toBe(true);
 
-   // The overview's 店長 chip opens the verb popover.
-   expect(store.focusItemByKey("target-7")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The rail's 店長 entry opens the client-local verb card
+   // (exploration-presence-rail): no router frame.
+   expect(store.activatePresence("target-7").handled).toBe(true);
 
     const depthBefore = store.router.depth();
    const descriptorBefore = store.router.currentDescriptor();
    const trailBefore = trailTitles(store.router);
 
    // Activate service-shop navigate row
-   expect(store.focusItemByKey("service-shop")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
 
    // The shop drawer opens frameless: no frame pushed, no dock switch, no service surface
     expect(store.view.hudDrawer).toBe("shop");

@@ -111,6 +111,10 @@ export default {
     mode: { type: String, default: "exploration" },
     // The dialogue view model (`dialogueViewModel`), null unless available.
     dialogue: { type: Object, default: null },
+    // The person in focus in exploration (exploration-presence-rail): the
+    // name plate names them while their verb card is open, so the plate is
+    // already up when 交談 hands the standee to the dialogue screen.
+    speaker: { type: String, default: null },
     // The prose scale; a change re-pages (a CSS variable change is invisible
     // to the ResizeObserver).
     fontScale: { type: Number, default: PROSE_SCALE_DEFAULT },
@@ -151,8 +155,11 @@ export default {
     const measure = useMessageMeasure(surfaceRef);
     const pageLabelId = useId();
 
-    // The name plate renders while the dialogue panel is available.
-    const plated = computed(() => props.mode === "dialogue" && !!props.dialogue);
+    // The name plate renders while the dialogue panel is available, and in
+    // exploration while a person is in focus.
+    const dialoguePlated = computed(() => props.mode === "dialogue" && !!props.dialogue);
+    const plated = computed(() => dialoguePlated.value || (props.mode === "exploration" && !!props.speaker));
+    const plateName = computed(() => (dialoguePlated.value ? props.dialogue.host.displayName : props.speaker));
     const responses = computed(() => segmentResponses(props.lines, props.marks));
 
     // A dispatch is out and no line has taken its ordinal yet.
@@ -918,8 +925,8 @@ export default {
                     // The underline runs under this line only, from the
                     // name's own left edge (webclient-message-typesetting).
                     h("span", { class: "message-window__plate-line" }, [
-                      h("span", { class: "message-window__plate-name" }, props.dialogue.host.displayName),
-                      props.dialogue.bondStage == null
+                      h("span", { class: "message-window__plate-name" }, plateName.value),
+                      !dialoguePlated.value || props.dialogue.bondStage == null
                         ? null
                         : h(
                             "span",
@@ -1335,6 +1342,17 @@ export default {
   font-size: var(--message-page-font);
   white-space: nowrap;
   overflow: hidden;
+}
+
+/* In exploration the plate names the person in focus (exploration-presence-
+   rail) above the centred reading column, so it takes the page's own
+   geometry: the same centred measure and side padding, its name starting
+   where the text starts. */
+.message-window[data-mode="exploration"] .message-window__plate {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: calc(24px * var(--ui-scale));
 }
 
 /* The name's underline (webclient-message-typesetting): it starts exactly

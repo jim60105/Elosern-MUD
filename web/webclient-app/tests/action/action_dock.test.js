@@ -113,18 +113,9 @@ describe("ActionDock (B2 action-dock family)", () => {
     ).toBe(true);
   });
 
-  it("states a verb popover's target once: no breadcrumb on that frame only", () => {
-    // webclient-band-material-pass: the popover's own heading names the
-    // target, so the breadcrumb stays out of the `exploration.target` frame;
-    // any other frame below the root keeps it.
-    const trail = ["場景", "店長"];
-    const popover = mountDock({
-      rootItems: ROOT_ITEMS,
-      view: { dockDepth: 2, dockTrail: trail, dockSource: "exploration.target" },
-    });
-    expect(popover.find('[data-testid="dock-crumb"]').exists()).toBe(false);
-    popover.unmount();
-    document.body.innerHTML = "";
+  it("keeps the breadcrumb on every frame below the root", () => {
+    // exploration-presence-rail: the verb popover that named its own target
+    // (and so hid the breadcrumb) is gone; every submenu frame keeps it.
 
     const submenu = mountDock({
       rootItems: ROOT_ITEMS,

@@ -105,6 +105,8 @@ export function applyFrames(ctx) {
   // descriptor as the one-frame stack. Browser helpers use it to normalize
   // the stack.
   ctx.resetFramesToRoot = function resetFramesToRoot() {
+    // The presence cards are not frames, but a root reset leaves no card open.
+    ctx.resetPresence?.();
     ctx.inStackMutation = true;
     try {
       router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });
@@ -447,7 +449,7 @@ export function applyFrames(ctx) {
       // D2). The committed room identity changes exactly on movement; a move
       // from the minimap or a typed command bypasses the dock's own push
       // sites, so the reset lives here, after the access-time settle (a
-      // popover already popped by a departed target is not double-handled).
+      // frame already popped by the settle is not double-handled).
       // The identity is recorded on every settle: the first settle after
       // mount carries no previous identity and never resets, and an
       // unavailable panel records null.

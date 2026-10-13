@@ -13,9 +13,10 @@ events/actions it emits, and its primary states.
 - **WHEN** the required-component manifest is enumerated
 - **THEN** every listed component has at least one registered Storybook story, including the
   message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
-  pending-action, and dialogue name-plate states, the scene overview's story with its full-room, empty-rows,
-  disabled-exit, and overflowing states, the verb popover's story with its dialogue-host,
-  hostile-target, and look-only states, and the stage actor's story with its player, host-image,
+  pending-action, and dialogue name-plate states, the scene overview's story with its full-room and empty-rows
+  states, the choice card's story with its verbs, wait, suggestions, and overflow states, the
+  presence rail's story with its default, overflow, no-portraits, and objects-only states, the
+  exploration screen's story with its default and person-focus states, and the stage actor's story with its player, host-image,
   host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story
   with its one-foe, two-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
   dialogue choice list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
@@ -39,7 +40,7 @@ events/actions it emits, and its primary states.
 - **WHEN** the contextual HUD redesign completes
 - **THEN** the required manifest SHALL enumerate at minimum: the header; the place card; the
   message window; the command line; the action dock with its menu, submenu, and choice-card frames,
-  its scene overview, and the scene overview's verb popover; the status panel with its gauges and
+  its scene overview; the presence rail and the centred choice card; the status panel with its gauges and
   conditions; the character status drawer (including the equipment doll); the skill book; the
   local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait
   on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice
@@ -96,9 +97,9 @@ non-local network requests blocked.
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 
 The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`, `ExitCompass`,
-`ExplorationReadout`, `SceneOverview`, `DockVerbPopover`) SHALL present the `context_actions` v5 menus and, in
-exploration, the `exploration` panel's scene overview as an exit compass beside finite people/object/footer
-rows or chips sharing one readout, with the mode's guidance line, focused/disabled states, and the exact
+`ExplorationReadout`, `SceneOverview`) SHALL present the `context_actions` v5 menus and, in
+exploration, the `exploration` panel's scene overview as an exit compass beside finite footer
+chips sharing one readout, with the mode's guidance line, focused/disabled states, and the exact
 server-authored option and choice card shape.
 
 #### Scenario: Focused and disabled cells are distinct
@@ -110,16 +111,16 @@ server-authored option and choice card shape.
 - **THEN** each option and choice card is the exact server-authored shape and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
 
 #### Scenario: The scene overview renders only its non-empty rows
-- **WHEN** the scene overview renders objects and the footer, with no people section, beside a compass with exits
-- **THEN** only the 物件 row and footer render in that order, with no 人物 or 出口 row or label, and each chip carries its row key and row id
+- **WHEN** the scene overview renders for a room with people, objects, and exits beside a compass
+- **THEN** only the footer row renders, with no 人物, 物件, or 出口 row or label, and each chip carries its row key and row id
 
 #### Scenario: A disabled exit chip explains itself without submitting
 - **WHEN** a disabled compass target is aimed or clicked
 - **THEN** the shared readout shows its unchanged server reason and no move intent is emitted
 
 #### Scenario: The verb popover closes on an outside press
-- **WHEN** the verb popover is open inside its host and the pointer presses inside the host but outside the popover card
-- **THEN** the popover emits its back intent once and emits no activation
+- **WHEN** the centred choice card is open and the player presses Escape or activates its trailing `✕ 返回` row
+- **THEN** the card emits its back intent once and emits no activation
 
 #### Scenario: The dock exposes its keys, target, and test ids
 - **WHEN** the action dock renders
@@ -143,8 +144,8 @@ server-authored option and choice card shape.
 - **THEN** its target and readout obey `webclient-exit-compass`, including bearing, direction and portal resolution, destination fallback, and disabled reason presentation
 
 #### Scenario: The verb popover names its target and its rows
-- **WHEN** the verb popover renders for a target
-- **THEN** it renders a head naming its target and that target's rows in the menu's order
+- **WHEN** the choice card renders a target's verb rows
+- **THEN** it renders that target's rows in the menu's order with digit badges, followed by the trailing `✕ 返回` row under a hairline rule
 
 #### Scenario: A disabled chip exposes its reason to assistive technology
 - **WHEN** the scene overview renders a disabled chip

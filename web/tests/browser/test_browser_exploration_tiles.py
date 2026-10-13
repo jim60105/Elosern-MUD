@@ -1,4 +1,4 @@
-"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): the scene overview's chip wrapping and the fixed-column nav pane's track sizing at narrow viewports.
+"""Keyboard-only exploration browser acceptance (webclient-exploration-menu 4.2-4.6): a crowded room folding into the presence rail and the fixed-column nav pane's track sizing at narrow viewports.
 """
 
 from __future__ import annotations
@@ -7,6 +7,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
+    presence_entry_keys,
     sent_action_count,
     valid_local_map_panel,
     store_state,
@@ -66,16 +67,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-    @covers_requirement("webclient-exploration-menu::the-keyboard-first-exploration-dock-roots-at-the-scene-overview-and-opens-dialogue-directly")
-    def test_overview_chips_wrap_inside_the_pane_at_a_narrow_viewport(self):
-        """The scene overview's chips wrap by width inside the command region.
-
-        At the minimum supported viewport a crowded room renders its chips as
-        wrapping rows in the right column beside the exit compass
-        (exploration-exit-compass D5): no chip overflows the column
-        horizontally, the reading order is unchanged, the last chip is
-        reachable by scrolling (the column is the pane's single scrolling
-        region), and the twelve exits stay on the compass.
+    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    def test_crowded_room_folds_into_the_rail_at_a_narrow_viewport(self):
+        """A crowded room at the minimum supported viewport: the overview
+        keeps only its footer chips, the twelve exits stay on the compass,
+        and the ten people stand on the presence rail as five medallions and
+        a ``＋5`` slot (exploration-presence-rail), right-aligned on the stage
+        floor above the band, left of the right-hand island column, and fully
+        inside the stage. The dock pane never scrolls.
         """
         page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
@@ -94,80 +93,55 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             {"status": "unavailable"},
         )
 
-        column = page.locator("#action-dock .exploration-root__side")
-        chips = page.locator("#action-dock .scene-chip")
-        # Ten person chips plus the footer's 查看房間 and 等待／休息 chips.
-        self.assertEqual(chips.count(), 12, "the overview renders one chip per entry")
-        pane_box = column.bounding_box()
-        self.assertIsNotNone(pane_box, "the overview column must be visible at 1451x790")
+        keys = page.evaluate(
+            "() => Array.from(document.querySelectorAll('#action-dock .scene-chip'))"
+            ".map((el) => el.getAttribute('data-item-key'))"
+        )
+        self.assertEqual(keys, ["look-room", "wait"], "the overview keeps only its footer")
         self.assertEqual(
             page.locator('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').count(),
             len(exits),
             "every exit is a compass target",
         )
-
-        # The reading order is unchanged: the people lead, the footer closes.
-        keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll('#action-dock .scene-chip'))"
-            ".map((el) => el.getAttribute('data-item-key'))"
-        )
+        page.wait_for_selector('[data-anchor="presence"] [data-testid="presence-rail"]', timeout=15000)
         self.assertEqual(
-            keys,
-            ["target-%d" % (700 + index) for index in range(len(names))] + ["look-room", "wait"],
-            "the overview's chips keep their reading order",
+            presence_entry_keys(page),
+            ["target-%d" % (700 + index) for index in range(5)] + ["presence-more"],
+            "five medallions and the ＋N slot",
         )
-
-        # No chip overflows the column horizontally, and the chips wrap into
-        # more than one row.
-        tops = set()
-        for index in range(chips.count()):
-            box = chips.nth(index).bounding_box()
-            self.assertIsNotNone(box, "chip %d must have a bounding box" % index)
-            self.assertLessEqual(
-                box["x"] + box["width"],
-                pane_box["x"] + pane_box["width"] + 1,
-                "chip %d overflows the column horizontally" % index,
-            )
-            self.assertGreaterEqual(
-                box["x"], pane_box["x"] - 1, "chip %d starts left of the column" % index
-            )
-            tops.add(round(box["y"]))
-        self.assertGreater(
-            len(tops), 1, "the chips must wrap into more than one row at 1451x790"
+        self.assertIn(
+            "＋5",
+            page.locator('[data-anchor="presence"] [data-entry-key="presence-more"]').inner_text(),
         )
-
-        # The last chip is reachable by scrolling: focusing it (the real
-        # keyboard path) scrolls it into the column's visible box.
-        last_key = keys[-1]
-        self.assertTrue(
-            page.evaluate(
-                "(key) => window.__elosernBridge.store.focusItemByKey(key)", last_key
-            ),
-            "the last chip must be focusable by its key",
+        geometry = page.evaluate(
+            """() => {
+              const rect = (sel) => {
+                const el = document.querySelector(sel);
+                if (!el) return null;
+                const r = el.getBoundingClientRect();
+                return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+              };
+              return {
+                rail: rect('[data-anchor="presence"] [data-testid="presence-rail"]'),
+                band: rect('[data-testid="stage-band"]'),
+                map: rect('[data-anchor="map"]'),
+                stage: rect('[data-testid="elosern-stage"]'),
+              };
+            }"""
         )
-        page.wait_for_timeout(150)
-        last_box = chips.last.bounding_box()
-        self.assertIsNotNone(last_box, "the last chip must have a bounding box")
-        self.assertGreaterEqual(
-            last_box["y"],
-            pane_box["y"] - 1,
-            "the focused last chip must be scrolled into the column",
-        )
-        self.assertLessEqual(
-            last_box["y"] + last_box["height"],
-            pane_box["y"] + pane_box["height"] + 1,
-            "the focused last chip must be scrolled into the column",
-        )
-        # The pane itself never scrolls: the column does.
+        rail, band, island, stage = geometry["rail"], geometry["band"], geometry["map"], geometry["stage"]
+        self.assertLessEqual(rail["bottom"], band["top"] + 0.5, "the rail stands above the band")
+        self.assertLessEqual(rail["right"], island["left"] + 0.5, "the rail clears the island column")
+        self.assertGreaterEqual(rail["left"], stage["left"], "the rail lies inside the stage")
+        self.assertLessEqual(island["left"] - rail["right"], 40.0, "the rail is right-aligned against the island column")
+        # The pane itself never scrolls.
         self.assertEqual(
             page.evaluate(
                 "() => { const p = document.querySelector('#action-dock .action-dock__pane');"
                 " return p.scrollHeight - p.clientHeight; }"
             ),
             0,
-            "the dock pane must not scroll; the overview column does",
+            "the dock pane must not scroll",
         )
-        self.assertEqual(
-            sent_action_count(page), 0, "focusing a chip submits nothing"
-        )
+        self.assertEqual(sent_action_count(page), 0, "nothing was submitted")
 

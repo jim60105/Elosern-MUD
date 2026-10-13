@@ -709,11 +709,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    );
    await wrapper.vm.$nextTick();
 
-   // The overview's 店長 chip opens the verb popover (the dock root is the
-   // scene overview, webclient-scene-overview-swap).
-   expect(store.focusItemByKey("target-7")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The rail's 店長 entry opens the client-local verb card
+   // (exploration-presence-rail): no router frame.
+   expect(store.activatePresence("target-7").handled).toBe(true);
    await wrapper.vm.$nextTick();
+   await wrapper.vm.$nextTick();
+   const card = wrapper.get('[data-anchor="choices"] [data-testid="presence-card"]').element;
 
    const depthBefore = store.router.depth();
    const trailBefore = store.router.trail();
@@ -733,9 +734,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    for (const [name, closeAction] of Object.entries(closeRoutes)) {
      const actionsCountBefore = sender.sent.actions.length;
 
-     // Focus and activate service-shop
-     expect(store.focusItemByKey("service-shop")).toBe(true);
-     expect(store.focusConfirm()).toBe(true);
+     // The verb card's service-shop row
+     expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
      await wrapper.vm.$nextTick();
 
      expect(store.view.hudDrawer, name).toBe("shop");
@@ -752,7 +752,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
      expect(store.router.trail(), name).toEqual(trailBefore);
      expect(store.view.activeSubDock, name).toBe(null);
      expect(sender.sent.actions.length, name).toBe(actionsCountBefore);
-     expect(store.router.currentItem().key, name).toBe("service-shop");
+     // The card stays open under the drawer and takes focus back.
+     expect(store.view.presenceCard, name).toMatchObject({ kind: "verbs", identity: 7 });
+     expect(document.activeElement, name).toBe(card);
    }
 });
 
@@ -790,11 +792,12 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    );
    await wrapper.vm.$nextTick();
 
-   // The overview's 店長 chip opens the verb popover (the dock root is the
-   // scene overview, webclient-scene-overview-swap).
-   expect(store.focusItemByKey("target-7")).toBe(true);
-   expect(store.focusConfirm()).toBe(true);
+   // The rail's 店長 entry opens the client-local verb card
+   // (exploration-presence-rail): no router frame.
+   expect(store.activatePresence("target-7").handled).toBe(true);
    await wrapper.vm.$nextTick();
+   await wrapper.vm.$nextTick();
+   const card = wrapper.get('[data-anchor="choices"] [data-testid="presence-card"]').element;
 
    const depthBefore = store.router.depth();
    const trailBefore = store.router.trail();
@@ -814,9 +817,8 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
    for (const [name, closeAction] of Object.entries(closeRoutes)) {
      const actionsCountBefore = sender.sent.actions.length;
 
-     // Focus and activate service-guild
-     expect(store.focusItemByKey("service-guild")).toBe(true);
-     expect(store.focusConfirm()).toBe(true);
+     // The verb card's service-guild row
+     expect(store.activatePresenceVerb("service-guild").handled).toBe(true);
      await wrapper.vm.$nextTick();
 
      expect(store.view.hudDrawer, name).toBe("quest");
@@ -833,7 +835,9 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
      expect(store.router.trail(), name).toEqual(trailBefore);
      expect(store.view.activeSubDock, name).toBe(null);
      expect(sender.sent.actions.length, name).toBe(actionsCountBefore);
-     expect(store.router.currentItem().key, name).toBe("service-guild");
+     // The card stays open under the drawer and takes focus back.
+     expect(store.view.presenceCard, name).toMatchObject({ kind: "verbs", identity: 7 });
+     expect(document.activeElement, name).toBe(card);
    }
  });
 

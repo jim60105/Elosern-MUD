@@ -21,11 +21,18 @@ import { NON_SUCCESS_OUTCOMES } from "../stores/elosern/shared.js";
 // summary content.
 export function useReadoutState(idle) {
   const aim = ref(null);
+  // The hovered or focused presence-rail entry's content
+  // (exploration-presence-rail design D6).
+  const rail = ref(null);
   const flash = ref(null);
   let timer = null;
 
   function setAim(next) {
     aim.value = next;
+  }
+
+  function setRail(next) {
+    rail.value = next;
   }
 
   function showFlash(content) {
@@ -42,6 +49,7 @@ export function useReadoutState(idle) {
     timer = null;
     flash.value = null;
     aim.value = null;
+    rail.value = null;
   }
 
   if (getCurrentScope()) {
@@ -49,10 +57,10 @@ export function useReadoutState(idle) {
   }
 
   const content = computed(() =>
-    readoutContent({ flash: flash.value, aim: aimReadout(aim.value), idle: idle() }),
+    readoutContent({ flash: flash.value, aim: aimReadout(aim.value), rail: rail.value, idle: idle() }),
   );
 
-  return { aim, flash, content, setAim, showFlash, clear };
+  return { aim, rail, flash, content, setAim, setRail, showFlash, clear };
 }
 
 export function useExitCompass(store, { panel, compassRef }) {
@@ -77,10 +85,12 @@ export function useExitCompass(store, { panel, compassRef }) {
 
   // The compass is the live control only at the exploration root, with no
   // drawer or overlay over it; anything else stops a walk.
+  // An open presence card (exploration-presence-rail) stops it too.
   const compassActive = computed(
     () =>
       store.view.mode === "exploration" &&
       store.view.dockSource === "exploration.root" &&
+      !store.view.presenceCard &&
       !store.view.degradedRoot &&
       !store.view.hudDrawer &&
       !store.view.hudOverlay,
@@ -188,5 +198,9 @@ export function useExitCompass(store, { panel, compassRef }) {
     onCompassMove,
     onCompassAim,
     onCompassBlocked,
+    // The presence rail's readout feed and the departed flash
+    // (exploration-presence-rail design D6).
+    onRailHover: readout.setRail,
+    showReadoutFlash: readout.showFlash,
   };
 }

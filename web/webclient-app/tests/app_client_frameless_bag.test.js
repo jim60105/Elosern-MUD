@@ -70,8 +70,9 @@ describe("frameless 背包 drawer (composition contract)", () => {
     const dock = wrapper.get("#action-dock");
     // The exploration root is the scene overview (webclient-scene-overview-
     // swap): its chips are the dock's rendered rows in reading order.
-    // The exits are the exit compass's (exploration-exit-compass).
-    const keys = ["target-7", "object-3", "look-room", "wait", "suggestions"];
+    // The exits are the exit compass's (exploration-exit-compass), the
+    // people and objects the presence rail's (exploration-presence-rail).
+    const keys = ["look-room", "wait", "suggestions"];
     expect(dock.findAll('[role="option"]').map((item) => item.attributes("data-item-key"))).toEqual(keys);
     for (const key of keys.slice(0, -1)) {
       expect(store.view.focus.key).toBe(key);

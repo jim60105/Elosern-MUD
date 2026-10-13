@@ -2,16 +2,16 @@ import { h } from "vue";
 import SceneOverview from "../../components/SceneOverview.vue";
 import {
   AFFORDANCES,
-  DIRECTION_LABELS,
   explorationPanelFixture,
   overviewArgs,
 } from "../fixtures/scene_overview.js";
 
 // SceneOverview: the chip rows of the exploration root pane (AVG stage
 // design §7), in the right column beside the exit compass
-// (exploration-exit-compass). Chip rows 人物 / 物件 and a label-less footer
-// (查看房間 ‧ 等待／休息 ‧ 建議), built by the real `overviewMenu` through the
-// shared derived-shape helper; exits are the compass's, never chips. Props:
+// (exploration-exit-compass). The label-less footer (查看房間 ‧ 等待／休息 ‧
+// 建議), built by the real `overviewMenu` through the shared derived-shape
+// helper; exits are the compass's and people and objects the presence
+// rail's (exploration-presence-rail), never chips. Props:
 // menu, focusedKey, idPrefix, active.
 // Events: focus-change (every click), activate ({key, item}, enabled chips
 // only). Each story renders inside a box the size of the command panel at
@@ -67,42 +67,18 @@ const READY_SUGGESTIONS = {
   ],
 };
 
-// Every row present: people (two hosts and a look-only traveller), objects,
-// and the footer with 建議 (2). The room's three exits are the compass's.
+// A full room: the footer with 建議 (2). The room's exits are the compass's
+// and its two hosts, traveller, and objects stand on the presence rail.
 export const FullRoom = {
   render,
   args: overviewArgs(FULL_ROOM, {
     suggestions: READY_SUGGESTIONS,
-    focusedKey: "target-11",
+    focusedKey: "look-room",
   }),
 };
 
-// Nobody and nothing here: only the footer renders.
+// Nobody and nothing here, and no suggestions: 查看房間 and 等待／休息.
 export const EmptyRows = {
   render,
   args: overviewArgs(explorationPanelFixture({ exits: [{ label: "南", destination: "room:904" }] })),
-};
-
-// A crowded crossroads: 10 people wrap inside the panel's width with no
-// horizontal scroll (a taller room scrolls the panel).
-export const Overflowing = {
-  render,
-  args: overviewArgs(
-    explorationPanelFixture({
-      exits: [
-        ...DIRECTION_LABELS.map((label, i) => ({ label, destination: `room:${910 + i}` })),
-        { label: "地下水道入口" },
-        { label: "舊城牆缺口", enabled: false, reason: "崩落的石塊堵住了缺口。" },
-      ],
-      targets: Array.from({ length: 10 }, (_, i) => ({
-        identity: 40 + i,
-        name: ["哨兵", "攤販", "吟遊詩人", "巡邏隊長", "乞丐", "藥師", "鐵匠學徒", "信差", "修女", "賞金獵人"][i],
-        affordances: i % 3 === 0 ? [AFFORDANCES.engage] : [AFFORDANCES.talk],
-      })),
-    }),
-    {
-      suggestions: { status: "generating" },
-      focusedKey: "target-45",
-    },
-  ),
 };

@@ -6,6 +6,10 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
+    CARD_SELECTOR,
+    activate_card_row,
+    card_row_keys,
+    presence_entry_keys,
     activate_overview_chip,
     aim_compass_exit,
     compass_target_refs,
@@ -148,22 +152,23 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             self.assertEqual(geometry["dockBorderTopWidth"], "0px")
             self.assertEqual(geometry["dockBoxShadow"], "none")
 
-            # No frame moves or resizes the region: a target's verb popover
-            # over the inert overview, then the waiting frame.
+            # No frame or card moves or resizes the region: a person's verb
+            # card over the stage (the command region inert and dimmed beneath
+            # it, exploration-presence-rail), then the waiting frame.
             baseline = (geometry["regionLeft"], geometry["regionTop"],
                         geometry["regionRight"], geometry["regionBottom"],
                         geometry["bandHeight"])
             activate_overview_chip(page, "target-11")
-            page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
+            page.wait_for_selector(CARD_SELECTOR, timeout=15000)
             after_interact = page.evaluate(measure)
-            # Escape closes the popover and returns to the overview, whose
-            # 等待／休息 chip then opens the waiting frame.
+            # Escape closes the card, and the overview's 等待／休息 chip then
+            # opens the waiting frame.
             _press(page, "Escape")
-            wait_for_store_state(page, lambda s: s.get("dockSource") == "exploration.root")
+            wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
             activate_overview_chip(page, "wait")
             page.wait_for_selector(".waiting-screen", timeout=15000)
             after_wait = page.evaluate(measure)
-            for label, state in (("popover", after_interact), ("wait", after_wait)):
+            for label, state in (("verb card", after_interact), ("wait", after_wait)):
                 box = (state["regionLeft"], state["regionTop"], state["regionRight"],
                        state["regionBottom"], state["bandHeight"])
                 for got, want in zip(box, baseline):
@@ -313,7 +318,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
     )
     def test_breadcrumb_tracks_router_depth(self):
-        """The breadcrumb appears below the root (except over a verb popover) and names parent + current."""
+        """The breadcrumb appears below the root and names parent + current;
+        a person's verb card is no router frame and adds none."""
         page = self.logged_in_page()
         exploration = _exploration_panel(
             [_interact_target(11, "小販"), _interact_target(12, "守門人")]
@@ -339,47 +345,20 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
             "no breadcrumb is rendered at the root frame",
         )
 
-        # Open a person chip's verb popover (webclient-band-material-pass):
-        # the popover's own heading names the target once, so no breadcrumb
-        # renders on that one frame.
-        activate_overview_chip(page, "target-11")
-        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
-        self.assertEqual(
-            _dock_depth(page),
-            2,
-            "opening the popover puts the router at depth 2",
-        )
-        self.assertEqual(
-            page.locator('[data-testid="dock-crumb"]').count(),
-            0,
-            "the verb popover renders no breadcrumb",
-        )
-        self.assertEqual(
-            page.locator('[data-testid="verb-popover"] h3').inner_text().strip(),
-            "小販",
-            "the popover's single heading names the target",
-        )
-
-        # The card isolates the covered chips: a press where the 守門人 chip
-        # sits lands on the popover's layer, never on the chip.
-        covered = page.evaluate(
-            """() => {
-              const chip = document.querySelector('[data-testid="scene-overview"] [data-item-key="target-12"]');
-              const r = chip.getBoundingClientRect();
-              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-              return { chip: chip.contains(hit),
-                       layer: !!hit.closest('[data-testid="verb-popover-layer"]') };
-            }"""
-        )
-        self.assertEqual(covered, {"chip": False, "layer": True}, "covered chips cannot be hit")
-
-        # The popover's back row pops exactly one level and dispatches no
-        # ui_action.
+        # A person's verb card (exploration-presence-rail) is client-local:
+        # the router stays at the root, so no breadcrumb renders, and the
+        # card's ✕ 返回 closes it with no ui_action.
         install_outbound_recorder(page)
-        page.locator('[data-testid="verb-popover"]').get_by_text("返回上一層").click()
-        page.wait_for_timeout(150)
-        self.assertEqual(_dock_depth(page), 1, "the back row pops exactly one router level")
-        self.assertEqual(sent_action_count(page), 0, "the back row dispatches no ui_action")
+        activate_overview_chip(page, "target-11")
+        page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        self.assertEqual(_dock_depth(page), 1, "the verb card pushes no router frame")
+        self.assertTrue(
+            crumb.evaluate("el => el.hidden || getComputedStyle(el).display === 'none'"),
+            "no breadcrumb is rendered under the verb card",
+        )
+        activate_card_row(page, "back")
+        wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
+        self.assertEqual(sent_action_count(page), 0, "the card's back row dispatches no ui_action")
 
         # Any other submenu keeps the breadcrumb naming parent + current.
         activate_overview_chip(page, "suggestions")
@@ -409,10 +388,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-dock-s-shortcut-legend-names-only-real-keyboard-behaviour-and-renders-as-one-visible-instance"
     )
     def test_digit_keys_pick_the_rows_of_the_current_frame(self):
-        """`數字鍵 1–9` is real behaviour: a digit moves the dock focus onto
-        the Nth rendered entry of the current frame and runs it exactly like
-        Enter; a digit whose entry does not exist is unclaimed
-        (webclient-align-01, widened by webclient-retire-exploration-submenus).
+        """`數字鍵 1–9` is real behaviour. At the exploration root the presence
+        rail owns the digits (exploration-presence-rail): a digit activates
+        the Nth rail entry exactly like Enter, a digit past the rail is
+        claimed and does nothing, and none reaches the footer chips; while a
+        card is open its rows own the digits (webclient-align-01, widened by
+        webclient-retire-exploration-submenus).
         """
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -435,35 +416,43 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-        # The exploration root is the scene overview: its rendered chips in
-        # reading order are [target-11, look-room, wait] (the suggestions
-        # envelope is unavailable). The three exits are the exit compass's
-        # (exploration-exit-compass) and take no digit slot.
+        # The exploration root is the scene overview's footer [look-room,
+        # wait] (the suggestions envelope is unavailable); the person stands
+        # on the presence rail and the three exits on the exit compass
+        # (exploration-exit-compass), neither taking a footer slot.
         self.assertEqual(_dock_depth(page), 1, "the overview is the root frame")
         self.assertEqual(
             page.evaluate(
                 "() => Array.from(document.querySelectorAll("
                 "'#action-dock .scene-chip')).map((el) => el.getAttribute('data-item-key'))"
             ),
-            ["target-11", "look-room", "wait"],
-            "the overview's rendered chips are the digit slots",
+            ["look-room", "wait"],
+            "the overview's rendered chips",
         )
+        self.assertEqual(presence_entry_keys(page), ["target-11"])
         self.assertEqual(sorted(compass_target_refs(page)), ["ex-a", "ex-b", "ex-c"])
 
-        # `9` is beyond the three rendered chips: unclaimed, the overview
-        # stays current, nothing submits.
-        _press(page, "9")
-        self.assertEqual(
-            _dock_depth(page),
-            1,
-            "a digit beyond the overview's rendered chips leaves the frame current",
+        # `9` is past the rail's one entry: claimed (its default prevented),
+        # nothing opens or submits, and no footer chip runs.
+        claimed = page.evaluate(
+            """() => {
+          const event = new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true });
+          document.dispatchEvent(event);
+          return event.defaultPrevented;
+        }"""
         )
-        self.assertEqual(sent_action_count(page), 0, "the unclaimed digit submits nothing")
+        self.assertTrue(claimed, "a digit past the rail is claimed")
+        self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
+        self.assertEqual(_dock_depth(page), 1)
+        self.assertEqual(sent_action_count(page), 0, "the digit past the rail submits nothing")
 
-        # `2` picks the second rendered chip (查看房間) and submits its look
-        # exactly as Enter would — the proof is the OUTBOUND envelope, so the
-        # assertion cannot race the commit. No digit ever moves.
-        _press(page, "2")
+        # `1` opens the person's verb card (no request); the card then owns
+        # the digits, and its `2` (查看) submits the person's look once.
+        _press(page, "1")
+        page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        self.assertEqual(sent_action_count(page), 0, "opening the card submits nothing")
+        self.assertEqual(card_row_keys(page), ["look-target", "back"])
+        _press(page, "1")
         looks = [
             args[0]
             for cmdname, args, _kwargs in outbound_messages(page)
@@ -471,22 +460,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(
             [m.get("payload") for m in looks],
-            [{"room": True}],
-            "digit 2 submitted exactly the second chip's look, once",
+            [{"target_id": 11}],
+            "the card's digit 1 submitted exactly the person's look, once",
         )
         self.assertEqual(sent_action_count(page, "explore.move"), 0, "no digit moves")
-
-        # A digit with no such row is unclaimed: the bridge does not prevent
-        # its default (dispatchEvent returns false only when a listener
-        # cancelled the event).
-        unclaimed = page.evaluate(
-            """() => {
-          const event = new KeyboardEvent("keydown", { key: "9", bubbles: true, cancelable: true });
-          document.dispatchEvent(event);
-          return !event.defaultPrevented;
-        }"""
-        )
-        self.assertTrue(unclaimed, "a digit beyond the frame's rows is not claimed")
 
     @covers_requirement(
         "webclient-contextual-hud::dock-panes-render-a-per-kind-vocabulary-from-backed-fields-only"
@@ -570,10 +547,11 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size"
     )
-    def test_verb_popover_card_lies_inside_the_command_region(self):
-        """The verb popover is a card INSIDE the command region, and the
-        region's box is unchanged from the overview (webclient-scene-overview-
-        swap D3: the popover overlays the region's visible box)."""
+    def test_verb_card_leaves_the_command_region_unchanged(self):
+        """A person's verb card is centred over the stage in the `choices`
+        anchor, fully visible above the band, and the command region keeps
+        the overview's box exactly while it goes inert beneath the card
+        (exploration-presence-rail design D4)."""
         measure = """() => {
           const rect = (sel) => {
             const el = document.querySelector(sel);
@@ -583,9 +561,10 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
           };
           return {
             region: rect('[data-testid="anchor-band-command"]'),
-            card: rect('[data-testid="verb-popover"]'),
-            pane: rect('#action-dock .action-dock__pane'),
+            card: rect('[data-anchor="choices"] [data-testid="presence-card"]'),
             band: rect('[data-testid="stage-band"]'),
+            width: innerWidth,
+            inert: document.querySelector('[data-testid="anchor-band-command"]').hasAttribute('inert'),
           };
         }"""
         page = self.logged_in_page((1451, 790))
@@ -603,29 +582,25 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         overview = page.evaluate(measure)
 
         activate_overview_chip(page, "target-11")
-        page.wait_for_selector('[data-testid="verb-popover"]', timeout=15000)
-        popover = page.evaluate(measure)
+        page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        page.wait_for_timeout(400)
+        focused = page.evaluate(measure)
 
-        # The card lies inside the command region at every edge.
-        card, region = popover["card"], popover["region"]
-        self.assertIsNotNone(card, "the verb popover card must render")
-        self.assertGreaterEqual(card["left"], region["left"] - 1.0)
-        self.assertGreaterEqual(card["top"], region["top"] - 1.0)
-        self.assertLessEqual(card["right"], region["right"] + 1.0)
-        self.assertLessEqual(card["bottom"], region["bottom"] + 1.0)
-        # The region (and the band) keep the overview's box exactly.
+        card = focused["card"]
+        self.assertIsNotNone(card, "the verb card must render")
+        # Centred over the stage, fully visible, above the band.
+        self.assertAlmostEqual((card["left"] + card["right"]) / 2, focused["width"] / 2, delta=2.0)
+        self.assertGreaterEqual(card["left"], 0)
+        self.assertLessEqual(card["right"], focused["width"])
+        self.assertGreaterEqual(card["top"], 0)
+        self.assertLessEqual(card["bottom"], focused["band"]["top"] + 1.0)
+        # The region (and the band) keep the overview's box exactly, inert.
+        self.assertTrue(focused["inert"], "the command region is inert under the card")
         for key in ("region", "band"):
             for edge in ("left", "top", "right", "bottom"):
                 self.assertAlmostEqual(
-                    popover[key][edge],
+                    focused[key][edge],
                     overview[key][edge],
                     delta=1.0,
-                    msg="the %s box moved when the popover opened (%s)" % (key, edge),
+                    msg="the %s box moved when the card opened (%s)" % (key, edge),
                 )
-        # The card lies inside the pane's visible box: it is laid OVER the
-        # region (the overlay layer), never appended below the pane.
-        pane = popover["pane"]
-        self.assertGreaterEqual(card["left"], pane["left"] - 1.0)
-        self.assertGreaterEqual(card["top"], pane["top"] - 1.0)
-        self.assertLessEqual(card["right"], pane["right"] + 1.0)
-        self.assertLessEqual(card["bottom"], pane["bottom"] + 1.0)

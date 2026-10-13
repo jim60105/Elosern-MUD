@@ -78,7 +78,8 @@ class NpcPersonaEditorBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         expect(page.get_by_test_id("npc-persona-editor")).to_have_count(0)
         expect(page.locator(".npe-confirm")).to_have_count(0)
         self._idle(page)
-        # Closing restores the existing verb popover, not a new router frame.
+        # Closing leaves the person's verb card open (exploration-presence-
+        # rail): no router frame, the same card's 編輯人物設定 row reopens it.
         activate_overview_chip(page, "service-npc_persona")
         expect(speech).to_have_value("說話輕快，喜歡用渡船比喻。")
         expect(greeting).to_have_value("「渡口今日風平浪靜。」")

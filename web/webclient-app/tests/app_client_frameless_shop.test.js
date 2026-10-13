@@ -71,13 +71,10 @@ describe("frameless 商店 drawer (composition contract)", () => {
     commitPanels();
     await wrapper.vm.$nextTick();
 
-    // Open shop drawer from 店長 navigate row: the dock root is the scene
-    // overview (webclient-scene-overview-swap), so the person chip is one
-    // activation away.
-    expect(store.focusItemByKey("target-7")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
-    expect(store.focusItemByKey("service-shop")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // Open shop drawer from 店長's navigate row on the verb card (the rail's
+    // person entry opens it, exploration-presence-rail).
+    expect(store.activatePresence("target-7").handled).toBe(true);
+    expect(store.activatePresenceVerb("service-shop").handled).toBe(true);
     await wrapper.vm.$nextTick();
 
     let drawer = wrapper.get('[data-testid="hud-drawer"]');
@@ -93,16 +90,13 @@ describe("frameless 商店 drawer (composition contract)", () => {
     await wrapper.vm.$nextTick();
 
     const drawers = ["skill", "inventory", "shop", "quest", "lore", "status", "party"];
-    // The two deep exploration frames left that render a row region: the
-    // suggestions frame (DockMenu's cards pane) and a target's verb popover
-    // (the DockVerbPopover card over the inert overview). The wait frame is
-    // the waiting screen and the root is the SceneOverview, so neither is a
+    // The one deep exploration frame left that renders a row region: the
+    // suggestions frame (DockMenu's cards pane). The wait frame is the
+    // waiting screen and the root is the SceneOverview, so neither is a
     // row-container frame (webclient-talk-open-dock retired the keyword
-    // frame, the last other one).
-    const descriptors = [
-      { source: "exploration.suggestions", params: {} },
-      { source: "exploration.target", params: { identity: 7 } },
-    ];
+    // frame, and exploration-presence-rail the verb popover, the last
+    // other ones).
+    const descriptors = [{ source: "exploration.suggestions", params: {} }];
 
     for (const drawerName of drawers) {
       for (const descriptor of descriptors) {

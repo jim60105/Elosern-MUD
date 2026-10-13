@@ -1683,8 +1683,8 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         )
         bard = talking[1]
 
-        # The overview's 人物 chip for the bard opens its verb popover
-        # (webclient-scene-overview-swap); 交談 opens the conversation, whose
+        # The rail's medallion for the bard opens its verb card
+        # (exploration-presence-rail); 交談 opens the conversation, whose
         # choice list carries the free row.
         activate_overview_chip(page, "target-%s" % bard["identity"])
         _press(page, "Enter")  # 交談 -> explore.talk_open
@@ -1752,7 +1752,7 @@ class InputEchoExplorationTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
 
-        # The overview's 人物 chip for the bard opens its verb popover; 交談
+        # The rail's medallion for the bard opens its verb card; 交談
         # opens the conversation (whose choice list carries the free row) and the
         # locked send is attempted after that open.
         panel = self._wait_exploration_available(page)

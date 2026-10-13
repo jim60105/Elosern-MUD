@@ -330,19 +330,122 @@ def focus_action_dock(page: Page, timeout: int = 60000) -> None:
         )
 
 
-def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
-    """Activate one scene-overview chip by its keyboard key.
+# The presence rail's entry keys (exploration-presence-rail): the people and
+# objects stand on the stage, not in the dock's overview.
+PRESENCE_KEY_PREFIXES = ("target-", "entity-", "object-", "presence-more")
+RAIL_SELECTOR = '[data-anchor="presence"] [data-testid="presence-rail"]'
+CARD_SELECTOR = '[data-anchor="choices"] [data-testid="presence-card"]'
 
-    The exploration dock's root frame is the scene overview
-    (webclient-scene-overview-swap, design D6): people, objects, and the
-    footer render as one frame of chips keyed ``target-<identity>``,
-    ``entity-<identity>``, ``object-<identity>``, ``look-room``, ``wait``, and
-    ``suggestions``; the exits are the exit compass's
-    (``activate_compass_exit``). This helper focuses the
-    dock, moves the keyboard router's focus onto that chip, and confirms it
-    with Enter — the same path a keyboard user takes, with no pointer click
-    and no direct store call.
+
+def presence_entry_keys(page: Page) -> list:
+    """The keys of the presence rail's visible slots, in rail order."""
+    return page.evaluate(
+        """() => Array.from(document.querySelectorAll(
+          '[data-anchor="presence"] [data-testid="presence-entry"]'))
+          .map((el) => el.getAttribute('data-entry-key'))"""
+    )
+
+
+def _active_key(page: Page, selector: str, attribute: str):
+    return page.evaluate(
+        """([selector, attribute]) => {
+          const host = document.querySelector(selector);
+          const id = host && host.getAttribute('aria-activedescendant');
+          const el = id ? document.getElementById(id) : null;
+          return el ? el.getAttribute(attribute) : null;
+        }""",
+        [selector, attribute],
+    )
+
+
+def activate_presence_entry(page: Page, key: str, timeout: int = 30000) -> None:
+    """Activate one presence-rail entry by its key with the keyboard.
+
+    The rail is one tab stop on the stage floor (exploration-presence-rail):
+    this helper focuses it, walks ArrowRight until its active descendant is
+    the entry, and presses Enter — the path a keyboard user takes. An entry
+    folded into the rail's ``＋N`` slot is reached through the overflow card.
+    An interact target opens its verb card (no request); a bystander or an
+    object submits its look.
     """
+    rail = page.locator(RAIL_SELECTOR)
+    rail.wait_for(state="visible", timeout=timeout)
+    keys = presence_entry_keys(page)
+    if key not in keys:
+        if "presence-more" not in keys:
+            raise AssertionError("no presence-rail entry %r (rail %r)" % (key, keys))
+        activate_presence_entry(page, "presence-more", timeout=timeout)
+        activate_card_row(page, key, timeout=timeout)
+        return
+    rail.focus()
+    for _ in range(len(keys) + 1):
+        if _active_key(page, RAIL_SELECTOR, "data-entry-key") == key:
+            break
+        page.keyboard.press("ArrowRight")
+    else:
+        raise AssertionError("the presence rail never reached %r" % (key,))
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(80)
+
+
+def open_verb_card(page: Page, identity, timeout: int = 30000) -> None:
+    """Open an interact target's verb card from its rail medallion and wait for it."""
+    activate_presence_entry(page, "target-%s" % identity, timeout=timeout)
+    page.wait_for_selector(CARD_SELECTOR, timeout=timeout)
+
+
+def card_row_keys(page: Page) -> list:
+    """The open card's row keys, in card order (the trailing ``back`` included)."""
+    return page.evaluate(
+        """(selector) => Array.from(document.querySelectorAll(selector + ' [role="menuitem"]'))
+          .map((el) => el.getAttribute('data-row-key'))""",
+        CARD_SELECTOR,
+    )
+
+
+def activate_card_row(page: Page, key: str, timeout: int = 30000) -> None:
+    """Activate one row of the open centred card (the verb or overflow card).
+
+    The card is one tab stop that traps focus: this helper focuses it, walks
+    ArrowDown until its active descendant is the row, and presses Enter.
+    """
+    card = page.locator(CARD_SELECTOR)
+    card.wait_for(state="visible", timeout=timeout)
+    card.focus()
+    keys = card_row_keys(page)
+    if key not in keys:
+        raise AssertionError("no card row %r (card %r)" % (key, keys))
+    for _ in range(len(keys) + 1):
+        if _active_key(page, CARD_SELECTOR, "data-row-key") == key:
+            break
+        page.keyboard.press("ArrowDown")
+    else:
+        raise AssertionError("the card never reached %r" % (key,))
+    page.keyboard.press("Enter")
+    page.wait_for_timeout(80)
+
+
+def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
+    """Activate one exploration entry by its keyboard key.
+
+    The exploration dock's root frame is the scene overview's footer
+    (``look-room``, ``wait``, ``suggestions``); the exits are the exit
+    compass's (``activate_compass_exit``), and the people and objects
+    (``target-<identity>``, ``entity-<identity>``, ``object-<identity>``) are
+    the presence rail's (exploration-presence-rail), so those keys route to
+    ``activate_presence_entry``. While a verb or overflow card is open, any
+    other key names one of its rows (``talk-open``, ``look-target``,
+    ``service-*``, ``back``) and routes to ``activate_card_row``. A footer key
+    focuses the dock, moves the keyboard router's focus onto that chip, and
+    confirms it with Enter — the same path a keyboard user takes, with no
+    pointer click and no direct store call.
+    """
+    if key.startswith(PRESENCE_KEY_PREFIXES):
+        activate_presence_entry(page, key, timeout=timeout)
+        return
+    if page.locator(CARD_SELECTOR).count() > 0:
+        activate_card_row(page, key, timeout=timeout)
+        return
     focus_action_dock(page, timeout=timeout)
     focused = page.evaluate(
         "(key) => window.__elosernBridge.store.focusItemByKey(key)", key
@@ -356,10 +459,10 @@ def activate_overview_chip(page: Page, key: str, timeout: int = 30000) -> None:
 def overview_target_with_affordance(page: Page, action_id: str) -> dict:
     """The first committed interact target carrying ``action_id``.
 
-    The scene overview's 人物 row lists the committed interact targets in
-    payload order, and a target's chip key is ``target-<identity>``
-    (webclient-scene-overview-swap), so this returns the descriptor whose own
-    identity names its chip.
+    The presence rail lists the committed interact targets in payload order,
+    and a target's entry key is ``target-<identity>``
+    (exploration-presence-rail), so this returns the descriptor whose own
+    identity names its medallion.
     """
     panel = ((store_state(page).get("panels") or {}).get("exploration") or {})
     for target in panel.get("interact") or []:

@@ -1,13 +1,15 @@
 // The shared derived-shape helper for the scene overview family
 // (webclient-scene-overview-component design D7; the showcase rule that a
 // story is bound to the same reducer-derived shape the live wiring passes).
-// Every SceneOverview / DockVerbPopover story builds its args here, by
-// running the real `overviewMenu` / `verbMenuFor` of the exploration-menu
+// Every SceneOverview, PresenceRail, and ChoiceCard story builds its args
+// here, by running the real `overviewMenu` / `presenceEntries` /
+// `verbMenuFor` / `waitItems` / `suggestionsMenu` of the exploration-menu
 // model over a synthesized `exploration` panel. Every value is a fixed
 // literal: no live server, LLM, or image data.
 import ExplorationMenu from "../../lib/exploration_menu.js";
 import { resolveTargets } from "../../components/compass-model.js";
 import { localMapModelFor } from "./local_map.js";
+import { BACK_ROW, overflowCardRows, verbCardRows } from "../../composables/use-person-focus.js";
 
 const DIRECTION_LABELS = ["北", "東", "南", "西", "東北", "西北", "東南", "西南", "上", "下"];
 
@@ -73,11 +75,59 @@ export function overviewArgs(panel, { currentNode = "room:900", suggestions = nu
   };
 }
 
-// DockVerbPopover args: the verb menu of one interact target.
-export function verbArgs(panel, identity, { focusedKey = null } = {}) {
+// PresenceRail args (exploration-presence-rail): the rail entries exactly as
+// the store publishes them. `portraits` maps an identity to a committed
+// catalog key (the exploration panel's schema v3 still publishes
+// `portrait_ref: null`, so a face crop is shown only where a story supplies
+// the ref the presenter will carry).
+export function presenceArgs(panel, { artPanel = null, portraits = {}, motionLevel = "full" } = {}) {
+  const entries = ExplorationMenu.presenceEntries(panel).map((entry) =>
+    Object.hasOwn(portraits, entry.identity) ? { ...entry, portraitRef: portraits[entry.identity] } : entry,
+  );
+  return { entries, artPanel, motionLevel };
+}
+
+// ChoiceCard args for one interact target's verb card: `verbMenuFor`'s rows
+// mapped exactly as the person-focus wiring maps them.
+export function verbCardArgs(panel, identity) {
   const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:900" });
   const target = ExplorationMenu.targetById(model, identity);
-  return { menu: ExplorationMenu.verbMenuFor(model, target), focusedKey };
+  const rows = verbCardRows(ExplorationMenu.verbMenuFor(model, target).items);
+  return { rows, trailingIndex: rows.length - 1, ariaLabel: `${target.display_name}：選擇行動` };
+}
+
+// ChoiceCard args for the presence overflow card.
+export function overflowCardArgs(panel) {
+  const rows = overflowCardRows(ExplorationMenu.presenceEntries(panel));
+  return { rows, trailingIndex: rows.length - 1, caption: "在場", ariaLabel: "其餘在場者與物件" };
+}
+
+// A builder menu's rows on the card (the wait and suggestions menus, whose
+// own back row becomes the trailing `✕ 返回`).
+function menuCardRows(items) {
+  const rows = items
+    .filter((item) => !item.goBack)
+    .map((item, index) => ({
+      key: item.key,
+      label: item.label,
+      badge: String(index + 1),
+      kind: "verb",
+      enabled: item.enabled !== false,
+      reason: item.enabled === false ? (item.disabledReason && item.disabledReason.message) || item.description : null,
+    }));
+  return [...rows, BACK_ROW];
+}
+
+// ChoiceCard args for the wait menu (the card change 3 opens from the place
+// card) and the suggestions list.
+export function waitCardArgs() {
+  const rows = menuCardRows(ExplorationMenu.waitItems());
+  return { rows, trailingIndex: rows.length - 1, caption: "等待", ariaLabel: "等待與休息" };
+}
+
+export function suggestionsCardArgs(suggestions) {
+  const rows = menuCardRows(ExplorationMenu.suggestionsMenu(suggestions).items);
+  return { rows, trailingIndex: rows.length - 1, caption: "建議", ariaLabel: "建議" };
 }
 
 // ExitCompass args (exploration-exit-compass): the compass targets exactly as

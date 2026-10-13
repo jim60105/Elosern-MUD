@@ -37,8 +37,8 @@ or pops a frame.
 - **THEN** it captures its own input, the router's frame is unchanged beneath it, and closing it restores the rendered rows for that frame
 
 #### Scenario: The overview beneath a popover is inert
-- **WHEN** a target's verb popover is open and the player presses the compass or an overview chip visible beneath it
-- **THEN** the popover closes exactly as its back row would, no `ui_action` is emitted, and the overview becomes the current frame with the target's chip focused
+- **WHEN** a person's verb card is open over the stage and the player presses the compass or an overview chip in the command panel beneath it
+- **THEN** the command panel is `inert` while the card is open, so the press reaches no compass target or chip, no `ui_action` is emitted, the router's current frame is unchanged, and the card keeps focus until Escape or its `✕ 返回` row closes it
 
 #### Scenario: Re-render is synchronous with the router event
 - **WHEN** the router pushes, replaces, or pops a frame
@@ -49,7 +49,7 @@ or pops a frame.
 - **THEN** the row markup, the focused marker, the disabled marker and its `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined in exactly one shared renderer
 
 #### Scenario: The shared renderer adapts to the frame's shape
-- **WHEN** a frame's shape calls for a tab, a scene-overview chip, a verb-popover row, a suggestion card, a skill row, a target token, a scale choice, or a confirmation row
+- **WHEN** a frame's shape calls for a tab, a scene-overview chip, a suggestion card, a skill row, a target token, a scale choice, or a confirmation row
 - **THEN** the same shared renderer renders the row in that visual form, chosen from the frame's own shape, and is not duplicated per form
 
 #### Scenario: The row model preserves menu semantics

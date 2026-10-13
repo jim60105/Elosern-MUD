@@ -1,5 +1,8 @@
 // webclient-scene-overview-component (task 4.4): the scene overview renders
 // the real `overviewMenu` as chip rows through the shared row renderer.
+// exploration-presence-rail: the menu is the footer only (the people and
+// objects are the presence rail's); the renderer still draws any labelled
+// section a menu carries.
 
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -48,24 +51,21 @@ describe("SceneOverview", () => {
     });
     const w = mountOverview(panel);
     const rows = w.findAll(".scene-overview__row").map((row) => row.attributes("data-section"));
-    // The exits are the exit compass's (exploration-exit-compass): no 出口 row.
-    expect(rows).toEqual(["objects", "footer"]);
+    // The exits are the exit compass's (exploration-exit-compass) and the
+    // people and objects the presence rail's (exploration-presence-rail).
+    expect(rows).toEqual(["footer"]);
     expect(w.find('[data-testid="scene-overview-people"]').exists()).toBe(false);
+    expect(w.find('[data-testid="scene-overview-objects"]').exists()).toBe(false);
     expect(w.find('[data-testid="scene-overview-exits"]').exists()).toBe(false);
     expect(w.text()).not.toContain("人物");
+    expect(w.text()).not.toContain("物件");
     expect(w.text()).not.toContain("出口");
-    expect(w.get('[data-testid="scene-overview-objects"] .scene-overview__label').text()).toBe("物件");
     expect(w.get('[data-testid="scene-overview-footer"]').find(".scene-overview__label").exists()).toBe(false);
   });
 
   it("gives every chip its row key and a row id in reading order", () => {
     const w = mountOverview();
-    expect(chipKeys(w)).toEqual([
-      "target-11",
-      "object-31",
-      "look-room",
-      "wait",
-    ]);
+    expect(chipKeys(w)).toEqual(["look-room", "wait"]);
     w.findAll('[data-testid="dock-item"]').forEach((chip, index) => {
       expect(chip.attributes("id")).toBe(`exploration-row-${index}`);
     });
@@ -107,11 +107,11 @@ describe("SceneOverview", () => {
 
   it("emits focus-change then activate for an enabled chip", async () => {
     const w = mountOverview();
-    await w.get('[data-item-key="target-11"]').trigger("click");
-    expect(w.emitted("focus-change")).toEqual([["target-11"]]);
+    await w.get('[data-item-key="wait"]').trigger("click");
+    expect(w.emitted("focus-change")).toEqual([["wait"]]);
     const [[payload]] = w.emitted("activate");
-    expect(payload.key).toBe("target-11");
-    expect(payload.item.openTarget).toBe(11);
+    expect(payload.key).toBe("wait");
+    expect(payload.item.openSubmenu).toBe("wait");
   });
 
   it("follows focusedKey with aria-activedescendant and scrolls the chip into view", async () => {
@@ -120,12 +120,12 @@ describe("SceneOverview", () => {
     const w = mountOverview();
     const list = w.get('[data-testid="dock-menu"]');
     expect(list.attributes("aria-activedescendant")).toBeUndefined();
-    await w.setProps({ focusedKey: "object-31" });
+    await w.setProps({ focusedKey: "wait" });
     await nextTick();
     expect(list.attributes("aria-activedescendant")).toBe("exploration-row-1");
-    expect(w.get('[data-item-key="object-31"]').classes()).toContain("dock-menu-item--focused");
+    expect(w.get('[data-item-key="wait"]').classes()).toContain("dock-menu-item--focused");
     expect(scroll).toHaveBeenCalledWith({ block: "nearest", inline: "nearest" });
-    expect(scroll.mock.contexts.at(-1)).toBe(w.get('[data-item-key="object-31"]').element);
+    expect(scroll.mock.contexts.at(-1)).toBe(w.get('[data-item-key="wait"]').element);
     delete Element.prototype.scrollIntoView;
   });
 
