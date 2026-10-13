@@ -10,10 +10,11 @@ with an independent, scope-seeded RNG.
 
 Intelligence is authored per registered variant and never inferred (design
 section 5/6): no tier, species, danger grade, rank, stat or archetype supplies
-one. Every production variant is still authored ``legacy``, so
-``monster_behaviour_policy`` keeps returning exactly the action the legacy body
-returned; activating a variant is the separate ``monster-ai-staged-activation``
-change's decision, and the utility path itself is complete here.
+one, and an authored value comes from that variant's own setting rather than
+from any ordering of those axes. The rulebook's ``variant_decision_mode`` names
+the small activated set introduced by ``monster-ai-staged-activation``; every
+other registered variant is still authored ``legacy`` and keeps returning
+exactly the action the legacy body returned.
 
 A typed invalid runtime AI state is the one narrow failure this boundary owns:
 it is reported through the facade and resolved by the configured invalid-state

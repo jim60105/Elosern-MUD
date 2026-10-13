@@ -1,0 +1,68 @@
+# Repository gates: monster-ai-staged-activation
+#
+# Run from the worktree root (.worktrees/monster-ai-staged-activation) with
+# uv --locked / CPython 3.13. Raw console output follows each command.
+
+$ uv run --locked openspec validate monster-ai-staged-activation --type change --strict
+Change 'monster-ai-staged-activation' is valid
+
+$ uv run --locked python -m tools.observability_lint check
+scanned=719 frozen=0 violations=0 exemptions=218
+
+$ uv run --locked python -m tools.test_data_lint check
+test_data_lint: catalog-data modules skipped at import (need runtime state): world.lore.sync
+test-data-lint: scanned=1287 flagged=99 universe=1225+39 quantity-pins=9 violations=0
+
+$ uv run --locked python -m tools.contract_gate
+== contract gate: traceability
+spec traceability: 2185 requirements, 9102 associations, 2185 covered, 0 uncovered, 12 errors
+Errors:
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::activation-follows-complete-accepted-evidence (world/rules/tests/test_monster_ai_activation.py:196)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::activation-follows-complete-accepted-evidence (world/rules/tests/test_monster_ai_activation.py:275)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::activation-follows-complete-accepted-evidence (world/rules/tests/test_monster_ai_activation.py:297)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::activation-follows-complete-accepted-evidence (world/rules/tests/test_monster_ai_activation.py:435)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::expansion-and-retuning-require-affected-evidence (world/rules/tests/test_monster_ai_activation.py:315)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::legacy-mode-rollback-is-demonstrated (world/rules/tests/test_monster_ai_activation.py:537)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::legacy-mode-rollback-is-demonstrated (world/rules/tests/test_monster_ai_activation.py:621)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::legacy-mode-rollback-is-demonstrated (world/rules/tests/test_monster_ai_activation.py:682)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::release-evidence-is-reproducible-and-scoped (world/rules/tests/test_monster_ai_activation.py:197)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::release-evidence-is-reproducible-and-scoped (world/rules/tests/test_monster_ai_activation.py:217)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::release-evidence-is-reproducible-and-scoped (world/rules/tests/test_monster_ai_activation.py:235)
+  - [unknown-requirement-id] Unknown requirement ID: monster-ai-rollout::release-evidence-is-reproducible-and-scoped (world/rules/tests/test_monster_ai_activation.py:255)
+== contract gate: observability
+scanned=719 frozen=0 violations=0 exemptions=218
+== contract gate: test-data
+test_data_lint: catalog-data modules skipped at import (need runtime state): world.lore.sync
+test-data-lint: scanned=1287 flagged=99 universe=1225+39 quantity-pins=9 violations=0
+== contract gate: manifests
+== contract gate: contracts
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 0.804s
+
+OK
+contract gate FAILED: traceability
+
+# Only the traceability gate fails, and only on this active change's own four new
+# capability IDs. That is the documented pre-sync state: traceability indexes
+# openspec/specs/ only, so an active change's requirements enter it when the
+# archive workflow syncs the delta (scripts/openspec-gates.sh documents the
+# pre-archive read and makes post-archive authoritative). Every already synced
+# requirement stays covered (0 uncovered), the observability and test-data lints
+# are clean, the shard manifests are structurally valid, and the 18 ownership
+# contract tests pass (so the new module has exactly one shard owner).
+
+$ uv run --locked python -m tools.spec_traceability --repo-root <equivalent delta-applied tree> check --json-output <file>
+# The equivalent delta-applied tree is the worktree's own source tree with this
+# change's delta applied as openspec/specs/monster-ai-rollout/spec.md. The run
+# exits 0 and prints nothing (the tool is quiet on success); its machine-readable
+# summary reports ok=true with requirements=2189, associations=9114,
+# covered=2189, uncovered=0, errors=0, and all four new IDs are in `covered`:
+monster-ai-rollout::activation-follows-complete-accepted-evidence
+monster-ai-rollout::expansion-and-retuning-require-affected-evidence
+monster-ai-rollout::legacy-mode-rollback-is-demonstrated
+monster-ai-rollout::release-evidence-is-reproducible-and-scoped
+
+# Not run locally, by policy: the full non-browser Evennia suite, CI shard
+# commands, browser suites, tools.spec_traceability verify --evidence, and the
+# automatic manual campaign.

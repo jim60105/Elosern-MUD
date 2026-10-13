@@ -1,0 +1,81 @@
+{
+  "schema": "monster-ai-activation-evidence/1",
+  "algorithm_version": 5,
+  "configuration_fingerprint": "23e711e9bb93a0c9c0e0b66a72f5c17bb4c9bb78c6693b540b34ad54b7da37ba",
+  "activated": {
+    "flock_leader": 58,
+    "reef_warden": 66,
+    "trail_hunter": 44
+  },
+  "activation_bindings": {
+    "flock_leader": ["low", "instinctive"],
+    "reef_warden": ["low", "instinctive"],
+    "trail_hunter": ["mid", "ambush_predator"]
+  },
+  "legacy_rollback": {
+    "edit": "variant_decision_mode: {} (the three named entries removed; variant_intelligence is kept and stays validated)",
+    "configuration_fingerprint": "878a9106ed51750c5079ea02e910b92c5037d4b08b8033a767d063945125bcd8",
+    "restart_required": true,
+    "migration": "none",
+    "database_restore": "none",
+    "evidence": "world.rules.tests.test_monster_ai_activation.RollbackTests"
+  },
+  "evidence": [
+    {
+      "path": "docs/development/monster-ai-manual-evidence/selector-check.json",
+      "fingerprint": "23e711e9bb93a0c9c0e0b66a72f5c17bb4c9bb78c6693b540b34ad54b7da37ba",
+      "claim": "paired selector evidence, regenerated under this tuning because the operation records the process's startup fingerprint"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-ambush_predator.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-apex_predator.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-brute.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-instinctive.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-pack_hunter.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/archetype-tactical_caster.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "archetype campaign over the campaign's own synthetic pairs, whose tuning the shipped variant maps do not enter"
+    },
+    {
+      "path": "docs/development/monster-ai-manual-evidence/performance.json",
+      "fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+      "claim": "complete-policy performance on the reference envelope, warm utility p95 15.78 ms against the 50 ms budget"
+    }
+  ],
+  "operations": [
+    {
+      "operation": "activation contract module",
+      "label": "world.rules.tests.test_monster_ai_activation",
+      "command": "uv run --locked --env-file=<path> evennia test --settings test_settings.py --keepdb world.rules.tests.test_monster_ai_activation",
+      "environment": "<path> is a temporary file containing MUD_TEST_SETTINGS=1, removed after the run",
+      "seeds": "real encounter: session activation:1:0, round 1, combat initiative and to-hit dice patched to 95; legacy smoke: the same field with the patched selection roller proving the legacy body spends no selection dice",
+      "covers": ["real settlement and committed reload", "legacy target/skill/flee priority", "new-session-no-reload", "database-failure boundary"]
+    },
+    {
+      "operation": "selector evidence regeneration",
+      "command": "uv run --locked python tools/monster_ai_manual_reports.py selector",
+      "seeds": "the documented 128 injected seeds of the selector-check operation",
+      "covers": ["the selector report's recorded configuration fingerprint"]
+    }
+  ]
+}
