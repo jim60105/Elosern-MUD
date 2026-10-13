@@ -293,6 +293,7 @@ class MonsterAITuningLoaderTests(unittest.TestCase):
         return _load_behaviour_profiles(rulebook, tiers=TIER_KEYS)
 
     @covers_requirement("monster-behaviour-profile::ai-tuning-is-strict-and-startup-scoped")
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_each_mandatory_legacy_field_is_required(self):
         for field in MANDATORY_FIELDS:
             with self.subTest(field=field):

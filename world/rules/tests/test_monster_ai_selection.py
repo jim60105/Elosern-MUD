@@ -339,6 +339,7 @@ class ScoreArithmeticTests(unittest.TestCase):
         fields.update(over)
         return SimpleNamespace(**fields)
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_the_score_is_the_authored_formula(self):
         # Independently known numbers: 2*0.5 + 0.5*0.25 = 1.125 without any
         # tactical term, plus (4*0.4 - 1*0.2 - 3*0.1) = 1.1 at full
@@ -357,6 +358,7 @@ class ScoreArithmeticTests(unittest.TestCase):
             isclose(attack_utility(**values, weights=weights, intelligence=50), 1.675)
         )
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_the_temperature_ladder_and_its_invalid_values(self):
         self.assertTrue(isclose(selection_temperature(0), 1.25))
         self.assertTrue(isclose(selection_temperature(100), 0.08))
@@ -366,6 +368,7 @@ class ScoreArithmeticTests(unittest.TestCase):
                 with self.assertRaises(MonsterAIStateError):
                     selection_temperature(value)
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_invalid_numbers_fail_explicitly(self):
         with self.assertRaises(MonsterAIStateError):
             softmax_probabilities([1.0, float("nan")], temperature=1.0)
@@ -402,6 +405,7 @@ class ScoreArithmeticTests(unittest.TestCase):
                         cost=0.5, waste=0.5, weights=weights, intelligence=0,
                     )
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_ranks_are_bounded_shared_and_total(self):
         ranks = normalized_ranks(
             {"best": 9.0, "tied-a": 5.0, "tied-b": 5.0, "worst": 1.0},
@@ -433,6 +437,7 @@ class SamplingTests(unittest.TestCase):
             )
         return output
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_equal_scores_sample_uniformly_and_the_rng_decides(self):
         probabilities = softmax_probabilities([2.0, 2.0, 2.0], temperature=1.0)
         self.assertEqual(len(probabilities), 3)
@@ -449,6 +454,7 @@ class SamplingTests(unittest.TestCase):
         )
         self.assertEqual(chosen.identity.skill_key, "b")
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_large_finite_scores_stay_numerically_stable(self):
         # A spread far past the temperature's range must not overflow: the
         # dominated candidates simply underflow to an ordinary zero
@@ -465,10 +471,12 @@ class SamplingTests(unittest.TestCase):
         self.assertGreater(moderate[0], moderate[1])
         self.assertGreater(moderate[1], moderate[2])
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_a_lone_candidate_is_deterministic(self):
         probability = softmax_probabilities([-4.0], temperature=0.08)
         self.assertEqual(probability, (1.0,))
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_canonical_order_is_total_and_permutation_invariant(self):
         entries = [
             ("b", ("2",), 1.0, 1.0),
@@ -497,6 +505,7 @@ class SamplingTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             select_candidate([], temperature=1.0, seed=0)
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_the_seed_is_versioned_and_sensitive_to_every_real_field(self):
         base = dict(
             session_id="s",
@@ -522,6 +531,7 @@ class SamplingTests(unittest.TestCase):
         ):
             self.assertNotEqual(baseline, selection_seed(**base))
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_an_inspection_seeds_from_the_canonical_identity(self):
         inspection = selection_seed_for(
             scope=None,
@@ -559,6 +569,7 @@ class SamplingTests(unittest.TestCase):
         )
         self.assertNotEqual(inspection, scoped)
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_the_same_seed_replays_the_selection(self):
         scored = self._scored(
             [("a", ("1",), 1.0, 3.0), ("b", ("2",), 1.0, 2.9), ("c", ("3",), 1.0, 0.1)]
@@ -648,6 +659,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
         )
         return scored, candidates
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_every_preference_component_is_a_bounded_rank(self):
         scored, candidates = self._score("lowest_hp", "first_owned", False)
         self.assertEqual(len(scored), len(candidates.candidates))
@@ -658,6 +670,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
             self.assertTrue(0.0 <= item.finishing <= 1.0)
             self.assertTrue(item.cost >= 0.0)
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_the_target_strategy_moves_the_preferred_target(self):
         weakest_first, candidates = self._score("lowest_hp", "first_owned", False)
         strongest_first, _ = self._score(
@@ -675,6 +688,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertGreater(weakest[(weak_id,)], weakest[(strong_id,)])
         self.assertGreater(strongest[(strong_id,)], strongest[(weak_id,)])
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_the_area_preference_moves_the_group_plan(self):
         singles_first, candidates = self._score("lowest_hp", "first_owned", False)
         area_first, _ = self._score("lowest_hp", "first_owned", True)
@@ -688,6 +702,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
             {item.identity: item.preference for item in area_first}[group],
         )
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_the_skill_choice_moves_the_preferred_skill(self):
         by_owned, candidates = self._score("lowest_hp", "first_owned", False)
         by_damage, _ = self._score("lowest_hp", "highest_expected_damage", False)
@@ -707,6 +722,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
             [owned[shape] for shape in shapes], [damage[shape] for shape in shapes]
         )
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_six_archetypes_keep_distinct_soft_preferences(self):
         # Six authored configurations over the same legal options: each keeps
         # its own signature of the three preference ranks. The rankings, not
@@ -753,6 +769,7 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
             signatures["instinctive"][2], signatures["pack_hunter"][2]
         )
 
+    @covers_requirement("monster-ai-utility-selection::utility-attack-score-reflects-continuous-intelligence")
     def test_intelligence_scales_only_the_tactical_terms(self):
         low, candidates = self._score(
             "lowest_hp", "first_owned", False, intelligence=10
@@ -938,6 +955,7 @@ class ExecutionScopeTests(unittest.TestCase):
             for item in scopes
         ]
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_every_action_slot_of_every_actor_has_its_own_scope(self):
         upkeep = self._upkeep()
         with (
@@ -971,6 +989,7 @@ class ExecutionScopeTests(unittest.TestCase):
             ],
         )
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_each_internal_overwhelm_round_has_its_own_round_index(self):
         upkeep = self._upkeep()
         with (
@@ -1020,6 +1039,7 @@ class ExecutionScopeTests(unittest.TestCase):
             self._shape(self.observed), [("", 0, "key:actor", 0, "normal")]
         )
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_a_provider_exception_restores_the_enclosing_scope(self):
         outer = ExecutionScopeBase("outer", 3).at_round(3)
 
@@ -1092,6 +1112,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
             roster,
         )
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_a_direct_inspection_repeats_in_the_same_scope(self):
         before = _stored_attributes(self.monster)
         rows = ObjectDB.objects.count()
@@ -1105,6 +1126,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(ObjectDB.objects.count(), rows)
         self.assertIsNone(current_decision_scope())
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_the_inspection_identity_is_canonical_and_read_only(self):
         trace = []
         monster_behaviour_policy(self.monster, self._field(), trace=trace)
@@ -1143,6 +1165,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(_stored_attributes(self.monster), before)
         self.assertEqual(ObjectDB.objects.count(), rows)
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_no_legal_candidate_is_a_no_action_boundary(self):
         monster = self._monster_row("t_sel_healer", skills=(HEAL_SELF.key,))
         with patch("world.rules.monster_behaviour.log_warn") as warning:
@@ -1150,6 +1173,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertIsNone(request)
         warning.assert_not_called()
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_an_unsupported_candidate_set_is_a_no_action_boundary(self):
         monster = self._monster_row("t_sel_unmodelable", skills=(PURGED.key,))
         trace = []
@@ -1160,6 +1184,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(trace[0].selected, None)
         self.assertTrue(trace[0].omitted_estimates)
 
+    @covers_requirement("monster-ai-utility-selection::selection-uses-stable-independent-softmax")
     def test_selection_dice_are_independent_of_the_combat_dice(self):
         random.seed(913)
         before = random.getstate()
@@ -1176,6 +1201,7 @@ class UtilityInspectionTests(SyntheticTuningMixin, EvenniaTestCase):
         monster_behaviour_policy(self.monster, self._field())
         self.assertEqual([dice.roll_d100() for _ in range(3)], expected)
 
+    @covers_requirement("monster-ai-utility-selection::actual-execution-identity-distinguishes-every-decision")
     def test_stable_actor_id_matches_the_snapshot_identity(self):
         self.assertEqual(
             stable_actor_id(self.monster), stable_identity(self.monster)
@@ -1233,6 +1259,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         )
 
     @covers_requirement("monster-action-policy::monster-behaviour-policy-is-a-complete-drop-in-action-provider")
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_the_adapter_preserves_the_shorthand_and_settles_committed_state(self):
         before_hp = _committed(self.player, "hp")
         before_mp = _committed(self.monster, "mp")
@@ -1251,6 +1278,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(_committed(self.monster, "mp"), before_mp - 4)
         self.assertEqual(_committed(self.monster, "hp"), 300)
 
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_an_authored_non_default_scale_reaches_real_settlement(self):
         # The freeform entitlement is element-scoped: the castable row must name
         # the element whose mastery the actor owns, so it is a distinct key
@@ -1276,6 +1304,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(result.outcome, "success", result.detail)
         self.assertEqual(_committed(self.monster, "mp"), 100 - allowed)
 
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_a_real_session_round_settles_the_utility_action(self):
         engage(self.player, self.monster)
         before_mp = _committed(self.monster, "mp")
@@ -1294,6 +1323,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(_committed(self.monster, "mp"), before_mp - 4)
         self.assertLess(_committed(self.monster, "hp"), 300)
 
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_the_session_opening_compression_numbers_its_internal_rounds(self):
         # The end-to-end session overwhelm path: the sole production requester
         # of compression resolves each internal round under the session's own
@@ -1348,6 +1378,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         # by ExecutionScopeTests, which provisions several slots explicitly.
         self.assertEqual({item[2] for item in compressed}, {0})
 
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_a_fault_after_the_utility_action_rolls_back_everything(self):
         # The utility action really writes (the monster pays its MP and damages
         # the party); a fault after those writes but before the outer commit
@@ -1374,6 +1405,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(_committed(self.player, "hp"), before_hp)
         self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
+    @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_the_overwhelm_provider_settles_utility_decisions_too(self):
         request = ActionRequest(
             actor=self.player,
@@ -1436,6 +1468,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
             {str(monster.key): monster, str(self.opponent.key): self.opponent},
         )
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_the_default_configured_behaviour_is_the_legacy_fallback(self):
         self.assertIs(invalid_state_fallback(), InvalidStateFallback.LEGACY)
         self.assertIs(
@@ -1460,6 +1493,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         # The stored binding is never rewritten by the fallback.
         self.assertEqual(monster.db.behaviour_tree, 7)
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_the_diagnostic_setting_returns_no_action_instead(self):
         monster = self._monster_row("t_sel_diagnostic")
         monster.db.behaviour_tree = 7
@@ -1471,6 +1505,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
         warning.assert_called_once()
         self.assertEqual(warning.call_args.kwargs["context"]["action"], "none")
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_utility_without_an_identity_warns_and_falls_back(self):
         monster = self._monster_row("t_sel_tier_only", species=None)
         with patch("world.rules.monster_behaviour.log_warn") as warning:
@@ -1480,6 +1515,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
             warning.call_args.kwargs["context"]["reason"], "invalid_identity"
         )
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_utility_without_intelligence_warns_and_falls_back(self):
         monster = self._monster_row("t_sel_unvalued")
         monster.db.behaviour_tree = OTHER_ARCHETYPE
@@ -1511,6 +1547,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
                 "missing_intelligence",
             )
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_a_database_error_keeps_its_own_boundary(self):
         monster = self._monster_row("t_sel_db")
         with patch(
@@ -1521,6 +1558,7 @@ class InvalidStateTests(SyntheticTuningMixin, EvenniaTestCase):
                 monster_behaviour_policy(monster, self._field(monster))
         warning.assert_not_called()
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_a_typed_invalid_score_warns_and_falls_back(self):
         monster = self._monster_row("t_sel_corrupt")
         with patch(
@@ -1564,6 +1602,7 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
             },
         )
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_the_trace_records_the_decision_and_round_trips_as_json(self):
         trace = []
         request = monster_behaviour_policy(self.monster, self._field(), trace=trace)
@@ -1587,6 +1626,7 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(summary["selected"], request.skill_key)
         self.assertEqual(summary["plans"], len(recorded.plans))
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_the_trace_has_a_bounded_facade_summary_only(self):
         trace = []
         monster_behaviour_policy(self.monster, self._field(), trace=trace)
@@ -1601,6 +1641,7 @@ class TraceTests(SyntheticTuningMixin, EvenniaTestCase):
         for value in summary.values():
             self.assertLessEqual(len(str(value)), 200)
 
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_a_no_action_decision_is_traced_as_well(self):
         _suppress_innate_skills(self)
         self.monster.db.skills = {"active": [HEAL_SELF.key], "passive": []}
@@ -1694,6 +1735,7 @@ class LegacyRetentionTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(random.getstate(), before)
 
     @covers_requirement("monster-action-policy::monster-behaviour-policy-is-a-complete-drop-in-action-provider")
+    @covers_requirement("monster-ai-utility-selection::invalid-state-fallback-is-narrow-and-observable")
     def test_a_late_rejection_is_never_reselected(self):
         field = self._field()
         selections = []

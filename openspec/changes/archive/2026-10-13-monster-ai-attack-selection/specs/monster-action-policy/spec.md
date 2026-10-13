@@ -146,12 +146,11 @@ attacking stat, and an exact tie SHALL be broken via one `dice.roll_d100()` roll
 
 ### Requirement: Area-versus-single-target shape is decided before target/skill selection, reusing the
 Legacy mode SHALL retain the following existing contract.
-existing all-enemies shorthand
-`world/rules/monster_behaviour.py` SHALL decide whether the acting monster uses an `AREA`-targeted or
-`SINGLE`-targeted skill this turn based on `BehaviourProfile.prefer_area_when_multiple_enemies`, the
-count of living enemies, and which target-spec shapes the entity owns a matching damage skill for, before
-running target selection. An `AREA` decision SHALL use the `"all-enemies"` shorthand as its `targets`
-value rather than computing an explicit target list.
+`world/rules/monster_behaviour.py` SHALL decide whether the acting monster uses an `AREA`- or
+`SINGLE`-targeted skill this turn from `BehaviourProfile.prefer_area_when_multiple_enemies`, the
+count of living enemies, and which target-spec shapes the entity owns a matching damage skill for,
+before target selection. An `AREA` decision SHALL use the `"all-enemies"` shorthand as `targets`
+rather than an explicit target list.
 
 #### Scenario: An archetype preferring area skills uses one when multiple enemies are present
 - **WHEN** in legacy mode, the acting monster's profile has `prefer_area_when_multiple_enemies: true`, more than one
