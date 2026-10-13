@@ -78,17 +78,29 @@ from world.rules.monster_ai.candidates import (
 )
 from world.rules.monster_ai.models import DecisionSnapshot, DivertLimit, stable_identity
 from world.rules.monster_ai.snapshot import DecisionReads
+from world.rules.progression import scaled_magnitude
 from world.rules.target_facts import matches_target_predicate
 from world.rules.targeting import Relation
 from world.skills.effects import (
     BuffApplyEffect,
+    CleanseEffect,
+    ConferGrowthRateEffect,
+    ConferralEffect,
     DamageEffect,
+    DisguiseEffect,
+    DivineMysteryEffect,
     EffectPolicy,
+    FlavorEffect,
     GaugeTransferEffect,
+    GrowthRateEffect,
     HealEffect,
     RiteBlessingEffect,
+    RiteShelterEffect,
+    RuleTableEffect,
     SelfBuffApplyEffect,
     SelfHealEffect,
+    SessionStampEffect,
+    WeaponStyleEffect,
 )
 from world.skills.registry import SkillDef
 
@@ -106,6 +118,23 @@ _ACTOR_BOUND_EFFECTS = (SelfHealEffect, SelfBuffApplyEffect)
 #: The parsed effects whose payload names a buff definition whose declared
 #: polarity decides whether the effect helps or hurts its recipient.
 _BUFF_REFERENCE_EFFECTS = (BuffApplyEffect, RiteBlessingEffect, SelfBuffApplyEffect)
+#: The parsed effect classes positively known to help their recipient. The
+#: table is closed on purpose: an unmodeled effect absent from it is *not*
+#: known to be harmless, so the classifier refuses it on the actor's own side
+#: instead of valuing an unknown outcome at zero.
+_BENIGN_EFFECTS = (
+    CleanseEffect,
+    ConferGrowthRateEffect,
+    ConferralEffect,
+    DisguiseEffect,
+    DivineMysteryEffect,
+    FlavorEffect,
+    GrowthRateEffect,
+    RiteShelterEffect,
+    RuleTableEffect,
+    SessionStampEffect,
+    WeaponStyleEffect,
+)
 #: The buff polarity that hurts its holder.
 _DEBUFF_POLARITY = "debuff"
 #: The buff polarity that helps its holder.
@@ -146,6 +175,10 @@ class EstimationLimit(StrEnum):
     #: gate opened, because the joint state of that gate and the effect's own
     #: pools is not tracked branch by branch.
     GATED_EFFECT_WEIGHTED = "gated_effect_weighted"
+    #: A conditional effect was omitted because the occurrence it depends on
+    #: already changed the very state that effect would act on, so crediting it
+    #: on every branch would overstate the plan.
+    GATED_EFFECT_OMITTED = "gated_effect_omitted"
     #: An unmodeled effect could change a recipient's health over time.
     OVER_TIME_EFFECT_UNMODELED = "over_time_effect_unmodeled"
     #: An unmodeled effect that could only ever help the actor's side
@@ -337,11 +370,18 @@ def _harmful_to_recipient(effect: Any, polarity: str | None) -> bool:
     return polarity == _DEBUFF_POLARITY
 
 
-def _benefits_recipient(effect: Any, polarity: str | None) -> bool:
-    """Return whether one unmodeled effect measurably helps its recipient."""
+def _is_benign(effect: Any, polarity: str | None) -> bool:
+    """Return whether one effect is positively known to help its recipient.
+
+    Only the closed :data:`_BENIGN_EFFECTS` table, a restore, and a
+    ``buff``-polarity reference answer yes. Everything else is unknown, which
+    the classifier treats conservatively on the actor's own side.
+    """
     if isinstance(effect, GaugeTransferEffect):
         return effect.direction == "restore"
-    return polarity == _BUFF_POLARITY
+    if polarity is not None:
+        return polarity == _BUFF_POLARITY
+    return isinstance(effect, _BENIGN_EFFECTS)
 
 
 def estimate_candidates(
@@ -467,10 +507,18 @@ class _Recipient:
         The cap is what stops a depleted recipient absorbing further loss, so a
         later effect can never count the same health point twice.
         """
-        capacity = self.participant.capacity
+        return self.expected_loss(self.participant.capacity)
+
+    def expected_loss(self, limit: float) -> float:
+        """Return the expected loss this distribution holds under one cap.
+
+        The cap is the operation's own floor: direct damage floors a nonlethal
+        recipient at one stored point, while a health-gauge diversion pays
+        through the ordinary health write and may take the last point as well.
+        """
         total = 0.0
         for (loss, _crossed), probability in self.states.items():
-            total += min(loss, capacity) * probability
+            total += min(loss, max(limit, 0.0)) * probability
         return total
 
     def finishing(self) -> float:
@@ -561,7 +609,8 @@ class _Decision:
         self.allies = group_members(KIND_FRIENDLY, snapshot, self.pool)
         self._participants: dict[str, _Participant] = {}
         self._pools: dict[str, dict[str, float]] = {}
-        self._paid: dict[str, float] = {}
+        self._paid: dict[tuple[str, str], float] = {}
+        self._gates: dict[int, dict[str, float]] = {}
         self._limits: set[EstimationLimit] = set()
         self._diagnostics: set[str] = set()
 
@@ -589,7 +638,10 @@ class _Decision:
     def faction_capacity(self, relation: Relation) -> float:
         """Return one faction's eligible live maximum-health sum, floored at one."""
         members = self.enemies if relation is Relation.ENEMY else self.allies
-        return max(sum(self.participant(entity).max_hp for entity in members), 1.0)
+        total = 0.0
+        for entity in members:
+            total += self.participant(entity).max_hp
+        return max(_finite(total, "faction capacity"), 1.0)
 
     # -- classification ------------------------------------------------------
 
@@ -597,11 +649,16 @@ class _Decision:
         """Return the exclusion detail for one plan, or ``None`` when it is valueable.
 
         The closed classification is the only place this module decides what a
-        plan's effects mean. A modeled health or resource effect is estimated;
-        every other effect contributes zero and is reported. Two unmodeled
-        shapes are refused outright, because valuing them as zero would be a
-        fabrication: an adverse outcome aimed at the actor's own side, and an
-        unmodeled benefit handed to a hostile side.
+        plan's effects mean, and it is deliberately conservative about the
+        effects it does not model. A modeled health or resource effect is
+        estimated. An unmodeled effect is valued at zero only when it is
+        positively known to be benign for its recipient: on the actor's own side
+        that makes it a harmless benefit, and on a hostile side it makes it a
+        benefit the plan hands to the enemy, which is refused. An unmodeled
+        effect that is not positively benign is refused on the actor's own side,
+        because treating an unknown outcome aimed at a friend as harmless would
+        be a fabrication, and is valued at zero on a hostile side, where it
+        cannot hurt the actor's side at all.
         """
         for ordinal, effect in enumerate(skill.parsed_effects):
             policy = skill.effect_policies[ordinal]
@@ -614,6 +671,13 @@ class _Decision:
                         return (
                             f"{skill.effects[ordinal]} has an unprojectable state magnitude"
                         )
+                    for target in targets:
+                        participant = self.participant(target)
+                        if participant.relation is Relation.ENEMY:
+                            return (
+                                f"{skill.effects[ordinal]} heals a hostile "
+                                "recipient by an unprojectable magnitude"
+                            )
                     self._limits.add(EstimationLimit.STATE_MAGNITUDE_UNMODELED)
                     self._diagnostics.add(
                         f"{skill.effects[ordinal]} magnitude not modeled"
@@ -634,13 +698,16 @@ class _Decision:
                             )
                 continue
             polarity = _polarity(effect)
-            harmful = _harmful_to_recipient(effect, polarity)
+            benign = _is_benign(effect, polarity)
             for target in targets:
                 participant = self.participant(target)
                 own_side = participant.relation in (Relation.SELF, Relation.ALLY)
-                if own_side and harmful:
-                    return f"{skill.effects[ordinal]} harms a friendly recipient"
-                if not own_side and _benefits_recipient(effect, polarity):
+                if own_side and not benign:
+                    return (
+                        f"{skill.effects[ordinal]} has an unvaluable outcome "
+                        "for a friendly recipient"
+                    )
+                if not own_side and benign:
                     return f"{skill.effects[ordinal]} benefits a hostile recipient"
             if targets:
                 self._note_unmodeled(skill, ordinal, effect)
@@ -719,7 +786,7 @@ class _Decision:
         """
         routed = candidate.routed or ()
         ledgers = self._ledgers(skill, routed)
-        self._settle(skill, routed, ledgers)
+        self._settle(skill, routed, ledgers, _finite(candidate.plan.scale, "scale"))
         cost = self.reads.costs(self.actor, skill, candidate.plan.scale)
         self._pay_cost(cost)
         return self._assemble(candidate, ledgers, cost)
@@ -763,23 +830,36 @@ class _Decision:
         skill: SkillDef,
         routed: tuple[tuple[Any, ...], ...],
         ledgers: dict[str, _Ledger],
+        scale: float,
     ) -> None:
-        """Apply every effect's contribution in settlement's commit order."""
+        """Apply every effect's contribution in settlement's commit order.
+
+        ``scale`` is the plan's authored cast magnitude: settlement stages every
+        damage and heal amount through it, so the estimate must too.
+        """
         gates: dict[int, dict[str, float]] = {}
+        self._gates = gates
         for ordinal, effect in enumerate(skill.parsed_effects):
             policy = skill.effect_policies[ordinal]
             if isinstance(effect, _MODELED_EFFECTS) and policy.magnitude is not None:
                 continue
-            targets = self._effect_recipients(
-                effect, self._routed_for(routed, ordinal)
-            )
+            routed_targets = self._routed_for(routed, ordinal)
+            targets = self._effect_recipients(effect, routed_targets)
             weights = self._gate_weights(policy, gates)
             if isinstance(effect, DamageEffect):
                 gates[ordinal] = self._apply_damage(
-                    effect, policy, targets, ledgers, weights, skill, ordinal
+                    effect, policy, targets, ledgers, weights, scale
                 )
             elif isinstance(effect, (HealEffect, SelfHealEffect)):
-                self._apply_heal(effect, policy, targets, ledgers, weights, skill, ordinal)
+                self._apply_heal(
+                    effect,
+                    policy,
+                    targets,
+                    routed_targets,
+                    ledgers,
+                    weights,
+                    scale,
+                )
             elif isinstance(effect, GaugeTransferEffect):
                 self._apply_transfer(effect, policy, targets, ledgers, weights)
 
@@ -807,6 +887,27 @@ class _Decision:
             self._limits.add(EstimationLimit.GATED_EFFECT_WEIGHTED)
         return weight
 
+    def _execution_weight(
+        self, weights: Mapping[str, float] | None, routed: tuple[Any, ...]
+    ) -> float:
+        """Return the probability an actor-bound effect's handler actually runs.
+
+        Settlement filters an effect's *routed* recipients by the source
+        occurrence's recorded hits and invokes the handler whenever any of them
+        survived that filter; a handler that binds the actor (the two self-bound
+        effects) therefore runs with the probability that at least one routed
+        recipient qualified, and never with the actor's own gate weight -- the
+        actor is not a recipient the prerequisite filtered.
+        """
+        if weights is None:
+            return 1.0
+        miss = 1.0
+        for target in routed:
+            miss *= 1.0 - self._weight(
+                weights, self.participant(target).identity
+            )
+        return max(0.0, min(1.0, 1.0 - miss))
+
     # -- damage --------------------------------------------------------------
 
     def _apply_damage(
@@ -816,8 +917,7 @@ class _Decision:
         targets: tuple[Any, ...],
         ledgers: dict[str, _Ledger],
         weights: Mapping[str, float] | None,
-        skill: SkillDef,
-        ordinal: int,
+        scale: float,
     ) -> dict[str, float]:
         """Advance each recipient through one damage occurrence.
 
@@ -833,15 +933,20 @@ class _Decision:
             else:
                 self._limits.add(EstimationLimit.EVIDENCE_STRIKE_UNCREDITED)
         self._limits.add(EstimationLimit.HIT_REACTIONS_UNMODELED)
-        del skill, ordinal
         gate: dict[str, float] = {}
         for target in targets:
             participant = self.participant(target)
             weight = self._weight(weights, participant.identity)
             if weight <= 0:
                 continue
+            if weights is not None and weight < 1.0:
+                # The occurrence this effect depends on already moved this very
+                # recipient's health, so crediting the effect on every branch it
+                # never reached would overstate the plan. Omit it and say so.
+                self._limits.add(EstimationLimit.GATED_EFFECT_OMITTED)
+                continue
             ledger = self._ledger_for(ledgers, participant)
-            outcomes = self._strike_outcomes(effect, policy, participant)
+            outcomes = self._strike_outcomes(effect, policy, participant, scale)
             gate[participant.identity] = weight * (
                 1.0 - outcomes.get(0, 0.0) ** strikes
             )
@@ -849,11 +954,11 @@ class _Decision:
             nominal = strikes * sum(
                 amount * probability for amount, probability in outcomes.items()
             )
-            before = ledger.recipient.expected_capacity_loss()
-            self._advance(ledger, applied, strikes, participant, spent, weight)
+            ledger.paid_loss += self._advance(
+                ledger, applied, strikes, participant, spent, weight
+            )
             self._spend(participant, spent)
             ledger.nominal_damage += nominal * weight
-            ledger.paid_loss += ledger.recipient.expected_capacity_loss() - before
             if participant.floor > 0 and ledger.paid_loss > 0:
                 self._limits.add(EstimationLimit.NONLETHAL_FLOOR_APPLIED)
         return gate
@@ -863,6 +968,7 @@ class _Decision:
         effect: DamageEffect,
         policy: EffectPolicy,
         participant: _Participant,
+        scale: float,
     ) -> dict[int, float]:
         """Return one strike's analytic amount distribution for one recipient.
 
@@ -873,18 +979,30 @@ class _Decision:
         """
         actor = self.participant(self.actor)
         attack_key = "atk_phys" if effect.school == "physical" else "magic_power"
-        attack = attack_with_bundle(
-            self._real(actor, attack_key),
-            actor.modifiers,
-            attack_key,
+        attack = _finite(
+            attack_with_bundle(
+                self._real(actor, attack_key),
+                actor.modifiers,
+                attack_key,
+            ),
+            "adjusted attack",
         )
         accuracy = _finite(actor.modifiers.get("accuracy", 0), "actor.accuracy")
-        agility = agility_with_bundle(self._real(actor, "agility"), actor.modifiers)
-        defender_agility = agility_with_bundle(
-            self._real(participant, "agility"), participant.modifiers
+        agility = _finite(
+            agility_with_bundle(self._real(actor, "agility"), actor.modifiers),
+            "adjusted agility",
         )
-        defense = defense_with_bundle(
-            self._real(participant, "defense"), participant.modifiers
+        defender_agility = _finite(
+            agility_with_bundle(
+                self._real(participant, "agility"), participant.modifiers
+            ),
+            "adjusted defender agility",
+        )
+        defense = _finite(
+            defense_with_bundle(
+                self._real(participant, "defense"), participant.modifiers
+            ),
+            "adjusted defense",
         )
         damage_policy = policy.damage
         matched_multiplier = 1.0
@@ -920,6 +1038,7 @@ class _Decision:
                 defense=defense,
                 rider=rider,
                 matched_multiplier=matched_multiplier,
+                scale=scale,
             )
             outcomes[amount] = outcomes.get(amount, 0.0) + _FACE_PROBABILITY
         return outcomes
@@ -946,12 +1065,19 @@ class _Decision:
         the ordinary health write, which shields no health at all, so it is
         charged against the instance's budget and reported but never subtracted
         from the residual.
+
+        Every occurrence stages against the *persisted* budget and the live pool
+        it read, keeping only its own occurrence-local ledger; the payment
+        itself is settled separately in commit order, so this history is not
+        spent twice.
         """
         if not participant.divert:
             return ({amount: probability for amount, probability in outcomes.items()}, {})
         if strikes > 1:
             self._limits.add(EstimationLimit.DIVERSION_SHARED_BUDGET)
         residual: dict[int, float] = {}
+        staged_instances: dict[str, float] = {}
+        staged_gauges: dict[str, float] = {}
         expected: dict[str, float] = {}
         shielded = False
         for amount, probability in outcomes.items():
@@ -959,11 +1085,19 @@ class _Decision:
             for limit in participant.divert:
                 if remaining <= 0:
                     break
-                absorbed = self._absorb(participant, limit, remaining)
+                absorbed = self._absorb(
+                    participant, limit, remaining, staged_instances, staged_gauges
+                )
                 if absorbed <= 0:
                     continue
                 expected[limit.instance_key] = (
                     expected.get(limit.instance_key, 0.0) + absorbed * probability
+                )
+                staged_instances[limit.instance_key] = (
+                    staged_instances.get(limit.instance_key, 0.0) + absorbed
+                )
+                staged_gauges[limit.gauge] = (
+                    staged_gauges.get(limit.gauge, 0.0) + absorbed
                 )
                 if limit.gauge == "hp":
                     self._limits.add(EstimationLimit.DIVERSION_UNSHIELDED_HEALTH)
@@ -980,16 +1114,27 @@ class _Decision:
         }
 
     def _absorb(
-        self, participant: _Participant, limit: DivertLimit, residual: int
+        self,
+        participant: _Participant,
+        limit: DivertLimit,
+        residual: int,
+        staged_instances: Mapping[str, float],
+        staged_gauges: Mapping[str, float],
     ) -> int:
         """Return how much of one strike's residual one instance absorbs.
 
         The instance's own order in settlement decides which budget binds
-        first, and the absorbed amount is clamped by what is left of the
-        instance's cap and by what the paid pool actually holds.
+        first, and the absorbed amount is clamped by what the instance's cap
+        still allows and by what the pool it would be paid from still holds --
+        both measured against what settlement read when it staged this
+        occurrence, plus this occurrence's own staged spending.
         """
-        remaining_cap = limit.remaining_cap - self._paid.get(limit.instance_key, 0.0)
-        available = self.pools(participant).get(limit.gauge, 0.0)
+        remaining_cap = limit.remaining_cap - staged_instances.get(
+            limit.instance_key, 0.0
+        )
+        available = participant.gauges.get(limit.gauge, 0.0) - staged_gauges.get(
+            limit.gauge, 0.0
+        )
         return max(
             0,
             int(
@@ -1004,15 +1149,27 @@ class _Decision:
     def _spend(
         self, participant: _Participant, spent: Mapping[str, int]
     ) -> None:
-        """Record the diversion budget and pool one occurrence would pay away."""
+        """Pay one occurrence's staged diversion at commit, in order.
+
+        The budget is keyed by the holder as well as the instance, because an
+        instance key is local to one entity's own cache. The payment is clamped
+        by what the instance's cap still allows after the payments this action
+        has already made and by what the paid pool holds at this point in
+        commit order: a shield cannot absorb what the action already spent.
+        """
         pools = self.pools(participant)
         for limit in participant.divert:
-            paid = spent.get(limit.instance_key, 0)
+            staged = spent.get(limit.instance_key, 0)
+            if staged <= 0:
+                continue
+            key = (participant.identity, limit.instance_key)
+            remaining_cap = limit.remaining_cap - self._paid.get(key, 0.0)
+            paid = max(0, min(staged, int(max(remaining_cap, 0.0))))
+            if limit.gauge != "hp":
+                paid = min(paid, int(max(pools.get(limit.gauge, 0.0), 0.0)))
             if paid <= 0:
                 continue
-            self._paid[limit.instance_key] = (
-                self._paid.get(limit.instance_key, 0.0) + paid
-            )
+            self._paid[key] = self._paid.get(key, 0.0) + paid
             if limit.gauge in pools and limit.gauge != "hp":
                 pools[limit.gauge] = max(0.0, pools[limit.gauge] - float(paid))
 
@@ -1024,19 +1181,24 @@ class _Decision:
         participant: _Participant,
         spent: Mapping[str, int],
         weight: float,
-    ) -> None:
+    ) -> float:
         """Advance one recipient through one occurrence's modeled strikes.
 
         Capacity and the recipient's floor are enforced inside every face's
         branch, so an occurrence that needs two strikes to cross a recipient is
         credited with the crossing and never with twice the capped loss. A
         health-gauge diversion raises the cap to the recipient's whole health,
-        because its payment carries no nonlethal floor.
+        because its payment carries no nonlethal floor -- and the extra loss
+        that floor-free payment accounts for is returned with the accounted
+        loss, so the ledger, the health pool and the finishing projection agree.
         """
         limit = participant.capacity
+        spilled = False
         for limit_spec in participant.divert:
             if limit_spec.gauge == "hp" and spent.get(limit_spec.instance_key):
                 limit = participant.hp
+                spilled = True
+        before = ledger.recipient.expected_capacity_loss()
         for _strike in range(strikes):
             branches: list[tuple[float, _Recipient]] = [
                 (1.0 - weight, ledger.recipient.copy())
@@ -1047,6 +1209,12 @@ class _Decision:
                 branches.append((probability * weight, branch))
             ledger.recipient.mix(branches)
         self._sync_health(ledger)
+        accounted = ledger.recipient.expected_capacity_loss() - before
+        if spilled:
+            accounted += ledger.recipient.expected_loss(
+                participant.hp
+            ) - ledger.recipient.expected_capacity_loss()
+        return accounted
 
     def _sync_health(self, ledger: _Ledger) -> None:
         """Keep one participant's projected health pool on its branch expectation.
@@ -1066,34 +1234,48 @@ class _Decision:
         effect: HealEffect | SelfHealEffect,
         policy: EffectPolicy,
         targets: tuple[Any, ...],
+        routed: tuple[Any, ...],
         ledgers: dict[str, _Ledger],
         weights: Mapping[str, float] | None,
-        skill: SkillDef,
-        ordinal: int,
+        scale: float,
     ) -> None:
         """Advance each recipient by one heal's staged restoration.
 
         Settlement stages the restoration against the recipient's health gap
         *before* any part of the action commits, so the allowance is that
-        pre-action gap however much damage the same action deals first.
+        pre-action gap however much damage the same action deals first; the
+        staged magnitude carries the plan's authored scale. An actor-bound heal
+        runs when any *routed* recipient survived the prerequisite filter and
+        then mutates the actor, so its weight comes from the routed set.
         """
-        del skill, ordinal
         actor = self.participant(self.actor)
         magnitude = attack_with_bundle(
             self._real(actor, "magic_power"), actor.modifiers, "magic_power"
         )
         if isinstance(effect, SelfHealEffect) and effect.basis == "missing_fraction":
             gap = max(0.0, actor.max_hp - actor.hp) if actor.hp > 0 else 0.0
-            staged_full = int(round(gap * _finite(effect.fraction, "fraction")))
+            base = int(round(gap * _finite(effect.fraction, "fraction")))
+            staged_full = scaled_magnitude(base, scale) if base > 0 else 0
         else:
             staged_full = heal_amount(
                 magic_power=magnitude,
                 coefficient=_finite(policy.coefficient, "coefficient"),
                 heal_gain=actor.modifiers.get("heal_gain"),
+                scale=scale,
             )
+        bound = isinstance(effect, _ACTOR_BOUND_EFFECTS)
+        execution = (
+            self._execution_weight(weights, routed) if bound else 1.0
+        )
+        if bound and execution <= 0:
+            return
         for target in targets:
             participant = self.participant(target)
-            weight = self._weight(weights, participant.identity)
+            weight = (
+                execution
+                if bound
+                else self._weight(weights, participant.identity)
+            )
             if weight <= 0:
                 continue
             ledger = self._ledger_for(ledgers, participant)
@@ -1143,15 +1325,6 @@ class _Decision:
                     self._weight(weights, participant.identity),
                 )
             return
-        gross = 0
-        weight = 1.0
-        for target in targets:
-            participant = self.participant(target)
-            held, gate = self._drain(effect, participant, ledgers, weights)
-            gross += held
-            weight *= gate
-        if gross <= 0 or weight <= 0:
-            return
         share = 0.0
         if policy.transfer is not None:
             share = _finite(policy.transfer.caster_recovery_share, "recovery share")
@@ -1159,27 +1332,40 @@ class _Decision:
             self.participant(self.actor).modifiers.get("recovery_share_bonus", 0.0),
             "recovery_share_bonus",
         )
-        self._credit(effect, min(1.0, share + bonus), gross, weight, ledgers)
+        effective = min(1.0, share + bonus)
+        for target in targets:
+            participant = self.participant(target)
+            weight = self._weight(weights, participant.identity)
+            if weight <= 0:
+                continue
+            if effect.gauge == "hp" and weights is not None and weight < 1.0:
+                # The occurrence this drain depends on already moved this
+                # recipient's health, so crediting the drain on branches it
+                # never reached would overstate it: omit it and say so.
+                self._limits.add(EstimationLimit.GATED_EFFECT_OMITTED)
+                continue
+            self._transfer_one(effect, effective, participant, ledgers, weight)
 
-    def _drain(
+    def _transfer_one(
         self,
         effect: GaugeTransferEffect,
+        share: float,
         participant: _Participant,
         ledgers: dict[str, _Ledger],
-        weights: Mapping[str, float] | None,
-    ) -> tuple[int, float]:
-        """Remove one drain's requested-and-held amount from one recipient.
+        weight: float,
+    ) -> None:
+        """Take one drain from one recipient and credit the actor its share.
 
         The request is re-derived from the recipient's pool at this point in
         commit order, exactly as settlement re-reads it when the staged closure
         runs, so a pool an earlier effect already emptied cannot be drained
-        twice. Returns what the open branch actually holds and the probability
-        that this is the branch taken: the two travel separately because the
-        actor's share is rounded once on the removal settlement would see.
+        twice. The removal is what the recipient's projected state actually
+        gives up -- the pool's own reduction for a gauge drain, the projected
+        health loss for a health drain, which a floor or earlier damage can
+        leave far below the request -- and each qualifying recipient is settled
+        on its own, so one recipient's closed gate never cancels another's
+        removal.
         """
-        weight = self._weight(weights, participant.identity)
-        if weight <= 0:
-            return 0, 0.0
         pools = self.pools(participant)
         current = max(pools.get(effect.gauge, 0.0), 0.0)
         if effect.magnitude_mode == "fixed":
@@ -1188,21 +1374,24 @@ class _Decision:
             requested = round(current * _finite(effect.magnitude, "magnitude"))
         else:
             requested = current
-        gross = max(0, min(int(requested), int(current)))
-        if gross <= 0:
-            return 0, weight
-        pools[effect.gauge] = max(0.0, current - gross * weight)
-        if effect.gauge == "hp":
-            ledger = self._ledger_for(ledgers, participant)
-            before = ledger.recipient.expected_capacity_loss()
-            branch = ledger.recipient.copy()
-            branch.apply_loss(gross, participant.capacity)
-            ledger.recipient.mix(
-                [(weight, branch), (1.0 - weight, ledger.recipient.copy())]
-            )
-            ledger.nominal_damage += float(gross) * weight
-            ledger.paid_loss += ledger.recipient.expected_capacity_loss() - before
-        return gross, weight
+        held = max(0, min(int(requested), int(current)))
+        if held <= 0:
+            return
+        if effect.gauge != "hp":
+            pools[effect.gauge] = max(0.0, current - held * weight)
+            self._recover(effect, held, share, weight, ledgers)
+            return
+        ledger = self._ledger_for(ledgers, participant)
+        before = ledger.recipient.expected_capacity_loss()
+        branch = ledger.recipient.copy()
+        branch.apply_loss(held, participant.capacity)
+        ledger.recipient.mix(
+            [(weight, branch), (1.0 - weight, ledger.recipient.copy())]
+        )
+        lost = ledger.recipient.expected_capacity_loss() - before
+        ledger.nominal_damage += float(held) * weight
+        ledger.paid_loss += lost
+        self._recover(effect, int(round(lost)), share, weight, ledgers)
 
     def _restore(
         self,
@@ -1226,27 +1415,27 @@ class _Decision:
             amount = max(0.0, maximum - current)
         pools["mp"] = min(maximum, current + amount * weight)
 
-    def _credit(
+    def _recover(
         self,
         effect: GaugeTransferEffect,
+        removal: int,
         share: float,
-        gross: int,
         weight: float,
         ledgers: dict[str, _Ledger],
     ) -> None:
-        """Pay the actor the share of one drain's aggregated actual removal.
+        """Pay the actor the share of one drain's actual removal.
 
-        The share is computed once on the whole aggregated removal, exactly as
-        settlement rounds it after summing every recipient, and only then is the
-        result weighted by the prerequisite gate -- so the rounding applies to
-        the integer settlement would round, not to its expectation. The result
-        is clamped by the paid pool's own bound: a restored pool never exceeds
-        its maximum, and a restored recipient is never revived.
+        The share is rounded once on the integer removal settlement would sum,
+        and only then weighted by the prerequisite gate, so the rounding applies
+        to the value settlement rounds rather than to its expectation. The room
+        the recovery can occupy is applied *before* that weighting -- a pool
+        absorbs a credit into its own bound, and a recipient is never revived --
+        so an expected recovery can never exceed the space that actually exists.
         """
-        if share <= 0 or weight <= 0 or gross <= 0:
+        if share <= 0 or weight <= 0 or removal <= 0:
             return
         actor = self.participant(self.actor)
-        amount = float(min(gross, round(gross * share))) * weight
+        amount = min(removal, round(removal * share))
         if amount <= 0:
             return
         gauge = effect.gauge
@@ -1254,17 +1443,24 @@ class _Decision:
             if actor.hp <= 0:
                 return
             ledger = self._ledger_for(ledgers, actor)
+            amount = min(amount, int(max(actor.max_hp - actor.hp, 0.0)))
+            if amount <= 0:
+                return
             before = ledger.recipient.expected_health()
             branch = ledger.recipient.copy()
-            branch.apply_heal(int(amount), actor.hp - actor.max_hp)
-            ledger.recipient.mix([(1.0, branch)])
-            ledger.nominal_healing += amount
+            branch.apply_heal(amount, actor.hp - actor.max_hp)
+            ledger.recipient.mix(
+                [(weight, branch), (1.0 - weight, ledger.recipient.copy())]
+            )
+            ledger.nominal_healing += float(amount) * weight
             ledger.paid_healing += ledger.recipient.expected_health() - before
+            self._sync_health(ledger)
             return
         pools = self.pools(actor)
         current = max(pools.get(gauge, 0.0), 0.0)
         maximum = _finite(actor.maxima.get(gauge, current), f"actor.{gauge}.max")
-        pools[gauge] = min(maximum, current + amount)
+        room = max(maximum - current, 0.0)
+        pools[gauge] = min(maximum, current + min(float(amount), room) * weight)
 
     # -- features ------------------------------------------------------------
 

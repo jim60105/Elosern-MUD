@@ -219,6 +219,53 @@ FOE_MEND = replace(
         EffectPolicy(audience=EffectAudience.ENEMIES),
     ),
 )
+#: Two damage occurrences where the second depends on the first having landed.
+GATED = replace(
+    STRIKE,
+    key="t_est_gated",
+    effects=[*STRIKE.effects, *STRIKE.effects],
+    effect_policies=(EffectPolicy(), EffectPolicy(requires_hit_from=0)),
+)
+#: A damage occurrence plus a health drain at full recovery share.
+BLOOD = replace(
+    STRIKE,
+    key="t_est_blood",
+    effects=[*STRIKE.effects, "gauge_transfer:hp:drain:fixed:5"],
+    effect_policies=(
+        EffectPolicy(),
+        EffectPolicy(transfer=GaugeTransferPolicy(caster_recovery_share=1.0)),
+    ),
+)
+#: An area row that damages every enemy and drains every enemy's mana.
+SIPHON = replace(
+    STRIKE,
+    key="t_est_siphon",
+    target_spec=TargetSpec.AREA,
+    effects=[*STRIKE.effects, "gauge_transfer:mp:drain:fixed:10"],
+    effect_policies=(
+        EffectPolicy(audience=EffectAudience.ENEMIES),
+        EffectPolicy(
+            audience=EffectAudience.ENEMIES,
+            requires_hit_from=0,
+            transfer=GaugeTransferPolicy(caster_recovery_share=1.0),
+        ),
+    ),
+)
+#: A damage occurrence plus a grant revocation aimed at the actor's own side.
+STRIPPED = replace(
+    STRIKE,
+    key="t_est_stripped",
+    effects=[*STRIKE.effects, "revoke_grants"],
+    effect_policies=(EffectPolicy(), EffectPolicy(audience=EffectAudience.ALLIES)),
+)
+#: A damage occurrence plus a cleanse aimed at the enemy.
+PURGED = replace(
+    STRIKE,
+    key="t_est_purged",
+    effects=[*STRIKE.effects, "cleanse:status"],
+)
+#: A row charging two different pools.
+COSTLY = replace(STRIKE, key="t_est_costly", cost={"mp": 10, "sp": 4})
 
 
 def _rows() -> dict[str, object]:
@@ -240,6 +287,12 @@ def _rows() -> dict[str, object]:
             FRIEND_LEECH,
             WARD,
             FOE_MEND,
+            GATED,
+            BLOOD,
+            SIPHON,
+            STRIPPED,
+            PURGED,
+            COSTLY,
         )
     }
 
@@ -353,12 +406,12 @@ def _deltas(estimate, entity) -> dict[str, float]:
     return {}
 
 
-def _hand(skill, recipients, routed):
+def _hand(skill, recipients, routed, *, scale=1.0):
     """One hand-built candidate carrying its own declared routing."""
     ordered = tuple(sorted(stable_identity(target) for target in recipients))
     return Candidate(
-        CandidateIdentity(skill.key, 1.0, ordered),
-        PlannedAction(skill.key, 1.0, target_ids=ordered),
+        CandidateIdentity(skill.key, scale, ordered),
+        PlannedAction(skill.key, scale, target_ids=ordered),
         recipients=tuple(recipients),
         routed=tuple(tuple(reached) for reached in routed),
     )
@@ -730,7 +783,16 @@ class SpreadProjectionTests(unittest.TestCase):
         _owned(self.actor, row.key)
         with patch.dict("world.skills.registry.SKILL_REGISTRY", {row.key: row}):
             estimate = _widest(_estimate(self.actor, (self.enemy,)), row.key)
-        self.assertGreater(_recipient(estimate, self.actor).damage, 0.0)
+        own_loss = _recipient(estimate, self.actor).damage
+        enemy_loss = _recipient(estimate, self.enemy).damage
+        self.assertGreater(own_loss, 0.0)
+        # The feature is the enemy loss over the enemy faction's capacity minus
+        # the own-side loss over the ally faction's capacity, so the plan's own
+        # damage measurably lowers it.
+        self.assertAlmostEqual(
+            estimate.damage.magnitude, enemy_loss / 100.0 - own_loss / 40.0
+        )
+        self.assertLess(estimate.damage.magnitude, enemy_loss / 100.0)
 
     def test_an_unvaluable_harm_is_refused_instead_of_zeroed(self):
         _owned(self.actor, SELF_HARM.key)
@@ -837,6 +899,152 @@ class SpreadProjectionTests(unittest.TestCase):
         self.assertEqual(estimate.classification, ApproximationClass.EXACT)
         self.assertEqual(estimate.limits, ())
         self.assertAlmostEqual(_recipient(estimate, self.actor).healing, 10.0)
+
+
+class ScaleGateAndPoolTests(unittest.TestCase):
+    """The clauses the estimate must establish beyond one plain strike."""
+
+    def setUp(self):
+        _scope(self)
+        _suppress_innate_skills(self)
+        self.actor = _ProbeParticipant("t_est_actor", skills=(STRIKE.key,))
+        self.enemy = _ProbeParticipant("t_est_enemy", pk=7)
+        _set(self.actor, "magic_power", 30)
+        _set(self.actor, "agility", 0)
+        _set(self.actor, "hp", 40, current=40)
+        _set(self.actor, "mp", 100, current=20)
+        _set(self.enemy, "defense", 10)
+        _set(self.enemy, "agility", 0)
+        _set(self.enemy, "hp", 100, current=100)
+
+    def _plan(self, skill, recipients, routed, *, scale=1.0):
+        """Estimate one hand-built plan over the probe participants."""
+        snapshot, reads, roster, context = _shaped(self.actor, (self.enemy,))
+        return estimate_plan(
+            _hand(skill, recipients, routed, scale=scale),
+            snapshot=snapshot,
+            actor=self.actor,
+            context=context,
+            roster=roster,
+            reads=reads,
+        )
+
+    def test_a_non_default_scale_scales_the_effects_and_their_cost(self):
+        # Faces 1..50 miss; 51..90 land round(30) - 10 = 20, 91..99 land
+        # round(45) - 10 = 35 and face 100 crits for 50. Halved, the same faces
+        # land 10, 18 and 25, so the expected loss is (400 + 162 + 25) / 100 =
+        # 5.87 while the twelve-mana cost is charged as six.
+        estimate = self._plan(STRIKE, (self.enemy,), ((self.enemy,),), scale=0.5)
+        self.assertNotIsInstance(estimate, InvalidEstimate)
+        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 5.87)
+        self.assertAlmostEqual(estimate.cost, 6.0 / 20.0)
+
+    def test_a_gated_damage_occurrence_is_omitted_rather_than_marginalized(self):
+        # The second occurrence reads the first one's gate, so half the time it
+        # would act on a recipient the first already hit. Crediting it on every
+        # branch would overstate the plan, so it is omitted and reported: the
+        # estimate is the first occurrence's own range alone.
+        estimate = self._plan(GATED, (self.enemy,), ((self.enemy,), (self.enemy,)))
+        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 11.65)
+        self.assertIn(EstimationLimit.GATED_EFFECT_OMITTED, estimate.limits)
+
+    def test_independent_drain_gates_sum_rather_than_multiply(self):
+        # Two enemies, each holding ten mana and each reached half the time by
+        # the damage occurrence its drain depends on: the actor recovers
+        # 0.5 x 10 from each of them, ten in all. Multiplying the gates would
+        # claim only 2.5, and one closed gate would erase the other's removal.
+        second = _ProbeParticipant("t_est_second", pk=8)
+        for target in (self.enemy, second):
+            _set(target, "mp", 30, current=10)
+            _set(target, "defense", 10)
+            _set(target, "agility", 0)
+        _owned(self.actor, SIPHON.key)
+        snapshot, reads, roster, context = _shaped(self.actor, (self.enemy, second))
+        estimates = estimate_candidates(
+            enumerate_candidates(
+                snapshot,
+                actor=self.actor,
+                context=context,
+                roster=roster,
+                reads=reads,
+            ),
+            snapshot=snapshot,
+            actor=self.actor,
+            context=context,
+            roster=roster,
+            reads=reads,
+        )
+        estimate = _pick(estimates, SIPHON.key)
+        self.assertAlmostEqual(_deltas(estimate, self.enemy)["mp"], -5.0)
+        self.assertAlmostEqual(_deltas(estimate, second)["mp"], -5.0)
+        self.assertAlmostEqual(_deltas(estimate, self.actor)["mp"], -2.0)
+
+    def test_a_health_drain_credits_only_the_projected_loss(self):
+        # The actor starts ten points below its maximum, so a five-point health
+        # drain against a healthy recipient credits five. Against a recipient
+        # the same action has already emptied, the drain removes nothing and so
+        # credits nothing at all.
+        _set(self.actor, "hp", 40, current=30)
+        _set(self.actor, "agility", 90)
+        _set(self.enemy, "defense", 0)
+        drained = self._plan(BLOOD, (self.enemy,), ((self.enemy,), (self.enemy,)))
+        self.assertAlmostEqual(_deltas(drained, self.actor)["hp"], 5.0)
+        self.assertAlmostEqual(
+            _recipient(drained, self.enemy).damage, 45.15 + 5.0
+        )
+        _set(self.enemy, "hp", 2, current=2)
+        spent = self._plan(BLOOD, (self.enemy,), ((self.enemy,), (self.enemy,)))
+        self.assertNotIn("hp", _deltas(spent, self.actor))
+        self.assertAlmostEqual(_recipient(spent, self.enemy).damage, 2.0)
+        # Nothing was removed, so nothing was credited: the actor has no
+        # health projection in this plan at all.
+        identities = {item.identity for item in spent.recipients}
+        self.assertNotIn(stable_identity(self.actor), identities)
+
+    def test_a_same_recipient_heal_gets_no_fresh_allowance(self):
+        # The restoration is staged against the recipient's *pre-action* gap, so
+        # an enemy at full health stages nothing even though the same action
+        # damages it first -- the nominal heal never becomes a healing point.
+        _owned(self.actor, FOE_MEND.key)
+        _set(self.actor, "agility", 90)
+        estimate = _widest(_estimate(self.actor, (self.enemy,)), FOE_MEND.key)
+        projection = _recipient(estimate, self.enemy)
+        self.assertGreater(projection.damage, 0.0)
+        self.assertEqual(projection.healing, 0.0)
+        self.assertGreater(projection.nominal_healing, 0.0)
+
+    def test_the_cost_feature_spans_every_charged_pool(self):
+        # Two charged pools make the feature their mean: ten of twenty mana and
+        # four of twenty stamina is 0.35. A pool holding nothing contributes
+        # zero rather than an infinite fraction, so the same row over an empty
+        # stamina pool is 0.25.
+        measured = self._plan(COSTLY, (self.enemy,), ((self.enemy,),))
+        self.assertAlmostEqual(measured.cost, (0.5 + 0.2) / 2)
+        _set(self.actor, "sp", 20, current=0)
+        empty = self._plan(COSTLY, (self.enemy,), ((self.enemy,),))
+        self.assertAlmostEqual(empty.cost, 0.5 / 2)
+
+    def test_an_unclassified_own_side_outcome_is_refused(self):
+        # Revoking grants from the actor's own side takes something away, and
+        # this model does not know that class's outcome: the plan is refused
+        # rather than valued at zero.
+        estimate = self._plan(
+            STRIPPED, (self.enemy,), ((self.enemy,), (self.actor,))
+        )
+        self.assertIsInstance(estimate, InvalidEstimate)
+        self.assertEqual(
+            estimate.reason, InvalidEstimateReason.UNSUPPORTED_HARMFUL_OUTCOME
+        )
+        self.assertIn("friendly recipient", estimate.detail)
+
+    def test_cleansing_a_hostile_recipient_is_refused(self):
+        # A cleanse removes its recipient's debuffs, which on a hostile
+        # recipient hands the enemy a benefit the estimate cannot value.
+        estimate = self._plan(
+            PURGED, (self.enemy,), ((self.enemy,), (self.enemy,))
+        )
+        self.assertIsInstance(estimate, InvalidEstimate)
+        self.assertIn("hostile recipient", estimate.detail)
 
 
 class EstimationIntegrationTests(EvenniaTestCase):
