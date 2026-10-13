@@ -3,10 +3,11 @@
 Everything here stages through the resolver's commit semantics: the handler
 computes hit and damage at staging time and returns pending effects whose
 closures are the only writers. The module consumes the rulebook and the
-read-only stat helpers owned by :mod:`world.rules.combat.battlefield`.
+read-only stat helpers owned by :mod:`world.rules.combat.battlefield`, and the
+scalar arithmetic it stages is the shared expression in
+:mod:`world.rules.combat.scalars` -- the same one effect estimation calls.
 """
 
-from math import floor as math_floor
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
@@ -24,16 +25,22 @@ from world.rules.buffs import (
     _active_buff_instances,
 )
 from world.rules.combat.battlefield import (
-    COMBAT_YAML,
     _adjusted_attack,
     _adjusted_defense,
     _max_hp,
+)
+from world.rules.combat.scalars import (
+    damage_multiplier,
+    damage_rider,
+    hit_margin,
+    nonlethal_projection,
+    strike_amount,
+    strike_lands,
 )
 from world.rules.combat_modifiers import adjusted_agility, evaluate_combat_modifiers
 from world.rules.action_evidence import has_action_evidence
 from world.rules.dice import roll_d100
 from world.rules.mp_flow import apply_mp_change
-from world.rules.progression import scaled_magnitude
 from world.rules.state_reactions import dispatch_outcome_reaction
 from world.rules.target_facts import matches_target_predicate
 from world.skills.effects import (
@@ -80,12 +87,8 @@ def _extract_damage_policy(event_context: dict[str, Any] | None) -> DamagePolicy
 
 
 def _roll_multiplier(raw_roll: int, margin: float) -> float:
-    damage = COMBAT_YAML["damage"]
-    if raw_roll == 100:
-        return float(damage["crit_multiplier"])
-    if margin >= damage["solid_hit_margin"]:
-        return float(damage["solid_hit_multiplier"])
-    return float(damage["base_multiplier"])
+    """Return one strike's rulebook multiplier (the shared scalar expression)."""
+    return damage_multiplier(raw_roll, margin)
 
 
 def _to_hit(
@@ -93,18 +96,21 @@ def _to_hit(
     defender: Any,
     raw_roll: int,
 ) -> tuple[bool, float]:
+    """Return one strike's ``(landed, margin)`` pair.
+
+    The two agility terms come from the live adjusted-agility path and the
+    attacker's accuracy bundle bonus, and the margin itself is the shared
+    scalar expression settlement and estimation both read.
+    """
     attacker_mods = evaluate_combat_modifiers(attacker)
     defender_mods = evaluate_combat_modifiers(defender)
-    attacker_agility = adjusted_agility(attacker, attacker_mods)
-    defender_agility = adjusted_agility(defender, defender_mods)
-    attack_score = (
-        raw_roll + attacker_agility + attacker_mods.get("accuracy", 0)
+    margin = hit_margin(
+        raw_roll,
+        attacker_agility=adjusted_agility(attacker, attacker_mods),
+        attacker_accuracy=attacker_mods.get("accuracy", 0),
+        defender_agility=adjusted_agility(defender, defender_mods),
     )
-    threshold = (
-        COMBAT_YAML["to_hit"]["defender_constant"] + defender_agility
-    )
-    margin = attack_score - threshold
-    return margin >= 0, margin
+    return strike_lands(margin), margin
 
 
 def _parse_damage_effect(effect_id: str) -> DamageEffect:
@@ -142,9 +148,7 @@ def _apply_hp_delta_nonlethal(entity: Any, delta: int) -> None:
     """
     trait = entity.traits.hp
     current = _stored_trait_value(trait)
-    projected = current + delta
-    if current > 0 and projected <= 0:
-        projected = 1
+    projected = nonlethal_projection(current=current, loss=-delta)
     if hasattr(trait, "current"):
         trait.current = projected
     else:
@@ -172,9 +176,10 @@ def _handle_damage(
     inside the same commit, so the in-round initiative, targeting, overwhelm,
     and terminal consumers observe the knockout through the shared predicate.
 
-    The final per-target amount is scaled by ``scaled_magnitude`` and clamped
-    at the unscaled ``combat.yaml`` damage floor (the floor itself is never
-    scaled, so even a 1/4 cast lands its minimum hit).
+    The final per-target amount is the shared scalar strike amount of
+    :mod:`world.rules.combat.scalars`: scaled by the authored cast magnitude
+    and clamped at the unscaled ``combat.yaml`` damage floor (the floor itself
+    is never scaled, so even a 1/4 cast lands its minimum hit).
     """
     school = _parse_damage_effect(effect_id).school
     attack_key = "atk_phys" if school == "physical" else "magic_power"
@@ -184,7 +189,6 @@ def _handle_damage(
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
     now = event_context.get("now") if event_context is not None else None
-    floor = int(COMBAT_YAML["damage"]["floor"])
     source_tier = "學徒"
     resolved = event_context.get("resolved_effect") if event_context is not None else None
     source_skill = getattr(resolved, "source_skill", None)
@@ -238,12 +242,15 @@ def _handle_damage(
                     matched_mult = 1.0
                     defense = _adjusted_defense(target)
                     max_hp_frac = 0.0
-                attack_part = round(attack * multiplier * coefficient * matched_mult)
-                post_defense = attack_part - defense
-                rider = math_floor(round(_max_hp(target) * max_hp_frac, 6))
-                base_amount = int(max(post_defense + rider, floor))
-                amount = max(scaled_magnitude(base_amount, scale), floor)
-                amount = int(amount)
+                amount = strike_amount(
+                    attack=attack,
+                    multiplier=multiplier,
+                    coefficient=coefficient,
+                    defense=defense,
+                    rider=damage_rider(_max_hp(target), max_hp_frac),
+                    matched_multiplier=matched_mult,
+                    scale=scale,
+                )
 
             residual = amount
             planned_diverts: list[tuple[Any, int, str, str | None, str | None]] = []

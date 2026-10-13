@@ -14,7 +14,11 @@ from typing import Any
 import yaml
 
 from world.rules.action import ActionRequest, _stored_trait_value
-from world.rules.combat_modifiers import evaluate_combat_modifiers
+from world.rules.combat_modifiers import (
+    attack_with_bundle,
+    defense_with_bundle,
+    evaluate_combat_modifiers,
+)
 from world.rules.dice import roll_d100
 from world.rules.event_log import EventLog
 from world.rules.items import ItemUseRequest
@@ -160,19 +164,23 @@ def _adjusted_attack(entity: Any, attack_key: str) -> float:
     The ``atk_phys`` bonus enters only physical attacks, the ``magic_power``
     bonus (mage robes, staves, magic swords) only the magic school, each
     matching the stat's role in the damage formula; neither school receives
-    the other stat's adjustment.
+    the other stat's adjustment. The fold is
+    :func:`world.rules.combat_modifiers.attack_with_bundle`, so a reader that
+    already holds the effective stat applies the identical arithmetic.
     """
-    attack = float(entity.skills.effective_value(attack_key))
-    if attack_key not in {"atk_phys", "magic_power"}:
-        return attack
-    return attack + evaluate_combat_modifiers(entity).get(attack_key, 0)
+    return attack_with_bundle(
+        float(entity.skills.effective_value(attack_key)),
+        evaluate_combat_modifiers(entity),
+        attack_key,
+    )
 
 
 def _adjusted_defense(entity: Any) -> float:
     """Return effective defense plus the flat ``defense`` bundle bonus."""
-    return float(entity.skills.effective_value("defense")) + evaluate_combat_modifiers(
-        entity
-    ).get("defense", 0)
+    return defense_with_bundle(
+        float(entity.skills.effective_value("defense")),
+        evaluate_combat_modifiers(entity),
+    )
 
 
 def roll_initiative(battlefield: Battlefield) -> list[str]:
