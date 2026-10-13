@@ -12,12 +12,37 @@ candidate_budget: 256
 # (monster-ai-design section 1). No tier, species, danger grade, ordinary or
 # stronger rank, stat, or archetype supplies one, and a variant needs a value
 # only while its effective decision mode is utility.
-variant_intelligence: {}
+#
+# monster-ai-staged-activation enables this first named set. Each value is
+# authored from that variant's own bestiary lore -- the decision depth it
+# describes -- never from its threat tier, its rank, its combat numbers or the
+# archetype it binds to; the low-tier reef warden therefore outranks the
+# mid-tier trail hunter. `領群型` flock_leader coordinates the flock's calls
+# and presses a driver from different directions, `守礁型` reef_warden picks
+# and holds the narrowest reef mouth that shields its group, and `獵道型`
+# trail_hunter repeats one rule at the party's edge instead of choosing among
+# several. Every other registered variant authors neither field and keeps its
+# archetype's mode. The values themselves hold no statistic, resource, skill
+# or combat formula in place.
+variant_intelligence:
+  # 領群型: coordinates the flock and varies its own angle of attack.
+  flock_leader: 58
+  # 守礁型: reads the terrain and the group it is shielding, then holds ground.
+  reef_warden: 66
+  # 獵道型: repeats one probing rule (avoid a formed line) with the least
+  # decision depth of the set.
+  trail_hunter: 44
 
-# Optional per-variant mode override; an absent entry uses the resolved
-# archetype's decision_mode. Every production variant stays legacy until
-# monster-ai-staged-activation flips a named set.
-variant_decision_mode: {}
+# Per-variant mode override; an absent entry uses the resolved archetype's
+# decision_mode. This is the rollback seam: editing one entry back to `legacy`
+# and restarting restores the permanent legacy decision for that variant, with
+# no data migration and no database restore. The tuning fingerprint changes
+# with every value here, so recorded evidence from an older tuning cannot be
+# presented for this one.
+variant_decision_mode:
+  flock_leader: utility
+  reef_warden: utility
+  trail_hunter: utility
 
 archetypes:
   instinctive:
