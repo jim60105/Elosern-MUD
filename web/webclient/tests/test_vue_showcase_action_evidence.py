@@ -3,7 +3,9 @@
 The action-dock family contract of webclient-vue-03-showcase-action is
 implemented and verified in the Node/Vue world: the action-family Vitest
 suite, the deterministic component-coverage gate extended with the family's
-six required components, and the Storybook showcase in which every family
+required components (the room-action cards it once hosted left with
+exploration-room-actions for Core/ChoiceCard, Core/PlaceCard, and
+Core/QuestionCard), and the Storybook showcase in which every family
 component is registered as a documented story. ``covers_requirement`` can
 only attach to a Python ``test_*`` function, so this module executes those
 gates and asserts they pass. Following the B1 precedent, the
@@ -18,7 +20,7 @@ Test-to-requirement mapping:
   guidance line, the focused/disabled cells, the preserved ``action-`` /
   ``target-`` keys, the stable ``data-testid`` cells, the exact
   server-authored card shapes with no invented payload, and the
-  generating/ready, movable choice-point block are each asserted there),
+  generating/ready choice-point rows are each asserted there),
   ``test_component_coverage_gate_passes_with_action_family``, and
   ``test_action_family_stories_are_registered_in_showcase`` (the offline
   rendering of the showcase stories is additionally evidenced in the browser
@@ -43,33 +45,37 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 APP_ROOT = REPO_ROOT / "web/webclient-app"
 STORYBOOK_OUT = REPO_ROOT / ".storybook-out"
 
-# The six action-dock family components this change adds to the required
+# The action-dock family components this change adds to the required
 # component manifest (extend, don't restructure — B5 freezes the manifest).
+# The suggestion card family it once hosted (Action/OptionCard,
+# Action/ChoiceCardRow) and the AVG scene overview (Action/SceneOverview)
+# left with exploration-room-actions: the room-action cards now live in
+# Core/ChoiceCard and Core/PlaceCard, and the dream question in
+# Core/QuestionCard.
 ACTION_FAMILY_KEYS = (
     "Action/ActionDock",
     "Action/DockMenu",
     "Action/DockMenuItem",
-    "Action/OptionCard",
-    "Action/ChoiceCardRow",
 )
 
 # The exact showcase story registration for the action-dock family: the
 # built Storybook index.json entry id for every story file/story exported by
 # this change (title "Action/<Component>", deterministic story names).
 ACTION_FAMILY_STORY_IDS = {
+    "action-actiondock--combat-categories",
+    "action-actiondock--combat-disabled-command",
+    "action-actiondock--combat-dock",
+    "action-actiondock--combat-playback",
     "action-actiondock--degraded-empty-suggestions",
     "action-actiondock--exploration-dock",
+    "action-actiondock--exploration-root",
     "action-actiondock--generating-suggestions",
     "action-actiondock--unavailable-suggestions",
-    "action-choicecardrow--ready-row",
     "action-dockmenu--fixed-grid-frame",
     "action-dockmenu--target-frame",
     "action-dockmenuitem--default",
     "action-dockmenuitem--disabled",
     "action-dockmenuitem--focused",
-    "action-optioncard--freeform",
-    "action-optioncard--known",
-    "action-optioncard--known-with-hint",
 }
 
 
@@ -122,6 +128,10 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         change joins it at the manifest's refreeze at 42.
         The Core/CompanionLineup, Overlays/PartyDrawer, and Overlays/ObjectiveTracker
         keys join at the manifest refreeze at 44.
+        The AVG scene overview and the suggestion card family it hosted left
+        with exploration-room-actions, whose room-action cards landed in
+        Core/ChoiceCard and Core/PlaceCard and whose dream question added
+        Core/QuestionCard.
         """
         required = json.loads(
             (APP_ROOT / "component-manifest.json").read_text(encoding="utf-8")
@@ -190,9 +200,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The AVG message window (webclient-message-window-component),
                 # built and story-documented before C6c mounts it.
                 "Core/MessageWindow",
-                # The AVG scene overview (webclient-scene-overview-component),
-                # built and story-documented before C8b mounted it.
-                "Action/SceneOverview",
+                # The AVG scene overview (webclient-scene-overview-component)
+                # left with exploration-room-actions, as did the suggestion
+                # card family it hosted (OptionCard, ChoiceCardRow).
                 "Action/ExitCompass",
                 # The dialogue stage actor (webclient-dialogue-stage-actors), the
                 # standing portrait that wraps Core/ReferenceArtwork on the stage.
@@ -226,6 +236,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # World/QuestLog.
                 "World/QuestList",
                 "World/QuestDetail",
+                # The wait card's 進入夢境協作？ question joined with
+                # exploration-room-actions.
+                "Core/QuestionCard",
             },
         )
         result = run_node(["scripts/component-coverage.mjs"], timeout=120)
@@ -244,7 +257,12 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
         "webclient-component-showcase::the-action-dock-family-presents-a-finite-keyboard-and-pointer-actionable-contract"
     )
     def test_action_family_stories_are_registered_in_showcase(self):
-        """Every family component has a documented story in the built showcase."""
+        """Every family component has a documented story in the built showcase.
+
+        The family is the action-dock surface itself (ActionDock, DockMenu,
+        DockMenuItem) after exploration-room-actions retired OptionCard and
+        ChoiceCardRow into Core/ChoiceCard and Core/PlaceCard.
+        """
         with showcase_build_lock():
             self.assertTrue(
                 (STORYBOOK_OUT / "index.json").is_file(),
@@ -260,13 +278,12 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
             set(),
             "action-dock family stories missing from the showcase: " + ", ".join(sorted(missing)),
         )
-        # Every family story title resolves to the family's six components,
+        # Every family story title resolves to the family's three components,
         # so the coverage gate and the showcase agree on the family surface.
         family_titles = {entries[story_id]["title"] for story_id in ACTION_FAMILY_STORY_IDS}
         self.assertEqual(
             family_titles,
             {f"Action/{component}" for component in (
                 "ActionDock", "DockMenu", "DockMenuItem",
-                "OptionCard", "ChoiceCardRow",
             )},
         )
