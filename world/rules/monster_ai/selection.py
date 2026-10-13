@@ -112,6 +112,17 @@ def selection_seed_for(
     with slot zero and the snapshot's own read-only fingerprint, which is what
     makes repeated inspection reproducible while a real round never shares
     another slot's identity.
+
+    ``context_mode`` is deliberately NOT part of the encoded payload: the
+    requirement enumerates exactly the five inputs above, and the two modes
+    cannot currently collide because their round spaces are disjoint by
+    construction -- the session path numbers from its durable
+    ``rounds_elapsed + 1``, compression numbers its internal rounds from the
+    same base (each of them a real round of that encounter), and a bounded
+    ``run_battle`` encounter carries the canonical empty session id instead of
+    a durable one. A future change that reuses one round index across the two
+    modes must therefore bump :data:`SELECTION_SEED_VERSION` and add the mode
+    to the payload rather than rely on this note.
     """
     if scope is None:
         return selection_seed(

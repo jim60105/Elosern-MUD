@@ -53,13 +53,23 @@ from world.rules.combat import (
     run_round,
     stable_actor_id,
 )
-from world.rules.combat_session import engage, read_session, submit_player_action
+from world.rules.combat_session import (
+    engage,
+    read_session,
+    submit_opening_action,
+    submit_player_action,
+)
 from world.rules.combat_session.policies import _enemy_policy, _overwhelm_provider
 from world.rules.combat_session.records import CombatSessionRecord
 from world.rules.overwhelm import resolve_overwhelm
 from world.rules.monster_ai import (
+    CandidateIdentity,
+    CapabilityState,
     DecisionReads,
     DecisionScope,
+    ParticipantSnapshot,
+    PlanEstimate,
+    RecipientProjection,
     build_decision_snapshot,
     canonical_order,
     enumerate_candidates,
@@ -76,10 +86,15 @@ from world.rules.monster_ai import (
 from world.rules.monster_ai.estimation import InvalidEstimate
 from world.rules.monster_ai.trace import write_trace_report
 from world.rules.monster_ai.utility import (
+    NO_TARGET_PREFERENCE,
     MonsterAIStateError,
+    _plan_target_rank,
     attack_utility,
     normalized_ranks,
+    target_metric,
 )
+from world.rules.targeting import Relation
+from world.rules.traits import STATIC_KEYS
 from world.rules.monster_behaviour import (
     InvalidStateFallback,
     invalid_state_fallback,
@@ -787,6 +802,98 @@ class PreferenceTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertTrue(scored)
 
 
+class TargetMetricTests(unittest.TestCase):
+    """The target metric mirrors combat's capacity read, and its neutral case."""
+
+    @staticmethod
+    def _participant(*, hp=40.0, maximum=None, effective=10.0):
+        resources = {} if maximum is None else {"hp": (int(hp), maximum)}
+        return ParticipantSnapshot(
+            identity="dbref:3",
+            relation=Relation.ENEMY,
+            present=True,
+            in_range=True,
+            alive=True,
+            traits={"hp": hp},
+            effective_traits={key: effective for key in STATIC_KEYS},
+            resources=resources,
+            capability=CapabilityState(blocked_by_buff=False, actions_per_turn=1),
+            buffs=(),
+        )
+
+    @staticmethod
+    def _plan(identity, recipients):
+        return PlanEstimate(
+            identity=CandidateIdentity(identity, 1.0, ()), recipients=recipients
+        )
+
+    def test_the_power_metric_scales_the_effective_stats_by_the_capacity(self):
+        # Four traits of ten with a maximum of one hundred is 4000.
+        self.assertEqual(
+            target_metric(
+                self._participant(maximum=100), "highest_effective_power"
+            ),
+            4000.0,
+        )
+        self.assertEqual(
+            target_metric(self._participant(hp=25.0), "lowest_hp"), 25.0
+        )
+
+    def test_a_corrupt_capacity_never_inverts_the_comparison(self):
+        # combat._max_hp clamps a negative maximum at zero, so the metric is
+        # zero rather than a negative power that would reverse the ranks.
+        self.assertEqual(
+            target_metric(
+                self._participant(maximum=-5), "highest_effective_power"
+            ),
+            0.0,
+        )
+
+    def test_an_unreadable_capacity_falls_back_to_stored_hp(self):
+        # combat._max_hp falls back to the stored current value when no maximum
+        # is readable: twenty-five stored hp of forty effective power is 1000.
+        self.assertEqual(
+            target_metric(
+                self._participant(hp=25.0, maximum=None),
+                "highest_effective_power",
+            ),
+            1000.0,
+        )
+
+    def test_a_plan_with_no_hostile_recipient_takes_the_neutral_rank(self):
+        ally = RecipientProjection(
+            identity="dbref:4",
+            relation=Relation.ALLY,
+            damage=0.0,
+            healing=0.2,
+            nominal_damage=0.0,
+            nominal_healing=0.2,
+            finishing=0.0,
+        )
+        hostile = RecipientProjection(
+            identity="dbref:9",
+            relation=Relation.ENEMY,
+            damage=0.3,
+            healing=0.0,
+            nominal_damage=0.3,
+            nominal_healing=0.0,
+            finishing=0.0,
+        )
+        ranks = {"dbref:9": 1.0, "dbref:8": 0.0}
+        self.assertEqual(
+            _plan_target_rank(self._plan("t_sel_heal", (ally,)), ranks),
+            NO_TARGET_PREFERENCE,
+        )
+        # "No hostile target to prefer" is not "the worst target available".
+        self.assertNotEqual(NO_TARGET_PREFERENCE, 0.0)
+        self.assertEqual(
+            _plan_target_rank(self._plan("t_sel_strike", (hostile,)), ranks), 1.0
+        )
+        self.assertEqual(
+            _plan_target_rank(self._plan("t_sel_strike", (ally, hostile)), ranks), 1.0
+        )
+
+
 def _fake_field(actor, *others):
     """A two-team battlefield over in-memory fakes."""
     roster = {str(entity.key): entity for entity in (actor, *others)}
@@ -1186,6 +1293,60 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(_committed(self.monster, "mp"), before_mp - 4)
         self.assertLess(_committed(self.monster, "hp"), 300)
+
+    def test_the_session_opening_compression_numbers_its_internal_rounds(self):
+        # The end-to-end session overwhelm path: the sole production requester
+        # of compression resolves each internal round under the session's own
+        # identity, numbered from the record's committed rounds, in the
+        # overwhelm context mode.
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        recorded = []
+        real = decision_scope
+
+        def recording(scope):
+            recorded.append(
+                (
+                    scope.session_id,
+                    scope.round_index,
+                    scope.slot_index,
+                    scope.context_mode,
+                )
+            )
+            return real(scope)
+
+        verdicts = []
+
+        def verdict(battlefield):
+            # The opening's own dispatch judgement, the compression's initial
+            # verdict and its first-round verdict all decide for the party;
+            # the second round's verdict ends the compression, so exactly two
+            # internal rounds are resolved.
+            verdicts.append(1)
+            return "party" if len(verdicts) < 4 else "foes"
+
+        with (
+            patch("world.rules.combat.rounds.decision_scope", recording),
+            patch("world.rules.combat_session.rounds.classify_overwhelm", verdict),
+            patch(
+                "world.rules.combat_session.rounds.commanded_damage_reaches_enemy",
+                return_value=True,
+            ),
+            patch("world.rules.overwhelm.classify_overwhelm", verdict),
+            patch("world.rules.overwhelm.combat.is_battle_over", return_value=False),
+            patch("world.rules.combat.rounds.roll_d100", return_value=95),
+            patch("world.rules.combat.damage.roll_d100", return_value=95),
+            patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
+        ):
+            submit_opening_action(self.player, PLAYER_HIT.key, [self.monster])
+        compressed = [item for item in recorded if item[3] == "overwhelm"]
+        self.assertTrue(compressed)
+        self.assertEqual({item[0] for item in compressed}, {session_id})
+        self.assertEqual({item[1] for item in compressed}, {1, 2})
+        # These fixtures grant one action per turn, so each compressed round
+        # resolves the actor's first slot; the multi-slot numbering is pinned
+        # by ExecutionScopeTests, which provisions several slots explicitly.
+        self.assertEqual({item[2] for item in compressed}, {0})
 
     def test_a_fault_after_the_utility_action_rolls_back_everything(self):
         # The utility action really writes (the monster pays its MP and damages

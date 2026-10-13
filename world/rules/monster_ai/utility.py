@@ -82,6 +82,12 @@ class MonsterAIStateError(ValueError):
     """
 
 
+#: The target rank of a plan whose projection reaches no hostile recipient.
+#: A normalized rank's neutral middle, not its floor: such a plan is outside
+#: the target bias's scope rather than the worst possible target.
+NO_TARGET_PREFERENCE = 0.5
+
+
 @dataclass(frozen=True, slots=True)
 class ScoredCandidate:
     """One legal candidate, its utility score and the contributions behind it.
@@ -315,19 +321,32 @@ def target_metric(participant: ParticipantSnapshot, strategy: str) -> float:
     ``lowest_hp`` reads the decision's literal stored hp projection;
     ``highest_effective_power`` reads the four effective static traits scaled
     by the participant's maximum hp -- the same expression combat's
-    ``effective_power()`` computes, taken from the snapshot's own no-create
-    projections so a decision never reads a live entity to rank a target.
+    ``effective_power()`` computes, capacity included, taken from the
+    snapshot's own no-create projections so a decision never reads a live
+    entity to rank a target.
     """
     if strategy == "lowest_hp":
         return _finite_trait(participant, "hp")
     if strategy == "highest_effective_power":
-        maximum = participant.resources.get("hp")
-        capacity = 0.0 if maximum is None else float(maximum[1])
         return (
             sum(_finite_trait(participant, key, effective=True) for key in STATIC_KEYS)
-            * capacity
+            * _projected_max_hp(participant)
         )
     raise ValueError(f"unknown target strategy: {strategy!r}")
+
+
+def _projected_max_hp(participant: ParticipantSnapshot) -> float:
+    """Return one participant's maximum hp as combat's own reader reports it.
+
+    ``world.rules.combat._max_hp`` clamps a stored maximum at zero and falls
+    back to the stored current value when no maximum is readable; a corrupt
+    gauge must therefore never invert a power comparison here either (a
+    negative capacity would flip the metric's sign and reverse the ranks).
+    """
+    maximum = participant.resources.get("hp")
+    if maximum is None:
+        return max(_finite_trait(participant, "hp"), 0.0)
+    return max(float(maximum[1]), 0.0)
 
 
 def _target_metric_higher_is_better(strategy: str) -> bool:
@@ -363,8 +382,10 @@ def _plan_target_rank(
     The estimate's own recipient projections decide which of the plan's
     recipients are hostile, so this reads the routing settlement will actually
     apply rather than the submitted roster. A plan whose projection reaches no
-    hostile recipient -- which the candidate producer only admits for a
-    self-bound damage skill -- carries no target preference at all.
+    hostile recipient carries no target preference at all: the neutral middle
+    of the normalized scale, never its floor, because "this plan has no
+    hostile target to prefer" is not the same claim as "its target is the
+    worst available" and a decision must not invent the latter.
     """
     ranks = [
         target_ranks[recipient.identity]
@@ -372,7 +393,7 @@ def _plan_target_rank(
         if recipient.relation is Relation.ENEMY and recipient.identity in target_ranks
     ]
     if not ranks:
-        return 0.0
+        return NO_TARGET_PREFERENCE
     return sum(ranks) / len(ranks)
 
 

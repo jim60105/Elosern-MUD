@@ -363,7 +363,11 @@ def run_battle(
 
     The encounter has no persistent session, so every round carries the
     canonical empty session id and its own real round number: a decision made
-    in round two is never the same decision as round one.
+    in round two is never the same decision as round one. This numbering is
+    zero-based while the persistent session path numbers from its durable
+    ``rounds_elapsed + 1``; the two conventions coexist deliberately and can
+    never collide, because the empty session id is a different encounter
+    namespace from a durable one (``combat_session.rounds._submit_request``).
     """
     if max_rounds < 0:
         raise ValueError("max_rounds must be non-negative")
