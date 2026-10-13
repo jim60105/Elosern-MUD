@@ -14,7 +14,7 @@ from typeclasses.monsters import Monster
 from world.observability import log_info
 from world.rules.action import _stored_trait_value
 from world.rules.combat import Battlefield
-from world.rules.combat_session.ai_tuning import discard_session_ai_tuning
+from world.rules.combat_session.observations import discard_session_memory
 from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.records import (
@@ -74,7 +74,11 @@ def clear_session(
     actor.db.active_combat = None
     actor.ndb.action_context = None
     if session_id is not None:
-        discard_session_ai_tuning(session_id)
+        # Terminal cleanup is a commit-only request (monster-ai-observation-
+        # lifecycle): the session's observation memory and its recorded tuning
+        # are discarded once the outermost transaction commits, so a failed
+        # or rolled-back settlement keeps both.
+        discard_session_memory(session_id)
     unregister_active_battlefield(actor)
     if battlefield is not None:
         for key in list(battlefield.roster):

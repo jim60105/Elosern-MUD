@@ -1235,11 +1235,19 @@ def _utility_action(
     participants = tuple(
         member for member in battlefield.roster.values() if member is not entity
     )
+    observations: tuple[Any, ...] = ()
+    if scope is not None and scope.session_id:
+        # Local import: the session-owned observation memory depends on this
+        # module's tuning, so the dependency may only be resolved at call time.
+        from world.rules.combat_session.observations import project_observations
+
+        observations = project_observations(scope.session_id, battlefield)
     snapshot = build_decision_snapshot(
         entity,
         context,
         scope=decision_scope,
         participants=participants,
+        observations=observations,
         context_mode="normal" if scope is None else scope.context_mode,
         reads=reads,
     )
