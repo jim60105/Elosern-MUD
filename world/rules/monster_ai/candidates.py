@@ -353,20 +353,6 @@ def _routed_signature(proposal: _Proposal) -> tuple[tuple[str, ...], ...] | None
     )
 
 
-def canonical_plan(candidates: CandidateSet) -> PlannedAction | None:
-    """Return the one plan this bounded set hands on, or ``None``.
-
-    The canonical head of the ring order is the decision's plan. An empty legal
-    set returns ``None``: the decision proposes no action and never forces an
-    attack or falls back to the legacy body. Scoring and sampling are a later
-    slice that replaces (never duplicates) this head choice; the function
-    exists so the no-action boundary is expressible and testable now.
-    """
-    if not candidates.candidates:
-        return None
-    return candidates.candidates[0].plan
-
-
 def enumerate_candidates(
     snapshot: DecisionSnapshot,
     *,

@@ -57,29 +57,40 @@ def _enemy_policy(
     entity: Any,
     battlefield: Battlefield,
     record: CombatSessionRecord,
+    *,
+    scale: float = 1.0,
 ):
     """Return one deterministic enemy action with the session's combat context.
 
     ``monster_behaviour_policy`` falls back to ``default_attack_policy`` for
     non-Monster combatants, so a guild-examination NPC opponent (which has no
-    ``threat_tier``) still acts through its profile skills. The request context
-    is rebuilt from the session record, so examination opponents fight with
-    ordinary lethal semantics inside the simulated battle.
+    ``threat_tier``) still acts through its profile skills. The settlement
+    context is built from the session record BEFORE selection and handed to
+    the decision, so examination opponents fight with ordinary lethal
+    semantics inside the simulated battle and an overwhelm round keeps the
+    companion non-lethal policy while it is being decided.
 
     The decision boundary is also where one monster's immutable, startup-
     validated AI tuning is recorded for its session (nothing durable, nothing
     per-entity): the recording is what a terminal cleanup or a restarted
-    process later replaces.
+    process later replaces. The recorded resolution is what the decision
+    scores against, so the selection seed's configuration fingerprint is the
+    tuning this session actually recorded.
+
+    The decision's own request is returned unchanged: its ``targets`` keep the
+    authored representation (a recognized AREA shorthand stays a string) and
+    its ``scale`` is preserved, because the supplied context already is the
+    session's settlement context. ``scale`` is the authored cast magnitude the
+    decision is authorized to plan with; production passes the plain magnitude
+    (``1.0``) until a monster casts scaled.
     """
-    record_session_ai_tuning(record.session_id, entity)
-    request = monster_behaviour_policy(entity, battlefield)
-    if request is None:
-        return None
-    return ActionRequest(
-        actor=request.actor,
-        skill_key=request.skill_key,
-        targets=list(request.targets),
+    decision = record_session_ai_tuning(record.session_id, entity)
+    return monster_behaviour_policy(
+        entity,
+        battlefield,
         context=_context_for(battlefield, record),
+        scale=scale,
+        decision=decision,
     )
 
 

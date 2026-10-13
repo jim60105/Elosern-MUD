@@ -422,6 +422,7 @@ def _resolve_overwhelm_raw(
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
     first_actor: str | None = None,
+    decision_scope_base: "combat.ExecutionScopeBase | None" = None,
 ) -> tuple[str | None, str | None, list[EventLog], int, tuple[EventLog, ...]]:
     """Resolve and expose raw logs, the round-1 slice, and round count."""
     if max_rounds < 0:
@@ -453,6 +454,18 @@ def _resolve_overwhelm_raw(
             # Later rounds act on ordinary initiative, so an explicit
             # first_actor=None is what every later round forwards.
             round_kwargs["first_actor"] = first_actor if rounds == 0 else None
+        if decision_scope_base is not None:
+            # Each compressed round IS an actual round of this encounter: it
+            # gets its own round index (the base's first round plus this one's
+            # offset) and the overwhelm context mode, so the internal rounds
+            # never share a decision scope even though one provider object
+            # serves them all. Forwarded only when supplied, like every other
+            # policy kwarg here, so a default-mode call observes the
+            # pre-parameter call signature byte-identically.
+            round_kwargs["decision_scope_base"] = decision_scope_base.at_round(
+                decision_scope_base.round_index + rounds,
+                context_mode="overwhelm",
+            )
         round_logs = combat.run_round(battlefield, action_provider, **round_kwargs)
         if rounds == 0:
             round1_window = tuple(round_logs)
@@ -477,6 +490,7 @@ def resolve_overwhelm(
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
     first_actor: str | None = None,
+    decision_scope_base: "combat.ExecutionScopeBase | None" = None,
 ) -> OverwhelmResult:
     """Resolve a currently overwhelming encounter through the normal loop.
 
@@ -506,6 +520,10 @@ def resolve_overwhelm(
     default-mode call's call into ``run_round()`` stays byte-identical to
     the pre-parameter signature.
     """
+    # ``decision_scope_base`` (monster-ai-attack-selection) is the encounter
+    # identity the compressed rounds are numbered from: round i of this
+    # compression resolves under the base's first round plus i, in the
+    # overwhelm context mode, so each internal round's decisions are distinct.
     initial, verdict_after, raw_logs, rounds, round1_window = (
         _resolve_overwhelm_raw(
             battlefield,
@@ -516,6 +534,7 @@ def resolve_overwhelm(
             journal_sink=journal_sink,
             notifications_sink=notifications_sink,
             first_actor=first_actor,
+            decision_scope_base=decision_scope_base,
         )
     )
     event_logs = (

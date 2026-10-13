@@ -51,7 +51,6 @@ from world.rules.monster_ai import (
     DecisionReads,
     DecisionScope,
     build_decision_snapshot,
-    canonical_plan,
     enumerate_candidates,
     roster_index,
     stable_identity,
@@ -880,7 +879,7 @@ class CandidateBudgetTests(unittest.TestCase):
         _owned(self.actor, HEAL_SELF.key)
         result = _enumerate(self.actor, self.enemies)
         self.assertEqual(result.candidates, ())
-        self.assertIsNone(canonical_plan(result))
+        self.assertEqual(result.plans, ())
         self.assertEqual(result.examined, 0)
 
     @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
@@ -890,7 +889,7 @@ class CandidateBudgetTests(unittest.TestCase):
         self.assertEqual(
             result.plans[0].target_ids, (stable_identity(self.enemies[0]),)
         )
-        self.assertIsNotNone(canonical_plan(result))
+        self.assertEqual(len(result.plans), 1)
 
     @covers_requirement("monster-ai-legal-candidates::proposal-work-is-deterministically-bounded")
     def test_enumeration_draws_no_selection_or_combat_dice(self):
@@ -1121,8 +1120,8 @@ class CandidateRestrictionTests(EvenniaTestCase):
         self._own(MAGIC.key)
         target = self._participant("t_cand_target")
         result = self._enumerate((target,))
-        plan = canonical_plan(result)
-        self.assertIsNotNone(plan)
+        self.assertTrue(result.plans)
+        plan = result.plans[0]
         context = BattlefieldActionContext(self._field(target))
         before = self._reloaded_hp(target)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):

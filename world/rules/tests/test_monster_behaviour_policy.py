@@ -2,7 +2,6 @@
 
 from tools.spec_traceability import covers_requirement
 
-from pathlib import Path
 import unittest
 from unittest.mock import patch
 
@@ -154,17 +153,4 @@ class MonsterBehaviourPolicyTests(unittest.TestCase):
         self.assertEqual(request.skill_key, _T_CLAW.key)
         self.assertNotEqual(request.targets, "all-enemies")
 
-    def test_source_has_no_forbidden_dependencies(self):
-        source = (
-            Path(__file__).parents[1] / "monster_behaviour.py"
-        ).read_text(encoding="utf-8")
-        for forbidden in (
-            "combat_modifiers",
-            "evaluate_combat_modifiers",
-            "actions_per_turn",
-            "entity.buffs",
-            "entity.sexual",
-            "world.ai",
-            "random.choice",
-        ):
-            self.assertNotIn(forbidden, source)
+

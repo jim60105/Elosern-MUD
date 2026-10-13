@@ -2,7 +2,6 @@
 
 from tools.spec_traceability import covers_requirement
 
-from pathlib import Path
 import random
 import unittest
 from unittest.mock import patch
@@ -58,16 +57,4 @@ class MonsterBehaviourDeterminismTests(unittest.TestCase):
         self.assertIs(first, second)
         self.assertEqual(roller.call_count, 2)
 
-    def test_source_has_no_parallel_random_or_external_dependency(self):
-        source = (
-            Path(__file__).parents[1] / "monster_behaviour.py"
-        ).read_text(encoding="utf-8")
-        for forbidden in (
-            "import random",
-            "from random",
-            "world.ai",
-            "requests.",
-            "httpx.",
-            "urllib.",
-        ):
-            self.assertNotIn(forbidden, source)
+

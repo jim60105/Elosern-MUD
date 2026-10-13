@@ -5,9 +5,12 @@ snapshot and the shared deterministic legality every planned action passes
 before it is scored -- the bounded candidate enumeration that expands the owned
 hostile damage skills into legal, deduplicated, budgeted proposals, and the
 analytic effect estimation that projects each candidate's health effects with
-settlement's own arithmetic. Utility scoring and sampling are later slices and
-are not implemented here, so every production variant stays ``legacy`` and the
-legacy decision body in :mod:`world.rules.monster_behaviour` is unchanged.
+settlement's own arithmetic, and the utility decision itself: the bounded score
+of every supported candidate and the stable, independently seeded softmax
+sampling that selects one. Every production variant is still authored
+``legacy``, so the legacy decision body in
+:mod:`world.rules.monster_behaviour` returns exactly what it returned before;
+activating a variant is the separate staged-activation change's decision.
 
 - :mod:`world.rules.monster_ai.models` -- the immutable models and the
   read-only snapshot fingerprint.
@@ -18,6 +21,12 @@ legacy decision body in :mod:`world.rules.monster_behaviour` is unchanged.
   semantically legal damage candidates.
 - :mod:`world.rules.monster_ai.estimation` -- the signed, bounded health
   features of one candidate plan, with no dice, handlers, costs or events.
+- :mod:`world.rules.monster_ai.utility` -- the bounded utility score of one
+  candidate, with its three stable preference ranks.
+- :mod:`world.rules.monster_ai.selection` -- canonical ordering, the stable
+  softmax and the versioned execution-identity seed.
+- :mod:`world.rules.monster_ai.trace` -- the opt-in, normalized decision
+  trace.
 """
 
 from world.rules.monster_ai.candidates import (
@@ -28,7 +37,6 @@ from world.rules.monster_ai.candidates import (
     CandidateRejection,
     CandidateSet,
     SkillObservation,
-    canonical_plan,
     enumerate_candidates,
 )
 from world.rules.monster_ai.estimation import (
@@ -63,6 +71,27 @@ from world.rules.monster_ai.snapshot import (
     DecisionReads,
     build_decision_snapshot,
 )
+from world.rules.monster_ai.selection import (
+    SELECTION_SEED_VERSION,
+    canonical_order,
+    select_candidate,
+    selection_seed,
+    selection_seed_for,
+    selection_temperature,
+    softmax_probabilities,
+)
+from world.rules.monster_ai.trace import (
+    DecisionTrace,
+    TracePlan,
+    write_trace_report,
+)
+from world.rules.monster_ai.utility import (
+    MonsterAIStateError,
+    ScoredCandidate,
+    attack_utility,
+    normalized_ranks,
+    score_candidates,
+)
 
 __all__ = [
     "ApproximationClass",
@@ -77,6 +106,7 @@ __all__ = [
     "DecisionReads",
     "DecisionScope",
     "DecisionSnapshot",
+    "DecisionTrace",
     "DivertLimit",
     "EffectDirection",
     "EstimateSet",
@@ -84,6 +114,7 @@ __all__ = [
     "HealthFeature",
     "InvalidEstimate",
     "InvalidEstimateReason",
+    "MonsterAIStateError",
     "OwnedSkillSnapshot",
     "ParticipantSnapshot",
     "PlanVerdict",
@@ -92,13 +123,25 @@ __all__ = [
     "PublicObservation",
     "RecipientProjection",
     "ResourceProjection",
+    "SELECTION_SEED_VERSION",
+    "ScoredCandidate",
     "SkillObservation",
+    "TracePlan",
+    "attack_utility",
     "build_decision_snapshot",
-    "canonical_plan",
+    "canonical_order",
     "enumerate_candidates",
     "estimate_candidates",
     "estimate_plan",
+    "normalized_ranks",
     "roster_index",
+    "score_candidates",
+    "select_candidate",
+    "selection_seed",
+    "selection_seed_for",
+    "selection_temperature",
+    "softmax_probabilities",
     "stable_identity",
     "validate_plan",
+    "write_trace_report",
 ]

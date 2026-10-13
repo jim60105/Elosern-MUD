@@ -14,7 +14,7 @@ from world.observability import log_info
 from world.rules import combat
 from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
 from world.rules.action_preview import revalidate_submission
-from world.rules.combat import Battlefield, run_round
+from world.rules.combat import Battlefield, ExecutionScopeBase, run_round
 from world.rules.combat_beats import RoundRecord, capture_round_hp
 from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
@@ -397,6 +397,16 @@ def _submit_request(
             # keeps per-round agency. The session's simulated/nonlethal
             # policy threads into both entries so upkeep-settled ticks honor
             # the same credit rules as direct damage (fix-dot-kill-credit D4).
+            # Both entries carry the encounter's real decision identity
+            # (monster-ai-attack-selection): the durable session id and the
+            # actual round number this submission resolves, counted from the
+            # record's committed rounds. The ordinary path settles exactly one
+            # round; overload compression numbers each internal round from the
+            # same base, so no two real rounds share a decision scope.
+            scope_base = ExecutionScopeBase(
+                session_id=record.session_id,
+                round_index=record.rounds_elapsed + 1,
+            )
             if opening == "overwhelm":
                 provider = _overwhelm_provider(actor, request, battlefield, record)
                 result = resolve_overwhelm(
@@ -411,6 +421,7 @@ def _submit_request(
                     journal_sink=item_journals,
                     notifications_sink=grant_notifications,
                     first_actor=first_actor,
+                    decision_scope_base=scope_base,
                 )
                 logs = result.event_logs
                 gained = result.rounds_elapsed
@@ -430,6 +441,7 @@ def _submit_request(
                     journal_sink=item_journals,
                     notifications_sink=grant_notifications,
                     first_actor=first_actor,
+                    decision_scope_base=scope_base,
                 )
                 gained = 1
                 # Boundary event for a committed ordinary round only: the

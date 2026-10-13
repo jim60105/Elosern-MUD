@@ -374,6 +374,24 @@ DEFEAT_ADULT_SCENES = _env_typed(
 )
 
 ######################################################################
+# Monster AI invalid-state behaviour (monster-ai-attack-selection)
+######################################################################
+
+# What one typed invalid runtime monster-AI state resolves to. The product's
+# behaviour is "legacy": the decision falls back to the legacy body, which
+# resolves a repaired-but-unusable stored binding through its tier default
+# instead of failing on it. "none" is the diagnostic setting a manual
+# investigation selects: the decision proposes nothing rather than acting on a
+# state it could not validate. Only these two values are meaningful; anything
+# else keeps the product default. Deliberately NOT environment-overridable:
+# this is a debugging switch for one operator's session, not a deployment
+# knob, and an inherited environment must not silently change how a monster
+# resolves an invalid decision (settings-environment-overrides).
+# Consumed through world.rules.monster_behaviour.invalid_state_fallback(),
+# which reads it at call time so a session can be switched without a restart.
+MONSTER_AI_INVALID_STATE_FALLBACK = "legacy"
+
+######################################################################
 # Deterministic art-assets backend (art-assets)
 ######################################################################
 
