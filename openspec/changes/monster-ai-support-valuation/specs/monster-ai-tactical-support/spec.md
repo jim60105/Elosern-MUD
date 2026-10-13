@@ -20,7 +20,7 @@ Healing SHALL use shared magnitude, potency, proficiency, scale and conditional 
 
 #### Scenario: HP cost before self heal
 - **WHEN** a full-HP actor pays HP and then self-heals
-- **THEN** benefit reflects missing HP after payment rather than ignoring payment
+- **THEN** the projection reflects the actor's missing HP after that payment (the payment is a real projected own-side loss) rather than being evaluated as if the actor still held it, while settlement's own staging-time restoration cap still applies so no recovery is credited that the resolver would not apply
 
 #### Scenario: Conditional combined effect
 - **WHEN** ordered damage, drain and healing can miss or exceed remaining capacity
