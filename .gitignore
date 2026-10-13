@@ -105,6 +105,12 @@ tmp/
 .superpowers/
 *.swp
 
+# Manual monster-AI evidence scratch (the default output directory of
+# tools/monster_ai_manual_reports.py, plus its isolated scratch databases):
+# per-run acceptance artifacts stay local; only the deliberately published
+# copies under docs/development/monster-ai-manual-evidence/ are committed.
+.var/
+
 # ==========================================
 # IDEs & System Files
 # ==========================================
