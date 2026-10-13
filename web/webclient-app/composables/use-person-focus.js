@@ -3,8 +3,9 @@
 // card's rows (the verb card or the overflow card) through ChoiceCard, the
 // one stage actor in `actor-right` (the dialogue host, else the person in
 // focus), the message window's speaker line, focus restoration to the
-// opener when a card closes, the departed flash, and the Tab chain compass
-// → rail → dock footer. The card's state is the store's client-local slice
+// opener when a card closes, and the departed flash. The Tab chain across the
+// exploration zones is use-room-actions.js's (exploration-room-actions). The
+// card's state is the store's client-local slice
 // (`store.view.presenceCard`); this composable owns no state of its own but
 // the template refs.
 import { computed, nextTick, ref, watch } from "vue";
@@ -75,7 +76,9 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
       !store.view.beatHold &&
       !store.view.degradedRoot,
   );
-  const railShown = computed(() => railMounted.value && !cardOpen.value);
+  // A room card (the wait or suggestions card, exploration-room-actions)
+  // takes the stage the same way.
+  const railShown = computed(() => railMounted.value && !cardOpen.value && !store.view.roomCard);
 
   // The interact target in focus, read from the committed panel.
   const focusTarget = computed(() => {
@@ -151,7 +154,8 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
   watch(
     () => store.view.presenceCard,
     async (next, previous) => {
-      if (next || !previous || store.view.mode !== "exploration") {
+      // A room card that replaced the presence card owns focus now.
+      if (next || !previous || store.view.mode !== "exploration" || store.view.roomCard) {
         return;
       }
       await nextTick();
@@ -186,50 +190,8 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     }
   });
 
-  // The Tab chain (design D5): compass → rail → dock footer, and back. The
-  // rail stands in a stage anchor that precedes the band in DOM order, so the
-  // chain is stitched here; a hidden or absent target leaves Tab native.
-  function overviewList() {
-    return document.querySelector('#action-dock [data-testid="scene-overview"] [role="listbox"]');
-  }
-
   function railElement() {
     return document.querySelector('[data-anchor="presence"] [data-testid="presence-rail"]');
-  }
-
-  function moveFocus(event, target) {
-    if (!target || target.closest?.('[style*="display: none"]')) {
-      return false;
-    }
-    event.preventDefault();
-    target.focus({ preventScroll: true });
-    return true;
-  }
-
-  function onCompassTab(event) {
-    if (event.key !== "Tab" || event.shiftKey || !railShown.value) {
-      return;
-    }
-    moveFocus(event, railElement());
-  }
-
-  function onRailTab({ event, backward }) {
-    if (backward) {
-      const compass = document.querySelector('#action-dock [data-testid="exit-compass"]');
-      moveFocus(event, compass);
-    } else {
-      moveFocus(event, overviewList());
-    }
-  }
-
-  function onOverviewTab(event) {
-    if (event.key !== "Tab" || !event.shiftKey || !railShown.value) {
-      return;
-    }
-    if (event.target !== overviewList()) {
-      return;
-    }
-    moveFocus(event, railElement());
   }
 
   return {
@@ -248,8 +210,5 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
     onRailActivate,
     onCardPick,
     onCardBack,
-    onCompassTab,
-    onRailTab,
-    onOverviewTab,
   };
 }

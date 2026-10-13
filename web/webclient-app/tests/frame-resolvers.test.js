@@ -91,25 +91,22 @@ describe("frame resolver — committed-state following and purity", () => {
     expect(second).toEqual(first);
     // Deep-equal menu identity beyond reference.
     expect(JSON.stringify(second)).toBe(JSON.stringify(first));
-    // The exploration model resolves identically to a direct builder call —
-    // no hidden model state participates. The root is the scene overview
-    // (webclient-scene-overview-swap D1), not the tab root: it resolves to the
-    // overview builder's own menu.
-    expect(second).toEqual(
-      ExplorationMenu.overviewMenu(state.panels.exploration, {
-        currentNode: state.panels.local_map.current_node,
-        suggestions: state.panels.context_actions.suggestions,
-      }),
-    );
+    // The root is the empty exploration root (exploration-room-actions
+    // design D2): no hidden model state participates.
+    expect(second).toEqual({ items: [], focusKey: null, title: "場景" });
+    // The room accessors are pure too.
+    expect(resolver.explorationWait()).toEqual(resolver.explorationWait());
+    expect(resolver.explorationSuggestions()).toEqual(resolver.explorationSuggestions());
+    expect(resolver.explorationRoomLook()).toEqual(resolver.explorationRoomLook());
   });
 
   it("a resolver throwing mid-build degrades to the marker without an exception", () => {
     const state = committedState();
-    // A committed panel whose look read raises: the registry's exception
-    // guard converts the throw to the shared marker (available panel, so no
-    // authored reason).
-    const look = state.panels.exploration.look;
-    Object.defineProperty(state.panels.exploration, "look", {
+    // A committed panel whose `available` read raises: the registry's
+    // exception guard converts the throw to the shared marker, and the room
+    // accessors read it as nothing to offer.
+    const available = state.panels.exploration.available;
+    Object.defineProperty(state.panels.exploration, "available", {
       configurable: true,
       get() {
         throw new Error("boom");
@@ -121,10 +118,13 @@ describe("frame resolver — committed-state following and purity", () => {
       unresolvable: true,
       reason: null,
     });
+    expect(resolver.explorationRoomLook()).toBeNull();
+    expect(resolver.explorationWait()).toBeNull();
+    expect(resolver.explorationSuggestions()).toBeNull();
     // The guard converts every call over the poisoned panel; deleting the
     // poison restores resolution (the marker is not sticky).
-    delete state.panels.exploration.look;
-    state.panels.exploration.look = look;
+    delete state.panels.exploration.available;
+    state.panels.exploration.available = available;
     expect(resolver.resolve({ source: "exploration.root" }).unresolvable).toBeUndefined();
   });
 
@@ -181,26 +181,14 @@ describe("frame resolver — the finite exploration table", () => {
       currentNode: state.panels.local_map.current_node,
       suggestions: state.panels.context_actions.suggestions,
     });
-    // The root frame is the scene overview, not the tab root
-    // (webclient-scene-overview-swap D1). The wait submenu is the exploration
-    // family's remaining pushed frame; the move/look/interact frames are
-    // retired (webclient-retire-exploration-submenus).
-    for (const key of ["wait"]) {
-      const resolved = resolver.resolve({ source: `exploration.${key}` });
-      expect(resolved.unresolvable).toBeUndefined();
-      expect(resolved).toEqual(direct.menus[key]);
-    }
-    const overview = resolver.resolve({ source: "exploration.root" });
-    expect(overview.unresolvable).toBeUndefined();
-    expect(overview).toEqual(
-      ExplorationMenu.overviewMenu(state.panels.exploration, {
-        currentNode: state.panels.local_map.current_node,
-        suggestions: state.panels.context_actions.suggestions,
-      }),
-    );
-    expect(overview.geometry).toBe("sections");
-    expect(overview.sections.map((section) => section.key)).toEqual(["footer"]);
-    expect(overview.sections.map((section) => section.count)).toEqual([3]);
+    // The root frame is the empty exploration root (exploration-room-actions
+    // design D2): every exploration row lives outside the router. The
+    // move/look/interact frames are retired
+    // (webclient-retire-exploration-submenus), and so are the wait and
+    // suggestions frames (exploration-room-actions).
+    const root = resolver.resolve({ source: "exploration.root" });
+    expect(root).toEqual({ items: [], focusKey: null, title: "場景" });
+    expect(root.geometry).toBeUndefined();
     // The exits are the exit compass's, outside the root: the builder's rows
     // for the same current node.
     expect(resolver.explorationExits()).toEqual({
@@ -226,9 +214,19 @@ describe("frame resolver — the finite exploration table", () => {
     expect(verbMenu.items[verbMenu.items.length - 1].goBack).toBe(true);
     expect(verbMenu.items.map((i) => i.key)).toContain("look-target");
     expect(verbMenu.grid).toBeUndefined();
-    // Suggestions resolve through the shipped builder.
-    const suggestions = resolver.resolve({ source: "exploration.suggestions" });
-    expect(suggestions).toEqual(ExplorationMenu.suggestionsMenu(state.panels.context_actions.suggestions));
+    // The room actions resolve through the shipped builders, outside the
+    // router (exploration-room-actions): the place card's room look row, the
+    // wait card's rows, and the suggestions card's rows, each without the
+    // builder's back row.
+    expect(resolver.explorationRoomLook()).toEqual(
+      ExplorationMenu.lookItems(state.panels.exploration).find((item) => item.key === "look-room"),
+    );
+    expect(resolver.explorationWait()).toEqual(ExplorationMenu.waitItems().filter((item) => !item.goBack));
+    const menu = ExplorationMenu.suggestionsMenu(state.panels.context_actions.suggestions);
+    expect(resolver.explorationSuggestions()).toEqual({
+      status: state.panels.context_actions.suggestions.status,
+      items: menu.items.filter((item) => !item.goBack),
+    });
   });
 
   it("an unregistered source (including a reserved later-wave row) degrades to the marker", () => {
@@ -249,11 +247,15 @@ describe("frame resolver — the finite exploration table", () => {
     // webclient-talk-open-dock retires the scripted-keyword frame the same
     // way: nothing reaches its source once the v3 panel carries no keyword
     // list and 交談 dispatches `explore.talk_open` in one step.
+    // exploration-room-actions retires the waiting and suggestions frames:
+    // the wait and suggestions cards are client-local, outside the router.
     const FORMER_EXPLORATION_SOURCES = [
       "exploration.move",
       "exploration.look",
       "exploration.interact",
       "exploration.keywords",
+      "exploration.wait",
+      "exploration.suggestions",
     ];
     const resolver = resolverFor(committedState());
     for (const source of FORMER_EXPLORATION_SOURCES) {
@@ -261,22 +263,24 @@ describe("frame resolver — the finite exploration table", () => {
     }
   });
 
-  it("suggestions degrade on unavailable/absent and resolve on generating/ready/degraded", () => {
+  it("the suggestions card is absent on unavailable/absent and present on generating/ready/degraded", () => {
     const state = committedState();
     const resolver = resolverFor(state);
     // The store fixture's default envelope is `generating`.
-    const generating = resolver.resolve({ source: "exploration.suggestions" });
+    const generating = resolver.explorationSuggestions();
+    expect(generating.status).toBe("generating");
     expect(generating.items.map((i) => i.label)).toContain("AI 正在構思建議…");
+    state.panels.context_actions = explorationActions({
+      suggestions: { status: "degraded", cards: [] },
+    });
+    expect(resolver.explorationSuggestions().items.map((i) => i.key)).toEqual([
+      "suggestions-empty",
+      "action-options.dismiss",
+    ]);
     state.panels.context_actions = explorationActions({ suggestions: { status: "unavailable" } });
-    expect(resolver.resolve({ source: "exploration.suggestions" })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
+    expect(resolver.explorationSuggestions()).toBeNull();
     delete state.panels.context_actions;
-    expect(resolver.resolve({ source: "exploration.suggestions" })).toEqual({
-      unresolvable: true,
-      reason: null,
-    });
+    expect(resolver.explorationSuggestions()).toBeNull();
   });
 });
 
@@ -353,8 +357,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     const resolver = resolverFor(state);
     const panel = state.panels.exploration;
 
-    const overview = resolver.resolve({ source: "exploration.root" });
-    const roomChip = overview.items.find((i) => i.key === "look-room");
+    const roomChip = resolver.explorationRoomLook();
     expect(roomChip.payload).toEqual({ room: true });
     expect(roomChip.description).toBe(panel.look.room.display_name);
     for (const entity of panel.look.entities) {
@@ -416,25 +419,15 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
     });
   });
 
-  it("the root is the scene overview: the footer, and no tab or navigation entry", () => {
+  it("the root carries no item: no exit, presence, room action, tab, or navigation entry", () => {
     const resolver = resolverFor(committedState());
     const root = resolver.resolve({ source: "exploration.root" });
-    const keys = root.items.map((i) => i.key);
-    // The label-less footer only: the exits are the exit compass's
-    // (exploration-exit-compass), the people and objects the presence
-    // rail's (exploration-presence-rail).
-    expect(root.sections.map((section) => section.key)).toEqual(["footer"]);
-    expect(keys).not.toContain("exit-east");
-    expect(keys).not.toContain("target-7");
-    expect(keys).not.toContain("object-3");
-    expect(keys).toContain("look-room");
-    expect(keys).toContain("wait");
-    // A generating envelope adds the footer suggestions chip (builder-owned).
-    expect(keys).toContain("suggestions");
-    // No tab-root entry and no navigation-carried entry survives on the root.
-    for (const gone of ["move", "look", "interact", "character", "quests", "inventory", "bag"]) {
-      expect(keys).not.toContain(gone);
-    }
+    // The exits are the exit compass's (exploration-exit-compass), the people
+    // and objects the presence rail's (exploration-presence-rail), and the
+    // room actions the place card's and the 建議 pill's
+    // (exploration-room-actions).
+    expect(root.items).toEqual([]);
+    expect(root.unresolvable).toBeUndefined();
   });
 });
 
@@ -461,10 +454,10 @@ describe("frame resolver — ownership isolation", () => {
     const before = JSON.stringify(state.panels, (k, v) => v);
     // Write through every reference the builder handed out.
     target.target.display_name = "POISONED";
-    const overview = resolver.resolve({ source: "exploration.root" });
-    const disabledChip = overview.items.find((i) => i.disabledReason);
+    const exits = resolver.explorationExits().rows;
+    const disabledChip = exits.find((i) => i.disabledReason);
     if (disabledChip) disabledChip.disabledReason.message = "POISONED";
-    const suggestions = resolver.resolve({ source: "exploration.suggestions" });
+    const suggestions = resolver.explorationSuggestions();
     suggestions.items.forEach((item) => {
       if (item.payload && item.payload.exit_ref) item.payload.exit_ref = "POISONED";
     });
@@ -498,22 +491,21 @@ describe("frame resolver — the degradation marker", () => {
     }).toThrow();
   });
 
-  it("suggestions belong to the exploration family: an unavailable exploration panel degrades even with a live envelope", () => {
+  it("suggestions belong to the exploration family: an unavailable exploration panel offers none even with a live envelope", () => {
     const state = committedState();
     state.panels.exploration = {
       schema_version: 1,
       available: false,
       reason: { code: "scene_lost", message: "這片區域已不可用。" },
     };
-    // context_actions still carries a ready envelope.
+    // context_actions still carries a live envelope.
     const resolver = resolverFor(state);
-    expect(resolver.resolve({ source: "exploration.suggestions" })).toEqual({
-      unresolvable: true,
-      reason: "這片區域已不可用。",
-    });
+    expect(resolver.explorationSuggestions()).toBeNull();
+    expect(resolver.explorationWait()).toBeNull();
+    expect(resolver.explorationRoomLook()).toBeNull();
   });
 
-  it("an unavailable context_actions envelope degrades with its own authored reason", () => {
+  it("an unavailable context_actions envelope offers no suggestions card", () => {
     const state = committedState();
     state.panels.context_actions = {
       schema_version: 5,
@@ -524,10 +516,7 @@ describe("frame resolver — the degradation marker", () => {
       items: [],
     };
     const resolver = resolverFor(state);
-    expect(resolver.resolve({ source: "exploration.suggestions" })).toEqual({
-      unresolvable: true,
-      reason: "建議服務目前離線。",
-    });
+    expect(resolver.explorationSuggestions()).toBeNull();
   });
 });
 
@@ -560,8 +549,8 @@ describe("frame resolver — (legacy) the degradation marker", () => {
     const state = committedState();
     delete state.panels.exploration;
     const resolver = resolverFor(state);
-    expect(() => resolver.resolve({ source: "exploration.wait" })).not.toThrow();
-    expect(resolver.resolve({ source: "exploration.wait" })).toEqual({
+    expect(() => resolver.resolve({ source: "exploration.root" })).not.toThrow();
+    expect(resolver.resolve({ source: "exploration.root" })).toEqual({
       unresolvable: true,
       reason: null,
     });

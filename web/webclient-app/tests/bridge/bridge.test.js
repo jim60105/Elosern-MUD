@@ -198,11 +198,11 @@ describe("window.Elosern bridge", () => {
     const { store, facade } = installBridge();
     openActiveSession(store);
 
-    // Initial focus is the scene overview's first chip
-    // (webclient-scene-overview-swap: the exploration root is the overview;
-    // its exits are the exit compass's, exploration-exit-compass, and its
-    // people and objects the presence rail's, exploration-presence-rail).
-    expect(store.view.focus.key).toBe("look-room");
+    // The exploration root is an empty router menu (exploration-room-actions:
+    // the exits are the exit compass's, the people and objects the presence
+    // rail's, and the room actions the place card's and the 建議 pill's), so
+    // nothing is focused on it.
+    expect(store.view.focus.key).toBeNull();
 
     // An unclaimed key (a plain letter) is not swallowed by the bridge.
     const unclaimed = press("l");
@@ -215,30 +215,33 @@ describe("window.Elosern bridge", () => {
     const slash = press("/");
     expect(slash.defaultPrevented).toBe(true);
 
-    // A consumed key (ArrowRight) steps the overview's footer chips.
+    // No root row claims an arrow or Enter. A direction key still has its
+    // default prevented (the bridge always suppresses page scroll) but moves
+    // nothing; Enter falls through unclaimed.
     const right = press("ArrowRight");
     expect(right.defaultPrevented).toBe(true);
-    expect(store.view.focus.key).toBe("wait");
+    expect(store.view.focus.key).toBeNull();
     const unclaimed2 = press("m");
     expect(unclaimed2.defaultPrevented).toBe(false);
-    const enterWait = press("Enter");
-    expect(enterWait.defaultPrevented).toBe(true);
-    expect(store.view.dockDepth).toBe(2);
+    const enter = press("Enter");
+    expect(enter.defaultPrevented).toBe(false);
+    expect(store.view.dockDepth).toBe(1);
 
-    // Escape returns to the visible opener, never a removed reference entry.
+    // Escape at the root is the router's (reported as escape-root), and
+    // leaves the stack untouched.
     const escape = press("Escape");
     expect(escape.defaultPrevented).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
-    expect(store.view.focus.key).toBe("wait");
+    expect(store.view.dockDepth).toBe(1);
 
     // Positional picks (the help reference advertises 1–9): the presence
     // rail owns the root's digits (exploration-presence-rail). `1` opens the
     // host's verb card and is claimed; while the rail is on the stage a
     // digit past its slots is claimed too and does nothing, so no digit
-    // falls through to the footer.
+    // falls through to a dock row.
     const nine = press("9");
     expect(nine.defaultPrevented).toBe(true);
-    expect(store.view.focus.key).toBe("wait");
+    expect(store.view.presenceCard).toBeNull();
     const one = press("1");
     expect(one.defaultPrevented).toBe(true);
     expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });

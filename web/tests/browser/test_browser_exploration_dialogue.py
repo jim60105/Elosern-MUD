@@ -182,7 +182,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
     )
     @covers_requirement(
         "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
@@ -486,23 +486,23 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             page, "dialogue", lambda p: p.get("available") is True
         )
 
-        # The dock keeps its ORDINARY form while talking — the scene overview
-        # (webclient-scene-overview-swap), never the retired 對話選項 mirror and
-        # never a tab bar — but the command region is collapsed around it
-        # (webclient-dialogue-stage-actors): mounted, hidden with display:none.
+        # The dock keeps its ORDINARY form while talking — the exploration
+        # root's compass pane (exploration-room-actions), never the retired
+        # 對話選項 mirror and never a tab bar — but the command region is
+        # collapsed around it (webclient-dialogue-stage-actors): mounted,
+        # hidden with display:none.
         self.assertFalse(page.locator("#action-dock").is_visible())
         self.assertEqual(page.locator("#action-dock").count(), 1)
-        overview_labels = page.evaluate(
-            "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
-            ".map((el) => el.textContent)"
+        self.assertEqual(
+            page.locator('#action-dock [data-testid="exploration-root"]').count(),
+            1,
+            "the exploration root pane stays mounted while talking",
         )
-        self.assertTrue(overview_labels, "the scene overview must render while talking")
-        self.assertNotIn("對話選項", "".join(overview_labels))
+        self.assertNotIn("對話選項", page.locator("#action-dock").text_content() or "")
         self.assertEqual(
             page.locator('#action-dock [data-pane-kind="commands"]').count(),
             0,
-            "dialogue mode renders the overview, not the combat command list",
+            "dialogue mode renders the exploration pane, not the combat command list",
         )
 
         # The message window pages the greeting (no reply box, no row); the

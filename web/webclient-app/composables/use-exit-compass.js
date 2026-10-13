@@ -24,6 +24,10 @@ export function useReadoutState(idle) {
   // The hovered or focused presence-rail entry's content
   // (exploration-presence-rail design D6).
   const rail = ref(null);
+  // The hovered or focused place-card button and 建議 pill
+  // (exploration-room-actions design D6).
+  const place = ref(null);
+  const pill = ref(null);
   const flash = ref(null);
   let timer = null;
 
@@ -33,6 +37,14 @@ export function useReadoutState(idle) {
 
   function setRail(next) {
     rail.value = next;
+  }
+
+  function setPlace(next) {
+    place.value = next;
+  }
+
+  function setPill(next) {
+    pill.value = next;
   }
 
   function showFlash(content) {
@@ -50,6 +62,8 @@ export function useReadoutState(idle) {
     flash.value = null;
     aim.value = null;
     rail.value = null;
+    place.value = null;
+    pill.value = null;
   }
 
   if (getCurrentScope()) {
@@ -57,10 +71,17 @@ export function useReadoutState(idle) {
   }
 
   const content = computed(() =>
-    readoutContent({ flash: flash.value, aim: aimReadout(aim.value), rail: rail.value, idle: idle() }),
+    readoutContent({
+      flash: flash.value,
+      aim: aimReadout(aim.value),
+      rail: rail.value,
+      place: place.value,
+      pill: pill.value,
+      idle: idle(),
+    }),
   );
 
-  return { aim, rail, flash, content, setAim, setRail, showFlash, clear };
+  return { aim, rail, place, pill, flash, content, setAim, setRail, setPlace, setPill, showFlash, clear };
 }
 
 export function useExitCompass(store, { panel, compassRef }) {
@@ -85,12 +106,14 @@ export function useExitCompass(store, { panel, compassRef }) {
 
   // The compass is the live control only at the exploration root, with no
   // drawer or overlay over it; anything else stops a walk.
-  // An open presence card (exploration-presence-rail) stops it too.
+  // An open presence card (exploration-presence-rail) or room card — the
+  // wait or suggestions card (exploration-room-actions) — stops it too.
   const compassActive = computed(
     () =>
       store.view.mode === "exploration" &&
       store.view.dockSource === "exploration.root" &&
       !store.view.presenceCard &&
+      !store.view.roomCard &&
       !store.view.degradedRoot &&
       !store.view.hudDrawer &&
       !store.view.hudOverlay,
@@ -156,9 +179,14 @@ export function useExitCompass(store, { panel, compassRef }) {
   // hands focus over on a mode change into exploration; this covers the
   // compass's first appearance in an exploration stretch (the session's first
   // snapshot, whose mode never "changes"). Only focus that sits nowhere (the
-  // body, a removed element) or on the dock itself moves; later re-mounts in
-  // the same stretch (returning from the waiting frame) leave focus to the
-  // router's path.
+  // body, a removed element) or on the dock itself moves; a later re-mount in
+  // the same stretch (the panel turning available again) leaves focus to the
+  // unmount rescue below and the shell's focus home.
+  //
+  // The compass unmounting while it held focus (the exploration panel turned
+  // unavailable, a degraded root) would drop focus to the body: it goes to
+  // the dock, the exploration screen's remaining focus home
+  // (exploration-room-actions).
   let entered = false;
   watch(
     () => store.view.mode,
@@ -170,8 +198,22 @@ export function useExitCompass(store, { panel, compassRef }) {
   );
   watch(
     compassRef,
-    async (compass) => {
-      if (!compass || entered || store.view.mode !== "exploration") {
+    async (compass, previous) => {
+      if (!compass) {
+        if (!previous || typeof document === "undefined") {
+          return;
+        }
+        await nextTick();
+        if (store.view.mode !== "exploration") {
+          return;
+        }
+        const active = document.activeElement;
+        if (!active || active === document.body || active === document.documentElement || !active.isConnected) {
+          document.getElementById("action-dock")?.focus({ preventScroll: true });
+        }
+        return;
+      }
+      if (entered || store.view.mode !== "exploration") {
         return;
       }
       entered = true;
@@ -201,6 +243,9 @@ export function useExitCompass(store, { panel, compassRef }) {
     // The presence rail's readout feed and the departed flash
     // (exploration-presence-rail design D6).
     onRailHover: readout.setRail,
+    // The place card's buttons and the 建議 pill (exploration-room-actions).
+    onPlaceHover: readout.setPlace,
+    onPillHover: readout.setPill,
     showReadoutFlash: readout.showFlash,
   };
 }

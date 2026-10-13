@@ -7,7 +7,10 @@
 // its motion-level handling. It is passive: rows arrive as data and an
 // activation emits `pick(key)` (an enabled row) or `back` (a back row, or
 // Escape). Consumers: the dialogue choice list, the person-focus verb card,
-// and the presence overflow card.
+// the presence overflow card, and the room cards — the wait card and the
+// suggestions card (exploration-room-actions), whose rows may carry a second
+// `hint` line and whose muted `notes` (the generating, degraded, and empty
+// states) are lines above the rows that are not rows at all.
 //
 // One keyboard composite, one tab stop: DOM focus rests on the menu
 // container, which names its active row through `aria-activedescendant`.
@@ -32,13 +35,17 @@
 // shows the card at rest.
 //
 // The initial highlight: the card opens with its first enabled non-back row
-// active, shown quietly even while the card does not hold focus.
+// active, shown quietly even while the card does not hold focus. A committed
+// update that re-renders the rows keeps the active row by its key while that
+// key survives, else keeps its position in range.
 import { computed, nextTick, onMounted, ref, useId, watch } from "vue";
 
 const props = defineProps({
-  // [{key, label, badge, kind, enabled, reason, back, icon, testId,
+  // [{key, label, hint, badge, kind, enabled, reason, back, icon, testId,
   //   reasonTestId, keywordId}]
   rows: { type: Array, default: () => [] },
+  // Muted lines above the rows; never selectable, never a digit.
+  notes: { type: Array, default: () => [] },
   // Rows re-key (and re-stagger) when this changes.
   viewKey: { type: String, default: "" },
   // The first trailing row: it opens under a hairline rule.
@@ -98,12 +105,17 @@ function reasonId(index) {
   return `${idPrefix}-reason-${index}`;
 }
 
-// A committed update that shortens the rows keeps the active row in range.
+// A committed update keeps the active row by key while it survives, and
+// otherwise keeps the active position in range.
 watch(
-  () => props.rows.length,
-  (length) => {
-    if (activeIndex.value > length - 1) {
-      activeIndex.value = Math.max(0, length - 1);
+  () => props.rows.map((row) => row.key),
+  (keys, previous) => {
+    const activeKey = previous ? previous[activeIndex.value] : undefined;
+    const survivor = activeKey === undefined ? -1 : keys.indexOf(activeKey);
+    if (survivor >= 0) {
+      activeIndex.value = survivor;
+    } else if (activeIndex.value > keys.length - 1) {
+      activeIndex.value = Math.max(0, keys.length - 1);
     }
   },
 );
@@ -240,6 +252,12 @@ defineExpose({ focus, setActive });
   >
     <span :class="cls('__corners')" aria-hidden="true"></span>
     <div v-if="caption" :class="cls('__caption')" aria-hidden="true">{{ caption }}</div>
+    <p
+      v-for="(note, index) in notes"
+      :key="`note-${index}`"
+      :class="cls('__note')"
+      data-testid="choice-card-note"
+    >{{ note }}</p>
     <div :key="viewKey" ref="scrollRef" :class="cls('__rows')" :style="{ '--row-count': rows.length }">
     <div
       v-for="(row, index) in rows"
@@ -289,10 +307,30 @@ defineExpose({ focus, setActive });
         >
           <path d="M7 7l10 10M17 7L7 17" />
         </svg>
+        <!-- A trash-can badge (the suggestions card's 清除建議): drawn in the
+             dock icon vocabulary so it never reads as the ✕ of 返回. -->
+        <svg
+          v-else-if="row.icon === 'trash'"
+          :class="[cls('__badge-icon'), cls('__badge-icon--trash')]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          data-icon="trash"
+        >
+          <path d="M4.5 7h15M9.5 7V4.8h5V7M6.5 7l1 12.2h9L17.5 7M10.2 10.5v5.5M13.8 10.5v5.5" />
+        </svg>
         <template v-else>{{ row.badge }}</template>
       </span>
       <span :class="cls('__text')">
         <span :class="cls('__label')">{{ row.label }}</span>
+        <span
+          v-if="row.hint"
+          :class="cls('__hint')"
+          data-testid="choice-card-hint"
+        >{{ row.hint }}</span>
         <span
           v-if="row.reason"
           :id="reasonId(index)"
@@ -573,6 +611,30 @@ defineExpose({ focus, setActive });
 
 .choice-card:focus .choice-card__row--active .choice-card__label {
   color: var(--paper-50);
+}
+
+/* A row's optional second line (a suggestion's hint): quieter than the
+   label, in the command face. */
+.choice-card__hint {
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  color: var(--paper-400);
+  overflow-wrap: anywhere;
+}
+
+/* The muted notes above the rows (the generating, degraded, and empty
+   states of the suggestions card): not rows, not selectable. */
+.choice-card__note {
+  flex: none;
+  margin: 0;
+  padding: calc(10px * var(--ui-scale)) calc(26px * var(--ui-scale)) 0;
+  font: var(--text-sm)/1.5 var(--f-sans);
+  color: var(--paper-400);
+}
+
+.choice-card__note + .choice-card__rows {
+  padding-top: calc(6px * var(--ui-scale));
 }
 
 .choice-card__reason {

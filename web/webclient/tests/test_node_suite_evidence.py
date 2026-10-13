@@ -75,7 +75,8 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe"
+        "webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe",
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
     )
     def test_keyboard_router_node_suite_passes(self):
         result = subprocess.run(
@@ -272,7 +273,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
     )
     def test_exploration_menu_node_suite_passes(self):
         result = subprocess.run(
@@ -361,12 +362,14 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-context-actions-suggestions::the-dock-suggestion-pane-is-the-single-suggestion-surface",
+        "webclient-context-actions-suggestions::the-suggestions-card-is-the-single-suggestion-surface",
+        "webclient-room-actions::the-建議-pill-opens-the-suggestions-card",
     )
     def test_choicepoint_node_suite_passes(self):
-        # The suggestions behavior lives in the action dock: generating,
-        # ready, degraded, and transport-reset all render exclusively in
-        # the dock suggestion pane (action_dock.test.js).
+        # The single suggestion surface is the centred suggestions card the
+        # 建議 pill opens (app_client_room_actions.test.js: generating, ready,
+        # degraded, and unavailable present only on the card, whose rows own
+        # the intents; action_dock.test.js keeps the retired dock pane down).
         result = subprocess.run(
             [
                 "npx",
@@ -374,6 +377,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
                 "vitest",
                 "run",
                 str(REPO_ROOT / "web/webclient-app/tests/action/action_dock.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_room_actions.test.js"),
             ],
             cwd=str(REPO_ROOT),
             capture_output=True,
@@ -445,6 +449,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
 
     @covers_requirement(
         "webclient-contextual-hud::the-place-card-names-the-current-location-and-the-world-time",
+        "webclient-room-actions::the-place-card-carries-查看房間-and-等待-in-exploration-only",
     )
     def test_place_card_node_suite_passes(self):
         result = subprocess.run(
@@ -1275,6 +1280,7 @@ class ExitCompassEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-exit-compass::the-compass-feeds-one-shared-readout-line",
         "webclient-exit-compass::the-aimed-destination-lights-on-the-minimap-and-motion-respects-the-motion-level",
+        "webclient-room-actions::the-shared-readout-resolves-its-content-by-a-fixed-priority",
     )
     def test_exit_compass_readout_and_pane_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -1302,6 +1308,7 @@ class ExitCompassEvidenceTest(unittest.TestCase):
         "webclient-exit-compass::the-compass-never-loosens-the-server-s-gate",
         "webclient-exit-compass::the-dialogue-screen-s-exits-list-stays-independent-of-the-exploration-root",
         "webclient-exit-compass::the-controls-reference-documents-the-compass-and-the-exploration-panel-shows-no-key-hints",
+        "webclient-room-actions::the-controls-reference-documents-the-room-actions",
     )
     def test_exit_compass_gate_and_surfaces_vitest_evidence_passes(self):
         result = subprocess.run(
@@ -1366,7 +1373,7 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         self._run_vitest("web/webclient-app/tests/store/presence_card.test.js")
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview",
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions",
         "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover",
         "webclient-presence-rail::a-departed-person-closes-the-card",
         "webclient-presence-rail::the-presence-rail-shows-people-and-objects-on-the-stage-floor",
@@ -1385,11 +1392,44 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::rail-digits-are-claimed-and-never-fall-through-to-the-footer",
+        "webclient-presence-rail::rail-digits-are-claimed-by-the-rail-and-never-fall-through",
         "webclient-presence-rail::the-rail-shows-at-most-six-entries-and-folds-the-rest-into-a-count",
     )
     def test_rail_digit_claims_vitest_evidence_passes(self):
         self._run_vitest("web/webclient-app/tests/store/digit_row_picks.test.js")
+
+
+class RoomActionsEvidenceTest(unittest.TestCase):
+    """exploration-room-actions: the wait card, the dream question, and the
+    suggestions card are the AppClient's room-actions composition contract;
+    the Vitest files are their executed evidence (the browser journeys cover
+    the live client's geometry and the retired surfaces)."""
+
+    @covers_requirement(
+        "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
+        "webclient-room-actions::sleeping-asks-whether-to-enter-dream-collaboration-first",
+    )
+    def test_room_actions_wait_card_vitest_evidence_passes(self):
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/app_client_room_actions.test.js"),
+                str(REPO_ROOT / "web/webclient-app/tests/waiting_surface.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "room-actions wait-card Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
 
 
 if __name__ == "__main__":

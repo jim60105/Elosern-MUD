@@ -132,20 +132,23 @@ describe("dock digit row picks (1–9)", () => {
       action_id: "explore.look",
       payload: { target_id: 3 },
     });
-    // The overview's own focus never moved: the rail is outside the router.
-    expect(store.view.focus.key).toBe("look-room");
+    // The router's empty root never moved: the rail is outside the router.
+    expect(store.view.focus.key).toBeNull();
+    expect(store.view.dockDepth).toBe(1);
   });
 
-  it("no digit addresses an exit or a footer chip", () => {
+  it("no digit addresses an exit or a room action", () => {
     openSession();
     openOverview(SIX_CHIP_OVERRIDES, fx.explorationActions());
-    const keys = store.router.currentMenu().items.map((i) => i.key);
-    expect(keys).toEqual(["look-room", "wait", "suggestions"]);
+    // The root carries no row at all (exploration-room-actions).
+    expect(store.router.currentMenu().items).toEqual([]);
     for (const digit of ["1", "2", "3", "4", "5", "6"]) {
       store.focusPress(digit);
       store.closePresenceCard();
     }
     expect(sender.sent.actions.some((action) => action.action_id === "explore.move")).toBe(false);
+    expect(sender.sent.actions.some((action) => action.action_id === "explore.wait")).toBe(false);
+    expect(store.view.roomCard).toBeNull();
     expect(store.view.dockSource).toBe("exploration.root");
   });
 
@@ -181,10 +184,10 @@ describe("dock digit row picks (1–9)", () => {
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.view.presenceCard).toBe(null);
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.focus.key).toBe("look-room");
+    expect(store.view.focus.key).toBeNull();
   });
 
-  it("an empty rail claims no digit and never falls through to the footer", () => {
+  it("an empty rail claims no digit and never falls through to a dock row", () => {
     openSession();
     openOverview({ interact: [], look: { entities: [], objects: [] } });
     expect(store.view.presenceEntries).toEqual([]);
@@ -235,17 +238,22 @@ describe("dock digit row picks (1–9)", () => {
     expect(sender.sent.actions).toHaveLength(0);
   });
 
-  it("the rail keeps the digits while the waiting frame is open", () => {
+  it("an open room card claims the digits so none reaches the rail beneath it", () => {
     openSession();
     openOverview(undefined, fx.explorationActions({ suggestions: { status: "unavailable" } }));
-    expect(store.focusItemByKey("wait")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
-    expect(store.view.dockSource).toBe("exploration.wait");
-    // `2` is the rail's object, never the waiting frame's second row.
-    expect(store.focusPress("2")).toBe(true);
-    expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0]).toMatchObject({ action_id: "explore.look", payload: { target_id: 3 } });
-    expect(store.view.dockSource).toBe("exploration.wait");
+    expect(store.openRoomCard("wait")).toBe(true);
+    expect(store.view.railVisible).toBe(false);
+    // `2` is the wait card's (its own keydown handles it), never the rail's
+    // object; a stray digit that reaches the store does nothing.
+    for (const digit of ["1", "2", "3", "9"]) {
+      expect(store.focusPress(digit), digit).toBe(true);
+    }
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.roomCard).toEqual({ kind: "wait" });
+    expect(store.view.presenceCard).toBeNull();
+    // Under a drawer the digits are not the card's.
+    store.openHudDrawer("inventory");
+    expect(store.focusPress("1")).toBe(false);
   });
 
   it("a combat skill frame's sixth row is reachable by digit 6", () => {

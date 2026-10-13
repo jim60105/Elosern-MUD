@@ -1,9 +1,12 @@
 // webclient-scene-overview-swap (task 4.5): the AppClient composition contract
 // for the exploration dock's root. exploration-exit-compass moved the exits to
-// the compass and exploration-presence-rail the people and objects to the
-// presence rail on the stage (tests/app_client_presence_rail.test.js), so the
-// overview beside the compass is the footer alone. The move/look/interact tab
-// root is gone; only the combat root keeps a tab bar.
+// the compass, exploration-presence-rail the people and objects to the
+// presence rail on the stage (tests/app_client_presence_rail.test.js), and
+// exploration-room-actions retired the scene overview itself: the room actions
+// are the place card's and the 建議 pill's
+// (tests/app_client_room_actions.test.js), so the command panel holds the
+// compass, the pill, and the readout. The move/look/interact tab root is gone;
+// only the combat root keeps a tab bar.
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { createPinia, setActivePinia } from "pinia";
@@ -51,9 +54,6 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     expect(result.accepted).toBe(true);
   }
 
-  function chip(key) {
-    return wrapper.find(`#action-dock [data-item-key="${key}"]`);
-  }
 
 
   beforeEach(() => {
@@ -68,42 +68,34 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     document.body.innerHTML = "";
   });
 
-  it("renders the compass and the overview at the exploration root with no tab bar", async () => {
+  it("renders the compass, the pill, and the readout at the exploration root with no tab bar", async () => {
     mountAppClient();
     await wrapper.vm.$nextTick();
     commitPanels();
     await wrapper.vm.$nextTick();
 
     expect(store.view.dockSource).toBe("exploration.root");
-    // The root pane (exploration-exit-compass D5): the compass on the left,
-    // then a right column with the readout over the overview's chip rows.
+    // The root pane (exploration-room-actions D2): the compass on the left,
+    // then a right column with the 建議 pill over the readout.
     const root = wrapper.get('#action-dock [data-testid="exploration-root"]');
     const [left, right] = root.element.children;
     expect(left.querySelector('[data-testid="exit-compass"]')).not.toBeNull();
     expect(Array.from(right.children).map((el) => el.getAttribute("data-testid"))).toEqual([
+      "suggestions-pill",
       "exploration-readout",
-      "scene-overview",
     ]);
-    const overview = wrapper.get('[data-testid="scene-overview"]');
-    // One frame: the label-less footer; no 出口, 人物, or 物件 row.
-    expect(overview.findAll("[data-section]").map((row) => row.attributes("data-section"))).toEqual(["footer"]);
-    expect(chip("exit-east").exists()).toBe(false);
+    // No retired surface: no scene overview, chip, footer, or row container.
+    expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(false);
+    expect(wrapper.find("#action-dock [data-item-key]").exists()).toBe(false);
+    expect(wrapper.find('#action-dock [data-testid="dock-menu"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="exploration-detail"]').exists()).toBe(false);
+    expect(wrapper.find(".waiting-screen").exists()).toBe(false);
     expect(wrapper.findAll('#action-dock [data-testid="exit-compass-pip"], #action-dock [data-testid="exit-compass-portal"]').map((el) => el.attributes("data-exit-ref")).sort()).toEqual(["east", "north"]);
-    expect(chip("target-7").exists()).toBe(false);
-    expect(chip("object-3").exists()).toBe(false);
     // The host's medallion and the object's lozenge stand on the rail.
     expect(
       wrapper.findAll('[data-anchor="presence"] [data-testid="presence-entry"]').map((el) => el.attributes("data-presence")),
     ).toEqual(["target", "object"]);
-    expect(chip("look-room").exists()).toBe(true);
-    expect(chip("wait").exists()).toBe(true);
-    // The active overview listbox is the dock's row container and single tab
-    // stop; the retired tab root's entries are gone.
-    expect(overview.find('[data-testid="dock-menu"]').exists()).toBe(true);
     expect(wrapper.find('#action-dock [data-pane-kind="commands"]').exists()).toBe(false);
-    for (const gone of ["move", "look", "interact", "character"]) {
-      expect(wrapper.find(`#action-dock [data-item-key="${gone}"]`).exists()).toBe(false);
-    }
     // The exploration panel shows no key-hint legend.
     expect(wrapper.find('[data-testid="action-dock-description"]').exists()).toBe(false);
     // The readout idles with the exit and presence counts.

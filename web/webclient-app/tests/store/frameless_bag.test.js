@@ -55,8 +55,8 @@ describe("frameless 背包 drawer (store contract)", () => {
 
   it("keeps top navigation subject to both submission and revision locks", () => {
     openSession();
-    expect(store.focusItemByKey("wait")).toBe(true);
-    expect(store.focusConfirm("pointer")).toBe(true);
+    store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+    store.refreshView();
     expect(store.router.depth()).toBe(2);
     store.router.setMutationInFlight(true);
     store.tabToRootAndConfirm("character", "pointer");
@@ -200,8 +200,8 @@ describe("frameless 背包 drawer (store contract)", () => {
     openSession();
     // 任務 (frameless): tabToRootAndConfirm from depth > 1 pops to root and opens
     // the quest drawer with depth 1 and nothing pushed; closing it pops nothing.
-    expect(store.focusItemByKey("wait")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+    store.refreshView();
     expect(store.router.depth()).toBe(2);
 
     store.tabToRootAndConfirm("quests", "pointer");

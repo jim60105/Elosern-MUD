@@ -7,14 +7,20 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     CARD_SELECTOR,
+    WAIT_CARD_SELECTOR,
+    PLACE_LOOK_SELECTOR,
+    PLACE_WAIT_SELECTOR,
+    PILL_SELECTOR,
     activate_compass_exit,
     activate_overview_chip,
     card_row_keys,
     compass_target_refs,
+    exploration_root_controls,
     fixture_home_node_id,
     focus_action_dock,
     install_outbound_recorder,
     open_verb_card,
+    open_wait_card,
     outbound_messages,
     presence_entry_keys,
     sent_action_count,
@@ -174,7 +180,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_pointer_back_cell_returns_to_the_root_without_an_action(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -220,19 +228,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "description": "focus back on the presence rail",
             },
         )
-        # The overview's chips render again, no ui_action was sent, and the
-        # stack is back at the root frame.
-        keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
-            ".map((el) => el.getAttribute('data-item-key'))"
-        )
-        self.assertNotIn(chip_key, keys, "the person stands on the rail, not in the overview")
+        # The room actions render again on the place card, the dock holds no
+        # row (the exploration root is empty, exploration-room-actions), no
+        # ui_action was sent, and the stack is at the root frame.
+        controls = exploration_root_controls(page)
+        self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
         self.assertIn(chip_key, presence_entry_keys(page), "the rail renders the person again")
-        self.assertIn("look-room", keys, "the overview renders its footer again")
-        self.assertIn("wait", keys, "the overview renders its footer again")
-        for gone in ("move", "look", "interact"):
-            self.assertNotIn(gone, keys, "the retired tab-root entry must not render")
+        self.assertTrue(controls["look"], "the place card renders 查看房間 again")
+        self.assertTrue(controls["wait"], "the place card renders 等待 again")
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(
             page.evaluate("window.__elosernBridge.router.depth()"),
@@ -240,7 +243,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the card never pushed a router frame",
         )
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -265,24 +270,20 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_timeout(80)
         self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
         self.assertEqual(page.evaluate("window.__elosernBridge.router.depth()"), 1)
-        root_keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
-            ".map((el) => el.getAttribute('data-item-key'))"
-        )
-        # The exits are the exit compass's (exploration-exit-compass) and the
-        # people the presence rail's: the overview is the footer.
-        expected_root = ["look-room", "wait"]
-        # The footer's 建議 chip renders whenever the committed envelope's
-        # status is not `unavailable`.
+        # The exits are the exit compass's (exploration-exit-compass), the
+        # people the presence rail's, and the room actions the place card's
+        # and the 建議 pill's (exploration-room-actions): the dock has no row.
+        controls = exploration_root_controls(page)
+        self.assertEqual(controls["dockRows"], [], "the exploration root renders no dock row")
+        self.assertTrue(controls["look"] and controls["wait"], "the place card's room actions")
+        # The 建議 pill renders whenever the committed envelope's status is
+        # not `unavailable`.
         suggestions = (
             ((store_state(page).get("panels") or {}).get("context_actions") or {})
             .get("suggestions")
             or {}
         )
-        if suggestions.get("status") not in (None, "unavailable"):
-            expected_root.append("suggestions")
-        self.assertEqual(root_keys, expected_root, "the overview's chips")
+        self.assertEqual(controls["pill"], suggestions.get("status") not in (None, "unavailable"))
         # Escape returned focus to the medallion that opened the card.
         self.assertEqual(
             page.evaluate(
@@ -296,7 +297,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), 0)
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_from_quests_drawer_leaves_root_clean(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -324,18 +327,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, lambda s: s.get("hudDrawer") is None)
         self.assertEqual(sent_action_count(page), 0)
 
-        keys = page.evaluate(
-            "() => Array.from(document.querySelectorAll("
-            "'#action-dock [data-testid=\"scene-overview\"] [data-item-key]'))"
-            ".map((el) => el.getAttribute('data-item-key'))"
-        )
-        # The exploration root is the scene overview (webclient-scene-
-        # overview-swap): the exits lead its reading order, then the people,
-        # the objects, and the footer.
-        self.assertIn("look-room", keys, "the overview's footer renders after Escape from Quests")
-        self.assertIn("wait", keys, "the overview's footer renders after Escape from Quests")
-        for gone in ("move", "look", "interact"):
-            self.assertNotIn(gone, keys, "the retired tab-root entry must not render")
+        # The exploration root is empty (exploration-room-actions): the room
+        # actions are the place card's, and the dock renders no row.
+        controls = exploration_root_controls(page)
+        self.assertEqual(controls["dockRows"], [], "no dock row renders after Escape from Quests")
+        self.assertTrue(controls["look"] and controls["wait"], "the place card's room actions render after Escape from Quests")
         self.assertEqual(
             page.evaluate(
                 "window.__elosernBridge.router.currentItem() && "
@@ -346,15 +342,16 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions",
+        "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
     )
     def test_keyboard_only_journey_walks_the_overview(self):
-        """A pure arrows-and-Enter journey at 1451x790: the overview's chips
-        are reachable, the exit compass moves, a rail medallion opens the
-        verb card (Escape returns with that medallion focused), and a move
-        from the minimap returns the dock to the new room's overview
-        (webclient-scene-overview-swap, design D2/D6; exploration-presence-
-        rail)."""
+        """A pure arrows-and-Enter journey at 1451x790: the exit compass
+        moves, a rail medallion opens the verb card (Escape returns with that
+        medallion focused), and a move from the minimap closes the open wait
+        card and leaves the dock at the new room's exploration root
+        (webclient-scene-overview-swap D2; exploration-presence-rail;
+        exploration-room-actions)."""
         page = self.logged_in_page((1451, 790))
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -392,16 +389,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
-        # The exits are on the exit compass beside the overview
-        # (exploration-exit-compass): every committed exit is a compass
-        # target, none is an overview chip, and the compass's keyboard cycle
-        # plus Enter submits explore.move for one.
+        # The exits are on the exit compass (exploration-exit-compass): every
+        # committed exit is a compass target, none is a dock row, and the
+        # compass's keyboard cycle plus Enter submits explore.move for one.
         self.assertEqual(
             sorted(compass_target_refs(page)),
             sorted(str(row["exit_ref"]) for row in exits),
         )
         self.assertEqual(
-            page.locator('#action-dock [data-testid="scene-overview"] [data-item-key^="exit-"]').count(),
+            page.locator('#action-dock [data-item-key^="exit-"]').count(),
             0,
         )
         enabled_exit = next(row for row in exits if row.get("enabled"))
@@ -415,23 +411,22 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, _connected_active)
         page.wait_for_timeout(120)
 
-        # The new room's overview is the dock's ONLY frame: the move reset the
-        # stack to the committed root, and nothing of the previous room stays
-        # activatable.
+        # The new room's exploration root is the dock's ONLY frame, and
+        # nothing of the previous room stays activatable.
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
         self.assertEqual(
             store_state(page)["dockSource"],
             "exploration.root",
-            "the dock must be back at the overview after a move",
+            "the dock must be at the exploration root after a move",
         )
         self.assertEqual(page.locator(CARD_SELECTOR).count(), 0)
 
-        # Opening 等待／休息 and then moving by activating a minimap node
-        # returns the dock to the overview (design D2: a minimap move
-        # bypasses the dock's own push sites).
+        # Opening the wait card from the place card's 等待 and then moving by
+        # activating a minimap node closes the card in that commit
+        # (exploration-room-actions: a minimap move bypasses the card).
         activate_overview_chip(page, "wait")
-        page.wait_for_selector(".waiting-screen", timeout=15000)
-        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 2)
+        page.wait_for_selector(WAIT_CARD_SELECTOR, timeout=15000)
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
 
         # The minimap's own node control is the move path that bypasses the
         # dock entirely: a click on it submits the same explore.move the
@@ -452,8 +447,103 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         node_control.first.click()
         wait_for_store_state(
             page,
-            lambda s: (s.get("dockDepth") or 0) == 1 and s.get("dockSource") == "exploration.root",
+            lambda s: s.get("roomCard") is None and s.get("dockSource") == "exploration.root",
             timeout=30000,
         )
-        self.assertEqual(page.locator(".waiting-screen").count(), 0)
-        self.assertEqual(page.locator('[data-testid="scene-overview"]').count(), 1)
+        self.assertEqual(page.locator(WAIT_CARD_SELECTOR).count(), 0)
+        controls = exploration_root_controls(page)
+        self.assertTrue(controls["look"] and controls["wait"])
+        self.assertEqual(controls["dockRows"], [])
+
+    @covers_requirement(
+        "webclient-room-actions::retired-exploration-surfaces-are-gone-and-room-actions-are-verified-in-the-live-client"
+    )
+    def test_room_actions_hold_at_both_reference_viewports(self):
+        """exploration-room-actions: at 1451x790 and 1920x1080 the place
+        card's 查看房間 and 等待 fit the card without truncating the
+        location heading's accessible name, the 建議 pill does not overlap
+        the compass, and the centred wait card is fully visible."""
+        for viewport in ((1451, 790), (1920, 1080)):
+            page = self.logged_in_page(viewport)
+            self._wait_exploration_available(page)
+            geometry = page.evaluate(
+                """([look, waitBtn, pill, compassSel]) => {
+                  const rect = (sel) => {
+                    const el = document.querySelector(sel);
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom,
+                             width: r.width, height: r.height };
+                  };
+                  const card = document.querySelector('[data-testid="place-card"]');
+                  const heading = document.querySelector('[data-testid="place-card__location"]');
+                  const pillRect = rect(pill);
+                  const compassRect = rect(compassSel);
+                  const overlap =
+                    pillRect &&
+                    compassRect &&
+                    pillRect.left < compassRect.right &&
+                    pillRect.right > compassRect.left &&
+                    pillRect.top < compassRect.bottom &&
+                    pillRect.bottom > compassRect.top;
+                  return {
+                    look: rect(look),
+                    wait: rect(waitBtn),
+                    pill: pillRect,
+                    cardScrolls: card.scrollHeight - card.clientHeight,
+                    headingName: heading.getAttribute("title"),
+                    pillClearsCompass: !pillRect || !compassRect || !overlap,
+                  };
+                }""",
+                [
+                    PLACE_LOOK_SELECTOR,
+                    PLACE_WAIT_SELECTOR,
+                    PILL_SELECTOR,
+                    '#action-dock [data-testid="exit-compass"]',
+                ],
+            )
+            self.assertTrue(
+                geometry["look"] and geometry["wait"],
+                f"{viewport}: the place card carries 查看房間 and 等待",
+            )
+            self.assertGreater(geometry["look"]["height"], 0, f"{viewport}: 查看房間 is rendered")
+            self.assertGreater(geometry["wait"]["height"], 0, f"{viewport}: 等待 is rendered")
+            self.assertEqual(
+                geometry["cardScrolls"],
+                0,
+                f"{viewport}: the buttons fit the place card without overflow",
+            )
+            self.assertTrue(
+                geometry["headingName"],
+                f"{viewport}: the heading keeps its full accessible name",
+            )
+            self.assertTrue(
+                geometry["pillClearsCompass"],
+                f"{viewport}: the 建議 pill does not overlap the compass",
+            )
+            # A centred card open: the wait card renders fully inside the
+            # stage, centred in the choices anchor (the `justify-content:
+            # center` span the design centres room cards on).
+            open_wait_card(page)
+            placement = page.evaluate(
+                """(cardSel) => {
+                  const card = document.querySelector(cardSel);
+                  const stage = document.querySelector('[data-testid="elosern-stage"]');
+                  const anchor = document.querySelector('[data-anchor="choices"]');
+                  const c = card.getBoundingClientRect();
+                  const s = stage.getBoundingClientRect();
+                  const a = anchor.getBoundingClientRect();
+                  return {
+                    inside:
+                      c.left >= s.left - 0.5 && c.right <= s.right + 0.5 &&
+                      c.top >= s.top - 0.5 && c.bottom <= s.bottom + 0.5,
+                    offAnchorX: Math.abs((c.left + c.right) / 2 - (a.left + a.right) / 2),
+                    offAnchorY: Math.abs((c.top + c.bottom) / 2 - (a.top + a.bottom) / 2),
+                  };
+                }""",
+                WAIT_CARD_SELECTOR,
+            )
+            self.assertTrue(placement["inside"], f"{viewport}: the wait card is fully visible")
+            self.assertLess(placement["offAnchorX"], 2, f"{viewport}: the card is centred horizontally")
+            self.assertLess(placement["offAnchorY"], 2, f"{viewport}: the card is centred vertically in the choices anchor")
+            page.close()

@@ -83,14 +83,14 @@ describe("dialogue frame vocabulary", () => {
       source: "exploration.root",
       params: {},
     });
-    // The exploration root is the scene overview (webclient-scene-overview-
-    // swap) and carries NO dialogue form flag: the 對話選項 mirror tab is
-    // gone, and so is the tab root.
+    // The exploration root is the empty exploration root
+    // (exploration-room-actions) and carries NO dialogue form flag: the
+    // 對話選項 mirror tab is gone, and so is the tab root.
     expect(menu.dialogueForm).toBeUndefined();
     const keys = (menu.items || []).map((i) => i.key);
-    expect(menu.sections.map((section) => section.key)).toEqual(["footer"]);
+    expect(keys).toEqual([]);
+    expect(menu.unresolvable).toBeUndefined();
     expect(keys).not.toContain("exit-east");
-    expect(keys).toContain("wait");
     expect(keys).not.toContain("move");
     expect(keys).not.toContain("dlg-options");
   });
@@ -132,19 +132,20 @@ describe("dialogue store mode lifecycle", () => {
 
   it("a dialogue mode switch keeps the dock on exploration.root", () => {
     openSession();
-    // Open one exploration child frame so the switch has frames to replace.
-    // The dock root is the scene overview, so its child frames are the
-    // waiting and suggestions frames.
-    expect(store.focusItemByKey("wait")).toBe(true);
-    expect(store.focusConfirm("keyboard")).toBe(true);
+    // Open one exploration child frame so the switch has frames to replace
+    // (the exploration family pushes none of its own since
+    // exploration-room-actions, so the top navigation's resolvable source
+    // stands in).
+    store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+    store.refreshView();
     expect(store.view.dockDepth).toBe(2);
     expect(store.receive(1, "ui_snapshot", [dialogueSnapshot()], {}).accepted).toBe(true);
     expect(store.view.mode).toBe("dialogue");
     expect(store.view.dockDepth).toBe(1);
     // The root frame is the ORDINARY exploration root: no dialogue form,
-    // no 對話選項 tab, the ordinary overview chips still activatable.
+    // no 對話選項 tab, and no row of its own.
     expect(store.view.rootMenu && store.view.rootMenu.dialogueForm).toBeUndefined();
-    expect(store.view.rootMenu.items.map((i) => i.key)).toContain("look-room");
+    expect(store.view.rootMenu.items).toEqual([]);
     // The exits stay reachable outside the root (the compass and the
     // dialogue exits list read them).
     expect(store.view.explorationExits.map((i) => i.key)).toContain("exit-east");
@@ -409,7 +410,7 @@ describe("dialogue store mode lifecycle", () => {
     // sub-dock, exactly as in exploration mode.
     store.setActiveSubDock("character");
     store.router.pushFrame(
-      { source: "exploration.wait", params: {} },
+      { source: "exploration.navigation", params: {} },
       "character",
     );
     expect(store.view.dockDepth).toBe(2);
@@ -417,7 +418,7 @@ describe("dialogue store mode lifecycle", () => {
     expect(store.focusEscape()).toBe(true);
     expect(store.view.activeSubDock).toBe(null);
     expect(store.view.dockDepth).toBe(1);
-    expect(store.view.focus.key).toBe("look-room");
+    expect(store.view.focus.key).toBeNull();
   });
 
   it("an exploration-served drawer close while talking clears the sub-dock and re-homes", () => {
@@ -445,9 +446,10 @@ describe("dialogue store mode lifecycle", () => {
     store.setActiveSubDock("character");
     // The genuine push route (the store's pop-policy push, driven through the
     // widened exploration-row gate — itself the align-11 D8 behavior: rows
-    // work in dialogue mode): the overview's 等待／休息 chip opens its frame.
-    expect(store.focusItemByKey("wait")).toBe(true);
-    expect(store.focusConfirm()).toBe(true);
+    // work in dialogue mode); a resolvable exploration child frame stands in
+    // for the retired waiting frame (exploration-room-actions).
+    store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+    store.refreshView();
     expect(store.view.dockDepth).toBe(2);
     store.receive(
       1,

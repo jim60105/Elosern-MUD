@@ -155,49 +155,41 @@ test("look rows cover the room marker plus entities and objects, with no back ro
   assert.deepEqual(items[2].payload, { target_id: 6 });
 });
 
-test("every pushed exploration frame ends with an enabled back row", () => {
+test("the wait rows are dawn, sleep, and the rest form, then the back row", () => {
+  // exploration-room-actions design D5: the wait card's rows (the card drops
+  // the builder's back row and draws its own `✕ 返回`).
+  const items = ExplorationMenu.waitItems();
+  assert.deepEqual(
+    items.map((item) => item.key),
+    ["wait-dawn", "wait-sleep", "wait-rest", "back"]
+  );
+  assert.deepEqual(items[0].payload, { daypart: "dawn" });
+  assert.equal(items[0].actionId, "explore.wait");
+  assert.deepEqual(items[1].payload, { sleep: true }, "the dream flag is the question's, never the row's");
+  assert.equal(items[2].actionId, null, "the rest row opens the form and submits nothing");
+  assert.equal(items[2].openRestForm, true);
+  const back = items[items.length - 1];
+  assert.equal(back.goBack, true);
+  assert.equal(back.actionId, null, "the back row never submits an action");
+  // Dynamic menus (a target's affordances) and the suggestions rows end with
+  // the same back cell.
   const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  ["wait"].forEach((key) => {
-    const items = model.menus[key].items;
-    const back = items[items.length - 1];
-    assert.equal(back.key, "back", `${key} must end with the back row`);
-    assert.equal(back.label, "返回上一層");
-    assert.equal(back.enabled, true);
-    assert.equal(back.goBack, true);
-    assert.equal(back.actionId, null, "the back row never submits an action");
-  });
-  // Dynamic menus (the verb popover's target affordances) also end with it.
   const target = ExplorationMenu.targetById(model, 5);
   const targetMenu = ExplorationMenu.targetMenuFor(model, target);
   assert.equal(targetMenu.items[targetMenu.items.length - 1].key, "back");
-  // The suggestions frame too (the exploration root, the scene overview, does
-  // not: it carries no parent to return to).
   const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
   assert.equal(suggestions.items[suggestions.items.length - 1].key, "back");
 });
 
-test("the scene overview never gains a back row", () => {
-  const menu = ExplorationMenu.overviewMenu(validPanel(), { currentNode: "room:3" });
-  assert.ok(!menu.items.some((item) => item.key === "back"));
-});
-
-test("menu models carry the mockup grid geometry", () => {
-  const model = ExplorationMenu.buildMenus(validPanel(), { currentNode: "room:3" });
-  assert.deepEqual(Object.keys(model.menus), ["wait"]);
-  ["wait"].forEach((key) => {
-    assert.equal(model.menus[key].grid, true, `${key} must be a grid`);
-    assert.equal(model.menus[key].gridCols, 2, `${key} must use 2 columns`);
-  });
-  const target = ExplorationMenu.targetById(model, 5);
-  const targetMenu = ExplorationMenu.targetMenuFor(model, target);
-  assert.equal(targetMenu.gridCols, 2);
-  // The suggestions frame is a single-row grid whose column count is its own
-  // item count; the scene overview is a sections menu with no grid flag.
-  const suggestions = ExplorationMenu.suggestionsMenu({ status: "generating" });
-  assert.equal(suggestions.gridCols, suggestions.items.length);
-  const overview = ExplorationMenu.overviewMenu(validPanel(), { currentNode: "room:3" });
-  assert.equal(overview.grid, undefined);
-  assert.equal(overview.geometry, "sections");
+test("the menu model carries no router frame any more", () => {
+  // exploration-room-actions: the wait and suggestions frames are retired;
+  // the model keeps the panel and the current node the verb card reads.
+  const panel = validPanel();
+  const model = ExplorationMenu.buildMenus(panel, { currentNode: "room:3" });
+  assert.deepEqual(model.menus, {});
+  assert.equal(model.panel, panel);
+  assert.equal(model.currentNode, "room:3");
+  assert.equal(ExplorationMenu.overviewMenu, undefined, "the scene overview builder is retired");
 });
 
 test("rail target entries name their server-authored affordances", () => {
@@ -624,38 +616,14 @@ function overviewPanel() {
   });
 }
 
-test("the overview is the footer only: no person, object, or exit entry", () => {
-  const menu = ExplorationMenu.overviewMenu(overviewPanel(), { currentNode: "room:3" });
-  assert.equal(menu.geometry, "sections");
-  assert.equal(menu.title, "場景");
-  assert.equal(menu.grid, undefined, "a sections menu carries no grid flag");
-  assert.deepEqual(
-    menu.items.map((item) => item.key),
-    ["look-room", "wait"]
-  );
-  assert.deepEqual(menu.sections, [{ key: "footer", label: null, count: 2 }]);
-  const total = menu.sections.reduce((sum, section) => sum + section.count, 0);
-  assert.equal(total, menu.items.length);
-  assert.equal(menu.items.find((item) => item.key === "look-room").label, "查看房間");
-  assert.equal(menu.items.find((item) => item.key === "wait").label, "等待／休息");
-  assert.equal(menu.items.find((item) => item.key === "wait").openSubmenu, "wait");
-  assert.ok(!menu.items.some((item) => item.key === "back"), "the root has no back row");
-});
-
-test("the overview's sections do not depend on the room's people or objects", () => {
-  const panel = overviewPanel();
-  panel.interact = [];
-  panel.look.entities = [];
-  panel.look.objects = [];
-  const menu = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
-  assert.deepEqual(
-    menu.sections.map((section) => section.key),
-    ["footer"]
-  );
-  panel.move = [];
-  const noExits = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
-  assert.deepEqual(noExits.sections.map((section) => section.key), ["footer"]);
-  assert.ok(!noExits.items.some((item) => item.key === "move-empty"));
+test("the room's 查看房間 row is the look builder's room row", () => {
+  // exploration-room-actions design D3: the place card's 查看房間 submits the
+  // retired footer chip's payload.
+  const room = ExplorationMenu.lookItems(overviewPanel()).find((item) => item.key === "look-room");
+  assert.equal(room.label, "查看房間");
+  assert.equal(room.actionId, "explore.look");
+  assert.deepEqual(room.payload, { room: true });
+  assert.deepEqual(room.commandDisplay, { room: true });
 });
 
 test("a disabled exit target keeps its reason and the plain exit label", () => {
@@ -737,30 +705,10 @@ test("an empty room has no rail entries", () => {
   assert.deepEqual(ExplorationMenu.presenceEntries(null), []);
 });
 
-test("the footer's suggestions entry follows the suggestions status", () => {
-  const panel = overviewPanel();
-  const keys = (suggestions) =>
-    ExplorationMenu.overviewMenu(panel, { currentNode: "room:3", suggestions }).items.find(
-      (item) => item.key === "suggestions"
-    );
-  assert.equal(keys({ status: "unavailable" }), undefined);
-  assert.equal(keys(null), undefined);
-  assert.equal(keys({ status: "generating" }).label, "建議");
-  const cards = [{}, {}, {}].map((_, i) => ({ kind: "known_action", label: `c${i}` }));
-  const ready = keys({ status: "ready", cards });
-  assert.equal(ready.label, "建議 (3)");
-  assert.equal(ready.openSubmenu, "suggestions");
-  assert.equal(keys({ status: "degraded", cards: [] }).label, "建議");
-});
-
-test("the footer always carries 查看房間 and 等待／休息 on an available panel", () => {
-  // Design D1: the footer always renders. Its 查看房間 chip is `lookItems`'
-  // room row, which exists only when `look.room` does, so the guarantee comes
-  // from the OOB v2 schema: every available panel carries a non-null
-  // `look.room` (`validateExplorationLook` requires the exact room fields and
-  // rejects null). The validator is the source of that guarantee, so this
-  // pins both halves — the accepted panel and the rejected null room — next
-  // to the footer that depends on it.
+test("every available panel carries the room row the place card reads", () => {
+  // The OOB v2 schema guarantees a non-null `look.room` on every available
+  // panel (`validateExplorationLook` requires the exact room fields), so the
+  // place card's 查看房間 always has its row.
   const panel = overviewPanel();
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
   assert.throws(() =>
@@ -770,13 +718,7 @@ test("the footer always carries 查看房間 and 等待／休息 on an available
       })
     )
   );
-  const menu = ExplorationMenu.overviewMenu(panel, { currentNode: "room:3" });
-  const footer = menu.sections[menu.sections.length - 1];
-  assert.equal(footer.key, "footer");
-  assert.deepEqual(
-    menu.items.slice(menu.items.length - footer.count).map((item) => item.key),
-    ["look-room", "wait"]
-  );
+  assert.ok(ExplorationMenu.lookItems(panel).some((item) => item.key === "look-room"));
 });
 
 test("verbMenuFor keeps payload order and appends 查看 then back", () => {

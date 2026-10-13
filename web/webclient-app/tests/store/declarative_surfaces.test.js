@@ -152,8 +152,8 @@ describe("declarative service/combat/creation surfaces (store)", () => {
 
     it("tabToRootAndConfirm('quests') from depth > 1 pops to root and opens quest drawer with depth 1", () => {
       openSession();
-      expect(store.focusItemByKey("wait")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
+      store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+      store.refreshView();
       expect(store.router.depth()).toBe(2);
 
       store.tabToRootAndConfirm("quests", "pointer");
@@ -289,8 +289,8 @@ describe("declarative service/combat/creation surfaces (store)", () => {
   describe("teardown posts one root descriptor per mode", () => {
     it("transport loss under an open submenu re-posts the exploration root", () => {
       openSession();
-      expect(store.focusItemByKey("wait")).toBe(true);
-      expect(store.focusConfirm()).toBe(true);
+      store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+      store.refreshView();
       expect(store.router.depth()).toBe(2);
       store.setConnected(false);
       expect(store.router.depth()).toBe(1);

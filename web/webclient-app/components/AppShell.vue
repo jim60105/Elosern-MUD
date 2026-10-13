@@ -153,6 +153,9 @@ const props = defineProps({
   rosterLockReason: { type: String, default: null },
   epoch: { type: [Number, String], default: null },
   possessionBanner: { type: Object, default: null },
+  // The place card's room actions (exploration-room-actions design D3):
+  // rendered only while true (exploration with the panel available).
+  placeActions: { type: Boolean, default: false },
 });
 
 const emit = defineEmits([
@@ -164,6 +167,10 @@ const emit = defineEmits([
   "beat-skip",
   "switch-character",
   "create-character",
+  "place-look",
+  "place-wait",
+  "place-hover",
+  "place-tab",
 ]);
 
 const commandLine = ref(null);
@@ -200,8 +207,9 @@ function focusMessagePage() {
 
 // The mode's focus home (webclient-dialogue-stage-actors design D5): the
 // side-effect-free rescue every return path shares (no drawer-close side
-// effects, no `drawer-closed` emit). In every mode but dialogue it is
-// `#action-dock`. In dialogue the command region is collapsed and the home
+// effects, no `drawer-closed` emit). In exploration it is the exit compass
+// while it is rendered; otherwise, and in every other mode but dialogue, it
+// is `#action-dock`. In dialogue the command region is collapsed and the home
 // is the choice list while it is shown, else the message page
 // (webclient-dialogue-choices-overlay D7). The page takes focus at once —
 // it is always rendered in dialogue — and the list takes it after the next
@@ -223,7 +231,16 @@ function restoreFocusHome() {
   // `preventScroll`: leaving dialogue focuses the dock while its region still
   // starts its slide back from beyond the stage's right edge; the focus must
   // never scroll an ancestor towards it (the stage clips, never scrolls).
+  // In exploration the home is the exit compass, the screen's first zone
+  // (exploration-room-actions): the dock has no row of its own any more.
   const dock = document.getElementById("action-dock");
+  if (props.mode === "exploration") {
+    const compass = dock?.querySelector?.('[data-testid="exit-compass"]');
+    if (compass && typeof compass.focus === "function") {
+      compass.focus({ preventScroll: true });
+      return;
+    }
+  }
   if (dock && typeof dock.focus === "function") {
     dock.focus({ preventScroll: true });
   }
@@ -391,9 +408,7 @@ watch(
 // Entering exploration focuses the exit compass (exploration-exit-compass,
 // redesign §5.4): once the exploration pane has rendered, focus that sits on
 // the dock itself or fell out of the layout moves to the compass. Focus the
-// player put elsewhere (the command field, a drawer, an overlay) stays. Every
-// other return path keeps the dock as the focus home, so the router's arrow
-// keys keep walking the overview's chips after a child frame or drawer closes.
+// player put elsewhere (the command field, a drawer, an overlay) stays.
 async function focusExplorationEntry() {
   await nextTick();
   if (props.mode !== "exploration") {
@@ -467,7 +482,16 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
         <slot name="vitals" />
       </template>
       <template #map>
-        <PlaceCard :location-label="locationLabel" :time-label="timeLabel" :motion-level="props.motionLevel" />
+        <PlaceCard
+          :location-label="locationLabel"
+          :time-label="timeLabel"
+          :motion-level="props.motionLevel"
+          :actions-enabled="props.placeActions"
+          @look-room="emit('place-look')"
+          @wait="(opener) => emit('place-wait', opener)"
+          @hover="(content) => emit('place-hover', content)"
+          @tab="(payload) => emit('place-tab', payload)"
+        />
         <slot name="map" />
       </template>
       <template #actor-left>

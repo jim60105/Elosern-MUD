@@ -11,8 +11,11 @@ import {
   NO_EXIT_TEXT,
   aimReadout,
   blockedReadout,
+  PLACE_LOOK_READOUT,
+  PLACE_WAIT_READOUT,
   departedReadout,
   idleReadout,
+  pillReadout,
   presentCount,
   readoutContent,
 } from "../../components/exploration-readout.js";
@@ -100,6 +103,52 @@ describe("idle summary and priority", () => {
     expect(readoutContent({ flash, rail, aim, idle })).toEqual({ ...flash, flash: true });
     expect(readoutContent({ rail, aim, idle })).toEqual({ ...rail, flash: false });
     expect(readoutContent({ aim, idle })).toEqual({ ...aim, flash: false });
+  });
+});
+
+describe("readoutContent: the final priority (exploration-room-actions design D6)", () => {
+  const flash = { lead: "無法通行", text: "x", tone: "warn" };
+  const aim = { lead: "前往 ↑", text: "y", tone: "normal" };
+  const rail = { lead: "店長", text: "交談", tone: "normal" };
+  const place = PLACE_WAIT_READOUT;
+  const pill = pillReadout("ready", 4);
+  const idle = idleReadout(2, 1);
+
+  it("names the place-card buttons and the pill", () => {
+    expect(PLACE_LOOK_READOUT).toEqual({ lead: "查看房間", text: "重新觀察四周", tone: "normal" });
+    expect(PLACE_WAIT_READOUT).toEqual({ lead: "等待", text: "讓時間流逝、休息或睡眠", tone: "normal" });
+    expect(pillReadout("ready", 4)).toEqual({ lead: "建議", text: "4 個可行的下一步", tone: "normal" });
+    expect(pillReadout("generating", 0).text).toBe("AI 正在構思建議…");
+    expect(pillReadout("degraded", 0).text).toBe("查看可行的下一步");
+  });
+
+  it("a flash beats every source, and the hovered source returns when it ends", () => {
+    expect(readoutContent({ flash, place, pill, rail, aim, idle })).toEqual({ ...flash, flash: true });
+    expect(readoutContent({ place, pill, rail, aim, idle })).toEqual({ ...place, flash: false });
+  });
+
+  it("orders the aimed-or-hovered tier: place-card button, pill, rail entry, compass aim", () => {
+    expect(readoutContent({ pill, rail, aim, idle })).toEqual({ ...pill, flash: false });
+    expect(readoutContent({ rail, aim, idle })).toEqual({ ...rail, flash: false });
+    expect(readoutContent({ aim, idle })).toEqual({ ...aim, flash: false });
+    expect(readoutContent({ idle })).toEqual({ ...idle, flash: false, tone: "quiet" });
+  });
+
+  it("leaving a source falls back to the next live slot", () => {
+    const state = effectScope().run(() => useReadoutState(() => idle));
+    state.setAim({ angle: 270, target: angled, zone: "pad" });
+    state.setPill(pill);
+    expect(state.content.value.lead).toBe("建議");
+    // The pointer leaves the pill while the compass still has an aim.
+    state.setPill(null);
+    expect(state.content.value.lead).toBe("前往 ←");
+    state.setPlace(place);
+    state.setRail(rail);
+    expect(state.content.value.lead).toBe("等待");
+    state.setPlace(null);
+    expect(state.content.value.lead).toBe("店長");
+    state.clear();
+    expect(state.content.value).toMatchObject({ text: "出口 2 · 在場 1", tone: "quiet" });
   });
 });
 

@@ -674,8 +674,7 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 # panel degrades the root to the disabled marker row). The
                 # driven snapshot therefore carries an available exploration
                 # panel with no traversal exits — the root resolves to the
-                # scene overview, whose first chip is then `look-room`
-                # (webclient-scene-overview-swap).
+                # empty exploration root (exploration-room-actions).
                 "exploration": {
                     "schema_version": 3,
                     "available": True,
@@ -803,11 +802,11 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         self.assertFalse(released["stillInFlight"])
 
         # Document key events route through the bridge's key routing. The
-        # keyboard router's exploration focus frame is the scene overview
-        # (webclient-scene-overview-swap): its chips are the root's rows in
-        # reading order, and the overview's row-of-chips geometry claims the
-        # vertical arrow keys. Unclaimed letter keys fall through to the text
-        # path.
+        # keyboard router's exploration root is an empty menu
+        # (exploration-room-actions): nothing is focused on it, a direction
+        # key still has its default prevented (the bridge suppresses page
+        # scroll) but moves nothing, and unclaimed letter keys fall through
+        # to the text path.
         keys = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
@@ -824,36 +823,28 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
                 };
             }"""
         )
-        self.assertEqual(keys["focusKey"], "look-room")
-        self.assertTrue(keys["focusEnabled"])
+        self.assertIsNone(keys["focusKey"])
         self.assertTrue(keys["downClaimed"])
         self.assertFalse(keys["letterSwallowed"], "unclaimed keys must fall through to the text path")
 
-        # Enter on the overview's 等待／休息 chip opens the waiting frame (the
-        # dock depth becomes 2) without dispatching a ui_action: a submenu
-        # opener is a local navigation cell, not an OOB action. (The retired
-        # move submenu and its `move-empty` row are unreachable from the dock
-        # now, webclient-scene-overview-swap.)
+        # The place card's 等待 opens the wait card without dispatching a
+        # ui_action and without pushing a router frame: opening the card is
+        # client-local (exploration-room-actions).
         enter_result = page.evaluate(
             """() => {
                 const { store, facade } = window.__elosernBridge;
-                store.focusItemByKey("wait");
-                const enter = new KeyboardEvent("keydown", { key: "Enter", cancelable: true });
-                document.dispatchEvent(enter);
+                const button = document.querySelector('[data-anchor="map"] [data-testid="place-card-wait"]');
+                button.click();
                 return {
                     dockDepth: store.view.dockDepth,
-                    focusKey: store.view.focus.key,
-                    focusEnabled: store.view.focus.enabled,
+                    roomCard: store.view.roomCard,
                     inFlight: facade.actions.client.isInFlight(),
-                    prevented: enter.defaultPrevented,
                 };
             }"""
         )
-        self.assertEqual(enter_result["dockDepth"], 2)
-        self.assertEqual(enter_result["focusKey"], "wait-dawn")
-        self.assertTrue(enter_result["focusEnabled"])
-        self.assertFalse(enter_result["inFlight"], "a navigation item must not dispatch a ui_action")
-        self.assertTrue(enter_result["prevented"])
+        self.assertEqual(enter_result["dockDepth"], 1)
+        self.assertEqual(enter_result["roomCard"], {"kind": "wait"})
+        self.assertFalse(enter_result["inFlight"], "opening the wait card must not dispatch a ui_action")
 
     @covers_requirement(
         "webclient-component-showcase::the-frozen-component-set-grows-only-through-a-governed-redesign-wave"

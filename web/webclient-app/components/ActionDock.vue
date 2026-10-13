@@ -28,10 +28,12 @@
 // verb popover used it; a person's verbs are now the stage's verb card,
 // exploration-presence-rail).
 //
-// The `context_actions.suggestions` envelope is a keyboard-reachable router
-// frame: the overview's footer `建議` chip opens it, and the pane renders its
-// card rows, the `✕ 清除建議` row, and a back row. No separate
-// `suggestions-section` element.
+// The exploration root holds no row of its own (exploration-room-actions):
+// its pane is the exit compass, the 建議 pill, and the readout, each its own
+// tab stop, so the container leaves the tab order there (`tabStop` false)
+// while staying the programmatic focus target. The `context_actions.
+// suggestions` envelope is the centred suggestions card's, opened by the
+// pill; the dock renders no suggestions element.
 import { computed } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
 
@@ -50,15 +52,19 @@ const props = defineProps({
   // True while a combat round plays by itself and locks the commands
   // (`store.view.dispatch.beatLocked`, webclient-combat-beat-queue D5).
   playback: { type: Boolean, default: false },
+  // Whether the container itself is a tab stop (false at the exploration
+  // root, whose zones are the tab stops).
+  tabStop: { type: Boolean, default: true },
 });
 
 const emit = defineEmits(["action", "back", "skip"]);
 
 // Creation mode renders the panel with no bar and no crumb (task 4.8):
-// exactly one `#action-dock` persists across every mode change.
-const showChrome = computed(
-  () => props.mode !== "creation" && props.rootItems.length > 0,
-);
+// exactly one `#action-dock` persists across every mode change. Every other
+// mode keeps the crumb, even over the exploration root, whose router menu is
+// empty (exploration-room-actions): a pushed child frame there (the
+// SkillBook casting flow) still names its trail.
+const showChrome = computed(() => props.mode !== "creation");
 const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
 // Every submenu frame keeps the breadcrumb; a person's verbs are the stage's
@@ -86,7 +92,7 @@ function onPaneActivate(payload) {
   <section
     id="action-dock"
     class="action-dock"
-    tabindex="0"
+    :tabindex="tabStop ? 0 : -1"
     :data-mode="mode"
     data-testid="action-dock"
   >
@@ -103,8 +109,8 @@ function onPaneActivate(payload) {
       @back="onBack"
     />
     <!-- The body: the scrolling pane plus the overlay layer. The pane holds
-         the active menu frame (the scene overview, a sub-menu, or a
-         skill/scale/confirm frame); the named `overlay` slot renders after
+         the active menu frame (the exploration root pane, a combat or
+         skill-use frame, or a confirm frame); the named `overlay` slot renders after
          it and covers exactly the pane's visible box. -->
     <div class="action-dock__body" :class="{ 'action-dock__body--playback': playback }">
       <!-- The waiting cue (webclient-combat-command-window): it veils the
@@ -146,12 +152,6 @@ function onPaneActivate(payload) {
     >
       <span class="action-dock__legend-text">數字鍵 1–9 ‧ <kbd>Enter</kbd> 執行 ‧ <kbd>Esc</kbd> 返回</span>
     </p>
-    <!-- Frozen Node-gate contract anchor (ui_contract.test.js reads suggestions-dismiss
-         and ✕ 清除建議 from ActionDock.vue source text). The active suggestions
-         surface renders exclusively in the 建議 router pane. -->
-    <template v-if="false">
-      <button class="suggestions-dismiss">✕ 清除建議</button>
-    </template>
 
   </section>
 </template>

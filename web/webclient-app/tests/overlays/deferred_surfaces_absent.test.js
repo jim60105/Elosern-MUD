@@ -209,12 +209,12 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Feedback/ToastQueue",
       // The AVG stage series adds the stage place card.
       "Core/PlaceCard",
-      // The AVG scene overview (webclient-scene-overview-component).
-      "Action/SceneOverview",
       // The centred card shell and the presence rail
       // (exploration-presence-rail).
       "Core/ChoiceCard",
       "Core/PresenceRail",
+      // The wait card's 進入夢境協作？ question (exploration-room-actions).
+      "Core/QuestionCard",
     ]) {
       expect(manifest.required).toContain(title);
     }

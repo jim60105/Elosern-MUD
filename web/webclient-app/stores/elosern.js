@@ -42,6 +42,7 @@ import { applyCombat } from "./elosern/combat.js";
 import { applyCreation } from "./elosern/creation.js";
 import { applyInteraction } from "./elosern/interaction.js";
 import { applyPresence } from "./elosern/presence.js";
+import { applyRoomActions } from "./elosern/room_actions.js";
 import { applyTransport } from "./elosern/transport.js";
 import { applyBeats } from "./elosern/beats.js";
 import { applyView } from "./elosern/view.js";
@@ -82,9 +83,6 @@ export const useElosernStore = defineStore("elosern", () => {
   // The npc identity for an active freeform dialogue; set when a freeform
   // affordance is activated, cleared when its speech is submitted.
   ctx.freeformTarget = null;
-  // Monotonic signal the shell watches to open the exploration rest-duration
-  // form (the wait/rest entry point).
-  ctx.restFormRequest = 0;
   // A dispatched OOB mutation that has not yet been confirmed (its result
   // was withheld or the presentation has not committed). Set on dispatch,
   // cleared only when the in-flight gate releases; a transport loss while it
@@ -156,6 +154,7 @@ export const useElosernStore = defineStore("elosern", () => {
   applyCreation(ctx);
   applyInteraction(ctx);
   applyPresence(ctx);
+  applyRoomActions(ctx);
   applySkillUse(ctx);
   applyTransport(ctx);
   // The combat beat playback (webclient-combat-beat-queue, design D5) sits
@@ -219,6 +218,13 @@ export const useElosernStore = defineStore("elosern", () => {
     activatePresence: ctx.activatePresence,
     activatePresenceVerb: ctx.activatePresenceVerb,
     closePresenceCard: ctx.closePresenceCard,
+    // The place card's room actions and the client-local room cards
+    // (exploration-room-actions).
+    activateRoomLook: ctx.activateRoomLook,
+    openRoomCard: ctx.openRoomCard,
+    closeRoomCard: ctx.closeRoomCard,
+    activateWaitRow: ctx.activateWaitRow,
+    activateSuggestion: ctx.activateSuggestion,
     chooseScale: ctx.chooseScale,
     // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,
@@ -226,11 +232,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
     // one-frame stack. Browser helpers use it to normalize the stack.
-    // A presence card is not a frame, but the reset leaves none open; the
-    // public entry publishes that at once (the internal reset runs inside
-    // the publish window and must not publish itself).
+    // A presence or room card is not a frame, but the reset leaves none
+    // open; the public entry publishes that at once (the internal reset runs
+    // inside the publish window and must not publish itself).
     resetFramesToRoot: () => {
-      const hadCard = ctx.presenceCard !== null;
+      const hadCard = ctx.centredCardOpen();
       ctx.resetFramesToRoot();
       if (hadCard) {
         ctx.publishView();

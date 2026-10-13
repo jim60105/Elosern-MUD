@@ -1,12 +1,12 @@
 // The action-dock surface (H3): the committed `context_actions` frame
 // normalization shared by the keyboard router and the visible DockMenu, the
-// root/navigation tab entries, the scene-overview projection, the detail-pane
-// derivation, and the dock's pointer-activation handlers. Extracted verbatim
+// root/navigation tab entries, the exploration root's live flag, the
+// detail-pane derivation, and the dock's pointer-activation handlers. Extracted verbatim
 // from AppClient.vue so the SFC stays a passive renderer.
 import { computed } from "vue";
 import { badgeCount, badgeVisible, classifyPane } from "../components/dock-panes.js";
 
-export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }) {
+export function useDock(store, { panel, dispatchIntent }) {
   // Normalize the committed top navigation and action-root entries identically.
   function normalizeRootItems(items) {
     return items.map((item) => {
@@ -176,16 +176,13 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   // re-derives the same kind internally for its row variants.
   const dockPaneKind = computed(() => classifyPane({ items: dockItems.value }));
 
-  // The scene overview (webclient-scene-overview-swap D4): the exploration
-  // dock's root frame. Its child frames (the waiting and suggestions frames)
-  // replace it in the pane; a person's verbs are the client-local verb card
-  // on the stage (exploration-presence-rail), never a dock frame. A
-  // degraded root still renders through DockMenu's single marker row.
-  const overviewShown = computed(
+  // The exploration root pane (exploration-room-actions design D2): the
+  // exit compass, the shared readout, and the 建議 pill, while the router's
+  // current frame is the (empty) exploration root. A degraded root still
+  // renders through DockMenu's single marker row.
+  const explorationRootShown = computed(
     () => !store.view.degradedRoot && store.view.dockSource === "exploration.root",
   );
-  const overviewActive = overviewShown;
-  const overviewMenu = computed(() => store.view.combatMenu);
 
   // H3 (task 4.5): a non-current tab click pops to the root frame, focuses the
   // tab's item, and confirms it ("pointer") — one deliberate activation, no
@@ -207,14 +204,12 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   const contextActionsPanel = computed(() => panel("context_actions"));
   const dockKind = computed(() => (contextActionsPanel.value && contextActionsPanel.value.kind) || null);
   const rowPrefix = computed(() => (dockKind.value === "combat" ? "combat-row" : "exploration-row"));
-  const detailTestId = computed(() => (dockKind.value === "combat" ? "combat-detail" : "exploration-detail"));
-  // The detail pane renders only in combat mode or while a submenu frame is
-  // active (router depth 2+); the exploration root (depth 1) draws no visible
-  // detail pane (the shell mockup contract).
-  const showDetail = computed(() => {
-    const v = store.view;
-    return v.mode === "combat" || v.dockDepth > 1;
-  });
+  const detailTestId = computed(() => (dockKind.value === "combat" ? "combat-detail" : "dock-detail"));
+  // The detail pane renders only in combat (and on the combat panel's
+  // deeper frames). The exploration screen has no detail pane: its shared
+  // readout is where server-authored reasons appear (exploration-room-actions
+  // design D6).
+  const showDetail = computed(() => store.view.mode === "combat" || dockKind.value === "combat");
 
   function onAction(intent) {
     // One dispatch intent per activation; the store is the single writer.
@@ -222,14 +217,8 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
   }
 
   // DockMenu pointer activation follows the same router confirmation path as
-  // Enter. The rest-duration form is the sole local UI exception: confirming
-  // its action opens the form before any OOB action is dispatched.
-  function onDockActivate(payload) {
-    const intent = payload && payload.intent;
-    if (intent && intent.action_id === "explore.wait") {
-      openRestForm();
-      return;
-    }
+  // Enter.
+  function onDockActivate() {
     store.focusConfirm("pointer");
   }
 
@@ -249,9 +238,7 @@ export function useDock(store, { panel, dispatchIntent, openRestForm, shellRef }
     onDockBack,
     onDockFocusChange,
     onTabClick,
-    overviewActive,
-    overviewMenu,
-    overviewShown,
+    explorationRootShown,
     rowPrefix,
     rootItems,
     showDetail,

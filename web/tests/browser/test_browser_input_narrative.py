@@ -24,6 +24,7 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_wait_row,
     activate_first_compass_exit,
     activate_overview_chip,
     fixture_home_node_id,
@@ -942,25 +943,10 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
     def test_slash_while_the_rest_form_is_open_never_toggles_the_command_line(self):
         page = self.logged_in_page()
         # Open the rest form (Wait/休息 → 休息一段時間).
-        # Navigate to the Wait/休息 tab by the store's committed focus KEY,
-        # not by cell arithmetic: the declarative root's tab set is
-        # capability-driven (H3 design D5 appends the 建議 tab when the
-        # suggestions envelope is not `unavailable`), so the wait cell is
-        # no longer guaranteed to be last.
-        focus_action_dock(page)
-        for _ in range(10):
-            focused = page.evaluate(
-                "() => window.__elosernBridge.store.view.focus.key"
-            )
-            if focused == "wait":
-                break
-            _press(page, "ArrowRight")
-        else:
-            raise AssertionError("the wait tab never reached focus")
-        _press(page, "Enter")  # Wait/休息
-        _press(page, "ArrowRight")  # 睡眠至完全恢復
-        _press(page, "ArrowRight")  # 休息 N 小時 (opens the rest form)
-        _press(page, "Enter")
+        # The place card's 等待 opens the wait card, whose third row 休息 N
+        # 小時 (wait-rest) opens the bounded custom-duration form
+        # (exploration-room-actions).
+        activate_wait_row(page, "wait-rest")
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),

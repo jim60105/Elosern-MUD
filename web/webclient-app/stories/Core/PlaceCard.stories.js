@@ -5,7 +5,11 @@ import PlaceCard from "../../components/PlaceCard.vue";
 // card. Props: locationLabel (the store's resolved place name — the
 // `local_map` current-node label, else the status location) and timeLabel
 // (the committed world time); null renders the `位置：--` / `時間：--`
-// placeholders. Display-only: no control and no emitted events. The frame
+// placeholders. actionsEnabled (exploration-room-actions): only in
+// exploration with the panel available, the 查看房間 magnifier beside the
+// heading and the 等待 hourglass beside the time, emitting `look-room`,
+// `wait`, `hover` (readout content), and `tab`; otherwise the card has no
+// control and no tab stop. The frame
 // below sizes it like its island slot at the head of the `map` anchor
 // (the minimap column's width, content-sized height).
 
@@ -43,6 +47,23 @@ export const LongLabel = {
   args: {
     locationLabel: "伊洛瑟恩王都外城區‧商人公會附屬倉庫的地下儲藏室",
     timeLabel: "秋季 28 日 ‧ 23:59",
+  },
+};
+
+// Exploration: the room actions beside the place and the time.
+export const WithActions = {
+  render: renderCard,
+  args: { locationLabel: "城門廣場", timeLabel: "春季 3 日 ‧ 12:00", actionsEnabled: true },
+};
+
+// A long name beside the buttons: the visible text ellipsizes, the heading
+// keeps its full accessible name.
+export const LongLabelWithActions = {
+  render: renderCard,
+  args: {
+    locationLabel: "伊洛瑟恩王都外城區‧商人公會附屬倉庫的地下儲藏室",
+    timeLabel: "秋季 28 日 ‧ 23:59",
+    actionsEnabled: true,
   },
 };
 

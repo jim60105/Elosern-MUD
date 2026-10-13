@@ -1,7 +1,9 @@
 import { h } from "vue";
 import ActionDock from "../../components/ActionDock.vue";
 import DockMenu from "../../components/DockMenu.vue";
-import SceneOverview from "../../components/SceneOverview.vue";
+import ExitCompass from "../../components/ExitCompass.vue";
+import ExplorationReadout from "../../components/ExplorationReadout.vue";
+import { idleReadout } from "../../components/exploration-readout.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import {
   EXPLORATION_AFFORDANCES_SAMPLE,
@@ -13,25 +15,27 @@ import {
 import {
   AFFORDANCES,
   explorationPanelFixture,
-  localMapFixture,
-  overviewArgs,
+  compassArgs,
 } from "../fixtures/scene_overview.js";
+import { localMapAround } from "../fixtures/local_map.js";
 
 // ActionDock: the non-closable bottom action surface. Props: mode (the
 // preserved #action-dock data-mode), guidancePrefix (per-surface guidance
 // prefix, rendered on its own line and by the breadcrumb), rootItems, view
 // (the committed slice), and playback (a combat round playing by itself: the
 // waiting cue with its skip). Slots: default (the active frame's rows — the
-// scene overview, a submenu, or a combat frame's command list) and overlay (a
+// exploration root pane, or a combat frame's command list) and overlay (a
 // layer over the pane's visible box). Events: action (the exact OOB action intent
 // for a row activation), back, skip.
 
-// The exploration root's scene overview, from the shared derived-shape helper
-// (the same `overviewMenu` the live resolver returns).
+// The exploration root pane (exploration-room-actions design D2), from the
+// shared derived-shape helper: the exit compass (the same exit rows the live
+// resolver returns) beside a right column holding the 建議 pill over the
+// shared readout. The room's other actions are the place card's.
 const OVERVIEW_PANEL = explorationPanelFixture({
   exits: [
-    { label: "北", destination: "room:901" },
-    { label: "東", destination: "room:902" },
+    { ref: "n", label: "北", destination: "town:gate:0:1" },
+    { ref: "e", label: "東", destination: "town:gate:1:0" },
   ],
   targets: [
     { identity: 11, name: "葛里安‧衛登", affordances: [AFFORDANCES.talk, AFFORDANCES.trade] },
@@ -39,10 +43,14 @@ const OVERVIEW_PANEL = explorationPanelFixture({
   objects: [{ identity: 31, name: "任務板" }],
 });
 
-const OVERVIEW_MAP = localMapFixture([
-  ["room:901", "北岸大道"],
-  ["room:902", "公會櫃檯"],
-]);
+const OVERVIEW_MAP = localMapAround({
+  layer: "grid",
+  current: ["town:gate:0:0", "城門廣場", 0, 0],
+  neighbours: [
+    ["town:gate:0:1", "北岸大道", 0, 1],
+    ["town:gate:1:0", "公會街", 1, 0],
+  ],
+});
 
 const renderDock = (args) => ({
   render: () =>
@@ -61,39 +69,45 @@ const renderDock = (args) => ({
     ]),
 });
 
-// The exploration root: the scene overview in the pane, no tab bar, and the
-// dock's own legend strip below the scrolling body.
-const renderOverview = (args) => ({
-  render: () =>
-    h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden;" }, [
-      h("div", { style: "padding: 8px; font-family: var(--f-mono); color: var(--paper-500); font-size: 16px;" },
-        "（上方為敘事區域）"),
-      h(ActionDock, args, {
-        default: () => [
-          h(SceneOverview, {
-            ...overviewArgs(OVERVIEW_PANEL, {
-              currentNode: "room:900",
-              localMap: OVERVIEW_MAP,
-              focusedKey: "exit-0",
-            }),
-          }),
-        ],
-      }),
-    ]),
-});
+// The exploration root: the compass, the 建議 pill, and the readout in the
+// pane; no tab bar, chip row, or legend strip.
+const renderOverview = ({ pillCount, ...args }) => {
+  const { localMapModel, ...compass } = compassArgs(OVERVIEW_PANEL, OVERVIEW_MAP);
+  return {
+    render: () =>
+      h("div", { style: "border: 1px solid var(--ink-700); border-radius: 12px; overflow: hidden; height: calc(240px * var(--ui-scale)); width: calc(484px * var(--ui-scale));" }, [
+        h(ActionDock, args, {
+          default: () => [
+            h("div", { class: "dock-pane-host dock-pane-host--exploration" }, [
+              h("div", { class: "exploration-root", "data-testid": "exploration-root" }, [
+                h("div", { class: "exploration-root__compass" }, [h(ExitCompass, { ...compass, active: true })]),
+                h("div", { class: "exploration-root__side" }, [
+                  h("button", { type: "button", class: "exploration-pill", "data-testid": "suggestions-pill" }, [
+                    h("span", { class: "exploration-pill__label" }, "建議"),
+                    pillCount > 0 ? h("b", { class: "exploration-pill__count" }, ` ${pillCount}`) : null,
+                  ]),
+                  h(ExplorationReadout, { class: "exploration-root__readout", ...idleReadout(compass.targets.cycle.length, 1) }),
+                ]),
+              ]),
+            ]),
+          ],
+        }),
+      ]),
+  };
+};
 
 export default {
   title: "Action/ActionDock",
   component: ActionDock,
 };
 
-export const SceneOverviewRoot = {
+export const ExplorationRoot = {
   render: renderOverview,
   args: {
     mode: "exploration",
-    guidancePrefix: "場景",
     rootItems: [],
-    focusedKey: "exit-0",
+    tabStop: false,
+    pillCount: 4,
   },
 };
 

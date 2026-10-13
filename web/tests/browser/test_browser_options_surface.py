@@ -1,7 +1,8 @@
-"""Dock suggestions-surface browser acceptance (webclient-options-surface).
+"""Suggestions-surface browser acceptance (webclient-options-surface).
 
-These journeys drive the real Evennia server's exploration dock suggestions
-section: the four status renders (the muted generating line, the ready card
+These journeys drive the real Evennia server's exploration suggestions
+surface — since exploration-room-actions the 建議 pill in the command panel
+and the centred suggestions card it opens: the four status renders (the muted generating line, the ready card
 set with the dismiss control, degraded rule cards with the muted note, and
 unavailable after dismiss), exact card execution envelopes through the action
 client, the section-only re-render without a dock rebuild, the sub-dock
@@ -22,10 +23,11 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    PILL_SELECTOR,
+    SUGGESTIONS_CARD_SELECTOR,
     activate_first_compass_exit,
-    activate_overview_chip,
-    focus_action_dock,
     install_outbound_recorder,
+    open_suggestions_card,
     narrative_log_text,
     sent_action_count,
     store_state,
@@ -95,22 +97,22 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         wait_for_store_state(page, _status_reached, timeout=timeout)
 
     def _section(self, page):
+        """The suggestions card is shown with its content (rows or notes)
+        while no re-homed sub-dock owns the surface."""
         return page.evaluate(
-            """() => {
+            """(selector) => {
                 const s = (window.__elosernBridge && window.__elosernBridge.store.view) || {};
-                const subDock = s.activeSubDock || null;
-                const desc = (window.__elosernBridge && window.__elosernBridge.router.currentDescriptor()) || {};
-                const pane = document.querySelector('[data-testid="dock-menu"]');
-                const hasCards = pane !== null && pane.querySelector('[data-item-key^="action-"], [data-item-key^="suggestions-"]') !== null;
-                return subDock === null && desc.source === 'exploration.suggestions' && hasCards;
-            }"""
+                const card = document.querySelector(selector);
+                const hasContent = card !== null && card.querySelector(
+                    '[data-testid="suggestions-card-row"], [data-testid="choice-card-note"], [data-testid="suggestions-card-dismiss"]') !== null;
+                return (s.activeSubDock || null) === null && hasContent;
+            }""",
+            SUGGESTIONS_CARD_SELECTOR,
         )
 
     def _open_suggestions_pane(self, page):
-        desc = page.evaluate("() => (window.__elosernBridge && window.__elosernBridge.router.currentDescriptor()) || {}")
-        if desc.get("source") != "exploration.suggestions":
-            activate_overview_chip(page, "suggestions")
-            page.wait_for_timeout(60)
+        open_suggestions_card(page)
+        page.wait_for_timeout(60)
 
     def _wait_section(self, page, timeout=30000):
         def _section_shown(state):
@@ -123,15 +125,11 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             dom_readiness={
                 "selector": '#action-dock',
                 "predicate": (
-                    "() => { if (document.querySelector('#action-dock "
-                    "[data-item-key=\"suggestions\"]') !== null) { return true; } "
-                    "const b = window.__elosernBridge || null; "
-                    "if (!b) { return false; } "
-                    "const d = b.router.currentDescriptor() || {}; "
-                    "return d.source === 'exploration.suggestions'; }"
+                    "() => document.querySelector('%s') !== null "
+                    "|| document.querySelector('%s') !== null" % (PILL_SELECTOR, SUGGESTIONS_CARD_SELECTOR)
                 ),
-                "description": "the suggestions section is present: the overview footer "
-                "chip at the root frame, or the suggestions pane when it is open",
+                "description": "the suggestions surface is present: the 建議 pill, or the "
+                "suggestions card when it is open",
             },
             timeout=timeout,
         )
@@ -145,11 +143,12 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _section_hidden,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="suggestions"]',
+                "selector": PILL_SELECTOR,
                 "predicate": (
-                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') === null"
+                    "() => document.querySelector('%s') === null && document.querySelector('%s') === null"
+                    % (PILL_SELECTOR, SUGGESTIONS_CARD_SELECTOR)
                 ),
-                "description": "the suggestions tab has disappeared from the action dock",
+                "description": "the 建議 pill and the suggestions card have disappeared",
             },
             timeout=timeout,
         )
@@ -163,50 +162,41 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             page,
             _generating,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="suggestions"]',
-                "predicate": (
-                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions\"]') !== null"
-                ),
-                "description": "the suggestions tab is rendered before opening the generating pane",
+                "selector": PILL_SELECTOR,
+                "predicate": "() => document.querySelector('%s') !== null" % PILL_SELECTOR,
+                "description": "the 建議 pill is rendered before opening the generating card",
             },
             timeout=timeout,
         )
         self._open_suggestions_pane(page)
+        note = SUGGESTIONS_CARD_SELECTOR + ' [data-testid="choice-card-note"]'
         wait_for_store_state(
             page,
             _generating,
             dom_readiness={
-                "selector": '#action-dock [data-item-key="suggestions-generating"]',
-                "predicate": (
-                    "() => document.querySelector('#action-dock [data-item-key=\"suggestions-generating\"]') !== null"
-                ),
-                "description": "the generating line is rendered in the dock suggestions pane",
+                "selector": note,
+                "predicate": "() => document.querySelector('%s') !== null" % note,
+                "description": "the generating note is rendered on the suggestions card",
             },
             timeout=timeout,
         )
-        return page.evaluate(
-            """() => {
-                // The generating row is a disabled local cell (actionId null):
-                // AppClient normalizes it to a navigation cell and DockMenu
-                // renders the label directly in the row button
-                // (.dock-menu__card-nav), not through OptionCard's
-                // .option-card-label span. The muted label text is unchanged
-                // (webclient-options-surface; action_dock.test.js pins the
-                // row text).
-                const row = document.querySelector(
-                    '#action-dock [data-item-key="suggestions-generating"]');
-                return row ? row.innerText : null;
-            }"""
-        )
+        return page.locator(note).first.inner_text()
 
     def _ready_card_labels(self, page):
         self._open_suggestions_pane(page)
         return page.evaluate(
-            """() => Array.from(
+            """(selector) => Array.from(
                 document.querySelectorAll(
-                    '#action-dock .dock-menu__cards [data-item-key^="action-"]:not([data-item-key="action-options.dismiss"]) .option-card-label'))
-                .map((el) => el.innerText)"""
+                    selector + ' [data-testid="suggestions-card-row"] .choice-card__label'))
+                .map((el) => el.innerText)""",
+            SUGGESTIONS_CARD_SELECTOR,
         )
+
+    def _card_rows(self, page):
+        return page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="suggestions-card-row"]')
+
+    def _dismiss_rows(self, page):
+        return page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="suggestions-card-dismiss"]')
 
     def _sent_actions(self, page, action_id):
         sent = page.evaluate("window.__elosernSent || []")
@@ -236,7 +226,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
     def _dismiss(self, page):
         self._open_suggestions_pane(page)
-        page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').click()
+        self._dismiss_rows(page).click()
 
     def _open_plaza_page(self):
         """A logged-in page whose session displays the ready plaza card set."""
@@ -285,22 +275,24 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         line = self._wait_generating_line(page)
         self.assertEqual(line, GENERATING_LINE)
         self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key^="action-"]').count(),
+            self._card_rows(page).count(),
             0,
             "the generating render carries no cards and no dismiss control",
         )
-        self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
-            0,
-        )
+        self.assertEqual(self._dismiss_rows(page).count(), 0)
+        self.assertEqual(page.locator(PILL_SELECTOR).inner_text().strip(), "建議")
 
         self._wait_suggestions(page, "ready")
         self._wait_section(page)
         self.assertEqual(self._ready_card_labels(page), list(EXPECTED_READY_LABELS))
         self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
+            self._dismiss_rows(page).count(),
             1,
             "the ready render carries the dismiss control",
+        )
+        self.assertEqual(
+            page.locator(PILL_SELECTOR).get_attribute("aria-label"),
+            "建議 %d" % len(EXPECTED_READY_LABELS),
         )
         # Only the dismissal's own OOB action crossed the wire.
         self.assertEqual(sent_action_count(page, "options.dismiss"), 1)
@@ -322,28 +314,26 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._teleport_to_plaza(page)
         self._wait_generating_line(page)
 
-        # The generating push changed only the suggestions content: the
-        # exploration menu subtree and the keyboard router must be untouched.
-        # H3: the active row container carries `data-testid="dock-menu"` (the
-        # scene overview at depth 1, the exploration root). A suggestions-only
-        # update must not rebuild that container.
+        # The generating push changed only the suggestions content: the open
+        # suggestions card and the keyboard router must be untouched — the
+        # ready cards replace the muted note in place on the same card.
         captured = page.evaluate(
-            """() => {
-                window.__menuNode = document.querySelector(
-                    '#action-dock [data-testid="dock-menu"]');
+            """(selector) => {
+                window.__menuNode = document.querySelector(selector);
                 return window.__menuNode !== null;
-            }"""
+            }""",
+            SUGGESTIONS_CARD_SELECTOR,
         )
-        self.assertTrue(captured, "the exploration menu must be mounted")
+        self.assertTrue(captured, "the suggestions card must be open")
         depth = page.evaluate("window.__elosernBridge.router.depth()")
 
         self._wait_suggestions(page, "ready", timeout=60000)
         stable = page.evaluate(
-            """() => {
-                const menu = document.querySelector(
-                    '#action-dock [data-testid="dock-menu"]');
+            """(selector) => {
+                const menu = document.querySelector(selector);
                 return window.__menuNode === menu && window.__menuNode.isConnected;
-            }"""
+            }""",
+            SUGGESTIONS_CARD_SELECTOR,
         )
         self.assertTrue(
             stable,
@@ -364,8 +354,8 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         page = self._open_plaza_page()
         inp_before = self._narrative_inp_count(page)
 
-        # Keyboard activation works natively on the focused card button.
-        page.locator('[data-testid="dock-menu"] .option-card').nth(0).focus()
+        # Keyboard activation on the focused card: its first row is active.
+        page.locator(SUGGESTIONS_CARD_SELECTOR).focus()
         page.keyboard.press("Enter")
 
         self.assertEqual(self._sent_actions(page, "explore.look"), [{"room": True}])
@@ -406,10 +396,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             for target in store_state(page)["panels"]["exploration"]["interact"]
             if str(target["identity"]) == str(freeform_entry["params"]["npc_id"])
         )
-        page.locator(
-            '[data-testid="dock-menu"] .option-card',
-            has_text="我們聊聊好嗎？",
-        ).click()
+        self._card_rows(page).filter(has_text="我們聊聊好嗎？").click()
 
         self.assertEqual(
             self._sent_actions(page, "explore.talk_freeform"),
@@ -477,33 +464,19 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             return (not state.get("connected")) and bool(state.get("mutationsLocked"))
 
         wait_for_store_state(page, _locked)
-        # The transport close pops the router back to the root frame, and the
-        # keyboard-bridge focus gate requires a connected store, so the pane
-        # re-opens through the store façade directly: frame pushes are local
-        # router operations, never connection-gated.
-        opened = page.evaluate(
-            """() => {
-                const store = window.__elosernBridge.store;
-                if (!store.focusItemByKey('suggestions')) { return false; }
-                return store.focusConfirm('pointer') === true;
-            }"""
-        )
-        self.assertTrue(opened, "the suggestions pane must open through the store while locked")
+        # The non-dismissible offline overlay covers the stage (the lock UX),
+        # so the card opens through the store façade directly: opening it is
+        # local, never connection-gated.
+        opened = page.evaluate("() => window.__elosernBridge.store.openRoomCard('suggestions')")
+        self.assertTrue(opened, "the suggestions card must open through the store while locked")
         page.wait_for_function(
-            "() => ((window.__elosernBridge.router.currentDescriptor() || {})"
-            ".source === 'exploration.suggestions')",
+            "(selector) => document.querySelectorAll(selector + ' [data-testid=\"suggestions-card-row\"]').length > 0",
+            arg=SUGGESTIONS_CARD_SELECTOR,
             timeout=15000,
         )
-        page.wait_for_function(
-            "() => document.querySelectorAll('[data-testid=\"dock-menu\"] .option-card').length > 0",
-            timeout=15000,
-        )
-        # The non-dismissible offline overlay covers the dock (the lock UX);
-        # scroll the card into view, then force the click so the card's direct
-        # listener still runs and the action client's own lock gate is what
-        # rejects the submit.
-        card = page.locator('[data-testid="dock-menu"] .option-card').nth(0)
-        card.scroll_into_view_if_needed()
+        # Force the click so the card's own handler still runs and the action
+        # client's lock gate is what rejects the submit.
+        card = self._card_rows(page).nth(0)
         card.click(force=True)
         page.wait_for_timeout(300)
         self.assertEqual(
@@ -556,22 +529,15 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
 
         self._wait_section(page)
         self._open_suggestions_pane(page)
+        notes = page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="choice-card-note"]').all_inner_texts()
+        self.assertEqual(notes, [DEGRADED_NOTE, EMPTY_STATE_LINE])
         self.assertEqual(
-            # The empty-state row is a disabled local cell: DockMenu renders
-            # its label directly in the row button (no OptionCard
-            # .option-card-label span) — same shape as the generating row
-            # (webclient-options-surface; action_dock.test.js pins the row
-            # text).
-            page.locator('[data-testid="dock-menu"] [data-item-key="suggestions-empty"]').inner_text(),
-            EMPTY_STATE_LINE,
-        )
-        self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key^="action-explore"]').count(),
+            self._card_rows(page).count(),
             0,
-            "a zero-card degraded payload renders no card container",
+            "a zero-card degraded payload renders no card row",
         )
         self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
+            self._dismiss_rows(page).count(),
             1,
             "the empty-state render keeps the dismiss control",
         )
@@ -586,19 +552,23 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         self._wait_section(page)
         self._open_suggestions_pane(page)
         self.assertGreaterEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key^="action-"]').count(),
+            self._card_rows(page).count(),
             1,
             "the v1 exploration derivation always yields at least one rule card",
         )
         self.assertEqual(
-            page.locator('[data-testid="dock-menu"] [data-item-key="action-options.dismiss"]').count(),
+            page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="choice-card-note"]').first.inner_text(),
+            DEGRADED_NOTE,
+        )
+        self.assertEqual(
+            self._dismiss_rows(page).count(),
             1,
             "the degraded render carries the same dismiss control",
         )
-        # Degraded cards live in the dock only: the narrative stream never
-        # renders suggestion cards (choice-points are the later slice).
+        # Degraded cards live on the suggestions card only: the narrative
+        # stream never renders suggestion cards.
         self.assertEqual(
-            page.locator('[data-testid="message-window"] .option-card').count(),
+            page.locator('[data-testid="message-window"] [data-testid="suggestions-card-row"]').count(),
             0,
             "degraded rule cards must never appear in the narrative stream",
         )
@@ -645,7 +615,8 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
         # Activate the character sub-dock deterministically through the
         # store's `activeSubDock` state (the legacy `_open_root(page, 3)`
         # assumed a hierarchical root the Vue flat dock does not render).
-        # While it is active, the suggestions section must not render.
+        # While it is active, neither the suggestions card nor the 建議 pill
+        # renders.
         page.evaluate("window.__elosernBridge.store.setActiveSubDock('character')")
         self.assertEqual(
             page.evaluate("(() => { const s = window.__elosernBridge.store.view; return s && s.mode === 'exploration'; })()"),
@@ -657,6 +628,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
             "the suggestions section must not render under the character "
             "sub-dock",
         )
+        self.assertEqual(page.locator(PILL_SELECTOR).count(), 0)
 
         # Leaving the sub-dock (clearing `activeSubDock`) rebuilds the
         # exploration dock from the current snapshot: the ready card set

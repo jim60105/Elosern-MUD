@@ -13,10 +13,11 @@ events/actions it emits, and its primary states.
 - **WHEN** the required-component manifest is enumerated
 - **THEN** every listed component has at least one registered Storybook story, including the
   message window's story with its single-page, more-pages, last-page, error-page, oversize-page,
-  pending-action, and dialogue name-plate states, the scene overview's story with its full-room and empty-rows
-  states, the choice card's story with its verbs, wait, suggestions, and overflow states, the
+  pending-action, and dialogue name-plate states, the place card's story with and without its room actions,
+  the question card's story with its dream question and locked states, the choice card's story with its verbs,
+  wait, locked-wait, suggestions, generating, degraded-empty, and overflow states, the
   presence rail's story with its default, overflow, no-portraits, and objects-only states, the
-  exploration screen's story with its default and person-focus states, and the stage actor's story with its player, host-image,
+  exploration screen's story with its default, person-focus, wait-card, dream-question, and suggestions-card states, and the stage actor's story with its player, host-image,
   host-pending-placeholder, host-missing-entry, speaking, and dimmed states, the foe line-up's story
   with its one-foe, two-foe, three-foe, capped-at-three, pending-placeholder, and missing-entry states, and the
   dialogue choice list's story with its picks, no-picks, move-exits, disabled-exit, and overflowing states
@@ -39,8 +40,8 @@ events/actions it emits, and its primary states.
 #### Scenario: The manifest enumerates the contextual HUD redesign set
 - **WHEN** the contextual HUD redesign completes
 - **THEN** the required manifest SHALL enumerate at minimum: the header; the place card; the
-  message window; the command line; the action dock with its menu, submenu, and choice-card frames,
-  its scene overview; the presence rail and the centred choice card; the status panel with its gauges and
+  message window; the command line; the action dock with its menu and submenu frames and its exploration
+  root pane; the presence rail, the centred choice card, and the question card; the status panel with its gauges and
   conditions; the character status drawer (including the equipment doll); the skill book; the
   local map; the scene backdrop, the reference artwork frame, the stage actor that stands a portrait
   on the stage, the foe line-up that stands the combat foes on the stage, and the dialogue choice
@@ -96,23 +97,22 @@ non-local network requests blocked.
 
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 
-The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `OptionCard`/`ChoiceCardRow`, `ExitCompass`,
-`ExplorationReadout`, `SceneOverview`) SHALL present the `context_actions` v5 menus and, in
-exploration, the `exploration` panel's scene overview as an exit compass beside finite footer
-chips sharing one readout, with the mode's guidance line, focused/disabled states, and the exact
-server-authored option and choice card shape.
+The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `ExitCompass`, `ExplorationReadout`,
+`RestForm`) SHALL present the `context_actions` v5 menus and, in exploration, the exit compass beside
+the 建議 pill sharing one readout, with the mode's guidance line, focused/disabled states, and the
+exact server-authored suggestion card shape on the centred suggestions card.
 
 #### Scenario: Focused and disabled cells are distinct
 - **WHEN** the active menu frame renders a focused cell and a disabled cell
 - **THEN** the focused cell is the dispatch target (its activation emits the action intent) and the disabled cell emits nothing, and each exposes its `action-` or `target-` key and a stable `data-testid`
 
 #### Scenario: Option and choice cards match the server shape
-- **WHEN** the `context_actions` suggestions render
-- **THEN** each option and choice card is the exact server-authored shape and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
+- **WHEN** the `context_actions` suggestions render on the suggestions card
+- **THEN** each card row is the exact server-authored shape (label and optional hint) and its activation emits the exact OOB action intent (the `ui_action` envelope's `action_id` + `payload`) with no invented value
 
 #### Scenario: The scene overview renders only its non-empty rows
-- **WHEN** the scene overview renders for a room with people, objects, and exits beside a compass
-- **THEN** only the footer row renders, with no 人物, 物件, or 出口 row or label, and each chip carries its row key and row id
+- **WHEN** the exploration root renders for a room with people, objects, and exits beside a compass
+- **THEN** no chip row renders, with no 人物, 物件, 出口, or footer row or label: the people and objects stand on the presence rail and the room actions on the place card and the 建議 pill
 
 #### Scenario: A disabled exit chip explains itself without submitting
 - **WHEN** a disabled compass target is aimed or clicked
@@ -135,9 +135,8 @@ server-authored option and choice card shape.
   frame-opening intent its row carries, so no action or target is invented
 
 #### Scenario: Overview chips wrap inside the command panel
-- **WHEN** a scene-overview row's chips exceed its width
-- **THEN** they wrap onto further lines inside the command panel rather than overflow it
-  horizontally
+- **WHEN** the command panel's right column holds the 建議 pill and the readout
+- **THEN** both stay inside the command panel and neither overflows it horizontally
 
 #### Scenario: An exit chip follows the move row form's rules
 - **WHEN** the compass resolves and aims a committed move row
@@ -148,10 +147,10 @@ server-authored option and choice card shape.
 - **THEN** it renders that target's rows in the menu's order with digit badges, followed by the trailing `✕ 返回` row under a hairline rule
 
 #### Scenario: A disabled chip exposes its reason to assistive technology
-- **WHEN** the scene overview renders a disabled chip
-- **THEN** the chip stays focusable, carries its disabled marker in text, and exposes its
-  server-authored reason to assistive technology and, while focused, in the overview's reason
-  strip
+- **WHEN** a dock row or a card row is disabled
+- **THEN** it stays focusable, carries its disabled marker, and exposes its reason to assistive
+  technology; in the exploration screen a server-authored disabled reason appears in the shared
+  readout
 
 ### Requirement: The status, character, and skill surfaces present truthful, non-color-only state
 The `StatusPanel`, the `CharacterStatusDrawer` (housing the `EquipmentDoll`), and the `SkillBook`

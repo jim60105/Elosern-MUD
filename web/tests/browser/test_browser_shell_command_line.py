@@ -6,6 +6,7 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    activate_wait_row,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
@@ -506,31 +507,10 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
     def test_open_rest_form_never_swallows_command_line_enter(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
-        # Navigate to the Wait/休息 tab by the store's committed focus KEY,
-        # not by cell arithmetic: the declarative root's tab set is
-        # capability-driven (H3 design D5 appends the 建議 tab when the
-        # suggestions envelope is not `unavailable`), so the wait cell is
-        # no longer guaranteed to be last.
-        focus_action_dock(page)
-        for _ in range(10):
-            focused = page.evaluate(
-                "() => window.__elosernBridge.store.view.focus.key"
-            )
-            if focused == "wait":
-                break
-            page.keyboard.press("ArrowRight")
-        else:
-            raise AssertionError("the wait tab never reached focus")
-        page.keyboard.press("Enter")  # Wait/休息
-        # The shipped Wait surface is the three-operation frame (dawn /
-        # sleep / 休息 N 小時 cards; stores/elosern.js resolves the wait
-        # frame with gridCols: 3, one row + 返回). Dawn and sleep confirm
-        # their `explore.wait` dispatch directly — only 休息 N 小時
-        # (wait-rest) opens the custom-duration form — so the form is
-        # reached with two ArrowRight steps, not vertical arrows.
-        page.keyboard.press("ArrowRight")  # 睡眠至完全恢復
-        page.keyboard.press("ArrowRight")  # 休息 N 小時 (opens the rest form)
-        page.keyboard.press("Enter")
+        # The place card's 等待 opens the wait card, whose third row 休息 N
+        # 小時 (wait-rest) opens the bounded custom-duration form
+        # (exploration-room-actions).
+        activate_wait_row(page, "wait-rest")
         wait_for_store_state(
             page,
             lambda s: bool(s.get("connected")),

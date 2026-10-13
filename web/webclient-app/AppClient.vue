@@ -14,7 +14,6 @@ import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
 import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
-import SceneOverview from "./components/SceneOverview.vue";
 import ExitCompass from "./components/ExitCompass.vue";
 import ExplorationReadout from "./components/ExplorationReadout.vue";
 import FullLogOverlay from "./components/FullLogOverlay.vue";
@@ -54,6 +53,7 @@ import FoeLineup from "./components/FoeLineup.vue";
 import { FOE_LINEUP_MAX, activeFoes, foeLineupSpan, foeSlots } from "./components/foe-lineup.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
 import ChoiceCard from "./components/ChoiceCard.vue";
+import QuestionCard from "./components/QuestionCard.vue";
 import PresenceRail from "./components/PresenceRail.vue";
 import { inertWhileLeaving } from "./lib/transition_hooks.js";
 
@@ -75,14 +75,13 @@ const {
   onReadingChange, choicesShown, dialogueExits, onDialogueMove, beforeChoiceActivate,
   completionCandidates, possessionBanner, contextAffordances, releaseAffordance,
   titleBallotPanel, titleBallotCandidates, onMapMove, showObjectiveTracker,
-  restFormOpen, restFormError, onRestFormSubmit, onRestFormClose, onRestFormError,
-  waitOpen, skipDisabled, activateWait, practiceOpen, practiceFeedback, onPractice,
+  skipDisabled, practiceOpen, practiceFeedback, onPractice,
   fullLogOpen, fullLogRef, openFullLog, closeFullLog, openSurfaces,
   openOverlayByName, onOpenOverlay, onMapExpand, onOverlayClose,
   drawerTitle, drawerIcon, drawerHasArt, onOpenDrawer, onHudDrawerClose, skillBookSubtitle,
   inventoryWalletCopper, inventoryWalletSubtitle, partyReason, SKILL_BOOK_KEY_HINT,
   rootItems, navigationItems, dockItems, dockPaneKind,
-  overviewShown, overviewActive, overviewMenu,
+  explorationRootShown,
   onTabClick, onDockBack, contextActionsPanel, rowPrefix, detailTestId,
   showDetail,
   onAction, onDockActivate, onDockFocusChange,
@@ -96,7 +95,12 @@ const {
   readoutContent, aimedNode, onCompassMove, onCompassAim, onCompassBlocked, onRailHover,
   railRef, railMounted, railShown, presenceCardOpen, personFocus, focusTarget, focusPortrait,
   cardRows, cardKey, cardCaption, cardLabel, speaker,
-  onRailActivate, onCardPick, onCardBack, onCompassTab, onRailTab, onOverviewTab,
+  onRailActivate, onCardPick, onCardBack,
+  roomCardRef, roomCard, roomCardOpen, roomCardShown, roomCardRows, roomCardNotes, roomCardTrailing,
+  roomCardCaption, roomCardLabel, dreamOpen, restOpen, placeActions, pillShown, pillCount, pillLabel,
+  onPlaceLook, onPlaceWait, onPill, onRoomCardPick, onRoomCardBack, onDreamAnswer, onDreamClose,
+  onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
+  onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
 // The dialogue host's standing portrait (webclient-dialogue-stage-actors
 // D2): the committed `art` panel's raw catalog entry named by the committed
@@ -256,7 +260,7 @@ function onFoeLineupGone() {
         :beat-playback="store.view.beatPlayback"
         :mode-change="modeChange"
         :beat-hold="beatHold"
-        :card-open="presenceCardOpen"
+        :card-open="presenceCardOpen || roomCardOpen"
         :person-focus="personFocus"
         :speaker="speaker"
         :mode-hydrating="modeHydrating"
@@ -279,6 +283,7 @@ function onFoeLineupGone() {
         :roster-lock-reason="store.rosterLockReason"
         :epoch="store.view.epoch"
         :possession-banner="possessionBanner"
+        :place-actions="placeActions"
         @submit-command="onSubmitCommand"
         @focus-lost="store.clearFreeformTarget()"
         @open-full-log="openFullLog"
@@ -287,6 +292,10 @@ function onFoeLineupGone() {
         @beat-skip="store.skipBeats"
         @switch-character="onSwitchCharacter"
         @create-character="onCreateCharacter"
+        @place-look="onPlaceLook"
+        @place-wait="onPlaceWait"
+        @place-hover="onPlaceHover"
+        @place-tab="onPlaceTab"
       >
         <template #navigation>
           <DesktopNavigation
@@ -380,11 +389,59 @@ function onFoeLineupGone() {
              available, once the line is fully read, and never while an
              action is in flight. -->
         <template #choices>
+          <!-- The room cards (exploration-room-actions design D1/D4/D5): the
+               wait card the place card's 等待 opens and the suggestions card
+               the 建議 pill opens, through the one card shell, trapping focus
+               until they close. The wait card stays mounted (hidden) under
+               its 進入夢境協作？ question and its rest form, so it keeps its
+               active row for the return. -->
+          <template v-if="roomCardOpen">
+            <ChoiceCard
+              v-show="roomCardShown"
+              ref="roomCardRef"
+              :key="roomCard.kind"
+              :test-id="`${roomCard.kind}-card`"
+              :data-card-kind="roomCard.kind"
+              :rows="roomCardRows"
+              :notes="roomCardNotes"
+              :trailing-index="roomCardTrailing"
+              :caption="roomCardCaption"
+              :aria-label="roomCardLabel"
+              :entrance="!modeHydrating"
+              trap-focus
+              autofocus
+              @pick="onRoomCardPick"
+              @back="onRoomCardBack"
+            />
+            <QuestionCard
+              v-if="dreamOpen"
+              test-id="dream-question"
+              question="進入夢境協作？"
+              close-label="取消睡眠"
+              :locked="skipDisabled"
+              reason="上一個行動尚未完成，請稍候。"
+              :entrance="!modeHydrating"
+              @yes="onDreamAnswer(true)"
+              @no="onDreamAnswer(false)"
+              @close="onDreamClose"
+            />
+            <section
+              v-if="restOpen"
+              class="choice-card rest-card"
+              role="dialog"
+              aria-label="休息 N 小時"
+              data-testid="rest-card"
+            >
+              <span class="choice-card__corners" aria-hidden="true"></span>
+              <div class="choice-card__caption" aria-hidden="true">休息 N 小時</div>
+              <RestForm :disabled="skipDisabled" @submit="onRestSubmit" @close="onRestClose" />
+            </section>
+          </template>
           <!-- The exploration cards (exploration-presence-rail design D4):
                a person's verb card or the overflow card, through the one
                card shell, trapping focus until it closes. -->
           <ChoiceCard
-            v-if="presenceCardOpen"
+            v-else-if="presenceCardOpen"
             :key="cardKey"
             test-id="presence-card"
             :data-card-kind="store.view.presenceCard?.kind"
@@ -489,9 +546,10 @@ function onFoeLineupGone() {
       </template>
       <template #action-dock>
         <ActionDock
-          v-if="rootItems.length > 0 || !!store.view.degradedRoot || !!store.view.suggestions || (store.view.mode === 'creation' && panelAvailable('creation'))"
+          v-if="rootItems.length > 0 || !!store.view.degradedRoot || (store.view.mode !== 'creation' && !!store.view.dockSource) || (store.view.mode === 'creation' && panelAvailable('creation'))"
           :mode="store.view.mode || 'exploration'"
           :root-items="rootItems"
+          :tab-stop="!(store.view.mode === 'exploration' && explorationRootShown)"
           :view="store.view"
           :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
           @action="onAction"
@@ -502,39 +560,22 @@ function onFoeLineupGone() {
             class="dock-pane-host"
             :class="{
               'dock-pane-host--bounded': contextActionsPanel?.kind === 'combat' || skillUseDockShown,
-              'dock-pane-host--exploration': overviewShown && !waitOpen,
+              'dock-pane-host--exploration': explorationRootShown,
             }"
           >
-            <section v-if="waitOpen" class="waiting-screen" aria-label="等待與休息">
-              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-dawn' }">
-                <h3>等待直到黎明</h3>
-                <p>等待下一次天亮，再展開旅程。</p>
-                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-dawn')">等待直到黎明</button>
-              </article>
-              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-sleep' }">
-                <h3>睡眠至完全恢復</h3>
-                <p>依目前恢復速度睡眠，實際時長由伺服器決定，受睡眠上限限制。</p>
-                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="activateWait('wait-sleep')">開始睡眠</button>
-                <button type="button" :disabled="skipDisabled" @keydown.enter.stop @keydown.space.stop @click="dispatchIntent('explore.wait', { sleep: true, dream: true })">睡眠並進入夢境協作</button>
-              </article>
-              <article class="waiting-card" :class="{ 'waiting-card--focused': store.view.focus.key === 'wait-rest' }">
-                <h3>休息 N 小時</h3>
-                <RestForm :autofocus="restFormOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
-              </article>
-              <button type="button" class="waiting-back" @keydown.enter.stop @keydown.space.stop @click="onDockBack">返回上一層</button>
-            </section>
             <!-- The exploration dock's root pane (exploration-exit-compass
-                 design D5): the exit compass on the left, filling the panel
-                 height, and a right column holding the shared readout and
-                 the scene overview's footer chips (webclient-scene-overview-
-                 swap D4); the people and objects are the presence rail's
-                 (exploration-presence-rail). -->
+                 design D5; exploration-room-actions design D2): the exit
+                 compass on the left, filling the panel height, and a right
+                 column holding the 建議 pill at its top and the shared
+                 readout at its bottom. The room actions are the place
+                 card's, and the people and objects the presence rail's; the
+                 panel holds no chip row, footer, or key hint. -->
             <div
-              v-if="overviewShown"
+              v-if="explorationRootShown"
               class="exploration-root"
               data-testid="exploration-root"
             >
-              <div class="exploration-root__compass" :inert="!overviewActive || null" @keydown="onCompassTab">
+              <div class="exploration-root__compass" @keydown="onCompassTab">
                 <ExitCompass
                   ref="compassRef"
                   :targets="compassTargets"
@@ -548,20 +589,35 @@ function onFoeLineupGone() {
                 />
               </div>
               <div class="exploration-root__side">
+                <button
+                  v-if="pillShown"
+                  type="button"
+                  class="exploration-pill"
+                  data-testid="suggestions-pill"
+                  :aria-label="pillLabel"
+                  :data-count="pillCount > 0 ? pillCount : null"
+                  @click="onPill"
+                  @keydown.enter.stop
+                  @keydown.space.stop
+                  @keydown="onPillTab"
+                  @mouseenter="onPillHoverChange(true)"
+                  @mouseleave="onPillHoverChange(false)"
+                  @focus="onPillHoverChange(true)"
+                  @blur="onPillHoverChange(false)"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z" />
+                  </svg>
+                  <span class="exploration-pill__label">建議</span>
+                  <b v-if="pillCount > 0" class="exploration-pill__count">{{ ` ${pillCount}` }}</b>
+                </button>
                 <ExplorationReadout
+                  class="exploration-root__readout"
                   :lead="readoutContent.lead"
                   :text="readoutContent.text"
                   :tone="readoutContent.tone"
                   :flash="readoutContent.flash"
                   :motion-level="store.view.motionLevel"
-                />
-                <SceneOverview
-                  :menu="overviewMenu"
-                  :focused-key="store.view.focus.key"
-                  :active="overviewActive"
-                  @keydown="onOverviewTab"
-                  @focus-change="onDockFocusChange"
-                  @activate="onDockActivate"
                 />
               </div>
             </div>
@@ -577,14 +633,13 @@ function onFoeLineupGone() {
               @focus-change="onDockFocusChange"
               @activate="onDockActivate"
             />
-             <DockMenu
-               v-else-if="!waitOpen && dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot)"
-               :items="dockItems"
+            <DockMenu
+              v-else-if="dockItems.length && !(store.view.dockDepth === 1 && dockPaneKind === 'plain' && !store.view.degradedRoot)"
+              :items="dockItems"
               :focused-key="store.view.focus.key"
               :id-prefix="rowPrefix"
               :detail-test-id="detailTestId"
               :show-detail="showDetail"
-              :detail-message="restFormError"
               :grid-cols="store.view.combatMenu ? store.view.combatMenu.gridCols : null"
               :depth="store.view.dockDepth"
               :hide-generic-detail="!!store.view.focusedSkill"
@@ -601,7 +656,6 @@ function onFoeLineupGone() {
               @choose-shorthand="(p) => store.chooseShorthand(p.shorthand)"
             />
           </div>
-          <RestForm v-if="restFormOpen && !waitOpen" :disabled="skipDisabled" @submit="onRestFormSubmit" @close="onRestFormClose" @error="onRestFormError" />
         </ActionDock>
       </template>
     </AppShell>
@@ -909,10 +963,11 @@ function onFoeLineupGone() {
   align-items: flex-start;
 }
 
-/* The exploration root pane (exploration-exit-compass design D5): the
-   compass fills the pane's height on the left; the right column stacks the
-   readout over the overview's chip rows and is the one region that scrolls,
-   so the pane (and the command panel's box) never grows. */
+/* The exploration root pane (exploration-exit-compass design D5;
+   exploration-room-actions design D2): the compass fills the pane's height on
+   the left; the right column holds the 建議 pill at its top right and the
+   shared readout at its bottom, so the pane (and the command panel's box)
+   never grows. */
 .dock-pane-host.dock-pane-host--exploration {
   align-items: stretch;
   height: 100%;
@@ -943,8 +998,67 @@ function onFoeLineupGone() {
   gap: calc(8px * var(--ui-scale));
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
-  overflow-x: hidden;
-  scrollbar-width: thin;
+  overflow: hidden;
+}
+.exploration-root__readout {
+  margin-top: auto;
+}
+
+/* The 建議 pill (redesign §5.2): a quiet outlined pill at the column's top
+   right; the count in the gold numeral tone. */
+.exploration-pill {
+  align-self: flex-end;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  box-sizing: border-box;
+  height: calc(34px * var(--ui-scale));
+  padding: 0 calc(12px * var(--ui-scale)) 0 calc(10px * var(--ui-scale));
+  background: transparent;
+  border: 1px solid #736b5c;
+  border-radius: var(--radius-pill);
+  color: var(--paper-200);
+  font: var(--text-xs)/1 var(--f-sans);
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.exploration-pill svg {
+  flex: none;
+  width: calc(18px * var(--ui-scale));
+  height: calc(18px * var(--ui-scale));
+}
+.exploration-pill__count {
+  font-weight: 500;
+  color: var(--gold-300);
+}
+.exploration-pill:hover,
+.exploration-pill:focus-visible {
+  border-color: var(--gold-500);
+  background: var(--gold-glow);
+  color: var(--paper-50);
+  outline: none;
+}
+.exploration-pill:focus-visible {
+  box-shadow: 0 0 0 1px var(--gold-400);
+}
+
+/* The wait card's rest form (exploration-room-actions design D5): the
+   bounded RestForm in the centred card frame. */
+.rest-card {
+  align-self: center;
+  width: min(100%, calc(360px * var(--ui-scale)));
+  padding: 0 calc(14px * var(--ui-scale)) calc(14px * var(--ui-scale));
+  gap: calc(8px * var(--ui-scale));
+}
+.rest-card .exploration-rest-form {
+  background: transparent;
+  border: 0;
+  padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale)) 0;
 }
 </style>

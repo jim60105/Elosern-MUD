@@ -11,21 +11,26 @@
 // combat, and creation families. The dock push sites mount descriptors; menu
 // content exists only at resolution time.
 //
-// The exploration root is the scene overview (webclient-scene-overview-swap,
-// AVG stage design §7): `exploration.root` resolves
-// `ExplorationMenu.overviewMenu` — the footer, with the router's `sections`
-// geometry. The exits are the exit compass's, read through
-// `explorationExits`, and the people and objects are the presence rail's,
-// read through `explorationPresence`; an interact target's verbs are the
-// client-local verb card's, read through `explorationVerbs`
-// (exploration-presence-rail): none of them is a router frame, and the
-// retired `exploration.target` source is unregistered. `exploration.navigation` is the top navigation bar's own
-// entry set (the character status, quest, and inventory surfaces, which no
-// dock frame carries any more). The move/look/interact submenus are retired
-// (webclient-retire-exploration-submenus): their sources are unregistered, so
-// a stray descriptor for one degrades to the marker and pops, exactly like
-// every other unregistered source. `ExplorationMenu.navigationItems` outlives
-// them, because the bar keeps reading it.
+// The exploration root is an empty, resolvable menu (exploration-room-
+// actions design D2): `exploration.root` resolves `{items: [], title}` under
+// the exploration panel gate, so it never degrades while the panel is
+// available and no key is claimed by a root item. The exits are the exit
+// compass's, read through `explorationExits`; the people and objects are the
+// presence rail's, read through `explorationPresence`; an interact target's
+// verbs are the client-local verb card's, read through `explorationVerbs`
+// (exploration-presence-rail); and the room actions (查看房間, the wait card,
+// the suggestions card) are the place card's and the 建議 pill's, read through
+// `explorationRoomLook`, `explorationWait`, and `explorationSuggestions`
+// (exploration-room-actions). None of them is a router frame: the retired
+// `exploration.target`, `exploration.wait`, and `exploration.suggestions`
+// sources are unregistered. `exploration.navigation` is the top navigation
+// bar's own entry set (the character status, quest, and inventory surfaces,
+// which no dock frame carries any more). The move/look/interact submenus are
+// retired (webclient-retire-exploration-submenus): their sources are
+// unregistered, so a stray descriptor for one degrades to the marker and
+// pops, exactly like every other unregistered source.
+// `ExplorationMenu.navigationItems` outlives them, because the bar keeps
+// reading it.
 // The scripted-keyword frame is retired the same way (webclient-talk-open-
 // dock): its source is unregistered, because the v3 panel carries no keyword
 // list and 交談 dispatches `explore.talk_open` in one step, so no push site
@@ -59,10 +64,8 @@ import stableStringify from "../lib/stable_stringify.js";
 // the shared instance into a payload.
 export const UNRESOLVABLE = Object.freeze({ unresolvable: true, reason: null });
 
-// The suggestions statuses the frame may resolve while open (the
-// options-surface statuses minus `unavailable`, which forbids any pane — an
-// open suggestions frame at that status must degrade so the stack rule can
-// leave it).
+// The suggestions statuses the suggestions card may present (the
+// options-surface statuses minus `unavailable`, which forbids any card).
 const SUGGESTIONS_RESOLVABLE = ["generating", "ready", "degraded"];
 
 function marker(reasonMessage) {
@@ -122,8 +125,8 @@ export function createFrameResolver(deps) {
     return (deps && typeof deps.getState === "function" && deps.getState()) || {};
   }
 
-  // The shared exploration build: the same ExplorationMenu model the copy
-  // push sites produce today, from the panels committed right now.
+  // The shared exploration build: the ExplorationMenu model over the panels
+  // committed right now.
   function explorationModel() {
     const state = committed();
     const panels = state.panels || {};
@@ -133,12 +136,10 @@ export function createFrameResolver(deps) {
       (panels.local_map && panels.local_map.current_node) ||
       currentNodeFromAffordances(contextActions) ||
       null;
-    const suggestions = (contextActions && contextActions.suggestions) || null;
     return {
       panel,
       currentNode,
-      suggestions,
-      model: ExplorationMenu.buildMenus(panel, { currentNode, suggestions }),
+      model: ExplorationMenu.buildMenus(panel, { currentNode }),
     };
   }
 
@@ -153,21 +154,13 @@ export function createFrameResolver(deps) {
     return { ok: true, panel };
   }
 
-  const explorationMenuSource = (menuKey) => () => {
+  // The exploration root (exploration-room-actions design D2): an empty,
+  // resolvable menu. An unavailable or absent panel still degrades it into
+  // the router's single marker-reason row.
+  const explorationRootSource = () => {
     const gate = requireExplorationPanel();
     if (!gate.ok) return gate.reason;
-    const { model } = explorationModel();
-    return isolate(model.menus[menuKey]);
-  };
-
-  // The scene overview (webclient-scene-overview-swap D1): the exploration
-  // root frame. The committed panel's footer, carrying the router's
-  // `sections` geometry.
-  const explorationOverviewSource = () => {
-    const gate = requireExplorationPanel();
-    if (!gate.ok) return gate.reason;
-    const { panel, currentNode, suggestions } = explorationModel();
-    return isolate(ExplorationMenu.overviewMenu(panel, { currentNode, suggestions }));
+    return { items: [], focusKey: null, title: "場景" };
   };
 
   // The exit compass's rows (exploration-exit-compass design D2/D9): the
@@ -213,6 +206,59 @@ export function createFrameResolver(deps) {
       const { model } = explorationModel();
       const target = ExplorationMenu.targetById(model, identity);
       return target ? isolate(ExplorationMenu.verbMenuFor(model, target)) : null;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // The place card's 查看房間 row (exploration-room-actions design D3): the
+  // committed room's `lookItems` row, so its `explore.look` payload and
+  // command echo are the retired footer chip's. Null when the panel is
+  // unavailable or carries no room.
+  const explorationRoomLook = () => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok) return null;
+      const row = ExplorationMenu.lookItems(gate.panel).find((item) => item.key === "look-room");
+      return row ? isolate(row) : null;
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // The wait card's rows (exploration-room-actions design D5): `waitItems`
+  // without its router back row. Null when the panel is unavailable.
+  const explorationWait = () => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok) return null;
+      return isolate(ExplorationMenu.waitItems().filter((item) => !item.goBack));
+    } catch (err) {
+      return null;
+    }
+  };
+
+  // The suggestions card's content (exploration-room-actions design D4):
+  // the committed envelope's status and `suggestionsMenu` rows without the
+  // router back row. Null when the exploration panel or `context_actions` is
+  // unavailable or absent, or the status is `unavailable` (or missing): no
+  // card and no pill exist then.
+  const explorationSuggestions = () => {
+    try {
+      const gate = requireExplorationPanel();
+      if (!gate.ok) return null;
+      const state = committed();
+      const contextActions = (state.panels && state.panels.context_actions) || null;
+      if (!contextActions || contextActions.available === false || contextActions.kind === "combat") {
+        return null;
+      }
+      const suggestions = contextActions.suggestions || null;
+      const status = suggestions && suggestions.status;
+      if (SUGGESTIONS_RESOLVABLE.indexOf(status) === -1) {
+        return null;
+      }
+      const menu = ExplorationMenu.suggestionsMenu(suggestions);
+      return isolate({ status, items: menu.items.filter((item) => !item.goBack) });
     } catch (err) {
       return null;
     }
@@ -334,30 +380,8 @@ export function createFrameResolver(deps) {
   };
 
   const table = {
-    "exploration.root": explorationOverviewSource,
+    "exploration.root": explorationRootSource,
     "exploration.navigation": explorationNavigationSource,
-    "exploration.wait": explorationMenuSource("wait"),
-    "exploration.suggestions": () => {
-      // The frame belongs to the exploration family: an unavailable
-      // exploration panel degrades like every other source.
-      const gate = requireExplorationPanel();
-      if (!gate.ok) return gate.reason;
-      const state = committed();
-      const contextActions = (state.panels && state.panels.context_actions) || null;
-      if (!contextActions || contextActions.available === false) {
-        // The common unavailable form carries the server-authored reason.
-        return marker(panelReasonMessage(contextActions));
-      }
-      const suggestions = contextActions.suggestions || null;
-      const status = suggestions && suggestions.status;
-      if (SUGGESTIONS_RESOLVABLE.indexOf(status) === -1) {
-        // `unavailable` (or no envelope at all) is the no-pane rule: degrade
-        // so the consumer-side stack rule can leave the frame. `generating`
-        // resolves to the builder's one muted row.
-        return marker(null);
-      }
-      return isolate(ExplorationMenu.suggestionsMenu(suggestions));
-    },
 
     // --- combat family ------------------------------------------------------
     // The menus are the CombatMenu model's own; the model instance lives in
@@ -506,6 +530,9 @@ export function createFrameResolver(deps) {
     explorationExits,
     explorationPresence,
     explorationVerbs,
+    explorationRoomLook,
+    explorationWait,
+    explorationSuggestions,
     // The combat model accessor (the declared selection-state home): the
     // store's client-local combat interactions (focus-skill recording, AREA
     // toggle, scale/shorthand choice, submit payload building) act on this

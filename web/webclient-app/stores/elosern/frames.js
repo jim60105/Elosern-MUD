@@ -37,17 +37,7 @@ export function applyFrames(ctx) {
     // relied on the function declaration being hoisted); events only fire on
     // key entry, long after composition, so the indirection is inert.
     onEvent: (name, payload) => ctx.onRouterEvent(name, payload),
-    resolve: (descriptor) => {
-      const menu = ctx.frameResolver.resolve(descriptor);
-      if (descriptor.source === "exploration.suggestions" && Array.isArray(menu.items)) {
-        // Readable cards and action choices share a vertical keyboard list.
-        menu.gridCols = 1;
-      }
-      if (descriptor.source === "exploration.wait" && Array.isArray(menu.items)) {
-        menu.gridCols = 3;
-      }
-      return menu;
-    },
+    resolve: (descriptor) => ctx.frameResolver.resolve(descriptor),
   });
   // The live keyboard-router instance (C4 harness re-map): the managed
   // browser suite reads `depth()` / `currentItem()` off it; the store owns
@@ -105,8 +95,10 @@ export function applyFrames(ctx) {
   // descriptor as the one-frame stack. Browser helpers use it to normalize
   // the stack.
   ctx.resetFramesToRoot = function resetFramesToRoot() {
-    // The presence cards are not frames, but a root reset leaves no card open.
+    // The presence and room cards are not frames, but a root reset leaves no
+    // card open.
     ctx.resetPresence?.();
+    ctx.resetRoomCard?.();
     ctx.inStackMutation = true;
     try {
       router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });
@@ -118,7 +110,7 @@ export function applyFrames(ctx) {
   // The one declarative push (webclient-services-combat-creation-frames):
   // every family mounts ONLY a descriptor; content resolves at access time.
   // `openerKey` restores the parent's focus on a degradation; `unresolvable`
-  // "root" exits the whole stack (the suggestions status split).
+  // "root" exits the whole stack.
   ctx.pushFrame = function pushFrame(descriptor, openerKey, unresolvable) {
     ctx.inStackMutation = true;
     try {
@@ -386,19 +378,6 @@ export function applyFrames(ctx) {
     ctx.publishView();
   };
 
-  // The exploration-family push map: a root `openSubmenu` key or submenu frame
-  // title -> the descriptor of its declarative frame. The map is the ONE
-  // place naming exploration frame sources; the frame content itself comes
-  // only from the resolver.
-  ctx.EXPLORATION_SUBMENU_PUSHES = {
-    wait: { source: "exploration.wait", params: {} },
-    suggestions: { source: "exploration.suggestions", params: {} },
-  };
-  // The suggestions frame leaves the WHOLE stack when its envelope commits
-  // `unavailable` (the options-surface no-pane rule): exit to the root
-  // without a reason row. Every other exploration submenu pops one level.
-  ctx.UNRESOLVABLE_ACTION = { "exploration.suggestions": "root" };
-
   // The declarative-frame mutation window (webclient-declarative-frame-stack
   // D-A): the ONE commit hook for the exploration dock. A committed push
   // never re-pushes anything — the next access re-resolves. This window only
@@ -481,14 +460,4 @@ export function applyFrames(ctx) {
     }
   };
 
-  // One declarative exploration push: the store mutation window covers the
-  // push itself (the push-time resolve focuses the first item; an
-  // immediately-unresolvable push settles per its policy before the focus
-  // event reaches the store). `openerKey` is the activated row's key so a
-  // later degradation restores focus to it.
-  ctx.pushExplorationFrame = function pushExplorationFrame(descriptor, openerKey) {
-    // The suggestions status split: `unavailable` exits the whole stack
-    // to the root (the no-pane rule); every other submenu pops one level.
-    ctx.pushFrame(descriptor, openerKey, ctx.UNRESOLVABLE_ACTION[descriptor.source] || "pop");
-  };
 }

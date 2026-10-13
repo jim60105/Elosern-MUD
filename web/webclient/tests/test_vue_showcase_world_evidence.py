@@ -135,9 +135,7 @@ PREVIOUS_MANIFEST_KEYS = {
     "Action/ActionDock",
     "Action/DockMenu",
     "Action/DockMenuItem",
-    "Action/OptionCard",
     "Action/RestForm",
-    "Action/ChoiceCardRow",
     "Action/DockBreadcrumb",
     "Action/SkillDetailPane",
     # The SkillBook casting flow's dock pane joined with
@@ -193,8 +191,8 @@ PREVIOUS_MANIFEST_KEYS = {
     # The AVG message window (webclient-message-window-component),
     # built and story-documented before C6c mounts it.
     "Core/MessageWindow",
-    # The AVG scene overview (webclient-scene-overview-component).
-    "Action/SceneOverview",
+    # The AVG scene overview (webclient-scene-overview-component) left with
+    # exploration-room-actions, as did the suggestion card family it hosted.
     "Action/ExitCompass",
     # The dialogue stage actor (webclient-dialogue-stage-actors), the
     # standing portrait that wraps Core/ReferenceArtwork on the stage.
@@ -210,6 +208,8 @@ PREVIOUS_MANIFEST_KEYS = {
     "Core/ChoiceCard",
     "Core/PresenceRail",
     "Core/ExplorationScreen",
+    # The wait card's 進入夢境協作？ question (exploration-room-actions).
+    "Core/QuestionCard",
     # The correspondence folio and the stage-transform drawer refroze the
     # manifest: World/LettersPanel and Overlays/GalleryStageTransformModal
     # joined the frozen set after this baseline was pinned.

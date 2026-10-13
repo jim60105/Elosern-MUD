@@ -6,6 +6,8 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    SUGGESTIONS_CARD_SELECTOR,
+    WAIT_CARD_SELECTOR,
     activate_first_compass_exit,
     compass_target_refs,
     activate_overview_chip,
@@ -130,7 +132,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -285,16 +289,27 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             },
         }
 
+    def _card_active_label(self, page) -> str | None:
+        """The label of the suggestions card's active row."""
+        return page.evaluate(
+            """(selector) => {
+              const card = document.querySelector(selector);
+              const id = card && card.getAttribute('aria-activedescendant');
+              const row = id ? document.getElementById(id) : null;
+              const label = row && row.querySelector('.choice-card__label');
+              return label ? label.textContent : null;
+            }""",
+            SUGGESTIONS_CARD_SELECTOR,
+        )
+
     @covers_requirement("webclient-frame-resolution::focus-tracks-the-item-key-across-re-resolution")
     def test_focus_follows_the_item_key_across_committed_re_resolution(self):
-        """Focus tracks the item KEY (webclient-declarative-frame-stack): in
-        the open suggestions frame, a commit that REORDERS the cards keeps
-        the focus on the same key at its new index, and a commit that drops
-        the focused card lands focus on a surviving row — never on the
-        frozen copy's old row. Activation then submits the NEW committed
-        payload. (The exits are the exit compass's and the people and objects
-        the presence rail's, so the suggestions frame carries the
-        reorderable rows.)"""
+        """The suggestions card (exploration-room-actions) keeps its active
+        row on the same card across committed updates: a commit that
+        REORDERS the cards keeps the active row on that card at its new
+        index, and a commit that drops it lands on a surviving row — never on
+        a frozen copy's old row. Activation then submits the NEW committed
+        payload. The card is client-local, so the router stays at its root."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -307,47 +322,46 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertTrue(accepted["accepted"], accepted)
 
         activate_overview_chip(page, "suggestions")
-        self.assertEqual(self._depth(page), 2)
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.currentDescriptor().source"),
-            "exploration.suggestions",
-        )
-        self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusItemByKey('action-explore.wait')")
-        )
-        self.assertEqual(store_state(page)["focus"]["key"], "action-explore.wait")
+        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(self._depth(page), 1, "the suggestions card is not a router frame")
+        page.locator(SUGGESTIONS_CARD_SELECTOR).focus()
+        page.keyboard.press("ArrowDown")
+        self.assertEqual(self._card_active_label(page), "等到天亮")
 
-        # Reordered + extended commit: the same key survives at a new index.
+        # Reordered + extended commit: the same card survives at a new index.
         accepted = self._inject_panels(page, self._ready_context(talk, scripted, wait, look))
         self.assertTrue(accepted["accepted"], accepted)
+        page.wait_for_timeout(120)
         self.assertEqual(
-            store_state(page)["focus"]["key"],
-            "action-explore.wait",
-            "the same-key focus did not survive the re-resolution",
+            self._card_active_label(page),
+            "等到天亮",
+            "the active card did not survive the re-resolution",
         )
 
-        # The focused key vanishes: focus lands on a SURVIVING row (the
-        # nearest-row rule itself is pinned at store level; here it must land
-        # somewhere real, never on the vanished key).
+        # The active card vanishes: the active row lands on a SURVIVING row.
         accepted = self._inject_panels(page, self._ready_context(talk, look, scripted))
         self.assertTrue(accepted["accepted"], accepted)
-        focused = store_state(page)["focus"]["key"]
+        page.wait_for_timeout(120)
+        landed = self._card_active_label(page)
         self.assertIn(
-            focused,
-            ("action-explore.talk_open", "action-explore.look", "action-explore.talk_scripted", "action-options.dismiss"),
-            "the lost-key fallback did not land on a surviving row",
+            landed,
+            ("找哨衛聊聊", "看看石碑", "問候哨衛", "清除建議"),
+            "the lost-card fallback did not land on a surviving row",
         )
-        self.assertEqual(self._depth(page), 2, "the suggestions frame did not stay current")
 
-        # Activating the focused row submits the NEW committed row's action.
-        self.assertTrue(
-            page.evaluate("() => window.__elosernBridge.store.focusConfirm('keyboard')")
-        )
+        # Activating the active row submits the NEW committed row's action.
+        expected_action = {
+            "找哨衛聊聊": "explore.talk_open",
+            "看看石碑": "explore.look",
+            "問候哨衛": "explore.talk_scripted",
+            "清除建議": "options.dismiss",
+        }[landed]
+        page.locator(SUGGESTIONS_CARD_SELECTOR).focus()
+        page.keyboard.press("Enter")
         # The proof is the OUTBOUND envelope only: the fabricated identity
         # cannot be accepted by the server (its own result/lock behaviour is
         # covered elsewhere), so the recorder — written synchronously at
         # dispatch — is the assertion source, not the in-flight gate.
-        expected_action = focused[len("action-"):]
         page.wait_for_function(
             "(id) => window.__elosernSent.filter((m) => m[0] === 'ui_action'"
             " && m[1][0] && m[1][0].action_id === id).length === 1",
@@ -364,16 +378,15 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-frame-resolution::unresolvable-frames-pop-one-level-only-the-root-frame-renders-a-degraded-reason-row")
     def test_whole_stack_loss_cascades_to_the_degraded_root_and_recovers(self):
-        """A panel withdrawal makes EVERY open exploration frame unresolvable
-        at once: the pop cascades in ONE access down to the root frame, the
-        root degrades into the single disabled marker row with the
-        server-authored reason verbatim, activating it submits nothing, and a
-        returning panel re-resolves the SAME root frame back to content."""
+        """A panel withdrawal degrades the (empty) exploration root in place
+        into the single disabled marker row with the server-authored reason
+        verbatim, and closes the open wait card in the same commit;
+        activating the marker submits nothing, and a returning panel
+        re-resolves the SAME root frame, with the compass and the place
+        card's room actions back."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
-        # Pin the suggestions status to `generating` so the legacy section
-        # renders no keyed rows and the pane-key assertions stay exact.
         pinned_context = {
             "context_actions": {
                 "schema_version": 5,
@@ -389,8 +402,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         })
         self.assertTrue(accepted["accepted"], accepted)
 
-        activate_overview_chip(page, "wait")  # the 等待／休息 chip -> the waiting frame
-        self.assertEqual(self._depth(page), 2)
+        activate_overview_chip(page, "wait")  # the place card's 等待 -> the wait card
+        page.locator(WAIT_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(self._depth(page), 1)
 
         withdrawn = "這片區域暫時無法操作"
         accepted = self._inject_panels(page, {
@@ -403,7 +417,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         })
         self.assertTrue(accepted["accepted"], accepted)
 
-        # ONE access settles the WHOLE cascade: depth 1, degraded root.
+        # ONE commit settles it all: depth 1, degraded root, no card.
         self.assertEqual(self._depth(page), 1)
         self.assertEqual(
             store_state(page)["degradedRoot"],
@@ -413,8 +427,10 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "fallback": "畫面狀態已更新，請返回上層",
             },
         )
+        self.assertIsNone(store_state(page)["roomCard"])
+        page.locator(WAIT_CARD_SELECTOR).wait_for(state="detached", timeout=15000)
         # The pane presents exactly the single disabled marker row with the
-        # server message verbatim — no stale submenu row survives.
+        # server message verbatim — no stale row survives.
         self.assertEqual(self._pane_keys(page), ["degraded-root"])
         self.assertIn(
             withdrawn,
@@ -427,33 +443,26 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), sent_before)
 
-        # The panel returns: the SAME root frame re-resolves to content and
-        # the degraded presentation clears with the commit.
+        # The panel returns: the SAME root frame re-resolves and the degraded
+        # presentation clears with the commit.
         accepted = self._inject_panels(page, {
             "exploration": self._fabricated_exploration_panel(move=[self._move_row("ex-a", "北門")]),
             **pinned_context,
         })
         self.assertTrue(accepted["accepted"], accepted)
         self.assertIsNone(store_state(page)["degradedRoot"])
-        root_keys = self._pane_keys(page)
-        # The recovered root is the scene overview (webclient-scene-overview-
-        # swap): the room-look chip, the footer's 等待／休息, and the 建議
-        # entry — the retired move/look/interact dock entries are gone, and
-        # the character, quests, and inventory entries belong to the top
-        # navigation. The fabricated room's exit is back on the exit compass
-        # (exploration-exit-compass).
-        self.assertTrue(
-            {"look-room", "wait", "suggestions"} <= set(root_keys),
-            f"the recovered root lost its entries: {root_keys}",
-        )
+        # The recovered root is the empty exploration root: no dock row; the
+        # room actions are the place card's and the exit is the compass's.
+        self.assertEqual(self._pane_keys(page), [])
+        page.locator('[data-anchor="map"] [data-testid="place-card-wait"]').wait_for(state="visible", timeout=15000)
         self.assertEqual(compass_target_refs(page), ["ex-a"])
 
     @covers_requirement("webclient-frame-resolution::suggestions-frames-are-status-driven-generating-never-pops-unavailable-exits-to-the-root")
     def test_suggestions_frame_is_status_driven(self):
-        """The status split: `generating`/`degraded` commits keep the open 建議
-        frame and its content follows the commit (no pop, no timer);
-        `unavailable` — the options-surface no-pane rule — exits the WHOLE
-        stack to the exploration root WITHOUT any reason row."""
+        """The status split on the suggestions card: `generating`/`degraded`
+        commits keep the open card and its content follows the commit (no
+        close, no timer); `unavailable` — the options-surface no-pane rule —
+        closes the card and drops the 建議 pill WITHOUT any reason row."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._wait_exploration_available(page)
@@ -469,54 +478,42 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 },
             }
 
-        # A known `generating` envelope, then the 建議 tab opens the frame.
+        note = SUGGESTIONS_CARD_SELECTOR + ' [data-testid="choice-card-note"]'
+        # A known `generating` envelope, then the 建議 pill opens the card.
         accepted = self._inject_panels(page, context_actions({"status": "generating"}))
         self.assertTrue(accepted["accepted"], accepted)
-        self.assertIn("suggestions", self._pane_keys(page))
-        page.locator('#action-dock [data-item-key="suggestions"]').click()
-        self.assertEqual(self._depth(page), 2)
-        self.assertEqual(
-            page.evaluate("() => window.__elosernBridge.router.currentDescriptor()"),
-            {"source": "exploration.suggestions", "params": {}},
-        )
-        self.assertEqual(
-            page.locator('#action-dock [data-item-key="suggestions-generating"]').count(),
-            1,
-            "the generating muted row did not render",
-        )
+        activate_overview_chip(page, "suggestions")
+        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="visible", timeout=15000)
+        self.assertEqual(self._depth(page), 1)
+        self.assertEqual(page.locator(note).all_inner_texts(), ["AI 正在構思建議…"])
 
-        # A fresh `generating` commit: the frame STAYS (generating never
-        # pops), the muted row still carries the focus.
+        # A fresh `generating` commit: the card STAYS with its muted note.
         accepted = self._inject_panels(page, context_actions({"status": "generating"}))
         self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(self._depth(page), 2)
-        self.assertEqual(store_state(page)["focus"]["key"], "suggestions-generating")
+        self.assertEqual(store_state(page)["roomCard"], {"kind": "suggestions"})
+        self.assertEqual(page.locator(note).all_inner_texts(), ["AI 正在構思建議…"])
 
-        # `degraded` with zero cards is still resolvable: the frame stays and
-        # its CONTENT follows the commit (the dismiss control appears).
+        # `degraded` with zero cards: the card stays and its CONTENT follows
+        # the commit (the dismiss row appears).
         accepted = self._inject_panels(
             page, context_actions({"status": "degraded", "cards": []})
         )
         self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(self._depth(page), 2)
-        self.assertIn(
-            "action-options.dismiss",
-            self._pane_keys(page),
-            "the frame content did not follow the committed status change",
+        page.locator(SUGGESTIONS_CARD_SELECTOR + ' [data-testid="suggestions-card-dismiss"]').wait_for(
+            state="visible", timeout=15000
         )
+        self.assertEqual(store_state(page)["roomCard"], {"kind": "suggestions"})
 
-        # `unavailable`: no pane may exist — the whole stack exits to the
-        # root, and NO degraded marker/reason row is rendered.
+        # `unavailable`: no card and no pill may exist, and NO degraded
+        # marker/reason row is rendered.
         accepted = self._inject_panels(page, context_actions({"status": "unavailable"}))
         self.assertTrue(accepted["accepted"], accepted)
-        self.assertEqual(self._depth(page), 1)
         state = store_state(page)
-        self.assertIsNone(state["degradedRoot"], "the exit rendered a reason row")
-        self.assertNotIn(
-            "suggestions",
-            self._pane_keys(page),
-            "the unavailable root still lists the 建議 entry",
-        )
+        self.assertIsNone(state["roomCard"])
+        self.assertIsNone(state["degradedRoot"], "the close rendered a reason row")
+        page.locator(SUGGESTIONS_CARD_SELECTOR).wait_for(state="detached", timeout=15000)
+        self.assertEqual(page.locator('#action-dock [data-testid="suggestions-pill"]').count(), 0)
+        self.assertEqual(self._pane_keys(page), [])
 
     @covers_requirement("webclient-exploration-menu::exploration-actions-reject-stale-duplicate-and-tampered-input-without-mutation")
     def test_reconnect_rebuilds_exploration_without_replay(self):

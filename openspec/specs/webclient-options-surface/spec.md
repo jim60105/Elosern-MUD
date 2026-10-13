@@ -12,87 +12,89 @@ capability pins the dock's read-side render contract.
 
 ### Requirement: The exploration dock renders the suggestions section from the validated v5 panel
 
-In exploration mode the action-dock surface SHALL render the `suggestions` content derived from the validated
-`context_actions` panel as its own dock pane, reached from the scene overview's footer chip in the right
-column beside the exit compass, labelled `建議 (N)` with N the card count when N is positive and `建議` otherwise.
-The pane SHALL be a menu frame of the keyboard router like every other dock frame, with its four status
-renders defined by the scenarios below.
+In exploration mode the client SHALL render the `suggestions` content derived from the validated
+`context_actions` panel on the centred suggestions card, opened by the 建議 pill at the top right of the
+command panel beside the exit compass, labelled `建議 N` with N the card count when N is positive and `建議`
+otherwise (`webclient-room-actions`). The card SHALL be client-local, never a router frame, with its four
+status renders defined by the scenarios below.
 
 #### Scenario: The pane follows the four statuses
 - **WHEN** a puppeted WebClient in exploration mode presents `suggestions` with status
   `generating`, then `ready` (3–5 cards), then `degraded` (rule cards), then `unavailable`
-- **THEN** the 建議 pane first shows the muted generating row, then the ready card set with the
-  dismiss row and the footer chip labelled `建議 (N)` with N the card count, then the degraded rule
-  cards with the muted note and dismiss row, and finally the 建議 footer chip is absent altogether
+- **THEN** the suggestions card first shows the muted generating note, then the ready card set with
+  the dismiss row and the pill labelled `建議 N` with N the card count, then the degraded rule cards
+  with the muted note and dismiss row, and finally the 建議 pill and the card are absent altogether
 
 #### Scenario: A suggestions-only update re-renders without a dock rebuild
 - **WHEN** the exploration panel is unchanged but `suggestions.status` flips `generating` →
   `ready` in a `ui_update`
-- **THEN** the pane's rows are replaced in place with the ready cards while the exploration menu
-  frames are untouched, the router stays on whichever frame it was on, and no frame is popped
+- **THEN** the open card's rows are replaced in place with the ready cards on the same card element,
+  the router stays on whichever frame it was on, and no frame is popped
 
 #### Scenario: Focus survives a suggestions-only update deterministically
-- **WHEN** the 建議 pane is the current frame with a card focused and a `ui_update` replaces the card
+- **WHEN** the suggestions card is open with a card row active and a `ui_update` replaces the card
   set
-- **THEN** focus stays on that card when its action code and parameters survive the update, and
-  otherwise lands deterministically on the nearest surviving row rather than resetting the router to
-  another frame
+- **THEN** the active row stays on that card when its action code and parameters survive the update,
+  and otherwise stays deterministically at its position in range, never closing the card
 
 #### Scenario: Cards are reachable by keyboard
-- **WHEN** the player activates the 建議 footer chip with the keyboard and arrows through the pane
-- **THEN** each card is a focusable row of the dock's active row container, activating one emits its
-  exact envelope, and activating the dismiss row emits the dismiss envelope
+- **WHEN** the player activates the 建議 pill with the keyboard and arrows through the card
+- **THEN** each card is a row of the card's one keyboard composite, activating one emits its exact
+  envelope, and activating the dismiss row emits the dismiss envelope
 
 #### Scenario: The pane never appears in combat or creation mode
 - **WHEN** the active mode is combat or character creation while the same `context_actions`
   panel streams `suggestions`
-- **THEN** the dock surface presents no 建議 chip and no suggestions pane, and returning to
-  exploration mode without an available panel also presents none
+- **THEN** the client presents no 建議 pill and no suggestions card (an open card closes in the
+  commit that leaves exploration), and returning to exploration mode without an available panel also
+  presents none
 
 #### Scenario: The pane yields to a re-homed sub-dock
 - **WHEN** a re-homed services/character sub-dock is active while the exploration dock owns the surface
-- **THEN** the 建議 pane does not appear until the sub-dock is closed
+- **THEN** the 建議 pill and the suggestions card do not appear (an open card closes) until the
+  sub-dock is closed
 
 #### Scenario: The pane's cards are reachable rows and back returns to the chip
-- **WHEN** the player navigates the 建議 pane with arrow keys or pointer, then presses Escape or the
-  breadcrumb's back control
-- **THEN** every card is a focusable row reached through the identical gate, and the view returns to
-  the overview with the 建議 chip focused
+- **WHEN** the player navigates the suggestions card with arrow keys or pointer, then presses Escape
+  or its `✕ 返回` row
+- **THEN** every card row is activated through the identical gate, and the card closes with focus
+  returned to the 建議 pill
 
 #### Scenario: Generating renders exactly the muted row
 - **WHEN** the status is `generating`
-- **THEN** the footer chip is present labelled `建議` with no count, and the pane holds one muted,
-  focusable, non-submitting row reading "AI 正在構思建議…", no cards, no dismiss control
+- **THEN** the pill is present labelled `建議` with no count, and the card holds one muted,
+  non-selectable note reading "AI 正在構思建議…", no cards, no dismiss row
 
 #### Scenario: Ready renders three to five cards and the dismiss row
 - **WHEN** the status is `ready`
-- **THEN** the pane shows between 3 and 5 clickable suggestion cards (the bound the server validator
-  enforces for ready sets), each with its label and optional hint, and a "✕ 清除建議" dismiss row
+- **THEN** the card shows between 3 and 5 activatable suggestion rows (the bound the server validator
+  enforces for ready sets), each with its label and optional hint, and a "清除建議" dismiss row marked
+  with a trash-can icon above the trailing `✕ 返回`
 
 #### Scenario: Degraded renders rule cards with the muted note
 - **WHEN** the status is `degraded`
-- **THEN** the pane shows rule cards (0–5; the v1 exploration derivation always yields ≥ 1) plus one
+- **THEN** the card shows rule cards (0–5; the v1 exploration derivation always yields ≥ 1) plus one
   muted "AI 建議目前不可用" note and the same dismiss row
 
 #### Scenario: Unavailable renders nothing
 - **WHEN** the status is `unavailable`
-- **THEN** no 建議 footer chip is presented and no pane exists, so the surface renders nothing at all
-  for suggestions
+- **THEN** no 建議 pill is presented and no card exists (an open card closes in that commit), so the
+  surface renders nothing at all for suggestions
 
 #### Scenario: The dismiss control is a pane row with today's envelope
 - **WHEN** the dismiss control is rendered
-- **THEN** it dispatches the same envelope it dispatches today and appears as a row of the pane
-  rather than a corner control, so it is not a second tab stop inside the dock's composite widget
+- **THEN** it dispatches the same envelope it dispatches today and appears as a row of the card
+  rather than a corner control, so it is not a second tab stop inside the card's composite
 
 #### Scenario: Mode exit tears the pane down
 - **WHEN** the player leaves exploration mode
-- **THEN** the 建議 pane is torn down with the dock, and the surface is owned only while the
-  exploration dock owns it
+- **THEN** the suggestions card closes and the 建議 pill leaves with the exploration root, and the
+  surface exists only while the exploration screen does
 
 #### Scenario: Status derivation is DOM-independent
 - **WHEN** a test exercises every suggestions status
-- **THEN** the pane's status, card list, and visibility come from a DOM-independent view function, so
-  every status is testable without a browser
+- **THEN** the card's status, rows, and notes and the pill's visibility come from DOM-independent
+  builders, so every status is testable without a browser
 
 #### Scenario: Suggestions text is never markup
 - **WHEN** any suggestions text renders
@@ -100,44 +102,41 @@ renders defined by the scenarios below.
 
 #### Scenario: A suggestions-only update replaces rows in place
 - **WHEN** a panel update changes only the suggestions content
-- **THEN** the pane's rows are replaced in place without rebuilding the dock, without popping the
-  frame, and without resetting the keyboard router to another frame
+- **THEN** the open card's rows are replaced in place without rebuilding the card, without pushing
+  or popping a frame, and without resetting the keyboard router
 
 #### Scenario: Surviving focus is preserved across a suggestions-only update
-- **WHEN** the pane is the current frame during a suggestions-only update
-- **THEN** focus is preserved on a card whose action code and parameters survive the update and
-  otherwise lands deterministically on the nearest surviving row
+- **WHEN** the suggestions card is open during a suggestions-only update
+- **THEN** the active row is preserved on a card whose action code and parameters survive the update
+  and otherwise stays deterministically at its position in range
 
 #### Scenario: A rebuilt dock renders an equivalent generating row
-- **WHEN** a dock rebuild occurs while the status is `generating`
-- **THEN** the rebuilt pane renders an equivalent generating row, with no DOM-identity promise across
+- **WHEN** the card is re-opened while the status is `generating`
+- **THEN** the re-opened card renders an equivalent generating note, with no DOM-identity promise across
   rebuilds, because repeated `generating` statuses are never separately published by the trigger
   service
 
 ### Requirement: One shared card component renders every suggestion card
 
-A single card component SHALL build every suggestion card as a native `<button>` element from the
-validated card fields (`kind`, `action_code`, `label`, `params`, optional `hint`) — the same
-component the dock embeds and the later narrative choice-point slice reuses, so both surfaces
-cannot diverge. Both forms SHALL come from that one component, never from a second card renderer.
+The one centred card shell, `ChoiceCard`, SHALL render every suggestion card as a row built from the
+validated card fields (`kind`, `action_code`, `label`, `params`, optional `hint`), through the one
+suggestions-row builder the store and the card share, so no second card renderer exists (the retired
+`OptionCard` and `ChoiceCardRow` are gone).
 
 #### Scenario: The dock and the choice-point surface share one builder
-- **WHEN** a `known_action` card and a `freeform` card with hint are rendered by the component
-- **THEN** each produces a button with the exact label text, the hint rendered as a plain text
-  line where present, and the dismiss control is separate from both
+- **WHEN** a `known_action` card and a `freeform` card with hint are rendered by the card
+- **THEN** each produces a row with the exact label text, the hint rendered as a plain text second
+  line where present, and the dismiss row is separate from both
 
 #### Scenario: One component renders both the dock row and the choice-point button
-- **WHEN** the same card is rendered into the dock's suggestions pane and into the narrative
-  choice-point
-- **THEN** the dock instance is a row of the dock's active row container with the option role and a
-  row identity attribute while the choice-point instance stays a natively tab-focusable button, and
-  both are produced by the one shared component with identical label, hint and click contract
+- **WHEN** a card is rendered on the suggestions card
+- **THEN** it is a menu item of the card's one keyboard composite with a row identity attribute,
+  produced by the one shared component with one label, hint, and activation contract
 
 #### Scenario: The dock row form keeps one composite widget
-- **WHEN** the dock embeds the component
-- **THEN** the card additionally carries its selected state attribute, so the dock keeps exactly one
-  composite widget and one tab stop; where the narrative choice-point embeds it, the card stays a
-  natively tab-focusable button
+- **WHEN** the suggestions card renders its rows
+- **THEN** the card is exactly one composite widget and one tab stop that names its active row
+  through an active-descendant reference
 
 #### Scenario: Each card kind carries its defined text
 - **WHEN** a card is rendered by the component
@@ -147,8 +146,7 @@ cannot diverge. Both forms SHALL come from that one component, never from a seco
 #### Scenario: The dismiss control renders once per surface
 - **WHEN** a suggestions surface renders its dismiss control
 - **THEN** it is rendered once per suggestions surface, not per card, appears for both `ready` and
-  `degraded` states, and appears as a row of the pane where the dock hosts it and as a separate
-  small button where another surface hosts it
+  `degraded` states, and appears as the card's 清除建議 row
 
 #### Scenario: Card text never enters a markup pipeline
 - **WHEN** any card text renders
@@ -158,8 +156,8 @@ cannot diverge. Both forms SHALL come from that one component, never from a seco
 ### Requirement: Suggestion cards execute exact envelopes through the action client
 
 Activating a suggestion card or its dismiss control SHALL dispatch through the existing action
-client (`window.Elosern.actions.submit`) — no new OOB message type, no envelope change. In both
-hosting forms the dispatched envelopes are exactly:
+client (`window.Elosern.actions.submit`) — no new OOB message type, no envelope change. The
+dispatched envelopes are exactly:
 
 - `known_action` card → `submit(action_code, params)` with the card's validator-normalized payload as-is.
 - `freeform` card → `submit("explore.talk_freeform", {"npc_id": params.npc_id, "speech": label})`.
@@ -174,14 +172,15 @@ hosting forms the dispatched envelopes are exactly:
   neither dispatch echoes a command line
 
 #### Scenario: The dismiss control hides the suggestions surface
-- **WHEN** the player activates "✕ 清除建議" while the pane shows `ready` or `degraded` cards
+- **WHEN** the player activates "清除建議" while the card shows `ready` or `degraded` cards
 - **THEN** the client submits `options.dismiss` with an empty payload, and once the published
-  `unavailable` state arrives, the 建議 root entry and its pane disappear from the dock (the
-  narrative-stream choice-point removal is specified and tested by the later choice-point slice)
+  `unavailable` state arrives the card and the 建議 pill leave together — the committed envelope,
+  never the local dispatch, decides the removal (the preserved dismiss invariant
+  `webclient-context-actions-suggestions` restates)
 
 #### Scenario: A dock-hosted card submits exactly what its keyboard confirmation submits
-- **WHEN** the player activates a card in the dock's suggestions pane with the pointer, and then
-  confirms the same card with Enter
+- **WHEN** the player activates a card on the suggestions card with the pointer, and then confirms
+  the same card with Enter
 - **THEN** each deliberate activation emits exactly one `ui_action` with the identical action code
   and payload, and an activation while the action client is locked emits nothing
 
@@ -190,15 +189,14 @@ hosting forms the dispatched envelopes are exactly:
 - **THEN** the submitted `speech` is always the label text
 
 #### Scenario: A dock-hosted activation traverses the router path
-- **WHEN** the dock hosts the card as a row of its suggestions frame and the card is activated
-- **THEN** activation traverses the ordinary router path every other dock row traverses — the
-  delegated pointer bridge's `[data-item-key]` row handling, the shared focus, disabled-explanation
-  and submission gates, and the identical keyboard confirmation — and still ignores
-  keyboard-synthesized clicks
+- **WHEN** a card row on the suggestions card is activated
+- **THEN** the row is re-resolved from the committed envelope and traverses the one gated
+  exploration activation every exploration row outside the router shares — the in-flight and
+  awaiting-revision lock and the single dispatch entry — identically for pointer and keyboard
 
 #### Scenario: A non-dock activation bypasses the router
-- **WHEN** another surface hosts the card and it is activated
-- **THEN** activation uses the direct click handler on the native button and does not involve the
+- **WHEN** a suggestion card is activated
+- **THEN** activation uses the card's own click and keydown handlers and does not involve the
   KeyboardRouter
 
 #### Scenario: Card activations are never echoed
@@ -212,27 +210,27 @@ hosting forms the dispatched envelopes are exactly:
 - **THEN** the submit is rejected without side effects, exactly as for every other action
 
 #### Scenario: Tab reachability differs by host
-- **WHEN** a card is hosted outside the dock, and separately as a dock row
-- **THEN** the outside card remains natively tab-focusable and pointer-activatable, while the dock
-  row is reachable by the dock's arrow-key navigation and by pointer but NOT individually reachable
-  by sequential keyboard navigation, because the dock is one composite widget with a single tab stop
+- **WHEN** the suggestions card is open
+- **THEN** its rows are reachable by the card's arrow-key navigation, its digits, and the pointer but
+  NOT individually by sequential keyboard navigation, because the card is one composite widget with a
+  single tab stop that traps focus until it closes
 
 ### Requirement: A degraded payload with zero cards renders the defined empty-state
 
 A `degraded` payload carrying an empty card list SHALL render the muted line
-"現在沒有什麼值得做的動作" as the suggestions pane's body (never an empty container and never a
+"現在沒有什麼值得做的動作" as the suggestions card's body (never an empty container and never a
 failure), alongside the muted unavailability note and the dismiss row.
 
 #### Scenario: Zero-card degraded renders the empty-state line
 - **WHEN** the store presents a `degraded` suggestions payload with an empty `cards` array
-- **THEN** the pane body shows "現在沒有什麼值得做的動作" together with the "AI 建議目前
-  不可用" note and the dismiss row, the 建議 root entry carries no badge, and no crash or empty box
+- **THEN** the card body shows "現在沒有什麼值得做的動作" together with the "AI 建議目前
+  不可用" note and the dismiss row, the 建議 pill carries no count, and no crash or empty box
   is rendered
 
 #### Scenario: A missing suggestions field degrades silently as a compatibility guard
-- **WHEN** a pre-v5 `context_actions` panel (no `suggestions` field) reaches the dock through the
-  store
-- **THEN** no 建議 root entry is presented, the dock's other content is unaffected, and the
+- **WHEN** a pre-v5 `context_actions` panel (no `suggestions` field) reaches the exploration screen
+  through the store
+- **THEN** no 建議 pill is presented, the screen's other content is unaffected, and the
   guard's presence is documented as compatibility-only rather than a normal v5 case
 
 #### Scenario: The empty-state is unreachable in v1 by construction

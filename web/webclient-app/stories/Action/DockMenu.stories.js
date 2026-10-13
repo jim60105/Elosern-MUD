@@ -12,10 +12,12 @@ import {
 // combat-row), gridCols (fixed framed-grid columns). Events:
 // focus-change(key), activate({ key, item, intent }).
 //
-// The exploration dock's own frames do not render here: the root is the
-// SceneOverview component and a target's affordances are the stage's verb
-// card (exploration-presence-rail; webclient-talk-open-dock retired the
-// `nav` and `affordance` panes with their last producers).
+// The exploration dock's own surfaces do not render here: the root is the
+// exit compass's pane (an empty router menu, exploration-room-actions), a
+// target's affordances are the stage's verb card (exploration-presence-rail;
+// webclient-talk-open-dock retired the `nav` and `affordance` panes with
+// their last producers), and the suggestions are the centred suggestions
+// card (the `cards` pane left with its frame).
 
 const renderMenu = (args) => ({
   render: () =>

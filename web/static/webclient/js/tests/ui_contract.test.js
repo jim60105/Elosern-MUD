@@ -90,17 +90,22 @@ test("the narrative markup pipeline never parses HTML strings", () => {
 });
 
 
-test("suggestion cards and the dismiss control keep native activation", () => {
-  // The routing gate defers to the browser default for Enter/Space pressed on
-  // a focused suggestion card or dismiss button: the card click path is a
-  // direct listener, never the KeyboardRouter, so the router must not claim
-  // those keys (webclient-options-surface D4).
-  const card = read("web/webclient-app/components/OptionCard.vue");
-  assert.match(card, /class="option-card"/);
-  assert.match(card, /@click="activate"/);
-  const dock = read("web/webclient-app/components/ActionDock.vue");
-  assert.match(dock, /suggestions-dismiss/);
-  assert.match(dock, /✕ 清除建議/);
+test("suggestion cards and the dismiss row activate through the card's own handlers", () => {
+  // The suggestions card (exploration-room-actions design D4) is a ChoiceCard:
+  // its rows activate through the card's own click and keydown handlers,
+  // which consume every key they handle, never through the KeyboardRouter.
+  // The dismiss row keeps the label 清除建議 with a trash-can badge (not the
+  // ✕ of the trailing 返回 row).
+  const card = read("web/webclient-app/components/ChoiceCard.vue");
+  assert.match(card, /@click="onRowClick\(index\)"/);
+  assert.match(card, /@keydown="onKeydown"/);
+  assert.match(card, /row\.icon === 'trash'/);
+  const rows = read("web/webclient-app/composables/use-room-actions.js");
+  assert.match(rows, /label: "清除建議"/);
+  assert.match(rows, /icon: "trash"/);
+  const app = read("web/webclient-app/AppClient.vue");
+  assert.match(app, /data-testid="suggestions-pill"/);
+  assert.strictEqual(app.includes("suggestions-dismiss"), false, "no dock dismiss control remains");
 });
 
 test("seal-red small text is never used on dark surfaces", () => {

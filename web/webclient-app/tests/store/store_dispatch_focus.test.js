@@ -282,7 +282,7 @@ describe("store dispatch + focus", () => {
   });
 
   describe("the keyboard-router focus slice", () => {
-    it("loads the committed scene overview with its chip keys", () => {
+    it("loads the empty exploration root with every row outside the router", () => {
       openSession();
       store.receive(
         1,
@@ -291,18 +291,28 @@ describe("store dispatch + focus", () => {
         {},
       );
       const view = store.view;
-      // The exits are the exit compass's (exploration-exit-compass) and the
+      // The exits are the exit compass's (exploration-exit-compass), the
       // people and objects the presence rail's (exploration-presence-rail),
-      // so the overview opens on its first footer chip.
-      expect(view.focus.key).toBe("look-room");
-      expect(view.focus.label).toBe("查看房間");
-      expect(view.focus.enabled).toBe(true);
-      expect(store.router.rootMenu().items.some((item) => /^(exit|target|entity|object)-/.test(item.key))).toBe(false);
+      // and the room actions the place card's and the 建議 pill's
+      // (exploration-room-actions), so the root carries no item and nothing
+      // is focused on it.
+      expect(view.focus.key).toBeNull();
+      expect(store.router.rootMenu().items).toEqual([]);
+      expect(view.degradedRoot).toBeNull();
+      expect(view.dockSource).toBe("exploration.root");
       expect(view.presenceEntries.map((entry) => entry.key)).toEqual(["target-7", "object-3"]);
-      // The overview navigates as rows of chips in reading order
-      // (webclient-scene-overview-swap): ArrowRight steps to the next chip.
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("wait");
+      expect(view.roomLook.payload).toEqual({ room: true });
+      expect(view.waitRows.map((row) => row.key)).toEqual(["wait-dawn", "wait-sleep", "wait-rest"]);
+      // No arrow, Enter, or digit is claimed by a root row; Escape and Space
+      // keep their frame-independent meaning, with no error and no frame change.
+      for (const key of ["ArrowRight", "ArrowLeft", "ArrowUp", "ArrowDown", "Enter"]) {
+        expect(store.focusPress(key)).toBe(false);
+      }
+      expect(store.focusPress("Escape")).toBe(true);
+      expect(store.focusPress(" ")).toBe(true);
+      expect(store.view.dockDepth).toBe(1);
+      expect(store.view.dockSource).toBe("exploration.root");
+      expect(sender.sent.actions.length).toBe(0);
     });
 
     it("navigates the combat root grid with preserved action keys", () => {
@@ -352,7 +362,7 @@ describe("store dispatch + focus", () => {
       expect(store.view.dockDepth).toBe(1);
     });
 
-    it("rebuilds the frame only when the committed panel content changes", () => {
+    it("a committed update re-resolves the empty root in place", () => {
       openSession();
       store.receive(
         1,
@@ -360,32 +370,12 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      expect(store.view.focus.key).toBe("look-room");
-      store.focusPress("ArrowRight");
-      expect(store.view.focus.key).toBe("wait");
-
-      // An identical update must not reset the focus position.
-      store.receive(
-        1,
-        "ui_update",
-        [fx.update({ revision: 3, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
-        {},
-      );
-      expect(store.view.focus.key).toBe("wait");
-
-      // Declarative frame semantics (webclient-declarative-frame-stack): a
-      // changed panel RE-RESOLVES the open frame — the focus key survives
-      // whenever the re-derived rows still carry it (the inventory capability
-      // disappearing removes no overview chip). The old
-      // copy reset the whole frame to the first item on any content change;
-      // that reset is gone by design (design D3: the frame is a descriptor,
-      // focus is a key, and re-resolution preserves it).
       store.receive(
         1,
         "ui_update",
         [
           fx.update({
-            revision: 4,
+            revision: 3,
             panels: {
               exploration: fx.explorationPanel({ inventory: { available: false } }),
               local_map: fx.localMapPanel(),
@@ -394,10 +384,13 @@ describe("store dispatch + focus", () => {
         ],
         {},
       );
-      expect(store.view.focus.key).toBe("wait");
-     });
+      expect(store.view.dockDepth).toBe(1);
+      expect(store.view.dockSource).toBe("exploration.root");
+      expect(store.view.degradedRoot).toBeNull();
+      expect(store.view.navigationItems.map((item) => item.key)).not.toContain("inventory");
+    });
 
-    it("routes a confirmed action item through the single dispatch entry", () => {
+    it("routes a wait card row through the single dispatch entry", () => {
       openSession();
       store.receive(
         1,
@@ -405,17 +398,11 @@ describe("store dispatch + focus", () => {
         [fx.update({ revision: 2, panels: { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() } })],
         {},
       );
-      // Navigate the overview to the footer's 等待／休息 chip: the reading
-      // order is look-room, wait, suggestions.
-      store.focusPress("ArrowRight");
-      expect(store.view.focus.key).toBe("wait");
-      // Confirming "wait" opens the wait submenu (openSubmenu).
-      expect(store.focusConfirm("keyboard")).toBe(true);
-      // The simplified selector exposes dawn, sleep, then custom rest.
-      expect(store.focusPress("ArrowRight")).toBe(true);
-      expect(store.view.focus.key).toBe("wait-sleep");
-      // Confirming the leaf dispatches the exact `explore.wait` action.
-      expect(store.focusConfirm("keyboard")).toBe(true);
+      // The place card's 等待 opens the client-local wait card (no request),
+      // and its sleep row dispatches the exact `explore.wait` action.
+      expect(store.openRoomCard("wait")).toBe(true);
+      expect(sender.sent.actions.length).toBe(0);
+      expect(store.activateWaitRow("wait-sleep")).toMatchObject({ sent: true });
       expect(sender.sent.actions.length).toBe(1);
       // `base_revision` is the committed revision at dispatch time (the
       // exploration update advanced it to 2).
@@ -427,6 +414,7 @@ describe("store dispatch + focus", () => {
         action_id: "explore.wait",
         payload: { sleep: true },
       });
+      expect(store.view.roomCard).toBeNull();
     });
 
     it("never submits a disabled or locked item", () => {
@@ -442,10 +430,9 @@ describe("store dispatch + focus", () => {
       expect(store.activateExit("north")).toMatchObject({ sent: false, reason: "disabled" });
       expect(sender.sent.actions.length).toBe(0);
 
-      // Pointer activation shares the same gates (mutation-lock + enabled).
-      expect(store.focusItemByKey("look-room")).toBe(true);
+      // The place card's 查看房間 shares the same gates (mutation-lock).
        store.dispatchAction("explore.wait", { daypart: "dusk" });
-       expect(store.focusConfirm("pointer")).toBe(false);
+       expect(store.activateRoomLook()).toMatchObject({ sent: false, reason: "locked" });
        // The rail's look entry runs the same gate (exploration-presence-rail).
        expect(store.activatePresence("object-3")).toMatchObject({ sent: false, reason: "locked" });
        expect(store.view.dispatch.inFlight).not.toEqual(null);
@@ -464,12 +451,13 @@ describe("store dispatch + focus", () => {
        expect(store.view.dockDepth).toBe(1);
        invariant();
 
-       // Push: confirming the overview's 等待／休息 chip opens the waiting
-       // frame — the frame stack grows to depth 2, the trail gains a level.
+       // Push: a resolvable exploration child frame (the exploration family
+       // pushes none of its own since exploration-room-actions) — the frame
+       // stack grows to depth 2, the trail gains a level.
        const panels2 = { exploration: fx.explorationPanel(), local_map: fx.localMapPanel() };
        store.receive(1, "ui_update", [fx.update({ revision: 2, panels: panels2 })], {});
-       expect(store.focusItemByKey("wait")).toBe(true);
-       expect(store.focusConfirm("keyboard")).toBe(true);
+       store.router.pushFrame({ source: "exploration.navigation", params: {} }, { openerKey: null });
+       store.refreshView();
        expect(store.view.dockDepth).toBe(2);
        invariant();
 

@@ -9,7 +9,6 @@
 // arrive normalized (the AppClient `dockItems` shape: `key`, `label`,
 // `enabled`, `action_id`, `params`, `kind`, `scaleChoice`, `selected`). No
 // DOM, no store access — a pure function of the committed frame.
-//   - `cards`:   the suggestions frame (`.sugs` cards).
 //   - `commands`: the combat root, category, and group lists (one vertical
 //                column of icon-and-label rows with a neutral count).
 //   - `skills`:  the combat skill frame (`.sk` rows beside the detail pane).
@@ -18,7 +17,9 @@
 //   - `confirm`: a confirm/cancel confirmation frame (`.cast` / warning panel).
 //   - `plain`:   anything else (single-target rows, empty frames).
 //
-// The retired move frame's `outlet` kind is gone with the frame
+// The retired suggestions frame's `cards` kind is gone with the frame
+// (exploration-room-actions: the suggestions are the centred suggestions
+// card's). The retired move frame's `outlet` kind is gone with the frame
 // (webclient-retire-exploration-submenus): exits are the scene overview's
 // chips, which that component renders itself.
 // The retired `nav` kind went with the scripted-keyword frame, and the
@@ -48,20 +49,6 @@ export function classifyPane(frame) {
     })
   ) {
     return "confirm";
-  }
-  // Suggestions frame: the dismiss row, a generating/empty row, or an
-  // `action-*` card key identifies it (the suggestion cards are keyed
-  // `action-<code>` / `action-explore.talk_freeform`).
-  if (
-    items.some(
-      (i) =>
-        i.key === "action-options.dismiss" ||
-        i.key === "suggestions-generating" ||
-        i.key === "suggestions-empty" ||
-        (i.key && i.key.startsWith("action-"))
-    )
-  ) {
-    return "cards";
   }
   // The 威力 step: scale rows are marked `scaleChoice` or carry the
   // `choose-scale` action.

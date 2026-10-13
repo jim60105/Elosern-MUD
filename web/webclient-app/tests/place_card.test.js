@@ -1,7 +1,8 @@
 // webclient-avg-place-card-top-bar (design D3); place-card-relocation (design
 // D2): the stage's place card states the location and the world time — the
 // only surface that does — at the head of the `map` anchor, content-sized,
-// display-only, hidden in creation.
+// display-first, hidden in creation. exploration-room-actions (design D3):
+// only while `actionsEnabled` it carries the 查看房間 and 等待 buttons.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mount } from "@vue/test-utils";
@@ -95,5 +96,42 @@ describe("PlaceCard", () => {
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
     expect(shellCss).not.toContain("--place-h");
     expect(tokens).toContain("--header-h: calc(48px * var(--ui-scale));");
+  });
+
+  describe("room actions (exploration-room-actions)", () => {
+    it("renders 查看房間 and 等待 only while actions are enabled", async () => {
+      wrapper = mount(PlaceCard, { props: { locationLabel: "石板廣場", timeLabel: "春季 3 日 ‧ 12:00" } });
+      expect(wrapper.findAll("button")).toHaveLength(0);
+      await wrapper.setProps({ actionsEnabled: true });
+      const look = wrapper.get('[data-testid="place-card-look"]');
+      const wait = wrapper.get('[data-testid="place-card-wait"]');
+      expect(look.attributes("aria-label")).toBe("查看房間");
+      expect(look.find("svg").exists()).toBe(true);
+      expect(wait.text()).toBe("等待");
+      expect(wait.find("svg").exists()).toBe(true);
+      await wrapper.setProps({ actionsEnabled: false });
+      expect(wrapper.element.querySelectorAll(FOCUSABLE)).toHaveLength(0);
+    });
+
+    it("emits look-room and wait, and its readout content on hover and focus", async () => {
+      wrapper = mount(PlaceCard, { props: { locationLabel: "石板廣場", timeLabel: "t", actionsEnabled: true } });
+      await wrapper.get('[data-testid="place-card-look"]').trigger("click");
+      await wrapper.get('[data-testid="place-card-wait"]').trigger("click");
+      expect(wrapper.emitted("look-room")).toHaveLength(1);
+      expect(wrapper.emitted("wait")).toHaveLength(1);
+      await wrapper.get('[data-testid="place-card-look"]').trigger("mouseenter");
+      await wrapper.get('[data-testid="place-card-look"]').trigger("mouseleave");
+      await wrapper.get('[data-testid="place-card-wait"]').trigger("focus");
+      expect(wrapper.emitted("hover").map(([content]) => content && content.lead)).toEqual(["查看房間", null, "等待"]);
+    });
+
+    it("keeps the heading's full accessible name beside the buttons", () => {
+      const long = "伊洛瑟恩王都外城區‧商人公會附屬倉庫的地下儲藏室";
+      wrapper = mount(PlaceCard, { props: { locationLabel: long, timeLabel: "t", actionsEnabled: true } });
+      const heading = wrapper.get('[data-testid="place-card__location"]');
+      expect(heading.text()).toBe(long);
+      expect(heading.attributes("title")).toBe(long);
+      expect(heading.element.contains(wrapper.get('[data-testid="place-card-look"]').element)).toBe(false);
+    });
   });
 });

@@ -121,6 +121,7 @@ export function applyPresence(ctx) {
       if (entries.length <= RAIL_MAX) {
         return { sent: false, handled: false, reason: "missing" };
       }
+      ctx.roomCard = null;
       ctx.presenceCard = { kind: "overflow", openerKey: RAIL_MORE_KEY, location };
       ctx.publishView();
       return { sent: false, handled: true, reason: "local" };
@@ -130,6 +131,7 @@ export function applyPresence(ctx) {
       return { sent: false, handled: false, reason: "missing" };
     }
     if (entry.presence === "target") {
+      ctx.roomCard = null;
       ctx.presenceCard = {
         kind: "verbs",
         identity: entry.identity,
@@ -188,11 +190,12 @@ export function applyPresence(ctx) {
   }
 
   // Whether the rail is on the stage: exploration with an available panel
-  // that lists someone or something, no card open, and nothing covering the
+  // that lists someone or something, no card open (a presence card or a room
+  // card, exploration-room-actions), and nothing covering the
   // stage (a held combat round, a degraded root, a drawer, an overlay). The
   // digit path and the rail's own render share this one predicate.
   ctx.railVisible = function railVisible(rs) {
-    if (!rs || rs.mode !== "exploration" || ctx.presenceCard !== null) {
+    if (!rs || rs.mode !== "exploration" || ctx.centredCardOpen()) {
       return false;
     }
     if (ctx.beatHoldView() || ctx.hudDrawer.value || ctx.hudOverlay.value) {
@@ -206,15 +209,13 @@ export function applyPresence(ctx) {
   };
 
   // The rail's digit picks (design D5): `null` when the press is not the
-  // rail's (the router path decides), else whether it was claimed. In every
-  // exploration frame of the dock (the root and its waiting and suggestions
-  // frames, whose rows keep arrows, Enter, and the pointer — the interim
-  // the footer chips share until change 3 turns them into cards). While a card is
-  // open its rows own the digits; the card's keydown handles them first, and
-  // this covers a digit that reaches the store with focus elsewhere. With
-  // the rail on the stage every digit is claimed — one beyond the slots does
-  // nothing — and with no rail no digit is claimed and none falls through to
-  // the footer chips.
+  // rail's (the router path decides), else whether it was claimed. The
+  // exploration root is an empty router menu (exploration-room-actions), so
+  // no digit falls through to a dock row. While a card is open its rows own
+  // the digits; the card's keydown handles them first, and this covers a
+  // digit that reaches the store with focus elsewhere. With the rail on the
+  // stage every digit is claimed — one beyond the slots does nothing — and
+  // with no rail no digit is claimed.
   ctx.presenceDigit = function presenceDigit(key, repeat) {
     const rs = ctx.reducer.getState();
     if (rs.mode !== "exploration" || ctx.router.depth() === 0) {
@@ -224,6 +225,13 @@ export function applyPresence(ctx) {
     // An open card owns the digits whatever frame the dock shows, except
     // under a drawer or an overlay (the card stays open beneath a drawer its
     // navigate row opened): those digits are not the card's and not claimed.
+    if (ctx.roomCard !== null) {
+      // A room card's digits are its own keydown's: the sleep row opens the
+      // view's dream question and the rest row the view's form, which the
+      // store cannot. A stray digit is claimed and does nothing, so it never
+      // reaches the rail beneath the card.
+      return !(ctx.hudDrawer.value || ctx.hudOverlay.value);
+    }
     if (ctx.presenceCard !== null) {
       if (ctx.hudDrawer.value || ctx.hudOverlay.value) {
         return false;

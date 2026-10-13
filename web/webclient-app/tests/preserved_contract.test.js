@@ -182,7 +182,7 @@ describe("H1 preserved DOM contract (design D6)", () => {
     wrapper.unmount();
   });
 
-  it("AppClient keeps #action-dock (data-mode, tabindex, listbox role) in exploration mode", async () => {
+  it("AppClient keeps #action-dock (data-mode, tabindex) in exploration mode", async () => {
     const wrapper = mountAppClient();
     await wrapper.vm.$nextTick();
     store.beginTransport(1);
@@ -208,15 +208,16 @@ describe("H1 preserved DOM contract (design D6)", () => {
     const dock = wrapper.find("#action-dock");
     expect(dock.exists(), "#action-dock must render in exploration").toBe(true);
     expect(dock.attributes("data-mode")).toBe("exploration");
-    expect(dock.attributes("tabindex")).toBe("0");
-    // The listbox composite role on the dock's menu (the preserved focus
-    // target the keyboard router keeps using).
-    expect(wrapper.find('[role="listbox"]').exists()).toBe(true);
-    // Keyboard focus remains attached to a visible action, not a moved
-    // entry: the exploration root is the scene overview
-    // (webclient-scene-overview-swap), so its chips carry the dock's rows
-    // while the navigation-carried surfaces live on the top bar alone.
-    expect(wrapper.find('#action-dock [data-item-key="look-room"]').exists()).toBe(true);
+    // The dock keeps its `tabindex` attribute and stays the programmatic
+    // focus target, but at the exploration root it leaves the tab order
+    // (exploration-room-actions): the compass, the rail, the place card's
+    // buttons, and the 建議 pill are the tab stops, and the root has no row.
+    expect(dock.attributes("tabindex")).toBe("-1");
+    expect(wrapper.find('#action-dock [data-item-key]').exists()).toBe(false);
+    expect(wrapper.find('#action-dock [data-testid="exit-compass"]').exists()).toBe(true);
+    // The room actions are the place card's.
+    expect(wrapper.find('[data-anchor="map"] [data-testid="place-card-look"]').exists()).toBe(true);
+    expect(wrapper.find('[data-anchor="map"] [data-testid="place-card-wait"]').exists()).toBe(true);
     // The people and objects stand on the presence rail, outside the dock
     // (exploration-presence-rail).
     expect(wrapper.find('#action-dock [data-item-key="target-7"]').exists()).toBe(false);

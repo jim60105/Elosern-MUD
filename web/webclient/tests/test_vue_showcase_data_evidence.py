@@ -144,7 +144,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/SceneBackdrop",
                 "Core/FullLogOverlay", "Core/HudDrawer", "Core/DrawerHeader", "Core/EmptyState",
                 "Action/ActionDock", "Action/DockMenu", "Action/DockMenuItem",
-                "Action/OptionCard", "Action/RestForm", "Action/ChoiceCardRow",
+                "Action/RestForm",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
                 "Data/ParticipantFrame", "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
@@ -194,9 +194,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The AVG message window (webclient-message-window-component),
                 # built and story-documented before C6c mounts it.
                 "Core/MessageWindow",
-                # The AVG scene overview (webclient-scene-overview-component),
-                # built and story-documented before C8b mounted it.
-                "Action/SceneOverview",
+                # The AVG scene overview (webclient-scene-overview-component)
+                # left with exploration-room-actions, as did the suggestion
+                # card family it hosted (OptionCard, ChoiceCardRow).
                 "Action/ExitCompass",
                 # The dialogue stage actor (webclient-dialogue-stage-actors), the
                 # standing portrait that wraps Core/ReferenceArtwork on the stage.
@@ -212,6 +212,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Core/ChoiceCard",
                 "Core/PresenceRail",
                 "Core/ExplorationScreen",
+                # The wait card's 進入夢境協作？ question joined with
+                # exploration-room-actions.
+                "Core/QuestionCard",
                 # The correspondence folio and the gallery stage-transform
                 # drawer refroze the manifest after this baseline was
                 # pinned: World/LettersPanel and

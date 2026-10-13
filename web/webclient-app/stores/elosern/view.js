@@ -195,7 +195,6 @@ export function applyView(ctx) {
       lastTarget: ctx.lastTarget,
       drawerRequest: ctx.drawerRequest,
       drawerCloseRequest: ctx.drawerCloseRequest,
-      restFormRequest: ctx.restFormRequest,
       partyAvailable,
       partySlots,
       objectivesAvailable,
@@ -260,6 +259,9 @@ export function applyView(ctx) {
       // The presence rail's entries and the client-local card slice
       // (exploration-presence-rail design D2).
       ...ctx.presenceView(rs),
+      // The place card's room actions and the client-local room card
+      // (exploration-room-actions).
+      ...ctx.roomActionsView(),
       // The submission gate the compass waits on: a mutation in flight or a
       // declared presentation revision not yet committed.
       submitLocked: ctx.router.isMutationInFlight() || ctx.router.isAwaitingRevision(),
@@ -387,6 +389,7 @@ export function applyView(ctx) {
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
     ctx.settlePresence(rs);
+    ctx.settleRoomCard(rs);
     ctx.syncHudDrawer(prev, rs);
     ctx.syncSkillUse(prev, rs);
     // A free-form borrow speaks to the conversation's host. A refused

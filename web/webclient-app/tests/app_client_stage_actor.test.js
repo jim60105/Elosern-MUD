@@ -224,7 +224,9 @@ describe("the stage actors in the portrait anchors", () => {
     await nextTick();
     await nextTick();
     expect(document.getElementById("action-dock")).toBe(dock);
-    expect(document.activeElement).toBe(dock);
+    // Leaving dialogue re-homes focus on the exploration screen's focus home,
+    // the exit compass (exploration-room-actions).
+    expect(document.activeElement).toBe(document.querySelector('#action-dock [data-testid="exit-compass"]'));
   });
 
   it("re-homes focus once when the conversation opens from the verb card and again on leaving", async () => {
@@ -248,6 +250,6 @@ describe("the stage actors in the portrait anchors", () => {
     commit("exploration");
     await nextTick();
     await nextTick();
-    expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    expect(document.activeElement).toBe(document.querySelector('#action-dock [data-testid="exit-compass"]'));
   });
 });

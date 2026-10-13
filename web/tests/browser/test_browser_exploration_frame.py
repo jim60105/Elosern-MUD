@@ -76,19 +76,19 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(map_before["current_node"], home)
         time_before = store_state(page)["serverTime"]
 
-        # The exploration root is the scene overview (webclient-scene-overview-
-        # swap) beside the exit compass, which carries the room's exits
-        # (exploration-exit-compass).
+        # The exploration root is the exit compass's pane (an empty router
+        # menu, exploration-room-actions); the compass carries the room's
+        # exits (exploration-exit-compass).
         self.assertEqual(
             page.evaluate("() => window.__elosernBridge.router.depth()"),
             1,
-            "the exploration root is the scene overview",
+            "the exploration root is the only frame",
         )
         # remove-redundant-dock-menu-layout: the exploration root pane is the
         # direct-child rule's one exception for row regions — it renders as a
         # single element that is the pane host's only child (the compass plus
-        # the readout-and-overview column, exploration-exit-compass D5), with
-        # no anonymous layout wrapper and no detail aside.
+        # the pill-and-readout column, exploration-room-actions D2), with no
+        # anonymous layout wrapper and no detail aside.
         self.assertEqual(page.locator(".dock-menu-layout").count(), 0)
         self.assertEqual(
             page.evaluate(
@@ -96,7 +96,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 " if (!host) return false;"
                 " const kids = Array.from(host.children);"
                 " return kids.length === 1 && kids[0].getAttribute('data-testid') === 'exploration-root'"
-                " && !!kids[0].querySelector('[data-testid=\"scene-overview\"]'); }"
+                " && !!kids[0].querySelector('[data-testid=\"exploration-readout\"]'); }"
             ),
             True,
             "the exploration root pane renders as the pane host's only child",
@@ -345,17 +345,18 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the re-resolved payloads carry the new committed current_node",
         )
 
-        # The finite table: every exploration source resolves against the live
-        # committed snapshot (suggestions degrade iff its envelope status is
-        # `unavailable`, the no-pane rule), and resolution is pure: two calls
-        # agree deeply and nothing else in the committed state moved. The
-        # status read and every resolve must share ONE evaluate round-trip: a
-        # ui_update committing between separate CDP calls can flip the
-        # suggestions envelope to `unavailable` after its status was sampled,
-        # routing the iff below through the wrong branch (the same transport
-        # race the purity check documents underneath). Inside one synchronous
-        # evaluate the store cannot commit, so each verdict pairs with the
-        # exact committed state its resolver saw.
+        # The finite table: the exploration root resolves against the live
+        # committed snapshot to an empty menu, the retired wait and
+        # suggestions frames are unregistered (exploration-room-actions: they
+        # are client-local cards), and the suggestions card's content exists
+        # iff its envelope status is not `unavailable` (the no-pane rule).
+        # Resolution is pure: two calls agree deeply and nothing else in the
+        # committed state moved. The status read and every resolve must share
+        # ONE evaluate round-trip: a ui_update committing between separate
+        # CDP calls can flip the suggestions envelope to `unavailable` after
+        # its status was sampled. Inside one synchronous evaluate the store
+        # cannot commit, so each verdict pairs with the exact committed state
+        # its resolver saw.
         table = page.evaluate(
             """() => {
               const bridge = window.__elosernBridge;
@@ -376,24 +377,30 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                   (source) =>
                     [source, bridge.resolveFrame({ source })]
                 ),
+                suggestionsCard: state.suggestionsCard,
+                waitRows: (state.waitRows || []).map((row) => row.key),
               };
             }"""
         )
         status = table["status"]
         for source, menu in table["menus"]:
-            if source == "exploration.suggestions" and (
-                status == "unavailable" or not table["explorationAvailable"]
-            ):
-                self.assertTrue(
-                    menu.get("unresolvable", False),
-                    f"{source} resolved despite the no-pane condition",
-                )
-            else:
+            if source == "exploration.root":
                 self.assertFalse(
                     menu.get("unresolvable", False),
                     f"{source} (status {status}) did not resolve: {menu}",
                 )
-                self.assertTrue(isinstance(menu.get("items"), list) and menu["items"])
+                self.assertEqual(menu.get("items"), [], "the exploration root carries no item")
+            else:
+                self.assertEqual(
+                    menu,
+                    {"unresolvable": True, "reason": None},
+                    f"{source} is retired and must stay unregistered",
+                )
+        self.assertEqual(table["waitRows"], ["wait-dawn", "wait-sleep", "wait-rest"])
+        if status in (None, "unavailable") or not table["explorationAvailable"]:
+            self.assertIsNone(table["suggestionsCard"], "the suggestions card exists despite the no-pane condition")
+        else:
+            self.assertEqual(table["suggestionsCard"]["status"], status)
         identities = [row["identity"] for row in table["identities"]]
         if identities:
             # A person's verbs are the client-local verb card's, never a frame

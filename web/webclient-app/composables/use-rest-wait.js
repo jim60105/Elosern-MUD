@@ -1,26 +1,10 @@
-// The rest/wait surface (C4): the bounded rest-duration form open/close state,
-// the waiting-screen cards, and the skill-practice feedback. The
-// `restFormOpen` mark is driven from three routes — the store's rest-form
-// request, the dock's `explore.wait` activation, and the wait-frame teardown —
-// all kept with the state they mutate. Extracted verbatim from AppClient.vue.
+// The rest/wait support (C4): the skip lock the wait card and the practice
+// view share, and the skill-practice feedback. The wait card itself, its
+// dream question, and its rest form live in use-room-actions.js
+// (exploration-room-actions); no part of this group follows the router.
 import { computed, ref, watch } from "vue";
 
 export function useRestWait(store, { dispatchIntent }) {
-  // C4: the rest-duration form opens when the activated dock item is the
-  // `explore.wait` rest item (the legacy `openRestForm` behavior).
-  const restFormOpen = ref(false);
-  const restFormError = ref(null);
-  // The wait/rest entry point (openRestForm) requests the bounded rest-duration
-  // form open (the exploration rest form, `exploration-rest-form`).
-  watch(
-    () => store.view.restFormRequest,
-    (request) => {
-      if (request > 0) {
-        restFormOpen.value = true;
-        restFormError.value = null;
-      }
-    },
-  );
   const practiceRequest = ref(null);
   const practiceOpen = ref(false);
   watch([() => store.view.epoch, () => store.view.generation], () => {
@@ -33,54 +17,16 @@ export function useRestWait(store, { dispatchIntent }) {
   function onPractice(payload) {
     practiceRequest.value = dispatchIntent("explore.practice", payload);
   }
-  const waitOpen = computed(() => store.view.dockSource === "exploration.wait");
-  watch(waitOpen, (open) => {
-    if (!open) restFormOpen.value = false;
-  });
+  // A time skip cannot start while the session is not live in exploration or
+  // while an action is in flight or awaiting its declared revision.
   const skipDisabled = computed(() => !store.view.connected || store.view.phase !== "active"
-    || store.view.mode !== "exploration" || store.view.mutationsLocked || !!store.view.dispatch?.inFlight);
-  function activateWait(key) {
-    store.focusItemByKey(key);
-    store.focusConfirm("pointer");
-  }
-
-  function onRestFormSubmit(seconds) {
-    restFormOpen.value = false;
-    restFormError.value = null;
-    // One dispatch through the single store entry (the bounded `explore.wait`
-    // payload the server validates).
-    dispatchIntent("explore.wait", { seconds });
-  }
-
-  function onRestFormClose() {
-    restFormOpen.value = false;
-    document.querySelector(".action-dock")?.focus({ preventScroll: true });
-  }
-
-  function onRestFormError(message) {
-    restFormError.value = message;
-  }
-
-  // The dock route into the form (the sole local UI exception to router
-  // confirmation): confirming the `explore.wait` action opens the form before
-  // any OOB action is dispatched.
-  function openRestForm() {
-    restFormOpen.value = true;
-    restFormError.value = null;
-  }
+    || store.view.mode !== "exploration" || store.view.mutationsLocked || !!store.view.dispatch?.inFlight
+    || !!store.view.submitLocked);
 
   return {
-    activateWait,
     onPractice,
-    onRestFormClose,
-    onRestFormError,
-    onRestFormSubmit,
-    openRestForm,
     practiceOpen,
     practiceFeedback,
-    restFormError,
-    restFormOpen,
     skipDisabled,
-    waitOpen,
   };
 }

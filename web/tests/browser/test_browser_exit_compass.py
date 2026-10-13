@@ -159,7 +159,7 @@ class ExitCompassBrowserTest(BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-shared-readout-resolves-its-content-by-a-fixed-priority"
     )
     @covers_requirement(
         "webclient-exit-compass::continuous-movement-is-commit-driven",
@@ -217,7 +217,7 @@ class ExitCompassBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(len(page.evaluate("() => window.__walk.moves")), count, "release stopped the walk")
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-shared-readout-resolves-its-content-by-a-fixed-priority"
     )
     @covers_requirement(
         "webclient-exit-compass::the-compass-never-loosens-the-server-s-gate",
