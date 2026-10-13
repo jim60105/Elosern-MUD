@@ -132,7 +132,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         wait_for_store_state(page, _panel_ready, timeout=timeout)
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_from_character_panel_returns_keyboard_to_the_exploration_root(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)

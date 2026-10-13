@@ -8,6 +8,9 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     CARD_SELECTOR,
     WAIT_CARD_SELECTOR,
+    PLACE_LOOK_SELECTOR,
+    PLACE_WAIT_SELECTOR,
+    PILL_SELECTOR,
     activate_compass_exit,
     activate_overview_chip,
     card_row_keys,
@@ -17,6 +20,7 @@ from .browser_helpers import (
     focus_action_dock,
     install_outbound_recorder,
     open_verb_card,
+    open_wait_card,
     outbound_messages,
     presence_entry_keys,
     sent_action_count,
@@ -176,7 +180,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ".map((el) => el.getAttribute('data-item-key'))"
         )
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_pointer_back_cell_returns_to_the_root_without_an_action(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -237,7 +243,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "the card never pushed a router frame",
         )
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -289,7 +297,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page), 0)
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_escape_from_quests_drawer_leaves_root_clean(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
@@ -332,7 +342,8 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions",
+        "webclient-room-actions::等待-opens-the-wait-card-through-choicecard",
     )
     def test_keyboard_only_journey_walks_the_overview(self):
         """A pure arrows-and-Enter journey at 1451x790: the exit compass
@@ -443,3 +454,96 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         controls = exploration_root_controls(page)
         self.assertTrue(controls["look"] and controls["wait"])
         self.assertEqual(controls["dockRows"], [])
+
+    @covers_requirement(
+        "webclient-room-actions::retired-exploration-surfaces-are-gone-and-room-actions-are-verified-in-the-live-client"
+    )
+    def test_room_actions_hold_at_both_reference_viewports(self):
+        """exploration-room-actions: at 1451x790 and 1920x1080 the place
+        card's 查看房間 and 等待 fit the card without truncating the
+        location heading's accessible name, the 建議 pill does not overlap
+        the compass, and the centred wait card is fully visible."""
+        for viewport in ((1451, 790), (1920, 1080)):
+            page = self.logged_in_page(viewport)
+            self._wait_exploration_available(page)
+            geometry = page.evaluate(
+                """([look, waitBtn, pill, compassSel]) => {
+                  const rect = (sel) => {
+                    const el = document.querySelector(sel);
+                    if (!el) return null;
+                    const r = el.getBoundingClientRect();
+                    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom,
+                             width: r.width, height: r.height };
+                  };
+                  const card = document.querySelector('[data-testid="place-card"]');
+                  const heading = document.querySelector('[data-testid="place-card__location"]');
+                  const pillRect = rect(pill);
+                  const compassRect = rect(compassSel);
+                  const overlap =
+                    pillRect &&
+                    compassRect &&
+                    pillRect.left < compassRect.right &&
+                    pillRect.right > compassRect.left &&
+                    pillRect.top < compassRect.bottom &&
+                    pillRect.bottom > compassRect.top;
+                  return {
+                    look: rect(look),
+                    wait: rect(waitBtn),
+                    pill: pillRect,
+                    cardScrolls: card.scrollHeight - card.clientHeight,
+                    headingName: heading.getAttribute("title"),
+                    pillClearsCompass: !pillRect || !compassRect || !overlap,
+                  };
+                }""",
+                [
+                    PLACE_LOOK_SELECTOR,
+                    PLACE_WAIT_SELECTOR,
+                    PILL_SELECTOR,
+                    '#action-dock [data-testid="exit-compass"]',
+                ],
+            )
+            self.assertTrue(
+                geometry["look"] and geometry["wait"],
+                f"{viewport}: the place card carries 查看房間 and 等待",
+            )
+            self.assertGreater(geometry["look"]["height"], 0, f"{viewport}: 查看房間 is rendered")
+            self.assertGreater(geometry["wait"]["height"], 0, f"{viewport}: 等待 is rendered")
+            self.assertEqual(
+                geometry["cardScrolls"],
+                0,
+                f"{viewport}: the buttons fit the place card without overflow",
+            )
+            self.assertTrue(
+                geometry["headingName"],
+                f"{viewport}: the heading keeps its full accessible name",
+            )
+            self.assertTrue(
+                geometry["pillClearsCompass"],
+                f"{viewport}: the 建議 pill does not overlap the compass",
+            )
+            # A centred card open: the wait card renders fully inside the
+            # stage, centred in the choices anchor (the `justify-content:
+            # center` span the design centres room cards on).
+            open_wait_card(page)
+            placement = page.evaluate(
+                """(cardSel) => {
+                  const card = document.querySelector(cardSel);
+                  const stage = document.querySelector('[data-testid="elosern-stage"]');
+                  const anchor = document.querySelector('[data-anchor="choices"]');
+                  const c = card.getBoundingClientRect();
+                  const s = stage.getBoundingClientRect();
+                  const a = anchor.getBoundingClientRect();
+                  return {
+                    inside:
+                      c.left >= s.left - 0.5 && c.right <= s.right + 0.5 &&
+                      c.top >= s.top - 0.5 && c.bottom <= s.bottom + 0.5,
+                    offAnchorX: Math.abs((c.left + c.right) / 2 - (a.left + a.right) / 2),
+                    offAnchorY: Math.abs((c.top + c.bottom) / 2 - (a.top + a.bottom) / 2),
+                  };
+                }""",
+                WAIT_CARD_SELECTOR,
+            )
+            self.assertTrue(placement["inside"], f"{viewport}: the wait card is fully visible")
+            self.assertLess(placement["offAnchorX"], 2, f"{viewport}: the card is centred horizontally")
+            self.assertLess(placement["offAnchorY"], 2, f"{viewport}: the card is centred vertically in the choices anchor")
+            page.close()

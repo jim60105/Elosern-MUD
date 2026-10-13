@@ -67,7 +67,9 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         _wait_mode(page, "exploration")
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement(
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
+    )
     def test_crowded_room_folds_into_the_rail_at_a_narrow_viewport(self):
         """A crowded room at the minimum supported viewport: the dock holds no
         row (its room actions are the place card's, exploration-room-actions),

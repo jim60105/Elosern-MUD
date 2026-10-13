@@ -5,110 +5,8 @@ The presence rail shows who and what is in the room on the stage floor, so peopl
 
 ## Requirements
 
-### Requirement: The exploration dock roots at the compass and the presence rail and keeps the footer overview
-
-In exploration mode the exploration dock SHALL own the action-dock surface, and in dialogue mode it SHALL stay mounted, hidden with the collapsed command region, with its router holding the same root. Its root pane SHALL present the exit compass in the command panel and a footer-only scene overview (查看房間, 等待／休息, and 建議), while people and objects are presented by the presence rail on the stage (`webclient-presence-rail`). The router's root frame SHALL carry only the footer items.
-
-#### Scenario: Move, Look, and dialogue complete without typed input
-- **WHEN** a player uses only the keyboard to aim an exit on the compass and press Enter, then presses the digit of a scripted dialogue host's rail entry, chooses 交談 on the verb card, and then presses the digit of the first choice the dialogue surface offers
-- **THEN** the browser submits exactly `explore.move`, then `explore.talk_open` with the host's identity, then `explore.talk_scripted` with the server-authored keyword ID, and the refreshed panels appear without a typed command
-
-#### Scenario: The exploration screen shows the compass, the rail, and the footer
-- **WHEN** the committed exploration panel carries two exits, one dialogue host, and one object
-- **THEN** the command panel renders the exit compass with two targets and the footer with 查看房間 and 等待／休息, and the stage renders the presence rail with the host's medallion and the object's lozenge, with no 人物 or 物件 row in the overview
-
-#### Scenario: An empty rail renders nothing
-- **WHEN** the committed exploration panel carries exits but no people and no objects
-- **THEN** the overview renders the footer only and the presence rail renders no entry and no placeholder
-
-#### Scenario: A disabled exit stays aimable with its reason
-- **WHEN** the room has a locked exit and the player aims it on the compass and presses Enter
-- **THEN** its target is rendered disabled, its server-authored reason is readable in the compass readout, and no `ui_action` is emitted
-
-#### Scenario: Waiting and suggestions open child frames in the panel
-- **WHEN** the player activates 等待／休息, presses Escape, activates 建議, and presses Escape
-- **THEN** each opens its frame inside the command region in place of the overview, and each Escape returns to the overview with the footer chip that opened it focused
-
-#### Scenario: Movement closes the verb card and returns the dock to the overview
-- **WHEN** the verb card or the waiting frame is open and the player moves by activating a minimap node
-- **THEN** the commit that publishes the new room shows the new room's overview as the dock's only frame, the verb card and standee are gone, and no medallion, card row, or waiting card from the previous room remains activatable
-
-#### Scenario: Arrow keys step through the footer chips
-- **WHEN** the footer carries three chips and focus is on the first
-- **THEN** ArrowRight moves to the second chip and ArrowLeft from the first wraps to the last
-
-#### Scenario: The dock root omits the navigation-carried entries
-- **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces available and the dock renders its root
-- **THEN** the overview carries no 角色狀態, 任務, or 背包 entry, and those surfaces are opened from the top navigation bar
-
-#### Scenario: Escape from a re-homed service or character sub-view leaves the exploration root clean
-- **WHEN** the player opens the Character, Quests, or Inventory drawer from the top navigation while the dock is at the overview and presses Escape
-- **THEN** the drawer closes without sending an action, the overview remains the dock's current frame with no sub-dock active, and no exploration frame bookkeeping is corrupted or re-rendered
-
-#### Scenario: The overview scrolls inside the fixed panel
-- **WHEN** the room carries more chips than the command region can show and the player arrows to the last chip
-- **THEN** the chips wrap inside the region, the overview scrolls inside it with the focused chip in view, and the command region's box is unchanged
-
-#### Scenario: Mode change tears down the exploration dock atomically
-- **WHEN** the browser adopts a valid update or snapshot whose mode is `combat`
-- **THEN** the exploration dock synchronously unloads, unregisters its keyboard handlers, discards local selection and speech state, and only the combat dock owns action-dock focus
-
-#### Scenario: The compass mirrors move rows in payload order
-- **WHEN** the compass resolves the committed exits
-- **THEN** it carries one target per `move` row, and a disabled row stays a visible disabled target carrying its server-authored reason, never omitted
-- **AND** activating an enabled exit target submits the unchanged `explore.move` payload
-
-#### Scenario: The footer carries room look, waiting, and conditional suggestions
-- **WHEN** the overview renders its footer
-- **THEN** it holds 查看房間 (submitting `explore.look` for the room), 等待／休息, and — whenever the suggestions envelope's status is not `unavailable` — 建議, labelled `建議 (N)` with N the number of cards the suggestions frame will list when that number is positive
-
-#### Scenario: Navigation-carried entries are absent from the overview
-- **WHEN** the overview renders
-- **THEN** it carries no 移動, 查看, 互動, 角色狀態, 任務, or 背包 entry: the character status, quest, and inventory surfaces are opened from the top navigation bar, which is their sole keyboard-visible stop
-
-#### Scenario: Chips wrap and the overview scrolls inside the command region
-- **WHEN** the overview's chips exceed the fixed command region's width or height
-- **THEN** chips wrap inside the region and an overview taller than the region scrolls inside it with the focused chip kept in view
-
-#### Scenario: 等待／休息 opens the three-operation waiting frame
-- **WHEN** the player activates 等待／休息
-- **THEN** it opens the three-operation waiting frame — 等待直到黎明 submitting the dawn daypart, 睡眠至完全恢復 submitting the sleep flag, and 休息 N 小時 opening the bounded custom-hours form — with every value parsed and validated server-side and no client-side clock derivation (the form's own hours-to-whole-seconds unit conversion at the presentation boundary is unit entry, not clock arithmetic, as pinned by the waiting-surface requirement)
-
-#### Scenario: 建議 opens the options-surface suggestions frame in place
-- **WHEN** the player activates 建議 or 等待／休息
-- **THEN** 建議 opens the suggestions frame owned by `webclient-options-surface` and both frames render inside the command region in place of the overview
-
-#### Scenario: Every child frame backtracks through the identical router path
-- **WHEN** the waiting frame or the suggestions frame is open
-- **THEN** it ends with an enabled back row returning to its parent, so pointer and keyboard users backtrack through the identical router path, and Escape pops exactly one level and restores the parent frame's previously focused entry (the footer chip that opened the child frame)
-
-#### Scenario: A committed location change closes every child frame
-- **WHEN** the committed location changes — a move from the compass, the minimap, or a typed command
-- **THEN** the dock returns to the overview: any open verb card or child frame is closed in the same commit that publishes the new room, and no frame from the previous room remains activatable
-
-#### Scenario: A dialogue-mode commit collapses the dock's command region
-- **WHEN** a commit changes the mode from `exploration` to `dialogue` — a conversation opened from 交談, a suggestion card, or a typed command
-- **THEN** the dock returns to the overview in that commit, so no verb card or child frame stays open over the conversation, and the command region that holds the dock is then collapsed for the rest of the conversation
-- **AND** while the dock is collapsed its router claims no key and submits nothing, and leaving dialogue presents that overview again
-
-#### Scenario: Enter activates the focused entry and child frames are lists
-- **WHEN** the player presses Enter on an overview entry, or navigates a child frame
-- **THEN** Enter opens or submits the focused entry, and every child frame is navigated as a vertical list
-
-#### Scenario: Disabled and in-flight entries cannot submit
-- **WHEN** focus is on a disabled entry, or an action is in flight or awaiting its declared presentation revision
-- **THEN** the disabled entry stays focusable for its explanation but does not submit, and held or repeated Enter and any mutation are suppressed
-
-#### Scenario: Rendered cells always match the router's current frame
-- **WHEN** a back row, an Escape, or a panel replacement changes the active frame
-- **THEN** the dock keeps its rendered cells matched to the keyboard router's current frame at every depth, so no deeper frame's cells remain activatable while the router navigates the parent
-
-#### Scenario: Service surfaces have no standalone Services root
-- **WHEN** the player reaches the guild or shop surfaces
-- **THEN** they are reached from the top navigation bar and from a target's `navigate` affordance instead of a standalone Services root, and the `services` panel payload and its seven `guild.*`/`shop.*` adapters are unchanged
-
 ### Requirement: The presence rail shows people and objects on the stage floor
-In exploration mode the stage SHALL render `PresenceRail` right-aligned on the stage floor, inset left of the right-hand island column: interact targets as gold medallions, other present entities as dashed muted medallions, then a separator and objects as steel lozenges, in `ExplorationMenu.overviewMenu` order, each with a name plate. It SHALL yield to the foe line-up in combat, hide during dialogue and under a centred card, and render nothing when empty.
+In exploration mode the stage SHALL render `PresenceRail` right-aligned on the stage floor, inset left of the right-hand island column: interact targets as gold medallions, other present entities as dashed muted medallions, then a separator and objects as steel lozenges, in `ExplorationMenu.presenceEntries` order, each with a name plate. It SHALL yield to the foe line-up in combat, hide during dialogue and under a centred card, and render nothing when empty.
 
 #### Scenario: Entries follow the overview order
 - **WHEN** the room has two interact targets, one bystander, and two objects
@@ -257,12 +155,12 @@ The rail, the verb card, the standee handover into dialogue, and the overflow ca
 - **WHEN** 交談 is activated from the verb card at both viewports
 - **THEN** the standee does not leave and re-enter between the card and the dialogue surface
 
-### Requirement: Rail digits are claimed and never fall through to the footer
+### Requirement: Rail digits are claimed by the rail and never fall through
 While no card is open, digits 1–9 SHALL be claimed by the rail: a digit beyond the number of visible entries SHALL do nothing, and opening a card SHALL stop any compass walk.
 
 #### Scenario: A digit beyond the rail count is a no-op
 - **WHEN** the rail has two entries and the player presses `3`
-- **THEN** no `ui_action` is emitted and no footer chip is activated
+- **THEN** no `ui_action` is emitted and no room action or dock row is activated
 
 #### Scenario: Opening a card stops a walk
 - **WHEN** a compass walk is running and the player presses a rail digit that opens a verb card

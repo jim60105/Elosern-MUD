@@ -42,7 +42,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 - **THEN** the band's rendered box is unchanged, the popover renders above the island anchors, and Escape or outside activation closes it
 
 #### Scenario: The bottom band keeps one height whatever it holds
-- **WHEN** the shell renders at 1451x790 and the player moves through the exploration scene overview, a person's verb card, the waiting frame, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
+- **WHEN** the shell renders at 1451x790 and the player moves through the exploration root (the compass, the 建議 pill, and the readout), a person's verb card, the wait card, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
 - **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
 
 #### Scenario: The band splits two thirds and one third
@@ -177,7 +177,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
   stage, crossfading over the scene duration at `full` and switching in one frame at `off`
 
 #### Scenario: Focus is rescued before its surface is hidden
-- **WHEN** the focused element belongs to a surface that the incoming mode hides, including a scene-overview chip or a person's verb card when the incoming mode is dialogue
+- **WHEN** the focused element belongs to a surface that the incoming mode hides, including the exit compass, a place-card room action, the 建議 pill, or a person's verb card or a room card when the incoming mode is dialogue
 - **THEN** focus is moved to the incoming mode's focus home before the surface is removed, and no focus is lost to the document body
 
 #### Scenario: Creation mode presents only the creation surfaces
@@ -956,7 +956,7 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 
 #### Scenario: Digits pick and confirm the frame's first nine entries
 - **WHEN** the dock owns keyboard focus (the key target is not editable) and the player presses `1`–`9`
-- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order; a frame's `back` row takes the slot of its rendered position) — except in the exploration screen, where the presence rail owns the digits as `webclient-presence-rail` defines: they pick its visible entries, never the overview's footer chips or the rows of its waiting and suggestions frames, and exits belong to the separate compass and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
+- **THEN** the press moves the current dock frame's focus onto its first nine entries (1-indexed, rendered order; a frame's `back` row takes the slot of its rendered position) — except in the exploration screen, where the presence rail owns the digits as `webclient-presence-rail` defines: they pick its visible entries, never a place-card room action or the 建議 pill, while a wait or suggestions card is open its own rows take them, and exits belong to the separate compass, and activates the entry through the same confirm path `Enter` uses — a disabled entry shows its explanation and submits nothing, an in-flight entry stays locked, and a held repeat is suppressed; the slots address the frame's rendered entries, disabled ones included
 
 #### Scenario: Digits outside the dock's claim fall through
 - **WHEN** dialogue mode holds — or a digit's entry does not exist (a frame with fewer rendered entries, dialogue mode, or the pre-session empty stack)
@@ -973,12 +973,12 @@ The action dock SHALL carry one shortcut-legend strip at the bottom of its conte
 
 #### Scenario: A digit picks its row
 - **WHEN** the presence rail holds two people and one object beside a compass with three exit targets, and the player presses `2`, then after Escape presses `3`
-- **THEN** `2` opens the second person's verb card once and `3` submits the object's `explore.look` once; compass targets and footer chips occupy no digit slot
+- **THEN** `2` opens the second person's verb card once and `3` submits the object's `explore.look` once; compass targets and room actions occupy no digit slot
 
 #### Scenario: A digit beyond the frame's rows is unclaimed
 - **WHEN** the current dock frame has fewer rendered entries than the pressed digit and the command
   field is not focused
-- **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits; in the exploration screen the presence rail instead claims every digit while it is on the stage, so a digit past its entries does nothing and none falls through to the footer
+- **THEN** the digit is not claimed, the frame's focus is unchanged, and nothing submits; in the exploration screen the presence rail instead claims every digit while it is on the stage, so a digit past its entries does nothing and none falls through to a dock row
 
 #### Scenario: Digits address the caption's picks while the dialogue variant presents
 - **WHEN** the dialogue choice list shows four picks with focus on the list, the command region is
@@ -1043,7 +1043,7 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 
 #### Scenario: The form set is fixed
 - **WHEN** the row region selects a form
-- **THEN** the forms are: footer chips for the scene overview beside the exit compass; the waiting cards; suggestion cards for the suggestions frame; and the combat forms specified elsewhere in this capability
+- **THEN** the forms are the combat forms specified elsewhere in this capability, and in exploration the exploration root's pane — the exit compass beside the 建議 pill and the shared readout — whose router menu is empty; the wait and suggestions cards are centred `ChoiceCard`s over the stage, never dock forms
 
 #### Scenario: Exploration frames never regress to grids or nav lists
 - **WHEN** any exploration frame renders
@@ -1106,8 +1106,8 @@ The dock's row region SHALL render the current frame in a form chosen for what t
 - **THEN** its aim wedge, pip or bead treatment, and knob carry the aim, and no legacy chip-focus glyph is added beside its readout glyph
 
 #### Scenario: The move frame has no companion panel
-- **WHEN** the exploration root renders with any overview chip focused
-- **THEN** the compass occupies the left side and the shared readout and overview occupy the right column; no exit-outlet grid or detail aside renders
+- **WHEN** the exploration root renders
+- **THEN** the compass occupies the left side and the 建議 pill and the shared readout occupy the right column; no exit-outlet grid, chip row, or detail aside renders
 
 #### Scenario: A row renders only backed fields
 - **WHEN** the presence rail renders a look-only entry for a present entity
@@ -2232,7 +2232,7 @@ The skill book, the bag and equipment, the shop, the quest board, the lore refer
 The action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation mode and for every frame, and no surface outside the band SHALL be positioned from the frame the dock currently carries.
 
 #### Scenario: No frame moves or resizes the dock
-- **WHEN** the dock carries the scene overview (with or without a person's verb card open over the stage), the waiting frame, the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
+- **WHEN** the dock carries the exploration root (with or without a person's verb card or a room card open over the stage), the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
 - **THEN** no frame widens, heightens, shortens, or moves its box
 
 #### Scenario: Dialogue hides the dock with the region
@@ -2244,7 +2244,7 @@ The action dock SHALL fill the bottom band's command region — the right third 
 - **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
 
 #### Scenario: Popovers and wide frames stay inside the region
-- **WHEN** a person's verb card renders, or a frame's content does not fit the region's width
+- **WHEN** a person's verb card, the wait card, or the suggestions card renders, or a frame's content does not fit the region's width
 - **THEN** the card renders centred over the stage in the `choices` anchor, outside the command region, scrolling inside its own card when its rows exceed it, while the command region keeps its box, and the wide frame wraps or collapses its own columns inside the region, never overflowing it horizontally
 
 #### Scenario: One dock element persists across every mode
@@ -2260,8 +2260,8 @@ The action dock SHALL fill the bottom band's command region — the right third 
 - **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
 
 #### Scenario: No frame resizes the command region
-- **WHEN** the dock moves at 1451x790 from the scene overview to a person's verb card over the stage, to the waiting frame, and, in combat, to the deepest skill target frame
-- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and the verb card lies centred over the stage above the band
+- **WHEN** the dock moves at 1451x790 from the exploration root to a person's verb card over the stage, to the wait card, and, in combat, to the deepest skill target frame
+- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and each card lies centred over the stage above the band
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
@@ -2293,6 +2293,10 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 - **WHEN** the mode live-enters dialogue
 - **THEN** the card MAY retain only the inert exit paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility tree and tab order from commit, and becomes `display:none` when the anchor's fade ends
 
+#### Scenario: The card carries the room actions at the exploration root
+- **WHEN** the committed mode is exploration while the exploration panel is available and the exploration dock is at its root frame
+- **THEN** the card also carries the room actions `webclient-room-actions` defines — a 查看房間 icon button beside the heading and a 等待 button beside the time — and in every other mode and state it carries no control
+
 #### Scenario: The location resolves in a fixed order
 - **WHEN** the card resolves its location
 - **THEN** it uses the best server-authored place name the client already holds: the committed `local_map` panel's `current_node` label when that panel is available, names a current node, that node is present in the panel's nodes, and its label is a non-empty string; otherwise the committed status panel's actor location label; otherwise the card's own unavailable placeholder `位置：--`
@@ -2310,8 +2314,8 @@ The stage SHALL carry a place card as the first island of its `map` anchor, at t
 - **THEN** it wears the HUD island chrome (the translucent panel fill, the backdrop blur, the hairline border, the shared radius and shadow, all from the shared design tokens), spans the same content-column width as the minimap island beneath it, keeps a fixed height whatever the label lengths, and truncates a label that exceeds its width with an overflow indicator while keeping the full label as its accessible text
 
 #### Scenario: The card is display-only
-- **WHEN** the card renders
-- **THEN** it carries no control, no tab stop, and no dispatch
+- **WHEN** the card renders outside exploration, or while the exploration panel is unavailable
+- **THEN** it carries no control, no tab stop, and no dispatch; in exploration with the panel available its only controls are the 查看房間 and 等待 buttons, which never truncate the heading's accessible name, and the card itself dispatches nothing
 
 #### Scenario: The two values read on two levels
 - **WHEN** the card renders heading and time
@@ -2402,8 +2406,8 @@ When a dock pane's row region uses a fixed column count for keyboard row/col geo
 - **THEN** whatever the form, every row renders inside the pane's box without horizontal overflow: the rows wrap or compress, and long content wraps within its row
 
 #### Scenario: The scene overview is not a fixed-column pane
-- **WHEN** the scene overview renders its chips
-- **THEN** they wrap by width under the section geometry the exploration dock requirement defines — the scene overview is not a fixed-column pane
+- **WHEN** the exploration root renders
+- **THEN** its pane is the compass beside the 建議 pill and the readout, with no row region at all — the exploration root is not a fixed-column pane
 
 #### Scenario: A narrow command region keeps every row inside the pane
 - **WHEN** a combat skill, target, or scale pane renders in the command region at the 1451x790 reference viewport
@@ -2422,7 +2426,7 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 
 #### Scenario: The dock survives dialogue unmounted-free
 - **WHEN** the mode enters and leaves dialogue
-- **THEN** the dock stays the same mounted `#action-dock` element, its router keeps the exploration scene overview as its only frame (the reset on entering dialogue that `webclient-exploration-menu` defines), leaving dialogue shows that overview again with no remount, dialogue presents no dock frame, and no exploration affordance is removed from the committed `exploration` panel: movement stays reachable through the minimap and the conversation's own controls
+- **THEN** the dock stays the same mounted `#action-dock` element, its router keeps the empty exploration root as its only frame (the reset on entering dialogue that `webclient-exploration-menu` defines), leaving dialogue shows the exploration root's pane again with no remount, dialogue presents no dock frame, and no exploration affordance is removed from the committed `exploration` panel: movement stays reachable through the minimap and the conversation's own controls
 
 #### Scenario: Dialogue's focus home is the choice list or the page surface
 - **WHEN** the mode is dialogue
@@ -2442,7 +2446,7 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 
 #### Scenario: Leaving dialogue restores the overview without a remount
 - **WHEN** the player activates the exit row and the commit returns the mode to `exploration`
-- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the scene overview with no card open, and focus is on the exit compass
+- **THEN** the same `#action-dock` element is back in the accessibility tree in the commit's frame, slides back into the command region at the exploration root with no card open, and focus is on the exit compass
 
 #### Scenario: Keys never drive the hidden dock
 - **WHEN** the mode is dialogue, focus is on the document body, and the player presses ArrowRight, Enter, and Escape
@@ -2454,7 +2458,7 @@ While the committed mode is `dialogue`, the bottom band's command region SHALL b
 
 #### Scenario: Movement stays reachable during a conversation
 - **WHEN** a dialogue session is live and the player activates an adjacent minimap node
-- **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the session through the existing seam, the committed mode returns to `exploration`, and the command region renders the new room's overview
+- **THEN** the move dispatches exactly as in exploration mode, the movement settlement clears the session through the existing seam, the committed mode returns to `exploration`, and the command region renders the new room's exploration root
 
 ### Requirement: Stage actors present the player and the dialogue host with a speaking state
 Each standing portrait on the stage SHALL be rendered by one stage-actor component. The controlled figure and companions in `actor-left` SHALL follow the companion-lineup rule. The dialogue host SHALL render once: when its committed identity joins to a committed party slot or controlled lineup figure, its existing lineup StageActor is the host and no duplicate renders in `actor-right`.

@@ -29,6 +29,7 @@ class ShellAcceptanceTest(BrowserAcceptanceTest):
         "webclient-desktop-shell::theme-and-controls-remain-accessible",
         "webclient-contextual-hud::the-bottom-band-separates-material-and-focus-without-obscuring-controls",
         "webclient-exit-compass::compass-behavior-is-verified-in-the-live-client-at-two-viewports",
+        "webclient-room-actions::retired-exploration-surfaces-are-gone-and-room-actions-are-verified-in-the-live-client",
     )
     def test_action_dock_renders_the_mockup_command_surface(self):
         for viewport in ((1451, 790), (2560, 1440)):

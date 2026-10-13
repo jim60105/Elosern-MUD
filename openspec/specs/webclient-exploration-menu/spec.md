@@ -817,11 +817,11 @@ The exploration menu's wilderness move rows SHALL use the canonical destination 
 - **THEN** each row's destination is the canonical arrival node, including the gateway south row that returns to the grid
 
 ### Requirement: The waiting surface offers exactly three operations
-The exploration dock's Wait frame SHALL offer exactly three operations and no other time boundary: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, submitting `explore.wait` with the exact `sleep` flag; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
+The wait card, opened from the place card's 等待 button, SHALL offer exactly three time boundaries and no other: 等待直到黎明, submitting `explore.wait` with the `dawn` daypart; 睡眠至完全恢復, which first asks 進入夢境協作？ and then submits `explore.wait` with the exact `sleep` flag, plus the `dream` flag when the player answers 是; and 休息 N 小時, opening the bounded custom-duration form instead of dispatching.
 
 #### Scenario: The waiting frame renders the three operations
-- **WHEN** the player opens Wait in exploration mode
-- **THEN** the frame renders exactly 等待直到黎明, 睡眠至完全恢復, and 休息 N 小時 plus a back row, with no midnight, noon, or dusk control, and the card matching the router's focused key carries the focused treatment while the others do not
+- **WHEN** the player activates 等待 on the place card in exploration mode
+- **THEN** the centred card renders 等待直到黎明, 睡眠至完全恢復, and 休息 N 小時 followed by `✕ 返回`, with no separate dream row and no midnight, noon, or dusk control, and the active row carries the active-row fill while the others do not
 
 #### Scenario: The hours form dispatches whole seconds exactly once
 - **WHEN** the player enters `1.5` hours in the 休息 form and confirms
@@ -833,11 +833,11 @@ The exploration dock's Wait frame SHALL offer exactly three operations and no ot
 
 #### Scenario: Locked controls cannot start a skip
 - **WHEN** an action is in flight or the client awaits its declared presentation revision
-- **THEN** all three waiting controls are disabled and Enter or pointer activation on them submits nothing
+- **THEN** every wait row is disabled and Enter or pointer activation on them submits nothing
 
 #### Scenario: The frame shows three cards plus a back row with focused treatment
-- **WHEN** the Wait frame renders
-- **THEN** it shows exactly those three cards plus the frame's back row, and the card whose item key equals the keyboard router's focused key carries the focused treatment
+- **WHEN** the wait card renders
+- **THEN** it shows exactly those operations plus the trailing `✕ 返回` row, and the row that `aria-activedescendant` names carries the active-row fill
 
 #### Scenario: The custom hours form bounds, converts, and dispatches once
 - **WHEN** the player fills in the 休息 N 小時 form
@@ -849,7 +849,7 @@ The exploration dock's Wait frame SHALL offer exactly three operations and no ot
 
 #### Scenario: The surrounding skip vocabulary is unchanged
 - **WHEN** the waiting surface is scoped
-- **THEN** the remaining exploration root structure and the server-side skip maximum are unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
+- **THEN** the server-side skip maximum is unchanged, and the four-daypart payload vocabulary stays valid for the text commands and authored suggestion rows that still use it
 
 ### Requirement: explore.practice advances the clock for one declared skill
 The production action registry SHALL register `explore.practice` with a payload of exactly `skill` (a bounded non-space key of at most 64 characters) and `seconds` (the same positive-integer bound as the `explore.wait` `seconds` payload). The adapter SHALL recheck `evaluate_skip_safety(actor)` against current canonical state and the declared skill through the rules' practice preflight before any advance, with zero clock advance and no surviving practice booking on rejection.

@@ -68,7 +68,7 @@ region collapses.
 
 #### Scenario: The top navigation bar carries the persistent surface entry points
 - **WHEN** the shell renders in exploration mode at the 1451x790 reference viewport
-- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the dock's scene overview
+- **THEN** the top navigation bar shows one labelled control for each navigation-presented entry of the home surface plus a map control, a settings control, and the tool group, and no 探索 or 戰鬥 entry, each opening its surface in one action without pushing a keyboard menu frame, while the character, quest, and inventory entries are absent from the action dock
 
 #### Scenario: The complete narrative stays reachable from the bounded caption
 - **WHEN** the narrative holds more lines than the message window's page can display
@@ -92,10 +92,10 @@ region collapses.
 
 #### Scenario: The action dock fills the command region with its mode's root and one legend
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region with a shortcut-legend strip only outside exploration and creation, its exploration root renders as the exit compass beside the shared readout and the footer scene overview (people and objects stand on the stage's presence rail) and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame
+- **THEN** it renders as one panel filling the band's command region with a shortcut-legend strip only outside exploration and creation, its exploration root renders as the exit compass beside the 建議 pill and the shared readout (people and objects stand on the stage's presence rail, and the room actions on the place card) and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame
 
 #### Scenario: A tall frame grows the band without touching the narrative
-- **WHEN** the dock carries a taller frame (a crowded scene overview or the waiting frame), or a person's verb card is open over the stage, at 1451x790 or 2560x1440
+- **WHEN** the dock carries a taller frame (a deep combat frame), or a person's verb card, the wait card, or the suggestions card is open over the stage, at 1451x790 or 2560x1440
 - **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the message window's box is unchanged, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
@@ -124,7 +124,7 @@ region collapses.
 
 #### Scenario: A reference surface opens in the shared drawer within two actions
 - **WHEN** the player reaches for the skill book, the bag and equipment, the shop, the quest board, the lore reference, or the character status
-- **THEN** the surface renders in a drawer laid over the stage in the shared reference workspace, reached in at most two actions from the top navigation bar or from the action dock's scene overview
+- **THEN** the surface renders in a drawer laid over the stage in the shared reference workspace, reached in at most two actions from the top navigation bar or from a person's verb card
 
 #### Scenario: The top navigation bar carries the mode's entry points
 - **WHEN** the shell renders the top navigation bar
@@ -148,7 +148,7 @@ region collapses.
 
 #### Scenario: The dock renders its mode's root form
 - **WHEN** the action dock renders its root in exploration or combat
-- **THEN** its exploration root renders as the scene overview with the exit compass on the left and the shared readout and footer chips in the right column (people and objects stand on the stage's presence rail), its combat root renders as a vertical list of icon-and-label command rows with the focused entry marked by a muted-gold fill, and its remaining region renders the current frame's rows or chips
+- **THEN** its exploration root renders as the exit compass on the left and the 建議 pill and the shared readout in the right column (people and objects stand on the stage's presence rail, and the room actions on the place card), its combat root renders as a vertical list of icon-and-label command rows with the focused entry marked by a muted-gold fill, and its remaining region renders the current frame's rows or chips
 
 #### Scenario: The dock carries the defined shortcut legend
 - **WHEN** the action dock renders
@@ -160,10 +160,10 @@ region collapses.
 
 #### Scenario: Non-root frames show a breadcrumb and a detail pane
 - **WHEN** the dock is below its root frame
-- **THEN** it renders a breadcrumb naming the parent and current frames with a back control and renders each frame's rows in the form that frame calls for: navigation rows, the waiting cards, suggestion cards, or the combat forms - beside a detail pane that names the focused item, its availability, and the next key action wherever the frame carries one
+- **THEN** it renders a breadcrumb naming the parent and current frames with a back control and renders each frame's rows in the form that frame calls for: navigation rows or the combat forms - beside a detail pane that names the focused item, its availability, and the next key action wherever the frame carries one
 
 #### Scenario: The band height never follows its contents
-- **WHEN** the dock carries the scene overview (with or without a person's verb card open over the stage), the waiting frame, the combat frames, or an empty pane host, in any mode and under any narrative
+- **WHEN** the dock carries the exploration root (with or without a person's verb card or a room card open over the stage), the combat frames, or an empty pane host, in any mode and under any narrative
 - **THEN** all of them render inside the same command-region box whose height comes from the shared band-height token, so the message window and the action dock never overlap and neither clips the other at a supported viewport
 
 ### Requirement: Narrative output remains the authoritative text surface and is read page by page
@@ -281,19 +281,19 @@ document.
 
 #### Scenario: The suggestions root entry appears only when the envelope carries one
 - **WHEN** the committed `suggestions` envelope's status is `unavailable`
-- **THEN** the scene overview carries no `suggestions` chip at all
+- **THEN** the command panel carries no 建議 pill at all
 - **WHEN** the status is `generating`, `ready`, or `degraded`
-- **THEN** the overview's footer carries the `suggestions` chip and activating it pushes the suggestions frame without dispatching a `ui_action`
+- **THEN** the command panel carries the 建議 pill and activating it opens the client-local suggestions card without dispatching a `ui_action` and without pushing a router frame
 
 #### Scenario: Exploration root exposes the G2 hierarchical keys
 - **WHEN** the exploration root renders beside the compass and the presence rail
-- **THEN** the overview's first chip is `look-room`; an interact target is the rail's `target-<identity>` entry, outside the router, whose Enter opens its client-local verb card without submitting and without pushing a router frame; exits and rail entries are not router items
+- **THEN** the router's exploration root carries no item; an interact target is the rail's `target-<identity>` entry, outside the router, whose Enter opens its client-local verb card without submitting and without pushing a router frame; exits, rail entries, the place card's room actions, and the 建議 pill are not router items
 
 #### Scenario: The dock root omits the navigation-carried entries
 - **WHEN** the committed exploration panel makes the character, quest, and inventory surfaces
   available and the dock renders its root
-- **THEN** the scene overview carries no 角色狀態, 任務, or 背包 entry - those surfaces are opened
-  from the top navigation bar - and the overview's chips keep the panel's order
+- **THEN** the action dock carries no 角色狀態, 任務, or 背包 entry - those surfaces are opened
+  from the top navigation bar
 
 #### Scenario: The router is inert while the dock is collapsed
 - **WHEN** the committed mode is dialogue, focus is on the document body, and the player presses ArrowDown, Enter, Space, and Escape
@@ -330,7 +330,7 @@ document.
 
 #### Scenario: The exploration root carries the bare overview keys
 - **WHEN** the shell is in exploration mode
-- **THEN** the keyboard root is the scene overview frame, whose items carry the bare keys `look-room`, `wait`, and - whenever the committed `suggestions` envelope is not `unavailable` - `suggestions` for the footer, navigated by its row-of-chips geometry; exits are independent compass targets with no router key, and interact targets, look-only people, and objects are the presence rail's `target-<identity>`, `entity-<identity>`, and `object-<identity>` entries, also outside the router
+- **THEN** the keyboard root is the exploration root frame, an empty menu: the room actions are the place card's 查看房間 and 等待 buttons and the 建議 pill (present whenever the committed `suggestions` envelope is not `unavailable`), each its own tab stop outside the router; exits are independent compass targets with no router key, and interact targets, look-only people, and objects are the presence rail's `target-<identity>`, `entity-<identity>`, and `object-<identity>` entries, also outside the router
 
 #### Scenario: The exploration root omits the navigation-carried entries
 - **WHEN** the exploration keyboard root renders
@@ -567,7 +567,7 @@ new line, and SHALL be styled distinctly from server output (`.inp`) wherever th
 
 ### Requirement: The action dock's row region and detail panes are direct children of its pane host
 The action dock's pane host SHALL lay out the active frame's focusable row region and any displayed
-detail pane as direct children of that host, side by side when a detail pane is displayed. The exploration root is the explicit exception, composing a compass beside a right column containing the readout and overview. The
+detail pane as direct children of that host, side by side when a detail pane is displayed. The exploration root is the explicit exception, composing a compass beside a right column containing the 建議 pill and the readout. The
 action dock's pane host SHALL be the only host of the dock's row region: no reference drawer body
 renders it.
 
@@ -591,7 +591,7 @@ renders it.
 
 #### Scenario: The scene overview is the host's only child
 - **WHEN** the exploration root renders and a person's verb card opens over the stage
-- **THEN** the pane host carries the compass and its right column, whose readout and overview remain mounted and inert with the command panel beneath the card; the card renders in the stage's `choices` anchor, outside the action dock, and no detail pane renders
+- **THEN** the pane host carries the compass and its right column, whose pill and readout remain mounted and inert with the command panel beneath the card; the card renders in the stage's `choices` anchor, outside the action dock, and no detail pane renders
 
 #### Scenario: The dock menu adds no anonymous layout container
 - **WHEN** the dock menu component renders under the pane host
@@ -603,7 +603,7 @@ renders it.
 
 #### Scenario: The scene overview is the one exception to the direct-child rule for row regions
 - **WHEN** the exploration root renders
-- **THEN** the compass is beside a right column holding the readout, the overview's footer chips, and the reason strip; only this column scrolls, no detail pane renders, and the root fills the unchanged pane host
+- **THEN** the compass is beside a right column holding the 建議 pill at its top and the shared readout at its bottom; the column renders no chip row and no reason strip, no detail pane renders, and the root fills the unchanged pane host
 
 #### Scenario: A verb popover renders outside the pane host
 - **WHEN** a person's verb card is open over the stage

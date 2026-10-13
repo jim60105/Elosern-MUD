@@ -101,6 +101,7 @@
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_at_intermediate_depth_keeps_cells_matched_to_the_frame",
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_escape_from_quests_drawer_leaves_root_clean",
         "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_keyboard_only_journey_walks_the_overview",
+        "web.tests.browser.test_browser_exploration_nav.ExplorationBrowserTest.test_room_actions_hold_at_both_reference_viewports",
         "web.tests.browser.test_browser_exploration_tiles.ExplorationBrowserTest.test_crowded_room_folds_into_the_rail_at_a_narrow_viewport",
         "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
         "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker",

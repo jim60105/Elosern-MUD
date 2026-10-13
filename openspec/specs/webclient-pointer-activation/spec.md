@@ -8,8 +8,7 @@ The dock-wide contract that every action-dock surface renders exactly the keyboa
 
 Each dock that owns the action dock — exploration, character, creation, and combat — SHALL render its rows
 from the keyboard router's current menu frame, so the rows on screen are exactly the items the router will
-navigate, explain, and submit. The exploration compass is independent of router rows and submits committed
-move rows through the same store gate. A dock SHALL re-render its rows whenever the router pushes, replaces,
+navigate, explain, and submit. A dock SHALL re-render its rows whenever the router pushes, replaces,
 or pops a frame.
 
 #### Scenario: Combat submenus become visible instead of blind
@@ -33,12 +32,16 @@ or pops a frame.
 - **THEN** they are focusable and update the detail pane, and no row submits an action
 
 #### Scenario: A modal form is not required to become rows
-- **WHEN** the exploration rest-duration form or the creation dock's field form is open
-- **THEN** it captures its own input, the router's frame is unchanged beneath it, and closing it restores the rendered rows for that frame
+- **WHEN** the wait card's rest-duration form or the creation dock's field form is open
+- **THEN** it captures its own input, the router's frame is unchanged beneath it, and closing it restores what that surface showed before it opened
 
 #### Scenario: The overview beneath a popover is inert
-- **WHEN** a person's verb card is open over the stage and the player presses the compass or an overview chip in the command panel beneath it
-- **THEN** the command panel is `inert` while the card is open, so the press reaches no compass target or chip, no `ui_action` is emitted, the router's current frame is unchanged, and the card keeps focus until Escape or its `✕ 返回` row closes it
+- **WHEN** a person's verb card is open over the stage and the player presses the compass or the 建議 pill in the command panel beneath it
+- **THEN** the command panel is `inert` while the card is open, so the press reaches no compass target or pill, no `ui_action` is emitted, the router's current frame is unchanged, and the card keeps focus until Escape or its `✕ 返回` row closes it
+
+#### Scenario: The exploration root's room actions live outside the router menu
+- **WHEN** the exploration dock renders its root frame
+- **THEN** the root's router menu is empty, the exploration compass is independent of router rows and submits committed move rows through the same store gate, and the place card's room actions and the 建議 pill submit or open through that same gate outside the router menu
 
 #### Scenario: Re-render is synchronous with the router event
 - **WHEN** the router pushes, replaces, or pops a frame
@@ -49,7 +52,7 @@ or pops a frame.
 - **THEN** the row markup, the focused marker, the disabled marker and its `（無法使用）` suffix, the accessible disabled association, and the row identity attribute are defined in exactly one shared renderer
 
 #### Scenario: The shared renderer adapts to the frame's shape
-- **WHEN** a frame's shape calls for a tab, a scene-overview chip, a suggestion card, a skill row, a target token, a scale choice, or a confirmation row
+- **WHEN** a frame's shape calls for a tab, a skill row, a target token, a scale choice, or a confirmation row
 - **THEN** the same shared renderer renders the row in that visual form, chosen from the frame's own shape, and is not duplicated per form
 
 #### Scenario: The row model preserves menu semantics
@@ -57,7 +60,7 @@ or pops a frame.
 - **THEN** no menu's items, labels, order, or semantics have changed
 
 #### Scenario: Modal forms stay outside the row model
-- **WHEN** the creation dock's text and numeric fields or the exploration dock's bounded rest-duration form is open — modal forms never pushed onto the router stack
+- **WHEN** the creation dock's text and numeric fields or the wait card's bounded rest-duration form is open — modal forms never pushed onto the router stack
 - **THEN** each keeps its existing self-contained key capture, restores the router's frame rendering when it closes, and is an exception to the row model, not a violation of it
 
 #### Scenario: The combat root frame renders as a vertical command list
@@ -108,9 +111,8 @@ row's explanation and SHALL NOT submit.
 
 The rendered rows SHALL form one composite widget: the row container SHALL carry the listbox role, be the row
 region's single tab stop, and name the focused row through an active-descendant association, with each row
-carrying the option role and its selected state. The exploration compass SHALL be a separate single tab stop
-with `role="application"`; no exit is an overview row. A pointer press on a row SHALL NOT move DOM focus off
-that container.
+carrying the option role and its selected state. A pointer press on a row SHALL NOT move DOM focus off that
+container.
 
 #### Scenario: Enter on a focused row emits one action, not two
 - **WHEN** the player moves focus to an enabled row with the arrow keys and presses Enter
@@ -129,20 +131,20 @@ that container.
 - **THEN** the router closes the open frames one level at a time back to the root, focuses that tab's row, and opens its frame with exactly one deliberate activation, emitting no unexpected `ui_action`
 
 #### Scenario: Only one container is the listbox at a time
-- **WHEN** the dock is inspected at the root frame and again at a deeper frame
-- **THEN** exactly one row container carries the listbox role, the tab stop and the active-descendant reference in each case, and the other container is neither focusable by Tab nor exposed as a listbox
+- **WHEN** the dock is inspected at the exploration root and again at a row-bearing frame
+- **THEN** at the exploration root the dock renders no row container at all — its composite is the presence rail's, the place-card buttons and the 建議 pill are native buttons, and the compass is a separate single tab stop with `role="application"` where no exit is a router row — while a row-bearing frame renders exactly one row container carrying the listbox role, the tab stop and the active-descendant reference, with any other container neither focusable by Tab nor exposed as a listbox, so the row-container clauses hold for every row-bearing frame
 
 #### Scenario: Focus indication stays with the router
 - **WHEN** the player clicks a row
 - **THEN** the row container retains DOM focus, the active-descendant association names the clicked row, and the visible focus indicator is on that row
 
 #### Scenario: Composite roles are present and machine-checkable
-- **WHEN** the rendered action dock is inspected in the browser
-- **THEN** the row container exposes the listbox role with a tab stop and an active-descendant reference, each row exposes the option role with its selected and disabled state, and no row is reachable by sequential keyboard navigation
+- **WHEN** the rendered action dock is inspected in the browser at the exploration root and at a row-bearing frame
+- **THEN** the exploration root renders no dock row container, the presence rail carrying the listbox role, one tab stop, and an active-descendant reference on the stage, while at a row-bearing frame the row container exposes the listbox role with a tab stop and an active-descendant reference, each row exposes the option role with its selected and disabled state, and no row is reachable by sequential keyboard navigation
 
 #### Scenario: Exactly one container holds the listbox role
-- **WHEN** the dock is at the root frame, where the root frame renders as a tab bar, and at any deeper frame
-- **THEN** exactly one row container holds the role — the tab bar's container at the root frame and the rows region's container at every deeper frame — and the other is neither a tab stop nor a listbox
+- **WHEN** the dock is at the exploration root and again at any row-bearing frame
+- **THEN** no dock row container holds the role at the exploration root, and every row-bearing frame renders exactly one, its rows region's, with any other container neither a tab stop nor a listbox
 
 #### Scenario: The action-dock element forwards focus
 - **WHEN** an active row container is mounted

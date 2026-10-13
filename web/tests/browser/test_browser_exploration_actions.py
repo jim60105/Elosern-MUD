@@ -138,7 +138,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.wait"), 2)
         self.assertEqual(store_state(page)["serverTime"], time_before)
 
-    @covers_requirement("webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview")
+    @covers_requirement("webclient-room-actions::等待-opens-the-wait-card-through-choicecard")
     @covers_requirement("webclient-exploration-menu::explore-wait-obeys-the-shared-skip-safety-and-clock-api")
     def test_safe_wait_until_dawn_advances_the_clock(self):
         page = self.logged_in_page()

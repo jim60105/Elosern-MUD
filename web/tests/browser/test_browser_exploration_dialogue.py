@@ -182,7 +182,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement(
-        "webclient-presence-rail::the-exploration-dock-roots-at-the-compass-and-the-presence-rail-and-keeps-the-footer-overview"
+        "webclient-room-actions::the-exploration-screen-roots-at-the-compass-the-rail-and-room-actions"
     )
     @covers_requirement(
         "webclient-exploration-menu::explore-talk-open-opens-a-conversation-with-the-host-s-greeting"
