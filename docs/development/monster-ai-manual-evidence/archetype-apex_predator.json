@@ -1,0 +1,1232 @@
+{
+  "algorithm_version": 5,
+  "allocation": {
+    "encounters": 24,
+    "intelligences": [
+      10,
+      90
+    ],
+    "round_cap": 30,
+    "seeds": [
+      0,
+      1
+    ],
+    "situations": [
+      "finishing_choice",
+      "area_versus_single",
+      "resource_exhaustion",
+      "mandatory_targeting",
+      "support_and_focus",
+      "long_lifecycle"
+    ]
+  },
+  "archetype": "apex_predator",
+  "baseline_commit": "143b28d6f2cb07090f88753eacd4ea0c32e0246c",
+  "configuration_fingerprint": "e40c071ef3a428c419c6ff58c9750c77b93d01d01911b3dc2f3c62f09ac20232",
+  "evennia_version": "unknown",
+  "generated_at": "2026-10-13T15:46:49.638659+00:00",
+  "host": {
+    "clock": "monotonic",
+    "node": "Jim-Fedora",
+    "platform": "Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "processor": ""
+  },
+  "metrics": {
+    "area_versus_single@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 9,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 2,
+      "highest_utility_fraction": 0.2222222222222222,
+      "losses": 0,
+      "mean_rounds": 4.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 9,
+      "rounds_total": 9,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 2,
+        "t_campaign_heal_0": 2,
+        "t_campaign_strike_0": 2,
+        "t_campaign_strike_1": 3
+      },
+      "target_distribution": {
+        "dbref:14": 4,
+        "dbref:17": 1,
+        "dbref:22": 3,
+        "dbref:25": 1
+      },
+      "wins": 2
+    },
+    "area_versus_single@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 6,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 0,
+      "highest_utility_fraction": 0.0,
+      "losses": 0,
+      "mean_rounds": 3.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 6,
+      "rounds_total": 7,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 2,
+        "t_campaign_strike_1": 4
+      },
+      "target_distribution": {
+        "dbref:18": 1,
+        "dbref:26": 5
+      },
+      "wins": 2
+    },
+    "finishing_choice@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 4,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 1,
+      "highest_utility_fraction": 0.25,
+      "losses": 0,
+      "mean_rounds": 3.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 4,
+      "rounds_total": 6,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 1,
+        "t_campaign_heal_0": 1,
+        "t_campaign_strike_0": 1,
+        "t_campaign_strike_1": 1
+      },
+      "target_distribution": {
+        "dbref:4": 1,
+        "dbref:8": 3
+      },
+      "wins": 2
+    },
+    "finishing_choice@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 6,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 4,
+      "highest_utility_fraction": 0.6666666666666666,
+      "losses": 0,
+      "mean_rounds": 3.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 6,
+      "rounds_total": 7,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_strike_0": 4,
+        "t_campaign_strike_1": 2
+      },
+      "target_distribution": {
+        "dbref:11": 5,
+        "dbref:5": 1
+      },
+      "wins": 2
+    },
+    "long_lifecycle@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 20,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 6,
+      "highest_utility_fraction": 0.3,
+      "losses": 0,
+      "mean_rounds": 10.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 20,
+      "rounds_total": 21,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 4,
+        "t_campaign_heal_0": 5,
+        "t_campaign_strike_0": 6,
+        "t_campaign_strike_1": 5
+      },
+      "target_distribution": {
+        "dbref:74": 8,
+        "dbref:76": 2,
+        "dbref:80": 7,
+        "dbref:82": 3
+      },
+      "wins": 2
+    },
+    "long_lifecycle@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 25,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 12,
+      "highest_utility_fraction": 0.48,
+      "losses": 0,
+      "mean_rounds": 13.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 25,
+      "rounds_total": 26,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 3,
+        "t_campaign_strike_0": 12,
+        "t_campaign_strike_1": 10
+      },
+      "target_distribution": {
+        "dbref:77": 13,
+        "dbref:83": 12
+      },
+      "wins": 2
+    },
+    "mandatory_targeting@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 6,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 1,
+      "highest_utility_fraction": 0.16666666666666666,
+      "losses": 0,
+      "mean_rounds": 4.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 6,
+      "rounds_total": 8,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 1,
+        "t_campaign_strike_0": 1,
+        "t_campaign_strike_1": 4
+      },
+      "target_distribution": {
+        "dbref:42": 1,
+        "dbref:50": 5
+      },
+      "wins": 2
+    },
+    "mandatory_targeting@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 12,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 5,
+      "highest_utility_fraction": 0.4166666666666667,
+      "losses": 0,
+      "mean_rounds": 6.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 12,
+      "rounds_total": 13,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_heal_0": 3,
+        "t_campaign_strike_0": 5,
+        "t_campaign_strike_1": 4
+      },
+      "target_distribution": {
+        "dbref:46": 5,
+        "dbref:54": 4,
+        "dbref:57": 3
+      },
+      "wins": 2
+    },
+    "resource_exhaustion@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 4,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 0,
+      "highest_utility_fraction": 0.0,
+      "losses": 0,
+      "mean_rounds": 3.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 4,
+      "rounds_total": 6,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_heal_0": 1,
+        "t_campaign_strike_1": 3
+      },
+      "target_distribution": {
+        "dbref:30": 2,
+        "dbref:36": 1,
+        "dbref:38": 1
+      },
+      "wins": 2
+    },
+    "resource_exhaustion@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 0,
+      "decisions": 4,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 2,
+      "highest_utility_fraction": 0.5,
+      "losses": 0,
+      "mean_rounds": 3.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 4,
+      "rounds_total": 6,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_strike_0": 2,
+        "t_campaign_strike_1": 2
+      },
+      "target_distribution": {
+        "dbref:33": 2,
+        "dbref:39": 2
+      },
+      "wins": 2
+    },
+    "support_and_focus@10": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 2,
+      "decisions": 17,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 3,
+      "highest_utility_fraction": 0.17647058823529413,
+      "losses": 0,
+      "mean_rounds": 5.5,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 17,
+      "rounds_total": 11,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 1,
+        "t_campaign_heal_0": 13,
+        "t_campaign_strike_0": 3
+      },
+      "target_distribution": {
+        "dbref:58": 2,
+        "dbref:60": 3,
+        "dbref:61": 5,
+        "dbref:66": 2,
+        "dbref:68": 4,
+        "dbref:69": 1
+      },
+      "wins": 0
+    },
+    "support_and_focus@90": {
+      "approximation_flags": [
+        "hit_reactions_unmodeled"
+      ],
+      "capped": 2,
+      "decisions": 12,
+      "encounters": 2,
+      "exclusions": 0,
+      "exhausted": 0,
+      "highest_utility": 10,
+      "highest_utility_fraction": 0.8333333333333334,
+      "losses": 0,
+      "mean_rounds": 4.0,
+      "mean_rounds_denominator": 2,
+      "no_action": {
+        "budget_omission": 0,
+        "capability_blocked": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "omitted_estimates": 0,
+      "omitted_families": 0,
+      "rejections": 12,
+      "rounds_total": 8,
+      "selected_illegal": 0,
+      "skill_distribution": {
+        "t_campaign_area_0": 1,
+        "t_campaign_strike_0": 10,
+        "t_campaign_strike_1": 1
+      },
+      "target_distribution": {
+        "dbref:62": 8,
+        "dbref:70": 4
+      },
+      "wins": 0
+    }
+  },
+  "operation": "archetype",
+  "overall": {
+    "approximation_flags": [
+      "hit_reactions_unmodeled"
+    ],
+    "capped": 4,
+    "decisions": 125,
+    "encounters": 24,
+    "exclusions": 0,
+    "exhausted": 0,
+    "highest_utility": 46,
+    "highest_utility_fraction": 0.368,
+    "losses": 0,
+    "mean_rounds": 5.333333333333333,
+    "mean_rounds_denominator": 24,
+    "no_action": {
+      "budget_omission": 0,
+      "capability_blocked": 0,
+      "estimator_exclusion": 0,
+      "legal_restriction": 0
+    },
+    "omitted_estimates": 0,
+    "omitted_families": 0,
+    "rejections": 125,
+    "rounds_total": 128,
+    "selected_illegal": 0,
+    "skill_distribution": {
+      "t_campaign_area_0": 15,
+      "t_campaign_heal_0": 25,
+      "t_campaign_strike_0": 46,
+      "t_campaign_strike_1": 39
+    },
+    "target_distribution": {
+      "dbref:11": 5,
+      "dbref:14": 4,
+      "dbref:17": 1,
+      "dbref:18": 1,
+      "dbref:22": 3,
+      "dbref:25": 1,
+      "dbref:26": 5,
+      "dbref:30": 2,
+      "dbref:33": 2,
+      "dbref:36": 1,
+      "dbref:38": 1,
+      "dbref:39": 2,
+      "dbref:4": 1,
+      "dbref:42": 1,
+      "dbref:46": 5,
+      "dbref:5": 1,
+      "dbref:50": 5,
+      "dbref:54": 4,
+      "dbref:57": 3,
+      "dbref:58": 2,
+      "dbref:60": 3,
+      "dbref:61": 5,
+      "dbref:62": 8,
+      "dbref:66": 2,
+      "dbref:68": 4,
+      "dbref:69": 1,
+      "dbref:70": 4,
+      "dbref:74": 8,
+      "dbref:76": 2,
+      "dbref:77": 13,
+      "dbref:8": 3,
+      "dbref:80": 7,
+      "dbref:82": 3,
+      "dbref:83": 12
+    },
+    "wins": 20
+  },
+  "python_version": "3.13.14",
+  "raw": [
+    {
+      "combat_seed": 322826136293125553971337969803894953126,
+      "decision_seed": 327251179655750757342901647314612982577,
+      "decisions": 1,
+      "highest_utility": 0,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 2,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "finishing_choice"
+    },
+    {
+      "combat_seed": 281829883263894218336109861881578738898,
+      "decision_seed": 327251179655750757342901647314612982577,
+      "decisions": 1,
+      "highest_utility": 1,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:5",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:7",
+            "dbref:5"
+          ],
+          [
+            [
+              "dbref:7",
+              -22.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 2,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "finishing_choice"
+    },
+    {
+      "combat_seed": 10971317066571618584560968042410469740,
+      "decision_seed": 280890330436216879610500621798468334432,
+      "decisions": 3,
+      "highest_utility": 1,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:8",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:10",
+            "dbref:8"
+          ],
+          [],
+          [
+            "roll",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 4,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "finishing_choice"
+    },
+    {
+      "combat_seed": 47653067349347016433534353089316328284,
+      "decision_seed": 280890330436216879610500621798468334432,
+      "decisions": 5,
+      "highest_utility": 3,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:11",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:13",
+            "dbref:11"
+          ],
+          [],
+          [
+            "roll",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 5,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "finishing_choice"
+    },
+    {
+      "combat_seed": 162637417325444500731107245674261296007,
+      "decision_seed": 192660761917786509772962566810669009535,
+      "decisions": 5,
+      "highest_utility": 1,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 5,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "area_versus_single"
+    },
+    {
+      "combat_seed": 131113550791566915977513108586833202709,
+      "decision_seed": 192660761917786509772962566810669009535,
+      "decisions": 1,
+      "highest_utility": 0,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 1,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "area_versus_single"
+    },
+    {
+      "combat_seed": 303220391320211094744999484260583897903,
+      "decision_seed": 77360657593899465162203181773321859685,
+      "decisions": 4,
+      "highest_utility": 1,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:22",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:25",
+            "dbref:22"
+          ],
+          [
+            [
+              "dbref:25",
+              -22.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 4,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "area_versus_single"
+    },
+    {
+      "combat_seed": 52566791761796474091747670679891591516,
+      "decision_seed": 77360657593899465162203181773321859685,
+      "decisions": 5,
+      "highest_utility": 0,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:26",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:29",
+            "dbref:26"
+          ],
+          [
+            [
+              "dbref:29",
+              -22.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 6,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "area_versus_single"
+    },
+    {
+      "combat_seed": 74898301626940366055735593861828690401,
+      "decision_seed": 171340444384063507383217282205173355660,
+      "decisions": 2,
+      "highest_utility": 0,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:30",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:32",
+            "dbref:30"
+          ],
+          [],
+          [
+            "roll",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 3,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "resource_exhaustion"
+    },
+    {
+      "combat_seed": 159038714244065563317552168502189268729,
+      "decision_seed": 171340444384063507383217282205173355660,
+      "decisions": 2,
+      "highest_utility": 0,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:33",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:35",
+            "dbref:33"
+          ],
+          [
+            [
+              "dbref:35",
+              -22.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 3,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "resource_exhaustion"
+    },
+    {
+      "combat_seed": 160669602754299142562369234550492168850,
+      "decision_seed": 46762302283750686771662926878689352645,
+      "decisions": 2,
+      "highest_utility": 0,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 3,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "resource_exhaustion"
+    },
+    {
+      "combat_seed": 38724944122802565071912481325671885322,
+      "decision_seed": 46762302283750686771662926878689352645,
+      "decisions": 2,
+      "highest_utility": 2,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 3,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "resource_exhaustion"
+    },
+    {
+      "combat_seed": 221322225442644087751221292188847918126,
+      "decision_seed": 45208941223775061977165952139403054424,
+      "decisions": 1,
+      "highest_utility": 0,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 2,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "mandatory_targeting"
+    },
+    {
+      "combat_seed": 67327259794964791544985387284126736101,
+      "decision_seed": 45208941223775061977165952139403054424,
+      "decisions": 5,
+      "highest_utility": 1,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 5,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "mandatory_targeting"
+    },
+    {
+      "combat_seed": 309928485858282017527341701410125475042,
+      "decision_seed": 117776515821353638725504259518408711099,
+      "decisions": 5,
+      "highest_utility": 1,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 6,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "mandatory_targeting"
+    },
+    {
+      "combat_seed": 261449755260955629630689946500972111921,
+      "decision_seed": 117776515821353638725504259518408711099,
+      "decisions": 7,
+      "highest_utility": 4,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 8,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "mandatory_targeting"
+    },
+    {
+      "combat_seed": 311022687109805077524801393441000601219,
+      "decision_seed": 259676916766081732261873661946630724819,
+      "decisions": 10,
+      "highest_utility": 1,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "capped",
+      "rounds": 6,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "combat_seed": 159801400236600765884902875884907733491,
+      "decision_seed": 259676916766081732261873661946630724819,
+      "decisions": 8,
+      "highest_utility": 6,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:62",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:64",
+            "dbref:62"
+          ],
+          [],
+          [
+            "roll",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "capped",
+      "rounds": 5,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "combat_seed": 58341520144648290217282189049784334350,
+      "decision_seed": 63879590122296190897823675443031119607,
+      "decisions": 7,
+      "highest_utility": 2,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:66",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:68",
+            "dbref:66"
+          ],
+          [
+            [
+              "dbref:68",
+              -35.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "capped",
+      "rounds": 5,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "combat_seed": 287681386278579850679301821397589627362,
+      "decision_seed": 63879590122296190897823675443031119607,
+      "decisions": 4,
+      "highest_utility": 4,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "capped",
+      "rounds": 3,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "combat_seed": 140900754071379342261254315087880195406,
+      "decision_seed": 126032654848651569485363121942861549930,
+      "decisions": 10,
+      "highest_utility": 3,
+      "initial_observations": [],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 10,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "long_lifecycle"
+    },
+    {
+      "combat_seed": 229257195076617399388283832636941708200,
+      "decision_seed": 126032654848651569485363121942861549930,
+      "decisions": 13,
+      "highest_utility": 6,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:77",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:79",
+            "dbref:77"
+          ],
+          [
+            [
+              "dbref:79",
+              -22.0
+            ]
+          ],
+          [
+            "roll",
+            "damage",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 13,
+      "seed_index": 0,
+      "selected_illegal": 0,
+      "situation": "long_lifecycle"
+    },
+    {
+      "combat_seed": 304775239074057576229961996005325439017,
+      "decision_seed": 87473186118918473879268152654878610875,
+      "decisions": 10,
+      "highest_utility": 3,
+      "initial_observations": [
+        [
+          1,
+          0,
+          "dbref:80",
+          "party",
+          "t_campaign_strike",
+          [
+            "dbref:82",
+            "dbref:80"
+          ],
+          [],
+          [
+            "roll",
+            "skill_practice"
+          ]
+        ]
+      ],
+      "intelligence": 10,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 11,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "long_lifecycle"
+    },
+    {
+      "combat_seed": 305596299499391536047199471328217884545,
+      "decision_seed": 87473186118918473879268152654878610875,
+      "decisions": 12,
+      "highest_utility": 6,
+      "initial_observations": [],
+      "intelligence": 90,
+      "no_action": {
+        "budget_omission": 0,
+        "estimator_exclusion": 0,
+        "legal_restriction": 0
+      },
+      "outcome": "win",
+      "rounds": 13,
+      "seed_index": 1,
+      "selected_illegal": 0,
+      "situation": "long_lifecycle"
+    }
+  ],
+  "schema": "monster-ai-manual-evidence/1",
+  "unresolved": [
+    {
+      "intelligence": 10,
+      "rounds": 6,
+      "seed_index": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "intelligence": 90,
+      "rounds": 5,
+      "seed_index": 0,
+      "situation": "support_and_focus"
+    },
+    {
+      "intelligence": 10,
+      "rounds": 5,
+      "seed_index": 1,
+      "situation": "support_and_focus"
+    },
+    {
+      "intelligence": 90,
+      "rounds": 3,
+      "seed_index": 1,
+      "situation": "support_and_focus"
+    }
+  ]
+}

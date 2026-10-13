@@ -1,0 +1,947 @@
+{
+  "algorithm_version": 5,
+  "baseline_commit": "143b28d6f2cb07090f88753eacd4ea0c32e0246c",
+  "candidates": {
+    "highest": "highest",
+    "lowest": "lowest",
+    "utility_gap": 0.5
+  },
+  "configuration_fingerprint": "a29fd4fac5f07d65eb40377ee4dafe400c977738a321e8028852c9169cefe9c4",
+  "counts": {
+    "high": 118,
+    "low": 74,
+    "total": 128
+  },
+  "evennia_version": "unknown",
+  "generated_at": "2026-10-13T15:47:55.520543+00:00",
+  "host": {
+    "clock": "monotonic",
+    "node": "Jim-Fedora",
+    "platform": "Linux-7.2.6-200.fc44.x86_64-x86_64-with-glibc2.43",
+    "processor": ""
+  },
+  "intelligences": [
+    10,
+    90
+  ],
+  "margin_met": true,
+  "margin_required": 0.15,
+  "operation": "selector",
+  "paired_difference": 0.34375,
+  "proportions": {
+    "high": 0.921875,
+    "low": 0.578125
+  },
+  "python_version": "3.13.14",
+  "replicates": [
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 124827249951752498236883837526651300934,
+      "seed_index": 0
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 42171912539604470553047359000041634407,
+      "seed_index": 1
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 206514817375716035591299292464234389600,
+      "seed_index": 2
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 184939951213991876668801931263989211375,
+      "seed_index": 3
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 312998105973861086199421730878382130507,
+      "seed_index": 4
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 149739990387380774682441794544612817496,
+      "seed_index": 5
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 221625936433508307653584871650003005270,
+      "seed_index": 6
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 291737870133681305739655213225409345027,
+      "seed_index": 7
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 221467343921527286738970155855019306158,
+      "seed_index": 8
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 224669110573630631336472321029805368279,
+      "seed_index": 9
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 174000551615207522268869835379924712009,
+      "seed_index": 10
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 255156639870136467924250028661758833389,
+      "seed_index": 11
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 246889373637852655641642016881492845574,
+      "seed_index": 12
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 296556050259527459598031387142018503031,
+      "seed_index": 13
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 223218780997344942809123483819411047558,
+      "seed_index": 14
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 175953972807861526294409211785565155920,
+      "seed_index": 15
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 270924688737929043694639199611841590852,
+      "seed_index": 16
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 231400688712894461585231701872313818805,
+      "seed_index": 17
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 157586412909019859680400036891287051632,
+      "seed_index": 18
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 129042216695491566840206097862216675730,
+      "seed_index": 19
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 300354812288762600725260312946076682486,
+      "seed_index": 20
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 327273192471102132788086385391430000445,
+      "seed_index": 21
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 87176838171971970859894527920411976687,
+      "seed_index": 22
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 88147606313547126949157403616843460991,
+      "seed_index": 23
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 94462256771188849593820270607708081775,
+      "seed_index": 24
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 331725965926858950262676650738454610163,
+      "seed_index": 25
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 276807439934352933116762220058601764937,
+      "seed_index": 26
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 233029875437005575831216874991856530882,
+      "seed_index": 27
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 46400790807475863300669648400297324768,
+      "seed_index": 28
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 36971487055695764279357667329188204073,
+      "seed_index": 29
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 205123643929057045520017804422226530653,
+      "seed_index": 30
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 200704154673091036832755191929122412428,
+      "seed_index": 31
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 211981408769136900941013245142798882228,
+      "seed_index": 32
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 126822279863584927281906256219749674209,
+      "seed_index": 33
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 122915202634725735886334422671239054850,
+      "seed_index": 34
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 136199939491219034128589767785601993922,
+      "seed_index": 35
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 33957409707705305371024224461314163452,
+      "seed_index": 36
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 98134378058286827896166155930754510852,
+      "seed_index": 37
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 142016823287123448028231917895987315367,
+      "seed_index": 38
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 276201394363903459676598006173315728149,
+      "seed_index": 39
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 204508405663057771584166540927114035497,
+      "seed_index": 40
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 117274410381155816830602688663398347928,
+      "seed_index": 41
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 55821013314409615997940917244191960080,
+      "seed_index": 42
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 134321911206243567815036107257349042161,
+      "seed_index": 43
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 208443263609603859342777213474818250671,
+      "seed_index": 44
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 326673228019778640615608333289424271446,
+      "seed_index": 45
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 283423035996604584444099350384823889209,
+      "seed_index": 46
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 22259674662676880554654189769838693550,
+      "seed_index": 47
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 278800141316639598747792557287199402470,
+      "seed_index": 48
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 62221700676179709282126796010739118849,
+      "seed_index": 49
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 305869328585761869611648421642602090310,
+      "seed_index": 50
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 3051411166476099931984676555200619886,
+      "seed_index": 51
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 157282529694795112887902736079594058465,
+      "seed_index": 52
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 124731833450533267949152949711885062741,
+      "seed_index": 53
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 125065429595855000857282270538740124727,
+      "seed_index": 54
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 181157872255037522875789046752983198939,
+      "seed_index": 55
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 14864161400748485012917304515862806597,
+      "seed_index": 56
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 54203506307805801410211132120708229401,
+      "seed_index": 57
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 287480943576762599126561657937172099759,
+      "seed_index": 58
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 76830295453046718051260823755143301682,
+      "seed_index": 59
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 307191032477486264432364688341935355661,
+      "seed_index": 60
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 159675700568206355366162157575396972491,
+      "seed_index": 61
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 238840339119929127964808782630070322872,
+      "seed_index": 62
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 139967423119723597404832757862288472872,
+      "seed_index": 63
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 63347966195661733836938712265656419823,
+      "seed_index": 64
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 122009701843856878431409018395991838724,
+      "seed_index": 65
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 78263689611211242900977714346964035634,
+      "seed_index": 66
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 201860446079385869374859864407676502419,
+      "seed_index": 67
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 273309812844761567620427912455247473464,
+      "seed_index": 68
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 237328187634418907326947120163896845701,
+      "seed_index": 69
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 336584392818765903253214943103067374705,
+      "seed_index": 70
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 190107730247455291982049263270170584239,
+      "seed_index": 71
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 305552838105017379133670318428355136696,
+      "seed_index": 72
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 18776112349482493658172164646540491923,
+      "seed_index": 73
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 228587661255443718527513669071965898491,
+      "seed_index": 74
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 133066699141734655660495315477384395055,
+      "seed_index": 75
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 315552617205661747081885716678835992797,
+      "seed_index": 76
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 243205866129515176948334388609471719049,
+      "seed_index": 77
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 323229731715199212919124925508267565651,
+      "seed_index": 78
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 261958179008167261831574718956421696168,
+      "seed_index": 79
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 159006138851980326697319519478531032248,
+      "seed_index": 80
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 293903272794421610851701428972758133250,
+      "seed_index": 81
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 240038153840941144423792617229440243294,
+      "seed_index": 82
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 257998651777831092697862175053239407260,
+      "seed_index": 83
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 262425842622601840984576008572564529993,
+      "seed_index": 84
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 186289896667311582347080453261961311955,
+      "seed_index": 85
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 176136515979689476616756037430557863451,
+      "seed_index": 86
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 7152837411424808802470510046335780859,
+      "seed_index": 87
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 334857134913138652303618715133222165483,
+      "seed_index": 88
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 323873391672012878209495527076673935366,
+      "seed_index": 89
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 42639990136019708573417900969408651581,
+      "seed_index": 90
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 45360602197824189807743086429534620056,
+      "seed_index": 91
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 290140471420716950019685071673129879366,
+      "seed_index": 92
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 333011592349954438909871685083349483853,
+      "seed_index": 93
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 120208790938543172161697811059178785851,
+      "seed_index": 94
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 136107788479749458384668142472161297605,
+      "seed_index": 95
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 112425895543513507543273965436500891178,
+      "seed_index": 96
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 189214324564457052287480417123312411497,
+      "seed_index": 97
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 90868619192182093346400307153313841149,
+      "seed_index": 98
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 222463047000007233508324890130474240817,
+      "seed_index": 99
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 191106398620551806149167377827774580275,
+      "seed_index": 100
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 169093771452986154620011633496164980358,
+      "seed_index": 101
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 165854270477448628857493244715692841003,
+      "seed_index": 102
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 104778985162695141498834030243045766237,
+      "seed_index": 103
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 179959809369771982498124577995103009125,
+      "seed_index": 104
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 324579266549713382532732971003246639742,
+      "seed_index": 105
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 201542035307835635138200670419134333640,
+      "seed_index": 106
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 246703120612416193102685460808130091788,
+      "seed_index": 107
+    },
+    {
+      "high_choice": "lowest",
+      "low_choice": "lowest",
+      "seed": 190193629621526309439199672548284015072,
+      "seed_index": 108
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 266806594081056329320362446849446704067,
+      "seed_index": 109
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 131079644162436276578166189819395040353,
+      "seed_index": 110
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 15431922596315964960965543736885239341,
+      "seed_index": 111
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 33727087770324379773132170304807272555,
+      "seed_index": 112
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 144157800051974524342521271421675808812,
+      "seed_index": 113
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 209249432103371438872114417351280216180,
+      "seed_index": 114
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 81202535880808227420329255159820349420,
+      "seed_index": 115
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 296559583916616766464925311573585208836,
+      "seed_index": 116
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 262101280151578360306701858526034175264,
+      "seed_index": 117
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 140432158115353116838414504815311864302,
+      "seed_index": 118
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 66827023678331934559290020437831980127,
+      "seed_index": 119
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 327514156972382311206243301709762020768,
+      "seed_index": 120
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 123947037425021749892172783440028926579,
+      "seed_index": 121
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 322194125040674447121915236353871376088,
+      "seed_index": 122
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 4250194629080712999230086174316278396,
+      "seed_index": 123
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 118023181983779529389995720490425072097,
+      "seed_index": 124
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "lowest",
+      "seed": 326900791161599074523931302040480039904,
+      "seed_index": 125
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 115611534137498812524234834997714929981,
+      "seed_index": 126
+    },
+    {
+      "high_choice": "highest",
+      "low_choice": "highest",
+      "seed": 188286588698315728875844846041339137765,
+      "seed_index": 127
+    }
+  ],
+  "schema": "monster-ai-manual-evidence/1",
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21,
+    22,
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30,
+    31,
+    32,
+    33,
+    34,
+    35,
+    36,
+    37,
+    38,
+    39,
+    40,
+    41,
+    42,
+    43,
+    44,
+    45,
+    46,
+    47,
+    48,
+    49,
+    50,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    59,
+    60,
+    61,
+    62,
+    63,
+    64,
+    65,
+    66,
+    67,
+    68,
+    69,
+    70,
+    71,
+    72,
+    73,
+    74,
+    75,
+    76,
+    77,
+    78,
+    79,
+    80,
+    81,
+    82,
+    83,
+    84,
+    85,
+    86,
+    87,
+    88,
+    89,
+    90,
+    91,
+    92,
+    93,
+    94,
+    95,
+    96,
+    97,
+    98,
+    99,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    120,
+    121,
+    122,
+    123,
+    124,
+    125,
+    126,
+    127
+  ],
+  "wilson": {
+    "high": [
+      0.8621530681952095,
+      0.9570126249490177
+    ],
+    "low": [
+      0.4915184739711009,
+      0.6601788766111634
+    ]
+  }
+}
