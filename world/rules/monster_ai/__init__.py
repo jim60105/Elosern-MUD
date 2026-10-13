@@ -8,7 +8,8 @@ proposals, and the analytic effect estimation that projects each candidate's
 health effects with settlement's own arithmetic plus the bounded marginal value
 of the control it mounts, and the utility decision itself: the bounded score of
 every supported candidate and the stable, independently seeded softmax sampling
-that selects one. Every production variant is still authored
+that selects one, plus the observed focus and threat the eligible settled
+history contributes to that score. Every production variant is still authored
 ``legacy``, so the legacy decision body in
 :mod:`world.rules.monster_behaviour` returns exactly what it returned before;
 activating a variant is the separate staged-activation change's decision.
@@ -23,6 +24,9 @@ activating a variant is the separate staged-activation change's decision.
 - :mod:`world.rules.monster_ai.estimation` -- the signed, bounded health
   and control features of one candidate plan, with no dice, handlers, costs or
   events.
+- :mod:`world.rules.monster_ai.coordination` -- the observed allied focus and
+  opposing threat of one decision's eligible settled history, with the named
+  bounded age decay and the observation window they are read within.
 - :mod:`world.rules.monster_ai.utility` -- the bounded utility score of one
   candidate, with its three stable preference ranks.
 - :mod:`world.rules.monster_ai.selection` -- canonical ordering, the stable
@@ -40,6 +44,16 @@ from world.rules.monster_ai.candidates import (
     CandidateSet,
     SkillObservation,
     enumerate_candidates,
+)
+from world.rules.monster_ai.coordination import (
+    OBSERVATION_WINDOW_ROUNDS,
+    THREAT_DECAY_STEPS,
+    THREAT_DECAY_VERSION,
+    decayed_weight,
+    focus_for_plan,
+    observed_focus,
+    observed_threat,
+    threat_is_valued,
 )
 from world.rules.monster_ai.estimation import (
     ApproximationClass,
@@ -86,6 +100,7 @@ from world.rules.monster_ai.selection import (
 from world.rules.monster_ai.trace import (
     DecisionTrace,
     TracePlan,
+    trace_observations,
     write_trace_report,
 )
 from world.rules.monster_ai.utility import (
@@ -119,6 +134,7 @@ __all__ = [
     "InvalidEstimate",
     "InvalidEstimateReason",
     "MonsterAIStateError",
+    "OBSERVATION_WINDOW_ROUNDS",
     "OwnedSkillSnapshot",
     "ParticipantSnapshot",
     "PlanVerdict",
@@ -130,14 +146,20 @@ __all__ = [
     "SELECTION_SEED_VERSION",
     "ScoredCandidate",
     "SkillObservation",
+    "THREAT_DECAY_STEPS",
+    "THREAT_DECAY_VERSION",
     "TracePlan",
     "attack_utility",
     "build_decision_snapshot",
     "canonical_order",
+    "decayed_weight",
     "enumerate_candidates",
     "estimate_candidates",
     "estimate_plan",
+    "focus_for_plan",
     "normalized_ranks",
+    "observed_focus",
+    "observed_threat",
     "roster_index",
     "score_candidates",
     "select_candidate",
@@ -146,6 +168,8 @@ __all__ = [
     "selection_temperature",
     "softmax_probabilities",
     "stable_identity",
+    "threat_is_valued",
+    "trace_observations",
     "validate_plan",
     "write_trace_report",
 ]

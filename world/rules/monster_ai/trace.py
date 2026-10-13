@@ -13,6 +13,15 @@ recognized shorthand and stable target identifiers -- never the live request,
 its context or its entities. That is what keeps a trace JSON-safe and keeps
 pending player intent, live object addresses and internal containers out of any
 report.
+
+One part of the record is deliberately richer: the decision's *initial
+observation snapshot*, the already settled public facts the score read (their
+round, sequence, source and faction, action, recipients, signed health
+magnitudes and status facts). Same-process replay is defined against exactly
+those inputs -- identical initial observations, state, scope and tuning -- so a
+report that cannot hand them back cannot claim its decision is reproducible.
+They are flat primitives, so they stay JSON-safe and carry no entity, request
+or prose.
 """
 
 from dataclasses import dataclass
@@ -42,6 +51,7 @@ class TracePlan:
     damage: float
     healing: float
     control: float
+    focus: float
     preference: float
     finishing: float
     cost: float
@@ -59,6 +69,7 @@ class TracePlan:
             "damage": self.damage,
             "healing": self.healing,
             "control": self.control,
+            "focus": self.focus,
             "preference": self.preference,
             "finishing": self.finishing,
             "cost": self.cost,
@@ -93,6 +104,7 @@ class DecisionTrace:
     omitted_families: int = 0
     omitted_targets: int = 0
     exhausted: bool = False
+    observations: tuple[tuple[Any, ...], ...] = ()
     plans: tuple[TracePlan, ...] = ()
     selected: TracePlan | None = None
 
@@ -134,6 +146,7 @@ class DecisionTrace:
             "omitted_families": self.omitted_families,
             "omitted_targets": self.omitted_targets,
             "exhausted": self.exhausted,
+            "observations": [list(record) for record in self.observations],
             "plans": [plan.to_payload() for plan in self.plans],
             "selected": None if self.selected is None else self.selected.to_payload(),
         }
@@ -183,11 +196,42 @@ def trace_plan(scored: ScoredCandidate) -> TracePlan:
         damage=scored.damage,
         healing=scored.healing,
         control=scored.control,
+        focus=scored.focus,
         preference=scored.preference,
         finishing=scored.finishing,
         cost=scored.cost,
         waste=scored.waste,
         limits=scored.limits,
+    )
+
+
+def trace_observations(snapshot: Any) -> tuple[tuple[Any, ...], ...]:
+    """Return one decision's initial observation snapshot, as flat primitives.
+
+    The replay evidence, in the snapshot's own order: where each settled fact
+    happened, who published it and as which faction, what was used, who
+    received it, the signed health magnitudes observed and the status facts
+    recorded. Nothing else about the decision's state travels with it; the
+    snapshot fingerprint already identifies that. Every record and every
+    sequence inside it is a tuple, so the JSON payload a report builds from
+    these values can never alias -- and therefore never mutate -- the
+    observations the decision actually reproduced.
+    """
+    return tuple(
+        (
+            record.round_index,
+            record.sequence,
+            record.source_id,
+            record.source_faction,
+            record.action_key,
+            tuple(record.recipient_ids),
+            tuple(
+                (identity, float(magnitude))
+                for identity, magnitude in record.magnitudes
+            ),
+            tuple(record.statuses),
+        )
+        for record in snapshot.observations
     )
 
 

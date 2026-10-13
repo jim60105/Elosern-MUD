@@ -5,6 +5,7 @@ is worth taking. The score is exactly the authored one:
 
 ``U = w_damage * damage + w_heal * healing + w_preference * preference
      + i * (w_kill * finishing + w_control * control
+            + w_focus * observed_focus
             - w_cost * cost - w_waste * waste)``
 
 with ``i = intelligence / 100``. The health terms are the estimator's own
@@ -57,7 +58,15 @@ from world.rules.monster_ai.candidates import (
     CandidateIdentity,
     CandidateSet,
     decision_pool,
+    group_members,
     hostile_domain,
+    KIND_FRIENDLY,
+)
+from world.rules.monster_ai.coordination import (
+    focus_for_plan,
+    observed_focus,
+    observed_threat,
+    threat_is_valued,
 )
 from world.rules.monster_ai.estimation import (
     EstimateSet,
@@ -109,6 +118,7 @@ class ScoredCandidate:
     damage: float
     healing: float
     control: float
+    focus: float
     preference: float
     finishing: float
     cost: float
@@ -156,6 +166,7 @@ def attack_utility(
     damage: float,
     healing: float = 0.0,
     control: float = 0.0,
+    focus: float = 0.0,
     preference: float,
     finishing: float,
     cost: float,
@@ -171,16 +182,20 @@ def attack_utility(
     signed health feature and ``healing`` the estimator's signed recovery
     feature, while ``control`` is its bounded marginal control feature,
     ``finishing``, ``cost`` and ``waste`` are the positive magnitudes the
-    formula subtracts or credits and ``preference`` is the archetype's own soft
-    bias.
+    formula subtracts or credits, ``preference`` is the archetype's own soft
+    bias and ``focus`` is the bounded observed allied pressure against this
+    plan's own hostile recipients.
 
     Recovery is valued as an unscaled baseline -- a heal is useful however
     instinctive its caster is -- while control joins finishing, cost and waste
     inside the intelligence-scaled discipline term, so only a cleverer variant
-    weighs a denial or a buff more heavily.
+    weighs a denial or a buff more heavily. Observed focus joins that same
+    scaled term, so pressing an already pressured target is a discipline a
+    cleverer variant applies harder, and a decision that observed no pressure
+    adds exactly zero for it.
     """
     initiative = _unit_intelligence(intelligence)
-    terms = (damage, healing, control, preference, finishing, cost, waste)
+    terms = (damage, healing, control, focus, preference, finishing, cost, waste)
     if not all(isfinite(term) for term in terms):
         raise MonsterAIStateError(f"a utility term is not finite: {terms!r}")
     if min(finishing, cost, waste) < 0:
@@ -196,6 +211,7 @@ def attack_utility(
         * (
             _weight(weights, "kill") * finishing
             + _weight(weights, "control") * control
+            + _weight(weights, "focus") * focus
             - _weight(weights, "cost") * cost
             - _weight(weights, "waste") * waste
         )
@@ -255,6 +271,13 @@ def score_candidates(
     pool = decision_pool(snapshot, actor, roster, context)
     hostiles = hostile_domain(snapshot, pool)
     target_ranks = _target_ranks(snapshot, hostiles, profile.target_strategy)
+    if threat_is_valued(profile.target_strategy):
+        target_ranks = _threat_weighted_ranks(
+            snapshot, pool, hostiles, target_ranks
+        )
+    focus = observed_focus(
+        snapshot, hostiles=tuple(stable_identity(entity) for entity in hostiles)
+    )
     skill_ranks = _skill_ranks(snapshot, supported, profile.skill_choice)
     shape_ranks = _shape_ranks(
         snapshot,
@@ -271,6 +294,7 @@ def score_candidates(
             target_ranks=target_ranks,
             skill_ranks=skill_ranks,
             shape_ranks=shape_ranks,
+            focus=focus,
         )
         for candidate, estimate in supported
     )
@@ -285,8 +309,9 @@ def _score(
     target_ranks: Mapping[str, float],
     skill_ranks: Mapping[str, float],
     shape_ranks: Mapping[CandidateIdentity, float],
+    focus: Mapping[str, float],
 ) -> ScoredCandidate:
-    """Return one candidate's score from the three ranks and the estimate."""
+    """Return one candidate's score from the three ranks, the estimate and focus."""
     target = _plan_target_rank(estimate, target_ranks)
     preference = (
         target
@@ -294,10 +319,12 @@ def _score(
         + shape_ranks[candidate.identity]
     ) / 3.0
     damage = estimate.damage.value
+    observed = focus_for_plan(estimate, focus)
     score = attack_utility(
         damage=damage,
         healing=estimate.healing.value,
         control=estimate.control.value,
+        focus=observed,
         preference=preference,
         finishing=estimate.finishing,
         cost=estimate.cost,
@@ -311,6 +338,7 @@ def _score(
         damage=damage,
         healing=estimate.healing.value,
         control=estimate.control.value,
+        focus=observed,
         preference=preference,
         finishing=estimate.finishing,
         cost=estimate.cost,
@@ -336,6 +364,63 @@ def _target_ranks(
             )
         metrics[identity] = target_metric(participant, strategy)
     return normalized_ranks(metrics, higher_is_better=higher_is_better)
+
+
+def _threat_weighted_ranks(
+    snapshot: DecisionSnapshot,
+    pool: Sequence[Any],
+    hostiles: Sequence[Any],
+    static_ranks: Mapping[str, float],
+) -> dict[str, float]:
+    """Return a threat-valuing profile's target ranks over its opponents.
+
+    The existing ``highest_effective_power`` strategy is the one that opts in:
+    every applicable opponent's static rank is averaged with its rank under the
+    threat its own settled outcomes published against this side. A decision
+    whose opponents published no positive threat at all keeps the static rank
+    alone, so an empty history never moves a preference, and no other strategy
+    reaches here at all -- ``lowest_hp`` keeps its legacy metric ordering.
+    """
+    allies = group_members(KIND_FRIENDLY, snapshot, pool)
+    threat = observed_threat(
+        snapshot,
+        hostiles=tuple(stable_identity(entity) for entity in hostiles),
+        allies=tuple(stable_identity(entity) for entity in allies),
+        friendly_capacity=_faction_capacity(snapshot, allies),
+        hostile_capacity=_faction_capacity(snapshot, hostiles),
+    )
+    if not any(value > 0.0 for value in threat.values()):
+        return dict(static_ranks)
+    threat_ranks = normalized_ranks(threat, higher_is_better=True)
+    return {
+        identity: (rank + threat_ranks[identity]) / 2.0
+        for identity, rank in static_ranks.items()
+    }
+
+
+def _faction_capacity(
+    snapshot: DecisionSnapshot, members: Sequence[Any]
+) -> float:
+    """Return one eligible faction's live maximum-health sum, floored at one.
+
+    The same capacity convention the effect estimator normalizes a control
+    mount's attack and defense value with: the eligible live members' *maximum*
+    health, never their remaining current health, and floored at one so a
+    degenerate side can never divide a threat into an unbounded number.
+    """
+    total = 0.0
+    for entity in members:
+        identity = stable_identity(entity)
+        participant = snapshot.participant(identity)
+        if participant is None:
+            raise MonsterAIStateError(
+                f"an eligible faction member is missing from the decision "
+                f"snapshot: {identity}"
+            )
+        total += _projected_max_hp(participant)
+    if not isfinite(total):
+        raise MonsterAIStateError(f"a faction capacity is not finite: {total!r}")
+    return max(total, 1.0)
 
 
 def target_metric(participant: ParticipantSnapshot, strategy: str) -> float:

@@ -96,12 +96,35 @@ MONSTER_BEHAVIOUR_YAML = _load_rulebook(
 #: also enumerates owned healing, buff and control skills, projects the
 #: actor's own health payment and the marginal value of every mount it would
 #: apply, and scores recovery as a baseline term beside an intelligence-scaled
-#: control term.
-AI_ALGORITHM_VERSION = 4
+#: control term. Version 5 is the observed-coordination slice: a decision now
+#: also scores the eligible settled history's observed allied pressure as an
+#: intelligence-scaled focus term and lets the threat-valuing target strategy
+#: average each opponent's static rank with its observed-threat rank.
+AI_ALGORITHM_VERSION = 5
 
 #: The authored candidate-budget bounds (attack design section 4).
 MIN_CANDIDATE_BUDGET = 1
 MAX_CANDIDATE_BUDGET = 4096
+
+#: The version of the bounded event-age decay the observed-coordination slice
+#: scores with. It is part of the tuning fingerprint, so a change to that
+#: arithmetic invalidates every recorded fingerprint instead of silently
+#: changing what an identical resolved tuning decides.
+THREAT_DECAY_VERSION = 1
+
+#: The bounded per-round age weights of that decay, newest first: inside the
+#: observation window a one-round-old fact still counts for half of its
+#: observed impact and a two-round-old fact for a quarter. Declared here, with
+#: the other tuning leaves, because the fingerprint covers them and
+#: :mod:`world.rules.monster_ai.coordination` -- which projects with them --
+#: belongs to the package that reads this module's tuning.
+THREAT_DECAY_STEPS: tuple[float, ...] = (1.0, 0.5, 0.25)
+
+#: The coordination window in actual rounds: the session observation ring's own
+#: retention (``world.rules.combat_session.observations.MAX_RETAINED_ROUNDS``).
+#: ``test_monster_ai_coordination`` pins the two equal so the declarations
+#: cannot drift apart.
+OBSERVATION_WINDOW_ROUNDS = 3
 
 
 class DecisionMode(StrEnum):
@@ -536,6 +559,25 @@ def _estimation_rules_payload() -> dict[str, Any]:
     }
 
 
+def _coordination_rules_payload() -> dict[str, Any]:
+    """Return the observed-coordination constants a fingerprint must cover.
+
+    A decision's observed focus and threat are projected with the coordination
+    module's named, versioned age decay: the same resolved tuning and the same
+    settled history decide differently when that arithmetic or its version
+    changes, so both are carried here rather than by name. They are declared
+    beside the other tuning leaves of this module because the coordination
+    module belongs to the package this module's tuning feeds: a call-time
+    import of that package would close the cycle back through this module's
+    own startup tuning.
+    """
+    return {
+        "decay_version": THREAT_DECAY_VERSION,
+        "decay_steps": list(THREAT_DECAY_STEPS),
+        "window_rounds": OBSERVATION_WINDOW_ROUNDS,
+    }
+
+
 def _tuning_fingerprint(
     *,
     candidate_budget: int,
@@ -556,12 +598,14 @@ def _tuning_fingerprint(
     inputs this process consumes today (design section 5): the archetype
     decision leaves, the tier defaults, the referenced variant bindings, and --
     since the effect-estimation slice landed -- the shared combat rulebook
-    leaves every estimate averages over.
+    leaves every estimate averages over, plus the observed-coordination decay
+    and window constants the focus and threat projections are defined by.
     """
     payload = {
         "algorithm_version": AI_ALGORITHM_VERSION,
         "candidate_budget": candidate_budget,
         "estimation_rules": _estimation_rules_payload(),
+        "coordination_rules": _coordination_rules_payload(),
         "tier_default_archetype": dict(sorted(defaults.items())),
         "archetypes": {
             key: {
@@ -1216,6 +1260,7 @@ def _utility_action(
         DecisionTrace,
         trace_exclusions,
         trace_omissions,
+        trace_observations,
         trace_plan,
         trace_rejections,
         trace_scope,
@@ -1316,6 +1361,7 @@ def _utility_action(
         omitted_families=0 if candidates is None else candidates.omitted_families,
         omitted_targets=0 if candidates is None else candidates.omitted_targets,
         exhausted=False if candidates is None else candidates.exhausted,
+        observations=trace_observations(snapshot),
         plans=tuple(trace_plan(item) for item in scored),
         selected=None if chosen is None else trace_plan(chosen),
     )
