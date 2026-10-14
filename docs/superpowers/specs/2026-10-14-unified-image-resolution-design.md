@@ -1,7 +1,7 @@
 # Unified Image Resolution and Missing-Image Presentation
 
 **Date:** 2026-10-14
-**Status:** Design approved in conversation; written specification awaiting user review.
+**Status:** Written specification approved by the user; OpenSpec proposal handoff explicitly authorized.
 **Scope:** Shared artwork resolution, complete built-in scene artwork, room-specific official scenes, and consistent expected-missing and unexpected-failure presentation.
 
 This document records the approved design. It does not claim that the implementation or new artwork exists. Implementation proceeds through project OpenSpec changes after the written specification and implementation plan are reviewed.
@@ -295,4 +295,4 @@ This is one cross-surface policy design. The implementation plan may split depen
 
 The feature is complete only when the eleven actual scene artworks, per-room official resolution, all production consumers, fault visibility, and the acceptance evidence are delivered. A shared component without migrated callers, a type registry without artwork, or a silent fallback that hides failures is not completion.
 
-This documentation commit adds this specification and amends the architecture source. It does not add runtime code, images, OpenSpec proposals, or an implementation plan. The next gate is user review of the written specification; after approval, invoke `writing-plans` to prepare the implementation plan.
+The written specification was reviewed and approved by the user. The user explicitly requested OpenSpec proposals, each strictly below eight engineer-hours, with focused test commands in tasks.md. The repository `openspec-propose` workflow replaces the unavailable `writing-plans` step for this handoff. The proposals contain planning artifacts only; implementation requires a separate OpenSpec apply request.
