@@ -154,6 +154,10 @@ PREVIOUS_MANIFEST_KEYS = {
     # big windows from the obsidian-gold wave.
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
+    # The shared small-avatar renderer joined with unified-avatar-rendering
+    # (roster/presence/party/participant avatars, grapheme initial, compact
+    # failure explanation).
+    "Core/AvatarArtwork",
     # The gallery image contract added the shared descriptor preview position
     # (unified-gallery-image-contract).
     "Core/ArtworkPreview",

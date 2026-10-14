@@ -17,6 +17,7 @@ the transition writes real records through ``world/art/gallery.py``.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from evennia import Command, CmdSet
@@ -100,7 +101,6 @@ def seed_portrait_companions(character) -> list[str]:
 
     from typeclasses.npcs import LLMNPC
     from world.rules.party import join_party
-    from world.rules.traits import trait_config_for_values
     from world.art.subjects import character_subject_for
 
     location = character.location
@@ -108,6 +108,16 @@ def seed_portrait_companions(character) -> list[str]:
         return []
 
     from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+
+    # A living companion's mechanical baseline: the race baseline supplies the
+    # stored HP gauge the party and combat readers require, which only an
+    # initialized trait configuration provides. The synthetic install registers
+    # the kit race alone, so the baseline key follows the boot mode.
+    companion_race = (
+        "t_duskmari"
+        if os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS") == "1"
+        else "human"
+    )
 
     seeded: list[str] = []
     for index, key in enumerate((PORTRAIT_COMPANION_KEY, PORTRAIT_FOCUS_KEY)):
@@ -119,10 +129,8 @@ def seed_portrait_companions(character) -> list[str]:
         # are missing or malformed, so a seeded companion must carry them.
         npc.db.age = 30
         npc.db.apparent_age = 30
-        # A living companion's mechanical baseline: the party and combat
-        # readers require the stored HP gauge, which only an initialized trait
-        # configuration supplies.
-        npc._apply_trait_config(trait_config_for_values({}))
+        npc.race = companion_race
+        npc.apply_race_baseline()
         join_party(npc, character)
         # The committed card is written under the subject PRESENTATION derives
         # from the policy's stable key, not under the object identity: a card

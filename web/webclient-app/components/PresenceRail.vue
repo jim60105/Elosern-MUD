@@ -2,8 +2,8 @@
 // PresenceRail (exploration-presence-rail; scene overview redesign §4.1): who
 // and what is in the room, on the stage floor, right-aligned and inset left
 // of the right-hand island column, mirroring the player standee on the left.
-// Interact targets are gold medallions (the portrait's face crop through the
-// existing face-rect data, else the name's first character), present
+// Interact targets are gold medallions (the shared avatar renderer's real
+// portrait crop, else the name's first grapheme), present
 // entities without an interact descriptor are dashed muted medallions, and
 // objects follow a thin separator as steel lozenges. Each entry has a name
 // plate. At most six slots show; beyond six the sixth is `＋N`.
@@ -16,7 +16,7 @@
 // entry does (open the verb card or the overflow card, or submit a look).
 // An empty room renders no element at all.
 import { computed, nextTick, ref, useId, watch } from "vue";
-import ReferenceArtwork from "./ReferenceArtwork.vue";
+import AvatarArtwork from "./AvatarArtwork.vue";
 import { portraitFor } from "./party-helpers.js";
 import { railReadout, railSlots } from "./presence-rail.js";
 
@@ -74,8 +74,12 @@ function portrait(slot) {
   return portraitFor(props.artPanel, slot.portraitRef);
 }
 
-function initial(slot) {
-  return Array.from(String(slot.label || ""))[0] || "？";
+// The id the entry's own focusable/active-descendant node references for the
+// medallion's compact failure explanation (see AvatarArtwork): the rail is a
+// single-tab-stop composite, so the medallion never nests a second focusable
+// control.
+function failureTextId(index) {
+  return `${slotId(index)}-failure`;
 }
 
 function readout(index) {
@@ -212,6 +216,7 @@ defineExpose({ focus, focusEntry });
           role="option"
           :aria-selected="item.index === activeIndex ? 'true' : 'false'"
           :aria-label="item.slot.presence === 'more' ? `其餘 ${item.slot.count} 項` : item.slot.label"
+          :aria-describedby="failureTextId(item.index)"
           data-testid="presence-entry"
           :data-entry-key="item.slot.key"
           :data-presence="item.slot.presence"
@@ -230,15 +235,18 @@ defineExpose({ focus, focusEntry });
             v-else
             class="presence-rail__medal"
             :class="{ 'presence-rail__medal--dashed': item.slot.presence === 'bystander' }"
-            aria-hidden="true"
           >
-            <ReferenceArtwork
-              avatar
+            <!-- The medallion itself is decorative, but its compact failure
+                 explanation must stay in the accessibility tree: the entry
+                 references it through `aria-describedby`, so it cannot sit in
+                 an `aria-hidden` subtree. Every painted child here is itself
+                 `aria-hidden`, so this exposes only that bounded sentence. -->
+            <AvatarArtwork
               :artwork="portrait(item.slot)"
               :panel="artPanel"
               :has-reference="item.slot.portraitRef !== null && item.slot.portraitRef !== undefined"
               :name="item.slot.label"
-              :initial-of="initial(item.slot)"
+              :failure-text-id="failureTextId(item.index)"
               face-test-id="presence-entry-face"
               initial-test-id="presence-entry-initial"
             />
@@ -317,9 +325,9 @@ defineExpose({ focus, focusEntry });
     border-color var(--motion-fast) var(--ease-standard);
 }
 
-/* The shared figure renderer fills the medallion; its avatar position anchors
-   the face-rect zoom against this same clip. */
-.presence-rail__medal .reference-artwork {
+/* The shared avatar renderer fills the medallion; its bound zoom anchors the
+   face-rect crop against this same clip. */
+.presence-rail__medal .avatar-artwork {
   position: absolute;
   inset: 0;
 }
@@ -331,7 +339,7 @@ defineExpose({ focus, focusEntry });
   background: radial-gradient(circle at 40% 35%, #2a2722, #121110);
 }
 
-.presence-rail__medal--dashed .reference-artwork__figure {
+.presence-rail__medal--dashed .avatar-artwork__figure {
   filter: saturate(0.55) brightness(0.85);
 }
 

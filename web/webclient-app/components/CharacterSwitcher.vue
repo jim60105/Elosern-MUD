@@ -1,6 +1,6 @@
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import ReferenceArtwork from "./ReferenceArtwork.vue";
+import { computed, nextTick, onMounted, onUnmounted, ref, useId, watch } from "vue";
+import AvatarArtwork from "./AvatarArtwork.vue";
 
 // CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui):
 // Mounted in TopBar.vue's top-right cluster beside the meta pill.
@@ -9,11 +9,17 @@ import ReferenceArtwork from "./ReferenceArtwork.vue";
 // and trailing confirmation-gated create-character control.
 // Closes only on Escape, outside pointer activation, or committed epoch change.
 //
-// Every thumbnail is the shared figure renderer's avatar position over the
-// row's complete canonical roster descriptor: the real-only load lifecycle
-// (never the alpha terminal), the successful candidate's own face-rect zoom
-// crop, the identity glyph as the only fallback, and the shared persistent
-// failure marker instead of a silently missing image.
+// Every thumbnail is the shared avatar renderer over the row's complete
+// canonical roster descriptor: the real-only load lifecycle (never the alpha
+// terminal), the successful candidate's own face-rect zoom crop, the identity
+// glyph as the only fallback, and the compact failure explanation instead of a
+// silently missing image.
+//
+// The thumbnails live INSIDE this surface's own buttons (the collapsed pill
+// and each roster row), so the avatar never nests a focusable marker: the pill
+// and every row name their thumbnail's explanation through `aria-describedby`,
+// and the ids are unique per rendered position (pill vs row) under this
+// component's `useId()` prefix.
 const props = defineProps({
   available: { type: Boolean, default: false },
   characters: { type: Array, default: () => [] },
@@ -38,6 +44,14 @@ const switcherRef = ref(null);
 const triggerRef = ref(null);
 const cancelBtnRef = ref(null);
 const confirmSubmitRef = ref(null);
+const idPrefix = useId();
+
+// The one id per rendered avatar position: the collapsed pill's thumbnail and
+// the matching roster row are rendered at once while the popover is open, so a
+// shared identity alone would collide.
+function failureTextId(position) {
+  return `${idPrefix}-${position}-failure`;
+}
 
 const currentCharacter = computed(() => {
   if (!Array.isArray(props.characters)) return null;
@@ -149,15 +163,16 @@ onUnmounted(() => {
       :aria-expanded="expanded ? 'true' : 'false'"
       aria-haspopup="dialog"
       :aria-controls="expanded ? 'character-switcher-popover' : undefined"
+      :aria-describedby="failureTextId('pill')"
       @click="toggleExpanded"
     >
       <span class="character-switcher__thumb-wrapper">
-        <ReferenceArtwork
-          avatar
+        <AvatarArtwork
           :artwork="currentCharacter.portrait"
           :panel="panel"
           :name="currentCharacter.name"
           :initial-of="currentCharacter.name"
+          :failure-text-id="failureTextId('pill')"
         />
       </span>
       <span
@@ -201,15 +216,16 @@ onUnmounted(() => {
             :data-testid="`character-row-${char.identity}`"
             :disabled="char.current || switchLocked || locked"
             :aria-current="char.current ? 'true' : undefined"
+            :aria-describedby="failureTextId(`row-${char.identity}`)"
             @click="selectCharacter(char.identity)"
           >
             <span class="character-switcher__row-thumb-wrapper">
-              <ReferenceArtwork
-                avatar
+              <AvatarArtwork
                 :artwork="char.portrait"
                 :panel="panel"
                 :name="char.name"
                 :initial-of="char.name"
+                :failure-text-id="failureTextId(`row-${char.identity}`)"
               />
             </span>
             <span class="character-switcher__row-name" :title="char.name">
@@ -343,9 +359,9 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* The shared figure renderer fills the clipping wrapper; its avatar position
-   anchors a bound zoom against this same frame. */
-.character-switcher__thumb-wrapper .reference-artwork {
+/* The shared avatar renderer fills the clipping wrapper; its bound zoom
+   anchors against this same frame. */
+.character-switcher__thumb-wrapper .avatar-artwork {
   position: absolute;
   inset: 0;
 }
@@ -448,7 +464,7 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-.character-switcher__row-thumb-wrapper .reference-artwork {
+.character-switcher__row-thumb-wrapper .avatar-artwork {
   position: absolute;
   inset: 0;
 }

@@ -110,7 +110,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     expect(trigger.attributes("aria-expanded")).toBe("false");
     expect(trigger.attributes("aria-haspopup")).toBe("dialog");
     expect(wrapper.get('[data-testid="character-switcher-name"]').text()).toBe("艾莉亞");
-    const img = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
+    const img = wrapper.get(".character-switcher__thumb-wrapper img.avatar-artwork__figure");
     expect(img.attributes("src")).toBe("/art/portraits/char_1.webp");
     // The avatar position is decorative: the row's own name plate names the character.
     expect(img.attributes("alt")).toBe("");
@@ -122,13 +122,13 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     });
     // Rect {x: 0.3, y: 0.1, w: 0.4, h: 0.4}: a 2.5x enlargement anchored at
     // -x * 2.5 and -y * 2.5, so the marked face fills the 22/24px frame.
-    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
+    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.avatar-artwork__figure");
     expect(thumb.element.style.width).toBe("250%");
     expect(thumb.element.style.height).toBe("250%");
     expect(thumb.element.style.left).toBe("-75%");
     expect(thumb.element.style.top).toBe("-25%");
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
-    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.reference-artwork__figure");
+    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.avatar-artwork__figure");
     expect(rowThumb.element.style.width).toBe("250%");
     expect(rowThumb.element.style.height).toBe("250%");
     expect(rowThumb.element.style.left).toBe("-75%");
@@ -166,14 +166,14 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     });
     // The class rule supplies width/height: 100%; the inline style carries no
     // zoom property at all, so the frame renders today's centered crop.
-    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
+    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.avatar-artwork__figure");
     expect(thumb.element.style.objectPosition).toBe("50% 50%");
     expect(thumb.element.style.width).toBe("");
     expect(thumb.element.style.height).toBe("");
     expect(thumb.element.style.left).toBe("");
     expect(thumb.element.style.top).toBe("");
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
-    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.reference-artwork__figure");
+    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.avatar-artwork__figure");
     expect(rowThumb.element.style.objectPosition).toBe("50% 50%");
     expect(rowThumb.element.style.width).toBe("");
     expect(rowThumb.element.style.left).toBe("");
@@ -186,7 +186,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
       props: { available: true, panel: PANEL, characters: SAMPLE_CHARACTERS },
     });
     expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper").element).position).toBe("relative");
-    expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure").element).position).toBe("absolute");
+    expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper img.avatar-artwork__figure").element).position).toBe("absolute");
   });
 
   it("collapsed pill uses placeholder when current character has no url", () => {
@@ -212,7 +212,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     // The glyph is the identity's first grapheme, never a copied label.
     const firstName = Array.from(chars[0].name)[0];
     expect(
-      wrapper.get(".character-switcher__thumb-wrapper .reference-artwork__avatar-glyph").text(),
+      wrapper.get(".character-switcher__thumb-wrapper .avatar-artwork__initial").text(),
     ).toBe(firstName);
     expect(
       wrapper.find(".character-switcher__thumb-wrapper [data-testid='artwork-failure']").exists(),

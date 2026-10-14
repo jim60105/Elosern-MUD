@@ -84,7 +84,7 @@ describe("participant frame portrait positions", () => {
       ...PANEL,
       portrait_catalog: { portrait_mei: entry("portrait_mei", "/art/mei.png") },
     });
-    const image = wrapper.get("img.reference-artwork__figure");
+    const image = wrapper.get("img.avatar-artwork__figure");
     expect(image.attributes("src")).toBe("/art/mei.png");
     // The combat row keeps its recenters-only cover crop (never the small
     // thumbnail's zoom enlargement).
@@ -101,7 +101,7 @@ describe("participant frame portrait positions", () => {
     // No real candidate: the identity glyph stands, and the descriptor's
     // terminal is NOT requested (a silhouette is not an avatar).
     expect(wrapper.find("img").exists()).toBe(false);
-    expect(wrapper.findAll(".reference-artwork__avatar-glyph").map((g) => g.text())).toContain(
+    expect(wrapper.findAll(".avatar-artwork__initial").map((g) => g.text())).toContain(
       "小",
     );
     expect(wrapper.find('[data-testid="artwork-alpha"]').exists()).toBe(false);

@@ -155,10 +155,10 @@ describe("ParticipantFrame (task 6.9)", () => {
 
   it("keeps the glyph identity compact for a row with no real candidate", async () => {
     const w = mountFrame(participants, artPanel);
-    expect(w.get("img.reference-artwork__figure").attributes("src")).toBe("/static/art/mei.png");
+    expect(w.get("img.avatar-artwork__figure").attributes("src")).toBe("/static/art/mei.png");
     // The row with no real candidate draws the identity glyph, with no local
     // failure marker (an unfinished generation is expected, not broken).
-    const glyphs = w.findAll(".reference-artwork__avatar-glyph").map((g) => g.text());
+    const glyphs = w.findAll(".avatar-artwork__initial").map((g) => g.text());
     expect(glyphs).toContain("哥");
     expect(w.findAll('[data-testid="artwork-failure"]')).toHaveLength(0);
     expect(w.findAll(".participant-frame__token")[2].text()).toBe("哥布林");
@@ -247,7 +247,7 @@ describe("ParticipantFrame (task 6.9)", () => {
   it("offsets the resolved portrait crop by the catalog face rect", () => {
     const w = mountFrame(participants, artPanel);
     // 小美 resolves portrait_mei, whose rect centers at (50%, 31%).
-    const mei = w.findAll("img.reference-artwork__figure")[0];
+    const mei = w.findAll("img.avatar-artwork__figure")[0];
     expect(mei.element.style.objectPosition).toBe("50% 31%");
   });
 
@@ -268,7 +268,7 @@ describe("ParticipantFrame (task 6.9)", () => {
       },
     };
     const w = mountFrame(foeFramed, foePanel);
-    const img = w.get("img.reference-artwork__figure");
+    const img = w.get("img.avatar-artwork__figure");
     expect(img.element.style.objectPosition).toBe("55% 32%");
   });
 });

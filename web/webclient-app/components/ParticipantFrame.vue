@@ -2,13 +2,13 @@
 // Display-only, server-ordered combat identities. Playback substitutes only
 // the HP numerator addressed by the participant's catalog reference.
 //
-// Each row's portrait is the shared figure renderer's avatar position over the
-// canonical descriptor the participant's committed catalog reference names:
-// the real-only load lifecycle, the successful candidate's own face-rect crop,
-// the identity glyph as the only fallback and the shared persistent failure
-// marker — so a reached load failure is never a silently missing row.
+// Each row's portrait is the shared avatar renderer over the canonical
+// descriptor the participant's committed catalog reference names: the real-only
+// load lifecycle, the successful candidate's own face-rect crop, the identity
+// glyph as the only fallback and the compact keyboard-usable failure marker —
+// so a reached load failure is never a silently missing row.
 import { computed } from "vue";
-import ReferenceArtwork from "./ReferenceArtwork.vue";
+import AvatarArtwork from "./AvatarArtwork.vue";
 import { portraitFor as descriptorFor } from "./party-helpers.js";
 import { gaugeRatio } from "./vitals.js";
 
@@ -49,14 +49,13 @@ function portraitFor(p) {
           <span class="participant-frame__name" :title="p.display_name">{{ p.display_name }}</span>
           <span class="participant-frame__hp">{{ hpCurrent(p) }}/{{ p.hp_maximum }}</span>
           <span v-if="p.state !== 'active'" class="participant-frame__state">{{ STATE_MARKERS[p.state] || "未知狀態" }}</span>
-          <!-- The shared figure renderer's avatar position: the canonical
-               descriptor through the shared real-only load, the successful
-               candidate's own face-rect crop, the identity glyph as the only
-               fallback and the shared persistent failure marker. -->
-          <ReferenceArtwork
+          <!-- The shared avatar renderer: the canonical descriptor through the
+               shared real-only load, the successful candidate's own face-rect
+               crop, the identity glyph as the only fallback and the compact
+               keyboard-usable failure marker. -->
+          <AvatarArtwork
             class="participant-frame__portrait"
-            avatar
-            avatar-crop="recenter"
+            crop="recenter"
             :artwork="portraitFor(p)"
             :panel="artPanel"
             :has-reference="p.portrait_ref !== null && p.portrait_ref !== undefined"

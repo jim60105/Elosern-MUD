@@ -136,7 +136,7 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
       },
     };
     const w = mountDrawer({ artPanel });
-    const img = w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure');
+    const img = w.get('[data-testid="party-drawer__row-101"] img.avatar-artwork__figure');
     expect(img.element.style.width).toBe("500%");
     expect(img.element.style.height).toBe("500%");
     expect(img.element.style.left).toBe("-300%");
@@ -152,7 +152,7 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
       },
     };
     const w = mountDrawer({ artPanel });
-    const img = w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure');
+    const img = w.get('[data-testid="party-drawer__row-101"] img.avatar-artwork__figure');
     expect(img.element.style.objectPosition).toBe("50% 50%");
     expect(img.element.style.width).toBe("");
     expect(img.element.style.height).toBe("");
@@ -168,7 +168,7 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     expect(getComputedStyle(frame).position).toBe("relative");
     expect(
       getComputedStyle(
-        w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure').element,
+        w.get('[data-testid="party-drawer__row-101"] img.avatar-artwork__figure').element,
       ).position,
     ).toBe("absolute");
   });
@@ -186,7 +186,7 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     expect(avatar.find("img").exists()).toBe(false);
     // The identity glyph is the avatar's only fallback; an unfinished
     // generation is expected, so no failure marker stands.
-    expect(avatar.get(".reference-artwork__avatar-glyph").exists()).toBe(true);
+    expect(avatar.get(".avatar-artwork__initial").exists()).toBe(true);
     expect(avatar.find('[data-testid="artwork-failure"]').exists()).toBe(false);
   });
 
