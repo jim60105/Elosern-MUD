@@ -42,7 +42,7 @@ import LettersPanel from "./components/LettersPanel.vue";
 import DreamPanel from "./components/DreamPanel.vue";
 import ToastQueue from "./components/ToastQueue.vue";
 import CompanionLineup from "./components/CompanionLineup.vue";
-import { companionFigures } from "./components/companion-lineup.js";
+import { companionFigures, displayedLineup, lineupSlotByIdentity } from "./components/companion-lineup.js";
 import { portraitFor } from "./components/party-helpers.js";
 import PartyDrawer from "./components/PartyDrawer.vue";
 import ObjectiveTracker from "./components/ObjectiveTracker.vue";
@@ -111,26 +111,105 @@ const hostPortrait = computed(() => {
   const key = dialogueVM.value?.host.portraitRef;
   return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
 });
-const hostAlreadyInLineup = computed(() =>
-  !!dialogueVM.value && companionLineupSlots.value.some((slot) => String(slot.identity) === String(dialogueVM.value.host.identity)),
+// The speaking state (design D3): only a conversation with its host on the
+// stage dims anyone (a transiently unavailable panel leaves the player lit).
+const inDialogue = computed(() => store.view.mode === "dialogue");
+// The host's entrance and exit (webclient-mode-transitions D3) animate only
+// on a live mode change: at `off` there is no CSS phase (a CSS phase would
+// outlive the commit by a double frame even at 0s), and across a reconnect
+// (`modeHydrating`) the host appears and goes in the commit's frame.
+const hostTransitionCss = computed(
+  () => store.view.motionLevel !== "off" && !modeHydrating.value,
 );
+// The figures `actor-left` really draws (reuse-lineup-person-focus D1): the
+// bounded list `CompanionLineup` displays, so the actor-right join below
+// decides membership on what is rendered — never on raw `party.slots`, a
+// display name, a portrait key or art availability.
+const renderedLineup = computed(() => displayedLineup(companionLineupSlots.value));
 // The one figure in `actor-right` outside combat (exploration-presence-rail
 // design D3): the dialogue host while the conversation is on, else the
 // person in focus behind the verb card. Both are keyed by the same
 // server-authored identity, so the commit that turns 交談 into the dialogue
 // screen keeps the very same StageActor element on the stage — no leave,
 // no re-entry.
-const standee = computed(() => {
+const actorRightTarget = computed(() => {
   if (inDialogue.value && dialogueVM.value) {
-    return hostAlreadyInLineup.value
-      ? null
-      : { identity: dialogueVM.value.host.identity, name: dialogueVM.value.host.displayName, portrait: hostPortrait.value };
+    return { identity: dialogueVM.value.host.identity, name: dialogueVM.value.host.displayName, portrait: hostPortrait.value };
   }
   if (store.view.mode === "exploration" && personFocus.value && focusTarget.value) {
     return { identity: focusTarget.value.identity, name: focusTarget.value.display_name, portrait: focusPortrait.value };
   }
   return null;
 });
+// The exploration card target's rendered figure, or null (D1): exploration
+// mode, an open verbs card, and a target still committed to the room. All
+// three are committed state, so a target that leaves the room clears the
+// emphasis in that commit even while a locked settlement still holds the card
+// open (D3). The join normalizes identity only for the comparison and carries
+// no other evidence — a null portrait still matches, equal names never do.
+const explorationFocusFigure = computed(() =>
+  store.view.mode === "exploration" && personFocus.value && focusTarget.value
+    ? lineupSlotByIdentity(renderedLineup.value, focusTarget.value.identity)
+    : null,
+);
+// The actor-right identity's rendered figure, or null (D1): a person the
+// actor-left row already draws is represented once and gets no actor-right
+// copy. The dialogue host and the focused person share this one rule.
+const actorRightFigure = computed(() => {
+  if (inDialogue.value && dialogueVM.value) {
+    return lineupSlotByIdentity(renderedLineup.value, dialogueVM.value.host.identity);
+  }
+  return explorationFocusFigure.value;
+});
+const standee = computed(() => (actorRightFigure.value ? null : actorRightTarget.value));
+// The representation transfer must not leave a right-side copy behind (D1):
+// when the standee disappears because its identity is now drawn in the
+// actor-left lineup, that leave phase is skipped. Every other entrance and
+// exit — a non-lineup target's card closing, a departure — keeps the ordinary
+// CSS phase, and `off`/hydrating keep it off as before.
+const standeeTransitionCss = computed(() => hostTransitionCss.value && !actorRightFigure.value);
+// The exploration emphasis identity (D2): the selected rendered NON-controlled
+// slot's own identity, handed to the existing companion speaking signal so that
+// one figure goes lit with z above every baseline. The controlled front is
+// never a listener, so it never supplies this value and keeps its baseline z,
+// its independent dim and its beat gestures.
+const explorationSpeakingIdentity = computed(() => {
+  const figure = explorationFocusFigure.value;
+  return figure && !figure.isControlled ? figure.identity : null;
+});
+// The dialogue emphasis is unchanged (design D3): the committed host while the
+// conversation is on and the host is the one speaking. Dialogue and
+// exploration are exclusive modes, so one prop carries both.
+const dialogueSpeakingIdentity = computed(() =>
+  inDialogue.value && dialogueVM.value && store.view.dialogueSpeaker === "host"
+    ? panel("dialogue")?.host?.identity ?? null
+    : null,
+);
+const companionSpeakingIdentity = computed(() => dialogueSpeakingIdentity.value ?? explorationSpeakingIdentity.value);
+// Vue keeps a leaving stage actor until its CSS phase ends and cannot cancel a
+// started leave without a re-entering child, and the lineup's own slots use no
+// transition, so a copy still leaving when its identity becomes drawn in the
+// lineup would paint a second figure of the represented person (D1). A
+// transfer therefore finishes exactly that copy: the stage actor carries the
+// identity it was drawn for, and only a leaving copy of the now-represented
+// identity is removed. Vue's own leave completion stays a no-op on the
+// detached element, and an unrelated in-flight leave is untouched.
+watch(
+  () => actorRightFigure.value?.identity ?? null,
+  (identity) => {
+    if (identity === null) {
+      return;
+    }
+    document
+      .querySelectorAll('[data-testid="anchor-actor-right"] [data-testid="stage-actor"][data-identity]')
+      .forEach((el) => {
+        if (el.getAttribute("data-identity") === String(identity)) {
+          el.remove();
+        }
+      });
+  },
+  { flush: "post" },
+);
 const isControllingCompanion = computed(() => !!possessionBanner.value?.available);
 const companionLineupSlots = computed(() => companionFigures({
   player: {
@@ -157,16 +236,6 @@ const playerDisplayHp = computed(() => {
   const value = displayed[identity];
   return typeof value === "number" ? value : null;
 });
-// The speaking state (design D3): only a conversation with its host on the
-// stage dims anyone (a transiently unavailable panel leaves the player lit).
-const inDialogue = computed(() => store.view.mode === "dialogue");
-// The host's entrance and exit (webclient-mode-transitions D3) animate only
-// on a live mode change: at `off` there is no CSS phase (a CSS phase would
-// outlive the commit by a double frame even at 0s), and across a reconnect
-// (`modeHydrating`) the host appears and goes in the commit's frame.
-const hostTransitionCss = computed(
-  () => store.view.motionLevel !== "off" && !modeHydrating.value,
-);
 // The foe line-up (webclient-combat-foes-on-stage D1/D3): the committed
 // combat panel's active foes, in presenter order, stand in `actor-right`
 // while the mode is combat. It enters and leaves on the same live-only rule
@@ -329,7 +398,7 @@ function onFoeLineupGone() {
             v-if="store.view.mode !== 'creation'"
             :slots="companionLineupSlots"
             :compact="inDialogue"
-            :speaking-identity="inDialogue && dialogueVM && store.view.dialogueSpeaker === 'host' ? panel('dialogue')?.host?.identity : null"
+            :speaking-identity="companionSpeakingIdentity"
             :dimmed="inDialogue && !!dialogueVM && store.view.dialogueSpeaker === 'host'"
             :motion-level="store.view.motionLevel"
             :gesture="playerGesture?.gesture ?? null"
@@ -337,18 +406,25 @@ function onFoeLineupGone() {
             :float-amount="playerGesture?.amount ?? null"
           />
         </template>
-        <!-- The dialogue host's standing portrait (webclient-dialogue-stage-
-             actors D2): only while the mode is dialogue and the committed
-             panel is available; empty in every other state. -->
+        <!-- The opposite side of the stage (webclient-dialogue-stage-actors
+             D2 stands the dialogue host here; exploration-presence-rail D3
+             the person in focus). -->
         <template #actor-right>
-          <!-- The host enters from the right and leaves to it
+          <!-- The one non-combat standee (the dialogue host, else the person
+               in focus) enters from the right and leaves to it
                (webclient-mode-transitions D3), keyed by identity so a new
                host during a session hands over; a new portrait for the same
-               host is StageActor's own crossfade. -->
-          <Transition name="actor-enter" :css="hostTransitionCss" v-bind="inertWhileLeaving">
+               host is StageActor's own crossfade. A person the actor-left
+               lineup already draws stands there instead, so this anchor is
+               empty and the transfer skips its leave phase rather than
+               leaving a right-side copy behind (reuse-lineup-person-focus
+               D1) — the inert rule below still covers every other leaving
+               copy. -->
+          <Transition name="actor-enter" :css="standeeTransitionCss" v-bind="inertWhileLeaving">
             <StageActor
               v-if="standee"
               :key="standee.identity"
+              :data-identity="standee.identity"
               side="right"
               :portrait="standee.portrait"
               :name="standee.name"
