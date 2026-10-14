@@ -26,6 +26,8 @@ import unittest
 
 from PIL import Image
 
+from tools.spec_traceability import covers_requirement
+
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCENES_DIRECTORY = REPO_ROOT / "web/static/art/scenes"
 
@@ -181,6 +183,9 @@ def _load_provenance(key: str, directory: Path) -> dict:
 
 
 class BundledTerminalSceneArtContractTests(unittest.TestCase):
+    @covers_requirement(
+        "bundled-terminal-scene-art::forest-and-town-terminals-have-their-own-real-distributable-art"
+    )
     def test_every_owned_scene_decodes_within_the_admission_limits(self):
         """Each shipped file decodes to a bounded, full-bleed 16:9 landscape."""
         checksums = {}
@@ -206,6 +211,9 @@ class BundledTerminalSceneArtContractTests(unittest.TestCase):
             "file committed under several names",
         )
 
+    @covers_requirement(
+        "bundled-terminal-scene-art::forest-and-town-terminals-have-their-own-real-distributable-art"
+    )
     def test_provenance_matches_the_shipped_bytes_and_licenses_distribution(self):
         """Every sidecar records real source/terms and the actual file bytes."""
         for key in OWNED_SCENE_KEYS:

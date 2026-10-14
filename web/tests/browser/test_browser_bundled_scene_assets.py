@@ -241,6 +241,9 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         """Every committed sacred scene serves and decodes as its own image."""
         self._assert_pack_static_decode(SACRED_SCENE_ASSETS)
 
+    @covers_requirement(
+        "bundled-terminal-scene-art::forest-and-town-terminals-have-their-own-real-distributable-art",
+    )
     def test_terminal_pack_static_decode(self):
         """Every committed terminal scene serves and decodes as its own image."""
         self._assert_pack_static_decode(TERMINAL_SCENE_ASSETS)
