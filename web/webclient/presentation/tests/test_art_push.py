@@ -411,6 +411,18 @@ class ArtPushPresenterTests(EvenniaTestCase):
             entry for entry in panel["interact"] if entry["identity"] == int(identity)
         )
 
+    def _interact_row(self, panel, identity):
+        return next(
+            entry for entry in panel["interact"] if entry["identity"] == int(identity)
+        )
+
+    def _look_row(self, panel, identity):
+        return next(
+            entry
+            for entry in panel["look"]["entities"]
+            if entry["identity"] == int(identity)
+        )
+
     def _first_update(self, session):
         updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
         self.assertEqual(len(updates), 1)
@@ -634,16 +646,26 @@ class ArtPushPresenterTests(EvenniaTestCase):
         catalog and the exploration panel together at exactly one newer
         revision, with the descriptor naming the admitted image.
         """
-        ally = self._named_entity("合成的同伴", "synthetic-ally")
+        # An NPC with a named policy is BOTH an interact target and a look
+        # entity, so this test asserts the shared reference on both descriptor
+        # paths — the presenter emits them from one memoized resolution.
+        ally = create_object(NPC, key="合成的同伴", location=self.room)
+        ally.db.portrait_policy = {"mode": "named", "stable_key": "synthetic-ally"}
+        ensure_npc_canonical_age(ally)
+        ally.save()
         ally_key = ArtSubject(ArtSubjectKind.CHARACTER, "synthetic-ally").full()
         session = self._make_session()
         context = build_presentation_context(session, self.player)
         before = session.ndb.elosern_coordinator.full_snapshot(context)
 
-        ally_row = self._exploration_row(before["panels"]["exploration"], ally.pk)
+        panel_before = before["panels"]["exploration"]
         self.assertIsNone(
-            ally_row["portrait_ref"],
-            "an unfinished portrait leaves the descriptor at the truthful null",
+            self._interact_row(panel_before, ally.pk)["portrait_ref"],
+            "an unfinished portrait leaves the target descriptor at the truthful null",
+        )
+        self.assertIsNone(
+            self._look_row(panel_before, ally.pk)["portrait_ref"],
+            "an unfinished portrait leaves the entity descriptor at the truthful null",
         )
         self.assertIsNone(
             before["panels"]["art"]["portrait_catalog"][str(ally.pk)]["url"]
@@ -669,9 +691,14 @@ class ArtPushPresenterTests(EvenniaTestCase):
             panels["art"]["portrait_catalog"][catalog_key]["url"], f"/art/{identity}"
         )
         self.assertEqual(
-            self._exploration_row(panels["exploration"], ally.pk)["portrait_ref"],
+            self._interact_row(panels["exploration"], ally.pk)["portrait_ref"],
             catalog_key,
-            "the descriptor now names the current catalog image",
+            "the target descriptor now names the current catalog image",
+        )
+        self.assertEqual(
+            self._look_row(panels["exploration"], ally.pk)["portrait_ref"],
+            catalog_key,
+            "both descriptor paths carry the same server-authored key",
         )
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")

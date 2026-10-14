@@ -3,6 +3,21 @@ import PresenceRail from "../../components/PresenceRail.vue";
 import { ART_PANEL_SAMPLE } from "../fixtures.js";
 import { AFFORDANCES, explorationPanelFixture, presenceArgs } from "../fixtures/scene_overview.js";
 
+// The story's face-crop entry. Storybook serves `web/static` only (the built-in
+// fallbacks under `/art/defaults/`), so the SHARED sample's portrait-store URL
+// would 404 in the showcase and the medallion would silently fall back to the
+// initial. The story therefore re-points the entry at a served committed
+// bitmap: it pins the medallion's RENDERING, never the producer's URL.
+const STORY_FACE = {
+  ...ART_PANEL_SAMPLE.portrait_catalog["101"],
+  url: "/art/defaults/man.webp",
+};
+
+const STORY_ART = {
+  ...ART_PANEL_SAMPLE,
+  portrait_catalog: { ...ART_PANEL_SAMPLE.portrait_catalog, 101: STORY_FACE },
+};
+
 // PresenceRail: who and what is in the room, on the stage floor
 // (exploration-presence-rail; scene overview redesign §4.1). Gold medallions
 // for interact targets (the face crop, else the first character), dashed
@@ -65,7 +80,7 @@ const HALL = explorationPanelFixture({
 // asserted in the component tests, not by a static story.
 export const Default = {
   render,
-  args: presenceArgs(HALL, { artPanel: ART_PANEL_SAMPLE }),
+  args: presenceArgs(HALL, { artPanel: STORY_ART }),
 };
 
 // Seven entries: five slots and `＋2`, which opens the overflow card.
