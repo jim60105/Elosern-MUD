@@ -2,8 +2,9 @@
 
 Requests the committed ``/static/art/scenes/<key>.webp`` illustrations — the
 outdoor pack (``unified-scenes-outdoor-art``), the interior pack
-(``unified-scenes-interior-art``) and the sacred pack
-(``unified-scenes-sacred-art``) — through the running application's own
+(``unified-scenes-interior-art``), the sacred pack
+(``unified-scenes-sacred-art``) and the terminal pack
+(``unified-scenes-terminal-art``) — through the running application's own
 static-media boundary, with no operator artwork root and no generation
 service, and decodes each one in a real browser at the 1451x790 desktop
 reference viewport under cover cropping.
@@ -51,6 +52,14 @@ SACRED_SCENE_ASSETS = (
     "web/static/art/scenes/cave_interior.webp",
     "web/static/art/scenes/shrine_interior.webp",
     "web/static/art/scenes/dream_throne.webp",
+)
+
+# The two committed terminal illustrations, addressed by full repository path
+# for the same gate reason as the packs above; the keys are pinned by
+# world/art/tests/test_bundled_terminal_art.py.
+TERMINAL_SCENE_ASSETS = (
+    "web/static/art/scenes/forest_path.webp",
+    "web/static/art/scenes/city_street.webp",
 )
 
 # The repository path prefix that the served ``/static/`` root strips.
@@ -231,6 +240,10 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
     def test_sacred_pack_static_decode(self):
         """Every committed sacred scene serves and decodes as its own image."""
         self._assert_pack_static_decode(SACRED_SCENE_ASSETS)
+
+    def test_terminal_pack_static_decode(self):
+        """Every committed terminal scene serves and decodes as its own image."""
+        self._assert_pack_static_decode(TERMINAL_SCENE_ASSETS)
 
 
 if __name__ == "__main__":

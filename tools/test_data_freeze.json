@@ -13,6 +13,10 @@
       "reason": "bundled scene distribution and decode contract"
     },
     {
+      "path": "world/art/tests/test_bundled_terminal_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
       "path": "web/webclient/presentation/tests/test_lore_codex_registry_contract.py",
       "reason": "every registered lore entry is representable by the codex panel"
     },
