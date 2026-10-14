@@ -10,6 +10,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
+import { artworkDescriptor, artworkResource } from "../../stories/fixtures/art_panels.js";
 import {
   FOE_EXPOSED,
   FOE_LINEUP_MAX,
@@ -22,15 +23,40 @@ import {
 
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
+// One committed catalog value: the canonical descriptor plus its context.
 function entry(ref, extra = {}) {
   return {
-    subject_key: `npc_${ref}`,
-    status: "done",
-    url: `/art/portraits/npc_${ref}.webp`,
-    aspect_ratio: "3:4",
-    alt: "肖像",
-    placeholder: null,
-    face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+    artwork: artworkDescriptor({
+      subject_id: `npc_${ref}`,
+      generation_subject: `npc_${ref}`,
+      attempts: [
+        {
+          type: "image",
+          source_id: `portrait.default:${ref}`,
+          rank: 30,
+          resource: artworkResource({
+            resource_id: `portrait/character/npc_${ref}.webp`,
+            version: `npc-${ref}`.padEnd(64, "0"),
+            url: `/art/portraits/npc_${ref}.webp`,
+          }),
+        },
+      ],
+    }),
+    context: { name: "敵人", role: "敵方" },
+    ...extra,
+  };
+}
+
+// The same value with no real candidate and no terminal.
+function pendingEntry(ref, extra = {}) {
+  return {
+    artwork: artworkDescriptor({
+      subject_id: `npc_${ref}`,
+      generation_subject: `npc_${ref}`,
+      generation_state: "pending",
+      attempts: [],
+      terminal: null,
+    }),
     context: { name: "敵人", role: "敵方" },
     ...extra,
   };
@@ -51,7 +77,7 @@ function foe(identity, extra = {}) {
 }
 
 const ART = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   kind: "scene",
   scene: null,
@@ -86,12 +112,7 @@ describe("FoeLineup", () => {
   });
 
   it("resolves each foe only through the committed catalog", () => {
-    const pending = entry(2, {
-      status: "pending",
-      url: null,
-      face_rect: null,
-      placeholder: { kind: "missing", label: "肖像生成中" },
-    });
+    const pending = pendingEntry(2);
     wrapper = mount(FoeLineup, {
       props: {
         foes: [foe(1), foe(2), foe(9, { display_name: "蒙面刺客" })],
@@ -104,11 +125,14 @@ describe("FoeLineup", () => {
     expect(card.find("img").exists()).toBe(false);
     expect(card.get(".reference-artwork__placeholder-label").text()).toBe("肖像生成中");
     expect(card.get(".reference-artwork__placeholder-glyph").text()).toBe("敵");
-    // A reference with no entry: the name's initial and the name.
+    // An ADMITTED reference the committed catalog does not carry is a local
+    // failure, not an absence: the name's initial and the shared unavailable
+    // form stand, with the persistent local marker.
     expect(missing.find("img").exists()).toBe(false);
     expect(missing.attributes("data-portrait-ref")).toBe("9");
     expect(missing.get(".reference-artwork__placeholder-glyph").text()).toBe("蒙");
-    expect(missing.get("figcaption").text()).toBe("蒙面刺客，無肖像");
+    expect(missing.get("figcaption").text()).toBe("蒙面刺客，無法提供");
+    expect(missing.get('[data-testid="artwork-failure"]').exists()).toBe(true);
   });
 
   it("shows the name placeholder for a null reference and builds no URL", () => {
@@ -206,7 +230,10 @@ describe("FoeLineup", () => {
 
     it("resolves current entry before held entry and retains pre-round foe artwork", () => {
       const heldEntry = entry(99);
-      heldEntry.url = "/art/portraits/held_foe.webp";
+      heldEntry.artwork.attempts[0].resource = {
+        ...heldEntry.artwork.attempts[0].resource,
+        url: "/art/portraits/held_foe.webp",
+      };
       const foe99 = foe(99, { display_name: "殘留敵手" });
       wrapper = mount(FoeLineup, {
         props: {

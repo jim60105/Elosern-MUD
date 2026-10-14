@@ -1,6 +1,41 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import CharacterSwitcher from "../../components/CharacterSwitcher.vue";
+import {
+  artworkDescriptor,
+  artworkResource,
+} from "../../stories/fixtures/art_panels.js";
+
+// The committed roster panel every thumbnail is judged against.
+const PANEL = { schema_version: 3, available: true };
+
+// One row portrait: the complete canonical descriptor.
+function portraitFor(identity, overrides = {}) {
+  return artworkDescriptor({
+    subject_id: `portrait:character:${identity}`,
+    generation_subject: `portrait:character:${identity}`,
+    attempts: [
+      {
+        type: "image",
+        source_id: `portrait.default:${identity}`,
+        rank: 30,
+        resource: artworkResource({
+          resource_id: `portrait/character/char_${identity}.webp`,
+          version: `char-${identity}`.padEnd(64, "0"),
+          url: `/art/portraits/char_${identity}.webp`,
+          // The avatar zoom crop: a 0.4 x 0.4 rectangle is a 2.5x enlargement.
+          geometry: {
+            image_size: null,
+            face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+            stage: { scale: 1, x: 0, y: 0 },
+            aspect_ratio: "3/4",
+          },
+        }),
+      },
+    ],
+    ...overrides,
+  });
+}
 
 describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
   let wrapper;
@@ -16,92 +51,83 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
       name: "艾莉亞",
       current: true,
       pending: false,
-      portrait: {
-        subject_key: "char_1",
-        status: "done",
-        url: "/art/portraits/char_1.webp",
-        aspect_ratio: "3/4",
-        alt: "艾莉亞的肖像",
-        placeholder: null,
-        face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
-      },
+      portrait: portraitFor(1),
     },
     {
       identity: 2,
       name: "雷恩",
       current: false,
       pending: false,
-      portrait: {
-        subject_key: "char_2",
-        status: "pending",
-        url: null,
-        aspect_ratio: "3/4",
-        alt: "雷恩的肖像",
-        placeholder: { kind: "generating", label: "肖像生成中" },
-      },
+      // A pending generation with no real candidate and no terminal.
+      portrait: portraitFor(2, {
+        generation_state: "pending",
+        attempts: [],
+        terminal: null,
+      }),
     },
     {
       identity: 3,
       name: "新冒險者",
       current: false,
       pending: true,
-      portrait: {
-        subject_key: null,
-        status: "missing",
-        url: null,
-        aspect_ratio: "3/4",
-        alt: "新冒險者的肖像",
-        placeholder: { kind: "silhouette", label: "未建立" },
-      },
+      // A creation-pending shell: the EMPTY canonical descriptor.
+      portrait: artworkDescriptor({
+        subject_id: "3",
+        generation_subject: null,
+        generation_state: null,
+        attempts: [],
+        terminal: null,
+      }),
     },
   ];
 
   it("renders nothing when the roster is unavailable, empty, or has no current character", () => {
     wrapper = mount(CharacterSwitcher, {
-      props: { available: false, characters: SAMPLE_CHARACTERS },
+      props: { available: false, panel: PANEL, characters: SAMPLE_CHARACTERS, panel: PANEL },
     });
     expect(wrapper.find('[data-testid="character-switcher"]').exists()).toBe(false);
 
     wrapper.unmount();
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: [] },
+      props: { available: true, panel: PANEL, characters: [], panel: PANEL },
     });
     expect(wrapper.find('[data-testid="character-switcher"]').exists()).toBe(false);
 
     wrapper.unmount();
     const noCurrent = SAMPLE_CHARACTERS.map((c) => ({ ...c, current: false }));
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: noCurrent },
+      props: { available: true, panel: PANEL, characters: noCurrent, panel: PANEL },
     });
     expect(wrapper.find('[data-testid="character-switcher"]').exists()).toBe(false);
   });
 
   it("collapsed pill reads the current row's name and portrait thumbnail", () => {
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: SAMPLE_CHARACTERS },
+      props: { available: true, panel: PANEL, characters: SAMPLE_CHARACTERS },
     });
     const trigger = wrapper.get('[data-testid="character-switcher-trigger"]');
     expect(trigger.attributes("aria-expanded")).toBe("false");
     expect(trigger.attributes("aria-haspopup")).toBe("dialog");
     expect(wrapper.get('[data-testid="character-switcher-name"]').text()).toBe("艾莉亞");
-    const img = wrapper.get(".character-switcher__thumb");
+    const img = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
     expect(img.attributes("src")).toBe("/art/portraits/char_1.webp");
-    expect(img.attributes("alt")).toBe("艾莉亞的肖像");
+    // The avatar position is decorative: the row's own name plate names the character.
+    expect(img.attributes("alt")).toBe("");
   });
 
   it("zoom-crops portrait thumbnails to the payload face rect in both thumbnails", async () => {
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: SAMPLE_CHARACTERS },
+      props: { available: true, panel: PANEL, characters: SAMPLE_CHARACTERS },
     });
     // Rect {x: 0.3, y: 0.1, w: 0.4, h: 0.4}: a 2.5x enlargement anchored at
     // -x * 2.5 and -y * 2.5, so the marked face fills the 22/24px frame.
-    const thumb = wrapper.get("img.character-switcher__thumb");
+    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
     expect(thumb.element.style.width).toBe("250%");
     expect(thumb.element.style.height).toBe("250%");
     expect(thumb.element.style.left).toBe("-75%");
     expect(thumb.element.style.top).toBe("-25%");
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
-    const rowThumb = wrapper.get("img.character-switcher__row-thumb");
+    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.reference-artwork__figure");
     expect(rowThumb.element.style.width).toBe("250%");
     expect(rowThumb.element.style.height).toBe("250%");
     expect(rowThumb.element.style.left).toBe("-75%");
@@ -112,22 +138,41 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     const chars = [
       {
         ...SAMPLE_CHARACTERS[0],
-        portrait: { ...SAMPLE_CHARACTERS[0].portrait, face_rect: null },
+        portrait: portraitFor(1, {
+          attempts: [
+            {
+              type: "image",
+              source_id: "portrait.default:1",
+              rank: 30,
+              resource: artworkResource({
+                resource_id: "portrait/character/char_1.webp",
+                version: "char-1".padEnd(64, "0"),
+                url: "/art/portraits/char_1.webp",
+                geometry: {
+                  image_size: null,
+                  face_rect: null,
+                  stage: { scale: 1, x: 0, y: 0 },
+                  aspect_ratio: "3/4",
+                },
+              }),
+            },
+          ],
+        }),
       },
     ];
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: chars },
+      props: { available: true, panel: PANEL, characters: chars },
     });
     // The class rule supplies width/height: 100%; the inline style carries no
     // zoom property at all, so the frame renders today's centered crop.
-    const thumb = wrapper.get("img.character-switcher__thumb");
+    const thumb = wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure");
     expect(thumb.element.style.objectPosition).toBe("50% 50%");
     expect(thumb.element.style.width).toBe("");
     expect(thumb.element.style.height).toBe("");
     expect(thumb.element.style.left).toBe("");
     expect(thumb.element.style.top).toBe("");
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
-    const rowThumb = wrapper.get("img.character-switcher__row-thumb");
+    const rowThumb = wrapper.get(".character-switcher__row-thumb-wrapper img.reference-artwork__figure");
     expect(rowThumb.element.style.objectPosition).toBe("50% 50%");
     expect(rowThumb.element.style.width).toBe("");
     expect(rowThumb.element.style.left).toBe("");
@@ -137,10 +182,10 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     // The CSS one-liners are load-bearing: without the relative frame the
     // absolute image would resolve its offsets against a further ancestor.
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: SAMPLE_CHARACTERS },
+      props: { available: true, panel: PANEL, characters: SAMPLE_CHARACTERS },
     });
     expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper").element).position).toBe("relative");
-    expect(getComputedStyle(wrapper.get("img.character-switcher__thumb").element).position).toBe("absolute");
+    expect(getComputedStyle(wrapper.get(".character-switcher__thumb-wrapper img.reference-artwork__figure").element).position).toBe("absolute");
   });
 
   it("collapsed pill uses placeholder when current character has no url", () => {
@@ -150,26 +195,30 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
         name: "雷恩",
         current: true,
         pending: false,
-        portrait: {
-          subject_key: "char_2",
-          status: "pending",
-          url: null,
-          aspect_ratio: "3/4",
-          alt: "雷恩的肖像",
-          placeholder: { kind: "generating", label: "生成中" },
-        },
+        portrait: portraitFor(2, {
+          generation_state: "pending",
+          attempts: [],
+          terminal: null,
+        }),
       },
     ];
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: chars },
+      props: { available: true, panel: PANEL, characters: chars },
     });
     expect(wrapper.get('[data-testid="character-switcher-name"]').text()).toBe("雷恩");
-    expect(wrapper.get('[data-testid="character-switcher-placeholder"]').text()).toBe("生成中");
+    // No real candidate: the avatar position draws the identity glyph and
+    // carries no failure marker (an unfinished generation is expected).
+    expect(
+      wrapper.get(".character-switcher__thumb-wrapper .reference-artwork__avatar-glyph").text(),
+    ).toBe("雷");
+    expect(
+      wrapper.find(".character-switcher__thumb-wrapper [data-testid='artwork-failure']").exists(),
+    ).toBe(false);
   });
 
   it("expanded popover lists roster rows in payload order with the current one selected and non-activatable", async () => {
     wrapper = mount(CharacterSwitcher, {
-      props: { available: true, characters: SAMPLE_CHARACTERS, canCreate: true },
+      props: { available: true, panel: PANEL, characters: SAMPLE_CHARACTERS, canCreate: true },
     });
     // Click to expand
     await wrapper.get('[data-testid="character-switcher-trigger"]').trigger("click");
@@ -260,7 +309,13 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
       name: "第四名角色",
       current: false,
       pending: false,
-      portrait: null,
+      portrait: artworkDescriptor({
+        subject_id: "9",
+        generation_subject: null,
+        generation_state: null,
+        attempts: [],
+        terminal: null,
+      }),
     }];
     await wrapper.setProps({ characters: updatedChars });
     expect(wrapper.find('[data-testid="character-switcher-popover"]').exists()).toBe(true);

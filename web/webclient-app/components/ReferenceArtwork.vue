@@ -119,15 +119,26 @@ const failureReason = computed(() => (
 ));
 const state = computed(() => {
   if (realImage.value) return "done";
+  // A reached browser fault is the local fact that wins: the player is owed
+  // the explanation even while a lower source is still being tried.
+  if (
+    failure.value?.reason === "image_load_failed" ||
+    failure.value?.reason === "image_decode_failed"
+  ) {
+    return "load-failed";
+  }
   if (panelUnavailable.value) return "unavailable";
-  if (failure.value?.reason === "image_load_failed") return "load-failed";
-  if (failure.value?.reason === "image_decode_failed") return "load-failed";
+  // A recorded ``done`` generation whose resource is still in flight is a
+  // done portrait, not a missing one: the caption never claims an absence the
+  // descriptor contradicts.
+  if (loading.value && props.artwork?.generation_state === "done") return "done";
   const generation = props.artwork?.generation_state ?? null;
   if (generation === "pending") return "pending";
   if (generation === "failed") return "failed";
   return "missing";
 });
 const STATE_LABELS = {
+  done: "",
   pending: "肖像生成中",
   failed: "肖像生成失敗",
   "load-failed": "肖像載入失敗",

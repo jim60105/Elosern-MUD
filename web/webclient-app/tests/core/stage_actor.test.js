@@ -6,26 +6,39 @@
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import StageActor from "../../components/StageActor.vue";
+import {
+  artworkDescriptor,
+  artworkResource,
+} from "../../stories/fixtures/art_panels.js";
 
-const HOST_ENTRY = {
-  subject_key: "npc_41",
-  status: "done",
-  url: "/art/portraits/npc_41.webp",
-  aspect_ratio: "3:4",
-  alt: "灰婆婆的肖像",
-  placeholder: null,
-  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-  context: { name: "灰婆婆", role: "對話對象" },
-};
+// The committed art panel every figure position is judged against.
+const PANEL = { schema_version: 3, available: true };
 
-const PENDING_ENTRY = {
-  ...HOST_ENTRY,
-  status: "pending",
-  url: null,
-  aspect_ratio: null,
-  face_rect: null,
-  placeholder: { kind: "missing", label: "肖像圖像尚未生成" },
-};
+const HOST_ENTRY = artworkDescriptor({
+  subject_id: "npc_41",
+  generation_subject: "npc_41",
+  generation_state: "done",
+  attempts: [
+    {
+      type: "image",
+      source_id: "portrait.default:41",
+      rank: 30,
+      resource: artworkResource({
+        resource_id: "portrait/character/npc_41.webp",
+        url: "/art/portraits/npc_41.webp",
+      }),
+    },
+  ],
+});
+
+// No real candidate and no terminal: the truthful no-portrait row.
+const PENDING_ENTRY = artworkDescriptor({
+  subject_id: "npc_41",
+  generation_subject: "npc_41",
+  generation_state: "pending",
+  attempts: [],
+  terminal: null,
+});
 
 describe("StageActor", () => {
   let wrapper;
@@ -35,7 +48,7 @@ describe("StageActor", () => {
   });
 
   it("preserves the supplied image and accessible actor identity", () => {
-    wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "灰婆婆", side: "right" } });
+    wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right" } });
     const root = wrapper.get('[data-testid="stage-actor"]');
     expect(root.attributes("data-side")).toBe("right");
     const img = wrapper.get('[data-testid="reference-artwork"] img');
@@ -45,7 +58,7 @@ describe("StageActor", () => {
   });
 
   it("states pending availability separately from actor identity", () => {
-    wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY, name: "灰婆婆", side: "right" } });
+    wrapper = mount(StageActor, { props: { artwork: PENDING_ENTRY, panel: PANEL, name: "灰婆婆", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     const card = wrapper.get('[data-testid="reference-artwork__placeholder"]');
     expect(wrapper.get("figure").attributes("data-status")).toBe("pending");
@@ -54,13 +67,15 @@ describe("StageActor", () => {
     expect(card.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
   });
 
-  it("uses the catalog identity when no explicit name is known", () => {
-    wrapper = mount(StageActor, { props: { portrait: PENDING_ENTRY } });
+  it("draws the catalog identity's initial", () => {
+    // The joiners always carry the entity's display identity: the figure never
+    // invents one from the descriptor.
+    wrapper = mount(StageActor, { props: { artwork: PENDING_ENTRY, panel: PANEL, name: "灰婆婆" } });
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("灰");
   });
 
   it("draws the name's initial and the name when no entry exists", () => {
-    wrapper = mount(StageActor, { props: { portrait: null, name: "合成‧旅人", side: "right" } });
+    wrapper = mount(StageActor, { props: { artwork: null, panel: PANEL, hasReference: false, name: "合成‧旅人", side: "right" } });
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("合");
     expect(wrapper.get("figcaption").text()).toBe("合成‧旅人，無肖像");
@@ -68,18 +83,18 @@ describe("StageActor", () => {
   });
 
   it("keeps the whole astral-plane initial of a name", () => {
-    wrapper = mount(StageActor, { props: { portrait: null, name: "𠮟婆婆" } });
+    wrapper = mount(StageActor, { props: { artwork: null, panel: PANEL, hasReference: false, name: "𠮟婆婆" } });
     expect(wrapper.get(".reference-artwork__placeholder-glyph").text()).toBe("𠮟");
   });
 
   it("does not promise generation without an entry or identity", () => {
-    wrapper = mount(StageActor, { props: { portrait: null } });
+    wrapper = mount(StageActor, { props: { artwork: null, panel: PANEL, hasReference: false } });
     expect(wrapper.get("figure").attributes("data-status")).toBe("missing");
     expect(wrapper.get("figcaption").text()).toBe("無肖像");
   });
 
   it("exposes the speaking state and dims the listener through the shared token", async () => {
-    wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, side: "left", dimmed: false } });
+    wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, side: "left", dimmed: false } });
     const root = wrapper.get('[data-testid="stage-actor"]');
     expect(root.attributes("data-speaking")).toBe("true");
     await wrapper.setProps({ dimmed: true });
@@ -88,42 +103,66 @@ describe("StageActor", () => {
   });
 
   it("carries no focusable element", () => {
-    wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "灰婆婆" } });
+    wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆" } });
     expect(wrapper.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
   });
 
   it("keeps missing, pending and failed authoritative across motion changes", async () => {
-    wrapper = mount(StageActor, { props: { name: "旅人", motionLevel: "full" } });
+    wrapper = mount(StageActor, {
+      props: { artwork: null, panel: PANEL, hasReference: false, name: "旅人", motionLevel: "full" },
+    });
     const state = () => wrapper.get("figure").attributes("data-status");
     expect(state()).toBe("missing");
-    await wrapper.setProps({ portrait: PENDING_ENTRY });
+    await wrapper.setProps({ artwork: PENDING_ENTRY });
     expect(state()).toBe("pending");
     for (const motionLevel of ["reduced", "off", "full"]) {
       await wrapper.setProps({ motionLevel });
       expect(state()).toBe("pending");
       expect(wrapper.get("figcaption").text()).toBe("旅人，肖像生成中");
     }
-    await wrapper.setProps({ portrait: { ...PENDING_ENTRY, status: "failed" } });
+    await wrapper.setProps({ artwork: { ...PENDING_ENTRY, generation_state: "failed" } });
     expect(state()).toBe("failed");
     expect(wrapper.get("figcaption").text()).toBe("旅人，肖像生成失敗");
   });
 
   it("reports a failed image without promising generation and recovers on a new URL", async () => {
-    wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, name: "旅人" } });
+    wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, name: "旅人" } });
     await wrapper.get("img").trigger("error");
-    expect(wrapper.find("img").exists()).toBe(false);
+    // The failed candidate is stepped past: the descriptor's own terminal
+    // becomes the presented resource, while the reached fault keeps its local
+    // load-failure state.
+    expect(wrapper.get("img").attributes("src")).toBe("/art/defaults/man.webp");
     expect(wrapper.get("figure").attributes("data-status")).toBe("load-failed");
     expect(wrapper.get("figcaption").text()).toBe("旅人，肖像載入失敗");
-    await wrapper.setProps({ portrait: { ...HOST_ENTRY, url: "/art/repaired.webp" } });
+    await wrapper.setProps({
+      artwork: {
+        ...HOST_ENTRY,
+        attempts: [
+          {
+            ...HOST_ENTRY.attempts[0],
+            resource: artworkResource({
+              resource_id: "portrait/character/repaired.webp",
+              version: "repaired-version".padEnd(64, "0"),
+              url: "/art/repaired.webp",
+            }),
+          },
+        ],
+      },
+    });
     expect(wrapper.get("img").attributes("src")).toBe("/art/repaired.webp");
     expect(wrapper.get("figure").attributes("data-status")).toBe("done");
   });
 
   it("preserves a degraded catalog's authoritative unavailable reason", () => {
-    wrapper = mount(StageActor, { props: {
-      name: "旅人",
-      portrait: { status: null, url: null, placeholder: { kind: "unavailable", label: "無法提供" } },
-    } });
+    // A required panel that is unavailable is its own availability fact, never
+    // a generation claim: the figure states the shared unavailable form.
+    wrapper = mount(StageActor, {
+      props: {
+        name: "旅人",
+        artwork: null,
+        panel: { schema_version: 3, available: false, reason: { code: "art_unavailable" } },
+      },
+    });
     expect(wrapper.get("figure").attributes("data-status")).toBe("unavailable");
     expect(wrapper.get("figcaption").text()).toBe("旅人，無法提供");
     expect(wrapper.find("img").exists()).toBe(false);
@@ -134,7 +173,7 @@ describe("StageActor", () => {
     const beat = () => wrapper.get('[data-testid="stage-actor"] > .stage-actor__beat');
 
     it("renders the rest state with no gesture", () => {
-      wrapper = mount(StageActor, { props: { portrait: HOST_ENTRY, side: "right" } });
+      wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, side: "right" } });
       expect(beat().attributes("data-beat")).toBeUndefined();
       expect(wrapper.find('[data-testid="stage-actor-float"]').exists()).toBe(false);
       // The portrait still stands inside the wrapper.
@@ -143,7 +182,7 @@ describe("StageActor", () => {
 
     it("re-keys the gesture wrapper per step, so the same gesture restarts", async () => {
       wrapper = mount(StageActor, {
-        props: { portrait: HOST_ENTRY, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
+        props: { artwork: HOST_ENTRY, panel: PANEL, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
       });
       const first = beat().element;
       expect(beat().attributes("data-beat")).toBe("hit");
@@ -169,7 +208,7 @@ describe("StageActor", () => {
 
     it("raises a decorative damage number on a hit only", async () => {
       wrapper = mount(StageActor, {
-        props: { portrait: HOST_ENTRY, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
+        props: { artwork: HOST_ENTRY, panel: PANEL, side: "right", gesture: "hit", gestureKey: "s-1/1:1", floatAmount: 12 },
       });
       const float = wrapper.get('[data-testid="stage-actor-float"]');
       expect(float.text()).toBe("−12");
