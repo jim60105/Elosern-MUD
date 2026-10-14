@@ -418,7 +418,8 @@
         "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_bundled_namespace_and_operator_isolation",
         "web.tests.browser.test_browser_scene_media.SceneMediaBrowserTest.test_configured_root_failure_keeps_bundled_media",
         "web.tests.browser.test_browser_original_editors.OriginalEditorsBrowserTest.test_new_original_recovers_and_ruler_failure_is_local",
-        "web.tests.browser.test_browser_unified_figures.UnifiedFiguresBrowserTest.test_exploration_dialogue_combat_and_drawer_share_descriptor"
+        "web.tests.browser.test_browser_unified_figures.UnifiedFiguresBrowserTest.test_exploration_dialogue_combat_and_drawer_share_descriptor",
+        "web.tests.browser.test_browser_avatar_artwork.AvatarArtworkBrowserTest.test_roster_presence_party_participant_fallback_is_accessible"
       ]
     },
     {

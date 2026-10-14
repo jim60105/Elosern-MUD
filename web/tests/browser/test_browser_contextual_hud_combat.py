@@ -78,13 +78,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # per admitted row, and a null reference draws the identity glyph
         # instead (never a failure marker).
         imgs = frame.locator(
-            '[data-testid="reference-artwork"] img.reference-artwork__figure'
+            '[data-testid="avatar-artwork"] img.avatar-artwork__figure'
         )
         self.assertEqual(imgs.count(), 2, "resolvable portrait references render the catalog image")
         imgs.first.wait_for(state="attached", timeout=15000)
         page.wait_for_function(
             "() => Array.from(document.querySelectorAll("
-            "'[data-testid=\"participant-frame\"] img.reference-artwork__figure'))"
+            "'[data-testid=\"participant-frame\"] img.avatar-artwork__figure'))"
             ".every((img) => img.complete && img.naturalWidth > 0)",
             timeout=15000,
         )

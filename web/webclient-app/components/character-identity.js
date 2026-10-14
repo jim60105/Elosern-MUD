@@ -11,50 +11,45 @@ export function formatCopper(value) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-// The head card's portrait is a glyph, never an image: the first Unicode
-// grapheme of the display name (grapheme-correct for ZWJ/combining
-// sequences). An empty or absent name renders an empty tile rather than a
-// substitute character.
+// The neutral text symbol an empty (or whitespace-only) name renders in an
+// identity/avatar initial position (unified-avatar-rendering design: "a
+// neutral text symbol for an empty name"). An unidentified subject still gets
+// a bounded, non-blank tile.
+export const EMPTY_NAME_GLYPH = "？";
+
+// The first Unicode grapheme cluster of the trimmed displayed name — the ONE
+// shared text-initial helper for every avatar and identity placeholder
+// (unified-avatar-rendering design: "the first Unicode grapheme cluster of the
+// trimmed displayed name, with a neutral text symbol for an empty name").
+//
+// Grapheme clustering rides the standard `Intl.Segmenter` API at
+// `granularity: "grapheme"` and the locale-neutral `"und"` locale. The result
+// is always one complete grapheme cluster: a combining sequence, a ZWJ emoji
+// sequence, a regional-indicator flag, a skin-tone modifier or an astral
+// character stays whole, and an isolated surrogate is never emitted. The
+// helper never splits by code unit (`substring`/`slice`) or by code point
+// (`Array.from`).
+//
+// The target browser runtime always provides `Intl.Segmenter`. A runtime that
+// does not keeps whole code points only, which still never emits half a
+// surrogate pair (it cannot cluster a combining sequence there).
 export function portraitGlyph(name) {
-  if (name === null || name === undefined || name === "") {
-    return "";
+  const text = name === null || name === undefined ? "" : String(name).trim();
+  if (text === "") {
+    return EMPTY_NAME_GLYPH;
   }
-  const text = String(name);
   if (typeof Intl !== "undefined" && typeof Intl.Segmenter === "function") {
     try {
-      const segmenter = new Intl.Segmenter("zh-Hant", { granularity: "grapheme" });
+      const segmenter = new Intl.Segmenter("und", { granularity: "grapheme" });
       for (const { segment } of segmenter.segment(text)) {
         return segment;
       }
-      return "";
+      return EMPTY_NAME_GLYPH;
     } catch {
-      // Grapheme segmentation unavailable: fall back to the first code point.
+      // An implementation that refuses to construct: keep whole code points.
     }
   }
   const chars = [...text];
   const first = chars[0];
-  if (first === undefined) {
-    return "";
-  }
-  // Keep any extenders (variation selectors U+FE00–FE0F, ZWJ/U+200D,
-  // ZWNJ/U+200C, and combining marks) glued to the first code point, so
-  // ZWJ / combining / variation sequences stay one grapheme even without
-  // full ICU.
-  let glyph = first;
-  for (let i = 1; i < chars.length; i++) {
-    const cp = chars[i].codePointAt(0);
-    const isExtender =
-      (cp >= 0x300 && cp <= 0x36f) ||
-      cp === 0x200c ||
-      cp === 0x200d ||
-      (cp >= 0xfe00 && cp <= 0xfe0f) ||
-      (cp >= 0x1ab0 && cp <= 0x1ab9) ||
-      (cp >= 0x20d0 && cp <= 0x20f0);
-    if (isExtender) {
-      glyph += chars[i];
-    } else {
-      break;
-    }
-  }
-  return glyph;
+  return first === undefined ? EMPTY_NAME_GLYPH : first;
 }

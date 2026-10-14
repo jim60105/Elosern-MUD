@@ -4,15 +4,16 @@
 //
 // It consumes one canonical artwork descriptor through the shared ordered
 // attempt lifecycle (`useArtwork`) and owns no selector, no failed-URL cache
-// and no fallback policy of its own. Three positions read from that one state:
+// and no fallback policy of its own. Two FIGURE positions read from that one
+// state:
 //
-//   * stage  — the standing figure on the stage band: contain fit, floor
+//   * stage — the standing figure on the stage band: contain fit, floor
 //     aligned, the descriptor's own placement triple;
-//   * cover  — a framed portrait: the shared rect-driven cover crop;
-//   * avatar — the small real-only position (roster thumbnails, presence
-//     medallions, party rows, combat participant rows): the successful
-//     candidate's own face-rect zoom crop, and never the alpha terminal,
-//     because a silhouette is not an avatar.
+//   * cover — a framed portrait: the shared rect-driven cover crop.
+//
+// The small-avatar position is its own renderer (`AvatarArtwork.vue`, change
+// unified-avatar-rendering): a real-only avatar is a different presentation
+// with a different failure marker, not a figure layout.
 //
 // Both FIGURE layouts permit the descriptor's terminal alpha mask: when no
 // real portrait succeeds, the committed silhouette is painted by the shared
@@ -25,7 +26,7 @@ import { computed, onBeforeUnmount } from "vue";
 
 import ArtworkAlpha from "./ArtworkAlpha.vue";
 import ArtworkFailure from "./ArtworkFailure.vue";
-import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
+import { faceObjectPosition } from "./face-rect.js";
 import { portraitGlyph } from "./character-identity.js";
 import { artworkAvailability, artworkGeometry, artworkTerminalGeometry, artworkTerminalUrl } from "../lib/artwork.js";
 import { useArtwork } from "../composables/useArtwork.js";
@@ -49,21 +50,10 @@ const props = defineProps({
   initialOf: { type: String, default: "" },
   // The stage band layout (contain, floor aligned, the placement triple).
   stage: { type: Boolean, default: false },
-  // The small real-only avatar position.
-  avatar: { type: Boolean, default: false },
-  // The avatar position's own crop policy: "zoom" enlarges and anchors the
-  // marked rectangle (the small roster/party/presence thumbnails), "recenter"
-  // keeps the recenters-only cover crop the combat participant row uses.
-  avatarCrop: {
-    type: String,
-    default: "zoom",
-    validator: (value) => value === "zoom" || value === "recenter",
-  },
-  // The hooks the OWNING surface publishes for the avatar position: the
-  // loaded face image and the identity-glyph fallback. They name that
-  // surface's own frozen contract hooks while this one renderer owns the load.
+  // The hook the OWNING surface publishes for its figure position: the loaded
+  // face image. It names that surface's own frozen contract hook while this
+  // one renderer owns the load.
   faceTestId: { type: String, default: null },
-  initialTestId: { type: String, default: null },
   motionLevel: { type: String, default: "full" },
 });
 
@@ -74,13 +64,11 @@ const availability = computed(() => artworkAvailability({
   artwork: props.artwork,
   viewSubjectId: props.viewSubjectId,
 }));
-// The avatar position is a real-only consumer: its load request permits no
-// terminal image, because a silhouette is not an avatar. Both FIGURE layouts
-// take the descriptor's terminal.
+// Both FIGURE layouts take the descriptor's terminal: a figure's own committed
+// silhouette is a legitimate figure fallback.
 const { attempt, phase, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
   () => props.artwork,
   availability,
-  { terminal: !props.avatar },
 );
 
 // The terminal alpha resource, told apart from a real original by its own URL
@@ -109,11 +97,6 @@ const stageVars = computed(() => ({
 const placementStyle = computed(() => {
   if (props.stage) {
     return { objectPosition: "center bottom", ...stageVars.value };
-  }
-  if (props.avatar) {
-    return props.avatarCrop === "recenter"
-      ? { objectPosition: faceObjectPosition(faceRect.value) }
-      : faceCropStyle(faceRect.value, faceObjectPosition(faceRect.value));
   }
   return { objectPosition: faceObjectPosition(faceRect.value) };
 });
@@ -163,7 +146,7 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
 <template>
   <figure
     class="reference-artwork"
-    :class="{ 'reference-artwork--stage': stage, 'reference-artwork--avatar': avatar }"
+    :class="{ 'reference-artwork--stage': stage }"
     :data-status="stage ? state : null"
     :data-motion="stage ? motionLevel : null"
     data-testid="reference-artwork"
@@ -199,7 +182,7 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
     <!-- The framed layout takes the descriptor's terminal too: the committed
          silhouette paints once its own resource loaded, and the identity text
          always stands (a placeholder is never a bare rectangle). -->
-    <div v-else-if="!stage && !avatar && !realImage && !loading" class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
+    <div v-else-if="!stage && !realImage && !loading" class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
       <ArtworkAlpha v-if="alphaResult" :result="alphaResult" />
       <span class="reference-artwork__cover-text">
         <span class="reference-artwork__placeholder-glyph">{{ glyph }}</span>
@@ -207,11 +190,10 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
         <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
       </span>
     </div>
-    <span v-else-if="avatar && !realImage && !loading" class="reference-artwork__avatar-glyph" :data-testid="initialTestId ?? 'reference-artwork__placeholder'" aria-hidden="true">{{ glyph }}</span>
     <figcaption v-if="stage" class="reference-artwork__stage-caption">{{ name }}{{ name && stateLabel ? "，" : "" }}{{ stateLabel }}</figcaption>
     <!-- A framed portrait captions only a shown image; a placeholder's label
-         is already its one visible state line, and an avatar carries none. -->
-    <figcaption v-else-if="realImage && !avatar">{{ name || "角色肖像" }}</figcaption>
+         is already its one visible state line. -->
+    <figcaption v-else-if="realImage">{{ name || "角色肖像" }}</figcaption>
     <ArtworkFailure :kind="failureKind" :reason="failureReason" />
   </figure>
 </template>
@@ -343,24 +325,4 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
   :root:not([data-motion]) .reference-artwork--stage[data-status="pending"][data-motion="full"] .reference-artwork__silhouette { animation: none; }
 }
 
-/* The avatar position: a square real-only crop with the identity glyph as its
-   only fallback — no caption, no fade mask, no silhouette. */
-.reference-artwork--avatar {
-  width: 100%;
-  height: 100%;
-}
-.reference-artwork--avatar .reference-artwork__figure {
-  position: absolute;
-  top: 0;
-  mask-image: none;
-}
-.reference-artwork--avatar .reference-artwork__avatar-glyph {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-  color: var(--paper-300);
-  font-family: var(--f-serif, serif);
-  font-size: var(--text-sm);
-}
 </style>

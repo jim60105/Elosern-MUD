@@ -5,6 +5,7 @@
     "Core/PlaceCard",
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
+    "Core/AvatarArtwork",
     "Core/ArtworkFailure",
     "Core/ArtworkAlpha",
     "Core/ArtworkPreview",

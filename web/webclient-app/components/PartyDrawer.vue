@@ -1,13 +1,14 @@
 <script setup>
 // PartyDrawer (webclient-align-05-party-hud, design D1/D2/D3):
 // the 同伴 ‧ 隊伍 drawer body, mounted inside the shared HudDrawer chrome.
-// Renders the committed `party.slots` compbig rows with avatar initial fallback,
-// display name, bond stage line, HP bar + numerals, joined combat token,
+// Renders the committed `party.slots` compbig rows with the shared avatar
+// renderer's real-portrait-or-grapheme-initial fallback, display name, bond
+// stage line, HP bar + numerals, joined combat token,
 // 請其離隊 confirmation flow, an 空位 row with stage-name-word invite rule,
 // and the three fixed 跟隨規則 lines verbatim.
 import { computed, ref, watch } from "vue";
+import AvatarArtwork from "./AvatarArtwork.vue";
 import EmptyState from "./EmptyState.vue";
-import ReferenceArtwork from "./ReferenceArtwork.vue";
 import {
   buildCombatTokenMap,
   hpFillRatio,
@@ -248,12 +249,11 @@ function onInviteCurrentNpc() {
       :data-testid="`party-drawer__row-${slot.identity}`"
     >
       <div class="av" data-testid="party-drawer__avatar">
-        <!-- The shared figure renderer's avatar position: the canonical
-             descriptor through the shared real-only load, the successful
-             candidate's own face-rect zoom crop, the identity glyph as the
-             only fallback and the shared persistent failure marker. -->
-        <ReferenceArtwork
-          avatar
+        <!-- The shared avatar renderer: the canonical descriptor through the
+             shared real-only load, the successful candidate's own face-rect
+             zoom crop, the identity glyph as the only fallback and the compact
+             keyboard-usable failure marker. -->
+        <AvatarArtwork
           :artwork="portraitEntry(slot)"
           :panel="artPanel"
           :has-reference="slot.portrait_ref !== null && slot.portrait_ref !== undefined"
@@ -449,9 +449,9 @@ function onInviteCurrentNpc() {
   background: var(--ink-820);
 }
 
-/* The shared figure renderer fills the clipping frame; its avatar position
-   anchors a bound zoom against this same frame. */
-.compbig .av .reference-artwork {
+/* The shared avatar renderer fills the clipping frame; its bound zoom anchors
+   against this same frame. */
+.compbig .av .avatar-artwork {
   position: absolute;
   inset: 0;
 }

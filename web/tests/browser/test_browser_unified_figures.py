@@ -419,7 +419,7 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "combat")
         page.wait_for_selector(
-            '[data-testid="participant-frame"] [data-testid="reference-artwork"]',
+            '[data-testid="participant-frame"] [data-testid="avatar-artwork"]',
             timeout=15000,
         )
         self.assertEqual(
