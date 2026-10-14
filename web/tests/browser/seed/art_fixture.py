@@ -38,6 +38,7 @@ def _art_fixture(character, room) -> None:
 
     from web.browser_support.browser_fixtures_data import (
         SHIPPED_ART_ARCHETYPE,
+        SHIPPED_DIALOGUE_HOST_KEY,
         SHIPPED_DIALOGUE_KEY,
         SHIPPED_MONSTER_TIER_KEY,
         SHIPPED_MONSTER_TIER_ATTR,
@@ -58,6 +59,10 @@ def _art_fixture(character, room) -> None:
         GridRoom, key="art 合成場景" if synth else "art 酒館場景", nohome=True, location=None
     )
     art_room.scene_archetype = archetype
+    # Supported map construction always writes the logical place identity
+    # beside the archetype; only an authored identity authorizes retained
+    # scene content, so the fixture writes one exactly as the map owner does.
+    art_room.scene_identity = f"instance:art-fixture-{character.pk}"
     character.location = art_room
     character.db.portrait_policy = {
         "mode": "named",
@@ -68,7 +73,9 @@ def _art_fixture(character, room) -> None:
     from typeclasses.npcs import NPC, ensure_npc_canonical_age
 
     host = create_object(
-        NPC, key=SYNTH_DIALOGUE_HOST_KEY if synth else "酒館老闆", location=art_room
+        NPC,
+        key=SYNTH_DIALOGUE_HOST_KEY if synth else SHIPPED_DIALOGUE_HOST_KEY,
+        location=art_room,
     )
     from typeclasses.components import ScriptedDialogue
 
@@ -163,30 +170,36 @@ def _art_fixture(character, room) -> None:
                 output_identity=portrait_identity,
                 error=None,
             )
-    elif mode == "failed":
-        from world.art.queue import claim
+    elif mode in ("failed", "pending"):
+        # A regeneration of the SAME scene: the first output is published and
+        # then requeued, so the record keeps its prior valid output (and the
+        # descriptor therefore authorizes that still-applicable image) while
+        # the regeneration is pending or has failed. A pending/failed record
+        # with no preserved output would authorize nothing, which is exactly
+        # the case the descriptor states by omitting the source.
+        from world.art.queue import claim, record_key, requeue
 
-        claimed = claim(10)
+        identity = f"scene/{archetype}.png"
+        (root / identity).write_bytes(FIXTURE_VALID_PNG)
+        claimed = claim(50)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
         settle(
             scene,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.FAILED,
-            output_identity=None,
-            error="fixture",
+            generation_token=tokens[record_key(scene)],
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
         )
-    elif mode == "pending":
-        from world.art.queue import claim
-
-        claim(10)
-        pending = ArtSubject(ArtSubjectKind.SCENE, archetype)
-        ensure(pending, "desc")
-        record = __import__(
-            "world.art.queue", fromlist=["record_key"]
-        ).record_key(pending)
-        record_obj = __import__(
-            "world.art.store", fromlist=["ArtAssetRecord"]
-        ).ArtAssetRecord.objects.filter(db_key=record).first()
-        record_obj.db.status = ArtAssetStatus.PENDING
-        record_obj.save()
+        requeue(scene)
+        if mode == "failed":
+            claimed = claim(50)
+            tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
+            settle(
+                scene,
+                generation_token=tokens[record_key(scene)],
+                status=ArtAssetStatus.FAILED,
+                output_identity=None,
+                error="fixture",
+            )
     print(f"seeded art fixture: {mode}")
 

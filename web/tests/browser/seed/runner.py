@@ -21,6 +21,7 @@ from web.tests.browser.seed.image_editor_fixture import _image_editor_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
 from web.tests.browser.seed.npc_persona_fixture import _npc_persona_fixture
 from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
+from web.tests.browser.seed.scene_fixture import _scene_fixture
 from web.tests.browser.seed.services_fixture import _services_fixture
 from web.tests.browser.seed.titles_fixture import _titles_fixture
 
@@ -264,6 +265,10 @@ def main() -> None:
     _services_fixture(character)
 
     _art_fixture(character, room)
+    # The unified scene journeys need authored room metadata, real operator
+    # scene content and the family's bounded transition cmdset; an unset flag
+    # is a no-op, so this never affects the unrelated browser suites.
+    _scene_fixture(character)
     # The unified-image family's editor/portrait/scene/dream journeys each seed
     # their own real records only under their own flag; an unset flag is a
     # no-op, so this never affects the unrelated browser suites.

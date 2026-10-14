@@ -2,11 +2,14 @@
 
 Drives the real Evennia server's art panel through the Vue SPA scene
 renderer and contextual portrait overlay. The seed fixture (``ELOSERN_BROWSER_ART``)
-places the character in a validated scene room with a done/pending/failed scene
-record and a named-policy NPC plus a living monster. Journeys assert same-origin
-URL rendering, truthful placeholders, keyboard-only full view, portrait overlay
-with name/role context, client-local focus switching with no packet, no-focus
-no-card, combat results removing the catalog entry in the same update, and the
+places the character in a validated scene room carrying authored scene metadata
+with a generated record (done / a pending regeneration with its prior output
+preserved / a failed regeneration) and a named-policy NPC plus a living monster.
+Journeys assert the canonical descriptor's own facts, same-origin URL rendering,
+the required bundled fallback for an ungenerated scene, the reached failure of a
+failed regeneration, keyboard-only full view, portrait overlay with name/role
+context, client-local focus switching with no packet, no-focus no-card, combat
+results removing the catalog entry in the same update, and the
 subject-eligibility payload exclusion.
 """
 
@@ -37,7 +40,7 @@ from .seed import FIXTURE_VALID_PNG
 from web.browser_support.browser_fixtures_data import art_room_monster_key, art_scene_values
 
 SCENE_ARCHETYPE_KEY, SCENE_LABEL = art_scene_values()
-SCENE_URL = f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"
+SCENE_SUBJECT = f"scene:{SCENE_ARCHETYPE_KEY}"
 
 # A same-origin-free image URL (the seed fixture's minimal valid 4x4 PNG as a
 # data URL) so the pending-scene generating notice can be seeded without any
@@ -147,24 +150,34 @@ def _art_portrait_ready(state: dict) -> bool:
     )
 
 
-def _art_missing_placeholder(state: dict) -> bool:
-    """The missing-scene fixture: the art panel is available and the scene placeholder kind is 'missing'."""
+def _scene_artwork(state: dict) -> dict:
+    """The committed scene descriptor (the v4 wire's own fact set)."""
+    scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
+    return scene.get("artwork") or {}
+
+
+def _scene_candidate(state: dict, source_prefix: str) -> dict | None:
+    """The descriptor's image candidate at one chain position, or None."""
+    for entry in _scene_artwork(state).get("attempts") or []:
+        if entry.get("type") == "image" and str(entry.get("source_id", "")).startswith(source_prefix):
+            return entry
+    return None
+
+
+def _art_scene_exhausted(state: dict) -> bool:
+    """The chain ran out: every permitted image source failed or is absent."""
     art = (state.get("panels") or {}).get("art") or {}
-    scene = art.get("scene") or {}
-    placeholder = scene.get("placeholder") or {}
-    return art.get("available") is True and placeholder.get("kind") == "missing"
+    return art.get("available") is True and _scene_candidate(state, "scene.bundled:") is None
 
 
 def _art_scene_failed(state: dict) -> bool:
-    """The seeded art scene has reached the failed status."""
-    scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
-    return scene.get("status") == "failed"
+    """The seeded art scene's recorded generation is failed."""
+    return _scene_artwork(state).get("generation_state") == "failed"
 
 
 def _art_scene_done(state: dict) -> bool:
-    """The art scene is a done asset (a client-side load failure keeps it done)."""
-    scene = ((state.get("panels") or {}).get("art") or {}).get("scene") or {}
-    return scene.get("status") == "done"
+    """The scene's recorded generation is done (a browser load failure keeps it done)."""
+    return _scene_artwork(state).get("generation_state") == "done"
 
 
 def _in_combat_mode(state: dict) -> bool:
@@ -247,18 +260,24 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_done_scene_renders_same_origin_image(self):
         page = self.logged_in_page()
-        state = store_state(page)
-        panel = state["panels"]["art"]
-        self.assertTrue(panel["available"])
-        self.assertEqual(panel["scene"]["status"], "done")
-        self.assertEqual(panel["scene"]["url"], SCENE_URL)
-        self.assertEqual(panel["scene"]["aspect_ratio"], "16:9")
-        self.assertIsNone(panel["scene"]["placeholder"])
-        # The image element is present with a same-origin src.
+        wait_for_store_state(page, _art_scene_done, timeout=20000)
+        artwork = _scene_artwork(store_state(page))
+        self.assertEqual(artwork["generation_subject"], SCENE_SUBJECT)
+        generated = _scene_candidate(store_state(page), "scene.generated:")
+        self.assertIsNotNone(generated, "the done scene carries no generated candidate")
+        resource = generated["resource"]
+        self.assertTrue(resource["url"].startswith(f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"))
+        self.assertEqual(resource["origin"], "runtime")
+        # The image element is present with a same-origin src: the element the
+        # shared driver issued, presenting the descriptor's own resource.
+        page.wait_for_selector('[data-testid="scene-backdrop-image"]', timeout=20000)
         img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
+        self.assertEqual(img.get_attribute("src"), resource["url"])
         self.assertTrue(img.get_attribute("src").startswith("/art/"))
         self.assertNotIn("http://", img.get_attribute("src"))
+        # A successfully resolved scene carries no error marker at all.
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-placeholder"]').count(), 0)
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     def test_alternative_text_is_present_outside_the_bitmap(self):
@@ -310,15 +329,30 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
-    def test_pending_scene_without_prior_image_uses_placeholder(self):
+    def test_pending_scene_shows_its_own_bundled_art_with_progress(self):
         page = self.logged_in_page()
-        panel = store_state(page)["panels"]["art"]
-        self.assertEqual(panel["scene"]["status"], "pending")
-        self.assertIsNone(panel["scene"]["url"])
-        # Without a prior image, the scene placeholder renders (no image).
-        self.assertEqual(page.locator('[data-testid="scene-backdrop-image"]').count(), 0)
-        placeholder = page.locator('[data-testid="scene-backdrop-placeholder"]').inner_text()
-        self.assertTrue(placeholder.strip())
+        wait_for_store_state(
+            page,
+            lambda state: _scene_artwork(state).get("generation_state") == "pending",
+            timeout=20000,
+        )
+        artwork = _scene_artwork(store_state(page))
+        # A pending regeneration claims no generated candidate at all, and its
+        # own REQUIRED bundled illustration is the current attempt.
+        self.assertIsNone(_scene_candidate(store_state(page), "scene.generated:"))
+        bundled = _scene_candidate(store_state(page), "scene.bundled:")
+        self.assertIsNotNone(bundled, "the pending scene carries no bundled candidate")
+        page.wait_for_selector('[data-testid="scene-backdrop-image"]', timeout=20000)
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-image"]').first.get_attribute("src"),
+            bundled["resource"]["url"],
+        )
+        # Expected absence carries no error styling, and the caption states the
+        # factual progress.
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-placeholder"]').count(), 0)
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-failure"]').count(), 0)
+        self.assertTrue(page.locator('[data-testid="scene-backdrop-generating"]').count())
+        self.assertIsNotNone(artwork.get("generation_subject"))
 
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
     def test_pending_generating_notice_clears_dock_and_command_line(self):
@@ -329,8 +363,11 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
-                panel = store_state(page)["panels"]["art"]
-                self.assertEqual(panel["scene"]["status"], "pending")
+                wait_for_store_state(
+                    page,
+                    lambda state: _scene_artwork(state).get("generation_state") == "pending",
+                    timeout=20000,
+                )
                 # Bounded-wait for the bridge backdrop hook (the SceneBackdrop
                 # instance registered by AppClient on mount; a plain property on
                 # the bridge, not a getter).
@@ -401,10 +438,10 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
 
     @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
-    def test_failed_scene_uses_the_placeholder(self):
+    def test_failed_regeneration_keeps_a_visible_reached_failure(self):
         page = self.logged_in_page()
         # Drain the queue with the failing image-generation client, then refresh
-        # presentation.
+        # presentation: the recorded failure is a real reached fact.
         page.evaluate("Evennia.msg('text', ['@art run --limit 1'], {})")
         page.wait_for_timeout(1500)
         page.evaluate("Evennia.msg('text', ['look'], {})")
@@ -428,13 +465,40 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
             },
             timeout=20000,
         )
-        self.assertEqual(store_state(page)["panels"]["art"]["scene"]["status"], "failed")
-        self.assertIsNone(store_state(page)["panels"]["art"]["scene"]["url"])
-        self.assertEqual(page.locator('[data-testid="scene-backdrop-image"]').count(), 0)
-        self.assertEqual(page.locator('[data-testid="scene-backdrop-placeholder"]').count(), 1)
+        # The reached regeneration failure is locally indicated beside the
+        # healthy bundled fallback — never hidden, and never a broken image.
+        self.assertEqual(_scene_artwork(store_state(page)).get("generation_state"), "failed")
+        failure = page.locator('[data-testid="scene-backdrop-failure"]')
+        failure.wait_for(state="visible", timeout=20000)
+        self.assertTrue(failure.inner_text().strip())
+        self.assertTrue(
+            page.locator('[data-testid="scene-backdrop-image"]').count()
+            + page.locator('[data-testid="scene-backdrop-placeholder"]').count()
+            >= 1
+        )
 
 
-class ArtMissingSceneTest(ArtSceneBrowserTest):
+class ArtExhaustedSceneTest(ArtSceneBrowserTest):
+    """A scene whose every permitted source is unavailable.
+
+    The seeded record is missing, so the descriptor carries no generated
+    candidate; the journey additionally makes the bundled illustration
+    unavailable, which is the one case that degrades to a non-image state.
+    """
+
+    def _exhaust_bundled(self, page) -> None:
+        """Fail every committed bundled scene illustration, and nothing else.
+
+        A bundled URL carries the collection's content fingerprint, so the
+        route matches the path family the running server serves it from; the
+        registration happens BEFORE the page loads so the first request for it
+        is the one that fails.
+        """
+        page.route(
+            "**/art/bundled-scene/**",
+            lambda route: route.fulfill(status=404, content_type="text/plain", body=b"missing"),
+        )
+
     def setUp(self) -> None:
         os.environ["ELOSERN_BROWSER_ART"] = "missing"
         super().setUp()
@@ -445,8 +509,12 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         "webclient-browser-verification::browser-test-waits-gate-on-deterministic-state-within-a-bounded-deadline",
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage",
     )
-    def test_missing_scene_uses_the_placeholder_and_play_continues(self):
-        page = self.logged_in_page()
+    def test_exhausted_scene_uses_one_placeholder_and_play_continues(self):
+        from .browser_helpers import login_and_open
+
+        page = self.new_page()
+        self._exhaust_bundled(page)
+        login_and_open(page, self.webclient_url, self.base_url)
         # The missing-scene placeholder is gated on the committed art-panel
         # store state and the scene-frame-scoped single-node DOM, within one
         # bounded deadline — not a single raw `.count()` sample that a
@@ -454,7 +522,7 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         # race.
         wait_for_store_state(
             page,
-            _art_missing_placeholder,
+            _art_scene_exhausted,
             dom_readiness={
                 "selector": "[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]",
                 "predicate": (
@@ -493,13 +561,17 @@ class ArtMissingSceneTest(ArtSceneBrowserTest):
         """
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
-                page = self.logged_in_page(viewport)
-                # The missing-scene placeholder is gated on the committed art-panel
+                from .browser_helpers import login_and_open
+
+                page = self.new_page(viewport)
+                self._exhaust_bundled(page)
+                login_and_open(page, self.webclient_url, self.base_url)
+                # The degraded badge is gated on the committed art-panel
                 # store state and the scene-frame-scoped single-node DOM, within one
                 # bounded deadline.
                 wait_for_store_state(
                     page,
-                    _art_missing_placeholder,
+                    _art_scene_exhausted,
                     {
                         "selector": "[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]",
                         "predicate": (
@@ -601,20 +673,25 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         super().setUp()
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
+    # The generated scene output's stable path: its bounded cache version is
+    # part of the URL, so the route matches the path and counts every request
+    # the browser makes for it.
+    GENERATED_PATH = f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"
+
     def _abort_art_media(self, page) -> None:
-        # Track how often the scene image URL is requested.
+        """Abort the generated scene media and count its requests."""
         self._art_requests = []
 
         def _handler(route):
-            if route.request.url.endswith(SCENE_URL):
+            if route.request.url.split("?")[0].endswith(self.GENERATED_PATH):
                 self._art_requests.append(route.request.url)
                 route.abort("failed")
             else:
                 route.continue_()
 
-        # Abort the art media URL before the shared local-only guard is
-        # consulted by registering a more specific route after it.
-        page.route("**/art/**", _handler)
+        # Abort the generated output's own path, before the shared local-only
+        # guard is consulted.
+        page.route("**/art/scene/**", _handler)
 
     @covers_requirement("webclient-art-panel::art-degradation-never-blocks-gameplay-or-leaks-rejected-content")
     def test_image_load_failure_shows_fallback_without_refetch(self):
@@ -636,8 +713,8 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         self.assertTrue(placeholder.inner_text().strip())
         self.assertEqual(
             placeholder.get_attribute("data-kind"),
-            "load_failed",
-            "an image load failure shows the load_failed placeholder kind",
+            "image_load_failed",
+            "an image load failure states the browser's own load fact",
         )
         # The aborted request was attempted exactly once.
         self.assertEqual(len(self._art_requests), 1)

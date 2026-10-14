@@ -166,3 +166,31 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
   （與 `ArtworkPreview` 的剪影探針同一手法）承載自身的載入／錯誤訊號；比例尺失敗時
   遮罩移除，顯示自己的在地失敗指示，而健康的原始仍是唯一可儲存的目標
   （原始失敗＋比例尺健康時，仍**不**可儲存）。
+
+## 場景表面：描述子、保留與臨時背景（unified-scene-rendering）
+
+場景背景不再由元件自行解析線路，也不再自帶解碼器或失敗網址快取：`art`
+面板 v4 的 `scene` 恰好是 `{archetype, label, alt, artwork}`，其中
+`artwork` 是場景解析出的標準描述子（邏輯地點身分、來源鏈的排序候選與已觸
+及故障、獨立的生成事實、允許的終端與保留授權）。`SceneBackdrop` 只透過
+`composables/useArtwork.js` 消費它，並且只決定「畫面上是什麼」：
+
+- **保留內容**由 `lib/scene-artwork.js` 的純規則決定：只有當新描述子的
+  `subject_id` 與 `generation_subject` 與保留項目相同、且
+  `retention_sources` 仍帶著同一組 `{source_id, token}` 時才保留；較低優先
+  序的成功替補（例如 bundled 圖）永遠不會取代已保留的良好生成圖，較高或同
+  優先序的替換才會接手。每一次提交都會在讀取時重新驗證保留項目，因此搬家、
+  綁定移除、授權撤銷或來源失效都在同一次提交內丟棄像素。
+- **臨時背景**（provisional）是該場景自己的 bundled／terminal 資源，由同一
+  個載入核心的 `options.provisionalSource` 在較高優先序來源仍在載入時於排
+  序之外抓取：它的成功只是暫時顯示，失敗維持潛伏直到游標走到該位置才成為已
+  觸及故障，並且在該位置直接重用、不重複請求（核心在元素出現前就登記
+  `loading` 的所有權）。排序解析一旦結算，臨時元素即退休。
+- **同場景替換**才會有淡入淡出，且由 `SceneBackdrop` 以單一動作權杖的時長驅
+  動（`:css="false"` 加上明確的進入／離開鉤子）；搬家、授權失效與 `off` 動態
+  層級都在提交的同一影格完成切換，舊地點的畫面絕不會跨場景殘留。
+- 載入核心的解析事實（`factsKey`）改為**同步**重啟，因此任何同一次提交的消費
+  者讀到的是已清空的選擇，不會把本次提交的事實與上一次的結果配對。
+
+相關閘門：`pnpm test`（含 `tests/scene_retention.test.js`）、Node 閘門的
+`protocol_art.test.js`，以及受管理的 `UnifiedScenesBrowserTest` 兩個旅程。

@@ -36,6 +36,27 @@ TRANSITIONS = frozenset(
     }
 )
 
+# The SCENE mode's transitions (change unified-scene-rendering): every one goes
+# through the real owner — the queue's requeue/claim/settle for the scene
+# record's own generation state, and the map-owned room attributes for the
+# binding/movement transitions — followed by the presentation coordinator's
+# normal refresh. A journey never mutates the browser store to claim a backend
+# transition was accepted.
+SCENE_TRANSITIONS = frozenset(
+    {
+        "pending_scene",
+        "failed_scene",
+        "done_scene",
+        "remove_room_binding",
+        "move_scene",
+    }
+)
+
+# The runtime identity the scene fixture's authored room metadata carries: the
+# same shape supported map construction writes, so a scene journey reads a real
+# logical place identity.
+SCENE_FIXTURE_IDENTITY_PREFIX = "instance:art-fixture-"
+
 # The transitions this slice owns. Every other name belongs to another mode's
 # owning change and is rejected rather than guessed at.
 #
@@ -48,7 +69,7 @@ TRANSITIONS = frozenset(
 # so journeys express it by injecting the panel's own unavailable form (the
 # client's ``artworkAvailability`` then reports ``failed`` locally) rather than
 # by corrupting art state.
-OWNED_TRANSITIONS = frozenset({"repaired_original", "revoke_source"})
+OWNED_TRANSITIONS = frozenset({"repaired_original", "revoke_source"}) | SCENE_TRANSITIONS
 
 # Deterministic identities for the seeded and the repaired original. The
 # repaired card is deliberately distinct from the seeded one, so a recovery
@@ -304,29 +325,139 @@ def seed_pending_and_failed_rows() -> str | None:
     return subject.full()
 
 
+def scene_subject_for_room(room):
+    """The scene subject the CURRENT room's authored metadata resolves to.
+
+    ``None`` when the room carries no registered archetype: a transition that
+    needs a scene record then has nothing to act on, which the caller reports
+    instead of guessing a subject.
+    """
+    from world.art.subjects import ArtSubjectError, scene_subject_for
+
+    archetype = getattr(room, "scene_archetype", None)
+    try:
+        return scene_subject_for(archetype)
+    except ArtSubjectError:  # observability: ignore R2: an unusable authored archetype is a reported no-op
+        return None
+
+
+def _settle_scene(character, status: str, *, publish: bool) -> dict:
+    """Run one real scene generation lifecycle for the character's current room.
+
+    ``pending_scene`` requeues the record, which preserves the prior valid
+    output (the descriptor keeps authorizing it); ``failed_scene`` requeues and
+    then settles the claimed regeneration as failed; ``done_scene`` publishes a
+    fresh readable output under the runtime store and settles it done. Every
+    step uses the record's OWN claim token, never an assumed index.
+    """
+    from django.conf import settings
+
+    from world.art.queue import claim, record_key, requeue, settle
+    from world.art.store import ArtAssetRecord, ArtAssetStatus
+
+    subject = scene_subject_for_room(character.location)
+    if subject is None:
+        raise UnsupportedTransitionError("the current room carries no registered scene archetype")
+    job = {
+        "pending_scene": ArtAssetStatus.PENDING,
+        "failed_scene": ArtAssetStatus.FAILED,
+        "done_scene": ArtAssetStatus.DONE,
+    }[status]
+    if job == ArtAssetStatus.PENDING:
+        requeue(subject)
+        return {"subject_key": subject.full(), "status": job}
+    claimed = claim(ArtAssetRecord.objects.count() + 1)
+    record = next((item for item in claimed if item.db_key == record_key(subject)), None)
+    if record is None:
+        raise UnsupportedTransitionError("the scene record was not claimable")
+    identity = None
+    if job == ArtAssetStatus.DONE:
+        identity = f"scene/{subject.key}.png"
+        path = Path(settings.ART_STORE_ROOT).joinpath(*identity.split("/"))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(_fixture_png())
+    settle(
+        subject,
+        status=job,
+        output_identity=identity,
+        error=None if job == ArtAssetStatus.DONE else "fixture",
+        generation_token=str(record.db.generation_token),
+    )
+    del publish
+    return {"subject_key": subject.full(), "status": job}
+
+
+def _remove_room_binding(character) -> dict:
+    """Remove the current room's authored room-art binding (map-owned metadata).
+
+    The room keeps its archetype, so the chain simply continues without the
+    per-room override — exactly what a map-owner sync writes when a declaration
+    no longer applies.
+    """
+    room = character.location
+    if room is None:
+        raise UnsupportedTransitionError("the character is in no room")
+    previous = getattr(room, "room_art_key", None)
+    room.room_art_key = None
+    return {"room": int(room.pk), "removed": previous}
+
+
+def _move_scene(character) -> dict:
+    """Move the character to a room with DIFFERENT logical scene metadata.
+
+    The destination is built through the ordinary Evennia object API carrying
+    the same authored attribute contract supported construction uses, so the
+    committed scene identity changes exactly as a real move makes it.
+    """
+    from evennia.utils.create import create_object
+
+    from typeclasses.rooms import Room
+
+    room = character.location
+    if room is None:
+        raise UnsupportedTransitionError("the character is in no room")
+    destination = create_object(Room, key="unified scene destination", location=None)
+    destination.scene_archetype = getattr(room, "scene_archetype", None)
+    destination.scene_identity = f"{SCENE_FIXTURE_IDENTITY_PREFIX}moved-{destination.pk}"
+    destination.room_art_key = None
+    character.location = destination
+    return {"room": int(destination.pk)}
+
+
+def _fixture_png() -> bytes:
+    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+
+    return FIXTURE_VALID_PNG
+
+
 def apply_transition(
     name: str,
     subject_key: str,
     *,
     image_id: str | None = None,
     payload: bytes | None = None,
+    character=None,
 ) -> dict:
-    """Apply one owned transition and return the stored card."""
+    """Apply one owned transition and return its stored/changed fact."""
     if name not in TRANSITIONS:
         raise UnsupportedTransitionError(f"unknown transition {name!r}")
+    if name in SCENE_TRANSITIONS:
+        if character is None:
+            raise UnsupportedTransitionError("a scene transition needs the acting character")
+        if name == "remove_room_binding":
+            return _remove_room_binding(character)
+        if name == "move_scene":
+            return _move_scene(character)
+        return _settle_scene(character, name, publish=True)
     handler = _APPLIERS.get(name)
     if handler is None:
         raise UnsupportedTransitionError(
             f"transition {name!r} belongs to another mode's owning change"
         )
     if payload is None:
-        from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
-
-        payload = FIXTURE_VALID_PNG
+        payload = _fixture_png()
     if name == "repaired_original" and image_id is None:
         image_id = REPAIRED_ORIGINAL_IMAGE_ID
-    if name == "revoke_source":
-        return handler(subject_key, image_id, payload)
     return handler(subject_key, image_id, payload)
 
 
@@ -346,11 +477,17 @@ class CmdUnifiedImageTransition(Command):
         image_id = args[1] if len(args) > 1 else None
         subject_key = f"portrait:character:{self.caller.pk}"
         try:
-            stored = apply_transition(name, subject_key, image_id=image_id)
+            stored = apply_transition(name, subject_key, image_id=image_id, character=self.caller)
         except UnsupportedTransitionError as error:
             self.caller.msg(str(error))
             return
-        summary = stored.get("image_id") or ",".join(stored.get("revoked") or []) or "none"
+        summary = (
+            stored.get("image_id")
+            or stored.get("status")
+            or str(stored.get("room") or "")
+            or ",".join(stored.get("revoked") or [])
+            or "none"
+        )
         self.caller.msg(f"transition {name} applied: {summary}")
         session = getattr(self, "session", None)
         if session is not None:
