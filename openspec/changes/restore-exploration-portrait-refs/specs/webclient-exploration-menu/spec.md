@@ -2,8 +2,8 @@
 
 ## RENAMED Requirements
 
-- FROM: `The exploration panel is an exact read-only version-3 presentation panel`
-- TO: `The exploration panel is an exact read-only version-4 presentation panel`
+- FROM: `### Requirement: The exploration panel is an exact read-only version-3 presentation panel`
+- TO: `### Requirement: The exploration panel is an exact read-only version-4 presentation panel`
 
 ## MODIFIED Requirements
 
@@ -74,12 +74,12 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: Only the deliver affordance carries params
 - **WHEN** the presenter emits target action affordances
-- **THEN** exactly the `explore.deliver` action affordance additionally carries `params` — the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`) — and every other action affordance carries no `params`, its dispatch payload being re-derived from the target identity at the dock
+- **THEN** exactly the `explore.deliver` action affordance additionally carries `params`, the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`), and every other action affordance carries no `params`, its dispatch payload being re-derived from the target identity at the dock
 
 #### Scenario: A navigation affordance carries exactly its five fields and opens only a drawer
 - **WHEN** the presenter serializes a navigation affordance
 - **THEN** it contains exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`
-- **AND** navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
+- **AND** navigation affordances are dock-navigation descriptors only; they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
 
 #### Scenario: Availability entries carry only the available boolean
 - **WHEN** the presenter builds `character`, `quests`, and `inventory`

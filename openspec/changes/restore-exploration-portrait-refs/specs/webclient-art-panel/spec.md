@@ -92,7 +92,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late completions gate on fresh references only
 
 - **WHEN** a completion notification is evaluated for staleness
-- **THEN** it is gated on the freshly rendered current references — not remembered selections, rooms, sent payloads, or completed image identities — a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
 
 #### Scenario: Completion rendering is pure presentation
 
