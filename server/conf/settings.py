@@ -641,6 +641,16 @@ ART_OFFICIAL_ROOT = os.environ.get(
     "ART_OFFICIAL_ROOT", os.path.join(GAME_DIR, "art-official")
 )
 
+# Whether the line above was BOUND by the environment or merely defaulted,
+# captured once at settings import (unified-art-source-faults /
+# art-source-fault-facts). The startup catalog reads it to tell a deliberately
+# absent DEFAULT optional root — the normal "no official artwork"
+# configuration — from an operator who configured a root that is missing (a
+# retained bounded availability fault). A DERIVED fact, never a knob: nothing
+# here is settable, no new environment name exists, and the catalog never
+# infers configuration from an empty index.
+ART_OFFICIAL_ROOT_EXPLICIT = "ART_OFFICIAL_ROOT" in os.environ
+
 # Periodic queue drain control. When ART_SCHEDULER_ENABLED is False the
 # ArtDrainScript never drains; records stay missing/pending and placeholders
 # remain.

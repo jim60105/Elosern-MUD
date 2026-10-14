@@ -156,6 +156,11 @@ ART_STORE_ROOT = _env_path("ELOSERN_BROWSER_ART_ROOT", os.path.join(CACHE_DIR, "
 ART_OFFICIAL_ROOT = _env_path(
     "ART_OFFICIAL_ROOT", os.path.join(CACHE_DIR, "art-official")
 )
+# The same import-time provenance the production settings capture (this module
+# deliberately does not import them). ``runtime.env`` binds ART_OFFICIAL_ROOT
+# only for a configured-root fault journey; a normal default-absence boot never
+# sets it, so its snapshot keeps the unconfigured meaning.
+ART_OFFICIAL_ROOT_EXPLICIT = "ART_OFFICIAL_ROOT" in os.environ
 ART_SD_CLIENT = _env_path(
     "ELOSERN_BROWSER_SD_CLIENT",
     "world.art.fake_sd_client.FakeSDWebUIClient",
