@@ -669,7 +669,8 @@ class BundledSceneServingTests(EvenniaTestCase):
 
     # -- cases ------------------------------------------------------------
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_an_admitted_identity_serves_the_committed_bytes(self):
         load_bundled_scene_catalog()
@@ -682,7 +683,8 @@ class BundledSceneServingTests(EvenniaTestCase):
         self.assertTrue(self._url(key).startswith(f"{BUNDLED_SCENE_MEDIA_PREFIX}{key}/"))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
         key = self._key(0)
@@ -700,7 +702,8 @@ class BundledSceneServingTests(EvenniaTestCase):
             self.assertNotEqual(self._url(key), stale)
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_unknown_keys_and_bogus_fingerprints_404(self):
         load_bundled_scene_catalog()
@@ -722,7 +725,8 @@ class BundledSceneServingTests(EvenniaTestCase):
                 self._assert_actual_404(self._get(target))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_file_deleted_after_admission_is_a_real_404(self):
         key = self._key(0)
@@ -738,7 +742,8 @@ class BundledSceneServingTests(EvenniaTestCase):
             self._assert_actual_404(self._get(url))
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_a_symlink_swapped_in_after_admission_is_refused(self):
         key = self._key(0)
@@ -754,7 +759,8 @@ class BundledSceneServingTests(EvenniaTestCase):
             self.assertTrue(outside.exists())
 
     @covers_requirement(
-        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_an_operator_root_neither_replaces_nor_serves_a_bundled_identity(self):
         key = self._key(0)

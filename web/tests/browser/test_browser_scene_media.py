@@ -114,7 +114,8 @@ class SceneMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         return page.request.get(f"{self.base_url}{target}")
 
     @covers_requirement(
-        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot",
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
     )
     def test_bundled_namespace_and_operator_isolation(self):
         """Bundled and operator scene media coexist without substituting."""

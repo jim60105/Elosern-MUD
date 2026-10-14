@@ -102,6 +102,9 @@ def _planted_scene_directory(files: dict[str, bytes]):
 class AuthoredRegistryTests(unittest.TestCase):
     """The declarations themselves, against the registries they must cover."""
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_every_registered_archetype_and_the_dream_scene_are_declared(self):
         """A registered archetype without a declaration is a contract hole."""
         from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
@@ -114,6 +117,9 @@ class AuthoredRegistryTests(unittest.TestCase):
             len(set(SCENE_ART_KEYS)), 11, "a declaration may not repeat a scene key"
         )
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_the_declared_terminal_map_is_the_approved_table(self):
         """The terminal fallback is authored per scene, never inferred."""
         self.assertEqual(
@@ -148,6 +154,9 @@ class AuthoredRegistryTests(unittest.TestCase):
             with self.subTest(key=repr(key)):
                 self.assertFalse(is_registered_room_art_key(key))
 
+    @covers_requirement(
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
+    )
     def test_the_production_root_is_the_committed_scene_directory(self):
         """The trusted bundled root is the in-repo collection, never a mount."""
         self.assertEqual(bundled_scene_root(), SCENES_DIRECTORY)
@@ -156,6 +165,9 @@ class AuthoredRegistryTests(unittest.TestCase):
 class CommittedCollectionTests(unittest.TestCase):
     """The ACTUAL shipped eleven files, their sidecars and their uniqueness."""
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_the_collection_is_complete_and_valid(self):
         """The complete-collection contract passes with no problem at all."""
         self.assertEqual(scene_art_collection_problems(), ())
@@ -178,6 +190,9 @@ class CommittedCollectionTests(unittest.TestCase):
         )
         self.assertEqual(names, expected)
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_every_required_image_is_bounded_full_bleed_and_distinct(self):
         """Eleven distinct committed illustrations, none over the file bound."""
         from PIL import Image
@@ -226,6 +241,9 @@ class CommittedCollectionTests(unittest.TestCase):
 class BrokenCoverageTests(unittest.TestCase):
     """Every defect the delta names is reported, and names its scene key."""
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_a_missing_declaration_names_the_archetype(self):
         definitions = _planted()
         del definitions["tavern_interior"]
@@ -275,6 +293,9 @@ class BrokenCoverageTests(unittest.TestCase):
                     f"{key}: terminal 'city_street' has no required image", problems
                 )
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_a_missing_required_image_names_its_key(self):
         with tempfile.TemporaryDirectory() as scratch:
             problems = scene_art_collection_problems(root=Path(scratch))
@@ -283,6 +304,9 @@ class BrokenCoverageTests(unittest.TestCase):
             self.assertIn(problem.split(":", 1)[0], SCENE_ART_KEYS)
             self.assertIn("missing", problem)
 
+    @covers_requirement(
+        "bundled-scene-art::every-registered-scene-has-complete-required-bundled-artwork"
+    )
     def test_a_corrupt_required_image_names_its_key(self):
         with _planted_scene_directory(files={"forest_path": b"not a webp at all"}) as root:
             problems = scene_art_collection_problems(root=root)
@@ -337,6 +361,9 @@ class BrokenCoverageTests(unittest.TestCase):
             problems,
         )
 
+    @covers_requirement(
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
+    )
     def test_a_symlinked_required_image_names_its_key(self):
         with tempfile.TemporaryDirectory() as scratch:
             root = Path(scratch)
@@ -365,6 +392,9 @@ class BundledAdmissionTests(unittest.TestCase):
         reset_bundled_scenes()
         self.addCleanup(reset_bundled_scenes)
 
+    @covers_requirement(
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
+    )
     def test_the_admission_publishes_every_declaration_with_its_own_fingerprint(self):
         with patch.object(scene_definitions, "log_info") as logged:
             summary = load_bundled_scene_catalog()
@@ -399,6 +429,9 @@ class BundledAdmissionTests(unittest.TestCase):
             len(snapshot.identities()), 11, "identities are unique per scene key"
         )
 
+    @covers_requirement(
+        "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace"
+    )
     def test_only_declared_keys_are_ever_admitted(self):
         """The closed allowlist is the declaration registry itself."""
         load_bundled_scene_catalog()
