@@ -241,6 +241,14 @@ keep the marked box square against that natural size, so the stored normalized r
 - **WHEN** the player presses Escape or activates 取消 in the modal
 - **THEN** the edit is discarded and nothing is dispatched
 
+#### Scenario: Failure removes original and cropped broken elements
+- **WHEN** the exact original fails decode while a silhouette is available
+- **THEN** the original and crop-preview image elements are removed; save remains disabled and the silhouette contributes no dimensions
+
+#### Scenario: New original revision alone recovers saving
+- **WHEN** a new exact original version loads with usable dimensions
+- **THEN** saving can recover for that identity; unchanged rerender and stale callback cannot manufacture success
+
 ### Requirement: Gallery mutations ride the single dispatch entry and its gates
 
 Every gallery control SHALL dispatch through the application's single action
@@ -355,7 +363,7 @@ The selected completed card SHALL expose 比例調整 opening a dedicated access
 - **THEN** they send no request and create no image
 
 ### Requirement: Stage saves reuse correlated lifecycle and accessible gallery chrome
-Save SHALL be disabled until the current image loads and while mutation admission is disabled/pending. Image failure SHALL leave the adult reference and truthful error text, with save disabled. 儲存調整 SHALL submit exactly one stage triple through gallery.stage.update using the committed subject/card identity. Only its own successful result and committed presentation revision SHALL close the editor; rejection SHALL retain the draft and offer the log link.
+Save SHALL require successful decode and usable dimensions of the exact original plus existing mutation admission. Original failure SHALL leave only a healthy adult ruler and local failure explanation; ruler failure SHALL be explicit. No substitute SHALL enable saving. Correlated success/revision, rejection-draft preservation and accessible editor chrome SHALL remain.
 
 #### Scenario: Save waits for image load
 - **WHEN** the image has not loaded or its load fails
@@ -388,6 +396,14 @@ Save SHALL be disabled until the current image loads and while mutation admissio
 #### Scenario: Chrome and motion follow existing tokens
 - **WHEN** the editor renders
 - **THEN** ink/gold/serif chrome and scaled geometry follow existing tokens, and motion preferences are respected without interpolating figure transforms or using red for normal selection
+
+#### Scenario: Adult reference never authorizes save
+- **WHEN** the original fails but adult reference loads
+- **THEN** no stage save can dispatch and the ruler dimensions never become subject dimensions
+
+#### Scenario: A failed ruler is identified separately
+- **WHEN** the original loads but the adult reference fails
+- **THEN** the missing ruler has its own local accessible failure indication and the original remains the only possible save target
 
 ### Requirement: Stage transform stories document visual and state behavior offline
 The offline showcase SHALL include the new modal family registered in the frozen component manifest, stage-transform states in Core/ReferenceArtwork and a gallery storyboard editing/save/rejection journey. Identity, child scale, offset/boundary, loading, failed-load, pending/disabled, rejection, keyboard focus and reduced-motion states SHALL be represented without game or AI services.

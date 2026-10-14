@@ -46,8 +46,11 @@ export function artworkAvailability({ panel, required = true, hasReference = tru
   return { state: ARTWORK_STATE_READY, ...view };
 }
 
-// The ordered image candidates of one descriptor, faults excluded.
-export function artworkCandidates(artwork) {
+// The ONE ordering rule for a descriptor's exact-original candidates: ranked
+// image attempts, faults excluded. Rank decides priority; ties keep declaration
+// order (`Array.prototype.sort` is stable), exactly like the shared reducer's
+// own canonical order.
+function orderedImageAttempts(artwork) {
   const attempts = Array.isArray(artwork?.attempts) ? artwork.attempts : [];
   return attempts
     .filter((entry) => entry?.type === "image" && entry.resource)
@@ -55,10 +58,58 @@ export function artworkCandidates(artwork) {
     .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
 }
 
+// The ordered image candidates of one descriptor, faults excluded.
+export function artworkCandidates(artwork) {
+  return orderedImageAttempts(artwork).map((entry) => entry.resource);
+}
+
 // The descriptor's exact original: its highest-ranked image candidate, or null
 // for a row that carries a named fault (or nothing at all) instead.
 export function artworkCandidate(artwork) {
-  return artworkCandidates(artwork)[0]?.resource ?? null;
+  return artworkOriginal(artwork)?.resource ?? null;
+}
+
+// The exact original's own attempt entry (its stable source identity plus its
+// resource), or null for a descriptor with no image candidate at all.
+export function artworkOriginal(artwork) {
+  return orderedImageAttempts(artwork)[0] ?? null;
+}
+
+// The identity of one exact original: its source layer plus its resource
+// identity/version. Two sides of the same fact are compared with it — what the
+// LIVE descriptor says its original is (`artworkOriginalIdentity`) and what a
+// SUCCESSFUL observation actually decoded (`artworkSelectedIdentity`) — so an
+// editor can never authorize a save from an observation of some other original.
+//
+// The subject id is deliberately not part of it, and neither is the descriptor
+// revision: the revision also covers geometry, and the shared lifecycle keeps a
+// decoded resource across a geometry-only re-presentation
+// (`lib/image-attempts.js`), so a geometry-only revision must not retire a save
+// the player can still make. The subject is redundant because a descriptor row's
+// own identity is already inside both halves — the source layer names the exact
+// card or catalog entry (`gallery.original:<image_id>`, `gallery.official:
+// <identity>`) and a runtime resource path embeds its kind directory, subject
+// key and image id — while the dispatched payload's subject comes independently
+// from the committed panel (`GalleryPanel.send`).
+export function artworkOriginalIdentity(artwork) {
+  const entry = artworkOriginal(artwork);
+  if (!artwork || !entry) {
+    return null;
+  }
+  return [entry.source_id ?? "", entry.resource?.resource_id ?? "", entry.resource?.version ?? ""].join("|");
+}
+
+// The same identity as one SUCCESSFUL observation states it. The shared driver's
+// selected result carries the source layer it reached and the resource it really
+// decoded, so a proof derived from it can never borrow the live descriptor's
+// identity: if the editor's descriptor changed while an in-flight element still
+// settled, this names the original that actually decoded and the comparison
+// refuses it.
+export function artworkSelectedIdentity(selected) {
+  if (!selected) {
+    return null;
+  }
+  return [selected.sourceId ?? "", selected.resourceId ?? "", selected.version ?? ""].join("|");
 }
 
 // The applicable geometry of the descriptor's exact original, or null.

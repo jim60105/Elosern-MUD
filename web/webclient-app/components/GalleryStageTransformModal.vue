@@ -1,11 +1,14 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, useId } from "vue";
+import ArtworkFailure from "./ArtworkFailure.vue";
 import DrawerHeader from "./DrawerHeader.vue";
 import { createFocusTrap } from "./focus-trap.js";
 import { clampStage, editStageField, moveStage } from "./stage-transform-edit.js";
 import { galleryCardName } from "./gallery-copy.js";
 import { artworkAvailability, artworkGeometry } from "../lib/artwork.js";
 import { useArtwork } from "../composables/useArtwork.js";
+import { useOriginalEligibility } from "../composables/useOriginalEligibility.js";
+import { ADULT_REFERENCE_DESCRIPTOR, ADULT_REFERENCE_SUBJECT } from "./adult-reference.js";
 import "./gallery.css";
 const props = defineProps({ panel: { type: Object, default: null }, card: { type: Object, required: true }, disabled: Boolean, rejected: Boolean });
 const emit = defineEmits(["close", "submit", "log"]);
@@ -21,7 +24,7 @@ const availability = computed(() => artworkAvailability({
   artwork: props.card.artwork,
   viewSubjectId: props.card.image_id,
 }));
-const { attempt, phase, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+const { attempt, phase, selected, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
   () => props.card.artwork,
   availability,
   // This editor MEASURES the exact original: the descriptor's silhouette
@@ -30,13 +33,42 @@ const { attempt, phase, reachedFaults, panelUnavailable, onImageLoad, onImageErr
 );
 const draft = ref(clampStage(geometry.value?.stage));
 const numberDraft = ref(Object.fromEntries(Object.entries(draft.value).map(([field, value]) => [field, String(value)])));
-// With no terminal in the request, a successful phase can only be the exact
-// original.
-const loaded = computed(() => phase.value === "success");
+// Only the exact original's own decoded resource enables saving, and only while
+// the editor still shows that same original.
+const { decoded: loaded, saveReady } = useOriginalEligibility(
+  () => props.card.artwork,
+  phase,
+  selected,
+  panelUnavailable,
+);
 // A reached fault (the original's own load/decode failure) or an unavailable
 // panel: either way this editor has no reference to measure and cannot save.
 const failed = computed(() => !loaded.value && (panelUnavailable.value || reachedFaults.value.length > 0));
 const imageUrl = computed(() => attempt.value?.url ?? null);
+// The fixed adult-size ruler, observed as its own display-only subject through
+// the same shared lifecycle. Its dimensions are deliberately never read: the
+// ruler is a comparison figure, never the edited original and never a save
+// target, so only its own success/failure is a fact this editor uses.
+const rulerAvailability = { state: "ready", view_subject_id: ADULT_REFERENCE_SUBJECT };
+const {
+  attempt: rulerAttempt,
+  phase: rulerPhase,
+  reachedFaults: rulerFaults,
+  onImageLoad: onRulerLoad,
+  onImageError: onRulerError,
+  dispose: disposeRuler,
+} = useArtwork(ADULT_REFERENCE_DESCRIPTOR, rulerAvailability, { terminal: false });
+const rulerUrl = computed(() => rulerAttempt.value?.url ?? null);
+const rulerFailure = computed(() => rulerFaults.value[rulerFaults.value.length - 1] ?? null);
+// The ruler keeps its committed static appearance until its own resource is
+// observed to have failed; a failure removes it and reports itself locally,
+// while a healthy original stays the only possible save target.
+const rulerFailed = computed(() => rulerPhase.value === "exhausted" && rulerFailure.value !== null);
+// The explanation only claims what this editor's own state supports: a broken
+// ruler is never itself the reason a save is unavailable.
+const rulerNote = computed(() => (loaded.value
+  ? "成人身形參照無法載入；它只是比例尺，這張肖像仍可調整並儲存。"
+  : "成人身形參照無法載入；它只是比例尺，不影響原始圖片。"));
 const submitted = ref(false);
 let trap;
 let drag = null;
@@ -51,7 +83,7 @@ onMounted(() => {
   trap = createFocusTrap(root.value, { openerEl: document.activeElement });
   trap.enter();
 });
-onBeforeUnmount(() => { trap?.restore(); dispose(); });
+onBeforeUnmount(() => { trap?.restore(); dispose(); disposeRuler(); });
 function keydown(event) {
   event.stopPropagation();
   if (event.key === "Escape") { event.preventDefault(); emit("close"); }
@@ -87,7 +119,7 @@ function move(event) {
 function end(event) { if (drag?.id === event.pointerId) drag = null; }
 function reset() { if (!locked.value) { draft.value = clampStage(null); numberDraft.value = { scale: "1", x: "0", y: "0" }; submitted.value = false; } }
 function submit() {
-  if (locked.value || !loaded.value || panelUnavailable.value) return;
+  if (locked.value || !saveReady.value) return;
   submitted.value = true;
   emit("submit", { stage: { ...draft.value } });
 }
@@ -106,12 +138,17 @@ function readout(field) {
           <div class="stage-transform__caption"><h4>{{ galleryCardName(card) }}</h4><span class="gallery-muted">成人身形參照</span></div>
           <div class="stage-transform__well">
             <div class="stage-transform__frame" :class="{ 'is-ready': loaded && !locked }" @pointerdown="start" @pointermove="move" @pointerup="end" @pointercancel="end" @lostpointercapture="end">
-              <span class="stage-transform__adult" aria-hidden="true"></span>
+              <span v-if="!rulerFailed" class="stage-transform__adult" aria-hidden="true"></span>
               <img v-if="imageUrl" :key="attempt.token" class="stage-transform__figure" :src="imageUrl" :data-attempt-token="attempt.token" :alt="galleryCardName(card)" :style="figureStyle" draggable="false" @load="onImageLoad" @error="onImageError">
               <span class="stage-transform__floor" aria-hidden="true"></span>
+              <img v-if="rulerUrl" :key="`ruler-${rulerAttempt.token}`" class="stage-transform__ruler" :src="rulerUrl" :data-attempt-token="rulerAttempt.token" alt="" aria-hidden="true" draggable="false" @load="onRulerLoad" @error="onRulerError">
             </div>
           </div>
           <p class="gallery-muted">拖曳肖像調整位置。背景成人身形維持原比例。</p>
+          <div v-if="rulerFailed" class="stage-transform__ruler-status">
+            <p class="gallery-muted">{{ rulerNote }}</p>
+            <ArtworkFailure kind="failure" :reason="rulerFailure.reason" />
+          </div>
         </section>
         <section class="stage-transform__instruments" aria-label="舞臺比例與位置">
           <p class="stage-transform__intro">調整舞臺與全身肖像的呈現，不影響頭像裁切。儲存的只有數值，不會產生新圖片。</p>
@@ -132,7 +169,7 @@ function readout(field) {
           </div>
         </section>
       </div>
-      <footer class="stage-transform__footer"><span class="gallery-muted">儲存後套用至此張肖像。</span><div class="gallery-actions"><button @click="emit('close')">取消</button><button class="gallery-primary" :disabled="locked || !loaded || failed" @click="submit">{{ locked && submitted ? '儲存中…' : '儲存調整' }}</button></div></footer>
+      <footer class="stage-transform__footer"><span class="gallery-muted">儲存後套用至此張肖像。</span><div class="gallery-actions"><button @click="emit('close')">取消</button><button class="gallery-primary" :disabled="locked || !saveReady" @click="submit">{{ locked && submitted ? '儲存中…' : '儲存調整' }}</button></div></footer>
     </section>
   </div>
 </template>
@@ -153,6 +190,11 @@ function readout(field) {
 .stage-transform__adult { position: absolute; bottom: 0; left: 12.5%; width: 75%; height: 100%; background: #17191f; mask: url('/art/defaults/man.webp') bottom center / contain no-repeat; -webkit-mask: url('/art/defaults/man.webp') bottom center / contain no-repeat; transform: translateX(-50%); pointer-events: none; }
 .stage-transform__figure { --stage-scale: 1; --stage-x: 0; --stage-y: 0; position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; object-position: center bottom; transform: translate(calc(var(--stage-x) * 100%), calc(var(--stage-y) * 100%)) scale(var(--stage-scale)); transform-origin: 50% 100%; filter: drop-shadow(0 calc(5px * var(--ui-scale)) calc(9px * var(--ui-scale)) #0009); user-select: none; pointer-events: none; }
 .stage-transform__floor { position: absolute; bottom: 0; left: -15%; right: -15%; height: 1px; background: linear-gradient(90deg, transparent, #bda66b70, transparent); pointer-events: none; }
+/* The ruler probe: the masked fill paints the shape itself, so this image is
+   never painted — it carries only the ruler resource's own load or error
+   signal, exactly as the shared preview's silhouette probe does. */
+.stage-transform__ruler { position: absolute; width: 1px; height: 1px; visibility: hidden; pointer-events: none; }
+.stage-transform__ruler-status { display: grid; gap: calc(6px * var(--ui-scale)); margin-top: calc(10px * var(--ui-scale)); }
 .stage-transform__intro { margin: 0 0 calc(18px * var(--ui-scale)); color: var(--paper-300); font-size: var(--text-sm); }
 .stage-transform__instrument { padding: calc(14px * var(--ui-scale)) 0; border-top: 1px solid #bda66b55; }
 .stage-transform__label label { font-family: var(--f-serif); color: var(--gold-300); font-size: var(--text-lg); }
