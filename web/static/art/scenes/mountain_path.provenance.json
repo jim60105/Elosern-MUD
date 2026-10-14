@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "mountain_path",
+  "label_zh": "山道",
+  "scene_sentence_zh": "陡峭的山道沿著岩壁盤旋而上，碎石在腳下滾落，空氣中帶著岩石與松脂的氣味。",
+  "asset": "web/static/art/scenes/mountain_path.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 225520,
+    "sha256": "5cbcb7c22897b370a59b371f425f585cfaa6084c5114a49305173217ca732540"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 609064835,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a narrow winding mountain track of grey scree climbing across a rock ledge on a steep cliff face, loose stones and boulders piled at the trail's edge, a sheer crag rising on one side and an open drop on the other, jagged peaks and a distant valley half-veiled in drifting mist beyond the ridge, a few wind-bent pines clinging to the rock, cold grey stone in slanting morning light, an unobstructed open rocky foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG mountain track climbing a rock ledge, with an unobstructed lower foreground for stage figures, no interface, watermark or readable lettering, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_outdoor_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside wilderness_path and coastal_path: scene identity, palette and composition are distinct for every sibling."
+  }
+}

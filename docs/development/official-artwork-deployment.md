@@ -15,6 +15,23 @@ Related documentation: [Settings and environment](/development/settings-and-envi
 (the `ART_OFFICIAL_ROOT` setting), [Prompts](/gm/prompts) and
 [Operations](/gm/operations) (the other bind-mounted operator inputs).
 
+## Bundled scene artwork is a tracked exception
+
+The repository also commits the required built-in scene illustrations — the
+closed eleven-path set under `web/static/art/scenes/`, delivered by the
+artwork packs — because a scene's own background must render with no operator
+mount and no generation service. Those files are tracked in git deliberately,
+are bounded in size, and each carries a `<key>.provenance.json` sidecar
+recording its source, distribution terms, production method and content
+checksum.
+
+This exception never moves operator artwork into git: everything under
+`ART_OFFICIAL_ROOT` stays external, untracked and read-only, and the runtime
+art store and seed roots stay outside the repository exactly as before. The
+registry that resolves the bundled scene keys, and the media boundary that
+serves their fingerprints, arrive with their own change; until then the
+committed files are ordinary static assets under `web/static/`.
+
 ## The directory contract
 
 One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:

@@ -1,7 +1,8 @@
 """Tests for the deterministic built-in fallback resolver (art-gallery-fallback).
 
 Covers the closed vocabulary committed to the repository (contract test in
-both directions, size bound, no tracked runtime art), the ordered resolution
+both directions, size bound, the closed eleven-path tracked-art exception for
+the bundled scene collection, no tracked runtime art), the ordered resolution
 rule (declared registry key -> monster constant -> sex/age band ->
 deterministic subject-key hash), fail-closed behaviour on malformed stored
 sex/apparent age, restart determinism of the hash, the filled seam payload
@@ -75,6 +76,42 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
         "web/static/favicon/favicon-96x96.png",
         "web/static/favicon/web-app-manifest-512x512.png",
     ]
+)
+
+# The closed tracked-art exception for the bundled scene collection
+# (unified-scenes-outdoor-art): exactly these eleven committed scene
+# illustrations may ever be tracked under web/static/art/scenes/, and nothing
+# else in that directory. Like APPROVED_NON_RUNTIME_IMAGES above, each path
+# joins this exact set deliberately, in review, never by directory prefix.
+#
+# The four artwork packs deliver them in separate changes, so a path listed
+# here need not exist yet — the list is an allowlist, not a coverage claim.
+# This pack asserts its own three actual files in
+# ``test_the_owned_bundled_scene_pack_is_tracked``; the complete
+# eleven-key inventory lands with the scene catalog.
+TRACKED_SCENE_ART_PATHS = frozenset(
+    {
+        "web/static/art/scenes/forest_path.webp",
+        "web/static/art/scenes/tavern_interior.webp",
+        "web/static/art/scenes/dungeon_interior.webp",
+        "web/static/art/scenes/city_street.webp",
+        "web/static/art/scenes/wilderness_path.webp",
+        "web/static/art/scenes/mountain_path.webp",
+        "web/static/art/scenes/ruin_interior.webp",
+        "web/static/art/scenes/coastal_path.webp",
+        "web/static/art/scenes/cave_interior.webp",
+        "web/static/art/scenes/shrine_interior.webp",
+        "web/static/art/scenes/dream_throne.webp",
+    }
+)
+
+# This pack's own delivered three (the outdoor artwork pack).
+OWNED_SCENE_ART_PATHS = frozenset(
+    {
+        "web/static/art/scenes/wilderness_path.webp",
+        "web/static/art/scenes/mountain_path.webp",
+        "web/static/art/scenes/coastal_path.webp",
+    }
 )
 
 
@@ -190,13 +227,41 @@ class ClosedVocabularyContractTests(unittest.TestCase):
     def test_only_the_defaults_directory_carries_tracked_images(self):
         tracked = subprocess_git_ls_files_images()
         # The closed runtime vocabulary is still exclusive: the defaults
-        # directory plus the explicitly reviewed documentation/fixture
-        # images. A new tracked image outside this exact set fails here.
-        self.assertEqual(
-            tracked,
-            {f"{FALLBACK_DEFAULTS_DIRECTORY}/{k}{FALLBACK_EXTENSION}" for k in FALLBACK_KEYS}
-            | APPROVED_NON_RUNTIME_IMAGES,
+        # directory, the explicitly reviewed documentation/fixture images, and
+        # the closed eleven-path bundled-scene exception. A new tracked image
+        # outside this exact set fails here. The scene entries are an
+        # allowlist, not a requirement that every pack has landed, so the four
+        # artwork packs stay independent.
+        self.assertLessEqual(
+            tracked
+            - {f"{FALLBACK_DEFAULTS_DIRECTORY}/{k}{FALLBACK_EXTENSION}" for k in FALLBACK_KEYS}
+            - APPROVED_NON_RUNTIME_IMAGES,
+            TRACKED_SCENE_ART_PATHS,
+            "a tracked image outside the closed defaults/documentation/"
+            "bundled-scene set appeared; add it in review, never by prefix",
         )
+
+    @covers_requirement(
+        "official-artwork-catalog::official-artwork-lives-outside-git-behind-one-directory-root-setting"
+    )
+    def test_the_owned_bundled_scene_pack_is_tracked(self):
+        """This pack's own three scene illustrations are committed and servable.
+
+        The eleven-path exception permits not-yet-delivered future packs, so
+        the allowlist above cannot prove this pack landed anything: this
+        assertion names the three actual outdoor files, and ``git ls-files``
+        proves they are tracked (a runtime/seed/operator image never appears
+        here because those roots stay outside the repository).
+        """
+        tracked = subprocess_git_ls_files_images()
+        self.assertEqual(
+            sorted(OWNED_SCENE_ART_PATHS - tracked),
+            [],
+            "the bundled outdoor scene pack is not fully tracked",
+        )
+        for path in sorted(OWNED_SCENE_ART_PATHS):
+            with self.subTest(path=path):
+                self.assertGreater((REPO_ROOT / path).stat().st_size, 0)
 
 
 def subprocess_git_ls_files_images():
