@@ -1,9 +1,11 @@
 # Official artwork deployment
 
-Official artwork (monsters, player presets, and authored NPCs) is distributed
-outside the code repository, under its own license, and is read by the server
-from one external directory. This guide is the operator/deployment surface for
-that directory: how to prepare it, how to mount it, and how to update it.
+Official artwork (monsters, player presets, authored NPCs, and optional
+scene/room overrides) is distributed outside the code repository, under its own
+license, and is read by the server from one external directory. This guide is
+the operator/deployment surface for that directory: how to prepare it, how to
+mount it, and how to update it. The required built-in scene collection is the
+one documented exception and is committed in the repository.
 
 The game only ever **reads** this directory. Startup never downloads, syncs, or
 extracts anything, so a host with no Git remote, no S3 credentials, and no
@@ -27,10 +29,21 @@ checksum.
 
 This exception never moves operator artwork into git: everything under
 `ART_OFFICIAL_ROOT` stays external, untracked and read-only, and the runtime
-art store and seed roots stay outside the repository exactly as before. The
-registry that resolves the bundled scene keys, and the media boundary that
-serves their fingerprints, arrive with their own change; until then the
-committed files are ordinary static assets under `web/static/`.
+art store and seed roots stay outside the repository exactly as before.
+
+The registry that resolves the bundled scene keys lives in
+`world/art/scene_definitions.py`: every registered scene archetype plus the
+explicit dream scene (`dream_throne`) declares a required illustration and a
+terminal scene key (`city_street` or `forest_path`). Startup admits the
+committed files once per boot and serves them through the application's own
+media boundary as `bundled-scene/<scene-key>/<sha256>.webp` identities
+(`/art/bundled-scene/<scene-key>/<sha256>.webp` URLs), from the FIXED in-repo
+`web/static/art/scenes/` root — never from `ART_OFFICIAL_ROOT`, and with no new
+setting. The key is the closed declaration registry and the fingerprint is the
+content digest of the committed bytes, so an operator file cannot replace a
+bundled identity or a terminal scene image, a bundled request can never be
+answered from an operator root, and a missing file is a real 404 rather than a
+substitute image.
 
 Delivered so far, each produced through the repository's own sd-webui client
 and prompt library, encoded by `world.art.formats.encode`, and reviewed at
@@ -45,8 +58,18 @@ Every file is original, redistributable work by the project maintainers (no
 third-party stock or externally licensed imagery) and its
 `<key>.provenance.json` sidecar records the source, distribution terms,
 production method, WebP processing, SHA-256 of the shipped bytes and the
-visual review. These paths are static assets only: the scene registry and the
-media boundary that own their runtime resolution are still their own change.
+visual review. The complete collection is a contract: a missing declaration, a
+terminal that names an unregistered scene key, and a missing, unreadable,
+oversized, undecodable or non-full-bleed required image each fail the named
+contract (`world.art.tests.test_bundled_scenes`) naming the affected scene key,
+while a deployment that loses one of these validated files still starts: the
+request for the lost file is a 404 and everything else keeps serving.
+
+The dream scene and the collaborative dream stage are two different assets:
+`dream_throne` is the bundled scene background above, while the stage's
+illustration is the optional operator `npc` asset
+`<root>/npc/dream_goddess/dream-throne.webp` documented below. Neither replaces
+the other.
 
 ## The directory contract
 
@@ -58,11 +81,22 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   monster/<species-key>/<image-file>       # e.g. monster/alpha_wolf/portrait.webp
   preset/<preset-key>/<image-file>         # e.g. preset/example_preset/portrait.png
   npc/<npc-or-profile-key>/<image-file>    # e.g. npc/example_contact/portrait.webp
+  scene/<scene-key>/<image-file>           # optional per-scene override
+  room/<room-art-key>/<image-file>         # optional per-authored-room override
 ```
 
-- `<kind>` is exactly `monster`, `preset`, or `npc`. Any other top-level
-  directory is skipped (one bounded diagnostic), and the four image extensions
-  `.png`, `.webp`, `.jpg`, and `.avif` are the closed accepted set.
+- `<kind>` is exactly `monster`, `preset`, `npc`, `scene`, or `room`. Any other
+  top-level directory is skipped (one bounded diagnostic), and the four image
+  extensions `.png`, `.webp`, `.jpg`, and `.avif` are the closed accepted set.
+- `scene/<scene-key>/` and `room/<room-art-key>/` name registered authored
+  content, never a database row id or a translated display name. The scene keys
+  are the eleven declared in `world/art/scene_definitions.py`; the room-art keys
+  are the authored room vocabulary of the same module. A directory keyed to a
+  name no registry declares is skipped with one bounded diagnostic while
+  unrelated artwork still indexes.
+- Operator scene/room artwork overrides the archetype chain of a room that
+  references it; the required bundled scene illustration above always remains
+  available for the built-in collection.
 - The collaborative dream stage's illustration is an official `npc` asset
   addressed by its **exact** identity
   `<root>/npc/dream_goddess/dream-throne.webp`, so that exact filename is what
@@ -256,6 +290,10 @@ podman compose config
 # The catalog reports what the server actually indexed at startup, once per
 # boot, including the empty/absent-root condition.
 podman compose logs --since 5m | grep official_art_catalog_loaded
+
+# The committed bundled scene collection is admitted by the same startup step
+# under its own event, on every boot — with or without an operator mount.
+podman compose logs --since 5m | grep bundled_scene_catalog_loaded
 ```
 
 A container that is merely "up" is not proof that artwork is being served: a
@@ -265,6 +303,12 @@ After preparing artwork, require the same event to report the indexed content
 directories and images with `reason=official_root_indexed` (for example
 `contents=1 images=7 refused=0`), and treat any refusal count as a to-do
 naming the offending root-relative paths the diagnostics carry.
+
+The bundled event is independent of the operator root: require
+`reason=bundled_root_indexed definitions=11 images=11 refused=0` on every
+deployment, including one with no `ART_OFFICIAL_ROOT` mounted. A lower `images`
+count means the checkout is incomplete (`refused` names the affected scene
+keys), and the missing identities answer 404 rather than a substitute image.
 
 For the collaborative dream stage specifically, the indexed image count must
 include `npc/dream_goddess/dream-throne.webp`: run one `sleep dream` and check
@@ -281,3 +325,5 @@ which the stage survives by design).
 | `permission denied` while creating the content directory | The named volume must be writable by the preparation service's user (UID 1001 of the image). Podman creates a fresh named volume owned by that user; if your engine creates it root-owned, either `chown` the volume to UID 1001 or run one preparation as root (`podman compose --profile artwork-prepare run --rm --user 0 artwork-prepare`) and then **repair ownership**, because root-owned content is unreadable to the game (UID 1001), which would start and silently serve silhouettes: `podman unshare chown -R 1001:1001 "$(podman volume inspect <project>_evennia-art-official --format '{{.Mountpoint}}')"`. |
 | Artwork replaced but the game serves the old bytes | The catalog refreshes only at startup, and old fingerprint URLs intentionally 404. Restart the service. |
 | `official_art_catalog_loaded` reports refusals | Per-entry admission refused unsupported, symlinked, out-of-root, or oversized files; the event and its bounded diagnostics name the offending root-relative paths and the unrelated artwork still loads. |
+| `bundled_scene_catalog_loaded` reports fewer than eleven images | The checkout is missing or has a corrupt `web/static/art/scenes/<scene-key>.webp`; the diagnostics name the affected scene keys. The served identity for a lost file is a real 404 — never another image. |
+| A `scene/<key>/` or `room/<key>/` directory was ignored | The directory key is not registered authored content (the declared scene keys and the authored room-art vocabulary of `world/art/scene_definitions.py`), or the directory entry was refused; the bounded diagnostic names it. |

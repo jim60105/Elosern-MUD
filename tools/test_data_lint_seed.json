@@ -13,6 +13,10 @@
       "reason": "bundled scene distribution and decode contract"
     },
     {
+      "path": "world/art/tests/test_bundled_scenes.py",
+      "reason": "bundled scene-art registry, collection and media identity contract"
+    },
+    {
       "path": "world/art/tests/test_bundled_terminal_art.py",
       "reason": "bundled scene distribution and decode contract"
     },

@@ -1,11 +1,13 @@
 """Tests for the same-origin art media route (art-assets D8)."""
 
+import hashlib
 import io
-from pathlib import Path
 import shutil
 import tempfile
 import unittest
 import uuid
+from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import patch
 
 from django.test import override_settings
@@ -14,8 +16,18 @@ from PIL import Image
 from evennia.utils.test_resources import EvenniaTestCase
 
 from world.art import official
+from world.art import scene_definitions
 from world.art.gallery import append_card
 from world.art.queue import ensure, settle
+from world.art.scene_definitions import (
+    BUNDLED_SCENE_MEDIA_PREFIX,
+    SCENE_ART_KEYS,
+    bundled_asset_filename,
+    bundled_identity,
+    current_bundled_scenes,
+    load_bundled_scene_catalog,
+    reset_bundled_scenes,
+)
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 
@@ -559,6 +571,258 @@ class OfficialIdentityServingTests(EvenniaTestCase):
         official.reset_catalog()
         self.assertEqual(self._get(f"official/{'a' * 64}/{identity}").status_code, 404)
         self.assertEqual(self._get(identity).status_code, 404)
+
+
+class BundledSceneServingTests(EvenniaTestCase):
+    """The bundled-scene branch: a snapshot lookup plus a fixed in-repo root.
+
+    The scene keys are resolved from the production registry at runtime (the
+    catalog's data contract owns the shipped key inventory), so these cases
+    exercise the boundary: the snapshot alone authorizes an identity, the root
+    is never the store or the operator root, and everything else is an actual
+    404 with no substitute bytes.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.root = Path(self.tempdir.name).resolve()
+        self.store_temp = tempfile.TemporaryDirectory()
+        self.store_root = Path(self.store_temp.name).resolve() / "store"
+        self.official_root = self.root / "art-official"
+        self.art_settings = override_settings(
+            ART_OFFICIAL_ROOT=str(self.official_root),
+            ART_STORE_ROOT=str(self.store_root),
+        )
+        self.art_settings.enable()
+        official.reset_catalog()
+        reset_bundled_scenes()
+        self.addCleanup(official.reset_catalog)
+        self.addCleanup(reset_bundled_scenes)
+
+    def tearDown(self):
+        self.art_settings.disable()
+        self.tempdir.cleanup()
+        self.store_temp.cleanup()
+        super().tearDown()
+
+    # -- helpers ----------------------------------------------------------
+    @staticmethod
+    def _key(index: int = 0) -> str:
+        return SCENE_ART_KEYS[index]
+
+    @staticmethod
+    def _digest(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    def _url(self, key: str) -> str:
+        url = current_bundled_scenes().url_for(key)
+        self.assertIsNotNone(url, msg=f"{key} is not admitted")
+        return url
+
+    def _get(self, target: str):
+        from django.test import Client
+
+        return Client().get(target if target.startswith("/art/") else f"/art/{target}")
+
+    @staticmethod
+    def _body(response) -> bytes:
+        return b"".join(response.streaming_content)
+
+    def _assert_actual_404(self, response) -> None:
+        """A missing identity is a real failure, never a substitute image.
+
+        A 404 may carry Django's plain error page; what it must never carry is
+        an image media type or decodable image bytes under a successful status.
+        """
+        self.assertEqual(response.status_code, 404)
+        self.assertNotIn("image/", str(response.headers.get("Content-Type", "")))
+        content = getattr(response, "content", None)
+        if content is None:
+            content = b"".join(response.streaming_content)
+        self.assertFalse(self._decodes_as_image(content), "a 404 body is never an image")
+
+    @staticmethod
+    def _decodes_as_image(payload: bytes) -> bool:
+        try:
+            with Image.open(io.BytesIO(payload)) as image:
+                image.load()
+        except Exception:  # noqa: BLE001 - any decode failure means "not an image"
+            return False
+        return True
+
+    @contextmanager
+    def _planted_static_root(self, key: str, payload: bytes):
+        """A redirected staticfiles root holding one planted scene image.
+
+        The override stays active for BOTH the admission and the requests, so
+        a case proves the route serves (or refuses) exactly the root its
+        snapshot was admitted from.
+        """
+        static_root = self.root / "static"
+        scenes = static_root / "art" / "scenes"
+        scenes.mkdir(parents=True, exist_ok=True)
+        path = scenes / bundled_asset_filename(key)
+        path.write_bytes(payload)
+        with override_settings(STATICFILES_DIRS=[str(static_root)]):
+            yield path
+
+    # -- cases ------------------------------------------------------------
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_an_admitted_identity_serves_the_committed_bytes(self):
+        load_bundled_scene_catalog()
+        key = self._key(0)
+        committed = Path(scene_definitions.bundled_scene_root()) / bundled_asset_filename(key)
+        response = self._get(self._url(key))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/webp")
+        self.assertEqual(self._body(response), committed.read_bytes())
+        self.assertTrue(self._url(key).startswith(f"{BUNDLED_SCENE_MEDIA_PREFIX}{key}/"))
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_stale_fingerprint_404s_while_the_refreshed_one_serves(self):
+        key = self._key(0)
+        with self._planted_static_root(key, _encoded("WEBP", size=(16, 9))) as planted:
+            load_bundled_scene_catalog()
+            stale = self._url(key)
+            self.assertEqual(self._get(stale).status_code, 200)
+            # A maintenance restart replaces the bytes at the same path.
+            planted.write_bytes(_encoded("WEBP", size=(32, 18)))
+            load_bundled_scene_catalog()
+            self._assert_actual_404(self._get(stale))
+            response = self._get(self._url(key))
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(self._body(response), planted.read_bytes())
+            self.assertNotEqual(self._url(key), stale)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_unknown_keys_and_bogus_fingerprints_404(self):
+        load_bundled_scene_catalog()
+        key = self._key(0)
+        fingerprint = current_bundled_scenes().fingerprint_for(key)
+        targets = (
+            f"bundled-scene/t_synth_ghost/{fingerprint}.webp",
+            f"bundled-scene/{key}/{'0' * 64}.webp",
+            f"bundled-scene/{key}/{fingerprint.upper()}.webp",
+            f"bundled-scene/{key}/{fingerprint[:-1]}.webp",
+            f"bundled-scene/{key}/{fingerprint}.png",
+            f"bundled-scene/{key}/sub/{fingerprint}.webp",
+            f"bundled-scene/{key}/%2e%2e/{fingerprint}.webp",
+            f"bundled-scene//{fingerprint}.webp",
+            "bundled-scene/",
+        )
+        for target in targets:
+            with self.subTest(target=target):
+                self._assert_actual_404(self._get(target))
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_file_deleted_after_admission_is_a_real_404(self):
+        key = self._key(0)
+        with self._planted_static_root(key, _encoded("WEBP", size=(16, 9))) as planted:
+            load_bundled_scene_catalog()
+            url = self._url(key)
+            self.assertEqual(self._get(url).status_code, 200)
+            planted.unlink()
+            # The snapshot still names it; the file check is the actual 404.
+            self._assert_actual_404(self._get(url))
+            # ... and a directory that disappears entirely 404s the same way.
+            planted.parent.rmdir()
+            self._assert_actual_404(self._get(url))
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_a_symlink_swapped_in_after_admission_is_refused(self):
+        key = self._key(0)
+        outside = self.root / "media-precious.webp"
+        outside.write_bytes(b"do not serve")
+        with self._planted_static_root(key, _encoded("WEBP", size=(16, 9))) as planted:
+            load_bundled_scene_catalog()
+            url = self._url(key)
+            self.assertEqual(self._get(url).status_code, 200)
+            planted.unlink()
+            planted.symlink_to(outside)
+            self._assert_actual_404(self._get(url))
+            self.assertTrue(outside.exists())
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_an_operator_root_neither_replaces_nor_serves_a_bundled_identity(self):
+        key = self._key(0)
+        load_bundled_scene_catalog()
+        bundled_url = self._url(key)
+        bundled_fingerprint = current_bundled_scenes().fingerprint_for(key)
+        committed = Path(scene_definitions.bundled_scene_root()) / bundled_asset_filename(key)
+
+        # An operator supplies the SAME filename under the operator scene kind.
+        operator_folder = self.official_root / "scene" / key
+        operator_folder.mkdir(parents=True, exist_ok=True)
+        operator_file = operator_folder / bundled_asset_filename(key)
+        operator_file.write_bytes(_encoded("PNG", size=(8, 8)))
+        official.load_catalog()
+        operator_fingerprint = official.current_catalog().fingerprint_for(
+            f"scene/{key}/{bundled_asset_filename(key)}"
+        )
+        self.assertIsNotNone(operator_fingerprint)
+        self.assertNotEqual(operator_fingerprint, bundled_fingerprint)
+
+        # Both identities coexist and serve their own bytes from their own root.
+        bundled_response = self._get(bundled_url)
+        self.assertEqual(bundled_response.status_code, 200)
+        self.assertEqual(self._body(bundled_response), committed.read_bytes())
+        self.assertEqual(current_bundled_scenes().fingerprint_for(key), bundled_fingerprint)
+        operator_response = self._get(
+            f"official/{operator_fingerprint}/scene/{key}/{bundled_asset_filename(key)}"
+        )
+        self.assertEqual(operator_response.status_code, 200)
+        self.assertEqual(self._body(operator_response), operator_file.read_bytes())
+        self.assertNotEqual(self._body(operator_response), committed.read_bytes())
+
+        # Neither root's fingerprint authorizes the other's identity.
+        self._assert_actual_404(
+            self._get(f"bundled-scene/{key}/{operator_fingerprint}.webp")
+        )
+        self._assert_actual_404(
+            self._get(
+                f"official/{bundled_fingerprint}/scene/{key}/{bundled_asset_filename(key)}"
+            )
+        )
+        self.assertEqual(self._get(bundled_url).status_code, 200)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_an_unloaded_snapshot_serves_no_bundled_identity(self):
+        key = self._key(0)
+        committed = Path(scene_definitions.bundled_scene_root()) / bundled_asset_filename(key)
+        identity = bundled_identity(key, self._digest(committed))
+        self.assertEqual(len(current_bundled_scenes()), 0)
+        self._assert_actual_404(self._get(identity))
+        self.assertEqual(current_bundled_scenes().url_for(key), None)
+
+    @covers_requirement(
+        "art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root"
+    )
+    def test_serving_a_bundled_identity_copies_nothing_into_the_store(self):
+        key = self._key(0)
+        load_bundled_scene_catalog()
+        store_before = _tree_bytes(self.store_root)
+        scenes_before = _tree_bytes(Path(scene_definitions.bundled_scene_root()))
+        response = self._get(self._url(key))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(self._body(response))
+        self.assertEqual(_tree_bytes(self.store_root), store_before)
+        self.assertEqual(_tree_bytes(self.store_root), {})
+        self.assertEqual(_tree_bytes(Path(scene_definitions.bundled_scene_root())), scenes_before)
 
 
 if __name__ == "__main__":

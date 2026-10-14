@@ -1,16 +1,19 @@
-"""No-follow file-open primitives shared by every external-content walker.
+"""No-follow file-open primitives shared by every content walker.
 
-Two external directories are read by the game — the operator-supplied bulk
-seed folder (``world/art/gallery_seed.py``, ``ART_SEED_ROOT``) and the
+Three directories are read by the game — the operator-supplied bulk seed
+folder (``world/art/gallery_seed.py``, ``ART_SEED_ROOT``), the
 operator-prepared official-artwork folder (``world/art/official.py``,
-``ART_OFFICIAL_ROOT``) — and both are mounted directories the game does not
-own. Classification alone is never the boundary there: a check-then-pathname-
-open is swappable in between, so traversal descends from one ``O_NOFOLLOW``
-directory fd and every content file is opened RELATIVE to its verified parent
-fd with ``O_NOFOLLOW`` and re-verified by ``fstat`` AFTER the open.
+``ART_OFFICIAL_ROOT``) and the committed repository scene collection
+(``world/art/scene_definitions.py``, the fixed ``web/static/art/scenes``
+root; in-repo rather than mounted, and read through this same discipline so a
+planted link can never stand in for a committed illustration). Classification
+alone is never the boundary: a check-then-pathname-open is swappable in
+between, so traversal descends from one ``O_NOFOLLOW`` directory fd and every
+content file is opened RELATIVE to its verified parent fd with ``O_NOFOLLOW``
+and re-verified by ``fstat`` AFTER the open.
 
-That discipline is defined exactly once, here, so the two walkers cannot drift
-into two definitions of "a real, confined, bounded file". The primitives take
+That discipline is defined exactly once, here, so the walkers cannot drift
+into several definitions of "a real, confined, bounded file". The primitives take
 their size cap from the caller (each root has its own documented bound) and
 stay stdlib-only: no Django settings, no Evennia, no logging, and no
 ``world.art`` import, so any walker may depend on them without closing an
