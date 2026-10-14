@@ -44,6 +44,7 @@ from .browser_helpers import (
 )
 from ._journey_support import (
     _SCENE_PNG_BYTES,
+    _combat_panel,
     _artwork_descriptor,
     _artwork_resource,
     _fixture_digest,
@@ -225,9 +226,10 @@ def _party_panel() -> dict:
 class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
     """Every figure/avatar surface renders the ONE admitted descriptor."""
 
-    def _serve_media(self, page) -> None:
-        """Fulfil the scene and the shared portrait so nothing races a load."""
-        for url in (SCENE_URL, SHARED_URL):
+    def _serve_media(self, page, include_portrait: bool = True) -> None:
+        """Fulfil the scene (and, unless the caller routes it itself, the portrait)."""
+        urls = (SCENE_URL, SHARED_URL) if include_portrait else (SCENE_URL,)
+        for url in urls:
             page.route(
                 f"**{url}",
                 lambda route: route.fulfill(
@@ -391,4 +393,75 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         page.wait_for_selector(f'{STANDEE} img[src$="{SHARED_URL}"]', timeout=15000)
         self.assertEqual(self._image_src(page, STANDEE), SHARED_URL)
         self.assertEqual(page.locator(f"{STANDEE} {ALPHA}").count(), 0)
+        page.close()
+
+        # The COMBAT join reads the same descriptor: the participant row's
+        # committed reference names the same catalog entry, and the row's
+        # real-only avatar position presents it.
+        page = self.logged_in_page((1451, 790), "off")
+        self._serve_media(page)
+        self._commit(page)
+        _wait_mode(page, "exploration")
+        # The combat panel is the family's own schema-valid fixture; its first
+        # participant's committed reference is rebound to the shared descriptor
+        # so the row and the exploration surfaces name ONE catalog entry.
+        combat_art = _art_panel()
+        combat_art["portrait_catalog"]["1"] = _art_panel()["portrait_catalog"]["7"]
+        inject_snapshot(
+            page,
+            {
+                "status": valid_status_panel("測試主角", "1"),
+                "local_map": valid_local_map_panel(),
+                "art": combat_art,
+                "context_actions": _combat_panel(),
+            },
+            mode="combat",
+        )
+        _wait_mode(page, "combat")
+        page.wait_for_selector(
+            '[data-testid="participant-frame"] [data-testid="reference-artwork"]',
+            timeout=15000,
+        )
+        self.assertEqual(
+            self._image_src(page, '[data-testid="participant-frame"]'),
+            SHARED_URL,
+            "the combat row presents the same admitted descriptor",
+        )
+        page.close()
+
+        # A SOURCE ERROR injected after server resolution: the server already
+        # resolved and committed the descriptor, and the browser's own request
+        # for that exact resource fails. Every figure steps past the failed
+        # candidate to the descriptor's own committed alpha terminal, keeps the
+        # persistent local marker, shows no broken image, and leaves the
+        # recorded generation truth untouched.
+        page = self.logged_in_page((1451, 790), "off")
+        page.route(f"**{SHARED_URL}", lambda route: route.abort("failed"))
+        self._serve_media(page, include_portrait=False)
+        self._commit(page)
+        _wait_mode(page, "exploration")
+        page.wait_for_selector('[data-anchor="presence"] [data-entry-key="target-8"]', timeout=15000)
+        open_verb_card(page, 8)
+        page.wait_for_selector(f"{STANDEE} {ALPHA_FILL}", timeout=15000)
+        self.assertEqual(
+            self._mask_url(page, f"{STANDEE} {ALPHA_FILL}"),
+            f"url('{TERMINAL_URL}')",
+            "the figure falls back to the descriptor's own terminal",
+        )
+        self.assertEqual(
+            page.locator(f"{STANDEE} {FAILURE}").count(),
+            1,
+            "the reached fault keeps its persistent local marker",
+        )
+        self.assertEqual(
+            self._image_src(page, f'{STANDEE} img:not([src$="{TERMINAL_URL}"])'),
+            None,
+            "no broken image element stands in for the figure",
+        )
+        after = store_state(page)["panels"]
+        self.assertEqual(
+            after["art"]["portrait_catalog"]["7"]["artwork"]["generation_state"],
+            "done",
+            "the recorded generation truth is unchanged by a browser failure",
+        )
         page.close()

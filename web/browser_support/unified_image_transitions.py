@@ -98,8 +98,10 @@ def seed_portrait_companions(character) -> list[str]:
     from evennia.objects.models import ObjectDB
     from evennia.utils.create import create_object
 
-    from typeclasses.npcs import NPC
+    from typeclasses.npcs import LLMNPC
     from world.rules.party import join_party
+    from world.rules.traits import trait_config_for_values
+    from world.art.subjects import character_subject_for
 
     location = character.location
     if location is None:
@@ -110,18 +112,26 @@ def seed_portrait_companions(character) -> list[str]:
     seeded: list[str] = []
     for index, key in enumerate((PORTRAIT_COMPANION_KEY, PORTRAIT_FOCUS_KEY)):
         existing = ObjectDB.objects.filter(db_key=key).first()
-        npc = existing or create_object(NPC, key=key, location=location)
+        npc = existing or create_object(LLMNPC, key=key, location=location)
         npc.location = location
         npc.db.portrait_policy = {"mode": "named", "stable_key": key}
         # Both canonical age fields: presentation refuses a subject whose ages
         # are missing or malformed, so a seeded companion must carry them.
         npc.db.age = 30
         npc.db.apparent_age = 30
+        # A living companion's mechanical baseline: the party and combat
+        # readers require the stored HP gauge, which only an initialized trait
+        # configuration supplies.
+        npc._apply_trait_config(trait_config_for_values({}))
         join_party(npc, character)
-        # A real committed card, written through the production gallery writer:
-        # the descriptor's own candidate, never a fixture-only shape.
+        # The committed card is written under the subject PRESENTATION derives
+        # from the policy's stable key, not under the object identity: a card
+        # in any other gallery can never be the descriptor's candidate.
+        subject = character_subject_for(npc)
+        if subject is None:
+            raise AssertionError(f"seeded companion {key!r} carries no portrait subject")
         append_original_card(
-            f"portrait:character:{npc.pk}",
+            subject.full(),
             f"{PORTRAIT_COMPANION_IMAGE_ID[:-1]}{index + 5}",
             FIXTURE_VALID_PNG,
             set_default=True,

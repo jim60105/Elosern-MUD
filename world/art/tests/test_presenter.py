@@ -233,6 +233,13 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertIsNotNone(candidate(descriptor))
         self.assertEqual(candidate(descriptor)["url"], "/art/portrait/character/42.png")
 
+    def test_the_flat_projection_refuses_every_non_scene_subject(self):
+        """The surviving flat payload is SCENE-only, by construction."""
+        with self.assertRaises(Exception):
+            resolve_scene_subject(ArtSubject(ArtSubjectKind.CHARACTER, "42"))
+        with self.assertRaises(Exception):
+            resolve_scene_subject(ArtSubject(ArtSubjectKind.MONSTER, "goblin"))
+
     def test_resolve_scene_handles_valid_and_unresolvable_archetypes(self):
         self.assertEqual(resolve_scene("not_a_scene")["kind"], PLACEHOLDER_UNAVAILABLE)
         payload = resolve_scene(_SYNTH_SCENE)
@@ -330,10 +337,12 @@ class ArtPresenterTests(EvenniaTestCase):
         # never becomes this payload's own image
         # (builtin-silhouette-stage-fallback).
         with patch("world.observability.log_info"):
-            payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+            descriptor = describe_portrait(subject)
+        # A monster identity living outside the portrait store resolves no
+        # candidate; the terminal carries the built-in silhouette.
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
@@ -694,18 +703,14 @@ class FaceRectPayloadTests(_CardPayloadCase):
         seam = {"identity": "defaults/monster_default.png", "key": "man", "face_rect": None}
         no_record = ArtSubject(ArtSubjectKind.MONSTER, "seam-no-record")
         with patch("world.art.presenter.fallback_for", return_value=seam):
-            payload = resolve_scene_subject(no_record)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNone(payload["stage"])
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+            descriptor = describe_portrait(no_record)
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
         self.assertEqual(
-            payload["fallback"],
-            {
-                "key": "man",
-                "url": "/art/defaults/monster_default.png",
-                "face_rect": dict(DEFAULT_FACE_RECT),
-            },
+            terminal(descriptor)["url"], "/art/defaults/monster_default.png"
+        )
+        self.assertEqual(
+            terminal(descriptor)["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT)
         )
         # The unpatched seam fills persons but still returns None for scenes:
         # a scene subject keeps the byte-identical truthful placeholder.

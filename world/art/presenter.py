@@ -11,7 +11,8 @@ projects it twice — as the canonical artwork descriptor
 (``describe_portrait``/``describe_entity``, using the frozen
 ``world.art.descriptors`` vocabulary with each position's stable source id and
 rank and every reached fault at its own position) and, for SCENES ONLY, as the
-flat scene payload ``resolve_scene`` returns. The portrait wire cut over to the
+flat scene payload ``resolve_scene``/``resolve_scene_subject`` returns (which
+refuses every non-scene subject kind). The portrait wire cut over to the
 canonical descriptor (change ``unified-portrait-image-contract``), so no
 portrait flat projection exists any more: a portrait consumer reads
 ``describe_entity``/``describe_portrait`` and the shipped serializers project
@@ -702,7 +703,10 @@ def _scene_placeholder_payload(
 
 
 def resolve_scene_subject(subject: ArtSubject) -> dict:
-    """The flat scene payload of one validated scene subject.
+    """The flat scene payload of one validated SCENE subject.
+
+    Scene-only by construction: any other subject kind is a caller error, so
+    no portrait can ever obtain a flat payload through this seam.
 
     The scene wire's own projection of the one canonical enumeration: the
     scene record's ``done`` asset becomes the payload's image and the truthful
@@ -712,6 +716,10 @@ def resolve_scene_subject(subject: ArtSubject) -> dict:
     truthful placeholder row it is. Nothing here is a portrait projection —
     portraits are read through ``describe_portrait``/``describe_entity``.
     """
+    if subject.kind is not ArtSubjectKind.SCENE:
+        raise ArtSubjectError(
+            f"the flat projection is scene-only; {subject.full()!r} is not a scene"
+        )
     enumeration = _enumerate_portrait(subject)
     if enumeration.attempt is not None:
         return _carried(
