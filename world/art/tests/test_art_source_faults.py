@@ -167,7 +167,8 @@ class _FaultCase(EvenniaTestCase):
 
 class RootHealthFactTests(_FaultCase):
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_a_default_absent_root_is_normal_and_retains_no_fault(self):
         absent = Path(self.tempdir.name) / "absent"
@@ -182,7 +183,8 @@ class RootHealthFactTests(_FaultCase):
         self.warn.assert_not_called()
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_a_configured_missing_root_survives_an_empty_index_as_a_fault(self):
         absent = Path(self.tempdir.name) / "absent"
@@ -202,7 +204,8 @@ class RootHealthFactTests(_FaultCase):
         self.assertNotIn(str(absent), str(self.contexts(self.warn)))
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_an_empty_root_is_healthy_and_an_unreadable_root_is_a_fault(self):
         self.root.mkdir(parents=True)
@@ -221,7 +224,8 @@ class RootHealthFactTests(_FaultCase):
 
 class DeclaredDefaultFaultTests(_FaultCase):
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_missing_declared_default_precedes_the_deterministic_substitute(self):
         self.image("a.png")
@@ -256,7 +260,8 @@ class DeclaredDefaultFaultTests(_FaultCase):
         self.assertIn("manifest_default_not_an_admitted_file", self.reasons(self.warn))
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_declared_default_refused_at_admission_is_a_rejected_fault(self):
         self.image("a.png")
@@ -275,7 +280,8 @@ class DeclaredDefaultFaultTests(_FaultCase):
         self.assertEqual(catalog.refusal_reason(broken), "image_undecodable")
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_an_admitted_declared_default_keeps_no_default_fault(self):
         identity = self.image("a.png")
@@ -301,7 +307,8 @@ class DeclaredDefaultFaultTests(_FaultCase):
         self.assertEqual(entry.face_rect, default_face_rect({"width": 4, "height": 4}))
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_valid_declared_default_is_retained_beside_the_effective_selection(self):
         self.image("a.png")
@@ -317,7 +324,8 @@ class DeclaredDefaultFaultTests(_FaultCase):
 
 class MetadataFaultTests(_FaultCase):
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_malformed_manifest_keeps_a_metadata_fault_with_safe_geometry(self):
         identity = self.image("a.png")
@@ -340,7 +348,8 @@ class MetadataFaultTests(_FaultCase):
         self.assertIsNotNone(catalog.url_for(identity))
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_an_unselected_corrupt_sibling_is_a_diagnostic_only(self):
         healthy = self.image("a.png")
@@ -355,7 +364,8 @@ class MetadataFaultTests(_FaultCase):
         self.assertIn("image_undecodable", self.reasons(self.warn))
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_an_image_whose_rectangle_is_inapplicable_alone_carries_the_fault(self):
         rect = {"x": 0.1, "y": 0.05, "w": 0.5, "h": 0.9}
@@ -378,7 +388,8 @@ class MetadataFaultTests(_FaultCase):
 
 class FactRetentionTests(_FaultCase):
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_wholly_refused_directory_retains_its_requested_default_fault(self):
         broken = self.image("broken.png", content=_UNDECODABLE)
@@ -395,7 +406,8 @@ class FactRetentionTests(_FaultCase):
         self.assertEqual(catalog.refusal_reason(broken), "image_undecodable")
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_manifest_only_directory_retains_a_missing_reference_fault(self):
         self.manifest({"default": "hero.png"})
@@ -414,7 +426,8 @@ class FactRetentionTests(_FaultCase):
         )
 
     @covers_requirement(
-        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade"
+        "official-artwork-catalog::catalog-load-and-refusals-are-observable-through-the-facade",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_facts_survive_an_exhausted_diagnostic_budget(self):
         identity = self.image("a.png")
@@ -442,7 +455,8 @@ class FactRetentionTests(_FaultCase):
         )
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_unsafe_declared_defaults_are_never_echoed_as_identities(self):
         unsafe = (
@@ -488,7 +502,8 @@ class FactRetentionTests(_FaultCase):
                     self.assertNotIn(value, rendered)
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_null_declared_default_is_no_declaration_at_all(self):
         identity = self.image("a.png")
@@ -506,7 +521,8 @@ class FactRetentionTests(_FaultCase):
         self.warn.assert_not_called()
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_facts_are_isolated_per_source(self):
         self.image("a.png")
@@ -526,7 +542,8 @@ class FactRetentionTests(_FaultCase):
         self.assertEqual(catalog.source_faults("preset", "t_synth_absent"), ())
 
     @covers_requirement(
-        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_an_unknown_manifest_key_never_loses_the_declared_default(self):
         """A manifest rejected for an unrelated key still keeps its default fact."""
@@ -573,7 +590,8 @@ class FactRetentionTests(_FaultCase):
                 )
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_an_unopenable_content_directory_keeps_a_source_availability_fault(self):
         self.image("a.png")
@@ -601,7 +619,8 @@ class FactRetentionTests(_FaultCase):
         self.assertEqual(catalog.refusal_reason(f"preset/{_PRESET_KEY}/a.png"), None)
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_a_failed_enumeration_is_a_source_fault_never_a_missing_reference(self):
         """A listing failure must not classify an on-disk default as missing.
@@ -639,7 +658,8 @@ class FactRetentionTests(_FaultCase):
         self.assertEqual(catalog.refusal_reason(identity), None)
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_the_unforeseen_fault_path_keeps_the_facts_already_collected(self):
         """The last-resort handler republishes the facts, not a bare snapshot."""
@@ -700,6 +720,7 @@ class RuntimeLookupSmokeTests(_FaultCase):
     @covers_requirement(
         "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention",
         "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources",
     )
     def test_the_real_lookup_resolves_the_substitute_and_writes_nothing(self):
         broken = self.image("broken.png", content=_UNDECODABLE)
@@ -743,7 +764,8 @@ class RuntimeLookupSmokeTests(_FaultCase):
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
     @covers_requirement(
-        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_a_disabled_generation_scheduler_never_clears_a_recorded_fault(self):
         absent = Path(self.tempdir.name) / "absent"

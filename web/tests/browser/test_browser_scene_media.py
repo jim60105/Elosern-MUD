@@ -251,6 +251,7 @@ class SceneMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     @covers_requirement(
         "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration",
         "bundled-scene-art::bundled-media-has-a-closed-trusted-namespace",
+        "art-source-fault-facts::root-absence-retains-configuration-meaning",
     )
     def test_configured_root_failure_keeps_bundled_media(self):
         """A configured root failure is retained and never hides bundled media.

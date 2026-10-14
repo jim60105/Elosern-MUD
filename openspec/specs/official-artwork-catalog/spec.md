@@ -29,15 +29,19 @@ Define the read-only external official-artwork directory: the `ART_OFFICIAL_ROOT
 - **THEN** it never creates, renames, replaces, or deletes any file under it
 
 ### Requirement: A missing or empty official root is a valid no-art configuration
-A missing, empty, or unreadable `ART_OFFICIAL_ROOT` directory SHALL be a supported startup configuration. Catalog load SHALL complete with an empty index, SHALL emit one bounded info diagnostic naming the empty/absent condition, and startup SHALL proceed with the existing runtime-art and built-in fallback behavior unchanged. Startup SHALL NOT download, extract, sync, or otherwise acquire artwork, and SHALL NOT require Git, S3, or archive availability.
+An absent default optional root or healthy empty root SHALL remain valid offline configuration. Startup SHALL proceed without acquiring artwork. Explicitly configured unavailable roots and unreadable roots SHALL retain bounded availability-failure facts in the snapshot even when the admitted index is empty; absence without explicit bindings SHALL not create a fault.
 
 #### Scenario: Startup with no artwork directory
-- **WHEN** the server starts with `ART_OFFICIAL_ROOT` naming a directory that does not exist
-- **THEN** startup completes, the catalog is empty, one bounded `official_art_catalog_loaded` diagnostic reports the empty root, and no network or extraction call occurs
+- **WHEN** the server starts with the absent default optional root and no explicit artwork binding
+- **THEN** startup completes with an empty index, one bounded catalog event reports normal absence, and no network or extraction occurs
 
 #### Scenario: Ordinary gameplay never acquires artwork
 - **WHEN** a player resolves any portrait while the catalog holds zero entries
 - **THEN** resolution uses only the loaded snapshot and the existing chain, with no filesystem acquisition attempt
+
+#### Scenario: Configured missing root remains a failure fact
+- **WHEN** an explicitly configured official root is missing
+- **THEN** startup succeeds but its snapshot and boundary diagnostic retain configured-root unavailability
 
 ### Requirement: The catalog indexes the mounted layout once at startup and serves from that snapshot
 `world/art/official.py` SHALL index the official root once at startup and ordinary resolution SHALL read from that in-memory snapshot only. An image's root-relative path SHALL be its stable official asset identity.
@@ -108,23 +112,23 @@ Catalog admission SHALL accept only regular, non-symlinked image files that (a) 
 - **THEN** it is refused entry with a bounded diagnostic
 
 ### Requirement: The optional per-content manifest follows the seed-metadata convention
-A content directory MAY carry a `manifest.json` declaring a `default` filename, a `face_rect`, and a `stage` placement, following the existing seed-metadata convention. When no valid explicit default is declared, the content's default image SHALL be the first valid image in deterministic filename order. An invalid or unreadable manifest SHALL emit one bounded diagnostic and behave as if absent, and SHALL NOT prevent that directory's valid images from loading.
+A content directory MAY carry a `manifest.json` declaring a `default` filename, a `face_rect`, and a `stage` placement, following the seed-metadata convention. When no valid explicit default is declared, the content's default image SHALL be the first valid image in deterministic filename order. An invalid or unreadable manifest SHALL emit bounded diagnostics and preserve source-scoped metadata/default faults while using safe deterministic selection and geometry; valid images SHALL still load.
 
 #### Scenario: No manifest uses deterministic filename order
 - **WHEN** a preset content directory holds three valid images and no manifest
 - **THEN** its default image is the first filename in deterministic order
 
 #### Scenario: An invalid manifest degrades without blocking images
-- **WHEN** a content directory's manifest names a nonexistent `default` filename and carries a malformed face rectangle
-- **THEN** one bounded diagnostic is emitted, the fitted default rectangle and identity stage are used, and the directory's valid images still index and resolve
+- **WHEN** a manifest names a nonexistent default and malformed selected-source geometry
+- **THEN** bounded diagnostics and attributable default/metadata facts remain before safe substitution; fitted geometry and valid images stay available
 
 #### Scenario: A face rectangle invalid for one image is ignored for rendering
 - **WHEN** a manifest declares a rectangle that fails validation against one of the images it would apply to
 - **THEN** that rectangle is ignored and the fitted default rectangle is reported for that image, with a bounded diagnostic
 
 #### Scenario: Absent-manifest behaviour uses fitted defaults
-- **WHEN** a manifest is absent or treated as absent
-- **THEN** the fitted per-image default face rectangle and identity stage placement are used
+- **WHEN** a manifest is absent or rejected
+- **THEN** fitted per-image geometry is used; genuine absence is normal and rejected applicable metadata retains its fault
 
 #### Scenario: Image dimensions are decoded locally, never declared
 - **WHEN** a manifest is authored for a content directory
