@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import ArtworkFailure from "./ArtworkFailure.vue";
 import { createFocusTrap } from "./focus-trap.js";
 import {
   clampFaceRect,
@@ -11,6 +12,7 @@ import {
   resizeFaceRect,
 } from "./face-rect-edit.js";
 import { galleryCardName, galleryDate } from "./gallery-copy.js";
+import { useImageAttempts } from "../composables/useImageAttempts.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -24,8 +26,49 @@ const root = ref(null);
 const image = ref(null);
 let trap;
 let drag = null;
-const loaded = ref(false);
-const dimensions = ref(null);
+
+// One rank-10 original resource request built from the exact committed card
+// facts this editor already receives (change unified-image-loading-core). This
+// is ordinary internal loading input for one existing exact original: no
+// subject descriptor, no panel-version parsing, and no reader accepts a new
+// shape — the gallery v2 serializer and its active validator stay unchanged.
+// The later gallery-v3 cutover replaces this caller input with its backend
+// descriptor; the same resource driver remains.
+const request = computed(() => {
+  const url = typeof props.card.url === "string" && props.card.url ? props.card.url : null;
+  if (!url) return null;
+  return {
+    subjectId: url,
+    epoch: props.card.image_id,
+    attempts: [{
+      type: "image",
+      source_id: `gallery.original:${props.card.image_id}`,
+      rank: 10,
+      resource: {
+        resource_id: url,
+        version: props.card.image_id,
+        url,
+        origin: "runtime",
+        geometry: {
+          face_rect: props.card.face_rect ?? null,
+          image_size: props.card.image_size ?? null,
+        },
+      },
+    }],
+    terminal: null,
+  };
+});
+const availability = computed(() => ({ state: "ready", view_subject_id: props.card.image_id }));
+const { attempt, phase, dimensions, reachedFaults, saveEligible, onImageLoad, onImageError, dispose } = useImageAttempts(request, availability);
+
+const loaded = computed(() => phase.value === "success");
+const imageUrl = computed(() => attempt.value?.url ?? null);
+// The crop preview reuses the already observed successful resource; it is never
+// a second original that can fail on its own.
+const previewUrl = computed(() => (loaded.value ? imageUrl.value : null));
+const failure = computed(() => reachedFaults.value[reachedFaults.value.length - 1] ?? null);
+const failureKind = computed(() => (failure.value ? "failure" : null));
+const failureReason = computed(() => failure.value?.reason ?? null);
 const previewStyle = computed(() => {
   // By construction rect is pixel-square when loaded, so aspect ratio is 1:1
   return { width: "100%", height: "100%" };
@@ -34,11 +77,26 @@ const rectStyle = computed(() => ({
   left: `${rect.value.x * 100}%`, top: `${rect.value.y * 100}%`,
   width: `${rect.value.w * 100}%`, height: `${rect.value.h * 100}%`,
 }));
+// Seed the draft from the committed rectangle once per decoded original. A
+// genuinely new original (a replacement or a recovered resource) re-seeds from
+// that original's own committed rectangle; an unchanged one keeps the player's
+// edits, because the watcher only fires on a new attempt token.
+let seededKey = null;
+watch([phase, () => attempt.value?.token], ([value, token]) => {
+  if (value !== "success" || token == null || token === seededKey) return;
+  seededKey = token;
+  const anchor = props.card.face_rect;
+  if (!anchor || (anchor.x === 0.25 && anchor.y === 0.06 && anchor.w === 0.5 && anchor.h === 0.5)) {
+    rect.value = defaultFaceRect(dimensions.value);
+  } else {
+    rect.value = refitFaceRectOnLoad(clampFaceRect(anchor), dimensions.value);
+  }
+}, { immediate: true });
 onMounted(() => {
   trap = createFocusTrap(root.value, { openerEl: document.activeElement });
   trap.enter();
 });
-onBeforeUnmount(() => { trap?.restore(); });
+onBeforeUnmount(() => { trap?.restore(); dispose(); });
 function close() { emit("close"); }
 function keydown(event) {
   event.stopPropagation();
@@ -62,28 +120,8 @@ function move(event) {
 function edit(field, event) {
   rect.value = editFaceRectField(rect.value, field, event.target.valueAsNumber, dimensions.value);
 }
-function imageLoaded() {
-  const w = image.value?.naturalWidth || 0;
-  const h = image.value?.naturalHeight || 0;
-  if (w > 0 && h > 0) {
-    loaded.value = true;
-    dimensions.value = { width: w, height: h };
-    if (!props.card.face_rect || (props.card.face_rect.x === 0.25 && props.card.face_rect.y === 0.06 && props.card.face_rect.w === 0.5 && props.card.face_rect.h === 0.5)) {
-      rect.value = defaultFaceRect(dimensions.value);
-    } else {
-      rect.value = refitFaceRectOnLoad(rect.value, dimensions.value);
-    }
-  } else {
-    loaded.value = false;
-    dimensions.value = null;
-  }
-}
-function imageError() {
-  loaded.value = false;
-  dimensions.value = null;
-}
 function submit() {
-  if (!loaded.value || !dimensions.value) return;
+  if (!saveEligible.value || !dimensions.value) return;
   const finalRect = clampFaceRect(rect.value, dimensions.value);
   emit("submit", { face_rect: finalRect });
 }
@@ -100,7 +138,8 @@ function submit() {
         <section>
           <h4>原始圖片<span class="gallery-muted">（可拖曳調整框選範圍）</span></h4>
           <div class="gallery-face__original">
-            <img ref="image" :src="card.url" :alt="galleryCardName(card)" draggable="false" @load="imageLoaded" @error="imageError">
+            <img v-if="imageUrl" :key="attempt.token" ref="image" :src="imageUrl" :data-attempt-token="attempt.token" :alt="galleryCardName(card)" draggable="false" @load="onImageLoad" @error="onImageError">
+            <ArtworkFailure v-else :kind="failureKind" :reason="failureReason" />
             <div v-if="loaded" class="gallery-face__rect" :style="rectStyle" @pointerdown="start($event)" @pointermove="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">
               <span class="gallery-face__cross"></span>
               <button class="gallery-face__resize" aria-label="拖曳調整框選大小" :disabled="disabled" @pointerdown.stop="start($event, true)" @pointermove.stop="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">↘</button>
@@ -118,7 +157,7 @@ function submit() {
             </label>
           </div>
           <h4>方形裁切預覽（1:1）</h4>
-          <div class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="card.url" :alt="`${galleryCardName(card)}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
+          <div v-if="previewUrl" class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="previewUrl" :alt="`${galleryCardName(card)}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
           <p class="gallery-muted">依真實比例呈顯方形頭像，鎖定等長像素範圍。</p>
           <p v-if="!loaded" class="gallery-muted">圖片尚未載入，無法儲存框選。</p>
           <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，框選已保留。<button @click="emit('log')">查看伺服器訊息</button></p>

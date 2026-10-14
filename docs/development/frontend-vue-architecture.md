@@ -99,3 +99,18 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 - `webclient-vue-application` 與 `webclient-component-showcase` 於 B1 作為全新能力新增（ADDED），並由後續變更修改（MODIFIED）。
 - 元件覆蓋率清單持續擴充：B1 植入初始值，B2 至 B4 擴充，B5 凍結。
 - 真實資料範圍：任何元件不得呈現缺乏後端 OOB 讀取模型（允許清單）或文字串流支援的資料；延後實作的外觀（隊伍面板、親密狀態、完整背包、事件日誌 toast）在 B5 被明確斷言為不存在。
+
+## 圖片載入與資源結果的單一擁有者（unified-image-loading-core）
+
+所有需要多來源排序的圖片介面（圖庫編輯器、立繪、頭像、場景、夢境）共用同一條載入生命週期。這是**唯一**的載入／資源／結果擁有者；後續的圖庫、立繪、場景整合只擴充它，不另寫第二個載入器。
+
+- **`lib/image-attempts.js`（純 reducer）** 擁有一次解析中的嘗試順序、僅已到達的失敗、資源身分／版本的與安全耗盡。輸入是**正規化的內部載入請求**，不是任何面板線路形狀：
+  `{ subjectId, epoch, attempts, terminal }`，其中每個 image 嘗試攜帶
+  `{ source_id, rank, resource }`，而 `resource` 為
+  `{ resource_id, version, url, origin, geometry }`；fault 嘗試攜帶 `{ source_id, rank, reason }`。
+  優先序是穩定的 `rank`，**絕不是**陣列索引：reducer 先排序再依資源身分／版本去重（保留最高優先者），因此重複的資源或終端不可能改變優先序或遮蔽較高優先的候選。耗盡一定終止並保留已到達的失敗，沒有遞迴或無限回退。
+- **`composables/useImageAttempts.js`（本地驅動）** 綁定作用中的主體／epoch／嘗試權杖，以實際 DOM 載入／解碼（真實 `naturalWidth`/`naturalHeight`）觀測成敗，拒絕過期回呼，並在替換或卸載時清除。它把已解碼的位元組重用在**僅幾何變更**的修訂上：重啟身分是有序的解析事實加上主體／epoch 與可用性，幾何不在其中，因此幾何修訂不發出新請求、不改變來源鍵、也不交叉淡入。相同修訂重繪不重試，已到達的失敗維持不變；新的資源版本／鍵才會重新解析。
+- **可用性輸入** `{ state: ready|expected_absent|failed, view_subject_id }` 與描述子分離：`failed` 讓本地 `panel_unavailable` 持續，並使過期回呼與原始儲存資格失效；`expected_absent` 與載入中不得使用錯誤樣式，也不得聲稱生成正在進行。
+- **公開結果** 為 `{ selected, reachedFaults, phase, dimensions }`；`selected` 攜帶實際成功的資源、穩定的 source_id/rank 與觀測到的自然尺寸。消費者可以另外持有顯示內容，但不能自行設定載入成功或重設 reachedFaults。
+- **`ArtworkFailure.vue`／`ArtworkAlpha.vue`** 是共用的呈現原語：失敗標記持續、非模態且具鍵盤／輔助技術說明；alpha 填色只在同一 URL 已被觀測成功後才上色，因此缺席的資源不可能被畫成不透明矩形。
+- **內部請求與未來標準線路的區別：** 本變更讓既有 gallery v2 編輯器**只**以它已提交的單一原始身分／URL／幾何建構一個 rank-10 原始請求（`terminal: null`）——不製造主體解析、不接受多種線路形狀、也不新增面板欄位，現行序列化器與作用中的驗證器維持不變。之後的 gallery v3 切換會把這個呼叫端輸入換成後端描述子；同一個資源驅動不變。

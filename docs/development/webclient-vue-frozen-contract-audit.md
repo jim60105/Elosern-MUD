@@ -375,6 +375,8 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 | `exploration-root` (the exploration root pane wrapper composing the exit compass beside its right column), `place-card-look`／`place-card-wait` (the place card's 查看房間 and 等待 action buttons, rendered only in exploration with the exploration panel available), `wait-card` (the centred wait card the place card's 等待 opens, carrying its card-kind attribute and the dawn／sleep／rest rows above the trailing back row), `dream-question` (the wait card's 進入夢境協作？ question card with its 是／否 answers and close control), `suggestions-pill` (the command panel's 建議 pill at the top right, absent while the committed status is `unavailable`), `suggestions-card` + `suggestions-card-<suffix>` (`suggestions-card-row`, `suggestions-card-dismiss`; the centred suggestions card the pill opens), `choice-card-note` (the shared card shell's muted note line carrying the generating row and the degraded note; added by the exploration-room-actions change) | exploration-room-actions | REMAP-TO-TESTID |
 | `message-content`, `message-name-plate` (the message window's per-page content block and the speaker name plate above the page surface; webclient-message-window-swap + webclient-dialogue-stage-actors), `data-anchor` (the stage anchor placement attribute selector, carrying the command-line／actor-left／actor-right／choices／band-message／band-command／place／vitals／map anchor names; webclient-dialogue-stage-actors + webclient-contextual-hud), `stage-actor` (the cinematic stage's player/host actor node carrying the speaking/side data attributes; webclient-dialogue-stage-actors + webclient-combat-foes-on-stage), `stage-combat-veil` (the combat mode's stage veil with its entrance fade; webclient-combat-stage-chrome), `stage-flash` (the transient mode-change flash; webclient-combat-stage-chrome), `foe-lineup` (the actor-right row container carrying the foe count attribute; webclient-combat-foes-on-stage), `foe-slot` (the per-foe actor slot keyed by its portrait-ref attribute; webclient-combat-foes-on-stage), `foe-gauge` (the slot's hit-point gauge box; webclient-combat-foes-on-stage), `dialogue-choices` (the over-stage choice list card in the choices anchor, keyed by its view attribute; webclient-dialogue-choices-overlay), `dialogue-exit-row` (a row of the dialogue list's exits view; webclient-align-11-dialogue-ux), `settings-overlay-motion-off`／`settings-overlay-motion-full` (the settings overlay's motion-tier toggles, siblings of the listed text-speed family; webclient-reduce-motion) | message-window-swap, dialogue-ux, combat-stage, motion | REMAP-TO-TESTID |
 
+| `artwork-failure`, `artwork-alpha`（共用的在地失敗指示與 alpha 遮罩填色原語：face-rect 原始編輯器在讀到的失敗位置渲染前者、以觀測成功後的同一 URL 填色渲染後者；由 unified-image-loading-core 變更加入，受管旅程 `test_browser_image_loading_core.py` 首次鎖定前者） | unified-image-loading-core | REMAP-TO-TESTID |
+
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
 | Hook | Bucket |
@@ -556,6 +558,11 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### unified-image-loading-core — 2026-10-14（unified-image-loading-core）
+
+- **§2.3 補登 hook：** `artwork-failure` 與 `artwork-alpha` 兩個共用的在地呈現原語登記為 REMAP-TO-TESTID 列。前者是 face-rect 原始編輯器在讀到的失敗位置渲染的持續、非模態說明（`role="status"`），後者是只在同一 URL 已被觀測成功後才填色的 alpha 遮罩原語；受管旅程 `test_browser_image_loading_core.py` 的 `ImageLoadingCoreBrowserTest.test_original_failure_has_persistent_local_state` 對 `artwork-failure` 斷言其文字與角色，因此需要在此凍結登記（`tests/test_webclient_frozen_contract.py` 的受管瀏覽器目標掃描自此轉綠）。
+- **§5 完整性聲明維持成立：** 本項僅為新掛鉤的補登；凍結 façade（§1）、分類（§2）與增量清單（§3）皆未改變（本變更不觸及 OOB 線路或面板序列化），manifest（`component-manifest.json`）以 `Core/ArtworkFailure`、`Core/ArtworkAlpha` 兩列隨其 story 擴充（72 → 74）。
 
 ### exploration-room-actions — 2026-10-13（exploration-room-actions）
 

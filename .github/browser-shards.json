@@ -391,6 +391,7 @@
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_the_reference_viewport",
+        "web.tests.browser.test_browser_image_loading_core.ImageLoadingCoreBrowserTest.test_original_failure_has_persistent_local_state",
         "web.tests.browser.test_browser_inventory_actions.CombatBagDrawerJourney.test_combat_bag_row_opens_the_drawer_and_confirms_one_item_use",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_scene_change",
         "web.tests.browser.test_browser_scene_transitions.SceneTransitionsBrowserTest.test_full_motion_place_card_and_clear",
