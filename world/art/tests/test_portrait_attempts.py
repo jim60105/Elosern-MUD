@@ -39,6 +39,7 @@ from world.art.gallery import (
     identity_stage,
     official_preferences_for,
     record_for,
+    record_error,
     set_official_selection,
 )
 from world.art.official import current_catalog, load_catalog, reset_catalog
@@ -53,6 +54,7 @@ from world.art.presenter import (
 from world.art.queue import claim, ensure, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from web.webclient.presentation import artwork as artwork_wire
 
 from tools.spec_traceability import covers_requirement
 
@@ -429,18 +431,18 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         "art-source-fault-facts::faults-are-attributed-to-requested-sources"
     )
     @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
-    def test_a_metadata_fault_shares_its_candidates_source_and_rank(self):
+    def test_a_metadata_fault_names_its_own_degraded_image(self):
         subject = self._subject("degraded-metadata")
         entity = self._character("degraded-metadata")
         # A manifest rectangle that cannot lie inside the unit square degrades
         # the declared metadata; the substitution is a retained startup fact.
-        self._index(face_rect={"x": 0.5, "y": 0.0, "w": 0.9, "h": 0.9})
+        identity = self._index(face_rect={"x": 0.5, "y": 0.0, "w": 0.9, "h": 0.9})
         descriptor = describe_portrait(subject, entity)
         source = f"portrait.official:preset/{_PRESET_KEY}"
         self.assertEqual(
             self._ordered(descriptor),
             [
-                ("fault", source, descriptors.PORTRAIT_RANK_OFFICIAL),
+                ("fault", f"portrait.official:{identity}", descriptors.PORTRAIT_RANK_OFFICIAL),
                 ("image", source, descriptors.PORTRAIT_RANK_OFFICIAL),
             ],
         )
@@ -456,6 +458,67 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         payload = resolve_subject(subject, entity=entity)
         self.assertEqual(payload["face_rect"], fitted)
         self.assertEqual(payload["status"], None)
+
+    @covers_requirement(
+        "art-source-fault-facts::faults-are-attributed-to-requested-sources"
+    )
+    def test_a_replaced_manifest_default_and_its_substitute_never_collide(self):
+        # Real startup admission: the manifest declares a default no listing
+        # entry carries, so the deterministic substitute is admitted with the
+        # declared default's own retained fault before it.
+        subject = self._subject("replaced-default")
+        entity = self._character("replaced-default")
+        identity = self._index(default="gone.png")
+        descriptor = describe_portrait(subject, entity)
+        self.assertEqual(
+            self._ordered(descriptor),
+            [
+                (
+                    "fault",
+                    f"portrait.official:preset/{_PRESET_KEY}/gone.png",
+                    descriptors.PORTRAIT_RANK_OFFICIAL,
+                ),
+                (
+                    "fault",
+                    f"portrait.official:{identity}",
+                    descriptors.PORTRAIT_RANK_OFFICIAL,
+                ),
+                (
+                    "image",
+                    f"portrait.official:preset/{_PRESET_KEY}",
+                    descriptors.PORTRAIT_RANK_OFFICIAL,
+                ),
+            ],
+        )
+        self.assertEqual(
+            descriptor["attempts"][0]["reason"],
+            descriptors.REASON_EXPLICIT_REFERENCE_MISSING,
+        )
+        self.assertEqual(
+            descriptor["attempts"][1]["reason"], descriptors.REASON_METADATA_INVALID
+        )
+        self.assertEqual(descriptor["attempts"][2]["resource"]["resource_id"], identity)
+        # Two faults of one layer must never collide on one source id and rank:
+        # the canonical wire validator refuses such a descriptor outright.
+        artwork_wire.validate_artwork(descriptor)
+
+    @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
+    def test_a_recorded_gallery_failure_is_the_subjects_generation_truth(self):
+        subject = self._subject("gallery-failure")
+        entity = self._character("gallery-failure", provenance=False)
+        # The shipped gallery writer records the failure; no card and no
+        # classic record exist, so the failure is the only generation fact.
+        record_error(subject, "sd_unreachable")
+        with override_settings(ART_SCHEDULER_ENABLED=False):
+            descriptor = describe_portrait(subject, entity)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
+        self.assertEqual(descriptor["generation_subject"], subject.full())
+        self.assertEqual(descriptor["attempts"], [])
+        # A stored card never erases the recorded failure either.
+        self._card(subject)
+        descriptor = describe_portrait(subject, entity)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
+        self.assertEqual(len(descriptor["attempts"]), 1)
 
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"

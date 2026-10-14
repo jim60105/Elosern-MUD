@@ -361,18 +361,22 @@ def _classic_attempts(
 
 
 def _generation_facts(
-    subject: ArtSubject, record: ArtAssetRecord | None, has_cards: bool
+    subject: ArtSubject,
+    record: ArtAssetRecord | None,
+    has_cards: bool,
+    gallery_failed: bool,
 ) -> tuple[str, str]:
     """The subject's recorded generation key and state, independent of any candidate.
 
     A pure read of stored state: a live gallery request or a claimed/pending
-    classic record is ``pending``; a recorded failure (the record's last error
-    code, or a failed classic record) is ``failed``; a stored card or a
-    ``done`` classic record is ``done``; anything else is factually
-    ``missing``. Nothing here erases a recorded failure or invents an active
-    job, so a subject whose generation is deliberately disabled and unstarted
-    claims nothing, while a finished official image can never complete a
-    pending or failed generation of the subject's own.
+    classic record is ``pending``; a recorded failure (the gallery record's
+    retained error, the classic record's own error code, or a failed classic
+    record) is ``failed``; a stored card or a ``done`` classic record is
+    ``done``; anything else is factually ``missing``. Nothing here erases a
+    recorded failure or invents an active job, so a subject whose generation is
+    deliberately disabled and unstarted claims nothing, while a finished
+    official image can never complete a pending or failed generation of the
+    subject's own.
     """
     pending = bool(pending_gallery_jobs(subject)) if capabilities_for(
         subject.kind.value
@@ -382,7 +386,11 @@ def _generation_facts(
     )
     if pending or recorded == descriptors.GENERATION_PENDING:
         state = descriptors.GENERATION_PENDING
-    elif (record is not None and record.db.last_error_code) or recorded == descriptors.GENERATION_FAILED:
+    elif (
+        gallery_failed
+        or (record is not None and record.db.last_error_code)
+        or recorded == descriptors.GENERATION_FAILED
+    ):
         state = descriptors.GENERATION_FAILED
     elif has_cards or recorded == descriptors.GENERATION_DONE:
         state = descriptors.GENERATION_DONE
@@ -444,8 +452,13 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
     chain = resolve_display_chain(subject, entity)
     for slot in chain.slots:
         source_id, rank = _slot_source(slot.layer, slot.source_identity)
-        for reason in slot.faults:
-            attempts.append(_PortraitAttempt(source_id, rank, fault=reason))
+        for identity, reason in slot.faults:
+            # A fault names its OWN failed source identity: two facts of one
+            # layer (a replaced manifest default and a degraded image) must
+            # never collide on one source id at one rank.
+            attempts.append(
+                _PortraitAttempt(_slot_source(slot.layer, identity)[0], rank, fault=reason)
+            )
         if slot.facts is None:
             continue
         # An official identity embeds an operator-chosen filename, so a URL
@@ -477,7 +490,13 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
         official = official_default_slot(subject, entity)
         if official.source_identity is not None:
             source_id, rank = _slot_source("official", official.source_identity)
-            faults = list(official.faults)
+            faults: list[_PortraitAttempt] = []
+            for identity, reason in official.faults:
+                faults.append(
+                    _PortraitAttempt(
+                        _slot_source("official", identity)[0], rank, fault=reason
+                    )
+                )
             if official.facts is not None:
                 if len(official.facts["url"]) <= MAX_PORTRAIT_MEDIA_URL:
                     candidate = _PortraitAttempt(
@@ -503,9 +522,12 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
                             "identity": official.facts["identity"],
                         },
                     )
-                    faults.append(descriptors.REASON_CONFIGURATION_INVALID)
-            for reason in faults:
-                attempts.append(_PortraitAttempt(source_id, rank, fault=reason))
+                    faults.append(
+                        _PortraitAttempt(
+                            source_id, rank, fault=descriptors.REASON_CONFIGURATION_INVALID
+                        )
+                    )
+            attempts.extend(faults)
             if candidate is not None:
                 attempts.append(candidate)
     # The already-resolved entity rides along so the seam reads its sex,
@@ -514,7 +536,7 @@ def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeratio
     # exactly when no real candidate resolved, so that is the report.
     fallback = fallback_for(subject, entity=entity, report=(candidate is None))
     generation_subject, generation_state = _generation_facts(
-        subject, record, chain.has_cards
+        subject, record, chain.has_cards, chain.failed
     )
     return _PortraitEnumeration(
         descriptors.descriptor(

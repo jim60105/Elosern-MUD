@@ -87,15 +87,17 @@ class ChainSlot:
     no identity at all. ``facts`` is the resolving source's read-only facts
     (the tolerant card dict, or the official layer's admitted-and-resolved
     facts) and is ``None`` exactly when the position resolved nothing.
-    ``faults`` holds the bounded reasons that belong at this position BEFORE
-    its candidate: the reason of an explicit source that could not resolve, or
-    the retained metadata fault of the very image the position resolved.
+    ``faults`` holds the bounded faults that belong at this position BEFORE its
+    candidate, each as its own ``(source_identity, reason)`` pair: the failed
+    identity of an explicit source that could not resolve, or the exact image
+    whose retained startup metadata fact accompanies the candidate. A fault
+    carries its OWN identity, so two faults of one layer never collide.
     """
 
     layer: str
     source_identity: str | None = None
     facts: dict | None = None
-    faults: tuple[str, ...] = ()
+    faults: tuple[tuple[str, str], ...] = ()
 
 
 @dataclass(frozen=True)
@@ -103,13 +105,15 @@ class DisplayChain:
     """The chain's steps 1-4: their ordered slots plus the subject's own card fact.
 
     ``has_cards`` reports whether the subject's record carries at least one
-    valid card — a completed generation of its own — beside the slots, so a
+    valid card — a completed generation of its own — and ``failed`` whether it
+    retains a recorded gallery generation failure, both beside the slots, so a
     consumer can state the subject's recorded generation truth without reading
     the record a second time.
     """
 
     slots: tuple[ChainSlot, ...]
     has_cards: bool
+    failed: bool = False
 
 
 def card_identity_resolution(subject: ArtSubject, card: dict) -> tuple[str | None, str | None]:
@@ -232,7 +236,9 @@ def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayCha
     """
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:
-        return DisplayChain((), False)
+        return DisplayChain((), False, False)
+    gallery_record = record_for(subject)
+    failed = gallery_record is not None and bool(gallery_record.db.last_error_code)
     cards = cards_for(subject)
     slots: list[ChainSlot] = []
     if capability.supports_bindings:
@@ -241,18 +247,19 @@ def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayCha
             return DisplayChain(
                 (ChainSlot("bound", str(bound["image_id"]), bound),),
                 bool(cards),
+                failed,
             )
     selection = official_selection_slot(subject, entity)
     if selection.facts is not None:
-        return DisplayChain((selection,), bool(cards))
+        return DisplayChain((selection,), bool(cards), failed)
     if selection.faults:
         slots.append(selection)
     default = _default_card_slot(subject, cards)
     if default.facts is not None:
-        return DisplayChain((*slots, default), bool(cards))
+        return DisplayChain((*slots, default), bool(cards), failed)
     if default.faults:
         slots.append(default)
-    return DisplayChain(tuple(slots), bool(cards))
+    return DisplayChain(tuple(slots), bool(cards), failed)
 
 
 def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
@@ -328,12 +335,15 @@ def _default_card_slot(subject: ArtSubject, cards: list[dict]) -> ChainSlot:
         _, fault = card_identity_resolution(subject, card)
         if fault is None:
             return ChainSlot("default", str(card["image_id"]), card)
-        return ChainSlot("default", str(card["image_id"]), None, (fault,))
+        return ChainSlot(
+            "default", str(card["image_id"]), None, ((str(card["image_id"]), fault),)
+        )
+    identity = default_image_id if isinstance(default_image_id, str) else ""
     return ChainSlot(
         "default",
-        default_image_id if isinstance(default_image_id, str) else None,
+        identity or None,
         None,
-        (descriptors.REASON_EXPLICIT_REFERENCE_MISSING,),
+        ((identity, descriptors.REASON_EXPLICIT_REFERENCE_MISSING),),
     )
 
 
@@ -415,8 +425,8 @@ def _official_facts_for(reference, identity: str, catalog) -> dict | None:
     }
 
 
-def _official_metadata_faults(identity: str) -> tuple[str, ...]:
-    """The retained metadata fault of one exact admitted image, as a reason tuple.
+def _official_metadata_faults(identity: str) -> tuple[tuple[str, str], ...]:
+    """The retained metadata fault of one exact admitted image, as an identity/reason pair.
 
     Identity-scoped on purpose: a fault of an unselected refused sibling is an
     operational diagnostic and never accompanies this image's candidate.
@@ -424,24 +434,36 @@ def _official_metadata_faults(identity: str) -> tuple[str, ...]:
     from world.art import official
 
     fault = official.current_catalog().fault_for(identity)
-    return (fault.reason,) if fault is not None else ()
+    return ((identity, fault.reason),) if fault is not None else ()
 
 
-def _official_source_faults(reference, catalog) -> tuple[str, ...]:
+def _official_source_faults(reference, catalog) -> tuple[tuple[str, str], ...]:
     """The pre-substitute startup faults retained for one official content source.
 
-    Only facts scoped to the reference itself: an unavailable content directory
-    or a manifest-declared default that a deterministic substitute replaced.
-    Per-image metadata faults are read through :func:`_official_metadata_faults`
-    so only the image a caller actually resolved can carry one.
+    Each entry is its own ``(failed identity, reason)`` pair, so a fault always
+    names the exact source it belongs to: an unavailable content directory (the
+    reference itself) or a manifest-declared default that a deterministic
+    substitute replaced. Per-image metadata faults are read through
+    :func:`_official_metadata_faults`, so only the image a caller actually
+    resolved can carry one.
     """
     from world.art import official
 
     return tuple(
-        fault.reason
+        (fault.identity, fault.reason)
         for fault in catalog.source_faults(reference.kind, reference.key)
         if fault.scope in (official.SOURCE_SCOPE_DEFAULT, official.SOURCE_SCOPE_SOURCE)
     )
+
+
+def _official_unavailable_reason(reference, catalog) -> str | None:
+    """The retained directory-availability reason of one official source, or ``None``."""
+    from world.art import official
+
+    for fault in catalog.source_faults(reference.kind, reference.key):
+        if fault.scope == official.SOURCE_SCOPE_SOURCE:
+            return fault.reason
+    return None
 
 
 def official_selection_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
@@ -477,10 +499,10 @@ def official_selection_slot(subject: ArtSubject, entity: Any = None) -> ChainSlo
     if catalog.refusal_reason(selection) is not None:
         reason = descriptors.REASON_SOURCE_REJECTED
     elif reference is not None:
-        reasons = _official_source_faults(reference, catalog)
-        if reasons:
-            reason = reasons[0]
-    return ChainSlot("personal", selection, None, (reason,))
+        unavailable = _official_unavailable_reason(reference, catalog)
+        if unavailable is not None:
+            reason = unavailable
+    return ChainSlot("personal", selection, None, ((selection, reason),))
 
 
 def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | None:

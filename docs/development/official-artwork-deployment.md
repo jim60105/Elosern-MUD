@@ -204,6 +204,10 @@ The mounted directory contributes only the official positions of that order:
 - an entity whose stored provenance declares no reference adds **no** official
   attempt and no fault — a never-mounted directory is the ordinary
   no-artwork configuration, exactly as it is for the gallery;
+- root-level availability (`official_art_catalog_loaded`'s `root_state` and
+  `root_fault`) stays a deployment fact of the whole catalog rather than a
+  per-subject fault: an explicitly configured but unreadable root is reported
+  once at startup, and no subject's attempts carry a directory-wide taint;
 - a personal selection or a named default card that can no longer resolve
   keeps its bounded fault at its own position, before the substitute that
   follows it, and the stored preference is never deleted;
