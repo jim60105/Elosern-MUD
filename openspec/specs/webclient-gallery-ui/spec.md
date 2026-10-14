@@ -319,6 +319,10 @@ Stage and drawer full-figure portraits SHALL render contain/bottom-aligned with 
 - **WHEN** the stage-transform work lands
 - **THEN** existing inline stage placeholders remain unchanged
 
+#### Scenario: Geometry revision reuses decoded resource
+- **WHEN** a descriptor revision changes stage but resource identity/version is unchanged
+- **THEN** updated placement applies immediately to already decoded bytes, with no new resource request, source-key change or crossfade
+
 ### Requirement: The stage editor previews a local triple against a static adult reference
 The selected completed card SHALL expose 比例調整 opening a dedicated accessible modal with a fixed 3:4 preview and paired range/number controls 比例 [0.2, 2.0], 水平/垂直 [-0.5, 0.5], all step 0.01. Controls SHALL synchronize and clamp locally; drag SHALL map captured pointer deltas to preview-frame fractions, preserving scale and clamping offsets. 重設 SHALL locally restore identity. The current card SHALL use the same contain/bottom transform as live stage.
 

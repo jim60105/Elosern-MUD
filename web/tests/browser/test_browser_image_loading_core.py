@@ -17,6 +17,8 @@ from __future__ import annotations
 import re
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
@@ -81,6 +83,9 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         page.locator(_FACE_BUTTON).first.click()
         page.wait_for_selector(_FACE_MODAL, timeout=30000)
 
+    @covers_requirement(
+        "image-attempt-lifecycle::unexpected-failures-remain-locally-accessible"
+    )
     def test_original_failure_has_persistent_local_state(self) -> None:
         from web.browser_support.unified_image_transitions import (
             REPAIRED_ORIGINAL_IMAGE_ID,
