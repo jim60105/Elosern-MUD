@@ -43,7 +43,7 @@ export function lineupSlotByIdentity(slots, identity) {
 // the committed panel it is judged against, and whether that panel admitted a
 // reference at all (so a deliberately unadmitted figure is expected absence,
 // never a local failure marker). No client-built art key.
-function position(artPanel, portraitRef) {
+function position(portraitFor, artPanel, portraitRef) {
   return {
     artwork: portraitFor(artPanel, portraitRef),
     panel: artPanel,
@@ -58,7 +58,7 @@ export function companionFigures({ player, companions, actorIdentity, possessing
   // status v2 has a bounded string identity; party v2 has safe integers.
   const controlledIndex = possessing ? rows.findIndex((row) => String(row.identity) === actorIdentity) : -1;
   const figure = (row) => ({
-    identity: row.identity, ...position(artPanel, row.portrait_ref),
+    identity: row.identity, ...position(portraitFor, artPanel, row.portrait_ref),
     displayName: row.display_name, isControlled: false,
   });
   const back = rows.map((row, index) => index === controlledIndex ? { ...player, isControlled: false } : figure(row));

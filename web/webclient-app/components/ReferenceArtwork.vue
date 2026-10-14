@@ -84,6 +84,9 @@ const alphaResult = computed(() => (
   silhouette.value && phase.value === "success" ? { url: probeUrl.value, phase: "success" } : null
 ));
 const realImage = computed(() => !!probeUrl.value && !silhouette.value && phase.value === "success");
+// An attempt is in flight: the placeholder never paints over an image the
+// browser is still loading (it stands once every permitted source is spent).
+const loading = computed(() => phase.value === "loading");
 // The crop always follows the LIVE descriptor: the presented resource's own
 // geometry, so a geometry-only re-presentation applies as soon as it lands.
 const geometry = computed(() => (
@@ -160,7 +163,7 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
       @load="onImageLoad"
       @error="onImageError"
     >
-    <div v-if="stage && !realImage" class="reference-artwork__silhouette" data-testid="reference-artwork__placeholder" aria-hidden="true">
+    <div v-if="stage && !realImage && !loading" class="reference-artwork__silhouette" data-testid="reference-artwork__placeholder" aria-hidden="true">
       <!-- The descriptor's own terminal alpha mask, dark-filled and
            floor-aligned: painted only once that resource itself loaded, so a
            missing bundled resource leaves the name and the truthful label
@@ -172,11 +175,11 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
         <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
       </div>
     </div>
-    <div v-else-if="!stage && !avatar && !realImage" class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
+    <div v-else-if="!stage && !avatar && !realImage && !loading" class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
       <span class="reference-artwork__placeholder-glyph">{{ glyph }}</span>
       <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
     </div>
-    <span v-else-if="avatar && !realImage" class="reference-artwork__avatar-glyph" :data-testid="initialTestId ?? 'reference-artwork__placeholder'" aria-hidden="true">{{ glyph }}</span>
+    <span v-else-if="avatar && !realImage && !loading" class="reference-artwork__avatar-glyph" :data-testid="initialTestId ?? 'reference-artwork__placeholder'" aria-hidden="true">{{ glyph }}</span>
     <figcaption v-if="stage" class="reference-artwork__stage-caption">{{ name }}{{ name && stateLabel ? "，" : "" }}{{ stateLabel }}</figcaption>
     <!-- A framed portrait captions only a shown image; a placeholder's label
          is already its one visible state line, and an avatar carries none. -->
