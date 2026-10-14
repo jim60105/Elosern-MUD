@@ -242,7 +242,8 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
 
         # --- The stage dialog cannot save it either, and keeps only the ruler.
         self._open_card_editor(page, SEEDED_ORIGINAL_IMAGE_ID, _STAGE_BUTTON, _STAGE_MODAL)
-        self.assertEqual(page.locator(_STAGE_FIGURE).count(), 0)
+        # The failure settles asynchronously: the broken figure is removed first.
+        page.wait_for_selector(_STAGE_FIGURE, state="detached", timeout=30000)
         self.assertEqual(page.locator(_STAGE_ADULT).count(), 1)
         stage_save = page.locator(_STAGE_SAVE)
         self.assertTrue(stage_save.is_disabled())
