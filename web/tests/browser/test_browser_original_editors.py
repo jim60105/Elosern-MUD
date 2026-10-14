@@ -194,6 +194,10 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         "webclient-gallery-ui::the-face-rect-modal-stores-geometry-over-the-original-image",
         "webclient-gallery-ui::stage-saves-reuse-correlated-lifecycle-and-accessible-gallery-chrome",
     )
+    @covers_requirement(
+        "original-image-edit-eligibility::only-decoded-original-dimensions-enable-saving",
+        "original-image-edit-eligibility::editing-failures-have-distinct-visible-states",
+    )
     def test_failed_original_never_saves(self) -> None:
         from web.browser_support.unified_image_transitions import (
             SEEDED_ORIGINAL_IMAGE_ID,
@@ -261,6 +265,10 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
     @covers_requirement(
         "webclient-gallery-ui::the-face-rect-modal-stores-geometry-over-the-original-image",
         "webclient-gallery-ui::stage-saves-reuse-correlated-lifecycle-and-accessible-gallery-chrome",
+    )
+    @covers_requirement(
+        "original-image-edit-eligibility::only-decoded-original-dimensions-enable-saving",
+        "original-image-edit-eligibility::editing-failures-have-distinct-visible-states",
     )
     def test_new_original_recovers_and_ruler_failure_is_local(self) -> None:
         from web.browser_support.unified_image_transitions import (
