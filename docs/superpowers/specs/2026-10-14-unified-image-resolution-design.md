@@ -1,10 +1,10 @@
 # Unified Image Resolution and Missing-Image Presentation
 
 **Date:** 2026-10-14
-**Status:** Written specification approved by the user; OpenSpec proposal handoff explicitly authorized.
+**Status:** Written specification approved by the user. Fifteen OpenSpec proposals are filed on the primary branch; their inventory and batch implementation order are recorded in section 11.
 **Scope:** Shared artwork resolution, complete built-in scene artwork, room-specific official scenes, and consistent expected-missing and unexpected-failure presentation.
 
-This document records the approved design. It does not claim that the implementation or new artwork exists. Implementation proceeds through project OpenSpec changes after the written specification and implementation plan are reviewed.
+This document records the approved design and its filed proposal set. It does not claim that the implementation or new artwork exists. Implementation proceeds change-by-change through the OpenSpec apply workflow in the section 11 order; each apply is a separate user request.
 
 ## 1. Goals and architectural amendments
 
@@ -296,3 +296,61 @@ This is one cross-surface policy design. The implementation plan may split depen
 The feature is complete only when the eleven actual scene artworks, per-room official resolution, all production consumers, fault visibility, and the acceptance evidence are delivered. A shared component without migrated callers, a type registry without artwork, or a silent fallback that hides failures is not completion.
 
 The written specification was reviewed and approved by the user. The user explicitly requested OpenSpec proposals, each strictly below eight engineer-hours, with focused test commands in tasks.md. The repository `openspec-propose` workflow replaces the unavailable `writing-plans` step for this handoff. The proposals contain planning artifacts only; implementation requires a separate OpenSpec apply request.
+
+## 11. Filed proposal inventory and batch implementation order
+
+Fifteen OpenSpec proposals implementing this design are filed on the primary branch under `openspec/changes/<id>/` (planning artifacts only; none is applied). Every estimate includes implementation, assets, tests, smoke, docs, and gates, and stays strictly below eight engineer-hours. `tasks.md` in each change names the exact focused test commands, actual-surface smoke steps, registration/doc obligations, and objective success conditions for its work.
+
+| ID | Change | Scope | Est. h | Depends on |
+|---|---|---|---:|---|
+| A | `unified-scenes-outdoor-art` | Three outdoor scene images; owns the tracked built-in artwork contract exception and the reusable image gate | 7.00 | none |
+| B | `unified-scenes-interior-art` | Tavern, dungeon, ruin images and provenance | 6.50 | A |
+| C | `unified-scenes-sacred-art` | Cave, shrine, dream images and provenance | 6.50 | A |
+| D | `unified-scenes-terminal-art` | Town and forest canonical terminal images plus provenance | 4.75 | A |
+| E | `unified-scene-catalog` | Eleven scene definitions, registry contract, operator scene/room catalog, bundled media, sample retirement | 7.25 | A, B, C, D |
+| F | `unified-art-source-faults` | Attributed source faults, catalog health facts, malformed-metadata facts, safe geometry | 5.75 | E |
+| G | `unified-image-loading-core` | Shared ordered-attempt state machine; first integration in the face-rect editor | 7.50 | none |
+| H | `unified-gallery-image-contract` | Canonical descriptor, gallery wire migration, card/detail previews | 6.50 | F, G |
+| I | `unified-gallery-original-editors` | Original-only edit eligibility, transform editor, reference-ruler fault | 5.50 | G, H |
+| J | `unified-portrait-source-resolution` | Backend portrait source enumeration, silhouette integration, faults | 6.50 | H |
+| K | `unified-portrait-image-contract` | Portrait wire, authorized full references, all figure cutovers | 7.50 | J |
+| L | `unified-avatar-rendering` | Shared avatar, grapheme initial, localized unexpected-failure indication | 5.25 | K |
+| M | `unified-room-art-metadata` | Room-art identity contract, permanent interiors, pooled-wilderness clearing | 6.25 | E |
+| N | `unified-scene-rendering` | Scene selection, retention, provisional background, full view, mode CSS removal | 7.50 | K, M |
+| O | `unified-dream-rendering` | Dream wire and shared scene presentation | 4.75 | N |
+
+### 11.1 Batch implementation order
+
+Apply wave by wave; a change may start once every dependency is archived with synced main specs. Within a wave, changes are independent and may run in parallel, subject to the shared-file conflicts below.
+
+```text
+Wave 1:  A  G            (no dependencies; parallel-safe: disjoint files)
+Wave 2:  B  C  D         (all follow A; parallel-safe with each other)
+Wave 3:  E               (needs the full eleven-image inventory)
+Wave 4:  F  M            (both follow E; parallel-safe: disjoint files)
+Wave 5:  H               (joins backend faults and the frontend core)
+Wave 6:  I  J            (both follow H; parallel-safe: disjoint files)
+Wave 7:  K               (portrait wire and figure cutovers)
+Wave 8:  L  N            (L follows K; N follows K and M; parallel-safe: disjoint tests)
+Wave 9:  O               (dream cutover after the scene renderer)
+```
+
+Total planned effort is 92 engineer-hours. The design is complete only after all fifteen changes are applied and archived; no change may be skipped as "optional polish".
+
+### 11.2 Shared-file integration conflicts
+
+Parallel waves assume disjoint files only when stated. These paths are shared integration surfaces, coordinated by the change that owns them:
+
+| Path | Owners (in order) |
+|---|---|
+| Image asset/data tests and `.github/evennia-shards.json` | A introduces; B, C, D, E extend |
+| `docs/superpowers/specs/2026-07-29-ai-mud-engine-design.md` | A records the tracked exception; E records the operator scene layout |
+| Official catalog and `web/art_media.py` | E owns layout/serving extensions; F adds health/reference facts |
+| `web/webclient-app/components/image-loading.js` | G owns the state machine; K and N extend the contract |
+| Gallery wire modules, `GalleryPanel.vue`, Node gate | H owns the gallery contract migration |
+| Portrait wire and `web/webclient/presentation` | J prepares backend sources; K cuts the wire over |
+| Shared failure indicator | L owns the compact indicator component |
+| `tests/test_webclient_frozen_contract.py` | Each active wire migration updates it; G and H already touch it |
+| Development docs | E, H, J, K, L, M record their respective boundaries |
+
+When two same-wave changes must touch the same registration file, serialize them in the listed owner order rather than merging concurrent edits.
