@@ -10,6 +10,7 @@ serialization size.
 
 from pathlib import Path
 import base64
+import hashlib
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -69,80 +70,145 @@ def _valid_scene(**overrides):
     return value
 
 
+def _fingerprint(label: str) -> str:
+    """A deterministic 64-character lowercase digest for one fixture fact."""
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+# The canonical artwork descriptor vocabulary the migrated wire carries: one
+# closed fact set shared by the art catalog entry and the roster row portrait.
+# The revision and the resource versions are real digests of their own fixture
+# label; the validators bound their SHAPE and no reader recomputes them.
+SILHOUETTE_FACE_RECT = {"x": 0.3403, "y": 0.02, "w": 0.3194, "h": 0.18}
+
+
+def _valid_resource(**overrides):
+    value = {
+        "resource_id": "portrait/monster/low.png",
+        "version": _fingerprint("resource"),
+        "url": "/art/portrait/monster/low.png",
+        "origin": "runtime",
+        "geometry": {
+            "image_size": {"width": 864, "height": 1536},
+            "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+            "aspect_ratio": "3:4",
+        },
+    }
+    value.update(overrides)
+    return value
+
+
+def _silhouette_terminal(**overrides):
+    """The committed silhouette alpha mask at its own terminal rank."""
+    value = {
+        "kind": "alpha_mask",
+        "source_id": "portrait.alpha:monster_anon",
+        "rank": 100,
+        "resource": _valid_resource(
+            resource_id="defaults/monster_anon.webp",
+            version=_fingerprint("terminal"),
+            url="/art/defaults/monster_anon.webp",
+            origin="silhouette",
+            geometry={
+                "image_size": None,
+                "face_rect": dict(SILHOUETTE_FACE_RECT),
+                "stage": None,
+                "aspect_ratio": "3:4",
+            },
+        ),
+    }
+    value.update(overrides)
+    return value
+
+
+def _valid_artwork(**overrides):
+    """One complete canonical descriptor with a resolved runtime candidate."""
+    value = {
+        "subject_id": "portrait:monster:low",
+        "revision": _fingerprint("revision"),
+        "generation_subject": "portrait:monster:low",
+        "generation_state": "done",
+        "attempts": [
+            {
+                "type": "image",
+                "source_id": "portrait.default:1",
+                "rank": 30,
+                "resource": _valid_resource(),
+            }
+        ],
+        "terminal": _silhouette_terminal(),
+        "retention_sources": [],
+    }
+    value.update(overrides)
+    return value
+
+
 def _valid_catalog_entry(**overrides):
     value = {
-        "subject_key": "portrait:monster:low",
-        "status": "done",
-        "url": "/art/portrait/monster/low.png",
-        "aspect_ratio": "3:4",
-        "alt": "低階魔物",
-        "placeholder": None,
-        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
-        "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
-        "origin": "runtime",
-        # The decorative built-in silhouette the fallback seam resolved: it
-        # rides beside the real fields and never fills them
-        # (builtin-silhouette-stage-fallback).
-        "fallback": {
-            "key": "monster_anon",
-            "url": "/art/defaults/monster_anon.webp",
-            "face_rect": {"x": 0.3403, "y": 0.02, "w": 0.3194, "h": 0.18},
-        },
+        "artwork": _valid_artwork(),
         "context": {"name": "哥布林", "role": "敵方"},
     }
     value.update(overrides)
     return value
 
 
-SILHOUETTE_FALLBACK = {
-    "key": "woman",
-    "url": "/art/defaults/woman.webp",
-    "face_rect": {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16},
-}
-
-
 def _silhouette_entry(**overrides):
-    """A truthful placeholder row carrying the built-in silhouette."""
-    value = {
-        "subject_key": None,
-        "status": "missing",
-        "url": None,
-        "aspect_ratio": None,
-        "alt": "未生成",
-        "placeholder": {"kind": "missing", "label": "未生成"},
-        "face_rect": None,
-        "stage": None,
-        "origin": "silhouette",
-        "fallback": dict(SILHOUETTE_FALLBACK),
-    }
-    value.update(overrides)
-    return _valid_catalog_entry(**value)
+    """A truthful admitted row with no real candidate and its alpha terminal."""
+    artwork = _valid_artwork(
+        subject_id="portrait:character:42",
+        generation_subject=None,
+        generation_state="missing",
+        attempts=[],
+    )
+    return _valid_catalog_entry(artwork=artwork, **overrides)
 
 
 def _bare_placeholder_entry(**overrides):
-    """A placeholder row with no built-in identity (e.g. a scene-kind actor)."""
-    return _silhouette_entry(fallback=None, origin="placeholder", **overrides)
+    """An admitted row with neither a candidate nor a built-in identity."""
+    artwork = _valid_artwork(
+        subject_id="portrait:character:42",
+        generation_subject=None,
+        generation_state=None,
+        attempts=[],
+        terminal=None,
+    )
+    return _valid_catalog_entry(artwork=artwork, **overrides)
 
 
 def _official_entry(**overrides):
     """A resolved official default: the mounted catalog's read-only image.
 
-    It is a real image but never a generated asset, so it carries its own
-    fingerprinted same-origin URL and NO status or placeholder — only the
-    decorative silhouette reference a browser re-renders when the real image
-    fails to load (``official-art-resolution``).
+    It is a real image but never a generated asset, so its own candidate
+    carries the ``official`` origin; recorded generation truth stays an
+    independent fact of the descriptor (``official-art-resolution``).
     """
+    artwork = _valid_artwork(
+        subject_id="portrait:character:42",
+        generation_subject="portrait:character:42",
+        generation_state=None,
+        attempts=[
+            {
+                "type": "image",
+                "source_id": "portrait.official:preset/t_synth_preset",
+                "rank": 50,
+                "resource": _valid_resource(
+                    resource_id="preset/t_synth_preset/hero.webp",
+                    version=_fingerprint("official"),
+                    url="/art/official/" + "a" * 64 + "/preset/t_synth_preset/hero.webp",
+                    origin="official",
+                    geometry={
+                        "image_size": None,
+                        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+                        "stage": {"scale": 1.4, "x": 0.1, "y": -0.2},
+                        "aspect_ratio": "3:4",
+                    },
+                ),
+            }
+        ],
+    )
     value = {
-        "subject_key": "portrait:character:42",
-        "status": None,
-        "url": "/art/official/" + "a" * 64 + "/preset/t_synth_preset/hero.webp",
-        "aspect_ratio": "3:4",
-        "alt": "portrait:character:42",
-        "placeholder": None,
-        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
-        "stage": {"scale": 1.4, "x": 0.1, "y": -0.2},
-        "origin": "official",
-        "fallback": dict(SILHOUETTE_FALLBACK),
+        "artwork": artwork,
         "context": {"name": "旅人", "role": "人物"},
     }
     value.update(overrides)
@@ -195,7 +261,9 @@ class ArtSchemaTests(unittest.TestCase):
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(schema_version=1))
         with self.assertRaises(ArtPanelError):
-            validate_art(_valid_payload(schema_version=3))
+            validate_art(_valid_payload(schema_version=2))
+        with self.assertRaises(ArtPanelError):
+            validate_art(_valid_payload(schema_version=4))
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(available=False))
         with self.assertRaises(ArtPanelError):
@@ -240,97 +308,179 @@ class ArtSchemaTests(unittest.TestCase):
             validate_art(payload)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_catalog_face_rect_is_exact_and_tied_to_the_url(self):
-        """face_rect is required with a url, null-only for placeholders, and exact."""
+    def test_catalog_geometry_is_exact_per_resource(self):
+        """Each resource carries its own bounded geometry; a placeholder carries none."""
+        def geometry_with(face_rect):
+            return {
+                "image_size": None,
+                "face_rect": face_rect,
+                "stage": None,
+                "aspect_ratio": "3:4",
+            }
+
         for bad in (
-            {"face_rect": None},  # url present, rect missing
-            {"face_rect": {"x": 0.25, "y": 0.06, "w": 0.5}},  # missing h
-            {"face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5, "z": 0}},  # extra key
-            {"face_rect": {"x": -0.1, "y": 0.06, "w": 0.5, "h": 0.5}},  # below 0
-            {"face_rect": {"x": 1.5, "y": 0.06, "w": 0.5, "h": 0.5}},  # above 1
-            {"face_rect": {"x": "0.25", "y": 0.06, "w": 0.5, "h": 0.5}},  # not a number
-            {"face_rect": {"x": True, "y": 0.06, "w": 0.5, "h": 0.5}},  # bool is not a number
+            geometry_with({"x": 0.25, "y": 0.06, "w": 0.5}),  # missing h
+            geometry_with({"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5, "z": 0}),  # extra key
+            geometry_with({"x": -0.1, "y": 0.06, "w": 0.5, "h": 0.5}),  # below 0
+            geometry_with({"x": 1.5, "y": 0.06, "w": 0.5, "h": 0.5}),  # above 1
+            geometry_with({"x": "0.25", "y": 0.06, "w": 0.5, "h": 0.5}),  # not a number
+            geometry_with({"x": True, "y": 0.06, "w": 0.5, "h": 0.5}),  # bool is not a number
+            {"image_size": None, "face_rect": None, "stage": None},  # missing aspect_ratio
         ):
             with self.subTest(bad=bad):
                 payload = _valid_payload(
-                    portrait_catalog={"42": _valid_catalog_entry(**bad)}
-                )
-                with self.assertRaises(Exception):
-                    validate_art(payload)
-        # A url-less placeholder entry carries face_rect: null.
-        placeholder_entry = _bare_placeholder_entry(
-            placeholder={"kind": "unavailable", "label": "無法提供"},
-        )
-        normalized = validate_art(
-            _valid_payload(portrait_catalog={"42": placeholder_entry})
-        )
-        self.assertIsNone(normalized["portrait_catalog"]["42"]["face_rect"])
-        # A placeholder must not carry a rectangle.
-        with self.assertRaises(Exception):
-            validate_art(
-                _valid_payload(
                     portrait_catalog={
-                        "42": _bare_placeholder_entry(
-                            placeholder={"kind": "unavailable", "label": "無法提供"},
-                            face_rect={"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+                        "42": _valid_catalog_entry(
+                            artwork=_valid_artwork(
+                                attempts=[
+                                    {
+                                        "type": "image",
+                                        "source_id": "portrait.default:1",
+                                        "rank": 30,
+                                        "resource": _valid_resource(geometry=bad),
+                                    }
+                                ]
+                            )
                         )
                     }
                 )
-            )
+                with self.assertRaises(Exception):
+                    validate_art(payload)
+        # An admitted row with no real candidate carries no real geometry, and
+        # its separate alpha terminal keeps its own.
+        normalized = validate_art(
+            _valid_payload(portrait_catalog={"42": _bare_placeholder_entry()})
+        )
+        entry = normalized["portrait_catalog"]["42"]["artwork"]
+        self.assertEqual(entry["attempts"], [])
+        self.assertIsNone(entry["terminal"])
+        normalized = validate_art(
+            _valid_payload(portrait_catalog={"42": _silhouette_entry()})
+        )
+        entry = normalized["portrait_catalog"]["42"]["artwork"]
+        self.assertEqual(entry["attempts"], [])
+        self.assertEqual(entry["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(entry["terminal"]["resource"]["geometry"]["face_rect"], SILHOUETTE_FACE_RECT)
 
     @covers_requirement(
         "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
     )
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_origin_is_the_closed_vocabulary(self):
-        # The server-authored discriminator names the branch that produced the
-        # entry's own media, so no client inspects the URL to tell them apart.
-        for origin, entry in (
-            ("runtime", _valid_catalog_entry()),
-            # The official read-only default: its own fingerprinted URL, no
-            # generated status (official-art-resolution).
-            ("official", _official_entry()),
-            ("silhouette", _silhouette_entry()),
-            ("placeholder", _bare_placeholder_entry()),
+        # Each RESOURCE names the branch that produced its own bytes, so no
+        # client inspects the URL to tell them apart.
+        for origin, entry, path in (
+            ("runtime", _valid_catalog_entry(), ("attempts", 0, "resource")),
+            # The official read-only default: its own fingerprinted URL
+            # (official-art-resolution).
+            ("official", _official_entry(), ("attempts", 0, "resource")),
+            ("silhouette", _silhouette_entry(), ("terminal", "resource")),
         ):
             with self.subTest(origin=origin):
                 normalized = validate_art(_valid_payload(portrait_catalog={"42": entry}))
-                self.assertEqual(normalized["portrait_catalog"]["42"]["origin"], origin)
+                resource = normalized["portrait_catalog"]["42"]["artwork"]
+                for step in path:
+                    resource = resource[step]
+                self.assertEqual(resource["origin"], origin)
         for rejected in (None, "", "runtime ", "generated"):
             with self.subTest(origin=rejected):
                 with self.assertRaises(ProtocolValidationError):
                     validate_art(
                         _valid_payload(
-                            portrait_catalog={"42": _valid_catalog_entry(origin=rejected)}
+                            portrait_catalog={
+                                "42": _valid_catalog_entry(
+                                    artwork=_valid_artwork(
+                                        attempts=[
+                                            {
+                                                "type": "image",
+                                                "source_id": "portrait.default:1",
+                                                "rank": 30,
+                                                "resource": _valid_resource(origin=rejected),
+                                            }
+                                        ]
+                                    )
+                                )
+                            }
                         )
                     )
-        absent = _valid_catalog_entry()
+        absent = _valid_resource()
         absent.pop("origin")
         with self.assertRaises(ProtocolValidationError):
-            validate_art(_valid_payload(portrait_catalog={"42": absent}))
+            validate_art(
+                _valid_payload(
+                    portrait_catalog={
+                        "42": _valid_catalog_entry(
+                            artwork=_valid_artwork(
+                                attempts=[
+                                    {
+                                        "type": "image",
+                                        "source_id": "portrait.default:1",
+                                        "rank": 30,
+                                        "resource": absent,
+                                    }
+                                ]
+                            )
+                        )
+                    }
+                )
+            )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_official_origin_carries_its_url_and_never_a_generated_status(self):
-        # An official image is a real image, so it always carries its own
-        # URL, and it is never a generated asset, so it reports no status.
+    def test_an_official_candidate_keeps_its_own_origin(self):
+        # An official image is a real image, so its candidate carries its own
+        # fingerprinted same-origin URL under the ``official`` origin, while
+        # the subject's recorded generation truth stays an independent fact of
+        # the descriptor (never erased, never invented by the image's origin).
         normalized = validate_art(
             _valid_payload(portrait_catalog={"42": _official_entry()})
         )
-        entry = normalized["portrait_catalog"]["42"]
-        self.assertEqual(entry["origin"], "official")
-        self.assertIsNone(entry["status"])
-        self.assertIsNone(entry["placeholder"])
-        self.assertTrue(entry["url"].startswith("/art/official/"))
-        self.assertEqual(entry["fallback"]["key"], "woman")
+        artwork = normalized["portrait_catalog"]["42"]["artwork"]
+        candidate = artwork["attempts"][0]["resource"]
+        self.assertEqual(candidate["origin"], "official")
+        self.assertTrue(candidate["url"].startswith("/art/official/"))
+        self.assertIsNone(artwork["generation_state"])
+        self.assertEqual(artwork["generation_subject"], "portrait:character:42")
+        # The same descriptor with a recorded pending generation is truthful
+        # too: a read-only catalog default cannot complete or erase the
+        # subject's own generation.
+        normalized = validate_art(
+            _valid_payload(
+                portrait_catalog={
+                    "42": _official_entry(
+                        artwork=_valid_artwork(
+                            subject_id="portrait:character:42",
+                            generation_subject="portrait:character:42",
+                            generation_state="pending",
+                            attempts=_official_entry()["artwork"]["attempts"],
+                        )
+                    )
+                }
+            )
+        )
+        self.assertEqual(
+            normalized["portrait_catalog"]["42"]["artwork"]["generation_state"],
+            "pending",
+        )
         cases = {
-            "official without a url": _official_entry(
-                url=None,
-                face_rect=None,
-                stage=None,
-                placeholder={"kind": "missing", "label": "未生成"},
+            # An official identity embeds an operator-chosen filename, so its
+            # URL stays inside the shared 256 ceiling: one past it is refused
+            # rather than shipped to a panel that cannot present it.
+            "an official resource past the media ceiling": _valid_catalog_entry(
+                artwork=_valid_artwork(
+                    attempts=[
+                        {
+                            "type": "image",
+                            "source_id": "portrait.official:preset/t_synth_preset",
+                            "rank": 50,
+                            "resource": _valid_resource(
+                                version=_fingerprint("over"),
+                                url="/art/" + "p" * (256 - len("/art/") + 1),
+                                origin="official",
+                            ),
+                        }
+                    ]
+                )
             ),
-            "official claiming a done portrait": _official_entry(status="done"),
-            "official claiming a pending portrait": _official_entry(status="pending"),
         }
         for label, entry in cases.items():
             with self.subTest(case=label):
@@ -345,65 +495,106 @@ class ArtSchemaTests(unittest.TestCase):
         self.assertEqual(MAX_MEDIA_URL, MAX_PORTRAIT_MEDIA_URL)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_catalog_fallback_is_decorative_and_coherent(self):
-        # The placeholder row's real fields stay null: the silhouette never
-        # populates the entry's URL, subject key, rectangle, stage, or origin.
+    def test_the_alpha_terminal_is_a_separate_decorative_fallback(self):
+        # A row with no real candidate carries NO real geometry and NO
+        # generation claim, while its terminal keeps its own identity and
+        # rectangle: the silhouette is a fallback, never the row's own image.
         entry = _silhouette_entry()
-        self.assertIsNone(entry["subject_key"])
-        self.assertIsNone(entry["url"])
-        self.assertIsNone(entry["face_rect"])
-        self.assertIsNone(entry["stage"])
+        artwork = entry["artwork"]
+        self.assertEqual(artwork["attempts"], [])
+        self.assertIsNone(artwork["generation_subject"])
+        self.assertEqual(artwork["generation_state"], "missing")
+        terminal = artwork["terminal"]
+        self.assertEqual(terminal["kind"], "alpha_mask")
+        self.assertEqual(terminal["resource"]["origin"], "silhouette")
+        self.assertTrue(terminal["resource"]["url"].startswith("/art/defaults/"))
         normalized = validate_art(_valid_payload(portrait_catalog={"42": entry}))
-        self.assertEqual(
-            normalized["portrait_catalog"]["42"]["fallback"], entry["fallback"]
-        )
-        # A resolved real row keeps the decoration beside its own fields.
+        self.assertEqual(normalized["portrait_catalog"]["42"], entry)
+        # A resolved real row keeps the terminal BESIDE its own candidate, so a
+        # browser whose real image fails still has the committed silhouette.
         normalized = validate_art(
             _valid_payload(portrait_catalog={"42": _valid_catalog_entry()})
         )
-        carried = normalized["portrait_catalog"]["42"]
-        self.assertEqual(carried["origin"], "runtime")
-        self.assertEqual(carried["url"], "/art/portrait/monster/low.png")
-        self.assertEqual(carried["fallback"]["key"], "monster_anon")
+        carried = normalized["portrait_catalog"]["42"]["artwork"]
+        self.assertEqual(
+            carried["attempts"][0]["resource"]["url"], "/art/portrait/monster/low.png"
+        )
+        self.assertEqual(carried["attempts"][0]["resource"]["origin"], "runtime")
+        self.assertEqual(carried["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(carried["generation_state"], "done")
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_catalog_fallback_coherence_rejects_one_sided_payloads(self):
+    def test_the_terminal_is_coherent_and_never_a_second_candidate(self):
         rect = {"x": 0.3576, "y": 0.03, "w": 0.2847, "h": 0.16}
-        # A placeholder with no silhouette at all stays legal (e.g. a
-        # scene-kind actor): the decoration is optional, the coherence is not.
+        # An admitted row with neither a candidate nor a terminal stays legal
+        # (an entity whose attributes select no built-in identity).
         validate_art(
             _valid_payload(portrait_catalog={"42": _bare_placeholder_entry()})
         )
         cases = {
-            "silhouette origin hiding a real url": _valid_catalog_entry(
-                origin="silhouette"
+            "a terminal past the silhouette media ceiling": _valid_catalog_entry(
+                artwork=_valid_artwork(
+                    terminal=_silhouette_terminal(
+                        resource=_valid_resource(
+                            resource_id="defaults/man.webp",
+                            version=_fingerprint("bad-terminal"),
+                            url="/art/" + "p" * (129 - len("/art/") + 1),
+                            origin="silhouette",
+                            geometry={
+                                "image_size": None,
+                                "face_rect": rect,
+                                "stage": None,
+                                "aspect_ratio": "3:4",
+                            },
+                        )
+                    )
+                )
             ),
-            "placeholder origin carrying a fallback": _silhouette_entry(
-                origin="placeholder"
+            "a terminal with an unknown kind": _valid_catalog_entry(
+                artwork=_valid_artwork(terminal=_silhouette_terminal(kind="cover"))
             ),
-            "silhouette claiming a done portrait": _silhouette_entry(status="done"),
-            "silhouette origin with no identity": _silhouette_entry(fallback=None),
-            "runtime origin with no url": _silhouette_entry(origin="runtime"),
-            "fallback outside the defaults route": _silhouette_entry(
-                fallback={"key": "man", "url": "/art/portrait/man.webp", "face_rect": rect}
+            "a terminal without a resource": _valid_catalog_entry(
+                artwork=_valid_artwork(
+                    terminal={
+                        "kind": "alpha_mask",
+                        "source_id": "portrait.alpha:man",
+                        "rank": 100,
+                    }
+                )
             ),
-            "fallback without a rectangle": _silhouette_entry(
-                fallback={"key": "man", "url": "/art/defaults/man.webp"}
+            "a terminal duplicating the candidate's bytes": _valid_catalog_entry(
+                artwork=_valid_artwork(terminal=_silhouette_terminal(resource=_valid_resource()))
             ),
-            "fallback with an unknown field": _silhouette_entry(
-                fallback={
-                    "key": "man",
-                    "url": "/art/defaults/man.webp",
-                    "face_rect": rect,
-                    "identity": "defaults/man.webp",
-                }
+            "a terminal with an out-of-range rectangle": _valid_catalog_entry(
+                artwork=_valid_artwork(
+                    terminal=_silhouette_terminal(
+                        resource=_valid_resource(
+                            resource_id="defaults/man.webp",
+                            version=_fingerprint("rect"),
+                            url="/art/defaults/man.webp",
+                            origin="silhouette",
+                            geometry={
+                                "image_size": None,
+                                "face_rect": {"x": 0.5, "y": 0.5, "w": 1.5, "h": 0.9},
+                                "stage": None,
+                                "aspect_ratio": "3:4",
+                            },
+                        )
+                    )
+                )
             ),
-            "fallback with an out-of-range rectangle": _silhouette_entry(
-                fallback={
-                    "key": "man",
-                    "url": "/art/defaults/man.webp",
-                    "face_rect": {"x": 0.5, "y": 0.5, "w": 1.5, "h": 0.9},
-                }
+            "a fault attempt carrying a resource": _valid_catalog_entry(
+                artwork=_valid_artwork(
+                    attempts=[
+                        {
+                            "type": "fault",
+                            "source_id": "portrait.default:1",
+                            "rank": 30,
+                            "reason": "generated_output_missing",
+                            "resource": _valid_resource(),
+                        }
+                    ]
+                )
             ),
         }
         for label, payload_entry in cases.items():
@@ -424,29 +615,71 @@ class ArtSchemaTests(unittest.TestCase):
             + ".avif"
         )
         self.assertEqual(len(worst), 129)
-        normalized = validate_art(
-            _valid_payload(
-                portrait_catalog={"42": _valid_catalog_entry(url=worst)}
+
+        def with_url(url):
+            return _valid_payload(
+                portrait_catalog={
+                    "42": _valid_catalog_entry(
+                        artwork=_valid_artwork(
+                            attempts=[
+                                {
+                                    "type": "image",
+                                    "source_id": "portrait.default:1",
+                                    "rank": 30,
+                                    "resource": _valid_resource(
+                                        version=_fingerprint(url), url=url
+                                    ),
+                                }
+                            ]
+                        )
+                    )
+                }
             )
+
+        normalized = validate_art(with_url(worst))
+        self.assertEqual(
+            normalized["portrait_catalog"]["42"]["artwork"]["attempts"][0]["resource"]["url"],
+            worst,
         )
-        self.assertEqual(normalized["portrait_catalog"]["42"]["url"], worst)
-        # The shared media-url bound is 256: admitted exactly at it...
-        boundary = "/art/" + "p" * (256 - len("/art/"))
-        normalized = validate_art(
-            _valid_payload(
-                portrait_catalog={"42": _valid_catalog_entry(url=boundary)}
-            )
+        # Each origin has its OWN ceiling: a runtime (gallery) identity is
+        # bounded at 129 and an official one at the shared 256.
+        runtime_boundary = "/art/" + "p" * (129 - len("/art/"))
+        self.assertEqual(len(runtime_boundary), 129)
+        normalized = validate_art(with_url(runtime_boundary))
+        self.assertEqual(
+            normalized["portrait_catalog"]["42"]["artwork"]["attempts"][0]["resource"]["url"],
+            runtime_boundary,
         )
-        self.assertEqual(normalized["portrait_catalog"]["42"]["url"], boundary)
-        # ...and rejected one character past it.
         with self.assertRaises(Exception):
-            validate_art(
-                _valid_payload(
-                    portrait_catalog={
-                        "42": _valid_catalog_entry(url=boundary + "p")
-                    }
-                )
+            validate_art(with_url(runtime_boundary + "p"))
+
+        def with_official_url(url):
+            return _valid_payload(
+                portrait_catalog={
+                    "42": _valid_catalog_entry(
+                        artwork=_valid_artwork(
+                            attempts=[
+                                {
+                                    "type": "image",
+                                    "source_id": "portrait.official:preset/t_synth_preset",
+                                    "rank": 50,
+                                    "resource": _valid_resource(
+                                        version=_fingerprint(url),
+                                        url=url,
+                                        origin="official",
+                                    ),
+                                }
+                            ]
+                        )
+                    )
+                }
             )
+
+        official_boundary = "/art/" + "p" * (256 - len("/art/"))
+        self.assertEqual(len(official_boundary), 256)
+        validate_art(with_official_url(official_boundary))
+        with self.assertRaises(Exception):
+            validate_art(with_official_url(official_boundary + "p"))
 
     def test_catalog_ceiling_and_byte_gate(self):
         entries = {
@@ -460,10 +693,41 @@ class ArtSchemaTests(unittest.TestCase):
             validate_art(_valid_payload(portrait_catalog=entries))
 
     def test_worst_case_realistic_payload_fits_the_envelope(self):
+        # Every entry carries the complete descriptor: an image candidate with
+        # all four geometry facts, a reached fault at its own position, the
+        # alpha terminal and a bounded retention authorization — the widest
+        # realistic row the wire admits.
         entries = {
             str(index): _valid_catalog_entry(
-                subject_key=f"portrait:character:{index}",
-                alt="長替代文字" * 20,
+                artwork=_valid_artwork(
+                    subject_id=f"portrait:character:{index}",
+                    generation_subject=f"portrait:character:{index}",
+                    attempts=[
+                        {
+                            "type": "image",
+                            "source_id": f"portrait.bound:{index}",
+                            "rank": 10,
+                            "resource": _valid_resource(
+                                resource_id=f"portrait/character/{index}.png",
+                                version=_fingerprint(f"resource-{index}"),
+                                url=f"/art/portrait/character/{index}.png",
+                            ),
+                        },
+                        {
+                            "type": "fault",
+                            "source_id": f"portrait.default:{index}",
+                            "rank": 30,
+                            "reason": "generated_output_missing",
+                        },
+                    ],
+                    retention_sources=[
+                        {
+                            "source_id": f"portrait.classic:{index}",
+                            "token": _fingerprint(f"retention-{index}"),
+                        }
+                    ],
+                ),
+                context={"name": "長名字" * 16, "role": "人物"},
             )
             for index in range(1, 33)
         }
@@ -657,9 +921,12 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             )
             self.assertEqual(entry["context"]["name"], participant["display_name"])
             self.assertIn(entry["context"]["role"], ("隊友", "敵方"))
-        monster_entry = payload["portrait_catalog"][str(monster.pk)]
+        monster_entry = payload["portrait_catalog"][str(monster.pk)]["artwork"]
         self.assertEqual(
-            monster_entry["subject_key"], f"portrait:monster:{_MONSTER_VISUAL_KEY}"
+            monster_entry["subject_id"], f"portrait:monster:{_MONSTER_VISUAL_KEY}"
+        )
+        self.assertEqual(
+            monster_entry["generation_subject"], f"portrait:monster:{_MONSTER_VISUAL_KEY}"
         )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
@@ -696,11 +963,13 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         incomplete.db.portrait_policy = {"mode": "named", "stable_key": "ageless-guest"}
         incomplete.db.age = None
         payload = self._render()
-        entry = payload["portrait_catalog"][str(incomplete.pk)]
-        self.assertEqual(entry["placeholder"]["kind"], "unavailable")
-        self.assertIsNone(entry["subject_key"])
-        self.assertIsNone(entry["url"])
-        self.assertIsNone(entry["face_rect"])
+        entry = payload["portrait_catalog"][str(incomplete.pk)]["artwork"]
+        # A refused subject exposes no real candidate and no generated subject
+        # key: only the attribute-selected alpha terminal remains.
+        self.assertEqual(entry["attempts"], [])
+        self.assertIsNone(entry["generation_subject"])
+        self.assertIsNone(entry["generation_state"])
+        self.assertEqual(entry["terminal"]["kind"], "alpha_mask")
         self.assertNotIn("portrait rejected", repr(payload))
 
     def test_party_catalog_keeps_present_order_cap_and_controlled_companion(self):
@@ -718,7 +987,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         host.components.add(ScriptedDialogue.create(host, dialogue_key=GUILD_STAFF_DIALOGUE_KEY))
         catalog = self._render()["portrait_catalog"]
         self.assertEqual(list(catalog), [str(host.pk), *[str(n.pk) for n in companions[:2]]])
-        self.assertIsNone(catalog[str(companions[0].pk)]["url"])
+        self.assertEqual(catalog[str(companions[0].pk)]["artwork"]["attempts"], [])
         context = PresentationContext(actor=companions[1], protocol_version=1)
         self.assertIn(str(companions[1].pk), self.registry.render("art", context)["portrait_catalog"])
         for index in range(MAX_PORTRAIT_CATALOG - 1):
@@ -737,9 +1006,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn("portrait_catalog", payload)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_resolved_catalog_entry_carries_url_and_face_rect(self):
-        # A resolved image entry carries both the media URL and the
-        # normalized face rectangle (art-gallery-resolution wire rule).
+    def test_resolved_catalog_entry_carries_its_candidate_geometry(self):
+        # A resolved image entry's own candidate carries the media URL and the
+        # normalized face rectangle inside its resource geometry
+        # (art-gallery-resolution wire rule).
         from world.art.gallery import DEFAULT_FACE_RECT
 
         guest = _player(key="rect guest")
@@ -750,9 +1020,18 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "portrait/character/rect-guest.png",
         )
         payload = self._render()
-        entry = payload["portrait_catalog"][str(guest.pk)]
-        self.assertEqual(entry["url"], "/art/portrait/character/rect-guest.png")
-        self.assertEqual(entry["face_rect"], dict(DEFAULT_FACE_RECT))
+        artwork = payload["portrait_catalog"][str(guest.pk)]["artwork"]
+        candidate = artwork["attempts"][0]
+        self.assertEqual(candidate["source_id"], "portrait.classic:portrait:character:rect-guest")
+        self.assertEqual(candidate["rank"], 40)
+        resource = candidate["resource"]
+        self.assertEqual(resource["url"], "/art/portrait/character/rect-guest.png")
+        self.assertEqual(resource["origin"], "runtime")
+        self.assertEqual(resource["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT))
+        self.assertEqual(artwork["generation_state"], "done")
+        self.assertEqual(
+            artwork["generation_subject"], "portrait:character:rect-guest"
+        )
         # The scene wire block stays byte-identical: no face_rect key.
         self.assertNotIn("face_rect", payload["scene"])
 
@@ -766,22 +1045,22 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         host.db.apparent_age = 30
         before = ArtAssetRecord.objects.count()
         payload = self._render()
-        entry = payload["portrait_catalog"][str(host.pk)]
-        # The real fields stay null: the decoration is the entity's own
-        # attribute-selected built-in identity, not one shared shape.
-        self.assertIsNone(entry["subject_key"])
-        self.assertIsNone(entry["url"])
-        self.assertIsNone(entry["face_rect"])
-        self.assertIsNone(entry["stage"])
-        self.assertEqual(entry["origin"], "silhouette")
-        self.assertEqual(entry["fallback"]["key"], "woman")
-        self.assertEqual(entry["fallback"]["url"], "/art/defaults/woman.webp")
+        entry = payload["portrait_catalog"][str(host.pk)]["artwork"]
+        # No real candidate and no generated subject key: the only fact is the
+        # entity's own attribute-selected built-in alpha terminal, never one
+        # shared shape.
+        self.assertEqual(entry["attempts"], [])
+        self.assertIsNone(entry["generation_subject"])
+        self.assertEqual(entry["terminal"]["kind"], "alpha_mask")
+        terminal = entry["terminal"]["resource"]
+        self.assertEqual(terminal["origin"], "silhouette")
+        self.assertEqual(terminal["url"], "/art/defaults/woman.webp")
         # The decoration installs nothing: no policy and no gallery record.
         self.assertIsNone(host.db.portrait_policy)
         self.assertEqual(ArtAssetRecord.objects.count(), before)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_a_resolved_row_retains_the_decorative_reference(self):
+    def test_a_resolved_row_retains_its_alpha_terminal(self):
         guest = _player(key="reference guest")
         guest.location = self.room
         guest.db.portrait_policy = {"mode": "named", "stable_key": "reference-guest"}
@@ -790,18 +1069,21 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "portrait/character/reference-guest.png",
         )
         payload = self._render()
-        entry = payload["portrait_catalog"][str(guest.pk)]
-        self.assertEqual(entry["origin"], "runtime")
-        self.assertEqual(entry["url"], "/art/portrait/character/reference-guest.png")
-        # The decorative reference rides beside the resolved image for a
-        # browser-side load-failure re-render.
-        self.assertIn(entry["fallback"]["key"], FALLBACK_KEYS)
-        self.assertEqual(
-            entry["fallback"]["url"],
-            f"/art/defaults/{entry['fallback']['key']}.webp",
-        )
+        artwork = payload["portrait_catalog"][str(guest.pk)]["artwork"]
+        candidate = artwork["attempts"][0]["resource"]
+        self.assertEqual(candidate["origin"], "runtime")
+        self.assertEqual(candidate["url"], "/art/portrait/character/reference-guest.png")
+        # The alpha terminal rides beside the resolved image at its own rank,
+        # for a browser-side load-failure re-render, without changing the
+        # subject's generation truth.
+        self.assertEqual(artwork["terminal"]["rank"], 100)
+        self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
+        terminal = artwork["terminal"]["resource"]
+        self.assertEqual(terminal["origin"], "silhouette")
+        self.assertEqual(terminal["url"], "/art/defaults/" + terminal["resource_id"].split("/", 1)[1])
+        self.assertEqual(artwork["generation_state"], "done")
         # The scene wire block is unchanged by any of this: the presenter
-        # never forwards origin or fallback into it.
+        # never forwards descriptor facts into it.
         self.assertEqual(
             sorted(payload["scene"]),
             [
@@ -820,10 +1102,11 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     @covers_requirement("portrait-source-attempts::portrait-source-order-retains-current-policy")
-    def test_canonical_source_enumeration_keeps_v2_portraits_and_scenes_valid(self):
+    def test_canonical_source_enumeration_keeps_v3_portraits_and_scenes_valid(self):
         # The internal portrait source enumerator ships NO alternate shape: the
         # registered panel contract still round-trips through its own validator
-        # for a real portrait entry and the unchanged scene block at once.
+        # for a complete portrait descriptor and the unchanged scene block at
+        # once.
         self._settle_done(
             ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
             "scene/t_synth_bazaar.png",
@@ -838,11 +1121,12 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         normalized = validate_art(self._render())
         self.assertEqual(normalized["schema_version"], ART_SCHEMA_VERSION)
         self.assertEqual(normalized["kind"], "scene")
-        entry = normalized["portrait_catalog"][str(guest.pk)]
-        self.assertEqual(entry["origin"], "runtime")
-        self.assertEqual(entry["url"], "/art/portrait/character/enumeration-guest.png")
-        self.assertEqual(entry["status"], ArtAssetStatus.DONE)
-        self.assertIsNone(entry["placeholder"])
+        artwork = normalized["portrait_catalog"][str(guest.pk)]["artwork"]
+        candidate = artwork["attempts"][0]["resource"]
+        self.assertEqual(candidate["origin"], "runtime")
+        self.assertEqual(candidate["url"], "/art/portrait/character/enumeration-guest.png")
+        self.assertEqual(artwork["generation_state"], "done")
+        self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
         self.assertEqual(
             normalized["scene"]["url"], "/art/scene/t_synth_bazaar.png"
         )
@@ -892,16 +1176,17 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             ):
                 load_catalog()
                 entry = self._render()["portrait_catalog"][str(guest.pk)]
+                self.assertEqual(entry["artwork"]["attempts"][0]["resource"]["origin"], "official")
         finally:
             reset_catalog()
-        self.assertEqual(entry["origin"], "official")
-        self.assertIsNone(entry["status"])
-        self.assertIsNone(entry["placeholder"])
-        self.assertEqual(entry["subject_key"], "portrait:character:official-guest")
-        self.assertTrue(entry["url"].startswith("/art/official/"))
-        self.assertIn("preset/t_synth_preset/hero.png", entry["url"])
-        self.assertEqual(sorted(entry["face_rect"]), ["h", "w", "x", "y"])
-        self.assertEqual(sorted(entry["stage"]), ["scale", "x", "y"])
+        artwork = entry["artwork"]
+        candidate = artwork["attempts"][0]["resource"]
+        self.assertEqual(candidate["origin"], "official")
+        self.assertEqual(artwork["subject_id"], "portrait:character:official-guest")
+        self.assertTrue(candidate["url"].startswith("/art/official/"))
+        self.assertIn("preset/t_synth_preset/hero.png", candidate["url"])
+        self.assertEqual(sorted(candidate["geometry"]["face_rect"]), ["h", "w", "x", "y"])
+        self.assertEqual(sorted(candidate["geometry"]["stage"]), ["scale", "x", "y"])
         # No mutable state claim: the subject's gallery is still empty.
         self.assertIsNone(
             gallery_record_for(
@@ -1148,9 +1433,18 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         self.assertIn(str(monster.pk), catalog)
         self.assertIn(str(self.char1.pk), catalog)
 
-        # Check monster entry fallback is monster_anon
-        monster_entry = catalog[str(monster.pk)]
-        self.assertEqual(monster_entry["fallback"]["key"], "monster_anon")
+        # The monster's admitted entry carries the complete descriptor: its
+        # own species subject, no real candidate here, and the committed
+        # ``monster_anon`` alpha terminal as the deterministic fallback.
+        monster_entry = catalog[str(monster.pk)]["artwork"]
+        # The descriptor names the monster's OWN registered visual species,
+        # never a threat tier or a display name.
+        species_key = getattr(monster, "species_key", None) or monster.art_species_key
+        self.assertEqual(monster_entry["subject_id"], f"portrait:monster:{species_key}")
+        self.assertEqual(monster_entry["attempts"], [])
+        terminal = monster_entry["terminal"]["resource"]
+        self.assertEqual(terminal["origin"], "silhouette")
+        self.assertTrue(terminal["url"].startswith("/art/defaults/"))
 
         # Verify that the action result was emitted with matching revision and outcome success
         results = [

@@ -4,10 +4,17 @@
  * Reduces a validated `art` panel into the logical scene + portrait-catalog
  * model consumed by the GoldenLayout art renderer: scene view reduction
  * (asset / placeholder / pending-with-prior dimmed retention), a catalog
- * keyed by opaque catalog IDs, client-local focus state with the approved
- * snapshot-adoption rule (keep on survival; else exploration has no focus and
- * combat selects the first valid participant in deterministic presenter
- * order), and open/close full-view state for the scene and portrait.
+ * keyed by opaque catalog IDs and reduced from each entry's canonical artwork
+ * descriptor, client-local focus state with the approved snapshot-adoption
+ * rule (keep on survival; else exploration has no focus and combat selects the
+ * first valid participant in deterministic presenter order), and open/close
+ * full-view state for the scene and portrait.
+ *
+ * The catalog value is exactly `{artwork, context}` (change
+ * unified-portrait-image-contract): the model reads the presented real image
+ * from the descriptor's highest-ranked image attempt and the terminal from its
+ * own terminal fact, so it holds no selector of its own and never reads a
+ * retired flat field.
  *
  * No `document` or `window` access at load time; Node tests exercise the
  * model directly. The browser never constructs a subject key, URL, status, or
@@ -66,21 +73,41 @@
   // Catalog model.
   // -------------------------------------------------------------------------
 
+  // The descriptor's presented real candidate: its highest-ranked image
+  // attempt (rank decides priority; ties keep declaration order), or null when
+  // no real image resolves.
+  function originalOf(artwork) {
+    var attempts = artwork && Array.isArray(artwork.attempts) ? artwork.attempts : [];
+    var best = null;
+    attempts.forEach(function (attempt) {
+      if (!attempt || attempt.type !== "image" || !attempt.resource) {
+        return;
+      }
+      if (best === null || attempt.rank < best.rank) {
+        best = attempt;
+      }
+    });
+    return best;
+  }
+
   function catalogModel(panel) {
     var catalog = (panel && panel.portrait_catalog) || {};
     var entries = {};
     var order = [];
     Object.keys(catalog).forEach(function (key) {
       var entry = catalog[key];
+      var artwork = entry.artwork;
+      var original = originalOf(artwork);
+      var terminal = artwork.terminal;
       entries[key] = {
         id: key,
-        subjectKey: entry.subject_key || null,
-        status: entry.status || null,
-        url: entry.url || null,
-        aspectRatio: entry.aspect_ratio || null,
-        alt: entry.alt || "",
-        placeholderKind: entry.placeholder ? entry.placeholder.kind : null,
-        placeholderLabel: entry.placeholder ? entry.placeholder.label : null,
+        artwork: artwork,
+        subjectId: artwork.subject_id,
+        generationSubject: artwork.generation_subject,
+        generationState: artwork.generation_state,
+        url: original ? original.resource.url : null,
+        aspectRatio: original ? original.resource.geometry.aspect_ratio : null,
+        terminalUrl: terminal ? terminal.resource.url : null,
         name: entry.context ? entry.context.name : "",
         role: entry.context ? entry.context.role : "",
       };

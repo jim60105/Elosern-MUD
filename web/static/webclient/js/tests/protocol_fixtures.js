@@ -427,21 +427,100 @@ function validCharacterPanel(overrides) {
   );
 }
 
-function validRosterPortrait(overrides) {
+// The canonical artwork descriptor fixtures (change
+// unified-portrait-image-contract): the ONE shape the art catalog entries and
+// the roster row portraits both carry. The revision and the resource version
+// are deterministic 64-character digests of their own fixture label: the wire
+// validators bound the SHAPE, and no reader recomputes either from the facts.
+function fixtureDigest(label) {
+  var table = "0123456789abcdef";
+  var out = "";
+  for (var i = 0; i < 64; i++) {
+    out += table[(label.charCodeAt(i % label.length) + i) % 16];
+  }
+  return out;
+}
+
+function validArtworkResource(overrides) {
   return Object.assign(
     {
-      subject_key: "character:1",
-      status: "done",
-      url: "/art/portraits/character_1.png",
-      aspect_ratio: "3:4",
-      alt: "英雄肖像",
-      placeholder: null,
-      face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
-      stage: { scale: 1, x: 0, y: 0 },
+      resource_id: "portrait/character/character_1.png",
+      version: fixtureDigest("resource"),
+      url: "/art/portrait/character/character_1.png",
       origin: "runtime",
+      geometry: {
+        image_size: { width: 864, height: 1536 },
+        face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+        stage: { scale: 1, x: 0, y: 0 },
+        aspect_ratio: "3:4",
+      },
     },
     overrides || {}
   );
+}
+
+// The descriptor's terminal: the committed silhouette alpha mask, whose
+// resource is deliberately distinct from every candidate's so the validator's
+// "terminal duplicates an attempt resource" rule is not tripped by a fixture.
+function validArtworkTerminal(overrides) {
+  return Object.assign(
+    {
+      kind: "alpha_mask",
+      source_id: "portrait.alpha:man",
+      rank: 100,
+      resource: validArtworkResource({
+        resource_id: "defaults/man.webp",
+        version: fixtureDigest("terminal"),
+        url: "/art/defaults/man.webp",
+        origin: "silhouette",
+        geometry: {
+          image_size: null,
+          face_rect: { x: 0.3576, y: 0.03, w: 0.2847, h: 0.16 },
+          stage: null,
+          aspect_ratio: "3:4",
+        },
+      }),
+    },
+    overrides || {}
+  );
+}
+
+function validArtwork(overrides) {
+  return Object.assign(
+    {
+      subject_id: "portrait:character:1",
+      revision: fixtureDigest("revision"),
+      generation_subject: "portrait:character:1",
+      generation_state: "done",
+      attempts: [
+        {
+          type: "image",
+          source_id: "portrait.default:1",
+          rank: 30,
+          resource: validArtworkResource(),
+        },
+      ],
+      terminal: validArtworkTerminal(),
+      retention_sources: [],
+    },
+    overrides || {}
+  );
+}
+
+// One art catalog value: exactly the canonical descriptor plus its bounded
+// display context.
+function validArtCatalogEntry(overrides) {
+  return Object.assign(
+    {
+      artwork: validArtwork(),
+      context: { name: "艾莉亞", role: "人物" },
+    },
+    overrides || {}
+  );
+}
+
+function validRosterPortrait(overrides) {
+  return validArtwork(overrides);
 }
 
 function validRosterCharacter(overrides) {
@@ -460,7 +539,7 @@ function validRosterCharacter(overrides) {
 function validRosterPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       characters: [validRosterCharacter()],
       max_characters: 5,
@@ -478,6 +557,11 @@ function validQuestLogPanel(rows) {
 }
 
 module.exports = {
+  fixtureDigest,
+  validArtworkResource,
+  validArtworkTerminal,
+  validArtwork,
+  validArtCatalogEntry,
   validQuestLogPanel,
   validCombatSkill,
   validSkillGroup,
