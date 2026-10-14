@@ -213,8 +213,8 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
             self.assertEqual(
                 len(set(observed_sizes)),
                 len(assets),
-                "the three scene URLs served identical byte counts, so one file "
-                "is standing in for several keys",
+                f"the {len(assets)} scene URLs served identical byte counts, so "
+                "one file is standing in for several keys",
             )
 
     @covers_requirement(

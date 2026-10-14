@@ -55,6 +55,12 @@ _PROVENANCE_SECTIONS = (
 )
 _VISUAL_REVIEW_FIELDS = ("native_scale", "desktop_cover_crop", "contact_sheet")
 
+# EXIF UserComment charset prefixes, the two-family rule world.art.formats
+# writes (mirrored here rather than imported: the private encoder constants
+# are not a public seam, and this decoder is the test-side counterpart).
+_ASCII_PREFIX = b"ASCII\x00\x00\x00"
+_UNICODE_PREFIX = b"UNICODE\x00"
+
 
 class SceneArtContractError(AssertionError):
     """A shipped scene asset violates its data contract; always names the key."""
@@ -125,6 +131,35 @@ def _decode_bounded(key: str, payload: bytes) -> dict:
             f"({max_dimension}px per side, {max_pixels} pixels)"
         )
     return {"mode": mode, "width": width, "height": height}
+
+
+def _embedded_parameters(key: str, payload: bytes) -> str:
+    """The generation-parameters text the shipped bytes actually carry.
+
+    Decodes the file's EXIF ``UserComment`` (the format-native location for
+    WebP, per the art-output-format-pipeline contract) and returns its text.
+    A missing, unreadable, or unknown-prefix comment is a keyed contract
+    error: the provenance record's ``metadata: a1111_parameters`` claim is
+    only true when this text exists.
+    """
+    import piexif
+
+    try:
+        comment = piexif.load(payload)["Exif"][piexif.ExifIFD.UserComment]
+    except Exception as error:  # noqa: BLE001 - any EXIF failure is a contract failure
+        raise SceneArtContractError(
+            f"{key}: the shipped file carries no readable EXIF UserComment ({error!r})"
+        ) from error
+    if not isinstance(comment, bytes):
+        comment = bytes(comment)
+    if comment.startswith(_ASCII_PREFIX):
+        return comment[len(_ASCII_PREFIX):].decode("ascii", "replace")
+    if comment.startswith(_UNICODE_PREFIX):
+        return comment[len(_UNICODE_PREFIX):].decode("utf-16-be", "replace")
+    raise SceneArtContractError(
+        f"{key}: the EXIF UserComment carries no known charset prefix "
+        f"({comment[:8]!r})"
+    )
 
 
 def _load_provenance(key: str, directory: Path) -> dict:
@@ -216,12 +251,21 @@ class BundledTerminalSceneArtContractTests(unittest.TestCase):
                 self.assertEqual(processing["output_format"], "webp")
                 if processing["metadata"] == "a1111_parameters":
                     # The sidecar claims the generation parameters ride the
-                    # shipped bytes; the EXIF container is that claim's proof.
+                    # shipped bytes. Decode that EXIF block and require it to
+                    # name the recorded seed and canvas — a bare EXIF marker
+                    # would not prove the claim, a matching block does.
+                    parameters = _embedded_parameters(key, payload)
                     self.assertIn(
-                        b"EXIF",
-                        payload,
-                        f"{key}: provenance claims embedded parameters, the "
-                        "shipped bytes carry no EXIF block",
+                        f"Seed: {source['seed']}",
+                        parameters,
+                        f"{key}: the embedded parameters do not carry the "
+                        "recorded seed",
+                    )
+                    self.assertIn(
+                        f"Size: {decoded['width']}x{decoded['height']}",
+                        parameters,
+                        f"{key}: the embedded parameters do not carry the "
+                        "decoded canvas size",
                     )
 
                 for field in _VISUAL_REVIEW_FIELDS:
