@@ -114,20 +114,48 @@ test("the delivery affordance is closed exploration and context actions with exa
   );
 });
 
-test("exploration portrait_ref must be null and entries exact", () => {
+test("exploration portrait_ref accepts decimal keys and rejects malformed entries", () => {
+  // Schema 4: both descriptor paths preserve null and ASCII-decimal refs of
+  // length 1 or 32 (the combat/dialogue seam) without coercion.
+  for (const accepted of [null, "1", "1".repeat(32)]) {
+    const normalized = Protocol.validateExplorationPanel(
+      validExplorationPanel({
+        interact: [validExplorationTarget({ portrait_ref: accepted })],
+        look: {
+          ...validExplorationPanel().look,
+          entities: [validExplorationLookEntity({ portrait_ref: accepted })],
+        },
+      })
+    );
+    assert.equal(normalized.interact[0].portrait_ref, accepted);
+    assert.equal(normalized.look.entities[0].portrait_ref, accepted);
+  }
+  for (const rejected of ["", "1".repeat(33), "12a", "１２３", 42, "cat:goblin"]) {
+    assert.throws(
+      () =>
+        Protocol.validateExplorationPanel(
+          validExplorationPanel({
+            interact: [validExplorationTarget({ portrait_ref: rejected })]
+          })
+        ),
+      /portrait_ref/
+    );
+    assert.throws(
+      () =>
+        Protocol.validateExplorationPanel(
+          validExplorationPanel({
+            look: {
+              ...validExplorationPanel().look,
+              entities: [validExplorationLookEntity({ portrait_ref: rejected })],
+            },
+          })
+        ),
+      /portrait_ref/
+    );
+  }
   assert.throws(() =>
     Protocol.validateExplorationPanel(
       validExplorationPanel({ interact: [validExplorationTarget({ portrait_ref: "cat:goblin" })] })
-    )
-  );
-  assert.throws(() =>
-    Protocol.validateExplorationPanel(
-      validExplorationPanel({
-        look: {
-          ...validExplorationPanel().look,
-          entities: [validExplorationLookEntity({ portrait_ref: "cat:goblin" })],
-        },
-      })
     )
   );
   assert.throws(() =>
@@ -151,6 +179,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
     interact.push(
       validExplorationTarget({
         identity: i + 1,
+        portrait_ref: "1".repeat(32),
         affordances,
       })
     );
@@ -159,7 +188,11 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
     move: Array(Protocol.EXPLORATION_MAX_MOVE_EXITS).fill(validExplorationMoveRow()),
     look: {
       room: { identity: 3, display_name: "南門", room: true },
-      entities: Array(Protocol.EXPLORATION_MAX_LOOK_ENTITIES).fill(validExplorationLookEntity()),
+      entities: Array(Protocol.EXPLORATION_MAX_LOOK_ENTITIES)
+        .fill(null)
+        .map((_, i) =>
+          validExplorationLookEntity({ identity: i + 1, portrait_ref: "1".repeat(32) })
+        ),
       objects: Array(Protocol.EXPLORATION_MAX_LOOK_OBJECTS).fill(validExplorationLookObject()),
     },
     interact,
@@ -185,7 +218,7 @@ test("worst-case exploration payload fits the envelope and all-ceilings fails cl
 });
 
 test("exploration and character are in the production panel allowlist", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 3);
+  assert.equal(Protocol.PANEL_ALLOWLIST.exploration, 4);
   assert.equal(Protocol.PANEL_ALLOWLIST.character, 7);
   const envelope = {
     protocol_version: 1,

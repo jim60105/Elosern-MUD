@@ -22,9 +22,11 @@ from evennia.utils.test_resources import EvenniaTestCase
 from typeclasses.accounts import Account
 
 from typeclasses.characters import PlayerCharacter
+from typeclasses.npcs import NPC, ensure_npc_canonical_age
 from typeclasses.rooms import Room
 from web.webclient.presentation.art_push import (
     DISPATCH_UID,
+    _art_portrait_catalog_keys,
     _art_subject_keys,
     _gallery_subject_keys,
     _panel_matches_subject,
@@ -38,12 +40,14 @@ from web.webclient.presentation.coordinator import (
     read_world_clock_calendar,
 )
 from web.webclient.presentation.gallery_selection import GallerySelection
+from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.registry import build_production_registry
-from world.art.queue import ensure, settle
+from world.art.queue import ensure, record_key, settle
 from world.art.signals import asset_completed
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore.monster_visuals import get_monster_visual_registry
+from world.rules.dialogue import open_or_refresh_dialogue
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 
 # Registered VISUAL species keys (never threat tiers), resolved at runtime
@@ -123,6 +127,31 @@ class ArtPushPureGateTests(unittest.TestCase):
             }),
             {"portrait:character:hero"},
         )
+
+    def test_art_portrait_catalog_keys_exclude_the_scene_reference(self):
+        """Only a current PORTRAIT-CATALOG match may add the exploration panel.
+
+        The scene reference is deliberately outside this set (design D3): a
+        scene-only completion must never widen the publication.
+        """
+        payload = {
+            "available": True,
+            "scene": {"subject_key": "scene:t_synth_bazaar"},
+            "portrait_catalog": {
+                "11": {"subject_key": "portrait:character:alice"},
+                "12": {"subject_key": ""},
+                "13": None,
+            },
+        }
+        self.assertEqual(
+            _art_portrait_catalog_keys(payload), {"portrait:character:alice"}
+        )
+        self.assertEqual(
+            _art_subject_keys(payload),
+            {"scene:t_synth_bazaar", "portrait:character:alice"},
+        )
+        # The unavailable form carries no catalog at all.
+        self.assertEqual(_art_portrait_catalog_keys({"available": False}), set())
 
     def test_roster_subject_keys_all_rows(self):
         self.assertEqual(_roster_subject_keys({}), set())
@@ -325,6 +354,80 @@ class ArtPushPresenterTests(EvenniaTestCase):
             error=None,
         )
 
+    def _settle_named_portrait(self, stable_key):
+        """Settle one named character's classic asset DONE with a real file.
+
+        Returns ``(subject_key, stored_identity)``. The record is created,
+        claimed and settled through the canonical queue, so the resolution
+        chain presents the SAME runtime URL the production worker would.
+        """
+        from world.art.queue import claim
+
+        subject = ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
+        ensure(subject, "desc")
+        claimed = claim(50)
+        token = next(
+            (
+                str(record.db.generation_token)
+                for record in claimed
+                if record.db_key == record_key(subject)
+            ),
+            None,
+        )
+        self.assertIsNotNone(token, "the portrait record must be claimed")
+        identity = f"portrait/character/{stable_key}.png"
+        target = self.root / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"asset")
+        settle(
+            subject,
+            generation_token=token,
+            status=ArtAssetStatus.DONE,
+            output_identity=identity,
+            error=None,
+        )
+        return subject.full(), identity
+
+    def _named_entity(self, key, stable_key):
+        """Create one co-located named-policy character (not an interact target)."""
+        entity = create_object(PlayerCharacter, key=key, location=self.room)
+        entity.age = 22
+        entity.apparent_age = 22
+        entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+        return entity
+
+    def _exploration_row(self, panel, identity):
+        row = next(
+            (
+                entry
+                for entry in panel["look"]["entities"]
+                if entry["identity"] == int(identity)
+            ),
+            None,
+        )
+        if row is not None:
+            return row
+        return next(
+            entry for entry in panel["interact"] if entry["identity"] == int(identity)
+        )
+
+    def _interact_row(self, panel, identity):
+        return next(
+            entry for entry in panel["interact"] if entry["identity"] == int(identity)
+        )
+
+    def _look_row(self, panel, identity):
+        return next(
+            entry
+            for entry in panel["look"]["entities"]
+            if entry["identity"] == int(identity)
+        )
+
+    def _first_update(self, session):
+        updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
+        self.assertEqual(len(updates), 1)
+        return updates[0]
+
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_settled_gallery_job_refreshes_all_three_referencing_panels_together(self):
         from evennia.utils.create import create_account
@@ -393,9 +496,23 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertIn("roster", panels)
         self.assertEqual(panels["gallery"]["selected"], other_key)
         self.assertEqual(len(panels["gallery"]["cards"]), 1)
+        # The completed subject is a CURRENT portrait-catalog member of the
+        # exploring session, so the SAME update carries the freshly rendered
+        # exploration panel whose descriptor names the admitted image
+        # (design D3): one revision, no second update.
+        self.assertIn("exploration", panels)
+        catalog_key = str(other_char.pk)
+        self.assertIsNotNone(
+            panels["art"]["portrait_catalog"][catalog_key]["url"],
+            "the art catalog entry for the completed subject carries its image",
+        )
+        self.assertEqual(
+            self._exploration_row(panels["exploration"], other_char.pk)["portrait_ref"],
+            catalog_key,
+        )
         ctx = info_mock.call_args.kwargs["context"]
         self.assertEqual(ctx["session"], session.sessid)
-        self.assertEqual(set(ctx["panels"]), {"gallery", "art", "roster"})
+        self.assertEqual(set(ctx["panels"]), {"gallery", "art", "roster", "exploration"})
 
     @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
     def test_selected_gallery_refreshes_without_art_or_roster_match(self):
@@ -514,6 +631,144 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertEqual(envelope["panels"]["art"]["scene"]["url"], "/art/scene/t_synth_bazaar.png")
         self.assertEqual(envelope["revision"], 1)
         self.assertNotIn("context_actions", envelope["panels"])
+        # Scene-only exclusion (design D3): the completed subject names the
+        # current SCENE, not a current portrait-catalog value, so the targeted
+        # publication adds no built exploration panel even though this session
+        # is in exploration mode and the panel would render available.
+        self.assertNotIn("exploration", envelope["panels"])
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_current_portrait_completion_turns_a_null_exploration_ref_real_in_one_update(self):
+        """A pending-to-done CURRENT portrait refreshes the descriptors once.
+
+        The pre-completion snapshot carries the truthful null on both
+        descriptor paths; the completion notification then publishes the art
+        catalog and the exploration panel together at exactly one newer
+        revision, with the descriptor naming the admitted image.
+        """
+        # An NPC with a named policy is BOTH an interact target and a look
+        # entity, so this test asserts the shared reference on both descriptor
+        # paths — the presenter emits them from one memoized resolution.
+        ally = create_object(NPC, key="合成的同伴", location=self.room)
+        ally.db.portrait_policy = {"mode": "named", "stable_key": "synthetic-ally"}
+        ensure_npc_canonical_age(ally)
+        ally.save()
+        ally_key = ArtSubject(ArtSubjectKind.CHARACTER, "synthetic-ally").full()
+        session = self._make_session()
+        context = build_presentation_context(session, self.player)
+        before = session.ndb.elosern_coordinator.full_snapshot(context)
+
+        panel_before = before["panels"]["exploration"]
+        self.assertIsNone(
+            self._interact_row(panel_before, ally.pk)["portrait_ref"],
+            "an unfinished portrait leaves the target descriptor at the truthful null",
+        )
+        self.assertIsNone(
+            self._look_row(panel_before, ally.pk)["portrait_ref"],
+            "an unfinished portrait leaves the entity descriptor at the truthful null",
+        )
+        self.assertIsNone(
+            before["panels"]["art"]["portrait_catalog"][str(ally.pk)]["url"]
+        )
+        session.sent.clear()
+
+        subject_key, identity = self._settle_named_portrait("synthetic-ally")
+        self.assertEqual(subject_key, ally_key)
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            on_asset_completed(subject_key=ally_key)
+
+        envelope = self._first_update(session)
+        self.assertEqual(
+            sorted({name for message in session.sent for name in message}),
+            ["ui_update"],
+            "one affected-panel update only: no snapshot broadcast, no focus action",
+        )
+        self.assertEqual(envelope["revision"], before["revision"] + 1)
+        panels = envelope["panels"]
+        self.assertEqual(set(panels), {"art", "exploration"})
+        catalog_key = str(ally.pk)
+        self.assertEqual(
+            panels["art"]["portrait_catalog"][catalog_key]["url"], f"/art/{identity}"
+        )
+        self.assertEqual(
+            self._interact_row(panels["exploration"], ally.pk)["portrait_ref"],
+            catalog_key,
+            "the target descriptor now names the current catalog image",
+        )
+        self.assertEqual(
+            self._look_row(panels["exploration"], ally.pk)["portrait_ref"],
+            catalog_key,
+            "both descriptor paths carry the same server-authored key",
+        )
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_unavailable_exploration_panel_is_omitted_from_a_portrait_completion(self):
+        """An unavailable exploration panel isolates the art completion."""
+        ally = self._named_entity("合成的同伴", "synthetic-ally")
+        ally_key = ArtSubject(ArtSubjectKind.CHARACTER, "synthetic-ally").full()
+        session = self._make_session()
+        registry = session.ndb.elosern_coordinator.registry
+        original_render = registry.render
+
+        def fake_render(name, ctx):
+            if name == "exploration":
+                return {"available": False, "reason": {"code": "x", "message": "y"}}
+            return original_render(name, ctx)
+
+        self._settle_named_portrait("synthetic-ally")
+        with (
+            patch.object(registry, "render", side_effect=fake_render),
+            patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]),
+        ):
+            on_asset_completed(subject_key=ally_key)
+
+        panels = self._first_update(session)["panels"]
+        self.assertIn("art", panels)
+        self.assertNotIn("exploration", panels)
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_portrait_completion_outside_exploration_publishes_without_the_panel(self):
+        """A live dialogue session is not exploring: art publishes alone."""
+        host = create_object(NPC, key="合成酒保", location=self.room)
+        host.db.portrait_policy = {"mode": "named", "stable_key": "synthetic-host"}
+        ensure_npc_canonical_age(host)
+        host.save()
+
+        session = FakeSession(self.player)
+        session.ndb.elosern_coordinator = PresentationCoordinator(
+            session, self.registry, calendar_provider=_fake_calendar
+        )
+        context = build_presentation_context(session, self.player)
+        self.assertEqual(PresentationCoordinator.mode_for(context), "exploration")
+        open_or_refresh_dialogue(self.player, host, "歡迎。")
+        self.assertEqual(PresentationCoordinator.mode_for(context), "dialogue")
+
+        host_key, _ = self._settle_named_portrait("synthetic-host")
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            on_asset_completed(subject_key=host_key)
+
+        updates = [k["ui_update"][0][0] for k in session.sent if "ui_update" in k]
+        self.assertEqual(len(updates), 1)
+        envelope = updates[0]
+        self.assertEqual(envelope["mode"], "dialogue")
+        self.assertIn("art", envelope["panels"])
+        self.assertIn(
+            str(host.pk), envelope["panels"]["art"]["portrait_catalog"]
+        )
+        self.assertNotIn("exploration", envelope["panels"])
+
+    @covers_requirement("webclient-art-panel::worker-completion-pushes-a-targeted-art-panel-update")
+    def test_departed_subject_portrait_completion_publishes_nothing(self):
+        """A subject that left the room cannot revive a stale descriptor."""
+        ally = self._named_entity("合成的同伴", "synthetic-ally")
+        ally_key = ArtSubject(ArtSubjectKind.CHARACTER, "synthetic-ally").full()
+        session = self._make_session()
+        self._settle_named_portrait("synthetic-ally")
+        other_room = create_object(Room, key="distant room")
+        ally.location = other_room
+        with patch("evennia.SESSION_HANDLER.get_sessions", return_value=[session]):
+            on_asset_completed(subject_key=ally_key)
+        self.assertEqual(session.sent, [])
 
     def test_non_referencing_session_receives_nothing(self):
         # The session is showing a different scene archetype.

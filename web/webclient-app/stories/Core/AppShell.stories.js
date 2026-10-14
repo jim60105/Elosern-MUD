@@ -233,7 +233,13 @@ const renderPlayer = (args) => ({
               { exit_ref: "north", label: "北", destination: "room:44", enabled: false, disabled_reason: { code: "blocked", message: "門被鎖住了" } },
             ] } : {}),
             interact: [
-              { identity: 7, display_name: "店長", portrait_ref: null, affordances: [
+              // The tavern keeper's finished portrait IS catalogued by the
+              // variants whose art panel carries the `"7"` entry (the
+              // dialogue and mode-journey panels), so the schema-4 descriptor
+              // carries that reference; where the committed panel has no such
+              // entry the medallion falls back to the initial, truthfully.
+              // The guard carries none and never shows a face.
+              { identity: 7, display_name: "店長", portrait_ref: "7", affordances: [
                 { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
               ] },
               { identity: 8, display_name: "守衛", portrait_ref: null, affordances: [

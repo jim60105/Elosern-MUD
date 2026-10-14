@@ -13,6 +13,15 @@ Late completions for an old room or a no-longer-present entity re-derive from
 current canonical state, so the rendered panel no longer references the subject
 and nothing is published for that panel -- the "late completion never replaces
 the current panel" rule is enforced by re-derivation, not by remembering what was sent.
+
+One bounded companion panel joins that update (design D3): when the freshly
+rendered current portrait catalog references the completed subject and the
+session is in exploration mode, the freshly rendered available ``exploration``
+panel is published in the SAME update, so a descriptor whose ``portrait_ref``
+was null because the portrait lacked real imagery becomes the real catalog key
+without another gameplay or focus action. A scene-only match, a session outside
+exploration, and an unavailable exploration panel add nothing, so a completion
+that only the current scene references cannot widen the publication.
 """
 
 from typing import Any
@@ -34,10 +43,21 @@ DISPATCH_UID = "elosern.art_push"
 
 def _art_subject_keys(payload: dict[str, Any]) -> set[str]:
     """Return the subject keys the rendered art payload references."""
-    keys: set[str] = set()
+    keys = _art_portrait_catalog_keys(payload)
     scene = payload.get("scene") or {}
     if isinstance(scene, dict) and scene.get("subject_key"):
         keys.add(scene["subject_key"])
+    return keys
+
+
+def _art_portrait_catalog_keys(payload: dict[str, Any]) -> set[str]:
+    """Return only the subject keys the rendered PORTRAIT CATALOG references.
+
+    Design D3 distinguishes this set from the scene reference: only a current
+    portrait-catalog match may add the bounded exploration companion panel, so
+    a scene-only completion never widens the publication.
+    """
+    keys: set[str] = set()
     catalog = payload.get("portrait_catalog")
     if isinstance(catalog, dict):
         for entry in catalog.values():
@@ -101,12 +121,34 @@ def _push_for_subject(session: Any, actor: Any, subject_key: str) -> None:
     context: PresentationContext = build_presentation_context(session, actor)
 
     matching_panels: dict[str, Any] = {}
+    art_payload: dict[str, Any] | None = None
     for panel_name in ("art", "gallery", "roster"):
         if panel_name not in registry.panel_names:
             continue
         payload = registry.render(panel_name, context)
+        if panel_name == "art":
+            art_payload = payload
         if _panel_matches_subject(panel_name, payload, subject_key):
             matching_panels[panel_name] = payload
+
+    # Design D3: one bounded companion panel. A current PORTRAIT-CATALOG match
+    # in exploration mode republishes the freshly rendered exploration panel in
+    # this same update, so a null descriptor whose portrait just became real
+    # turns into the authoritative catalog key without another game action.
+    # The art match that admitted it is always published too, so the companion
+    # panel can never be the only panel of the update. The canonical mode is
+    # the same derivation the exploration presenter's own mode gate uses
+    # (``PresentationCoordinator.mode_for``), and an unavailable panel (which
+    # is what a non-exploration session renders) is omitted.
+    if (
+        art_payload is not None
+        and subject_key in _art_portrait_catalog_keys(art_payload)
+        and "exploration" in registry.panel_names
+        and PresentationCoordinator.mode_for(context) == "exploration"
+    ):
+        exploration_payload = registry.render("exploration", context)
+        if exploration_payload.get("available"):
+            matching_panels["exploration"] = exploration_payload
 
     if not matching_panels:
         return
@@ -178,6 +220,7 @@ def connect_art_push() -> None:
 
 __all__ = [
     "_art_subject_keys",
+    "_art_portrait_catalog_keys",
     "_gallery_subject_keys",
     "_panel_matches_subject",
     "_roster_subject_keys",

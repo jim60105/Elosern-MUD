@@ -341,7 +341,7 @@ function validExplorationTarget(overrides) {
 function validExplorationPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "exploration",
       move: [validExplorationMoveRow()],

@@ -106,7 +106,8 @@
         "web.tests.browser.test_browser_pointer.PointerServiceAcceptanceTest.test_pointer_service_submenu_submission",
         "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_away_from_clerk_renders_book_with_no_clerk_marker",
         "web.tests.browser.test_browser_services_quest_drawer.QuestBookAwayFromClerkJourneys.test_keyboard_reaches_both_tablists_and_the_list",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region"
+        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_fixed_column_skill_pane_keeps_its_rows_inside_the_command_region",
+        "web.tests.browser.test_browser_exploration_nav.ExplorationPortraitMediaBrowserTest.test_admitted_media_loads_on_both_medallions_and_the_non_party_focus"
       ],
       "files_b": [
         "web.tests.browser.test_browser_session_lifecycle.SessionLifecycleBrowserTest",

@@ -12,8 +12,29 @@ import { explorationPanelFixture, AFFORDANCES } from "../../stories/fixtures/sce
 
 const FACE = {
   status: "done",
-  url: "/art/portraits/npc_11.webp",
+  url: "/art/portraits/11.webp",
   face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+};
+
+const BYSTANDER_FACE = {
+  status: "done",
+  url: "/art/portraits/21.webp",
+  face_rect: { x: 0.2, y: 0.05, w: 0.5, h: 0.5 },
+};
+
+const REPLACEMENT_FACE = {
+  status: "done",
+  url: "/art/portraits/11-replaced.webp",
+  face_rect: { x: 0.25, y: 0.08, w: 0.42, h: 0.42 },
+};
+
+// The wire-valid decimal references the presenter supplies (schema v4).
+const PORTRAITS = { 11: "11", 21: "21" };
+
+const PENDING_FACE = {
+  status: "pending",
+  url: null,
+  face_rect: null,
 };
 
 function entriesFor(options) {
@@ -74,25 +95,84 @@ describe("PresenceRail", () => {
     expect(w.findAll(".presence-rail__gem")).toHaveLength(2);
   });
 
-  it("a medallion shows the face crop when the portrait resolves, else the first character", () => {
-    const entries = entriesFor(ROOM).map((entry) =>
-      entry.key === "target-11" ? { ...entry, portraitRef: "npc_11" } : entry,
-    );
-    const w = mountRail({ entries, artPanel: { portrait_catalog: { npc_11: FACE, npc_12: { status: "pending", url: null } } } });
-    const [clerk, wolf] = slots(w);
-    const face = clerk.get('[data-testid="presence-entry-face"]');
-    expect(face.attributes("src")).toBe(FACE.url);
-    expect(face.attributes("style")).toContain("width");
-    expect(wolf.find('[data-testid="presence-entry-face"]').exists()).toBe(false);
-    expect(wolf.get('[data-testid="presence-entry-initial"]').text()).toBe("霧");
+  it("a target and a bystander medallion show the supplied face crop", () => {
+    const w = mountRail({
+      entries: entriesFor({ ...ROOM, portraits: PORTRAITS }),
+      artPanel: { portrait_catalog: { 11: FACE, 21: BYSTANDER_FACE } },
+    });
+    const [clerk, , traveller] = slots(w);
+    const clerkFace = clerk.get('[data-testid="presence-entry-face"]');
+    expect(clerkFace.attributes("src")).toBe(FACE.url);
+    expect(clerkFace.attributes("style")).toContain("width");
+    const travellerFace = traveller.get('[data-testid="presence-entry-face"]');
+    expect(travellerFace.attributes("src")).toBe(BYSTANDER_FACE.url);
+    // The wolf's descriptor carries no reference at all, so its medallion
+    // shows the name's first character and never a borrowed image.
+    expect(slots(w)[1].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(slots(w)[1].get('[data-testid="presence-entry-initial"]').text()).toBe("霧");
+    // Object lozenges are never portrait-bearing: the gem stands in for the
+    // medallion entirely.
+    expect(slots(w)[3].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(slots(w)[3].find('[data-testid="presence-entry-initial"]').exists()).toBe(false);
+    expect(slots(w)[3].find(".presence-rail__gem").exists()).toBe(true);
   });
 
-  it("a portrait that fails to load falls back to the initial", async () => {
-    const entries = entriesFor(ROOM).map((entry) =>
-      entry.key === "target-11" ? { ...entry, portraitRef: "npc_11" } : entry,
-    );
-    const w = mountRail({ entries, artPanel: { portrait_catalog: { npc_11: FACE } } });
+  it("a pending, unknown or absent reference shows the initial, never a built key", () => {
+    const panel = explorationPanelFixture({
+      targets: [{ identity: 11, name: "合成職員", affordances: [AFFORDANCES.talk] }],
+      entities: [
+        { identity: 21, name: "旅人" },
+        { identity: 22, name: "無圖者" },
+      ],
+      portraits: { 11: "11", 21: "999" },
+    });
+    const w = mountRail({
+      entries: ExplorationMenu.presenceEntries(panel),
+      artPanel: {
+        portrait_catalog: {
+          // A catalogued but unfinished portrait: no URL, so no image.
+          11: PENDING_FACE,
+          // The bystander's reference names no entry at all.
+          21: undefined,
+        },
+      },
+    });
+    expect(slots(w).map((slot) => slot.attributes("data-entry-key"))).toEqual([
+      "target-11",
+      "entity-21",
+      "entity-22",
+    ]);
+    for (const [index, initial] of [
+      [0, "合"],
+      [1, "旅"],
+      [2, "無"],
+    ]) {
+      expect(slots(w)[index].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+      expect(slots(w)[index].get('[data-testid="presence-entry-initial"]').text()).toBe(initial);
+    }
+  });
+
+  it("a failed image keeps the initial and a newer committed URL recovers in place", async () => {
+    const entries = entriesFor({ ...ROOM, portraits: PORTRAITS });
+    const w = mountRail({ entries, artPanel: { portrait_catalog: { 11: FACE } } });
     await slots(w)[0].get('[data-testid="presence-entry-face"]').trigger("error");
+    expect(slots(w)[0].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(slots(w)[0].get('[data-testid="presence-entry-initial"]').text()).toBe("合");
+    // A newer committed catalog entry replaces the failed URL: the same rail
+    // (never reopened, never re-mounted) renders the supplied crop again.
+    await w.setProps({ artPanel: { portrait_catalog: { 11: REPLACEMENT_FACE } } });
+    const recovered = slots(w)[0].get('[data-testid="presence-entry-face"]');
+    expect(recovered.attributes("src")).toBe(REPLACEMENT_FACE.url);
+    expect(w.findAll('[data-testid="presence-rail"]')).toHaveLength(1);
+  });
+
+  it("the same failed URL is not retried automatically", async () => {
+    const entries = entriesFor({ ...ROOM, portraits: PORTRAITS });
+    const w = mountRail({ entries, artPanel: { portrait_catalog: { 11: FACE } } });
+    await slots(w)[0].get('[data-testid="presence-entry-face"]').trigger("error");
+    // A re-committed panel still naming the failed URL stays on the initial:
+    // there is no retry policy, only a genuinely changed URL.
+    await w.setProps({ artPanel: { portrait_catalog: { 11: { ...FACE } } } });
     expect(slots(w)[0].find('[data-testid="presence-entry-face"]').exists()).toBe(false);
     expect(slots(w)[0].get('[data-testid="presence-entry-initial"]').text()).toBe("合");
   });

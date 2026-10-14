@@ -269,7 +269,8 @@ describe("the presence slice (exploration-presence-rail)", () => {
     it("an unavailable panel never reads as a departure", () => {
       open();
       store.activatePresence("target-7");
-      commit({ schema_version: 3, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      const result = commit({ schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } });
+      expect(result.accepted).toBe(true);
       expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 7 });
       expect(store.view.presenceNotice).toBe(null);
       commit(panelWith([CLERK]));

@@ -10,6 +10,7 @@ from web.webclient.presentation.exploration import (
     MAX_LOOK_OBJECTS,
     MAX_MOVE_EXITS,
     MAX_NODE_ID_CHARS,
+    MAX_PORTRAIT_REF,
     ExplorationPanelError,
     validate_exploration,
 )
@@ -44,11 +45,14 @@ class ExplorationSchemaTests(unittest.TestCase):
     def test_rejects_wrong_kind_and_version(self):
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(kind="services"))
-        # The version-2 panel is a protocol error in v3, as is any other version.
+        # The exact-gate cutover: the v2 and v3 panels are protocol errors in
+        # v4, as is any other version (no dual-version adapter).
         with self.assertRaises(ExplorationPanelError):
             validate_exploration(_valid_panel(schema_version=2))
         with self.assertRaises(ExplorationPanelError):
-            validate_exploration(_valid_panel(schema_version=4))
+            validate_exploration(_valid_panel(schema_version=3))
+        with self.assertRaises(ExplorationPanelError):
+            validate_exploration(_valid_panel(schema_version=5))
 
     def test_rejects_duplicate_interact_identities(self):
         payload = _valid_panel(
@@ -223,18 +227,48 @@ class ExplorationSchemaTests(unittest.TestCase):
             )
 
     @covers_requirement("webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam")
-    def test_portrait_ref_must_be_null(self):
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(
-                _valid_panel(
-                    interact=[_target(portrait_ref="catalog:goblin")]
+    def test_portrait_ref_accepts_decimal_and_rejects_malformed(self):
+        # Schema 4: both descriptor paths accept and preserve null or an
+        # ASCII-decimal reference of length 1 or 32, and reject every other
+        # shape (empty, overlong, numeric, Unicode-digit, subject-key,
+        # URL-like) without coercion (design D1).
+        for accepted in (None, "1", "1" * MAX_PORTRAIT_REF):
+            with self.subTest(portrait_ref=accepted):
+                normalized = validate_exploration(
+                    _valid_panel(
+                        interact=[_target(portrait_ref=accepted)],
+                        look={
+                            **_valid_panel()["look"],
+                            "entities": [_entity(portrait_ref=accepted)],
+                        },
+                    )
                 )
-            )
-        with self.assertRaises(ProtocolValidationError):
-            validate_exploration(_valid_panel(look={
-                **_valid_panel()["look"],
-                "entities": [_entity(portrait_ref="catalog:goblin")],
-            }))
+                self.assertEqual(
+                    normalized["interact"][0]["portrait_ref"], accepted
+                )
+                self.assertEqual(
+                    normalized["look"]["entities"][0]["portrait_ref"], accepted
+                )
+        for rejected in (
+            "",
+            "1" * (MAX_PORTRAIT_REF + 1),
+            42,
+            "12a",
+            "１２３",
+            "catalog:goblin",
+            "https://example.test/a.png",
+            True,
+        ):
+            with self.subTest(portrait_ref=rejected):
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(
+                        _valid_panel(interact=[_target(portrait_ref=rejected)])
+                    )
+                with self.assertRaises(ProtocolValidationError):
+                    validate_exploration(_valid_panel(look={
+                        **_valid_panel()["look"],
+                        "entities": [_entity(portrait_ref=rejected)],
+                    }))
 
     def test_disguise_like_availability_entries_are_exact(self):
         with self.assertRaises(ProtocolValidationError):
@@ -245,7 +279,10 @@ class ExplorationSchemaTests(unittest.TestCase):
     def test_worst_case_legal_payload_fits_the_envelope(self):
         # The structural maxima the schema allows -- 12 exits, 32 entities,
         # 32 objects, 32 targets with 8 affordances each -- with realistic
-        # bounded content.
+        # bounded content. Schema 4: every descriptor also carries a
+        # maximum-length 32-character decimal portrait reference, the worst
+        # portrait shape the seam allows.
+        at_bound = "1" * MAX_PORTRAIT_REF
         move = [
             _move_row(
                 exit_ref=f"e{i}",
@@ -255,7 +292,7 @@ class ExplorationSchemaTests(unittest.TestCase):
             for i in range(MAX_MOVE_EXITS)
         ]
         entities = [
-            _entity(identity=i + 1, display_name="南門守衛" * 2)
+            _entity(identity=i + 1, display_name="南門守衛" * 2, portrait_ref=at_bound)
             for i in range(MAX_LOOK_ENTITIES)
         ]
         objects = [
@@ -278,6 +315,7 @@ class ExplorationSchemaTests(unittest.TestCase):
                 _target(
                     identity=i + 1,
                     display_name="守衛",
+                    portrait_ref=at_bound,
                     affordances=affordances,
                 )
             )

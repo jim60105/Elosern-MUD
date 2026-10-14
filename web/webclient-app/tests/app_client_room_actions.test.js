@@ -165,7 +165,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
       store.setSender(sender);
       await mountWith();
       await commit({
-        exploration: { schema_version: 3, available: false, reason: { code: "scene_lost", message: "這片區域暫時不可用。" } },
+        exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "這片區域暫時不可用。" } },
       });
       expect(lookButton().exists()).toBe(false);
       expect(waitButton().exists()).toBe(false);
@@ -548,7 +548,7 @@ describe("AppClient room actions (exploration-room-actions)", () => {
       await mountWith();
       wrapper.get('[data-testid="exit-compass"]').element.focus();
       await commit({
-        exploration: { schema_version: 3, available: false, reason: { code: "scene_lost", message: "這片區域暫時不可用。" } },
+        exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "這片區域暫時不可用。" } },
       });
       expect(wrapper.find('[data-testid="exit-compass"]').exists()).toBe(false);
       expect(document.activeElement).toBe(document.getElementById("action-dock"));

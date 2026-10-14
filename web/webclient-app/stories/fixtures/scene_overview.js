@@ -24,12 +24,23 @@ function exitRow(exit, index) {
   };
 }
 
-// A synthesized `exploration` panel (schema v3). `targets` are interact
-// descriptors (`{identity, name, affordances}`), `entities` extra present
-// characters with no interact descriptor, `objects` look-only things.
-export function explorationPanelFixture({ exits = [], targets = [], entities = [], objects = [] } = {}) {
+// A synthesized available `exploration` panel at the current schema version
+// (v4). `targets` are interact descriptors (`{identity, name, affordances}`),
+// `entities` extra present characters with no interact descriptor, `objects`
+// look-only things, and `portraits` maps an identity to the wire-valid
+// decimal `portrait_ref` the presenter would supply (null everywhere else).
+// The values are hand-authored fixtures, NOT producer evidence: only the
+// server packet can establish that a reference names a catalog image.
+export function explorationPanelFixture({
+  exits = [],
+  targets = [],
+  entities = [],
+  objects = [],
+  portraits = {},
+} = {}) {
+  const refFor = (identity) => (Object.hasOwn(portraits, identity) ? portraits[identity] : null);
   return {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "exploration",
     move: exits.map(exitRow),
@@ -40,13 +51,13 @@ export function explorationPanelFixture({ exits = [], targets = [], entities = [
           identity: target.identity,
           display_name: target.name,
           kind: target.kind || "npc",
-          portrait_ref: null,
+          portrait_ref: refFor(target.identity),
         })),
         ...entities.map((entity) => ({
           identity: entity.identity,
           display_name: entity.name,
           kind: "character",
-          portrait_ref: null,
+          portrait_ref: refFor(entity.identity),
         })),
       ],
       objects: objects.map((object) => ({ identity: object.identity, display_name: object.name })),
@@ -54,7 +65,7 @@ export function explorationPanelFixture({ exits = [], targets = [], entities = [
     interact: targets.map((target) => ({
       identity: target.identity,
       display_name: target.name,
-      portrait_ref: null,
+      portrait_ref: refFor(target.identity),
       affordances: target.affordances || [],
     })),
   };
@@ -67,15 +78,11 @@ export function localMapFixture(nodes) {
 }
 
 // PresenceRail args (exploration-presence-rail): the rail entries exactly as
-// the store publishes them. `portraits` maps an identity to a committed
-// catalog key (the exploration panel's schema v3 still publishes
-// `portrait_ref: null`, so a face crop is shown only where a story supplies
-// the ref the presenter will carry).
-export function presenceArgs(panel, { artPanel = null, portraits = {}, motionLevel = "full" } = {}) {
-  const entries = ExplorationMenu.presenceEntries(panel).map((entry) =>
-    Object.hasOwn(portraits, entry.identity) ? { ...entry, portraitRef: portraits[entry.identity] } : entry,
-  );
-  return { entries, artPanel, motionLevel };
+// the store publishes them — the panel's own `portrait_ref` values flow
+// through `presenceEntries` untouched, so a story supplies a face crop by
+// threading the reference into the fixture's `portraits` map.
+export function presenceArgs(panel, { artPanel = null, motionLevel = "full" } = {}) {
+  return { entries: ExplorationMenu.presenceEntries(panel), artPanel, motionLevel };
 }
 
 // ChoiceCard args for one interact target's verb card: `verbMenuFor`'s rows

@@ -6,6 +6,64 @@ every body ships verbatim."""
 import os
 
 
+def _settle_admitted_portrait(entity, stable_key: str) -> None:
+    """Give one present entity a named policy and an admitted DONE portrait.
+
+    The completed record's output file is written under the runtime art store,
+    so ``/art/portrait/character/<stable_key>.png`` serves real bytes from the
+    project origin: the production exploration descriptor then carries the
+    catalog key the presenter emits, and the committed art panel carries the
+    image URL (with its face rectangle) beside it. The record is created,
+    claimed and settled through the canonical queue, exactly as the worker
+    would; nothing here invents a key or a URL.
+    """
+    from pathlib import Path
+
+    from typeclasses.npcs import NPC, ensure_npc_canonical_age
+    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+    from world.art.queue import claim, ensure, record_key, settle
+    from world.art.store import ArtAssetRecord, ArtAssetStatus
+    from world.art.subjects import character_subject_for
+
+    entity.db.portrait_policy = {"mode": "named", "stable_key": stable_key}
+    if isinstance(entity, NPC):
+        # Without canonical ages the presenter resolves the entry to the
+        # unavailable placeholder and emits no reference at all.
+        ensure_npc_canonical_age(entity)
+    entity.save()
+
+    subject = character_subject_for(entity)
+    if subject is None:
+        raise RuntimeError(f"portrait fixture: no named subject for {stable_key}")
+    ensure(subject, "browser exploration portrait fixture")
+    # Eager startup sync enqueues the scene/monster records first; the subject
+    # record enqueued last is claimed by a bounded number of rounds, and a
+    # genuinely absent record fails loudly instead of timing out later.
+    token = None
+    for _ in range(20):
+        claimed = claim(50)
+        record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
+        if record is not None and record.db.status == ArtAssetStatus.IN_PROGRESS:
+            token = str(record.db.generation_token)
+            break
+        if not claimed:
+            break
+    if token is None:
+        raise RuntimeError(f"portrait fixture: record {stable_key} not claimed")
+
+    root = Path(os.environ["ELOSERN_BROWSER_ART_ROOT"])
+    identity = f"portrait/character/{stable_key}.png"
+    (root / "portrait" / "character").mkdir(parents=True, exist_ok=True)
+    (root / identity).write_bytes(FIXTURE_VALID_PNG)
+    settle(
+        subject,
+        generation_token=token,
+        status=ArtAssetStatus.DONE,
+        output_identity=identity,
+        error=None,
+    )
+
+
 def _exploration_fixture(character) -> None:
     """Deterministically prepare an exploration-menu fixture (webclient-exploration-menu).
 
@@ -18,6 +76,7 @@ def _exploration_fixture(character) -> None:
     """
     from evennia.contrib.grid.xyzgrid.xyzroom import XYZRoom
     from evennia.utils.create import create_object
+    from typeclasses.characters import PlayerCharacter
     from typeclasses.components import ScriptedDialogue
     from typeclasses.monsters import Monster
     from typeclasses.npcs import LLMNPC, NPC
@@ -140,6 +199,25 @@ def _exploration_fixture(character) -> None:
         return_key="離開",
         ttl_seconds=3600,
     )
+
+    if os.environ.get("ELOSERN_BROWSER_EXPLORATION_PORTRAITS") == "1":
+        # Opt-in admitted media (restore-exploration-portrait-refs task 4.1):
+        # the scripted host — an interact target — and a second present
+        # player-character — a look-only bystander, never an interact target —
+        # each get a real, server-served portrait, so the live producer packet
+        # carries their decimal references and the committed art catalog
+        # carries the matching URL. The extra look entity is exactly what the
+        # dashed bystander medallion needs; no other fixture branch sees it.
+        bystander = create_object(
+            PlayerCharacter,
+            key="旅人見習",
+            location=south_gate,
+        )
+        bystander.db.age = 22
+        bystander.db.apparent_age = 22
+        bystander.save()
+        _settle_admitted_portrait(host, "browser-exploration-host")
+        _settle_admitted_portrait(bystander, "browser-exploration-traveller")
 
     print("seeded exploration fixture: south gate + scripted host + LLMNPC + goblin + defeated wolf + cave (+ boot-provisioned 荒野 gate)")
 

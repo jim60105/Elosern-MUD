@@ -1,5 +1,5 @@
 /*
- * exploration panel v3 (design D10): discriminator, bounds, affordance shapes, closed action codes.
+ * exploration panel v4 (design D10): discriminator, bounds, affordance shapes, closed action codes.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
@@ -17,13 +17,15 @@ const { validContextActionsExplorationPanel, validExplorationAffordance, validEx
 
 
 test("validates the exploration panel available/unavailable discriminator", () => {
+  // The common unavailable form passes the dispatcher at the registered
+  // exploration version (the schema-4 cutover moves it off the old shared 3).
   assert.deepEqual(
     Protocol.validatePanel(
       "exploration",
       Protocol.PANEL_ALLOWLIST.exploration,
-      unavailableStatusPanel({ schema_version: 3 })
+      unavailableStatusPanel({ schema_version: 4 })
     ),
-    unavailableStatusPanel({ schema_version: 3 })
+    unavailableStatusPanel({ schema_version: 4 })
   );
   assert.doesNotThrow(() => Protocol.validateExplorationPanel(validExplorationPanel()));
   assert.throws(() => Protocol.validateExplorationPanel(validExplorationPanel({ extra: 1 })));
@@ -31,9 +33,13 @@ test("validates the exploration panel available/unavailable discriminator", () =
   assert.throws(() =>
     Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 1 }))
   );
-  // The retired version-2 panel is a protocol error in v3.
+  // The exact-gate cutover: the retired v2 and v3 panels are protocol errors
+  // in v4, with no dual-version adapter.
   assert.throws(() =>
     Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 2 }))
+  );
+  assert.throws(() =>
+    Protocol.validateExplorationPanel(validExplorationPanel({ schema_version: 3 }))
   );
 });
 

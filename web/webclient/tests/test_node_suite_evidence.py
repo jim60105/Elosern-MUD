@@ -1377,6 +1377,7 @@ class PresenceRailEvidenceTest(unittest.TestCase):
         "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover",
         "webclient-presence-rail::a-departed-person-closes-the-card",
         "webclient-presence-rail::the-presence-rail-shows-people-and-objects-on-the-stage-floor",
+        "webclient-presence-rail::non-party-person-focus-uses-the-admitted-portrait-and-truthful-fallback",
     )
     def test_presence_rail_app_client_vitest_evidence_passes(self):
         self._run_vitest("web/webclient-app/tests/app_client_presence_rail.test.js")

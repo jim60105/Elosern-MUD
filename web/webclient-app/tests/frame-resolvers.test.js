@@ -155,7 +155,7 @@ describe("frame resolver — committed-state following and purity", () => {
 
   it("an unavailable exploration panel has no compass rows", () => {
     const state = committedState();
-    state.panels.exploration = { schema_version: 3, available: false, reason: { code: "x", message: "暫時無法使用。" } };
+    state.panels.exploration = { schema_version: 4, available: false, reason: { code: "x", message: "暫時無法使用。" } };
     expect(resolverFor(state).explorationExits()).toEqual({ rows: [], currentNode: null });
   });
 
@@ -409,7 +409,7 @@ describe("frame resolver — verbatim domain rows, reproduced navigation rows", 
 
     // An unavailable exploration panel degrades to the shared marker.
     state.panels.exploration = {
-      schema_version: 3,
+      schema_version: 4,
       available: false,
       reason: { code: "scene_lost", message: "這片區域暫時不可用。" },
     };
@@ -526,7 +526,7 @@ describe("frame resolver — (legacy) the degradation marker", () => {
     const resolver = resolverFor(state);
     expect(resolver.explorationVerbs(999)).toBeNull();
     // An unavailable panel lists no presence at all (null, not an empty room).
-    state.panels.exploration = { schema_version: 3, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } };
+    state.panels.exploration = { schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } };
     expect(resolver.explorationPresence()).toBeNull();
     expect(resolver.explorationVerbs(7)).toBeNull();
   });

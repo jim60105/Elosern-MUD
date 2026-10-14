@@ -320,7 +320,7 @@ all qualifying freshly rendered panels together in one affected-panel
 #### Scenario: Late completions gate on fresh references only
 
 - **WHEN** a completion notification is evaluated for staleness
-- **THEN** it is gated on the freshly rendered current references — not remembered selections, rooms, sent payloads, or completed image identities — a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
+- **THEN** it is gated on the freshly rendered current references rather than remembered selections, rooms, sent payloads, or completed image identities; a completion for an old room, vanished entity, or no-longer-selected gallery does not replace that panel's current content or restore an old selection, and a different panel still referencing the same subject remains eligible
 
 #### Scenario: Completion rendering is pure presentation
 
@@ -336,6 +336,22 @@ all qualifying freshly rendered panels together in one affected-panel
 
 - **WHEN** a completion notification is missed by a session
 - **THEN** reconnect's current-store full snapshot repairs the view without replaying the missed push
+
+#### Scenario: A current exploration portrait completion refreshes nullable descriptors
+- **WHEN** the completed subject appears in the freshly rendered current portrait catalog, the session is exploring, and its available exploration descriptors previously had null refs because that portrait lacked real imagery
+- **THEN** one newer update includes qualifying art/gallery/roster panels and the freshly rendered exploration panel, whose admitted target/entity refs now name the real catalog image, without another gameplay or focus action
+
+#### Scenario: Scene completion does not refresh unrelated exploration descriptors
+- **WHEN** only the current scene references the completed subject and no current portrait-catalog value names it
+- **THEN** the completion adds no exploration panel solely for that scene, preserving targeted publication
+
+#### Scenario: A portrait completion outside exploration keeps existing publication
+- **WHEN** the session is outside exploration or its exploration panel is unavailable
+- **THEN** qualifying art/gallery/roster publication continues without a fabricated exploration panel
+
+#### Scenario: Late portrait completion cannot revive a departed target
+- **WHEN** the entity left or the session changed room before a portrait completion and no current art/gallery/roster reference qualifies
+- **THEN** no stale exploration descriptor is published and no revision is advanced for that completion
 
 ### Requirement: Art degradation never blocks gameplay or leaks rejected content
 With the worker command fixed to fail and every LLM profile unavailable, movement, dialogue, combat,
