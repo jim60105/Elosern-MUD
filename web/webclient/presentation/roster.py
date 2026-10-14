@@ -1,10 +1,19 @@
-"""Exact schema-version-2 ``roster`` panel and presenter (webclient-character-roster).
+"""Exact schema-version-3 ``roster`` panel and presenter (webclient-character-roster).
 
-Each row's portrait carries the same field vocabulary the art panel's catalog
-entries carry — including the server-authored origin discriminator
-``runtime | official | silhouette | placeholder`` (``official-art-resolution``),
-validated by the shared rule, and no decorative silhouette reference — so the
-client renders roster portraits through its existing portrait treatment.
+Each row's ``portrait`` IS the complete canonical artwork descriptor
+(``world.art.descriptors``) — the same one shape the art panel's catalog
+entries carry, resolved by the same one production enumerator
+(``world.art.presenter.describe_entity``) — so a roster row can never lose a
+terminal, a reached fault or its independent generation truth to a field-copy
+omission. It is validated by the one shared descriptor validator
+(``web.webclient.presentation.artwork.validate_artwork``), and an old flat
+portrait object fails the exact-key check rather than being adapted.
+
+A character still pending creation carries the EMPTY canonical descriptor: no
+image attempt (so no URL), no generated subject key and no terminal, because
+activation is the only thing that establishes a portrait policy. Every
+activated character's row is the full descriptor, whether or not any real
+image resolves and regardless of which room the character stands in.
 
 Discloses the account-level character roster read model: owned characters in
 ascending identity order, each with its identity, display name, live puppet flag,
@@ -21,18 +30,7 @@ and dialogue.
 from typing import Any
 
 from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
-from web.webclient.presentation.art import (
-    MAX_ALT,
-    MAX_MEDIA_URL,
-    MAX_PLACEHOLDER_LABEL,
-    MAX_STATUS,
-    MAX_SUBJECT_KEY,
-    PLACEHOLDER_KINDS,
-    _validate_face_rect,
-    _validate_portrait_origin,
-    _validate_stage,
-    _placeholder_for,
-)
+from web.webclient.presentation.artwork import validate_artwork
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
@@ -45,7 +43,8 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.art.presenter import ORIGIN_PLACEHOLDER, resolve_character
+from world.art import descriptors
+from world.art.presenter import describe_entity
 from world.rules.account_roster import (
     MAX_ROSTER_ROWS,
     ROSTER_LOCK_REASON,
@@ -53,110 +52,23 @@ from world.rules.account_roster import (
     build_account_roster,
 )
 
-ROSTER_SCHEMA_VERSION = 2
+ROSTER_SCHEMA_VERSION = 3
 
 # Shared display-name code-point bound.
 MAX_ROSTER_NAME = MAX_DISPLAY_NAME_CODE_POINTS
-
-PORTRAIT_STATUSES = frozenset({"missing", "pending", "failed", "done"})
-
 
 class RosterPanelError(ProtocolValidationError):
     """The available roster payload violates its exact bounded schema."""
 
 
-def _validate_roster_placeholder(value: Any) -> dict[str, Any] | None:
-    if value is None:
-        return None
-    _require_exact_fields(value, "roster placeholder", {"kind", "label"}, {})
-    kind = value["kind"]
-    if kind not in PLACEHOLDER_KINDS:
-        raise RosterPanelError("placeholder kind is not a stable value")
-    label = _require_str(value, "label", maximum=MAX_PLACEHOLDER_LABEL)
-    if not label.strip():
-        raise RosterPanelError("placeholder label must be non-empty")
-    return {"kind": kind, "label": label}
-
-
 def _validate_roster_portrait(value: Any) -> dict[str, Any]:
-    _require_exact_fields(
-        value,
-        "roster portrait",
-        {
-            "subject_key",
-            "status",
-            "url",
-            "aspect_ratio",
-            "alt",
-            "placeholder",
-            "face_rect",
-            "stage",
-            "origin",
-        },
-        {},
-    )
-    subject_key = value["subject_key"]
-    if subject_key is not None:
-        subject_key = _require_str(value, "subject_key", maximum=MAX_SUBJECT_KEY)
-        if not subject_key.strip():
-            raise RosterPanelError("portrait subject_key must be non-empty")
+    """Validate one row's portrait: the complete canonical descriptor, verbatim.
 
-    status = value["status"]
-    if status is not None:
-        status = _require_str(value, "status", maximum=MAX_STATUS)
-        if status not in PORTRAIT_STATUSES:
-            raise RosterPanelError("portrait status is not a stable value")
-
-    url = value["url"]
-    if url is not None:
-        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
-        if not url.startswith("/art/"):
-            raise RosterPanelError("portrait url must be a same-origin media URL")
-
-    aspect_ratio = value["aspect_ratio"]
-    if aspect_ratio is not None:
-        aspect_ratio = _require_str(value, "aspect_ratio", maximum=16)
-        if aspect_ratio != "3:4":
-            raise RosterPanelError("portrait aspect_ratio must be 3:4")
-
-    alt = _require_str(value, "alt", maximum=MAX_ALT)
-    if not alt.strip():
-        raise RosterPanelError("portrait alt must be non-empty")
-
-    placeholder = _validate_roster_placeholder(value["placeholder"])
-
-    # Cross-field integrity checks mirroring art panel catalog entries.
-    if url is not None and placeholder is not None:
-        raise RosterPanelError("portrait cannot have both url and placeholder")
-    if url is None and placeholder is None:
-        raise RosterPanelError("portrait must have either url or placeholder")
-    face_rect = _validate_face_rect(value["face_rect"])
-    stage = _validate_stage(value["stage"], url)
-    # The same server-authored origin discriminator the art panel catalog
-    # carries, under the same closed-vocabulary and URL-coherence rules
-    # (official-art-resolution): a roster row never states its origin by URL
-    # shape, and an official row never reports a generated status.
-    origin = _validate_portrait_origin(
-        "portrait origin", "portrait", value, url, status
-    )
-    # Same rule as the art catalog: the rectangle exists exactly when the
-    # row carries a media URL, never for a placeholder.
-    if url is not None and face_rect is None:
-        raise RosterPanelError("a portrait with a url carries a face_rect")
-    if url is None and face_rect is not None:
-        raise RosterPanelError("a placeholder portrait carries no face_rect")
-
-    return {
-        "subject_key": subject_key,
-        "status": status,
-        "url": url,
-        "aspect_ratio": aspect_ratio,
-        "alt": alt,
-        "placeholder": placeholder,
-        "face_rect": face_rect,
-        "stage": stage,
-        "origin": origin,
-    }
+    The same one shared descriptor validator the art catalog entries use, so
+    the two surfaces cannot drift and a row that still carries the retired flat
+    image fields fails the exact-key check rather than being adapted.
+    """
+    return validate_artwork(value)
 
 
 def _validate_character_row(value: Any, index: int) -> dict[str, Any]:
@@ -283,6 +195,33 @@ def validate_roster(payload: Any) -> dict[str, Any]:
     return result
 
 
+def _row_portrait(entity: Any, identity: int, pending: bool) -> dict[str, Any]:
+    """One roster row's complete canonical portrait descriptor.
+
+    A creation-pending character carries the EMPTY canonical descriptor: it has
+    no named portrait policy (activation is what writes one), so it exposes no
+    image attempt, no generated subject key and no terminal — a truthful
+    no-portrait row rather than a silhouette standing in for an uncreated
+    character.
+
+    Every other row is the subject's own complete descriptor from the one
+    production enumerator, resolved regardless of room presence and regardless
+    of whether any real image exists. An owned identity whose database row no
+    longer resolves keeps its admitted position with the empty descriptor
+    instead of failing the panel.
+    """
+    if pending or entity is None:
+        return descriptors.descriptor(
+            subject_id=str(int(identity)),
+            generation_subject=None,
+            generation_state=None,
+            attempts=[],
+            terminal_payload=None,
+            retention_sources=[],
+        )
+    return describe_entity(entity)
+
+
 def roster_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available ``roster`` panel for the puppeted session.
 
@@ -300,41 +239,13 @@ def roster_presenter(context: PresentationContext) -> dict[str, Any]:
     character_rows: list[dict[str, Any]] = []
     for char_view in view.characters:
         entity = ObjectDB.objects.filter(id=int(char_view.identity)).first()
-        if entity is None:
-            resolved = {
-                "kind": "unavailable",
-                "label": "無法提供",
-                "status": None,
-                "url": None,
-                "aspect_ratio": None,
-                "alt": "無法提供",
-                "subject_key": None,
-                "face_rect": None,
-                "stage": None,
-                "origin": ORIGIN_PLACEHOLDER,
-            }
-        else:
-            resolved = resolve_character(entity)
-
-        portrait = {
-            "subject_key": resolved.get("subject_key"),
-            "status": resolved.get("status"),
-            "url": resolved.get("url"),
-            "aspect_ratio": resolved.get("aspect_ratio"),
-            "alt": resolved.get("alt") or "無法提供",
-            "placeholder": _placeholder_for(resolved),
-            "face_rect": resolved.get("face_rect"),
-            "stage": resolved.get("stage"),
-            "origin": resolved.get("origin"),
-        }
-
         character_rows.append(
             {
                 "identity": char_view.identity,
                 "name": char_view.name,
                 "current": char_view.current,
                 "pending": char_view.pending,
-                "portrait": portrait,
+                "portrait": _row_portrait(entity, char_view.identity, char_view.pending),
             }
         )
 
@@ -357,6 +268,7 @@ __all__ = [
     "ROSTER_LOCK_REASON",
     "ROSTER_SCHEMA_VERSION",
     "RosterPanelError",
+    "_row_portrait",
     "roster_presenter",
     "validate_roster",
 ]

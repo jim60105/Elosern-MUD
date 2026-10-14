@@ -1,9 +1,15 @@
 <script setup>
 // Display-only, server-ordered combat identities. Playback substitutes only
 // the HP numerator addressed by the participant's catalog reference.
-import { computed, ref } from "vue";
-import { faceObjectPosition } from "./face-rect.js";
-import { portraitGlyph } from "./character-identity.js";
+//
+// Each row's portrait is the shared figure renderer's avatar position over the
+// canonical descriptor the participant's committed catalog reference names:
+// the real-only load lifecycle, the successful candidate's own face-rect crop,
+// the identity glyph as the only fallback and the shared persistent failure
+// marker — so a reached load failure is never a silently missing row.
+import { computed } from "vue";
+import ReferenceArtwork from "./ReferenceArtwork.vue";
+import { portraitFor as descriptorFor } from "./party-helpers.js";
 import { gaugeRatio } from "./vitals.js";
 
 const props = defineProps({
@@ -11,7 +17,6 @@ const props = defineProps({
   artPanel: { type: Object, default: null },
   displayHp: { type: Object, default: null },
 });
-const failedPortraitUrls = ref(new Set());
 const groups = computed(() => [
   { team: "party", label: "我方", rows: props.participants.filter((p) => p.team === "party") },
   { team: "foes", label: "敵方", rows: props.participants.filter((p) => p.team === "foes") },
@@ -25,24 +30,10 @@ function hpWidth(p) {
   return `${Math.min(100, Math.max(0, ratio))}%`;
 }
 const STATE_MARKERS = { fled: "已逃離", knocked_out: "倒地", defeated: "已敗退" };
+// The canonical descriptor the row's committed reference names, or null for a
+// row that carries none (expected absence, never a failure).
 function portraitFor(p) {
-  if (p.portrait_ref == null || !props.artPanel || props.artPanel.available === false) return null;
-  return props.artPanel.portrait_catalog?.[p.portrait_ref] || { placeholder: true };
-}
-function portraitLabel(p) {
-  const portrait = portraitFor(p);
-  const state = portrait?.url && failedPortraitUrls.value.has(portrait.url)
-    ? "肖像載入失敗"
-    : { pending: "肖像生成中", failed: "肖像生成失敗", missing: "無肖像" }[portrait?.status];
-  return `${p.display_name}，${state || portrait?.placeholder?.label || "無肖像"}`;
-}
-function portraitSrc(portrait) {
-  return portrait?.url && !failedPortraitUrls.value.has(portrait.url) ? portrait.url : "";
-}
-function onPortraitError(url) {
-  if (url && !failedPortraitUrls.value.has(url)) {
-    failedPortraitUrls.value = new Set(failedPortraitUrls.value).add(url);
-  }
+  return descriptorFor(props.artPanel, p.portrait_ref);
 }
 </script>
 

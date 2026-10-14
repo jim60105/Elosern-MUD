@@ -579,15 +579,58 @@ def describe_entity(entity) -> dict | None:
 
     Applies exactly the presentation eligibility (explicit named policy, both
     canonical integer age fields, registered visual species) and then
-    enumerates that ONE subject. An ineligible or subject-less entity answers
-    ``None`` rather than a descriptor for a subject the caller was not already
-    authorized to show, and nothing here enumerates, scans, or discovers any
-    other subject.
+    enumerates that ONE subject. Nothing here enumerates, scans, or discovers
+    any other subject: the caller supplies the entities it is already
+    authorized to show.
+
+    An entity that carries no eligible subject (a dialogue host with no named
+    policy, a character whose canonical ages refuse it, a monster whose visual
+    species is unregistered) still answers its own complete descriptor — the
+    full fact set with no image attempt, no generated subject key and no
+    prompt, plus the deterministic attribute-selected alpha terminal — because
+    catalog admission is a membership decision the caller already made, not a
+    real-image decision. Only a genuinely absent entity answers ``None``.
     """
+    if entity is None:
+        return None
     subject, refusal = _portrait_subject(entity)
     if refusal is not None:
-        return None
+        return _refusal_descriptor(entity, subject)
     return describe_portrait(subject, entity)
+
+
+def _refusal_descriptor(entity, subject: ArtSubject | None) -> dict:
+    """The complete descriptor of an admitted entity with no eligible subject.
+
+    Every fact here is a REFUSAL fact: no candidate, no reached fault and no
+    recorded generation is claimed, so nothing is enqueued, created or read on
+    the refused subject's behalf, and ``generation_subject`` stays null so the
+    completion push can never match a subject the entity does not have. The
+    alpha terminal is the deterministic attribute-selected built-in the
+    presentation has always carried for such an entity — a fallback, never a
+    real candidate.
+
+    ``subject_id`` is the position's stable lifecycle identity: the portrait
+    subject key when the entity has one (an age-refused character, whose
+    policy still names a subject) and the entity's own stable decimal runtime
+    identity otherwise. It is deliberately NOT a generation key — that is
+    ``generation_subject``, which is null here — so a re-presentation of the
+    same position keeps the same resolution epoch while claiming no
+    generation.
+    """
+    identity = getattr(entity, "pk", None)
+    if subject is not None:
+        fallback = fallback_for(subject, entity=entity, report=True)
+    else:
+        fallback = _entity_fallback(entity)
+    return descriptors.descriptor(
+        subject_id=subject.full() if subject is not None else str(identity),
+        generation_subject=None,
+        generation_state=None,
+        attempts=[],
+        terminal_payload=_alpha_terminal(fallback),
+        retention_sources=[],
+    )
 
 
 def _attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
@@ -752,6 +795,19 @@ def _entity_silhouette(entity) -> dict | None:
     reported with ``kind`` "entity" because no portrait subject exists, and
     nothing is installed, created, or enqueued.
     """
+    return _silhouette_from(_entity_fallback(entity))
+
+
+def _entity_fallback(entity) -> dict | None:
+    """The SEAM-shaped fallback facts of an entity carrying no named portrait subject.
+
+    The canonical counterpart of :func:`_entity_silhouette`: the same
+    deterministic attribute-selected resolution, kept in the seam's own
+    ``{identity, key, face_rect}`` shape so it can build a canonical alpha
+    terminal (which needs the committed identity's version) exactly like a
+    subject's own resolution does. The one ``gallery_fallback_used`` event is
+    reported with ``kind`` "entity" because no portrait subject exists.
+    """
     identity = getattr(entity, "pk", None)
     if entity is None or identity is None:
         return None
@@ -762,7 +818,8 @@ def _entity_silhouette(entity) -> dict | None:
         "gallery_fallback_used",
         context={"subject": str(identity), "kind": "entity", "key": key},
     )
-    return _silhouette(key, *fallback_identity_and_rect(key))
+    committed, rect = fallback_identity_and_rect(key)
+    return {"key": key, "identity": committed, "face_rect": rect}
 
 
 def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:

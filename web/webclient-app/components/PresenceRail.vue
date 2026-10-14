@@ -16,7 +16,7 @@
 // entry does (open the verb card or the overflow card, or submit a look).
 // An empty room renders no element at all.
 import { computed, nextTick, ref, useId, watch } from "vue";
-import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
+import ReferenceArtwork from "./ReferenceArtwork.vue";
 import { portraitFor } from "./party-helpers.js";
 import { railReadout, railSlots } from "./presence-rail.js";
 
@@ -36,14 +36,6 @@ const idPrefix = useId();
 const slots = computed(() => railSlots(props.entries));
 const activeIndex = ref(0);
 const focused = ref(false);
-// Portrait URLs that failed to load: their medallion falls back to the
-// initial instead of an empty circle.
-const failedUrls = ref(new Set());
-
-function onFaceError(url) {
-  failedUrls.value = new Set([...failedUrls.value, url]);
-}
-
 // The rendered items: every slot, with the separator standing before the
 // first object slot (when anything precedes it).
 const items = computed(() => {
@@ -70,22 +62,20 @@ function slotId(index) {
   return `${idPrefix}-slot-${index}`;
 }
 
-// The catalog entry that can show a face: a URL-bearing entry only (a
-// pending or unknown key falls back to the initial).
+// The canonical descriptor the slot's committed reference names, or null for
+// a slot that carries no reference at all (an object, the overflow chip, or an
+// entity the art view does not admit). The reference itself is the admission
+// fact, so an unadmitted slot is expected absence and a dangling one is a
+// local failure — never a silently missing medallion.
 function portrait(slot) {
   if (slot.presence === "object" || slot.presence === "more") {
     return null;
   }
-  const entry = portraitFor(props.artPanel, slot.portraitRef);
-  return entry && entry.url && !failedUrls.value.has(entry.url) ? entry : null;
+  return portraitFor(props.artPanel, slot.portraitRef);
 }
 
 function initial(slot) {
   return Array.from(String(slot.label || ""))[0] || "？";
-}
-
-function faceStyle(entry) {
-  return faceCropStyle(entry.face_rect, faceObjectPosition(entry.face_rect));
 }
 
 function readout(index) {
@@ -242,16 +232,16 @@ defineExpose({ focus, focusEntry });
             :class="{ 'presence-rail__medal--dashed': item.slot.presence === 'bystander' }"
             aria-hidden="true"
           >
-            <img
-              v-if="portrait(item.slot)"
-              class="presence-rail__face"
-              data-testid="presence-entry-face"
-              :src="portrait(item.slot).url"
-              alt=""
-              :style="faceStyle(portrait(item.slot))"
-              @error="onFaceError(portrait(item.slot).url)"
+            <ReferenceArtwork
+              avatar
+              :artwork="portrait(item.slot)"
+              :panel="artPanel"
+              :has-reference="item.slot.portraitRef !== null && item.slot.portraitRef !== undefined"
+              :name="item.slot.label"
+              :initial-of="initial(item.slot)"
+              face-test-id="presence-entry-face"
+              initial-test-id="presence-entry-initial"
             />
-            <span v-else class="presence-rail__initial" data-testid="presence-entry-initial">{{ initial(item.slot) }}</span>
           </span>
           <span class="presence-rail__name" data-testid="presence-entry-name">{{ item.slot.label }}</span>
         </div>
@@ -327,13 +317,11 @@ defineExpose({ focus, focusEntry });
     border-color var(--motion-fast) var(--ease-standard);
 }
 
-/* Absolute so the face-rect zoom anchors against the medallion's clip. */
-.presence-rail__face {
+/* The shared figure renderer fills the medallion; its avatar position anchors
+   the face-rect zoom against this same clip. */
+.presence-rail__medal .reference-artwork {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
 }
 
 .presence-rail__medal--dashed {
@@ -343,7 +331,7 @@ defineExpose({ focus, focusEntry });
   background: radial-gradient(circle at 40% 35%, #2a2722, #121110);
 }
 
-.presence-rail__medal--dashed .presence-rail__face {
+.presence-rail__medal--dashed .reference-artwork__figure {
   filter: saturate(0.55) brightness(0.85);
 }
 

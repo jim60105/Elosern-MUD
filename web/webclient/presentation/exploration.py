@@ -27,13 +27,15 @@ adapter uses; the target-level ``keywords`` list and the in-conversation
 Version 4 adds one nullable ``portrait_ref`` to every look entity and interact
 target: ``None`` or an unchanged ASCII decimal string of 1..32 characters -- the
 exact catalog-key seam the combat participants and the dialogue host already
-use. The presenter emits a reference only for an identity that is a member of
-the current capped ``art`` panel portrait catalog AND whose own canonical art
-resolution carries a media URL under a ``runtime``/``official`` origin, so a
-descriptor never points at a catalog entry that is absent, cap-dropped, or a
-placeholder. The ``art`` panel itself is unchanged: same membership, cap, and
-face crops. Producer and client bundle cut over together with no compatibility
-adapter or data migration.
+use. The presenter emits a reference for exactly the identities the current
+capped ``art`` panel portrait catalog ADMITS, with no real-image gate: an
+admitted subject whose imagery is missing, pending, failed or alpha-only still
+carries its reference, and that key names its complete canonical descriptor in
+the same committed snapshot. A descriptor therefore never points at a catalog
+entry that is absent or cap-dropped, and a ``null`` means the current bounded
+view does not admit the subject at all. The ``art`` panel's own membership, cap
+and face crops are unchanged. Producer and client bundle cut over together
+with no compatibility adapter or data migration.
 
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
@@ -83,7 +85,6 @@ from web.webclient.presentation.protocol_validation import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation.options import _validate_affordance_params
-from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME, resolve_entity
 from world.rules.dialogue import is_dialogue_host, opens_dialogue
 from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
 from world.rules.map_knowledge import (
@@ -567,16 +568,16 @@ def _reason_dict(entry: Any) -> dict[str, Any] | None:
 def _portrait_ref_lookup(actor: Any) -> Callable[[Any], "str | None"]:
     """A per-presentation portrait-ref resolver over the current art view (design D2).
 
-    Builds ``build_art_view(actor)`` once and reuses one ``resolve_entity`` result
-    per identity across the look and interact paths. A reference is emitted only
-    when the identity is a member of the current capped art view AND its own
-    canonical resolution carries a media URL under a ``runtime``/``official``
-    origin -- the same real-image gate the party row uses, delegated to the single
-    chain owner rather than re-derived here. An excluded or cap-dropped identity,
-    or one whose resolution yields a placeholder/silhouette (no own URL), maps to
-    ``None``. When the art view is unavailable every reference degrades to
-    ``None`` through this boundary and exploration stays available; nothing here
-    writes art records, queues, or gameplay state.
+    Builds ``build_art_view(actor)`` once and answers every identity from that
+    one admitted set, so the look and interact paths can never disagree and
+    neither re-derives membership. A reference is emitted for every admitted
+    identity whether or not real imagery resolves -- an admitted
+    missing/pending/failed/alpha-only subject keeps its reference, and that key
+    names its complete canonical descriptor in the same committed snapshot. An
+    excluded or cap-dropped identity maps to ``None``. When the art view is
+    unavailable every reference degrades to ``None`` through this boundary and
+    exploration stays available; nothing here writes art records, queues, or
+    gameplay state.
     """
     try:
         members = frozenset(
@@ -584,21 +585,12 @@ def _portrait_ref_lookup(actor: Any) -> Callable[[Any], "str | None"]:
         )
     except ArtViewError:
         return lambda _entity: None
-    resolved: dict[int, "str | None"] = {}
 
     def lookup(entity: Any) -> "str | None":
         identity = int(entity.pk)
         if identity not in members:
             return None
-        if identity not in resolved:
-            payload = resolve_entity(entity)
-            resolved[identity] = (
-                portrait_catalog_key(identity)
-                if payload.get("url") is not None
-                and payload.get("origin") in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL)
-                else None
-            )
-        return resolved[identity]
+        return portrait_catalog_key(identity)
 
     return lookup
 

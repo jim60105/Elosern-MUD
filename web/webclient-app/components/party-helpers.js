@@ -18,8 +18,10 @@ export function hpFillRatio(hpCurrent, hpMaximum) {
 }
 
 /**
- * Resolve an art catalog entry for a companion row.
- * Returns the raw catalog entry or null when unresolvable / null ref.
+ * Resolve the canonical artwork descriptor a row's catalog reference names.
+ * Returns the descriptor or null when the reference is null/unadmitted or the
+ * committed catalog does not carry it (a dangling admitted reference — the
+ * figure renderer reports that as a local failure, never as invented art).
  */
 export function portraitFor(artPanel, portraitRef) {
   if (portraitRef === null || portraitRef === undefined) {
@@ -27,7 +29,7 @@ export function portraitFor(artPanel, portraitRef) {
   }
   const catalog = (artPanel && artPanel.portrait_catalog) || {};
   const entry = catalog[portraitRef];
-  return entry ?? null;
+  return entry?.artwork ?? null;
 }
 
 /**

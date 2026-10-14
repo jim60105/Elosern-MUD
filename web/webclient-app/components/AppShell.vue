@@ -151,6 +151,9 @@ const props = defineProps({
   rosterCanCreate: { type: Boolean, default: false },
   rosterSwitchLocked: { type: Boolean, default: false },
   rosterLockReason: { type: String, default: null },
+  // The committed `roster` panel the switcher's canonical portrait
+  // descriptors came from.
+  rosterPanel: { type: Object, default: null },
   epoch: { type: [Number, String], default: null },
   possessionBanner: { type: Object, default: null },
   // The place card's room actions (exploration-room-actions design D3):
@@ -579,6 +582,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       :roster-can-create="rosterCanCreate"
       :roster-switch-locked="rosterSwitchLocked"
       :roster-lock-reason="rosterLockReason"
+      :roster-panel="rosterPanel"
       :locked="mutationsLocked || !connected"
       :epoch="epoch"
       :possession-banner="possessionBanner"

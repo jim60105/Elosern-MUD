@@ -3,33 +3,34 @@
 // The art panel's own validators (scene + portrait catalog). The gallery
 // panel's wire validator moved to ./gallery.js in the gallery v2 -> v3 cutover
 // (change unified-gallery-image-contract) and consumes the canonical artwork
-// descriptor through ../artwork.js.
+// descriptor through ../artwork.js — the same shared validator this panel's
+// catalog entries now use.
 
 var C = require("../constants.js");
 var core = require("../core.js");
+var artwork = require("../artwork.js");
 
 var isPlainObject = core.isPlainObject;
 var jsonByteSize = core.jsonByteSize;
 var requireExactFields = core.requireExactFields;
 var requireInt = core.requireInt;
 var requireString = core.requireString;
+var validateArtwork = artwork.validateArtwork;
 
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
+var ART_SCHEMA_VERSION = C.ART_SCHEMA_VERSION;
 
 // Panel discriminator dispatch: the unavailable form is common to every
 // registered panel; the available form is validated against its schema.
 
-// Exact available art panel v1 schema (mirror of
-// web.webclient.presentation.art, webclient-art-panel D1).
+// Exact available art panel schema (mirror of
+// web.webclient.presentation.art, webclient-art-panel).
 var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
 var ART_ROLES = ["隊友", "敵方", "對話對象", "人物"];
-// The closed portrait-origin vocabulary (art-gallery-fallback owns it;
-// official-art-resolution-contracts extends both sides with "official").
-var ART_ORIGINS = ["runtime", "official", "silhouette", "placeholder"];
-var ART_MAX_FALLBACK_KEY = 32;
-var ART_FALLBACK_URL_PREFIX = "/art/defaults/";
+var ART_MAX_CONTEXT_NAME = 64;
+var ART_MAX_CONTEXT_ROLE = 16;
 
 function validateArtPlaceholder(value) {
   if (value === null) {
@@ -127,141 +128,26 @@ function validateArtStage(value, url) {
 
 function validateArtContext(value) {
   requireExactFields(value, "art context", ["name", "role"], []);
-  var name = requireString(value.name, "context name", 64);
+  var name = requireString(value.name, "context name", ART_MAX_CONTEXT_NAME);
   if (!name.trim()) {
     throw new Error("context name must be non-empty");
   }
-  var role = requireString(value.role, "context role", 16);
+  var role = requireString(value.role, "context role", ART_MAX_CONTEXT_ROLE);
   if (ART_ROLES.indexOf(role) === -1) {
     throw new Error("context role is not a stable value");
   }
   return { name: name, role: role };
 }
 
-// Face-rectangle validator (art catalog entries and roster portraits share
-// the portrait field vocabulary): null, or exactly x, y, w, h as finite
-// real numbers in [0, 1]. Placement metadata only — no crop, no second
-// image (mirror of web.webclient.presentation.art._validate_face_rect).
-function validateArtFaceRect(value) {
-  if (value === null) {
-    return null;
-  }
-  requireExactFields(value, "face_rect", ["x", "y", "w", "h"], []);
-  var names = ["x", "y", "w", "h"];
-  for (var i = 0; i < names.length; i++) {
-    var coordinate = value[names[i]];
-    if (typeof coordinate !== "number" || !Number.isFinite(coordinate)) {
-      throw new Error("face_rect." + names[i] + " must be a real number");
-    }
-    if (!(coordinate >= 0 && coordinate <= 1)) {
-      throw new Error("face_rect." + names[i] + " must lie in [0, 1]");
-    }
-  }
-  return { x: value.x, y: value.y, w: value.w, h: value.h };
-}
-
-// The decorative built-in silhouette reference the server resolved for a
-// still-absent portrait: exactly the committed key, its /art/defaults/
-// identity and that key's rectangle. It is presentation data and never the
-// entry's own media fields (mirror of
-// web.webclient.presentation.art._validate_portrait_fallback).
-function validateArtFallback(value) {
-  if (value === null) {
-    return null;
-  }
-  requireExactFields(value, "art fallback", ["key", "url", "face_rect"], []);
-  var key = requireString(value.key, "fallback key", ART_MAX_FALLBACK_KEY);
-  if (!key.trim()) {
-    throw new Error("fallback key must be non-empty");
-  }
-  var url = requireString(value.url, "fallback url", MAX_MEDIA_URL);
-  if (url.indexOf(ART_FALLBACK_URL_PREFIX) !== 0) {
-    throw new Error("fallback url must name a committed built-in identity");
-  }
-  var faceRect = validateArtFaceRect(value.face_rect);
-  if (faceRect === null) {
-    throw new Error("a fallback carries a face_rect");
-  }
-  return { key: key, url: url, face_rect: faceRect };
-}
-
-// The server-authored origin discriminator, coherent with its own media:
-// shared by the art catalog entry and the roster row portrait (mirror of
-// web.webclient.presentation.art._validate_portrait_origin). It names the
-// branch that produced the payload's own media, never a URL shape, so a
-// silhouette or placeholder origin never carries that media URL, a runtime or
-// official origin always does, and an official image (a read-only catalog
-// default, not a generated asset) is never reported with a status.
-function validatePortraitOrigin(field, noun, value, url, status) {
-  var origin = requireString(value, field, 16);
-  if (ART_ORIGINS.indexOf(origin) === -1) {
-    throw new Error(field + " is not a stable value");
-  }
-  if (url !== null && (origin === "silhouette" || origin === "placeholder")) {
-    throw new Error("a " + noun + " carrying a media URL is not a silhouette or a placeholder");
-  }
-  if (url === null && (origin === "runtime" || origin === "official")) {
-    throw new Error("an " + origin + " origin carries the " + noun + "'s media URL");
-  }
-  if (origin === "official" && status !== null) {
-    throw new Error("an official image is not a generated portrait");
-  }
-  return origin;
-}
-
+// One catalog entry: exactly the canonical artwork descriptor plus its
+// bounded display context (mirror of
+// web.webclient.presentation.art._validate_catalog_entry). The descriptor is
+// validated by the one shared mirror, so the art catalog and every other
+// descriptor consumer accept byte-identical fact shapes; a retired flat
+// portrait object fails the exact-key check instead of being adapted.
 function validateArtCatalogEntry(value) {
-  requireExactFields(
-    value,
-    "art catalog entry",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "context", "origin", "fallback"],
-    []
-  );
-  if (value.subject_key !== null) {
-    requireString(value.subject_key, "catalog subject_key", 128);
-  }
-  var status = value.status;
-  if (status !== null) {
-    requireString(status, "catalog status", 16);
-    if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
-      throw new Error("catalog status is not a stable value");
-    }
-  }
-  var url = value.url;
-  if (url !== null) {
-    requireString(url, "catalog url", MAX_MEDIA_URL);
-    if (url.indexOf("/art/") !== 0) {
-      throw new Error("catalog url must be a same-origin media URL");
-    }
-  }
-  if (value.aspect_ratio !== null && value.aspect_ratio !== "3:4") {
-    throw new Error("catalog aspect_ratio must be 3:4");
-  }
-  var alt = requireString(value.alt, "catalog alt", 512);
-  if (!alt.trim()) {
-    throw new Error("catalog alt must be non-empty");
-  }
-  validateArtPlaceholder(value.placeholder);
-  validateArtContext(value.context);
-  var faceRect = validateArtFaceRect(value.face_rect);
-  validateArtStage(value.stage, url);
-  var origin = validatePortraitOrigin("catalog origin", "catalog entry", value.origin, url, status);
-  var fallback = validateArtFallback(value.fallback);
-  if (url !== null && faceRect === null) {
-    throw new Error("a catalog entry with a url carries a face_rect");
-  }
-  if (url === null && faceRect !== null) {
-    throw new Error("a catalog placeholder carries no face_rect");
-  }
-  // The decorative reference carries a real meaning only on the silhouette
-  // origin's payload, so it is required there and refused by the placeholder
-  // origin.
-  if (origin === "silhouette") {
-    if (fallback === null) throw new Error("a silhouette origin carries its fallback identity");
-    if (status === "done") throw new Error("a silhouette origin is not a done portrait");
-  } else if (origin === "placeholder" && fallback !== null) {
-    throw new Error("a placeholder origin carries no fallback identity");
-  }
-  return value;
+  requireExactFields(value, "art catalog entry", ["artwork", "context"], []);
+  return { artwork: validateArtwork(value.artwork), context: validateArtContext(value.context) };
 }
 
 function validateArtPanel(payload) {
@@ -272,7 +158,7 @@ function validateArtPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 2) {
+  if (payload.schema_version !== ART_SCHEMA_VERSION) {
     throw new Error("unsupported art schema_version");
   }
   if (payload.available !== true || payload.kind !== "scene") {
@@ -295,7 +181,7 @@ function validateArtPanel(payload) {
   }
 
   var result = {
-    schema_version: 2,
+    schema_version: ART_SCHEMA_VERSION,
     available: true,
     kind: "scene",
     scene: scene,
@@ -313,9 +199,5 @@ function validateArtPanel(payload) {
 module.exports = {
   validateArtPlaceholder: validateArtPlaceholder,
   validateArtPanel: validateArtPanel,
-  validateArtFallback: validateArtFallback,
-  validateArtFaceRect: validateArtFaceRect,
   validateArtStage: validateArtStage,
-  validatePortraitOrigin: validatePortraitOrigin,
-  ART_ORIGINS: ART_ORIGINS,
 };

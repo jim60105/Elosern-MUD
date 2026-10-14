@@ -29,16 +29,23 @@ export const ARTWORK_STATE_FAILED = "failed";
 // `hasReference` states whether the committed payload intentionally admits
 // exactly one reference for it, and `artwork` is the descriptor that reference
 // resolved to (null when the panel claimed one and carried none).
+//
+// An intentional no-reference is judged FIRST: a position the committed
+// payload deliberately left without a reference (a party row the art view does
+// not admit, a look entity dropped by the catalog cap) is expected absence and
+// carries no local failure marker, whatever the panel's own availability says.
+// Only a position that DID admit a reference can fail — on a missing or
+// unavailable required panel, or on a reference whose entry is absent.
 export function artworkAvailability({ panel, required = true, hasReference = true, artwork = null, viewSubjectId = null } = {}) {
   const view = { view_subject_id: viewSubjectId ?? null };
   if (!required) {
     return { state: ARTWORK_STATE_EXPECTED_ABSENT, ...view };
   }
-  if (!panel || panel.available !== true) {
-    return { state: ARTWORK_STATE_FAILED, ...view };
-  }
   if (!hasReference) {
     return { state: ARTWORK_STATE_EXPECTED_ABSENT, ...view };
+  }
+  if (!panel || panel.available !== true) {
+    return { state: ARTWORK_STATE_FAILED, ...view };
   }
   if (!artwork) {
     return { state: ARTWORK_STATE_FAILED, ...view };

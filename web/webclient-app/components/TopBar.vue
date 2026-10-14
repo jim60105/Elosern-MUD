@@ -16,6 +16,9 @@ defineProps({
   rosterCanCreate: { type: Boolean, default: false },
   rosterSwitchLocked: { type: Boolean, default: false },
   rosterLockReason: { type: String, default: null },
+  // The committed `roster` panel the rows' canonical portrait descriptors
+  // came from (the availability fact their thumbnails are judged against).
+  rosterPanel: { type: Object, default: null },
   locked: { type: Boolean, default: false },
   epoch: { type: [Number, String], default: null },
   possessionBanner: { type: Object, default: null },
@@ -47,6 +50,7 @@ defineEmits({
     <CharacterSwitcher
       :available="rosterAvailable"
       :characters="rosterCharacters"
+      :panel="rosterPanel"
       :can-create="rosterCanCreate"
       :switch-locked="rosterSwitchLocked"
       :lock-reason="rosterLockReason"

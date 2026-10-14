@@ -1,6 +1,6 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from "vue";
-import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
+import ReferenceArtwork from "./ReferenceArtwork.vue";
 
 // CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui):
 // Mounted in TopBar.vue's top-right cluster beside the meta pill.
@@ -8,9 +8,17 @@ import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
 // Expanded: popover listing roster characters, single shared lock note,
 // and trailing confirmation-gated create-character control.
 // Closes only on Escape, outside pointer activation, or committed epoch change.
+//
+// Every thumbnail is the shared figure renderer's avatar position over the
+// row's complete canonical roster descriptor: the real-only load lifecycle
+// (never the alpha terminal), the successful candidate's own face-rect zoom
+// crop, the identity glyph as the only fallback, and the shared persistent
+// failure marker instead of a silently missing image.
 const props = defineProps({
   available: { type: Boolean, default: false },
   characters: { type: Array, default: () => [] },
+  // The committed `roster` panel the rows' descriptors came from.
+  panel: { type: Object, default: null },
   canCreate: { type: Boolean, default: false },
   switchLocked: { type: Boolean, default: false },
   lockReason: { type: String, default: null },
@@ -144,31 +152,13 @@ onUnmounted(() => {
       @click="toggleExpanded"
     >
       <span class="character-switcher__thumb-wrapper">
-        <img
-          v-if="currentCharacter.portrait && currentCharacter.portrait.url"
-          class="character-switcher__thumb"
-          :src="currentCharacter.portrait.url"
-          :alt="currentCharacter.portrait.alt || currentCharacter.name"
-          :style="
-            faceCropStyle(
-              currentCharacter.portrait.face_rect,
-              faceObjectPosition(currentCharacter.portrait.face_rect),
-            )
-          "
+        <ReferenceArtwork
+          avatar
+          :artwork="currentCharacter.portrait"
+          :panel="panel"
+          :name="currentCharacter.name"
+          :initial-of="currentCharacter.name"
         />
-        <span
-          v-else
-          class="character-switcher__thumb-placeholder"
-          data-testid="character-switcher-placeholder"
-        >
-          {{
-            (currentCharacter.portrait &&
-              currentCharacter.portrait.placeholder &&
-              (currentCharacter.portrait.placeholder.label ||
-                currentCharacter.portrait.placeholder.kind)) ||
-            currentCharacter.name.slice(0, 1)
-          }}
-        </span>
       </span>
       <span
         class="character-switcher__name"
@@ -214,30 +204,13 @@ onUnmounted(() => {
             @click="selectCharacter(char.identity)"
           >
             <span class="character-switcher__row-thumb-wrapper">
-              <img
-                v-if="char.portrait && char.portrait.url"
-                class="character-switcher__row-thumb"
-                :src="char.portrait.url"
-                :alt="char.portrait.alt || char.name"
-                :style="
-                  faceCropStyle(
-                    char.portrait.face_rect,
-                    faceObjectPosition(char.portrait.face_rect),
-                  )
-                "
+              <ReferenceArtwork
+                avatar
+                :artwork="char.portrait"
+                :panel="panel"
+                :name="char.name"
+                :initial-of="char.name"
               />
-              <span
-                v-else
-                class="character-switcher__row-thumb-placeholder"
-              >
-                {{
-                  (char.portrait &&
-                    char.portrait.placeholder &&
-                    (char.portrait.placeholder.label ||
-                      char.portrait.placeholder.kind)) ||
-                  char.name.slice(0, 1)
-                }}
-              </span>
             </span>
             <span class="character-switcher__row-name" :title="char.name">
               {{ char.name }}
@@ -370,20 +343,11 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
-   is exactly that wrapper's padding box. */
-.character-switcher__thumb {
+/* The shared figure renderer fills the clipping wrapper; its avatar position
+   anchors a bound zoom against this same frame. */
+.character-switcher__thumb-wrapper .reference-artwork {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.character-switcher__thumb-placeholder {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--paper-400);
-  font-family: var(--f-display);
+  inset: 0;
 }
 
 .character-switcher__name {
@@ -484,19 +448,9 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 
-/* Absolute so a bound zoom anchors against the wrapper; unbound, the 100% box
-   is exactly that wrapper's padding box. */
-.character-switcher__row-thumb {
+.character-switcher__row-thumb-wrapper .reference-artwork {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.character-switcher__row-thumb-placeholder {
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--paper-400);
+  inset: 0;
 }
 
 .character-switcher__row-name {
