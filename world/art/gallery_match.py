@@ -23,17 +23,19 @@ ONLY as the explicit default (step 4); no image the player has not chosen is
 ever displayed as a surprise. Scene subjects have no gallery and always
 resolve to ``None`` here.
 
-``resolve_display`` returns steps 1-4 as the discriminated pair the presenter
-consumes (``card`` | ``official`` | ``none``); ``resolve_card`` is its
-card-only projection. The chain's remaining lookups live in the presenter,
-which owns payload construction: the classic ``done`` asset record (step 5 —
-consulted only when no personal official selection resolved), the official
-default for the entity's content reference (step 6,
-``official_default_for`` — resolved from the startup catalog snapshot alone,
-so an entity with no reference, or a reference the snapshot does not hold,
-falls through with no diagnostic beyond the resolver's own bounded event),
-the terminal fallback seam (step 7), and the truthful placeholder (step 8).
-This module exposes the official lookup and the seam
+``resolve_display_chain`` returns steps 1-4 as ORDERED SLOTS
+(``bound`` | ``personal`` | ``default``) that name each source position and
+carry the bounded faults it reached at that position; ``resolve_display`` is
+its two-tuple projection (``card`` | ``official`` | ``none``) and
+``resolve_card`` the card-only projection of that. The chain's remaining
+lookups live in the presenter, which owns payload construction: the classic
+``done`` asset record (step 5 — consulted only when no personal official
+selection resolved), the official default for the entity's content reference
+(step 6, ``official_default_for`` — resolved from the startup catalog snapshot
+alone, so an entity with no reference, or a reference the snapshot does not
+hold, falls through with no diagnostic beyond the resolver's own bounded
+event), the terminal fallback seam (step 7), and the truthful placeholder
+(step 8). This module exposes the official lookup and the seam
 ``fallback_for(subject)``, filling the latter from
 ``gallery-builtin-fallbacks``: the deterministic built-in resolver over the
 six committed defaults, or ``None`` (scenes) when no fallback applies.
@@ -57,9 +59,10 @@ never imports the generative-transport packages or
 ``world.art.connectivity``, keeping the connectivity import boundary intact.
 """
 
+from dataclasses import dataclass
 from typing import Any
 
-from world.art import gallery_kinds
+from world.art import descriptors, gallery_kinds
 from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     empty_snapshot,
@@ -71,6 +74,42 @@ from world.art.gallery import (
 from world.art.paths import resolved_under_store_root
 from world.art.subjects import ArtSubject
 from world.observability import log_debug
+
+
+@dataclass(frozen=True)
+class ChainSlot:
+    """One ordered source position of the equipment-to-fallback chain.
+
+    ``layer`` names the position (``bound`` | ``personal`` | ``default``);
+    ``source_identity`` is the bounded identity that position's canonical
+    source id is built from (a card's image id, or the official identity a
+    personal selection names), and is ``None`` only when the position carries
+    no identity at all. ``facts`` is the resolving source's read-only facts
+    (the tolerant card dict, or the official layer's admitted-and-resolved
+    facts) and is ``None`` exactly when the position resolved nothing.
+    ``faults`` holds the bounded reasons that belong at this position BEFORE
+    its candidate: the reason of an explicit source that could not resolve, or
+    the retained metadata fault of the very image the position resolved.
+    """
+
+    layer: str
+    source_identity: str | None = None
+    facts: dict | None = None
+    faults: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class DisplayChain:
+    """The chain's steps 1-4: their ordered slots plus the subject's own card fact.
+
+    ``has_cards`` reports whether the subject's record carries at least one
+    valid card — a completed generation of its own — beside the slots, so a
+    consumer can state the subject's recorded generation truth without reading
+    the record a second time.
+    """
+
+    slots: tuple[ChainSlot, ...]
+    has_cards: bool
 
 
 def card_identity_resolution(subject: ArtSubject, card: dict) -> tuple[str | None, str | None]:
@@ -90,8 +129,6 @@ def card_identity_resolution(subject: ArtSubject, card: dict) -> tuple[str | Non
     fault instead of silently dropping it, and emits the same one bounded
     ``gallery_card_skipped`` debug event as before. Never a raise.
     """
-    from world.art import descriptors
-
     identity = card.get("stored_identity")
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     kind_directory = capability.store_directory if capability.has_gallery else None
@@ -158,23 +195,64 @@ def resolve_display(
     in steps 1-4 resolved. A pure function of stored state plus the startup
     snapshot: the same record, preference, and equipment always resolve the
     same way, and nothing here writes.
+
+    The two-tuple projection of :func:`resolve_display_chain`, which reports
+    WHICH source position resolved and the bounded faults reached on the way;
+    this form answers only which of the three shapes a caller builds.
+    """
+    for slot in resolve_display_chain(subject, entity).slots:
+        if slot.facts is None:
+            continue
+        if slot.layer == "personal":
+            return ("official", slot.facts)
+        return ("card", slot.facts)
+    return ("none", None)
+
+
+def resolve_display_chain(subject: ArtSubject, entity: Any = None) -> DisplayChain:
+    """The chain's steps 1-4 as their ordered slots, faults included.
+
+    The slot order is the chain's precedence, independent of any array index:
+    the equipment-bound card (steps 1-3), the personal official selection
+    (step 4's first half), then the card named by the record's
+    ``default_image_id`` (step 4's other half). The walk stops at the FIRST
+    position that resolves a presentable source, but it never drops a fault: an
+    explicit stored source that cannot resolve — a retained personal selection
+    or a named default card — is reported as a facts-less slot carrying its
+    bounded reason, BEFORE the substitute that follows it, so a consumer can
+    attribute the failure to the exact position that failed. An unusable
+    equipment-bound candidate is skipped operationally and contributes nothing:
+    it is an unselected sibling, not a displayed source.
+
+    A step-4 personal selection that resolves also carries the retained
+    metadata fault of the very image it resolved (the startup catalog's own
+    fact, never a re-derived one), so a degraded manifest is visible while its
+    valid bytes still present. Scenes and every other gallery-less kind return
+    no slots at all.
     """
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     if not capability.has_gallery:
-        return ("none", None)
+        return DisplayChain((), False)
     cards = cards_for(subject)
+    slots: list[ChainSlot] = []
     if capability.supports_bindings:
-        snapshot = snapshot_for(entity) if entity is not None else empty_snapshot()
-        for card in _binding_candidates(cards, snapshot):
-            if validated_card_identity(subject, card) is not None:
-                return ("card", card)
-    selection = official_selection_for(subject, entity)
-    if selection is not None:
-        return ("official", selection)
-    default = _default_card(subject, cards)
-    if default is not None:
-        return ("card", default)
-    return ("none", None)
+        bound = _selected_bound_card(cards, subject, entity)
+        if bound is not None:
+            return DisplayChain(
+                (ChainSlot("bound", str(bound["image_id"]), bound),),
+                bool(cards),
+            )
+    selection = official_selection_slot(subject, entity)
+    if selection.facts is not None:
+        return DisplayChain((selection,), bool(cards))
+    if selection.faults:
+        slots.append(selection)
+    default = _default_card_slot(subject, cards)
+    if default.facts is not None:
+        return DisplayChain((*slots, default), bool(cards))
+    if default.faults:
+        slots.append(default)
+    return DisplayChain(tuple(slots), bool(cards))
 
 
 def resolve_card(subject: ArtSubject, entity: Any = None) -> dict | None:
@@ -209,25 +287,54 @@ def _binding_candidates(cards: list[dict], snapshot: dict) -> list[dict]:
     return matched
 
 
-def _default_card(subject: ArtSubject, cards: list[dict]) -> dict | None:
-    """The validated card named by ``default_image_id``, or None.
+def _selected_bound_card(
+    cards: list[dict], subject: ArtSubject, entity: Any
+) -> dict | None:
+    """The card steps 1-3 select, or ``None`` when no bound card matches.
 
-    Consulted by every subject kind (the monster's whole chain, and the
-    character's fall-through). An unbound card is legal here — this is the
-    ONLY path by which an unbound card is ever displayed.
+    The identity-validated binding-step projection: the matching bound cards in
+    precedence order (most specific mask first, newest ``created_at``
+    tie-break), the first one whose stored identity is presentable. An unusable
+    candidate is skipped, exactly as the chain always skipped it.
     """
-    record = record_for(subject)
-    if record is None:
-        return None
-    default_image_id = record.db.default_image_id
-    if default_image_id is None:
-        return None
-    for card in cards:
-        if card["image_id"] != default_image_id:
-            continue
+    snapshot = snapshot_for(entity) if entity is not None else empty_snapshot()
+    for card in _binding_candidates(cards, snapshot):
         if validated_card_identity(subject, card) is not None:
             return card
     return None
+
+
+def _default_card_slot(subject: ArtSubject, cards: list[dict]) -> ChainSlot:
+    """The record's explicit default card as a chain slot.
+
+    Consulted by every subject kind (the monster's whole chain, and the
+    character's fall-through). An unbound card is legal here — this is the
+    ONLY path by which an unbound card is ever displayed. ``facts`` is the
+    presentable card ``default_image_id`` names; ``faults`` carries the bounded
+    reason when the record NAMES a default that cannot be presented (a refused
+    or vanished output, or an id no card of the record carries). A record that
+    sets no default contributes an EMPTY slot: an unset preference is not a
+    failure.
+    """
+    record = record_for(subject)
+    if record is None:
+        return ChainSlot("default")
+    default_image_id = record.db.default_image_id
+    if default_image_id is None:
+        return ChainSlot("default")
+    for card in cards:
+        if card["image_id"] != default_image_id:
+            continue
+        _, fault = card_identity_resolution(subject, card)
+        if fault is None:
+            return ChainSlot("default", str(card["image_id"]), card)
+        return ChainSlot("default", str(card["image_id"]), None, (fault,))
+    return ChainSlot(
+        "default",
+        default_image_id if isinstance(default_image_id, str) else None,
+        None,
+        (descriptors.REASON_EXPLICIT_REFERENCE_MISSING,),
+    )
 
 
 def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
@@ -275,19 +382,80 @@ def fallback_for(subject: ArtSubject, entity=None, *, report: bool = True) -> di
     return resolution
 
 
-def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | None:
-    """Step 4's first half: the subject's personal official selection.
+def _official_facts_for(reference, identity: str, catalog) -> dict | None:
+    """The catalog's own read-only facts for one admitted image, or ``None``.
+
+    The identity must be an admitted image of the SUPPLIED content reference: a
+    catalog identity alone is never enough, because a subject may present only
+    what its own stored reference declares. The returned facts are the
+    snapshot's own — the admitted root-relative ``identity``, its same-origin
+    fingerprinted ``url``, the restart-scoped content ``fingerprint`` that is
+    this resource's own version, the geometry it validated at load, and the
+    pixel size it decoded — so a caller re-validates personal overrides against
+    exactly those dimensions.
+    """
+    if reference is None:
+        return None
+    content = catalog.content(reference.kind, reference.key)
+    if content is None or identity not in content.images:
+        return None
+    image = catalog.entry(identity)
+    if image is None:
+        return None
+    url = catalog.url_for(image.identity)
+    if url is None:
+        return None
+    return {
+        "identity": image.identity,
+        "fingerprint": image.fingerprint,
+        "url": url,
+        "face_rect": dict(image.face_rect),
+        "stage": dict(image.stage),
+        "image_size": dict(image.image_size),
+    }
+
+
+def _official_metadata_faults(identity: str) -> tuple[str, ...]:
+    """The retained metadata fault of one exact admitted image, as a reason tuple.
+
+    Identity-scoped on purpose: a fault of an unselected refused sibling is an
+    operational diagnostic and never accompanies this image's candidate.
+    """
+    from world.art import official
+
+    fault = official.current_catalog().fault_for(identity)
+    return (fault.reason,) if fault is not None else ()
+
+
+def _official_source_faults(reference, catalog) -> tuple[str, ...]:
+    """The pre-substitute startup faults retained for one official content source.
+
+    Only facts scoped to the reference itself: an unavailable content directory
+    or a manifest-declared default that a deterministic substitute replaced.
+    Per-image metadata faults are read through :func:`_official_metadata_faults`
+    so only the image a caller actually resolved can carry one.
+    """
+    from world.art import official
+
+    return tuple(
+        fault.reason
+        for fault in catalog.source_faults(reference.kind, reference.key)
+        if fault.scope in (official.SOURCE_SCOPE_DEFAULT, official.SOURCE_SCOPE_SOURCE)
+    )
+
+
+def official_selection_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
+    """Step 4's first half as a chain slot: the subject's personal official selection.
 
     The retained preference resolves only when it names an image the startup
-    snapshot admits INSIDE the entity's own official content reference. An
-    unset, malformed, out-of-reference, or no-longer-indexed selection
-    resolves ``None`` and the chain continues with no other effect — the
-    preference stays stored, nothing is deleted, and no acquisition is
-    attempted. The returned facts are the catalog's own: the admitted
-    root-relative ``identity``, its same-origin fingerprinted ``url``, the
-    geometry it validated at load, and the pixel size it decoded, so the
-    presenter re-validates a personal override against exactly those
-    dimensions.
+    snapshot admits INSIDE the entity's own official content reference; that
+    slot carries the catalog's own facts, plus the retained metadata fault of
+    the very image it resolved. An unset selection contributes an EMPTY slot —
+    an unset preference is not a failure. A selection that IS set and cannot
+    resolve contributes a bounded fault instead (a refused identity, an
+    unavailable content directory, or a selection the snapshot no longer
+    holds), while the preference stays stored: nothing is deleted, repaired, or
+    acquired, and the chain continues to the remaining candidates.
 
     Imports stay local — like :func:`fallback_for` — so this module keeps its
     read-only, transport-free module-level import surface.
@@ -297,57 +465,53 @@ def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | No
 
     selection = official_preferences_for(subject, entity=entity).selection
     if selection is None:
-        return None
+        return ChainSlot("personal")
     reference = official_content_reference_for_entity(entity)
-    if reference is None:
-        return None
     catalog = official.current_catalog()
-    content = catalog.content(reference.kind, reference.key)
-    if content is None or selection not in content.images:
-        return None
-    image = catalog.entry(selection)
-    if image is None:
-        return None
-    url = catalog.url_for(image.identity)
-    if url is None:
-        return None
-    return {
-        "identity": image.identity,
-        "url": url,
-        "face_rect": dict(image.face_rect),
-        "stage": dict(image.stage),
-        "image_size": dict(image.image_size),
-    }
+    facts = _official_facts_for(reference, selection, catalog)
+    if facts is not None:
+        return ChainSlot(
+            "personal", selection, facts, _official_metadata_faults(selection)
+        )
+    reason = descriptors.REASON_EXPLICIT_REFERENCE_MISSING
+    if catalog.refusal_reason(selection) is not None:
+        reason = descriptors.REASON_SOURCE_REJECTED
+    elif reference is not None:
+        reasons = _official_source_faults(reference, catalog)
+        if reasons:
+            reason = reasons[0]
+    return ChainSlot("personal", selection, None, (reason,))
 
 
-def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None:
-    """Step 6 of the chain: the mounted catalog's default official image.
+def official_selection_for(subject: ArtSubject, entity: Any = None) -> dict | None:
+    """Step 4's first half: the subject's personal official selection, or ``None``.
 
-    ``resolve_card`` (steps 1-4) and the presenter's classic ``done`` asset
-    (step 5) are consulted before this lookup, so a subject with runtime
+    The facts-only projection of :func:`official_selection_slot`: a caller that
+    only builds a payload asks whether the selection resolves, while the
+    enumeration reads the same slot for its source position and its faults.
+    """
+    return official_selection_slot(subject, entity).facts
+
+
+def official_default_slot(subject: ArtSubject, entity: Any = None) -> ChainSlot:
+    """Step 6 as a chain slot: the entity's content reference and its default image.
+
+    ``source_identity`` is the entity's official content reference as
+    ``"<content-kind>/<content-key>"`` — the identity its candidate and its
+    faults share — and ``facts`` is the snapshot's admitted default image
+    inside that reference. ``faults`` carries the retained startup facts that
+    precede the candidate: a source-scoped unavailability or a
+    manifest-declared default that a deterministic substitute replaced, then
+    the metadata fault of the very image the snapshot admits as the default.
+
+    An entity declaring no reference contributes an EMPTY slot (a
+    never-configured source is not a failure), and a reference the snapshot
+    does not hold contributes no fault either: the mounted catalog simply has
+    nothing for it, exactly as it has nothing for a subject that never had
+    artwork. ``resolve_card`` (steps 1-4) and the presenter's classic ``done``
+    asset (step 5) are consulted before this step, so a subject with runtime
     artwork keeps presenting it and a catalog default never replaces the
-    player's own image. The entity's stored provenance supplies the typed
-    content reference (``official_content_reference_for_entity``): no
-    reference — every dynamically generated NPC, every imported NPC, every
-    tier-only monster (one carrying no stored species identity), and every
-    entity without a named portrait subject — resolves ``None`` here. A
-    species-backed monster resolves its species' reference, and a runtime card
-    whose stored image exists still outranks that official default exactly as
-    it outranks any other. A reference the snapshot does not hold (absent,
-    refused at admission, or removed by an artwork update) resolves ``None``
-    just the same, so a stale directory falls through to the remaining chain
-    with no exception, no preference deletion, and no acquisition attempt.
-
-    The returned facts are the snapshot's own: the default image's admitted
-    root-relative ``identity``, its same-origin
-    ``/art/official/<fingerprint>/<identity>`` ``url`` (the fingerprint is the
-    restart-scoped cache token, computed once at load and never re-derived
-    here), the pixel size the catalog decoded, and the ``face_rect``/``stage``
-    it validated at load against those dimensions (declared manifest geometry
-    or the fitted default rectangle / identity placement). The presenter
-    re-validates that geometry at the payload boundary and owns the wire
-    budget, so this step answers from the snapshot alone: no network call, no
-    filesystem write, no job enqueue, and no record mutation.
+    player's own image.
 
     Imports stay local — like :func:`fallback_for` — so this module keeps its
     read-only, transport-free module-level import surface.
@@ -357,31 +521,50 @@ def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None
 
     reference = official_content_reference_for_entity(entity)
     if reference is None:
-        return None
+        return ChainSlot("official")
+    source_identity = f"{reference.kind}/{reference.key}"
     catalog = official.current_catalog()
+    faults = _official_source_faults(reference, catalog)
     content = catalog.content(reference.kind, reference.key)
     if content is None or content.default_identity is None:
-        return None
-    image = catalog.entry(content.default_identity)
-    if image is None:
-        return None
-    url = catalog.url_for(image.identity)
-    if url is None:
-        return None
-    return {
-        "identity": image.identity,
-        "url": url,
-        "face_rect": dict(image.face_rect),
-        "stage": dict(image.stage),
-        "image_size": dict(image.image_size),
-    }
+        return ChainSlot("official", source_identity, None, faults)
+    facts = _official_facts_for(reference, content.default_identity, catalog)
+    if facts is None:
+        return ChainSlot("official", source_identity, None, faults)
+    return ChainSlot(
+        "official",
+        source_identity,
+        facts,
+        (*faults, *_official_metadata_faults(content.default_identity)),
+    )
+
+
+def official_default_for(subject: ArtSubject, entity: Any = None) -> dict | None:
+    """Step 6 of the chain: the mounted catalog's default official image, or ``None``.
+
+    The facts-only projection of :func:`official_default_slot`, so the
+    availability guard the art service reads and the presentation the chain
+    builds answer from one implementation. The returned facts are the
+    snapshot's own: the default image's admitted root-relative ``identity``,
+    its same-origin ``/art/official/<fingerprint>/<identity>`` ``url`` (the
+    fingerprint is the restart-scoped cache token, computed once at load and
+    never re-derived here), the pixel size the catalog decoded, and the
+    ``face_rect``/``stage`` it validated at load. Nothing here calls the
+    network, writes a file, enqueues a job, or mutates a record.
+    """
+    return official_default_slot(subject, entity).facts
 
 
 __all__ = [
+    "ChainSlot",
+    "DisplayChain",
     "fallback_for",
     "official_default_for",
+    "official_default_slot",
     "official_selection_for",
+    "official_selection_slot",
     "resolve_card",
     "resolve_display",
+    "resolve_display_chain",
     "validated_card_identity",
 ]

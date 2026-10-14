@@ -2,17 +2,23 @@
 
 The presenter resolves a validated subject to its status, same-origin media
 URL, aspect, and alternative text, or to a truthful placeholder kind/label.
-Gallery-bearing subjects (characters, monsters) resolve through the
-deterministic gallery display chain in ``world.art.gallery_match``: the
-equipment-bound/default card, the classic ``done`` asset record, the mounted
-catalog's official default for the entity's content reference
-(``official_default_for``, resolved from the startup snapshot alone), the
-terminal fallback seam, and the truthful placeholder. Every payload it
-produces carries ``face_rect`` — the resolved card's or official image's
-rectangle, the shared default for a classic asset or a fallback image, or
-``null`` for every placeholder — and ``origin``, the closed portrait-origin
-discriminator vocabulary this change completes: ``runtime`` for the payload's
-own card or classic image, ``official`` for the catalog's read-only default,
+ONE canonical enumerator owns the portrait source policy: the ordered chain of
+the equipment-bound card, the personal official selection, the record's
+default card, the classic ``done`` asset record, the mounted catalog's
+official default for the entity's content reference, and the authoritative
+alpha terminal. ``_enumerate_portrait`` walks that chain exactly once and
+projects it twice — as the canonical artwork descriptor
+(``describe_portrait``/``describe_entity``, using the frozen
+``world.art.descriptors`` vocabulary with each position's stable source id and
+rank and every reached fault at its own position) and as the current
+registered flat payload ``resolve_subject`` still returns. Scenes keep their
+own path through the same classic record and truthful placeholder.
+
+Every flat payload carries ``face_rect`` — the resolved card's or official
+image's rectangle, the shared default for a classic asset or a fallback image,
+or ``null`` for every placeholder — and ``origin``, the closed
+portrait-origin discriminator vocabulary: ``runtime`` for the payload's own
+card or classic image, ``official`` for the catalog's read-only default,
 ``silhouette`` when only the built-in fallback resolved, and ``placeholder``
 when nothing did.
 Every payload also carries the decorative ``fallback`` silhouette reference:
@@ -31,8 +37,11 @@ It never exposes ``out_path``, the store root, or any absolute filesystem path.
 Change 23f's browser panel consumes these primitives; this change owns them.
 """
 
+from dataclasses import dataclass
+
 from world.observability import log_warn
 
+from world.art import descriptors
 from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery import (
     DEFAULT_FACE_RECT,
@@ -45,9 +54,14 @@ from world.art.gallery import (
     identity_stage,
 )
 from world.art.gallery_fallback import fallback_identity_and_rect, fallback_key_for_entity
-from world.art.gallery_match import fallback_for, official_default_for, resolve_display
+from world.art.gallery_kinds import capabilities_for
+from world.art.gallery_match import (
+    fallback_for,
+    official_default_slot,
+    resolve_display_chain,
+)
 from world.art.paths import resolved_under_store_root
-from world.art.queue import record_key
+from world.art.queue import pending_gallery_jobs, record_key
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import (
     ArtSubject,
@@ -140,148 +154,52 @@ def _subject_directory(subject: ArtSubject) -> str:
     return "portrait/character"
 
 
-def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
-    """Resolve a validated subject to its presentation payload.
+@dataclass(frozen=True)
+class _PortraitAttempt:
+    """One ordered canonical attempt of a subject's portrait chain.
 
-    Characters and monsters first attempt the deterministic gallery display
-    chain's steps 1-4 (``resolve_display``): a resolved card yields an
-    ``asset`` payload whose URL is built only from its validated stored
-    identity, and a resolving personal official selection yields an
-    ``official`` payload (the player's explicit choice replaces the gallery
-    default while every equipment-bound card still outranks it). Only when no
-    personal official selection resolved is the classic ``done`` asset record
-    consulted, exactly as before; then the entity's official content
-    reference resolves its default image from the startup catalog snapshot
-    when one is indexed (an absent, unregistered, or removed reference — and
-    a URL outside the wire budget — falls through like the classic record's
-    unusable identity), the terminal fallback seam is consulted, and the
-    truthful placeholder closes the chain. Every payload carries
-    ``face_rect``: the card's or official image's rectangle (a personal
-    geometry override taking precedence for an official image), the shared
-    default for a classic asset or fallback image, or ``None`` for a
-    placeholder.
-
-    A resolved fallback is NEVER the payload's own image: it rides the
-    decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
-    rectangle) beside the subject's true status, so a silhouette-only
-    resolution stays the truthful placeholder row it is — no ``done`` status,
-    no generated label, and the same persisted record. Payloads whose real
-    image resolved carry the same reference (without reporting a use) so the
-    browser can fall back locally when that image fails to load.
-
-    Returns status, same-origin URL, aspect ratio, and alternative text for a
-    ``done`` record; a truthful placeholder kind/label otherwise. Never leaks
-    ``out_path`` or the store root. A claimed ``in_progress`` record is
-    normalized to the wire-stable ``pending`` status so a snapshot taken while
-    a worker holds the claim renders a placeholder instead of failing the wire
-    schema (fix-art-pipeline-contracts D3); the persistent record status is
-    never touched.
+    A candidate carries the source position it occupies and its canonical
+    resource (identity, version, same-origin URL, authored origin and validated
+    geometry); a fault carries only that position and its bounded reason, never
+    a URL.
     """
-    outcome, resolved = resolve_display(subject, entity)
-    if outcome == "card":
-        return _carried(
-            _card_payload(subject, resolved),
-            _silhouette_field(subject, entity, report=False),
-            origin=ORIGIN_RUNTIME,
-        )
-    if outcome == "official":
-        # Step 4's personal selection is the player's own explicit choice, so
-        # it replaces the gallery default and presents behind every
-        # equipment-bound card — still inside the shared wire budget, because
-        # an official identity embeds an operator-chosen filename.
-        if len(resolved["url"]) <= MAX_PORTRAIT_MEDIA_URL:
-            return _carried(
-                # A selection presentation performs two tolerant preference
-                # reads — the chain's step-4 read and this payload's override
-                # read — so corrupt stored state is reported once per read,
-                # the same discipline the tolerant card read follows.
-                _official_payload(subject, resolved, official_preferences_for(subject, entity=entity)),
-                _silhouette_field(subject, entity, report=False),
-                origin=ORIGIN_OFFICIAL,
-            )
-        log_warn(
-            "art_official_url_over_wire_budget",
-            context={"subject": subject.full(), "identity": resolved["identity"]},
-        )
-    record = _record_for(subject)
-    identity = None
-    if record is not None and record.db.status == ArtAssetStatus.DONE:
-        identity = _validated_output_identity(subject, record.db.output_identity)
-        if identity is None:
-            log_warn("art_asset_output_missing", context={"subject": subject.full()})
-    if identity is not None:
-        return _carried(
-            {
-                "kind": "asset",
-                "label": "已生成",
-                "status": ArtAssetStatus.DONE,
-                "url": media_url_for(identity),
-                "aspect_ratio": record.db.aspect_ratio,
-                "alt": subject.full(),
-                "subject_key": subject.full(),
-                "face_rect": dict(DEFAULT_FACE_RECT),
-                "stage": identity_stage(),
-            },
-            _silhouette_field(subject, entity, report=False),
-            origin=ORIGIN_RUNTIME,
-        )
-    # Step 6: the mounted catalog's official default for the entity's content
-    # reference, presented as the payload's own read-only image (origin
-    # ``official``) with the decorative silhouette carried beside it — the
-    # official image is the presented figure, so the fallback reports no use.
-    # ``official_default_for`` answers from the startup snapshot alone, and a
-    # URL outside the wire budget falls through exactly like an absent
-    # reference: one oversized operator filename must never fail the panel.
-    official = official_default_for(subject, entity)
-    if official is not None:
-        if len(official["url"]) <= MAX_PORTRAIT_MEDIA_URL:
-            return _carried(
-                _official_payload(subject, official, official_preferences_for(subject, entity=entity)),
-                _silhouette_field(subject, entity, report=False),
-                origin=ORIGIN_OFFICIAL,
-            )
-        log_warn(
-            "art_official_url_over_wire_budget",
-            context={"subject": subject.full(), "identity": official["identity"]},
-        )
-    # Steps 1-6 resolved nothing: consult the terminal seam (step 7) on
-    # EVERY fall-through path — no record, an unfinished record, an unusable
-    # done identity, and an absent/over-budget official reference alike —
-    # before the placeholder closes the chain.
-    # The already-resolved entity rides along so the resolver reads its sex,
-    # apparent age, and registry provenance directly (gallery-builtin-fallbacks).
-    # A resolution here IS the presented figure, so it reports its use exactly
-    # once and is carried decoratively — never as the payload's own media URL.
-    silhouette = _silhouette_field(subject, entity)
-    if record is None or record.db.status != ArtAssetStatus.DONE:
-        kind = PLACEHOLDER_MISSING
-        status = record.db.status if record else ArtAssetStatus.MISSING
-        if status == ArtAssetStatus.IN_PROGRESS:
-            status = ArtAssetStatus.PENDING
-        return _carried(
-            {
-                "kind": kind,
-                "label": PLACEHOLDER_LABELS[kind],
-                "status": status,
-                "url": None,
-                "aspect_ratio": record.db.aspect_ratio if record else None,
-                "alt": PLACEHOLDER_LABELS[kind],
-                "subject_key": subject.full(),
-                "face_rect": None,
-                "stage": None,
-            },
-            silhouette,
-        )
-    return _carried(_placeholder_unavailable("無法提供"), silhouette)
+
+    source_id: str
+    rank: int
+    resource: dict | None = None
+    fault: str | None = None
 
 
-def _card_payload(subject: ArtSubject, card: dict) -> dict:
-    """The asset payload for one validated gallery card.
+@dataclass(frozen=True)
+class _PortraitEnumeration:
+    """One subject's canonical descriptor plus the facts its flat payload needs."""
 
-    The URL is built only from the card's validated stored identity (the
-    chain checked prefix, extension, confinement, and existence). A stored
-    rectangle that fails validation degrades to the shared default with one
-    bounded diagnostic — never a failed payload.
+    descriptor: dict
+    record: ArtAssetRecord | None
+    attempt: _PortraitAttempt | None
+    silhouette: dict | None
+
+
+def _slot_source(layer: str, source_identity: str | None) -> tuple[str, int]:
+    """The canonical source id and rank of one gallery chain slot position."""
+    identity = source_identity or ""
+    if layer == "bound":
+        return descriptors.portrait_bound_source_id(identity), descriptors.PORTRAIT_RANK_BOUND
+    if layer == "personal":
+        return descriptors.portrait_personal_source_id(identity), descriptors.PORTRAIT_RANK_PERSONAL
+    if layer == "official":
+        return descriptors.portrait_official_source_id(identity), descriptors.PORTRAIT_RANK_OFFICIAL
+    return descriptors.portrait_default_source_id(identity), descriptors.PORTRAIT_RANK_DEFAULT
+
+
+def _card_geometry(subject: ArtSubject, card: dict) -> dict:
+    """The validated canonical geometry of one resolved card.
+
+    The ONE place a card's presentation geometry is validated, so the canonical
+    descriptor and the flat payload can never disagree about it. A stored
+    rectangle or placement triple that fails validation degrades to the
+    fitted/shared default or identity placement with exactly one bounded
+    diagnostic — never a failed payload, and never a repaired record.
     """
     try:
         face_rect = validate_face_rect(card["face_rect"], image_size=card.get("image_size"))
@@ -293,47 +211,29 @@ def _card_payload(subject: ArtSubject, card: dict) -> dict:
     except GalleryRecordError:  # observability: ignore R2: malformed placement degrades with its bounded diagnostic
         log_warn("art_stage_invalid", context={"subject": subject.full(), "image_id": card.get("image_id")})
         stage = identity_stage()
-    return {
-        "kind": "asset",
-        "label": "已生成",
-        "status": ArtAssetStatus.DONE,
-        "url": media_url_for(card["stored_identity"]),
-        "aspect_ratio": GALLERY_ASPECT_RATIO,
-        "alt": subject.full(),
-        "subject_key": subject.full(),
-        "face_rect": face_rect,
-        "stage": stage,
-    }
+    image_size = card.get("image_size")
+    return descriptors.geometry(
+        image_size=descriptors.image_size_payload(**image_size) if image_size else None,
+        face_rect=face_rect,
+        stage=stage,
+        aspect_ratio=GALLERY_ASPECT_RATIO,
+    )
 
 
-def _official_payload(
+def _official_geometry(
     subject: ArtSubject, official: dict, preferences: OfficialPreferences
 ) -> dict:
-    """The asset payload for one resolved official default (chain step 6).
+    """The validated canonical geometry of one resolved official image.
 
-    The URL is the catalog's admitted same-origin identity (fingerprinted; the
-    media route re-admits the exact path at the exact fingerprint), and the
-    geometry is the catalog's load-time rectangle/stage re-validated here
-    against the decoded image size exactly as a stored card's is: a rectangle
-    that fails validation (including one that is not pixel-square on its own
-    image) degrades to the fitted default for that image, and a malformed
-    stage to identity placement, each with one bounded diagnostic — never a
-    failed payload.
-
-    The subject's own geometry override for this identity takes precedence,
+    The subject's own geometry override for this identity takes precedence
     component by component, read from the caller's single tolerant preference
-    snapshot. A stored rectangle the CURRENT bytes invalidate
-    (an artwork update replaced them at other dimensions) degrades to the
+    snapshot; a stored rectangle the CURRENT bytes invalidate degrades to the
     catalog's metadata-or-fitted rectangle with ONE bounded
-    ``art_official_override_invalid`` diagnostic naming the subject, the
-    identity, and the component; the stored preference itself is retained,
-    because this builder only ever reads it. A stored stage needs no such
-    guard: the tolerant preference read already validated it (and drops a
-    malformed one) before this payload is built.
-
-    No status is claimed: an official image is not a generated asset, so the
-    payload reports no ``done``/generated portrait state, and it carries no
-    filesystem root, deployment source, license/manifest text, or prompt.
+    ``art_official_override_invalid`` diagnostic, and the stored preference
+    itself is retained because this builder only ever reads it. The catalog's
+    geometry is then re-validated exactly as a stored card's is, so neither a
+    snapshot that cannot have come from the catalog's own admission nor
+    replaced bytes can ship unvalidated geometry.
     """
     image_size = official.get("image_size")
     face_rect = official["face_rect"]
@@ -366,17 +266,397 @@ def _official_payload(
             context={"subject": subject.full(), "identity": official.get("identity")},
         )
         stage = identity_stage()
+    return descriptors.geometry(
+        image_size=descriptors.image_size_payload(**image_size) if image_size else None,
+        face_rect=face_rect,
+        stage=stage,
+        aspect_ratio=GALLERY_ASPECT_RATIO,
+    )
+
+
+def _card_attempt(subject: ArtSubject, slot) -> _PortraitAttempt:
+    """One resolved gallery chain slot as a canonical runtime candidate."""
+    card = slot.facts
+    identity = card["stored_identity"]
+    source_id, rank = _slot_source(slot.layer, slot.source_identity)
+    return _PortraitAttempt(
+        source_id,
+        rank,
+        descriptors.resource(
+            identity,
+            descriptors.identity_version(identity),
+            media_url_for(identity),
+            descriptors.ORIGIN_RUNTIME,
+            geometry_payload=_card_geometry(subject, card),
+        ),
+    )
+
+
+def _personal_attempt(subject: ArtSubject, slot, entity) -> _PortraitAttempt:
+    """One resolved personal official selection as a canonical official candidate.
+
+    The caller's single tolerant preference snapshot supplies the subject's
+    geometry override, so a selection presentation performs exactly two
+    preference reads — the chain's step-4 read and this override read — and
+    corrupt stored state is reported once per read, the same discipline the
+    tolerant card read follows.
+    """
+    facts = slot.facts
+    source_id, rank = _slot_source(slot.layer, slot.source_identity)
+    return _PortraitAttempt(
+        source_id,
+        rank,
+        descriptors.resource(
+            facts["identity"],
+            facts["fingerprint"],
+            facts["url"],
+            descriptors.ORIGIN_OFFICIAL,
+            geometry_payload=_official_geometry(
+                subject, facts, official_preferences_for(subject, entity=entity)
+            ),
+        ),
+    )
+
+
+def _classic_attempts(
+    subject: ArtSubject, record: ArtAssetRecord | None
+) -> tuple[list[_PortraitAttempt], _PortraitAttempt | None]:
+    """The classic ``done`` asset record's attempts: its bounded fault or its candidate.
+
+    The record's own validated output identity is the whole original (the one
+    digest convention of the classic layer is its identity plus the generation
+    token that published it), so a vanished output contributes a
+    generated-output-missing fault at this exact position and a recorded
+    failure a generation-failed one — while a record that is merely absent,
+    queued, or claimed contributes nothing at all.
+    """
+    source_id = descriptors.portrait_classic_source_id(subject.full())
+    rank = descriptors.PORTRAIT_RANK_CLASSIC
+    if record is None:
+        return [], None
+    status = record.db.status
+    if status == ArtAssetStatus.DONE:
+        identity = _validated_output_identity(subject, record.db.output_identity)
+        if identity is None:
+            log_warn("art_asset_output_missing", context={"subject": subject.full()})
+            return [_PortraitAttempt(source_id, rank, fault=descriptors.REASON_GENERATED_OUTPUT_MISSING)], None
+        return [], _PortraitAttempt(
+            source_id,
+            rank,
+            descriptors.resource(
+                identity,
+                descriptors.generated_version(identity, str(record.db.generation_token)),
+                media_url_for(identity),
+                descriptors.ORIGIN_RUNTIME,
+                geometry_payload=descriptors.geometry(
+                    face_rect=dict(DEFAULT_FACE_RECT),
+                    stage=identity_stage(),
+                    aspect_ratio=record.db.aspect_ratio,
+                ),
+            ),
+        )
+    if status == ArtAssetStatus.FAILED:
+        return [_PortraitAttempt(source_id, rank, fault=descriptors.REASON_GENERATION_FAILED)], None
+    return [], None
+
+
+def _generation_facts(
+    subject: ArtSubject, record: ArtAssetRecord | None, has_cards: bool
+) -> tuple[str, str]:
+    """The subject's recorded generation key and state, independent of any candidate.
+
+    A pure read of stored state: a live gallery request or a claimed/pending
+    classic record is ``pending``; a recorded failure (the record's last error
+    code, or a failed classic record) is ``failed``; a stored card or a
+    ``done`` classic record is ``done``; anything else is factually
+    ``missing``. Nothing here erases a recorded failure or invents an active
+    job, so a subject whose generation is deliberately disabled and unstarted
+    claims nothing, while a finished official image can never complete a
+    pending or failed generation of the subject's own.
+    """
+    pending = bool(pending_gallery_jobs(subject)) if capabilities_for(
+        subject.kind.value
+    ).has_gallery else False
+    recorded = descriptors.normalize_generation_state(
+        record.db.status if record is not None else None
+    )
+    if pending or recorded == descriptors.GENERATION_PENDING:
+        state = descriptors.GENERATION_PENDING
+    elif (record is not None and record.db.last_error_code) or recorded == descriptors.GENERATION_FAILED:
+        state = descriptors.GENERATION_FAILED
+    elif has_cards or recorded == descriptors.GENERATION_DONE:
+        state = descriptors.GENERATION_DONE
+    else:
+        state = descriptors.GENERATION_MISSING
+    return subject.full(), state
+
+
+def _alpha_terminal(fallback) -> dict | None:
+    """The resolved seam's alpha-mask terminal for a descriptor, or ``None``.
+
+    The authoritative deterministic alpha selector's resolution at its own
+    rank, carrying the committed identity's version and rectangle: the same
+    terminal vocabulary the gallery preview uses, so the portrait and gallery
+    surfaces name one non-competing fallback.
+    """
+    if not isinstance(fallback, dict):
+        return None
+    identity, key = fallback.get("identity"), fallback.get("key")
+    if not isinstance(identity, str) or not identity or not isinstance(key, str) or not key:
+        return None
+    try:
+        rect = validate_face_rect(fallback.get("face_rect"))
+    except GalleryRecordError:  # observability: ignore R2: the seam's rectangle defaults per contract
+        rect = dict(DEFAULT_FACE_RECT)
+    return descriptors.terminal(
+        descriptors.TERMINAL_ALPHA_MASK,
+        descriptors.portrait_alpha_source_id(key),
+        descriptors.PORTRAIT_RANK_ALPHA,
+        descriptors.resource(
+            identity,
+            descriptors.identity_version(identity),
+            media_url_for(identity),
+            descriptors.ORIGIN_SILHOUETTE,
+            geometry_payload=descriptors.geometry(
+                face_rect=rect, aspect_ratio=GALLERY_ASPECT_RATIO
+            ),
+        ),
+    )
+
+
+def _enumerate_portrait(subject: ArtSubject, entity=None) -> _PortraitEnumeration:
+    """Walk one subject's portrait chain ONCE and project it canonically.
+
+    The one production selector: the ordered attempt list keeps every reached
+    fault at its own source position (an explicit selection or default that
+    cannot resolve precedes the substitute that follows it) and stops at the
+    first resolving candidate, so a healthy earlier candidate prevents later
+    fault accumulation. The canonical descriptor and the current flat payload
+    are both projections of THIS result, so selection can never disagree
+    between them. A read-only walk: nothing here creates a record, enqueues a
+    job, repairs geometry, or touches a file, and the terminal seam is
+    consulted exactly once with its report decided by whether a real image
+    resolved.
+    """
+    record = _record_for(subject)
+    attempts: list[_PortraitAttempt] = []
+    candidate: _PortraitAttempt | None = None
+    chain = resolve_display_chain(subject, entity)
+    for slot in chain.slots:
+        source_id, rank = _slot_source(slot.layer, slot.source_identity)
+        for reason in slot.faults:
+            attempts.append(_PortraitAttempt(source_id, rank, fault=reason))
+        if slot.facts is None:
+            continue
+        # An official identity embeds an operator-chosen filename, so a URL
+        # outside the shared wire budget falls through exactly like an absent
+        # reference: one oversized filename must never fail the panel.
+        if slot.layer == "personal" and len(slot.facts["url"]) > MAX_PORTRAIT_MEDIA_URL:
+            log_warn(
+                "art_official_url_over_wire_budget",
+                context={"subject": subject.full(), "identity": slot.facts["identity"]},
+            )
+            attempts.append(
+                _PortraitAttempt(source_id, rank, fault=descriptors.REASON_CONFIGURATION_INVALID)
+            )
+            continue
+        candidate = (
+            _personal_attempt(subject, slot, entity)
+            if slot.layer == "personal"
+            else _card_attempt(subject, slot)
+        )
+        attempts.append(candidate)
+        break
+    if candidate is None:
+        classic_faults, classic = _classic_attempts(subject, record)
+        attempts.extend(classic_faults)
+        if classic is not None:
+            candidate = classic
+            attempts.append(classic)
+    if candidate is None:
+        official = official_default_slot(subject, entity)
+        if official.source_identity is not None:
+            source_id, rank = _slot_source("official", official.source_identity)
+            faults = list(official.faults)
+            if official.facts is not None:
+                if len(official.facts["url"]) <= MAX_PORTRAIT_MEDIA_URL:
+                    candidate = _PortraitAttempt(
+                        source_id,
+                        rank,
+                        descriptors.resource(
+                            official.facts["identity"],
+                            official.facts["fingerprint"],
+                            official.facts["url"],
+                            descriptors.ORIGIN_OFFICIAL,
+                            geometry_payload=_official_geometry(
+                                subject,
+                                official.facts,
+                                official_preferences_for(subject, entity=entity),
+                            ),
+                        ),
+                    )
+                else:
+                    log_warn(
+                        "art_official_url_over_wire_budget",
+                        context={
+                            "subject": subject.full(),
+                            "identity": official.facts["identity"],
+                        },
+                    )
+                    faults.append(descriptors.REASON_CONFIGURATION_INVALID)
+            for reason in faults:
+                attempts.append(_PortraitAttempt(source_id, rank, fault=reason))
+            if candidate is not None:
+                attempts.append(candidate)
+    # The already-resolved entity rides along so the seam reads its sex,
+    # apparent age, and registry provenance directly
+    # (gallery-builtin-fallbacks). A resolution here IS the presented figure
+    # exactly when no real candidate resolved, so that is the report.
+    fallback = fallback_for(subject, entity=entity, report=(candidate is None))
+    generation_subject, generation_state = _generation_facts(
+        subject, record, chain.has_cards
+    )
+    return _PortraitEnumeration(
+        descriptors.descriptor(
+            subject_id=subject.full(),
+            generation_subject=generation_subject,
+            generation_state=generation_state,
+            attempts=[
+                descriptors.image_attempt(attempt.source_id, attempt.rank, attempt.resource)
+                if attempt.resource is not None
+                else descriptors.fault_attempt(attempt.source_id, attempt.rank, attempt.fault)
+                for attempt in attempts
+            ],
+            terminal_payload=_alpha_terminal(fallback),
+            # Portraits carry no retention authorization: their runtime sources
+            # are presented only while they are reachable, and the atomic
+            # portrait wire owner is the one that introduces authorization.
+            retention_sources=[],
+        ),
+        record,
+        candidate,
+        _silhouette_from(fallback),
+    )
+
+
+def describe_portrait(subject: ArtSubject, entity=None) -> dict:
+    """The canonical descriptor of one portrait subject's ordered source attempts.
+
+    The canonical projection of the one production walk: the same selection
+    the flat payload presents, with every position's stable source identity and
+    rank, every reached fault at its own position, the subject's independent
+    recorded generation truth, and the authoritative alpha terminal at its own
+    rank. A scene subject resolves no person source and so contributes only its
+    classic record — the scene wire itself stays the scene owner's.
+    """
+    return _enumerate_portrait(subject, entity).descriptor
+
+
+def describe_entity(entity) -> dict | None:
+    """The canonical portrait descriptor of one entity, or ``None``.
+
+    Applies exactly the presentation eligibility (explicit named policy, both
+    canonical integer age fields, registered visual species) and then
+    enumerates that ONE subject. An ineligible or subject-less entity answers
+    ``None`` rather than a descriptor for a subject the caller was not already
+    authorized to show, and nothing here enumerates, scans, or discovers any
+    other subject.
+    """
+    subject, refusal = _portrait_subject(entity)
+    if refusal is not None:
+        return None
+    return describe_portrait(subject, entity)
+
+
+def _attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
+    """The current flat payload of one resolved canonical candidate.
+
+    The projection the registered portrait contract keeps until its atomic
+    canonical wire cutover: the resource's own URL, its validated geometry and
+    its authored origin, with the catalog's read-only image labelled as exactly
+    that and never as a generated asset. Selection, geometry validation and
+    diagnostics all already happened once, in the enumerator.
+    """
+    resource = attempt.resource
+    geometry = resource["geometry"]
+    official = resource["origin"] == descriptors.ORIGIN_OFFICIAL
     return {
-        "kind": PAYLOAD_OFFICIAL,
-        "label": "官方圖片",
-        "status": None,
-        "url": official["url"],
-        "aspect_ratio": GALLERY_ASPECT_RATIO,
+        "kind": PAYLOAD_OFFICIAL if official else "asset",
+        "label": "官方圖片" if official else "已生成",
+        "status": None if official else ArtAssetStatus.DONE,
+        "url": resource["url"],
+        "aspect_ratio": geometry["aspect_ratio"],
         "alt": subject.full(),
         "subject_key": subject.full(),
-        "face_rect": face_rect,
-        "stage": stage,
+        "face_rect": geometry["face_rect"],
+        "stage": geometry["stage"],
     }
+
+
+def _placeholder_payload(
+    subject: ArtSubject, record: ArtAssetRecord | None, silhouette: dict | None
+) -> dict:
+    """The truthful placeholder closing a chain that resolved no real image.
+
+    A missing or unfinished record reads ``missing`` with its own true status
+    (a claimed ``in_progress`` record is normalized to the wire-stable
+    ``pending`` status so a snapshot taken while a worker holds the claim
+    renders a placeholder instead of failing the wire schema; the persistent
+    record status is never touched), and a ``done`` record whose output cannot
+    be presented reads ``unavailable``. Never leaks ``out_path`` or the store
+    root.
+    """
+    if record is None or record.db.status != ArtAssetStatus.DONE:
+        kind = PLACEHOLDER_MISSING
+        status = record.db.status if record else ArtAssetStatus.MISSING
+        if status == ArtAssetStatus.IN_PROGRESS:
+            status = ArtAssetStatus.PENDING
+        return _carried(
+            {
+                "kind": kind,
+                "label": PLACEHOLDER_LABELS[kind],
+                "status": status,
+                "url": None,
+                "aspect_ratio": record.db.aspect_ratio if record else None,
+                "alt": PLACEHOLDER_LABELS[kind],
+                "subject_key": subject.full(),
+                "face_rect": None,
+                "stage": None,
+            },
+            silhouette,
+        )
+    return _carried(_placeholder_unavailable("無法提供"), silhouette)
+
+
+def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
+    """Resolve a validated subject to its current registered presentation payload.
+
+    The flat projection of the one canonical portrait enumeration: the first
+    resolving candidate of the ordered chain (the equipment-bound card, the
+    personal official selection, the record's default card, the classic
+    ``done`` asset, the mounted catalog's official default for the entity's
+    content reference) becomes the payload's own image, and the truthful
+    placeholder closes the chain when none resolved. A URL outside the shared
+    wire budget falls through exactly like an absent reference, and a
+    selection presentation performs the chain's step-4 read plus this
+    payload's override read.
+
+    A resolved fallback is NEVER the payload's own image: it rides the
+    decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
+    rectangle) beside the subject's true status, so a silhouette-only
+    resolution stays the truthful placeholder row it is — no ``done`` status,
+    no generated label, and the same persisted record. Payloads whose real
+    image resolved carry the same reference (without reporting a use) so the
+    browser can fall back locally when that image fails to load.
+    """
+    enumeration = _enumerate_portrait(subject, entity)
+    if enumeration.attempt is not None:
+        return _carried(
+            _attempt_payload(subject, enumeration.attempt),
+            enumeration.silhouette,
+            origin=enumeration.attempt.resource["origin"],
+        )
+    return _placeholder_payload(subject, enumeration.record, enumeration.silhouette)
 
 
 def _carried(payload: dict, silhouette: dict | None, *, origin: str | None = None) -> dict:
@@ -419,6 +699,15 @@ def _silhouette(key: object, identity: object, face_rect: object) -> dict | None
     return {"key": key, "url": media_url_for(identity), "face_rect": rect}
 
 
+def _silhouette_from(fallback) -> dict | None:
+    """The flat decorative reference for one resolved seam dict, or ``None``."""
+    if not isinstance(fallback, dict):
+        return None
+    return _silhouette(
+        fallback.get("key"), fallback.get("identity"), fallback.get("face_rect")
+    )
+
+
 def _silhouette_field(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
     """The silhouette a subject's payload carries, via the terminal seam.
 
@@ -427,12 +716,7 @@ def _silhouette_field(subject: ArtSubject, entity=None, *, report: bool = True) 
     beside a real image; it rides through to the seam, which owns the
     ``gallery_fallback_used`` event.
     """
-    fallback = fallback_for(subject, entity=entity, report=report)
-    if not isinstance(fallback, dict):
-        return None
-    return _silhouette(
-        fallback.get("key"), fallback.get("identity"), fallback.get("face_rect")
-    )
+    return _silhouette_from(fallback_for(subject, entity=entity, report=report))
 
 
 def _entity_silhouette(entity) -> dict | None:
@@ -459,6 +743,44 @@ def _entity_silhouette(entity) -> dict | None:
     return _silhouette(key, *fallback_identity_and_rect(key))
 
 
+def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:
+    """The entity's eligible portrait subject, or the bounded reason it has none.
+
+    ``(subject, None)`` for an eligible subject; ``(None, "unnamed")`` for a
+    character whose named portrait policy is absent or malformed; and
+    ``(subject, "ineligible")`` for a character whose canonical ages, or a
+    monster whose registered visual species, refuse it. Eligibility stays
+    exactly what presentation has always applied — the explicit named policy,
+    both canonical integer age fields, and the registered visual species —
+    and is never inferred from a display name, a quest role, or a key shape.
+    A monster's provenance is resolved from ``species_key`` when present, else
+    ``art_species_key``.
+    """
+    from typeclasses.monsters import Monster
+
+    if isinstance(entity, Monster):
+        visual_key = getattr(entity, "species_key", None)
+        if visual_key is None:
+            visual_key = getattr(entity, "art_species_key", None)
+        if visual_key is None:
+            return None, "ineligible"
+        try:
+            return monster_subject_for(visual_key), None
+        except ArtSubjectError:  # observability: ignore R2: unregistered visual species -> specified refusal
+            return None, "ineligible"
+    try:
+        subject = character_subject_for(entity)
+    except ArtSubjectError:  # observability: ignore R2: unresolvable policy -> specified refusal
+        return None, "unnamed"
+    if subject is None:
+        return None, "unnamed"
+    try:
+        character_ages(entity)
+    except Exception:  # observability: ignore R2: age-eligibility failure -> specified refusal; diagnostics must never leak
+        return subject, "ineligible"
+    return subject, None
+
+
 def resolve_character(entity) -> dict:
     """Resolve a character's portrait through the canonical-age check and named policy.
 
@@ -466,15 +788,10 @@ def resolve_character(entity) -> dict:
     unavailable placeholder with its explanatory label; the payload never
     contains a rejected prompt or the offending age values.
     """
-    try:
-        subject = character_subject_for(entity)
-    except ArtSubjectError:  # observability: ignore R2: unresolvable subject -> specified unavailable placeholder payload
-        subject = None
-    if subject is None:
+    subject, refusal = _portrait_subject(entity)
+    if refusal == "unnamed":
         return _placeholder_unavailable("無肖像", silhouette=_entity_silhouette(entity))
-    try:
-        character_ages(entity)
-    except Exception:  # observability: ignore R2: age-eligibility failure -> specified unavailable placeholder; diagnostics must never leak
+    if refusal == "ineligible":
         return _placeholder_unavailable(
             "無法提供", silhouette=_silhouette_field(subject, entity)
         )
@@ -495,23 +812,13 @@ def resolve_entity(entity) -> dict:
     """
     from typeclasses.monsters import Monster
 
-    if isinstance(entity, Monster):
-        visual_key = getattr(entity, "species_key", None)
-        if visual_key is None:
-            visual_key = getattr(entity, "art_species_key", None)
-        if visual_key is None:
-            return _placeholder_unavailable(
-                "無法提供", silhouette=_entity_silhouette(entity)
-            )
-        try:
-            subject = monster_subject_for(visual_key)
-        except ArtSubjectError:  # observability: ignore R2: unregistered visual species -> specified unavailable placeholder
-            return _placeholder_unavailable(
-                "無法提供", silhouette=_entity_silhouette(entity)
-            )
-        payload = resolve_subject(subject, entity=entity)
-        return dict(payload, subject_key=subject.full())
-    return resolve_character(entity)
+    if not isinstance(entity, Monster):
+        return resolve_character(entity)
+    subject, refusal = _portrait_subject(entity)
+    if refusal is not None:
+        return _placeholder_unavailable("無法提供", silhouette=_entity_silhouette(entity))
+    payload = resolve_subject(subject, entity=entity)
+    return dict(payload, subject_key=subject.full())
 
 
 def resolve_scene(archetype: str) -> dict:

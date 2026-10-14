@@ -156,6 +156,19 @@ MAX_SOURCE_LAYERS_PER_SUBJECT = 2
 # the alpha silhouette is a terminal fallback, never a competing original.
 GALLERY_RANK_ORIGINAL = 10
 GALLERY_RANK_ALPHA = 100
+# The exact-portrait-layer ranks (design §"Stable ranks and authorized
+# retention"): the selected equipment-bound card, the player's explicit
+# personal official choice, the record's default card, the classic generated
+# asset and the optional official default, in that precedence — before the
+# same authoritative alpha terminal the gallery preview uses. Positions are
+# independent of attempt-array order, and a fault keeps the rank of the source
+# it belongs to.
+PORTRAIT_RANK_BOUND = 10
+PORTRAIT_RANK_PERSONAL = 20
+PORTRAIT_RANK_DEFAULT = 30
+PORTRAIT_RANK_CLASSIC = 40
+PORTRAIT_RANK_OFFICIAL = 50
+PORTRAIT_RANK_ALPHA = GALLERY_RANK_ALPHA
 
 
 def gallery_original_source_id(image_id: str) -> str:
@@ -173,6 +186,41 @@ def gallery_alpha_source_id(key: str) -> str:
     return f"gallery.alpha:{key}"
 
 
+def portrait_bound_source_id(image_id: str) -> str:
+    """The canonical source id of one equipment-bound portrait card."""
+    return f"portrait.bound:{image_id}"
+
+
+def portrait_personal_source_id(identity: str) -> str:
+    """The canonical source id of one person's explicit official selection."""
+    return f"portrait.personal:{identity}"
+
+
+def portrait_default_source_id(image_id: str) -> str:
+    """The canonical source id of one record's named default card."""
+    return f"portrait.default:{image_id}"
+
+
+def portrait_classic_source_id(generation_subject: str) -> str:
+    """The canonical source id of one subject's classic generated asset."""
+    return f"portrait.classic:{generation_subject}"
+
+
+def portrait_official_source_id(reference: str) -> str:
+    """The canonical source id of one entity's official content reference.
+
+    ``reference`` is the catalog's own ``<content-kind>/<content-key>`` text:
+    one entity's reference is ONE source position, so its candidate and every
+    fault at that position share this id.
+    """
+    return f"portrait.official:{reference}"
+
+
+def portrait_alpha_source_id(key: str) -> str:
+    """The canonical source id of one committed silhouette alpha mask."""
+    return f"portrait.alpha:{key}"
+
+
 def identity_version(identity: str) -> str:
     """The stable version of one immutable admitted identity.
 
@@ -183,6 +231,18 @@ def identity_version(identity: str) -> str:
     this module, so a lone surrogate in a fact is escaped rather than fatal.
     """
     return _digest(identity)
+
+
+def generated_version(identity: str, generation_token: str) -> str:
+    """The stable version of one generated resource at a republishable identity.
+
+    Whole image bytes are never hashed and neither is the pending/failed
+    regeneration state: a validated output identity plus the successful
+    generation token that published it distinguish a regenerated file at the
+    same path, so the version changes exactly when the bytes a completed
+    generation produced change.
+    """
+    return _digest((identity, generation_token))
 
 
 # --- Builders -------------------------------------------------------------
