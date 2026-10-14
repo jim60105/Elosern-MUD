@@ -492,6 +492,46 @@ class GenerationStateTests(_SceneFixture):
         self.assertEqual(generated[0]["type"], "fault")
         self.assertEqual(generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING)
 
+    def test_successive_real_publications_yield_distinct_versions_and_urls(self):
+        """Two REAL worker publications of one scene are two resources.
+
+        The worker publishes through ``settle_generated``, which clears the
+        transient claim token. A version derived from that token would repeat
+        across regenerations, so every consumer would reuse the previous bytes;
+        the version therefore reads the token that PUBLISHED the output. This
+        walks the real drain/publication path twice and asserts the two
+        resources differ.
+        """
+        from world.art.worker import drain_synchronous
+
+        subject = self.subject()
+        versions = []
+        urls = []
+        for index in range(2):
+            if index:
+                # A regeneration is a requeue first: the record must be
+                # claimable again for the second publication.
+                requeue(subject)
+            ensure(subject, SCENE_DESCRIPTION)
+            drain_synchronous(1)
+            record = ArtAssetRecord.objects.get(db_key=record_key(subject))
+            self.assertEqual(record.db.status, ArtAssetStatus.DONE)
+            # The publication clears the transient claim token and keeps the
+            # publishing one, which is what the version reads.
+            self.assertEqual(str(record.db.generation_token), "")
+            self.assertNotEqual(str(record.db.published_generation_token), "")
+            descriptor = describe_scene(self.target())
+            generated = [
+                entry
+                for entry in self.entries(descriptor)
+                if entry["rank"] == descriptors.SCENE_RANK_GENERATED
+            ][0]
+            self.assertEqual(generated["type"], "image")
+            versions.append(generated["resource"]["version"])
+            urls.append(generated["resource"]["url"])
+        self.assertNotEqual(versions[0], versions[1])
+        self.assertNotEqual(urls[0], urls[1])
+
     def test_disabled_generation_never_erases_a_recorded_failure(self):
         subject = self.subject()
         ensure(subject, SCENE_DESCRIPTION)

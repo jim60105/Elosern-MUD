@@ -66,6 +66,75 @@ function panel(overrides = {}) {
   return panelWithScene(sceneBlock({}, descriptor(overrides)));
 }
 
+// One descriptor whose FIRST position is an authored room override: the
+// operator image at rank 10 in front of the same generated/bundled positions.
+const ROOM_URL = "/art/official/" + "e".repeat(64) + "/room/t_synth_room/a.png";
+
+function panelWithRoomBinding(overrides = {}) {
+  return panelWithScene(
+    sceneBlock(
+      {},
+      descriptor({
+        attempts: [
+          {
+            type: "image",
+            source_id: "scene.room:t_synth_room",
+            rank: 10,
+            resource: {
+              resource_id: "room/t_synth_room/a.png",
+              version: "e".repeat(64),
+              url: ROOM_URL,
+              origin: "official",
+              geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: null },
+            },
+          },
+          {
+            type: "image",
+            source_id: `scene.generated:${SCENE_SUBJECT}`,
+            rank: 20,
+            resource: sceneResource({ url: GENERATED_URL, version: "a".repeat(64) }),
+          },
+          {
+            type: "image",
+            source_id: "scene.bundled:river_dawn",
+            rank: 40,
+            resource: sceneBundledResource("river_dawn"),
+          },
+        ],
+        terminal: null,
+        ...overrides,
+      }),
+    ),
+  );
+}
+
+// The same place without the room binding: the chain continues to the
+// generated artwork and then to the bundled illustration.
+function panelWithoutRoomBinding() {
+  return panelWithScene(
+    sceneBlock(
+      {},
+      descriptor({
+        attempts: [
+          {
+            type: "image",
+            source_id: `scene.generated:${SCENE_SUBJECT}`,
+            rank: 20,
+            resource: sceneResource({ url: GENERATED_URL, version: "a".repeat(64) }),
+          },
+          {
+            type: "image",
+            source_id: "scene.bundled:river_dawn",
+            rank: 40,
+            resource: sceneBundledResource("river_dawn"),
+          },
+        ],
+        terminal: null,
+      }),
+    ),
+  );
+}
+
 // A selected result as the shared driver reports one.
 function selected(sourceId, rank, url) {
   return { sourceId, rank, url, key: `${url}@v`, resourceId: url, version: "v", geometry: null, dimensions: { width: 16, height: 9 } };
@@ -333,6 +402,31 @@ describe("SceneBackdrop retention and provisional behaviour", () => {
     expect(wrapper.get('[data-testid="scene-backdrop-placeholder"]').attributes("data-kind")).toBe(
       "panel_unavailable",
     );
+  });
+
+  it("reuses a provisional failure observed under a higher-priority success", async () => {
+    // The room override is the preferred source and the bundled illustration is
+    // the provisional one. The provisional FAILS first (latently), then the
+    // room image wins.
+    wrapper = mountBackdrop({ art: panelWithRoomBinding() });
+    await observeError(wrapper, BUNDLED_URL);
+    await observeLoad(wrapper, ROOM_URL);
+    await frames();
+    expect(displayedUrl(wrapper)).toBe(ROOM_URL);
+    const requestsBefore = renderedUrls(wrapper);
+    expect(requestsBefore).not.toContain(BUNDLED_URL);
+
+    // The binding is removed for the SAME place: the chain now walks the
+    // generated artwork and, once that fails in the browser too, reaches the
+    // bundled illustration at its own position and reuses the observed failure
+    // — it is never requested a second time, and the reached fault is stated.
+    await wrapper.setProps({ art: panelWithoutRoomBinding() });
+    await observeError(wrapper, GENERATED_URL);
+    await frames();
+    expect(renderedUrls(wrapper)).not.toContain(BUNDLED_URL);
+    expect(
+      wrapper.get('[data-testid="scene-backdrop-placeholder"]').attributes("data-kind"),
+    ).toBe("image_load_failed");
   });
 
   it("ignores a late load event from a retired element", async () => {

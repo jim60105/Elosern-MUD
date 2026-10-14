@@ -343,7 +343,7 @@ def _classic_attempts(
             rank,
             descriptors.resource(
                 identity,
-                descriptors.generated_version(identity, str(record.db.generation_token)),
+                _published_output_version(record, identity),
                 media_url_for(identity),
                 descriptors.ORIGIN_RUNTIME,
                 geometry_payload=descriptors.geometry(
@@ -830,6 +830,21 @@ def _scene_official_position(
     return faults, resource
 
 
+def _published_output_version(record: ArtAssetRecord, identity: str) -> str:
+    """The resource version of one published output: its identity plus its
+    PUBLISHING token.
+
+    The claim token is cleared when the output is published, so the version
+    reads the token that actually published the current bytes
+    (``published_generation_token``): two successive successful publications of
+    the same stored path therefore carry two different versions, which is what
+    makes a regeneration a new resource for every consumer instead of a reused
+    cached one. A record published before this fact existed contributes its
+    empty token, which is a stable version of its own.
+    """
+    return descriptors.generated_version(identity, str(record.db.published_generation_token))
+
+
 def _scene_generated_resource(
     subject: ArtSubject, record: ArtAssetRecord
 ) -> tuple[dict | None, str | None]:
@@ -849,7 +864,7 @@ def _scene_generated_resource(
     if identity is None:
         log_warn("art_asset_output_missing", context={"subject": subject.full()})
         return None, descriptors.REASON_GENERATED_OUTPUT_MISSING
-    version = descriptors.generated_version(identity, str(record.db.generation_token))
+    version = _published_output_version(record, identity)
     url = media_url_for(identity)
     versioned = f"{url}?{descriptors.VERSION_QUERY}={version}"
     if len(versioned) > descriptors.MEDIA_URL_LIMITS[descriptors.ORIGIN_RUNTIME]:
@@ -1018,7 +1033,14 @@ def describe_scene(target) -> dict:
     # illustration is admitted.
     definition = scene_definition_for(archetype)
     terminal_key = definition.terminal_key if definition is not None else None
-    subject = scene_subject_for(archetype)
+    try:
+        subject = scene_subject_for(archetype)
+    except ArtSubjectError:  # observability: ignore R2: an unusable authored archetype is the malformed case stated below
+        # A registered room's archetype is always a registered scene subject;
+        # one that is not cannot be honored, so it takes the same explicit
+        # malformed-metadata path as an absent archetype instead of raising
+        # into the art panel.
+        return _malformed_scene_descriptor(target.identity)
     record = _record_for(subject)
     attempts: list[dict] = []
 

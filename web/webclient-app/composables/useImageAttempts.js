@@ -157,6 +157,26 @@ export function useImageAttempts(request, availability, options = {}) {
     provisionalOutcomes.value = new Map();
   }
 
+  // Retire the live element WITHOUT discarding a settled observation.
+  //
+  // A `loading` marker only means something while its element exists, so it
+  // goes with the element; a settled outcome stays (it is an observation of a
+  // resource the ordered walk may still reach).
+  function retireProvisional() {
+    const current = provisionalAttempt.value;
+    provisionalAttempt.value = null;
+    if (!current) {
+      return;
+    }
+    const outcome = provisionalOutcomes.value.get(current.key);
+    if (outcome?.phase !== LOAD_PHASE.loading) {
+      return;
+    }
+    const next = new Map(provisionalOutcomes.value);
+    next.delete(current.key);
+    provisionalOutcomes.value = next;
+  }
+
   // Start or retire the out-of-band provisional element.
   //
   // It is started ONLY for a resource the ordered walk does not currently own:
@@ -174,25 +194,25 @@ export function useImageAttempts(request, availability, options = {}) {
     const source = provisionalSourceValue();
     const key = resourceKey(source);
     if (!req || !source || !key || availabilityValue().state !== "ready") {
-      provisionalAttempt.value = null;
+      retireProvisional();
       return;
     }
     if (phase.value !== LOAD_PHASE.loading) {
       // Resolution already settled (or exhausted): an out-of-band background
       // has nothing left to stand in for, so its element is retired rather
       // than left fetching a resource that will not be displayed.
-      provisionalAttempt.value = null;
+      retireProvisional();
       return;
     }
     const settledProvisional = provisionalOutcomes.value.get(key);
     if (settledProvisional && settledProvisional.phase !== LOAD_PHASE.loading) {
-      provisionalAttempt.value = null;
+      retireProvisional();
       return;
     }
     if (knownOutcomes.has(key) || attempt.value?.key === key) {
       // The ordered walk already owns (or already observed) this exact
       // resource: a second fetching element would be a duplicate attempt.
-      provisionalAttempt.value = null;
+      retireProvisional();
       return;
     }
     if (provisionalAttempt.value?.key === key) {
@@ -348,7 +368,17 @@ export function useImageAttempts(request, availability, options = {}) {
       knownOutcomes.clear();
       knownEpoch = epoch;
     }
-    clearProvisional();
+    // A settled provisional OUTCOME is an observation of one resource, so it
+    // survives a re-resolution of the SAME epoch: a chain that reaches that
+    // resource later reuses the observed result instead of requesting it
+    // again. Only the live element and the provisional display retire here,
+    // and a genuinely different epoch discards the observations with the rest
+    // of the retired resolution.
+    retireProvisional();
+    provisionalSelected.value = null;
+    if (knownEpoch !== epoch) {
+      provisionalOutcomes.value = new Map();
+    }
     clearResult();
     if (avail.state === "failed") {
       panelUnavailable.value = true;
