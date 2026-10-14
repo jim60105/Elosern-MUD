@@ -14,7 +14,31 @@ from world.quests.room_observation import QuestObservableRoomMixin
 from .objects import ObjectParent
 
 
-class Room(ObjectParent, DefaultRoom):
+class SceneArchetypeMixin:
+    """The shared room-art metadata seam owned by the map layer
+    (unified-room-art-metadata).
+
+    ``scene_archetype`` is the registered scene archetype the room's background
+    resolves from; ``room_art_key`` is the optional registered room-art key a
+    per-room operator override may address; ``scene_identity`` is the bounded
+    logical scene identity that distinguishes the logical place even when one
+    pooled room object serves many coordinates.
+
+    Assignment stays permissive (an ``AttributeProperty``, never a validating
+    descriptor): authored map/instance construction is where a key is checked
+    against its registry, and a test or builder may still assign any value.
+    ``autocreate=False`` keeps a READ non-mutating: resolving a room that was
+    never given metadata returns the default without persisting an Attribute,
+    so the art resolver stays read-only. An explicit map/instance assignment
+    still stores the value.
+    """
+
+    scene_archetype: str | None = AttributeProperty(default=None, autocreate=False)
+    room_art_key: str | None = AttributeProperty(default=None, autocreate=False)
+    scene_identity: str | None = AttributeProperty(default=None, autocreate=False)
+
+
+class Room(SceneArchetypeMixin, ObjectParent, DefaultRoom):
     """
     Rooms are like any Object, except their location is None
     (which is default). They also use basetype_setup() to
@@ -72,15 +96,6 @@ class LimboRoom(Room):
             return True
         account = getattr(moving_object, "account", None)
         return bool(getattr(account, "is_superuser", False))
-
-
-class SceneArchetypeMixin:
-    """The design doc D10/§8 seam: which SceneArchetype (change 22, unbuilt) a
-    room's scene art should use. Not validated against any registry here -- see
-    change 12's own GridRoom docstring for why (no SceneArchetype registry
-    exists yet)."""
-
-    scene_archetype: str | None = AttributeProperty(default=None)
 
 
 class GridRoom(SceneArchetypeMixin, QuestObservableRoomMixin, ObjectParent, XYZRoom):

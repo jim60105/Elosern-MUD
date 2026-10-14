@@ -13,6 +13,11 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
 from typeclasses.rooms import TerrainRoom
+from world.art.scene_definitions import ROOM_ART_KEY_SET
+from world.maps.room_art import (
+    REGION_SCENE_ARCHETYPES,
+    wilderness_scene_identity,
+)
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
     WILDERNESS_KM_PER_CELL,
@@ -251,7 +256,14 @@ class MapProviderTests(EvenniaTest):
         room = self.char1.location
         self.assertIsInstance(room, TerrainRoom)
         self.assertEqual(room.ndb.active_desc, terrain_description(*EAST_APPROACH))
-        self.assertEqual(room.scene_archetype, region_for_coordinates(*EAST_APPROACH))
+        self.assertEqual(
+            room.scene_archetype,
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
+        )
+        self.assertEqual(
+            room.scene_identity,
+            wilderness_scene_identity(WILDERNESS_NAME, *EAST_APPROACH),
+        )
 
     @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
     def test_enter_wilderness_refuses_a_footprint_cell(self):
@@ -277,7 +289,10 @@ class MapProviderTests(EvenniaTest):
         room = create_object(TerrainRoom, key="scriptless")
         self.assertIsNone(room.wilderness)
         self.provider.at_prepare_room(EAST_APPROACH, None, room)
-        self.assertEqual(room.scene_archetype, region_for_coordinates(*EAST_APPROACH))
+        self.assertEqual(
+            room.scene_archetype,
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
+        )
         self.assertEqual(room.ndb.active_desc, _terrain_description(*EAST_APPROACH))
         self.assertEqual(Monster.objects.all().count(), 0)
 
@@ -387,7 +402,10 @@ class MapProviderTests(EvenniaTest):
         # Enter at the east-gate approach in western_hills_valleys.
         enter_wilderness(self.char1, coordinates=EAST_APPROACH, name=WILDERNESS_NAME)
         room_a = self.char1.location
-        self.assertEqual(room_a.scene_archetype, region_for_coordinates(*EAST_APPROACH))
+        self.assertEqual(
+            room_a.scene_archetype,
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
+        )
         # Leave the wilderness; then force the room back into the reuse pool
         # (the sanctioned "inspect unused_rooms directly" route) so the
         # next entry is guaranteed to be handed this exact object again.
@@ -400,8 +418,33 @@ class MapProviderTests(EvenniaTest):
         enter_wilderness(self.char1, coordinates=(200, 100), name=WILDERNESS_NAME)
         self.assertIs(self.char1.location, room_a)
         self.assertEqual(
-            self.char1.location.scene_archetype, region_for_coordinates(200, 100)
+            self.char1.location.scene_archetype,
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(200, 100)],
         )
         self.assertEqual(
             self.char1.location.ndb.active_desc, terrain_description(200, 100)
         )
+
+    @covers_requirement("wilderness-map-provider::get-location-name-and-at-prepare-room-delegate-to-the-deterministic-terrain-model")
+    def test_pooled_room_reuse_clears_a_stale_room_art_key_and_identity(self):
+        # One pooled object prepared for declared place A (a planted room-art
+        # key) then undeclared place B: the wilderness declares no room-art
+        # key, so preparation clears A's key and gives B its own coordinate
+        # identity -- the stale key can never leak into another coordinate.
+        room = create_object(TerrainRoom, key="pooled-art")
+        self.provider.at_prepare_room(EAST_APPROACH, None, room)
+        room.room_art_key = sorted(ROOM_ART_KEY_SET)[0]
+        identity_a = room.scene_identity
+        # Equal archetypes, different coordinates: both cells are hills/plains.
+        coordinate_b = (200, 100)
+        self.assertEqual(
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*EAST_APPROACH)],
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(*coordinate_b)],
+        )
+        self.provider.at_prepare_room(coordinate_b, None, room)
+        self.assertIsNone(room.room_art_key)
+        self.assertEqual(
+            room.scene_identity,
+            wilderness_scene_identity(WILDERNESS_NAME, *coordinate_b),
+        )
+        self.assertNotEqual(room.scene_identity, identity_a)

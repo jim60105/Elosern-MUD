@@ -45,10 +45,17 @@ class GridRoomTypeclassTests(EvenniaTestCase):
         anchor.anchor_key = "does_not_exist"
         self.assertEqual(anchor.anchor_key, "does_not_exist")
 
-    def test_stock_room_is_unchanged(self):
+    def test_stock_room_carries_only_the_shared_room_art_seam(self):
+        # unified-room-art-metadata gives the plain Room the shared room-art
+        # metadata seam (a permanent interior IS a plain Room), so the stale
+        # "stock Room has no scene_archetype" expectation is now the opposite:
+        # the seam reads as its permissive None defaults, while the grid-only
+        # anchor_key seam stays off the plain Room.
         room = create_object(Room, key="stock_room")
         self.assertNotIsInstance(room, GridRoom)
-        self.assertFalse(hasattr(room, "scene_archetype"))
+        self.assertIsNone(room.scene_archetype)
+        self.assertIsNone(room.room_art_key)
+        self.assertIsNone(room.scene_identity)
         self.assertFalse(hasattr(room, "anchor_key"))
 
 

@@ -97,6 +97,8 @@ FORBIDDEN_TARGET_ATTRS = frozenset(
         "owned_entities",
         "pin_reasons",
         "scene_archetype",
+        "room_art_key",
+        "scene_identity",
         # LLMNPC
         "max_chat_memory_size",
         "thinking_messages",

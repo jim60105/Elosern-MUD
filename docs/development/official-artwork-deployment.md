@@ -74,6 +74,41 @@ illustration is the optional operator `npc` asset
 `<root>/npc/dream_goddess/dream-throne.webp` documented below. Neither replaces
 the other.
 
+## Room identities and authored metadata
+
+An operator `room/<room-art-key>/` directory only reaches a room the map layer
+has tagged. The map owner (`world/maps/room_art.py`) is the single writer of
+each supported room's scene facts, applied idempotently at startup and at
+construction: the registered **scene archetype** the room renders from, the
+optional registered **room_art_key**, and a bounded logical **scene identity**.
+No key is inferred from a room name, a runtime row id, a threat tier or a
+neighbouring room.
+
+- **Authored grid rooms** (`world/maps/altoria_capital.py`,
+  `world/maps/village_ciaran.py`) are keyed by their authored `(map, x, y)`
+  coordinate; they declare no room-art key, and their identity is that
+  coordinate.
+- **Permanent interiors** (the rooms `sync_service_interiors` builds from
+  `world.lore.settlements.places`) are plain `Room`s that now carry scene
+  metadata: their place key is their registered room-art key, their scene
+  archetype is declared per place in `room_art.py`, and their identity is the
+  authored place key.
+- **Pooled wilderness** rooms derive their archetype from the explicit
+  region→scene mapping (`forest_path` for forest regions, `mountain_path` for
+  the central mountains, `coastal_path` for the coasts, `wilderness_path` for
+  plains and hills); a preparation re-sets every fact and clears the previous
+  place's room-art key, so a pooled object never leaks an old key or identity
+  into another coordinate.
+- **Declared instances** carry an explicitly authored registered
+  `room_art_key` and scene archetype into supported construction; an
+  undeclared dynamic instance has none and falls back to its archetype chain.
+  The art resolver only reads these facts and never writes or repairs them.
+
+Declaring a new authored place or grid node without its room-art metadata fails
+closed at import; the authored tables are validated against the registered
+scene-archetype and room-art vocabularies, so a bad edit names the offending
+key instead of silently degrading a room to no scene art.
+
 ## The directory contract
 
 One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:

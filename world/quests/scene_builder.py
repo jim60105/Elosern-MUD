@@ -118,8 +118,8 @@ def _spawn_scene_room(actor, origin_room: Any, requirement: Any) -> InstanceRoom
         return_key=RETURN_EXIT_KEY,
         named=True,
         caller=actor,
+        scene_archetype=requirement.archetype,
     )
-    room.scene_archetype = requirement.archetype
     if requirement.scene_sentence:
         room.db.desc = requirement.scene_sentence
     else:
