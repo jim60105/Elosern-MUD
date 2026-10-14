@@ -216,11 +216,21 @@ The mounted directory contributes only the official positions of that order:
   while a recorded generation stays failed, and a deliberate no-generation
   configuration claims nothing.
 
-`world.art.presenter.resolve_subject` still returns the ONE registered flat
-portrait shape the art panel, roster and party surfaces consume today; the
-canonical descriptor `describe_portrait`/`describe_entity` both project the
-same single resolution, so no second selector and no alternate accepted wire
-shape exists while the atomic portrait contract is still pending.
+`world.art.presenter.describe_entity` is now the ONE production enumerator
+behind every portrait surface: the art panel's v3 catalog value is exactly
+`{artwork, context}`, the roster v3 row's `portrait` IS the descriptor, and
+the party/exploration `portrait_ref` names that same descriptor's catalog key.
+Catalog **admission** and real-image **eligibility** are different facts:
+membership is `world.rules.art_view`'s bounded decision (the currently present
+focusable entities in exploration, the participant set in combat), while an
+entry's own attempts state whether any real image resolves. An admitted entity
+with no eligible portrait subject still carries its complete refusal
+descriptor — no image attempt, no generated subject key, no prompt — plus the
+deterministic attribute-selected alpha terminal, so no surface ever has to
+guess imagery from a missing field and no reference is withheld merely because
+real artwork has not resolved. A personal selection or a named default card
+that can no longer resolve keeps its bounded fault at its own position, before
+the substitute that follows it, and the stored preference is never deleted.
 
 - Place the license notice for the artwork itself as a top-level `LICENSE`
   (or alongside the artwork in your own distribution); the server ignores

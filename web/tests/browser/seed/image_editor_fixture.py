@@ -2,15 +2,19 @@
 
 Slice of the unified image resolution family; owned by
 ``unified-image-loading-core`` and extended by ``unified-gallery-image-contract``
-for the gallery's v3 row shapes.
+for the gallery's v3 row shapes and by ``unified-portrait-image-contract`` for
+the portrait descriptor mode.
 
 Installed only when ``ELOSERN_BROWSER_UNIFIED_IMAGES=1`` (one real committed
 original card on the activated player character, written through the production
 ``world/art/gallery.py`` writers and fixed valid PNG bytes under the runtime art
-store, plus the family's bounded test-only transition cmdset) and/or when
-``ELOSERN_BROWSER_GALLERY_ROWS=1`` (the v3 official, pending and failed rows).
-Every helper here is test-only; the production mutation routes stay
-authoritative.
+store, plus the family's bounded test-only transition cmdset), and/or when
+``ELOSERN_BROWSER_GALLERY_ROWS=1`` (the v3 official, pending and failed rows),
+and/or when ``ELOSERN_BROWSER_PORTRAIT_DESCRIPTORS=1`` (the portrait mode: the
+player's own roster portrait, one co-located live party companion, one focused
+present entity and one combat participant all admitted to the same bounded art
+view, plus the ``revoke_source`` availability transition). Every helper here is
+test-only; the production mutation routes stay authoritative.
 
 This module deliberately imports the transition helper *inside* the fixture:
 ``seed/runner.py`` imports it at module import time, before ``django.setup()``,
@@ -23,9 +27,10 @@ import os
 
 
 def _image_editor_fixture(character) -> None:
-    """Seed the unified-image editor card and/or the gallery v3 rows."""
+    """Seed the unified-image editor card, the gallery v3 rows and the portrait mode."""
     _original_card(character)
     _gallery_rows(character)
+    _portrait_descriptors(character)
 
 
 def _original_card(character) -> None:
@@ -51,6 +56,44 @@ def _original_card(character) -> None:
     print(
         "seeded image-editor original card="
         f"{SEEDED_ORIGINAL_IMAGE_ID} subject={subject_key}"
+    )
+
+
+def _portrait_descriptors(character) -> None:
+    """Seed the portrait mode: one admitted real portrait for every figure scope.
+
+    The player's own activated character gets one real committed card (its
+    roster row therefore resolves a real candidate), and a co-located live
+    party companion plus a present focus entity and one combat participant are
+    admitted to the same bounded art view so a journey can assert that the
+    roster figure, the party row, the focus standee, the dialogue host and the
+    combat row all read ONE canonical descriptor shape. The bounded
+    ``revoke_source`` transition is installed with the same cmdset the editor
+    mode uses, so a journey can take the real candidate away and watch every
+    surface fall back to the descriptor's own committed alpha terminal.
+    """
+    if os.environ.get("ELOSERN_BROWSER_PORTRAIT_DESCRIPTORS") != "1":
+        return
+
+    from web.browser_support.unified_image_transitions import (
+        PORTRAIT_COMPANION_KEY,
+        PORTRAIT_FOCUS_KEY,
+        PORTRAIT_IMAGE_ID,
+        append_original_card,
+        install_transition_cmdset,
+        seed_portrait_companions,
+    )
+    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+
+    subject_key = f"portrait:character:{character.pk}"
+    append_original_card(subject_key, PORTRAIT_IMAGE_ID, FIXTURE_VALID_PNG, set_default=True)
+    install_transition_cmdset(character)
+    seeded = seed_portrait_companions(character)
+    print(
+        "seeded portrait descriptors "
+        f"player={subject_key} image={PORTRAIT_IMAGE_ID} "
+        f"companion={PORTRAIT_COMPANION_KEY} focus={PORTRAIT_FOCUS_KEY} "
+        f"companions={seeded}"
     )
 
 
