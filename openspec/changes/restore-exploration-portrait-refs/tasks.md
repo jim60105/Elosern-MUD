@@ -15,8 +15,8 @@ All tasks are implementation work for a later apply assignment. Acceptance follo
 
 ## 3. Consumer image and truthful fallback proof (1.5h)
 
-- [ ] 3.1 Extend Node `exploration_menu.test.js` with wire-valid decimal refs for target/entity precedence and no party/key synthesis; extend Vitest `app_client_presence_rail.test.js` and `tests/world/presence_rail.test.js` using accepted snapshots/updates for target and bystander face crops, non-party standee image, null/unknown/unavailable and failed media, changed-URL recovery and late art refresh while open; verify unchanged action payloads/router depth and no focus dispatch.
-- [ ] 3.2 Keep `PresenceRail`, `use-person-focus`, `StageActor` and `ReferenceArtwork` as existing consumers, making only changes required by the new regressions; update PresenceRail/AppShell stories and fixture comments to show valid references without claiming a synthetic story proves the live producer; verify the stories distinguish real images, truthful fallback and refreshing art and preserve existing component-manifest entries.
+- [x] 3.1 Extend Node `exploration_menu.test.js` with wire-valid decimal refs for target/entity precedence and no party/key synthesis; extend Vitest `app_client_presence_rail.test.js` and `tests/world/presence_rail.test.js` using accepted snapshots/updates for target and bystander face crops, non-party standee image, null/unknown/unavailable and failed media, changed-URL recovery and late art refresh while open; verify unchanged action payloads/router depth and no focus dispatch.
+- [x] 3.2 Keep `PresenceRail`, `use-person-focus`, `StageActor` and `ReferenceArtwork` as existing consumers, making only changes required by the new regressions; update PresenceRail/AppShell stories and fixture comments to show valid references without claiming a synthetic story proves the live producer; verify the stories distinguish real images, truthful fallback and refreshing art and preserve existing component-manifest entries.
 
 ## 4. Integrated acceptance and handoff (2h)
 

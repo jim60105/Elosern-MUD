@@ -15,13 +15,14 @@ import { createPinia, setActivePinia } from "pinia";
 
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
-import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
+import { ART_PANEL_SAMPLE, ART_PANEL_UNAVAILABLE_SAMPLE } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 
-// The exploration panel's schema v3 publishes `portrait_ref: null` on every
-// interact target and entity, so a live medallion shows the initial and the
-// focus standee the dialogue silhouette; the face-crop path is pinned at the
-// component level (tests/world/presence_rail.test.js).
+// The exploration panel is schema v4: its interact targets and look entities
+// carry a nullable `portrait_ref` that the presenter fills only for an
+// admitted catalog image. These fixtures commit exactly those accepted
+// snapshots/updates, so the medallion face crops and the non-party standee
+// image are asserted end to end through the store.
 const CLERK = {
   identity: 7,
   display_name: "店長",
@@ -32,9 +33,55 @@ const CLERK = {
   ],
 };
 
-function artPanel() {
-  return ART_PANEL_SAMPLE;
+// One committed catalog entry in the exact accepted shape: the target's own
+// face crop and stage placement.
+const CLERK_FACE = {
+  subject_key: "npc_7",
+  status: "done",
+  url: "/art/portraits/npc_7.webp",
+  aspect_ratio: "3:4",
+  alt: "店長的肖像",
+  placeholder: null,
+  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+  stage: { scale: 1, x: 0, y: 0 },
+  origin: "runtime",
+  fallback: {
+    key: "elder",
+    url: "/art/defaults/elder.webp",
+    face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 },
+  },
+  context: { name: "店長", role: "對話對象" },
+};
+
+const CLERK_FACE_REPLACED = {
+  ...CLERK_FACE,
+  url: "/art/portraits/npc_7_replaced.webp",
+  face_rect: { x: 0.22, y: 0.04, w: 0.52, h: 0.52 },
+};
+
+const BYSTANDER_FACE = {
+  ...CLERK_FACE,
+  subject_key: "npc_8",
+  url: "/art/portraits/npc_8.webp",
+  alt: "旅人的肖像",
+  face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+  context: { name: "旅人", role: "人物" },
+};
+
+// The bystander look entity (no interact descriptor): the rail's dashed
+// medallion.
+const TRAVELLER = { identity: 8, display_name: "旅人", kind: "character", portrait_ref: null };
+
+function artPanel(extra = null) {
+  if (extra === null) {
+    return ART_PANEL_SAMPLE;
+  }
+  return {
+    ...ART_PANEL_SAMPLE,
+    portrait_catalog: { ...ART_PANEL_SAMPLE.portrait_catalog, ...extra },
+  };
 }
+
 
 describe("AppClient presence rail and person focus (exploration-presence-rail)", () => {
   let store;
@@ -46,7 +93,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     return fx.explorationPanel({ interact: [CLERK], ...overrides });
   }
 
-  async function mountWith(panel = exploration()) {
+  async function mountWith(panel = exploration(), art = artPanel()) {
     wrapper = mount(AppClient, { attachTo: document.body });
     store.beginTransport(1);
     store.setConnected(true);
@@ -63,7 +110,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
             exploration: panel,
             local_map: fx.localMapPanel(),
             context_actions: fx.explorationActions(),
-            art: artPanel(),
+            art,
           },
         }),
       ],
@@ -167,6 +214,116 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(standee().exists()).toBe(true);
     expect(standee().find("img").exists()).toBe(false);
     expect(standee().text()).toContain("店長");
+  });
+
+  it("an accepted snapshot reaches the target and bystander medallions and the non-party standee", async () => {
+    await mountWith(
+      exploration({
+        interact: [{ ...CLERK, portrait_ref: "7" }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [{ ...TRAVELLER, portrait_ref: "8" }],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+      artPanel({ 7: CLERK_FACE, 8: BYSTANDER_FACE }),
+    );
+    // The gold target medallion and the dashed bystander medallion both show
+    // the supplied crop; the reference is read from the committed catalog and
+    // never built from identity.
+    expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
+      CLERK_FACE.url,
+    );
+    expect(entry("entity-8").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
+      BYSTANDER_FACE.url,
+    );
+    // The non-party focus figure renders the same catalog image with the
+    // supplied stage geometry, opening no action and pushing no frame.
+    await entry("target-7").trigger("click");
+    await settle();
+    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.url);
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.router.depth()).toBe(1);
+  });
+
+  it("a late art refresh reaches the open card without reopening or dispatching", async () => {
+    await mountWith(
+      exploration({
+        interact: [{ ...CLERK, portrait_ref: null }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [TRAVELLER],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+    );
+    expect(entry("target-7").find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    await entry("target-7").trigger("click");
+    await settle();
+    expect(standee().find("img").exists()).toBe(false);
+    const identity = card().attributes("data-card-kind");
+    const rowsBefore = cardRows().map((row) => row.text());
+    expect(identity).toBe("verbs");
+
+    // One newer committed update supplies the usable reference and image.
+    await commit({
+      art: artPanel({ 7: CLERK_FACE }),
+      exploration: exploration({
+        interact: [{ ...CLERK, portrait_ref: "7" }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [TRAVELLER],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+    });
+    expect(card().exists()).toBe(true);
+    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.url);
+    expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
+      CLERK_FACE.url,
+    );
+    // The open card keeps its target, its verb order and its geometry; no
+    // focus message or action is dispatched by the refresh.
+    expect(cardRows().map((row) => row.text())).toEqual(rowsBefore);
+    expect(store.router.depth()).toBe(1);
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("a newer committed URL replaces a failed face, and an unavailable catalog falls back truthfully", async () => {
+    await mountWith(
+      exploration({
+        interact: [{ ...CLERK, portrait_ref: "7" }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [{ ...TRAVELLER, portrait_ref: "404" }],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+      artPanel({ 7: CLERK_FACE }),
+    );
+    // The unknown bystander reference resolves to no catalog entry: the
+    // dashed medallion keeps the name's first character.
+    expect(entry("entity-8").find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(entry("entity-8").get('[data-testid="presence-entry-initial"]').text()).toBe("旅");
+    // A failed load keeps the initial, and a genuinely newer URL recovers.
+    await entry("target-7").get('[data-testid="presence-entry-face"]').trigger("error");
+    await settle();
+    expect(entry("target-7").find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    expect(entry("target-7").get('[data-testid="presence-entry-initial"]').text()).toBe("店");
+    await commit({ art: artPanel({ 7: CLERK_FACE_REPLACED }) });
+    expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
+      CLERK_FACE_REPLACED.url,
+    );
+    // An unavailable art panel leaves every medallion on its initial and the
+    // standee on the established placeholder — exploration stays usable.
+    await commit({ art: ART_PANEL_UNAVAILABLE_SAMPLE });
+    expect(entry("target-7").find('[data-testid="presence-entry-face"]').exists()).toBe(false);
+    await entry("target-7").trigger("click");
+    await settle();
+    expect(standee().exists()).toBe(true);
+    expect(standee().find("img").exists()).toBe(false);
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.router.depth()).toBe(1);
   });
 
   it("Escape and 返回 close the card and return focus to the medallion that opened it", async () => {

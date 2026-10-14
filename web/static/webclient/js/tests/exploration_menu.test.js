@@ -682,17 +682,46 @@ test("bystander entries appear only for identities without an interact descripto
   assert.deepEqual(chest.commandDisplay, { targetLabel: "試驗箱" });
 });
 
-test("rail target entries carry their portrait ref, falling back to the entity's", () => {
+const MAX_REF = "12345678901234567890123456789012"; // the 32-character bound
+
+test("rail target entries carry their wire portrait ref, falling back to the entity's", () => {
   const panel = overviewPanel();
-  panel.look.entities[0].portrait_ref = "npc_5";
-  panel.look.entities[1].portrait_ref = "char_8";
+  panel.look.entities[0].portrait_ref = "5";
+  panel.look.entities[1].portrait_ref = MAX_REF;
+  panel.interact[0].portrait_ref = "105";
+  // Every supplied value is wire-valid (null or 1..32 ASCII decimals), so the
+  // panel with the references adopted below still passes the exact validator.
+  assert.doesNotThrow(() => Protocol.validateExplorationPanel(panel));
   const entries = ExplorationMenu.presenceEntries(panel);
-  assert.equal(entries.find((entry) => entry.key === "target-5").portraitRef, "npc_5");
-  assert.equal(entries.find((entry) => entry.key === "entity-8").portraitRef, "char_8");
-  panel.interact[0].portrait_ref = "own_5";
+  assert.equal(entries.find((entry) => entry.key === "target-5").portraitRef, "105");
+  assert.equal(entries.find((entry) => entry.key === "entity-8").portraitRef, MAX_REF);
+  // The interact descriptor's own reference wins over the look entity's.
+  panel.interact[0].portrait_ref = null;
   assert.equal(
     ExplorationMenu.presenceEntries(panel).find((entry) => entry.key === "target-5").portraitRef,
-    "own_5"
+    "5"
+  );
+});
+
+test("a null rail reference is never synthesized from identity, party, or a subject key", () => {
+  const panel = overviewPanel();
+  // Identity 5 is BOTH the interact target and the first look entity; neither
+  // row carries a reference, so the rail entry carries the truthful null.
+  const entry = ExplorationMenu.presenceEntries(panel).find((e) => e.key === "target-5");
+  assert.equal(entry.portraitRef, null);
+  // Nothing in the model builds a key, a URL, or a party lookup: the entry's
+  // only reference field is the server-authored one it was handed.
+  assert.deepEqual(
+    Object.keys(entry).filter((field) => /portrait|url|subject|party/i.test(field)),
+    ["portraitRef"],
+  );
+  // The look-entity fallback keeps the exact supplied value: no key-shaped or
+  // URL-shaped value is accepted as a reference either.
+  const withRef = overviewPanel();
+  withRef.look.entities[1].portrait_ref = "8";
+  assert.equal(
+    ExplorationMenu.presenceEntries(withRef).find((e) => e.key === "entity-8").portraitRef,
+    "8"
   );
 });
 

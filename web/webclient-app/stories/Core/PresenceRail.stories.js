@@ -48,15 +48,24 @@ const HALL = explorationPanelFixture({
   ],
   entities: [{ identity: 21, name: "旅人艾拉" }],
   objects: [{ identity: 31, name: "任務板" }],
+  // The wire-valid decimal references the presenter supplies for a catalogued
+  // character (schema v4) — the shared art sample's own `"101"` entry; every
+  // other identity deliberately carries none, so the real image and the
+  // truthful fallback sit side by side.
+  portraits: { 101: "101" },
 });
 
-// Two hosts (the first with a committed portrait's face crop, the second
-// with its initial), a bystander, the separator, and an object. The
-// exploration panel's schema v3 still publishes `portrait_ref: null`, so the
-// story supplies the ref the presenter will carry for the first host.
+// Two hosts (the first with the catalog's face crop, the second with its
+// initial), a bystander, the separator, and an object. The reference is a
+// hand-authored fixture value matched to the shared art sample, so this story
+// pins the RENDERING of a supplied face crop — it is not production protocol
+// evidence: only the live server packet proves that a reference names an
+// admitted catalog image. A newer committed URL for the same reference
+// replaces the crop in place (no rail reopen); that stateful refresh is
+// asserted in the component tests, not by a static story.
 export const Default = {
   render,
-  args: presenceArgs(HALL, { artPanel: ART_PANEL_SAMPLE, portraits: { 101: "101" } }),
+  args: presenceArgs(HALL, { artPanel: ART_PANEL_SAMPLE }),
 };
 
 // Seven entries: five slots and `＋2`, which opens the overflow card.
@@ -77,7 +86,8 @@ export const Overflow = {
   ),
 };
 
-// No portraits at all: every medallion shows its name's first character.
+// Every reference null (`portrait_ref: null` on the wire): the truthful
+// fallback, the name's first character, on every medallion and lozenge.
 export const NoPortraits = {
   render,
   args: presenceArgs(HALL),
