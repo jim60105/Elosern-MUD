@@ -1,14 +1,17 @@
-// Focused lifecycle tests for the shared local resource driver and its first
-// production consumer, the gallery face-rectangle original editor
-// (change unified-image-loading-core). The driver cases use a minimal harness
-// component; the editor cases mount the real GalleryFaceRectModal over the
-// committed gallery rows.
+// Focused lifecycle tests for the shared local resource driver and the gallery
+// original editors that consume it (changes unified-image-loading-core,
+// unified-gallery-image-contract and unified-gallery-original-editors). The
+// driver cases use a minimal harness component; the editor cases mount the real
+// GalleryFaceRectModal and GalleryStageTransformModal over the committed
+// gallery rows.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { defineComponent, h, onBeforeUnmount, ref } from "vue";
 import ArtworkFailure from "../../components/ArtworkFailure.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
+import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
 import { useImageAttempts } from "../../composables/useImageAttempts.js";
+import { useOriginalEligibility } from "../../composables/useOriginalEligibility.js";
 import { canonicalOrder } from "../../lib/image-attempts.js";
 import { GALLERY_SAMPLE } from "../../stories/gallery-fixtures.js";
 
@@ -422,6 +425,296 @@ describe("face-rect original editor lifecycle", () => {
     await cancel.get('[role="dialog"]').trigger("keydown", { key: "Escape" });
     expect(cancel.emitted("close")).toHaveLength(1);
     expect(cancel.emitted("submit")).toBeUndefined();
+  });
+
+  it("tells a loading original apart from a failed one", async () => {
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
+    // Loading: its own sentence and its own indicator, never the failure one.
+    expect(wrapper.text()).toContain("原始圖片載入中，暫時無法儲存框選。");
+    expect(wrapper.text()).not.toContain("原始圖片載入失敗，無法儲存框選。");
+    expect(wrapper.find('[data-testid="artwork-failure"]').exists()).toBe(false);
+
+    await wrapper.get(".gallery-face__original > img").trigger("error");
+    // Failed: the loading frame is gone and the persistent failure frame, with
+    // its own bounded text, is what remains.
+    expect(wrapper.text()).not.toContain("原始圖片載入中，暫時無法儲存框選。");
+    expect(wrapper.text()).toContain("原始圖片載入失敗，無法儲存框選。");
+    const marker = wrapper.get('[data-testid="artwork-failure"]');
+    expect(marker.attributes("role")).toBe("status");
+    expect(marker.text()).toContain("圖片載入失敗");
+    // A failed original may still be drafted numerically, but never saved.
+    await wrapper.get('input[aria-label="寬度"]').setValue(0.2);
+    await button(wrapper, "儲存框選").trigger("click");
+    expect(wrapper.emitted("submit")).toBeUndefined();
+  });
+
+  it("keeps a decoded proof and the player's draft across a harmless republish", async () => {
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
+    const img = wrapper.get(".gallery-face__original > img");
+    declareImage(img.element, 768, 1024);
+    await img.trigger("load");
+    await wrapper.get('input[aria-label="寬度"]').setValue(0.3);
+
+    // The same original republished: same resource identity, so no reload, no
+    // re-seeded draft and no lost eligibility.
+    await wrapper.setProps({ card: row(CARD.image_id) });
+    expect(wrapper.get(".gallery-face__original > img").element).toBe(img.element);
+    expect(Number(wrapper.get('input[aria-label="寬度"]').element.value)).toBeCloseTo(0.3);
+    expect(Number(wrapper.get('input[aria-label="高度"]').element.value)).toBeCloseTo(0.225);
+    expect(button(wrapper, "儲存框選").attributes("disabled")).toBeUndefined();
+    await button(wrapper, "儲存框選").trigger("click");
+    expect(wrapper.emitted("submit")).toHaveLength(1);
+  });
+
+  it("never turns a silhouette terminal into the edit target", async () => {
+    // The row's descriptor permits a silhouette but carries no exact original:
+    // the editor's request excludes the terminal, so there is nothing to
+    // measure and nothing to save.
+    const silhouette = structuredClone(CARD);
+    silhouette.artwork.attempts = [];
+    silhouette.image_id = "10000000-0000-4000-8000-00000000000f";
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: silhouette });
+    expect(wrapper.find(".gallery-face__original > img").exists()).toBe(false);
+    expect(wrapper.find(".gallery-face__preview img").exists()).toBe(false);
+    expect(button(wrapper, "儲存框選").attributes("disabled")).toBeDefined();
+    expect(wrapper.text()).toContain("這張肖像沒有可編輯的原始圖片，無法儲存框選。");
+    await button(wrapper, "儲存框選").trigger("click");
+    expect(wrapper.emitted("submit")).toBeUndefined();
+  });
+});
+
+// The gate both editors hand their save to. Its own harness drives the same
+// reads the editors make: a live descriptor, the driver's phase and the
+// driver's observed dimensions.
+const GateHarness = defineComponent({
+  props: { artwork: { type: Object, default: null } },
+  setup(props, { expose }) {
+    const artwork = ref(props.artwork);
+    const phase = ref("exhausted");
+    const dimensions = ref(null);
+    const gate = useOriginalEligibility(artwork, phase, dimensions, null);
+    // Driving state through the harness's own methods keeps the reads and the
+    // writes on the same refs the gate holds. The gate's answers are read
+    // through the composable itself — synchronously, without waiting for a
+    // render — because that is exactly what the editors' save handlers do.
+    expose({
+      decoded: () => gate.decoded.value,
+      saveReady: () => gate.saveReady.value,
+      setArtwork: (value) => { artwork.value = value; },
+      setPhase: (value) => { phase.value = value; },
+      setDimensions: (value) => { dimensions.value = value; },
+      read: () => ({ phase: phase.value, dimensions: dimensions.value }),
+    });
+    return () => h("span");
+  },
+});
+
+describe("exact-original eligibility gate", () => {
+  function original(imageId, version = "a".repeat(64)) {
+    return {
+      subject_id: `portrait:character:7001:${imageId}`,
+      revision: "0".repeat(64),
+      attempts: [{
+        type: "image",
+        source_id: `gallery.original:${imageId}`,
+        rank: 10,
+        resource: {
+          resource_id: `gallery/character/7001/${imageId}.webp`,
+          version,
+          url: `/art/gallery/character/7001/${imageId}.webp`,
+          origin: "runtime",
+          geometry: null,
+        },
+      }],
+      terminal: null,
+    };
+  }
+  const A = original("10000000-0000-4000-8000-00000000000a");
+  const B = original("10000000-0000-4000-8000-00000000000b");
+
+  it("retires a decoded proof the moment the live descriptor changes", () => {
+    const wrapper = mountSurface(GateHarness, { artwork: A });
+    const gate = wrapper.vm;
+    gate.setPhase("success");
+    gate.setDimensions({ width: 768, height: 1024 });
+    expect(gate.saveReady()).toBe(true);
+
+    // The live descriptor becomes another exact original while the driver still
+    // reports the retired success: the very next synchronous read refuses.
+    gate.setArtwork(B);
+    expect(gate.read()).toEqual({ phase: "success", dimensions: { width: 768, height: 1024 } });
+    expect(gate.decoded()).toBe(false);
+    expect(gate.saveReady()).toBe(false);
+
+    // Only the replacement's own decode authorizes it.
+    gate.setPhase("loading");
+    expect(gate.saveReady()).toBe(false);
+    gate.setDimensions({ width: 512, height: 512 });
+    gate.setPhase("success");
+    expect(gate.saveReady()).toBe(true);
+
+    // A geometry-only revision of the SAME original keeps the proof: the shared
+    // lifecycle deliberately reuses those decoded bytes.
+    gate.setArtwork({ ...B, revision: "f".repeat(64) });
+    expect(gate.saveReady()).toBe(true);
+
+    // A new resource version of the same card is a new original.
+    gate.setArtwork(original("10000000-0000-4000-8000-00000000000b", "c".repeat(64)));
+    expect(gate.saveReady()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("never authorizes a save without a usable decoded size", () => {
+    const wrapper = mountSurface(GateHarness, { artwork: A });
+    const gate = wrapper.vm;
+    gate.setPhase("success");
+    expect(gate.saveReady()).toBe(false);
+    gate.setDimensions({ width: 0, height: 0 });
+    expect(gate.saveReady()).toBe(false);
+    gate.setDimensions({ width: 768, height: 1024 });
+    expect(gate.saveReady()).toBe(true);
+    // A reported failure retires the proof even with a size still in hand.
+    gate.setPhase("exhausted");
+    expect(gate.saveReady()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("never proves a descriptor that carries only a display substitute", () => {
+    const silhouette = {
+      ...A,
+      attempts: [],
+      terminal: {
+        kind: "alpha_mask",
+        source_id: "gallery.alpha:man",
+        rank: 100,
+        resource: {
+          resource_id: "defaults/man.webp",
+          version: "b".repeat(64),
+          url: "/art/defaults/man.webp",
+          origin: "silhouette",
+          geometry: null,
+        },
+      },
+    };
+    const wrapper = mountSurface(GateHarness, { artwork: silhouette });
+    wrapper.vm.setPhase("success");
+    wrapper.vm.setDimensions({ width: 864, height: 1536 });
+    expect(wrapper.vm.decoded()).toBe(false);
+    expect(wrapper.vm.saveReady()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+describe("stage-transform original editor lifecycle", () => {
+  const PANEL = GALLERY_SAMPLE;
+  const CARD = GALLERY_SAMPLE.cards[0];
+  const ADULT = ".stage-transform__adult";
+  const RULER = ".stage-transform__ruler";
+  const FIGURE = ".stage-transform__figure";
+  const RULER_MARKER = '.stage-transform__ruler-status [data-testid="artwork-failure"]';
+  function row(imageId, stage = { scale: 1, x: 0, y: 0 }, revision = CARD.artwork.revision) {
+    const next = structuredClone(CARD);
+    next.image_id = imageId;
+    const candidate = next.artwork.attempts[0].resource;
+    candidate.resource_id = `gallery/character/7001/${imageId}.webp`;
+    candidate.url = `/art/gallery/character/7001/${imageId}.webp`;
+    candidate.geometry.stage = { ...stage };
+    next.artwork.revision = revision;
+    return next;
+  }
+  const OTHER = row("10000000-0000-4000-8000-000000000002");
+  // The ruler is observed through its own probe image, exactly like the shared
+  // preview's silhouette probe: the masked fill paints the shape, the probe
+  // carries only the ruler resource's own load or error signal.
+  function rulerOf(wrapper) {
+    return wrapper.get(RULER);
+  }
+  function figureOf(wrapper) {
+    return wrapper.get(FIGURE);
+  }
+  // The footer's primary action is the one save control: its label changes
+  // while a save is in flight, so it is addressed by its own class rather than
+  // by text.
+  function saveOf(wrapper) {
+    return wrapper.get(".stage-transform__footer .gallery-primary");
+  }
+  async function loadFigure(wrapper, width = 768, height = 1024) {
+    const figure = figureOf(wrapper);
+    declareImage(figure.element, width, height);
+    await figure.trigger("load");
+    return figure;
+  }
+
+  it("observes the ruler separately and keeps a healthy original the save target", async () => {
+    const wrapper = mountSurface(GalleryStageTransformModal, { panel: PANEL, card: CARD });
+    // The ruler is its own subject with its own resource: the probe requests
+    // the bundled adult reference, never the edited card's media.
+    expect(rulerOf(wrapper).attributes("src")).toBe("/art/defaults/man.webp");
+    expect(rulerOf(wrapper).attributes("aria-hidden")).toBe("true");
+    expect(rulerOf(wrapper).attributes("src")).not.toBe(
+      wrapper.get(FIGURE).attributes("src"),
+    );
+    expect(wrapper.get(ADULT).attributes("aria-hidden")).toBe("true");
+    expect(wrapper.find(RULER_MARKER).exists()).toBe(false);
+
+    // The ruler's own decode is what removes its fill on failure, and the
+    // failure gets its own local, accessible indication.
+    await rulerOf(wrapper).trigger("error");
+    expect(wrapper.find(ADULT).exists()).toBe(false);
+    const marker = wrapper.get(RULER_MARKER);
+    expect(marker.attributes("role")).toBe("status");
+    expect(marker.text()).toContain("圖片載入失敗");
+    expect(wrapper.text()).toContain("成人身形參照無法載入");
+
+    // The original is untouched by the ruler's failure: it still decodes with
+    // real dimensions and remains the one save target.
+    await loadFigure(wrapper);
+    expect(saveOf(wrapper).attributes("disabled")).toBeUndefined();
+    await saveOf(wrapper).trigger("click");
+    expect(wrapper.emitted("submit")).toHaveLength(1);
+    expect(wrapper.emitted("submit")[0][0]).toEqual({ stage: { scale: 1, x: 0, y: 0 } });
+  });
+
+  it("never lets a healthy ruler authorize saving a failed original", async () => {
+    const wrapper = mountSurface(GalleryStageTransformModal, { panel: PANEL, card: CARD });
+    await figureOf(wrapper).trigger("error");
+    // The ruler itself decodes with usable dimensions...
+    const ruler = rulerOf(wrapper);
+    declareImage(ruler.element, 864, 1536);
+    await ruler.trigger("load");
+    expect(wrapper.find(RULER_MARKER).exists()).toBe(false);
+    // ...and none of them reach the original: the editor cannot save, and the
+    // failure explanation is the original's own.
+    expect(wrapper.text()).toContain("圖片載入失敗，無法儲存調整。");
+    expect(saveOf(wrapper).attributes("disabled")).toBeDefined();
+    await saveOf(wrapper).trigger("click");
+    expect(wrapper.emitted("submit")).toBeUndefined();
+    expect(wrapper.find(FIGURE).exists()).toBe(false);
+  });
+
+  it("discards eligibility for a replacement published while a save is pending", async () => {
+    const wrapper = mountSurface(GalleryStageTransformModal, { panel: PANEL, card: CARD });
+    await loadFigure(wrapper);
+    await saveOf(wrapper).trigger("click");
+    expect(wrapper.emitted("submit")).toHaveLength(1);
+    // The save is in flight: the editor is locked, so only a rejection can
+    // hand it back to the player.
+    expect(saveOf(wrapper).attributes("disabled")).toBeDefined();
+    expect(saveOf(wrapper).text()).toBe("儲存中…");
+
+    // A replacement arrives and the rejection unlocks the editor: the retired
+    // original must not authorize a second dispatch for the new card.
+    await wrapper.setProps({ card: OTHER, rejected: true });
+    expect(saveOf(wrapper).attributes("disabled")).toBeDefined();
+    await saveOf(wrapper).trigger("click");
+    expect(wrapper.emitted("submit")).toHaveLength(1);
+
+    // The replacement's own decode, and only that, enables the next save.
+    await loadFigure(wrapper, 512, 512);
+    expect(saveOf(wrapper).attributes("disabled")).toBeUndefined();
+    await saveOf(wrapper).trigger("click");
+    expect(wrapper.emitted("submit")).toHaveLength(2);
+    expect(wrapper.emitted("submit")[1][0]).toEqual({ stage: { scale: 1, x: 0, y: 0 } });
   });
 });
 

@@ -53,7 +53,10 @@ GALLERY_STORY_IDS = frozenset(
         "overlays-gallerybindingdrawer--overlap-warnings",
         "overlays-gallerybindingdrawer--unmatched",
         "overlays-galleryfacerectmodal--edit-portrait",
+        "overlays-galleryfacerectmodal--failed-original",
+        "overlays-galleryfacerectmodal--recovered-original",
         "overlays-galleryfacerectmodal--rejected",
+        "overlays-galleryfacerectmodal--silhouette-only",
         "overlays-gallerystagetransformmodal--identity",
         "overlays-gallerystagetransformmodal--child",
         "overlays-gallerystagetransformmodal--translated",
@@ -61,6 +64,7 @@ GALLERY_STORY_IDS = frozenset(
         "overlays-gallerystagetransformmodal--pending",
         "overlays-gallerystagetransformmodal--rejected",
         "overlays-gallerystagetransformmodal--failed-load",
+        "overlays-gallerystagetransformmodal--recovered-original",
         "overlays-gallerystagetransformmodal--reduced-motion",
     }
 )

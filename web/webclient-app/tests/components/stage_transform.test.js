@@ -56,7 +56,10 @@ describe("stage transform", () => {
   it("failed image keeps reference and refuses save", async () => {
     const wrapper = mount(Modal, { props: { panel, card } });
     await wrapper.get("img").trigger("error");
-    expect(wrapper.find("img").exists()).toBe(false);
+    // The broken exact original is gone; the ruler's own observation probe
+    // stays, and the masked reference it serves is still painted.
+    expect(wrapper.find(".stage-transform__figure").exists()).toBe(false);
+    expect(wrapper.get(".stage-transform__ruler").attributes("src")).toBe("/art/defaults/man.webp");
     expect(wrapper.get(".stage-transform__adult").attributes("aria-hidden")).toBe("true");
     expect(wrapper.text()).toContain("圖片載入失敗");
     wrapper.unmount();
