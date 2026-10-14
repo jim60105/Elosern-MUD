@@ -43,7 +43,7 @@ These were settled during design. Do not relitigate them inside a change.
 | D7 | **Sexual state is a mechanic, persona is material.** `sexual_baseline` is typed and simulated; `persona` is opaque and only ever injected into prompts. | The engine models what it must compute and stores the rest verbatim. |
 | D8 | **Sexual state feeds the combat modifier table.** High arousal degrades agility and accuracy; climax-in-progress zeroes actions. | Explicitly requested. Shares one modifier pipeline with poison and paralysis — no special-case branches. |
 | D9 | **`world/lore/` is Python; `world/rules/rulebook/` is YAML.** | Lore is a versioned single source of truth that deserves code review. Balance numbers are data that should be tunable without touching Python. |
-| D10 | **Scene art is keyed by archetype, not by room.** A tavern in the capital and a tavern in a border town share one image. | GPU cost scales with scene *kinds*, not room count. Style stays consistent for free. |
+| D10 | **Generated scene art is keyed by archetype; authored rooms may override it with official artwork.** Resolution uses room official art, archetype generated art, archetype official art, then a declared town/forest terminal image. Every scene type has bundled official artwork. | GPU cost still scales with scene *kinds*, while authored locations can have distinct official art and remain illustrated offline. |
 | D11 | **The engine never calls Stable Diffusion.** It maintains a queue and shells out to a configurable worker command. | Keeps the engine free of GPU concerns and lets the prompt-writing agent be swapped without touching engine code. |
 
 > **Amended (change `internal-art-worker`).** D11's "shells out to a configurable worker command" no longer
@@ -59,6 +59,16 @@ These were settled during design. Do not relitigate them inside a change.
 | D14 | **Finite ordinary player choices use server-authored, versioned OOB menus.** Free-form values remain text. | Players should not memorize skill, target, Exit, quest, or shop keys; the browser must not parse prose or duplicate rules to discover them. |
 | D15 | **Portrait art is a separate subject type.** Players and explicitly named NPCs have unique portraits; reusable monster art is keyed by registered visual species, never threat tier; personal choices remain entity-local. | Preserves D10's scene reuse while bounding portrait GPU/storage cost, avoiding cross-species image leakage, and giving important characters identity. |
 | D16 | **The local minimap remembers visited nodes and may render coordinate-free Exit graphs.** Instance/interior rooms gain no invented coordinates, world-map membership, or pathfinding. | A truthful local navigation aid can cover every current room type without weakening the four-layer map model. |
+
+> **Amended 2026-10-14 (approved Unified Image Resolution design).** D10 now
+> permits an explicitly declared, stable per-room official-art reference while
+> retaining archetype-only generation. The complete source, fallback, failure,
+> and consumer contracts are in
+> `docs/superpowers/specs/2026-10-14-unified-image-resolution-design.md`.
+> Required bundled scene artwork is a tracked exception to the external
+> official catalog's no-tracked-artwork rule; operator artwork remains
+> external and read-only. This is an approved design amendment, not a claim
+> that the runtime cutover or new scene assets have been implemented.
 
 ---
 
@@ -802,7 +812,21 @@ not an aspiration.
 
 ## 8. Scene Art Pipeline
 
-Keyed by archetype (D10). The engine never calls SD (D11).
+Generated scene assets remain keyed by archetype (amended D10). The internal
+worker contract is defined by amended D11.
+
+**Approved scene-display amendment, 2026-10-14.** A room's explicit official
+artwork overrides archetype generation. Without that override, resolution
+tries archetype generated art, optional operator-provided archetype official
+art, and required bundled archetype official art in that order. Every
+registered scene type plus the dream scene has an appropriate bundled image;
+town and forest are members of that collection and its declared terminal
+image fallbacks. The scene type chooses the terminal image, never the
+exploration/dialogue/combat mode. A failed source remains observable after
+fallback, while normal absence or pending generation carries no error marker.
+The shared image-resolution design owns the complete state and rendering
+rules, including per-room identities and the exception for bundled official
+artwork. No per-room generation is added.
 
 ```
 SceneArchetype registry
@@ -863,15 +887,18 @@ Completed entries are idempotent and never regenerate.
 > settings. It lives under `world/art/` with the rest of the art package; `typeclasses/scripts.py`
 > remains the stock Evennia base `Script` class.
 
-OOB push on room entry when an image exists; otherwise the panel keeps the previous image or shows
-a placeholder.
+OOB push carries the current scene's canonical image description. On a move,
+the background uses that new scene's own image or bundled fallback. A previous
+successful image may be retained during regeneration of the same scene, but
+never as the background of another scene. Retention does not hide a reached
+failure in the new image description.
 
-> **Amended 2026-08-02 (approved Browser-First MUD WebClient Suite).** Scene behavior above remains
-> unchanged and D10 still forbids per-room scene images. The art queue additionally accepts portrait
+> **Amended 2026-08-02 (approved Browser-First MUD WebClient Suite; its per-room
+> scene restriction is superseded by the 2026-10-14 amendment above).** The art queue additionally accepts portrait
 > subjects under a separate namespace: players and explicitly named NPCs have stable unique portrait
 > keys, while reusable monster art is keyed by declared visual species (never threat tier), personal choices remain entity-local, and unresolvable/imageless monsters degrade to `monster_anon`. Both canonical age attributes
 > are validated (present, integer) before portrait enqueue. Scene and portrait jobs share the same
-> serialized external worker boundary.
+> serialized artwork worker boundary.
 > Queue writes are owned by `world/art/service.py` and occur through startup synchronization, successful
 > room entry, or post-commit character/NPC lifecycle hooks; WebClient presenters and workers remain
 > read-only with respect to queue and game state.
