@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: The person-focus verb card is client-local and replaces the verb popover
-Activating an interact target SHALL open the person focus with no server request and no router frame. The rail SHALL fade out, the command panel SHALL become inert and dim to about 35% opacity, and the place card and minimap SHALL step away. A target outside the rendered companion lineup SHALL use `actor-right`; a lineup target SHALL reuse its existing figure without duplication, the message window SHALL name the target as speaker, and a centred card SHALL list the target's verbs followed by `✕ 返回`.
+Activating an interact target SHALL open the person focus with no server request and no router frame. The rail SHALL fade out, the command panel SHALL become inert and dim to about 35% opacity, and the place card and minimap SHALL step away. A target outside the rendered companion lineup SHALL slide into `actor-right`; a lineup target SHALL reuse its existing figure without duplication, the message window SHALL name the target as speaker, and a centred card SHALL list the target's verbs followed by `✕ 返回`.
 
 #### Scenario: A target without a portrait uses the dialogue silhouette
 - **WHEN** the focused target has no portrait
@@ -85,11 +85,15 @@ Each verb row SHALL submit exactly the payload the former popover row submitted:
 - **THEN** existing action feedback is shown and that card and companion emphasis remain without resubmitting or mutating party/control state
 
 ### Requirement: A departed person closes the card
-If the focused person is no longer in the committed `interact` list, the card SHALL close in the same commit, a temporary actor-right standee SHALL leave or a surviving lineup SHALL lose the departed focus emphasis, the rail SHALL return, and the readout SHALL flash `<name> 已經離開了。`. A move that changes the committed location SHALL close the card as well.
+When presence is available and submission is unlocked, a missing focused interact identity SHALL close its card in that commit, restore the rail and flash `<name> 已經離開了。`; otherwise closure SHALL await normal settlement. Missing committed targets SHALL immediately lose derived standee/focus emphasis. A committed location change SHALL close the card regardless of that departure gate.
 
 #### Scenario: The focused person leaves
-- **WHEN** the verb card is open and a commit removes that person from the room
+- **WHEN** the verb card is open and a commit removes that person from the room while presence is available and submission is unlocked
 - **THEN** the card closes in that commit and the readout flashes `<name> 已經離開了。`
+
+#### Scenario: A locked departure waits for normal settlement
+- **WHEN** the committed target disappears while submission is locked or presence entries are unavailable, then an available unlocked commit still lacks that target
+- **THEN** the first commit removes derived actor-right focus or lineup emphasis without prematurely closing the card or flashing departure; the later normal settlement closes the card, restores the rail and flashes the departure message once
 
 #### Scenario: Companion focus leaves no stale elevation
 - **WHEN** the normal committed presence settlement closes a companion card after departure, or a committed movement closes the card
