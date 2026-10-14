@@ -1,3 +1,10 @@
+// The companion lineup renderer's own showcase. `speakingIdentity` is the one
+// emphasis prop: the shell feeds it the committed dialogue host speaker or, in
+// exploration, the rendered non-controlled companion whose verb card is open
+// (reuse-lineup-person-focus D2). These stories are rendering fixtures — the
+// wire acceptance of that join is the managed browser journey
+// (web/tests/browser/test_browser_exploration_state.py) and the store-driven
+// Vitest regressions; no story proves the live producer.
 import { computed, h, ref } from "vue";
 import CompanionLineup from "../../components/CompanionLineup.vue";
 import HudFrame from "../../components/HudFrame.vue";
@@ -36,7 +43,7 @@ const renderLineup = (args) => ({
       ...(args.speaking ? [h("button", {
         type: "button", style: "position:absolute;top:var(--header-h);left:50%;z-index:5",
         onClick: () => { speaking.value = !speaking.value; },
-      }, "切換說話角色")] : []),
+      }, "切換焦點同伴")] : []),
     ]);
   },
 });
