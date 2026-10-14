@@ -841,9 +841,10 @@ class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
                 # Both descriptor paths join the same current image.
                 self.assertEqual(entity["portrait_ref"], key)
                 self.assertEqual(target["portrait_ref"], key)
-                entry = catalog[key]
-                self.assertEqual(entry["origin"], expected_origin)
-                self.assertTrue(entry["url"])
+                entry = catalog[key]["artwork"]
+                resource = entry["attempts"][0]["resource"]
+                self.assertEqual(resource["origin"], expected_origin)
+                self.assertTrue(resource["url"])
 
     @covers_requirement(
         "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
@@ -935,27 +936,44 @@ class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement(
         "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
     )
-    def test_silhouette_only_and_age_ineligible_stay_null(self):
+    def test_silhouette_only_and_age_ineligible_keep_their_references(self):
         with _official_art_scope():
-            # No image mounted anywhere: the named host resolves to the
-            # silhouette-only placeholder, which is not its own media URL.
+            # No image mounted anywhere: the named host resolves to no real
+            # candidate, and the age-ineligible host is refused outright. Both
+            # are ADMITTED to the view, so both keep their references while the
+            # catalog entry truthfully carries no real candidate and no
+            # generated subject key — only the attribute-selected terminal.
             silhouette_host = self._named_host("輪廓host", "t_synth_portrait_silhouette")
             age_host = self._named_host("年齡不符host", "t_synth_portrait_aged")
-            age_host.db.age = 20000
+            # A malformed canonical age is what refuses the subject: an
+            # in-range integer is eligible presentation data.
+            age_host.db.age = "not-a-number"
 
             payload, art_panel = self._panels()
             for npc in (silhouette_host, age_host):
                 entity, target = self._rows_for(payload, npc)
-                self.assertIsNone(entity["portrait_ref"])
+                self.assertEqual(entity["portrait_ref"], portrait_catalog_key(npc.pk))
                 if target is not None:
-                    self.assertIsNone(target["portrait_ref"])
-            for key in (
-                portrait_catalog_key(silhouette_host.pk),
-                portrait_catalog_key(age_host.pk),
-            ):
-                entry = art_panel["portrait_catalog"].get(key)
-                if entry is not None:
-                    self.assertIsNone(entry["url"])
+                    self.assertEqual(target["portrait_ref"], portrait_catalog_key(npc.pk))
+                entry = art_panel["portrait_catalog"][portrait_catalog_key(npc.pk)]["artwork"]
+                self.assertEqual(
+                    [a["type"] for a in entry["attempts"] if a["type"] == "image"], []
+                )
+                self.assertEqual(entry["terminal"]["kind"], "alpha_mask")
+            # The named-policy host keeps its own subject key (its generation is
+            # a real recorded fact about that subject), while the age-refused
+            # host exposes NO generated subject key at all.
+            self.assertEqual(
+                art_panel["portrait_catalog"][portrait_catalog_key(silhouette_host.pk)][
+                    "artwork"
+                ]["generation_subject"],
+                character_subject_for(silhouette_host).full(),
+            )
+            self.assertIsNone(
+                art_panel["portrait_catalog"][portrait_catalog_key(age_host.pk)][
+                    "artwork"
+                ]["generation_subject"]
+            )
 
     @covers_requirement(
         "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
