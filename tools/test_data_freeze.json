@@ -1,6 +1,10 @@
 {
   "contract": [
     {
+      "path": "world/art/tests/test_bundled_interior_art.py",
+      "reason": "bundled scene distribution and decode contract"
+    },
+    {
       "path": "world/art/tests/test_bundled_outdoor_art.py",
       "reason": "bundled scene distribution and decode contract"
     },
