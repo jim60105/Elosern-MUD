@@ -233,13 +233,15 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     // Row 1: current
     expect(rows[0].text()).toContain("艾莉亞");
     expect(rows[0].classes()).toContain("is-current");
-    expect(rows[0].attributes("disabled")).toBeDefined();
+    // The row states its own inactivity without leaving the tab order, so its
+    // avatar's accessible explanation stays reachable by keyboard.
+    expect(rows[0].attributes("aria-disabled")).toBe("true");
     expect(rows[0].attributes("aria-current")).toBe("true");
 
     // Row 2: non-current, enabled
     expect(rows[1].text()).toContain("雷恩");
     expect(rows[1].classes()).not.toContain("is-current");
-    expect(rows[1].attributes("disabled")).toBeUndefined();
+    expect(rows[1].attributes("aria-disabled")).toBeUndefined();
 
     // Row 3: pending creation sibling
     expect(rows[2].text()).toContain("新冒險者");
@@ -265,10 +267,10 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     expect(lockNotes).toHaveLength(1);
     expect(lockNotes[0].text()).toBe("戰鬥中無法切換角色");
 
-    // All rows are disabled
+    // All rows are inactive, and none of them vanishes from the tab order.
     const rows = wrapper.findAll(".character-switcher__row");
     for (const row of rows) {
-      expect(row.attributes("disabled")).toBeDefined();
+      expect(row.attributes("aria-disabled")).toBe("true");
     }
     // No per-row lock badge
     expect(wrapper.findAll(".character-switcher__row-lock-badge")).toHaveLength(0);
@@ -444,7 +446,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
 
     // All buttons inside must now be disabled
     for (const row of wrapper.findAll(".character-switcher__row")) {
-      expect(row.attributes("disabled")).toBeDefined();
+      expect(row.attributes("aria-disabled")).toBe("true");
     }
     expect(
       wrapper.get('[data-testid="character-create-control"]').attributes("disabled"),
@@ -492,7 +494,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     });
 
     const trigger = wrapper.get('[data-testid="character-switcher-trigger"]');
-    expect(trigger.attributes("disabled")).toBeDefined();
+    expect(trigger.attributes("aria-disabled")).toBe("true");
 
     // Clicking trigger does not open when locked
     await trigger.trigger("click");
@@ -510,7 +512,7 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
       },
     });
     for (const row of wrapper.findAll(".character-switcher__row")) {
-      expect(row.attributes("disabled")).toBeDefined();
+      expect(row.attributes("aria-disabled")).toBe("true");
     }
     expect(
       wrapper.get('[data-testid="character-create-control"]').attributes("disabled"),

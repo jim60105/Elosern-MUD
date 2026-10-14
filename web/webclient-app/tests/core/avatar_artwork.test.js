@@ -134,7 +134,7 @@ describe("avatar artwork (shared small-avatar renderer)", () => {
   it("draws the first grapheme of the trimmed name as the identity fallback", () => {
     const cases = [
       ["艾莉亞", "艾"],
-      ["  雷恩", "雷"],
+      ["  樣本甲", "樣"],
       ["𠮟婆婆", "𠮟"],
       ["\u{1F469}\u200D\u{1F4BB}技師", "\u{1F469}\u200D\u{1F4BB}"],
       ["\u{1F1F9}\u{1F1FC}旅人", "\u{1F1F9}\u{1F1FC}"],

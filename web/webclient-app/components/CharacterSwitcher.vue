@@ -103,9 +103,13 @@ function confirmCreate() {
   emit("create-character");
 }
 
-function selectCharacter(identity) {
-  if (props.locked || props.switchLocked) return;
-  emit("switch-character", identity);
+// Activation governance lives in this code path, not in the native `disabled`
+// attribute: a natively disabled control leaves the tab order entirely, which
+// would also hide its avatar's `aria-describedby` explanation from a keyboard
+// user. `aria-disabled` states the same fact and keeps the row reachable.
+function selectCharacter(char) {
+  if (props.locked || props.switchLocked || char.current) return;
+  emit("switch-character", char.identity);
 }
 
 function onKeydown(event) {
@@ -159,7 +163,7 @@ onUnmounted(() => {
       class="character-switcher__pill"
       data-testid="character-switcher-trigger"
       :class="{ 'is-expanded': expanded, 'is-locked': locked }"
-      :disabled="locked"
+      :aria-disabled="locked ? 'true' : undefined"
       :aria-expanded="expanded ? 'true' : 'false'"
       aria-haspopup="dialog"
       :aria-controls="expanded ? 'character-switcher-popover' : undefined"
@@ -214,10 +218,10 @@ onUnmounted(() => {
               'is-disabled': char.current || switchLocked || locked,
             }"
             :data-testid="`character-row-${char.identity}`"
-            :disabled="char.current || switchLocked || locked"
+            :aria-disabled="char.current || switchLocked || locked ? 'true' : undefined"
             :aria-current="char.current ? 'true' : undefined"
             :aria-describedby="failureTextId(`row-${char.identity}`)"
-            @click="selectCharacter(char.identity)"
+            @click="selectCharacter(char)"
           >
             <span class="character-switcher__row-thumb-wrapper">
               <AvatarArtwork
@@ -330,11 +334,12 @@ onUnmounted(() => {
   transition: border-color var(--motion-fast) ease, background var(--motion-fast) ease;
 }
 
-.character-switcher__pill:hover:not(:disabled) {
+.character-switcher__pill:hover:not(:disabled):not([aria-disabled="true"]) {
   border-color: var(--gold-400);
 }
 
-.character-switcher__pill:disabled {
+.character-switcher__pill:disabled,
+.character-switcher__pill[aria-disabled="true"] {
   opacity: 0.6;
   cursor: not-allowed;
 }

@@ -108,8 +108,11 @@ const loading = computed(() => phase.value === "loading");
 // candidate's, which is what a failed first source would otherwise lend out).
 // The shared lifecycle refreshes the selected geometry in place on a
 // geometry-only revision, so a re-presentation applies without a remount.
+// A SELECTED result states its geometry authoritatively, including an explicit
+// null (geometry removed): never fall back to the in-flight attempt's older
+// rectangle once a candidate has settled.
 const geometry = computed(() => (
-  selected.value?.geometry ?? attempt.value?.resource?.geometry ?? null
+  selected.value ? selected.value.geometry ?? null : attempt.value?.resource?.geometry ?? null
 ));
 const faceRect = computed(() => geometry.value?.face_rect ?? null);
 const placementStyle = computed(() => (
