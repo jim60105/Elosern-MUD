@@ -18,6 +18,7 @@ from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
 from evennia.utils.test_resources import EvenniaTest
 
+from tools.spec_traceability import covers_requirement
 from typeclasses.rooms import GridRoom, InstanceRoom, Room, TerrainRoom
 from world.art.scene_definitions import (
     ROOM_ART_KEY_SET,
@@ -72,6 +73,9 @@ class GridRoomArtMetadataTests(EvenniaTest):
         map_key, x, y = key
         return GridRoom.objects.filter_xyz((x, y, map_key)).first()
 
+    @covers_requirement(
+        "room-art-metadata::room-official-references-are-explicit-authored-keys"
+    )
     def test_every_authored_grid_node_carries_registered_metadata(self):
         for key, scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
             with self.subTest(node=key):
@@ -105,6 +109,9 @@ class PermanentInteriorArtMetadataTests(EvenniaTest):
         _limbo()
         sync_grid()
 
+    @covers_requirement(
+        "room-art-metadata::room-official-references-are-explicit-authored-keys"
+    )
     def test_new_interior_carries_metadata_that_survives_reload(self):
         sync_service_interiors()
         place = next(iter(_live_places().values()))
@@ -144,6 +151,9 @@ class PooledWildernessRoomArtTests(EvenniaTest):
         super().setUp()
         self.provider = ElosernWildernessMapProvider()
 
+    @covers_requirement(
+        "room-art-metadata::pooled-wilderness-describes-the-active-logical-place"
+    )
     def test_pooled_object_clears_a_stale_key_between_coordinates(self):
         room = create_object(TerrainRoom, key="t_pooled")
         place_a = (200, 100)
@@ -168,6 +178,9 @@ class PooledWildernessRoomArtTests(EvenniaTest):
         self.assertNotEqual(room.scene_identity, identity_a)
         self.assertTrue(is_registered_scene_key(room.scene_archetype))
 
+    @covers_requirement(
+        "room-art-metadata::pooled-wilderness-describes-the-active-logical-place"
+    )
     def test_identity_follows_the_attached_wilderness_name(self):
         # The delta requires identity from the CURRENT wilderness; an attached
         # script whose name differs from the configured constant must not
@@ -252,6 +265,9 @@ class InstanceRoomArtMetadataTests(EvenniaTest):
             self._spawn(scene_archetype="t_not_a_registered_scene")
         self.assertEqual(InstanceRoom.objects.count(), 0)
 
+    @covers_requirement(
+        "room-art-metadata::room-official-references-are-explicit-authored-keys"
+    )
     def test_absent_declaration_defaults_to_no_key_with_a_stable_identity(self):
         room = self._spawn()
         self.assertIsNone(room.room_art_key)
@@ -270,6 +286,9 @@ class InstanceRoomArtMetadataTests(EvenniaTest):
         room = self._spawn(scene_identity=identity)
         self.assertEqual(room.scene_identity, identity)
 
+    @covers_requirement(
+        "room-art-metadata::room-official-references-are-explicit-authored-keys"
+    )
     def test_explicit_registered_declaration_survives_a_reload(self):
         room_art_key = _registered_room_art_key()
         scene_archetype = _registered_scene_archetype()
@@ -304,6 +323,10 @@ class InstanceRoomArtMetadataTests(EvenniaTest):
 
 
 class RoomMetadataSmokeTests(EvenniaTest):
+    @covers_requirement(
+        "room-art-metadata::room-official-references-are-explicit-authored-keys",
+        "room-art-metadata::pooled-wilderness-describes-the-active-logical-place",
+    )
     def test_bootstrap_and_pool_reuse(self):
         """Real map/bootstrap construction and real wilderness reuse.
 
