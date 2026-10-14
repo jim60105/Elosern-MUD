@@ -86,12 +86,7 @@ function of the subject key and the stored sex and apparent age.
 - **THEN** resolution SHALL fail closed to the adult band rather than raising
 
 ### Requirement: The fallback seam supplies a URL and a face rectangle and reports its use
-`world/art/gallery_match.py::fallback_for(subject, entity=None)` SHALL return the resolved key's
-committed `defaults/<key>.<ext>` identity together with that key's declared face rectangle, taken
-from a fixed per-key rectangle map that falls back to the shared default rectangle for any key
-without its own entry. Each use SHALL emit one `gallery_fallback_used` info event through the
-`world.observability` facade carrying the `subject`, `kind`, and resolved fallback `key` in
-`context`.
+The single art-domain silhouette selector SHALL supply the existing closed key, committed resource identity/URL and its own geometry as the descriptor's alpha terminal. Existing declaration, demographics and stable-hash rules SHALL remain unchanged. Backend-selected fallback use SHALL emit gallery_fallback_used through named facade imports; browser-only failures SHALL not claim backend logging.
 
 #### Scenario: A subject with no card and no classic asset resolves a fallback image
 - **WHEN** the chain reaches the seam for a subject with no card and no `done` classic asset
@@ -115,8 +110,8 @@ without its own entry. Each use SHALL emit one `gallery_fallback_used` info even
 - **THEN** the payload carries the silhouette identity with the subject's true underlying status, the `silhouette` origin discriminator, and no `done`/generated label, and the persisted asset record is unchanged
 
 #### Scenario: A later real image keeps the decorative reference but not the claim
-- **WHEN** the same subject later resolves a real runtime image and that image then fails to load in the browser
-- **THEN** the payload's real image carries the `runtime` origin beside the retained decorative `fallback` reference, the browser renders the silhouette with the load-failure label without any new request or state mutation, and no generated-state write ever occurred during the silhouette phase
+- **WHEN** a real portrait later fails in the browser
+- **THEN** shared loading can reach the carried alpha terminal, retain the real-source failure and leave persisted generation state unchanged
 
 #### Scenario: The presenter builds the fallback URL like every other branch
 - **WHEN** the presenter builds the payload for a resolved fallback identity
@@ -136,25 +131,16 @@ without its own entry. Each use SHALL emit one `gallery_fallback_used` info even
   ambiguous shared stable key recovers no entity and fails closed to the band rule
 
 #### Scenario: Every stage-eligible payload carries the decorative fallback field
-- **WHEN** a stage-eligible payload is produced, including one whose real portrait resolved
-- **THEN** it carries the resolved fallback key, media identity, and rectangle as a distinct
-  decorative `fallback` field, so a browser whose real image later fails to load can render the
-  already-resolved silhouette without a new request or state mutation
-- **AND** the subject's real portrait state remains observable even while a silhouette media identity
-  is present for stage rendering
+- **WHEN** an eligible figure descriptor is produced, with or without a real source
+- **THEN** it carries its distinct canonical alpha terminal and geometry without a generated-success claim or mutation
 
 #### Scenario: The payload establishes the closed origin discriminator vocabulary
-- **WHEN** a resolution payload is produced
-- **THEN** it establishes the closed origin discriminator vocabulary itself — `runtime` for
-  card/classic images, `silhouette` when only the fallback resolved, `placeholder` otherwise — which
-  the `official-art-resolution` capability later extends with the `official` value
+- **WHEN** a canonical descriptor is produced
+- **THEN** real resources carry runtime or official origin, alpha terminal carries silhouette origin, and missing real imagery has no fabricated successful origin
 
 #### Scenario: The fallback field is decorative presentation data
-- **WHEN** a fallback resolves for a subject
-- **THEN** the decorative fallback field SHALL NOT report the subject's portrait as `done`, generated,
-  or completed by virtue of resolving — only a real payload image carries a media URL of its own — and
-  it SHALL NOT change the subject's underlying missing/pending/failed/unavailable status, which
-  passes through from the asset/gallery state exactly as before
+- **WHEN** a silhouette terminal is provided
+- **THEN** it never completes or mutates the subject generation state and remains separate from real-source attempts
 
 ### Requirement: The built-in fallback images carry a transparent background
 Each committed built-in fallback image SHALL be produced from the project art prompt library

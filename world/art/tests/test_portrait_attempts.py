@@ -256,6 +256,9 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
     @covers_requirement(
         "official-art-personalization::stale-official-selections-are-retained-but-ignored-for-resolution"
     )
+    @covers_requirement(
+        "portrait-source-attempts::portrait-source-order-retains-current-policy"
+    )
     def test_a_broken_personal_selection_precedes_the_default_candidate(self):
         subject = self._subject("stale-selection")
         entity = self._character("stale-selection")
@@ -522,6 +525,9 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
 
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
+    )
+    @covers_requirement(
+        "portrait-source-attempts::portrait-source-order-retains-current-policy"
     )
     def test_an_unconfigured_official_source_adds_no_fault(self):
         subject = self._subject("no-reference")

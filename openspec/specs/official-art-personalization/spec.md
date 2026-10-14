@@ -38,7 +38,7 @@ choice, which SHALL win without changing another individual.
 - **THEN** both choices remain unchanged and present independently, and no other species preference changes
 
 ### Requirement: Stale official selections are retained but ignored for resolution
-When a personal official selection names an identity the catalog no longer resolves, image resolution SHALL ignore the selection and continue through the remaining chain (runtime default, classic, official default, silhouette) while RETAINING the preference; no resolution failure SHALL delete the preference or any image.
+Unresolvable personal official selections SHALL remain stored and contribute an attributed fault at their original precedence position before the remaining runtime-default, classic, official-default and alpha sources. Resolution SHALL not delete preferences or images. Replaced bytes at the same identity SHALL use the refreshed snapshot fingerprint.
 
 #### Scenario: Removed image falls through, preference survives
 - **WHEN** the official image a player selected disappears from a later prepared directory and the server restarts
@@ -55,6 +55,10 @@ When a personal official selection names an identity the catalog no longer resol
 #### Scenario: Surviving identity picks up updated bytes
 - **WHEN** a selection's identity still exists and its content changed across a maintenance restart
 - **THEN** the selection SHALL resolve its updated bytes after the restart — same identity, new content, no re-selection required
+
+#### Scenario: Broken personal selection remains visible after fallback
+- **WHEN** a retained explicit official selection is missing and the runtime default loads
+- **THEN** the preferred-source fault remains locally indicated while preference and files stay unchanged
 
 ### Requirement: Official-image geometry overrides are personal, identity-keyed, and update-tolerant
 A character's face-rectangle and stage-placement adjustment for an official image SHALL be stored as a personal override keyed by that image's stable root-relative identity, written through the existing art-preference writer and validated with the existing geometry rules against the image's current decoded dimensions. Overrides SHALL be entity-local.

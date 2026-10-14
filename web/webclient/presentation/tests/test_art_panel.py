@@ -819,6 +819,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
+    @covers_requirement("portrait-source-attempts::portrait-source-order-retains-current-policy")
     def test_canonical_source_enumeration_keeps_v2_portraits_and_scenes_valid(self):
         # The internal portrait source enumerator ships NO alternate shape: the
         # registered panel contract still round-trips through its own validator
