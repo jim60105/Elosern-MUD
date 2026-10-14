@@ -112,19 +112,16 @@ body {
   top: var(--header-h);
   bottom: var(--band-h);
 }
-.scene-backdrop__sample {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, #0b0d10 3%, #0b0d1000 70%), url("../assets/redesign/sample-town.webp") center top / cover;
-  opacity: .78;
-}
-[data-elosern-mode="combat"] .scene-backdrop__sample,
-.elosern-stage[data-beat-hold="combat"] .scene-backdrop__sample {
-  background-image: linear-gradient(0deg, #0b0d10 3%, #0b0d1000 75%), url("../assets/redesign/sample-forest.webp");
-}
 .elosern-root .scene-backdrop__image {
   object-position: center top;
   mask-image: linear-gradient(#000 55%, transparent);
+}
+/* The probe layers report load/decode observations for the resources the
+   shared driver is fetching; they are invisible and never painted over the
+   displayed bitmap. */
+.elosern-root .scene-backdrop__image--probe {
+  z-index: 0;
+  mask-image: none;
 }
 .elosern-root .scene-backdrop .scene-backdrop__placeholder {
   top: calc(14px * var(--ui-scale));

@@ -40,6 +40,7 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import build_production_registry
+from world.art import descriptors
 from world.art.fallback_keys import FALLBACK_KEYS
 from world.art.gallery import record_for as gallery_record_for
 from world.art.official import load_catalog, reset_catalog
@@ -55,17 +56,55 @@ from world.rules.combat_session import engage
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
+# The canonical scene descriptor the v4 wrapper carries: the room-aware source
+# chain's own facts, built through the frozen descriptor vocabulary so the
+# fixture can never drift from the wire contract.
+def _scene_artwork(**overrides):
+    value = descriptors.descriptor(
+        subject_id="place:t_synth_room",
+        generation_subject="scene:t_synth_bazaar",
+        generation_state=descriptors.GENERATION_DONE,
+        attempts=[
+            descriptors.image_attempt(
+                descriptors.scene_generated_source_id("scene:t_synth_bazaar"),
+                descriptors.SCENE_RANK_GENERATED,
+                _valid_resource(
+                    resource_id="scene/t_synth_bazaar.png",
+                    version=_fingerprint("scene-output"),
+                    url=f"/art/scene/t_synth_bazaar.png?v={_fingerprint('scene-output')}",
+                    origin="runtime",
+                    geometry={
+                        "image_size": None,
+                        "face_rect": None,
+                        "stage": None,
+                        "aspect_ratio": None,
+                    },
+                ),
+            ),
+            descriptors.fault_attempt(
+                descriptors.scene_bundled_source_id("t_synth_bazaar"),
+                descriptors.SCENE_RANK_BUNDLED,
+                descriptors.REASON_REQUIRED_RESOURCE_MISSING,
+            ),
+        ],
+        terminal_payload=None,
+        retention_sources=[
+            descriptors.retention_source(
+                descriptors.scene_generated_source_id("scene:t_synth_bazaar"),
+                _fingerprint("scene-retention"),
+            )
+        ],
+    )
+    value.update(overrides)
+    return value
+
+
 def _valid_scene(**overrides):
     value = {
         "archetype": "t_synth_bazaar",
         "label": T_BAZAAR_LABEL,
-        "subject_key": "scene:t_synth_bazaar",
-        "status": "done",
-        "url": "/art/scene/t_synth_bazaar.png",
-        "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
-        "aspect_ratio": "16:9",
         "alt": T_BAZAAR_LABEL,
-        "placeholder": None,
+        "artwork": _scene_artwork(),
     }
     value.update(overrides)
     return value
@@ -264,30 +303,71 @@ class ArtSchemaTests(unittest.TestCase):
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(schema_version=2))
         with self.assertRaises(ArtPanelError):
-            validate_art(_valid_payload(schema_version=4))
+            validate_art(_valid_payload(schema_version=3))
+        with self.assertRaises(ArtPanelError):
+            validate_art(_valid_payload(schema_version=5))
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(available=False))
         with self.assertRaises(ArtPanelError):
             validate_art(_valid_payload(kind="combat"))
 
-    def test_scene_url_must_be_same_origin(self):
-        payload = _valid_payload(scene=_valid_scene(url="https://evil.test/x.png"))
-        with self.assertRaises(Exception):
-            validate_art(payload)
-        payload = _valid_payload(scene=_valid_scene(url="/tmp/out.png"))
-        with self.assertRaises(Exception):
-            validate_art(payload)
+    def test_scene_media_url_must_be_same_origin(self):
+        """A scene candidate's URL obeys the shared same-origin media route."""
+        for url in ("https://evil.test/x.png", "/tmp/out.png"):
+            with self.subTest(url=url):
+                resource = _valid_resource(
+                    resource_id="scene/t_synth_bazaar.png",
+                    version=_fingerprint("scene-output"),
+                    url=url,
+                    origin="runtime",
+                    geometry={
+                        "image_size": None,
+                        "face_rect": None,
+                        "stage": None,
+                        "aspect_ratio": None,
+                    },
+                )
+                payload = _valid_payload(
+                    scene=_valid_scene(
+                        artwork=_scene_artwork(
+                            attempts=[
+                                descriptors.image_attempt(
+                                    descriptors.scene_generated_source_id(
+                                        "scene:t_synth_bazaar"
+                                    ),
+                                    descriptors.SCENE_RANK_GENERATED,
+                                    resource,
+                                )
+                            ]
+                        )
+                    )
+                )
+                with self.assertRaises(Exception):
+                    validate_art(payload)
 
-    def test_scene_placeholder_truthfulness(self):
-        # A pending scene needs a placeholder; a done scene must not carry one.
-        payload = _valid_payload(
-            scene=_valid_scene(status="pending", url=None, placeholder=None)
+    def test_scene_is_exactly_the_v4_wrapper(self):
+        """The retired flat scene fields are rejected, never adapted."""
+        normalized = validate_art(_valid_payload())
+        self.assertEqual(
+            set(normalized["scene"]), {"archetype", "label", "alt", "artwork"}
         )
-        with self.assertRaises(Exception):
-            validate_art(payload)
-        payload = _valid_payload(
-            scene=_valid_scene(placeholder={"kind": "missing", "label": "未生成"})
-        )
+        # An archetype-less scene is a valid wrapper (the malformed-metadata
+        # case the descriptor itself states), never a missing field.
+        validate_art(_valid_payload(scene=_valid_scene(archetype=None)))
+        for retired, value in (
+            ("url", "/art/scene/t_synth_bazaar.png"),
+            ("subject_key", "scene:t_synth_bazaar"),
+            ("status", "done"),
+            ("aspect_ratio", "16:9"),
+            ("stage", {"scale": 1.0, "x": 0.0, "y": 0.0}),
+            ("placeholder", None),
+        ):
+            with self.subTest(retired=retired):
+                with self.assertRaises(Exception):
+                    validate_art(_valid_payload(scene=_valid_scene(**{retired: value})))
+        # A scene wrapper without its descriptor is not an available scene.
+        payload = _valid_payload(scene=_valid_scene())
+        del payload["scene"]["artwork"]
         with self.assertRaises(Exception):
             validate_art(payload)
 
@@ -309,27 +389,29 @@ class ArtSchemaTests(unittest.TestCase):
             validate_art(payload)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
-    def test_v3_portraits_coexist_with_the_unchanged_scene_block(self):
-        """One v3 payload carries canonical descriptors AND the untouched scene.
+    def test_both_artwork_vocabularies_are_canonical(self):
+        """One payload carries canonical descriptors in BOTH vocabularies.
 
-        The scene block keeps its own prior shape until its separately
-        versioned cutover: the catalog value is exactly ``{artwork, context}``
-        with the seven canonical descriptor keys, while the scene keeps its
-        nine flat keys and never gains a descriptor field.
+        The scene is exactly ``{archetype, label, alt, artwork}`` — the
+        room-aware descriptor the scene resolution produced — and the catalog
+        value is exactly ``{artwork, context}`` with the same seven descriptor
+        keys, so no surface sees a second, flat artwork vocabulary.
         """
         payload = validate_art(_valid_payload())
         self.assertEqual(
             set(payload["scene"]),
+            {"archetype", "label", "alt", "artwork"},
+        )
+        self.assertEqual(
+            set(payload["scene"]["artwork"]),
             {
-                "archetype",
-                "stage",
-                "label",
-                "subject_key",
-                "status",
-                "url",
-                "aspect_ratio",
-                "alt",
-                "placeholder",
+                "subject_id",
+                "revision",
+                "generation_subject",
+                "generation_state",
+                "attempts",
+                "terminal",
+                "retention_sources",
             },
         )
         entry = payload["portrait_catalog"]["42"]
@@ -349,11 +431,12 @@ class ArtSchemaTests(unittest.TestCase):
         # The retired flat portrait vocabulary appears nowhere in the payload.
         flat = json.dumps(payload, ensure_ascii=False)
         # (a resource legitimately carries its own ``origin``; the retired
-        # FLAT portrait fields do not appear)
+        # FLAT portrait and scene fields do not appear)
         for retired in (
             '"subject_key": "portrait:monster:low"',
             '"fallback"',
             '"placeholder": {"kind"',
+            '"status": "done"',
         ):
             self.assertNotIn(retired, flat)
 
@@ -847,6 +930,10 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.art_settings.enable()
         self.room = create_object(Room, key="art arena")
         self.room.scene_archetype = "t_synth_bazaar"
+        # Supported map construction writes the logical place identity beside
+        # the archetype; only an authored identity may authorize retained
+        # display content, so the surface tests run on a real one.
+        self.room.scene_identity = "place:t_synth_room"
         self.player = _player()
         self.player.location = self.room
         self.registry = build_production_registry()
@@ -882,7 +969,7 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
-    def test_done_scene_renders_same_origin_url(self):
+    def test_done_scene_renders_the_canonical_descriptor(self):
         self._settle_done(
             ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
             "scene/t_synth_bazaar.png",
@@ -890,50 +977,80 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         payload = self._render()
         self.assertTrue(payload["available"])
         scene = payload["scene"]
+        self.assertEqual(set(scene), {"archetype", "label", "alt", "artwork"})
         self.assertEqual(scene["archetype"], "t_synth_bazaar")
         self.assertEqual(scene["label"], SYNTH_ARCHETYPES[T_BAZAAR].display_name_zh)
-        self.assertEqual(scene["subject_key"], "scene:t_synth_bazaar")
-        self.assertEqual(scene["status"], ArtAssetStatus.DONE)
-        self.assertEqual(scene["url"], "/art/scene/t_synth_bazaar.png")
-        self.assertEqual(scene["aspect_ratio"], "16:9")
-        self.assertIsNone(scene["placeholder"])
+        self.assertEqual(scene["alt"], scene["label"])
+        artwork = scene["artwork"]
+        self.assertEqual(artwork["generation_subject"], "scene:t_synth_bazaar")
+        self.assertEqual(artwork["generation_state"], descriptors.GENERATION_DONE)
+        generated = [
+            attempt
+            for attempt in artwork["attempts"]
+            if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+        ]
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "image")
+        resource = generated[0]["resource"]
+        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_bazaar.png"))
+        self.assertNotIn("http", resource["url"])
+        self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
+        # The generated source authorizes this scene's still-applicable output.
+        self.assertEqual(
+            [entry["source_id"] for entry in artwork["retention_sources"]],
+            [descriptors.scene_generated_source_id("scene:t_synth_bazaar")],
+        )
         self.assertNotIn("out_path", repr(payload))
         self.assertNotIn(self.root.as_posix(), repr(payload))
 
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
-    def test_pending_missing_failed_states_render_placeholders(self):
+    def test_pending_and_failed_generation_states_are_truthful(self):
         from world.art.queue import claim
 
-        pending = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
-        ensure(pending, "desc")
-        claim(10)
-        pending_record = __import__("world.art.queue", fromlist=["record_key"]).record_key(
-            pending
-        )
-        record = __import__(
-            "world.art.store", fromlist=["ArtAssetRecord"]
-        ).ArtAssetRecord.objects.filter(db_key=pending_record).first()
-        record.db.status = ArtAssetStatus.PENDING
-        record.save()
-        payload = self._render()
-        scene = payload["scene"]
-        self.assertEqual(scene["status"], ArtAssetStatus.PENDING)
-        self.assertIsNone(scene["url"])
-        self.assertEqual(scene["placeholder"]["kind"], "missing")
-
-        failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
-        ensure(failed, "desc")
+        subject = ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar")
+        ensure(subject, "desc")
         claimed = claim(10)
+        artwork = self._render()["scene"]["artwork"]
+        # A claimed generation is the same player-visible fact as a queued one.
+        self.assertEqual(artwork["generation_state"], descriptors.GENERATION_PENDING)
+        self.assertEqual(
+            [
+                attempt
+                for attempt in artwork["attempts"]
+                if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+            ],
+            [],
+        )
+        # The synthetic archetype ships no bundled illustration: the required
+        # position states that fact instead of inventing a URL.
+        bundled = [
+            attempt
+            for attempt in artwork["attempts"]
+            if attempt["rank"] == descriptors.SCENE_RANK_BUNDLED
+        ]
+        self.assertEqual(len(bundled), 1)
+        self.assertEqual(bundled[0]["type"], "fault")
+        self.assertEqual(
+            bundled[0]["reason"], descriptors.REASON_REQUIRED_RESOURCE_MISSING
+        )
+
         settle(
-            failed,
+            subject,
             generation_token=str(claimed[0].db.generation_token),
             status=ArtAssetStatus.FAILED,
             output_identity=None,
             error="boom",
         )
-        payload = self._render()
-        self.assertEqual(payload["scene"]["status"], ArtAssetStatus.FAILED)
-        self.assertIsNone(payload["scene"]["url"])
+        artwork = self._render()["scene"]["artwork"]
+        self.assertEqual(artwork["generation_state"], descriptors.GENERATION_FAILED)
+        self.assertEqual(
+            [
+                attempt["reason"]
+                for attempt in artwork["attempts"]
+                if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+            ],
+            [descriptors.REASON_GENERATION_FAILED],
+        )
 
     @covers_requirement("webclient-art-panel::the-art-panel-accepts-the-normalized-in-flight-state")
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
@@ -943,25 +1060,40 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         claim(10)
         payload = self._render()
         self.assertTrue(payload["available"])
-        scene = payload["scene"]
-        self.assertEqual(scene["subject_key"], "scene:t_synth_bazaar")
-        self.assertEqual(scene["status"], "pending")
-        self.assertIsNone(scene["url"])
-        self.assertEqual(scene["placeholder"]["kind"], "missing")
-        self.assertEqual(scene["aspect_ratio"], "16:9")
+        artwork = payload["scene"]["artwork"]
+        self.assertEqual(artwork["generation_subject"], "scene:t_synth_bazaar")
+        self.assertEqual(artwork["generation_state"], "pending")
+        self.assertEqual(
+            [
+                attempt
+                for attempt in artwork["attempts"]
+                if attempt["type"] == "image"
+                and attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+            ],
+            [],
+        )
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
-    def test_unresolvable_scene_archetype_renders_unavailable(self):
+    def test_unresolvable_scene_archetype_states_the_configuration_failure(self):
         self.room.scene_archetype = None
         payload = self._render()
         scene = payload["scene"]
         self.assertIsNone(scene["archetype"])
-        self.assertEqual(scene["placeholder"]["kind"], "unavailable")
-        self.assertIsNone(scene["url"])
-        self.assertIsNone(scene["subject_key"])
+        self.assertEqual(scene["label"], "場景")
+        artwork = scene["artwork"]
+        self.assertIsNone(artwork["generation_subject"])
+        self.assertIsNone(artwork["generation_state"])
+        self.assertEqual(artwork["retention_sources"], [])
+        self.assertEqual(len(artwork["attempts"]), 1)
+        fault = artwork["attempts"][0]
+        self.assertEqual(fault["type"], "fault")
+        self.assertEqual(
+            fault["reason"], descriptors.REASON_CONFIGURATION_INVALID
+        )
+        self.assertEqual(fault["rank"], descriptors.SCENE_RANK_TERMINAL)
 
-    def test_missing_file_for_done_record_renders_unavailable(self):
+    def test_missing_file_for_done_record_is_a_reached_output_missing_fact(self):
         ensure(ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"), "desc")
         from world.art.queue import claim
 
@@ -973,10 +1105,21 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             output_identity="scene/t_synth_bazaar.png",
             error=None,
         )
-        # The file is never written, so the presenter treats it as unavailable.
+        # The file is never written, so the recorded output cannot be presented:
+        # the generated position states that truth.
         payload = self._render()
-        self.assertEqual(payload["scene"]["placeholder"]["kind"], "unavailable")
-        self.assertIsNone(payload["scene"]["url"])
+        artwork = payload["scene"]["artwork"]
+        generated = [
+            attempt
+            for attempt in artwork["attempts"]
+            if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+        ]
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "fault")
+        self.assertEqual(
+            generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING
+        )
+        self.assertEqual(artwork["retention_sources"], [])
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_combat_catalog_mirrors_context_actions_participants(self):
@@ -1158,27 +1301,17 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(terminal["origin"], "silhouette")
         self.assertEqual(terminal["url"], "/art/defaults/" + terminal["resource_id"].split("/", 1)[1])
         self.assertEqual(artwork["generation_state"], "done")
-        # The scene wire block is unchanged by any of this: the presenter
-        # never forwards descriptor facts into it.
+        # The scene wrapper carries its own canonical descriptor; a portrait
+        # row's facts never leak into it.
         self.assertEqual(
             sorted(payload["scene"]),
-            [
-                "alt",
-                "archetype",
-                "aspect_ratio",
-                "label",
-                "placeholder",
-                "stage",
-                "status",
-                "subject_key",
-                "url",
-            ],
+            ["alt", "archetype", "artwork", "label"],
         )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
     @covers_requirement("portrait-source-attempts::portrait-source-order-retains-current-policy")
-    def test_canonical_source_enumeration_keeps_v3_portraits_and_scenes_valid(self):
+    def test_canonical_source_enumeration_keeps_portraits_and_scenes_valid(self):
         # The internal portrait source enumerator ships NO alternate shape: the
         # registered panel contract still round-trips through its own validator
         # for a complete portrait descriptor and the unchanged scene block at
@@ -1203,22 +1336,19 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(candidate["url"], "/art/portrait/character/enumeration-guest.png")
         self.assertEqual(artwork["generation_state"], "done")
         self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
-        self.assertEqual(
-            normalized["scene"]["url"], "/art/scene/t_synth_bazaar.png"
+        scene_artwork = normalized["scene"]["artwork"]
+        generated = [
+            attempt
+            for attempt in scene_artwork["attempts"]
+            if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+        ]
+        self.assertEqual(len(generated), 1)
+        self.assertTrue(
+            generated[0]["resource"]["url"].startswith("/art/scene/t_synth_bazaar.png")
         )
         self.assertEqual(
             sorted(normalized["scene"]),
-            [
-                "alt",
-                "archetype",
-                "aspect_ratio",
-                "label",
-                "placeholder",
-                "stage",
-                "status",
-                "subject_key",
-                "url",
-            ],
+            ["alt", "archetype", "artwork", "label"],
         )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")

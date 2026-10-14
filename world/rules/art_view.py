@@ -1,9 +1,10 @@
 """Frozen read-only art-panel view model (design D2/D3).
 
 The art panel (WebClient ``art``) is built from canonical state by this module:
-the actor's current location's validated ``scene_archetype`` and the bounded,
-deterministic set of currently present focusable entities. In combat mode the
-entity set comes from the shared roster query
+the actor's current location's complete read-only scene metadata — its logical
+place identity, its validated ``scene_archetype`` and its optional registered
+``room_art_key`` — and the bounded, deterministic set of currently present
+focusable entities. In combat mode the entity set comes from the shared roster query
 ``world.rules.combat_view.combat_participants`` so the ``context_actions`` and
 ``art`` panels can never drift on membership or order; in exploration mode it
 comes from the current room's ``contents`` filtered to dialogue hosts and
@@ -21,6 +22,7 @@ from dataclasses import dataclass
 from typing import Any, Callable
 
 from world.art.subjects import ArtSubjectError, character_subject_for
+from world.art.subjects import is_valid_subject_key
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.combat_session import is_in_active_session
 from world.rules.combat_view import MAX_DISPLAY_NAME_CODE_POINTS, combat_participants
@@ -43,9 +45,54 @@ SUBJECT_NONE = "none"
 # Presentation bounds owned by the art view (equal or below wire limits).
 MAX_ROLE_CODE_POINTS = 16
 
+# The bounded logical identity of a puppet that is in no location at all: a
+# constant, because there is no logical place to name, and deliberately never a
+# retention-authorized identity (no authored metadata backs it).
+UNLOCATED_SCENE_IDENTITY = "room:none"
+
+# The bounded placeholder a per-room binding that fails even the shared
+# stable-key contract is named by. The raw attribute value is never echoed onto
+# the wire, so a malformed stored value can neither leak nor exceed a bound.
+INVALID_ROOM_BINDING_KEY = "invalid"
+
 
 class ArtViewError(ValueError):
     """The art panel cannot read required canonical data without mutation."""
+
+
+@dataclass(frozen=True)
+class SceneTarget:
+    """The complete read-only logical scene input one scene resolution reads.
+
+    Attributes:
+        identity: The bounded logical place identity the descriptor is keyed
+            by. ``scene_identity`` when the map owner declared one; otherwise a
+            bounded runtime fallback (never an authored-place identity).
+        trusted_identity: True exactly when ``identity`` came from the map
+            owner's authored metadata. Only a trusted identity may authorize
+            retained display content, so a fallback identity can never make two
+            different places look like one.
+        archetype: The registered scene archetype the room renders from, or
+            ``None`` when the room's authored metadata cannot be honored (an
+            absent or unregistered value) — the malformed case the scene
+            resolution states explicitly instead of hiding.
+        room_art_key: The registered per-room operator override key, or
+            ``None`` when the room declares none (or declares an unusable one
+            that cannot be safely named).
+        room_binding_invalid: True when the room DOES declare a room-art key
+            that cannot be honored. It is deliberately distinct from "declares
+            none": an authored override that cannot resolve is a
+            configuration-failure fact, never an expected absence.
+
+    Nothing here is written anywhere: the target is a frozen read of the
+    room's already-stored attributes.
+    """
+
+    identity: str
+    trusted_identity: bool
+    archetype: str | None
+    room_art_key: str | None
+    room_binding_invalid: bool
 
 
 @dataclass(frozen=True)
@@ -72,12 +119,14 @@ class ArtView:
     """The complete frozen read-only art panel inputs.
 
     Attributes:
-        scene_archetype: The actor's current location's validated
-            ``scene_archetype``, or ``None`` when unresolved or invalid.
+        scene: The actor's current location's complete read-only logical scene
+            input — its logical place identity, its validated archetype and its
+            optional registered room-art key, with the invalid-metadata facts
+            the scene resolution states rather than hides.
         entities: The bounded, deterministic, currently present focusable set.
     """
 
-    scene_archetype: str | None
+    scene: SceneTarget
     entities: tuple[ArtEntityView, ...]
 
 
@@ -97,6 +146,83 @@ def _default_resolver(identity: Any):
     from evennia.objects.models import ObjectDB
 
     return ObjectDB.objects.filter(id=int(identity)).first()
+
+
+def _bounded_identity(value: Any, maximum: int) -> str | None:
+    """One non-empty authored identity inside its code-point bound, or ``None``."""
+    if not isinstance(value, str) or not value:
+        return None
+    if sum(1 for _ in value) > maximum:
+        return None
+    return value
+
+
+def _room_art_binding(value: Any) -> tuple[str | None, bool]:
+    """Read one room's authored ``room_art_key`` as ``(key, invalid)``.
+
+    A registered key is a binding the room-art chain presents. A value that is
+    not a registered key is an authored override that cannot be honored: it is
+    reported as ``invalid`` and is named only when it satisfies the shared
+    stable-key contract, so an arbitrary stored value never reaches the wire.
+    """
+    from world.art.scene_definitions import is_registered_room_art_key
+
+    if value is None:
+        return None, False
+    if is_registered_room_art_key(value):
+        return value, False
+    return (value if is_valid_subject_key(value) else None), True
+
+
+def scene_target_for(location: Any) -> SceneTarget:
+    """Read one location's authored scene metadata into the frozen scene target.
+
+    Every fact is read, never inferred: the archetype and the room-art key are
+    honored only when they are registered values, and the logical identity is
+    the map owner's ``scene_identity`` or a bounded runtime fallback that never
+    authorizes retained content. A room that is not a location at all (a puppet
+    in Limbo, a creation-pending shell) resolves the same way as a room whose
+    metadata cannot be honored: an explicit malformed-metadata target, never a
+    silently missing scene.
+    """
+    from world.maps.room_art import MAX_SCENE_IDENTITY_CODE_POINTS
+
+    if location is None:
+        return SceneTarget(
+            identity=UNLOCATED_SCENE_IDENTITY,
+            trusted_identity=False,
+            archetype=None,
+            room_art_key=None,
+            room_binding_invalid=False,
+        )
+    archetype = getattr(location, "scene_archetype", None)
+    if not isinstance(archetype, str) or archetype not in SCENE_ARCHETYPE_REGISTRY:
+        archetype = None
+    room_art_key, room_binding_invalid = _room_art_binding(
+        getattr(location, "room_art_key", None)
+    )
+    identity = _bounded_identity(
+        getattr(location, "scene_identity", None), MAX_SCENE_IDENTITY_CODE_POINTS
+    )
+    if identity is not None:
+        return SceneTarget(
+            identity=identity,
+            trusted_identity=True,
+            archetype=archetype,
+            room_art_key=room_art_key,
+            room_binding_invalid=room_binding_invalid,
+        )
+    try:
+        runtime_identity = str(int(location.pk))
+    except (AttributeError, TypeError, ValueError):
+        runtime_identity = "none"
+    return SceneTarget(
+        identity=f"room:{runtime_identity}",
+        trusted_identity=False,
+        archetype=archetype,
+        room_art_key=room_art_key,
+        room_binding_invalid=room_binding_invalid,
+    )
 
 
 def _bound(value: str, maximum: int, field: str) -> str:
@@ -210,36 +336,36 @@ def build_art_view(
 
     In combat mode the entity set comes from the shared roster query; in
     exploration mode it comes from the current room's present contents. The
-    scene archetype is the actor's current location's validated
-    ``scene_archetype``; an unresolvable or invalid archetype is ``None`` (the
-    scene payload then degrades to the unavailable placeholder). Never writes
-    state and never reads ``disguised_stats`` or persona.
+    scene input is the actor's current location's complete read-only metadata
+    (its logical place identity, its validated archetype and its optional
+    registered room-art key), so the scene resolution downstream can state a
+    malformed override explicitly instead of hiding it. Never writes state and
+    never reads ``disguised_stats`` or persona.
     """
     location = getattr(actor, "location", None)
-    scene_archetype = None
-    if location is not None:
-        archetype = getattr(location, "scene_archetype", None)
-        if archetype in SCENE_ARCHETYPE_REGISTRY:
-            scene_archetype = archetype
     if is_in_active_session(actor):
         entities = _combat_entities(actor, resolver)
     else:
         entities = _exploration_entities(location, actor)
-    return ArtView(scene_archetype=scene_archetype, entities=entities)
+    return ArtView(scene=scene_target_for(location), entities=entities)
 
 
 __all__ = [
     "ArtEntityView",
     "ArtView",
     "ArtViewError",
+    "INVALID_ROOM_BINDING_KEY",
     "MAX_PORTRAIT_CATALOG",
     "ROLE_ALLY",
     "ROLE_DIALOGUE",
     "ROLE_FOE",
     "ROLE_PERSON",
+    "SceneTarget",
     "SUBJECT_CHARACTER",
     "SUBJECT_MONSTER",
     "SUBJECT_NONE",
+    "UNLOCATED_SCENE_IDENTITY",
     "build_art_view",
     "portrait_catalog_key",
+    "scene_target_for",
 ]

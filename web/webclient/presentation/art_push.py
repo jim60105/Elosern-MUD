@@ -42,11 +42,21 @@ DISPATCH_UID = "elosern.art_push"
 
 
 def _art_subject_keys(payload: dict[str, Any]) -> set[str]:
-    """Return the subject keys the rendered art payload references."""
+    """Return the subject keys the rendered art payload references.
+
+    The scene block carries the scene resolution's canonical descriptor, so the
+    key a completion event matches is read from that descriptor's own
+    ``generation_subject`` — the same stable fact every other descriptor
+    consumer reads — rather than from a copied display field. A malformed
+    scene's descriptor claims no generation subject and therefore never
+    matches.
+    """
     keys = _art_portrait_catalog_keys(payload)
     scene = payload.get("scene") or {}
-    if isinstance(scene, dict) and scene.get("subject_key"):
-        keys.add(scene["subject_key"])
+    artwork = scene.get("artwork") if isinstance(scene, dict) else None
+    subject = artwork.get("generation_subject") if isinstance(artwork, dict) else None
+    if isinstance(subject, str) and subject:
+        keys.add(subject)
     return keys
 
 

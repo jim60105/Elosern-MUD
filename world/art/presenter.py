@@ -7,37 +7,36 @@ the equipment-bound card, the personal official selection, the record's
 default card, the classic ``done`` asset record, the mounted catalog's
 official default for the entity's content reference, and the authoritative
 alpha terminal. ``_enumerate_portrait`` walks that chain exactly once and
-projects it twice — as the canonical artwork descriptor
+projects it as the canonical artwork descriptor
 (``describe_portrait``/``describe_entity``, using the frozen
 ``world.art.descriptors`` vocabulary with each position's stable source id and
-rank and every reached fault at its own position) and, for SCENES ONLY, as the
-flat scene payload ``resolve_scene``/``resolve_scene_subject`` returns (which
-refuses every non-scene subject kind). The portrait wire cut over to the
-canonical descriptor (change ``unified-portrait-image-contract``), so no
+rank and every reached fault at its own position). The portrait wire cut over
+to the canonical descriptor (change ``unified-portrait-image-contract``), so no
 portrait flat projection exists any more: a portrait consumer reads
 ``describe_entity``/``describe_portrait`` and the shipped serializers project
-the descriptor. Scenes keep their own path through the same classic record and
-truthful placeholder until their separately versioned cutover.
+the descriptor.
 
-Every flat payload carries ``face_rect`` — the resolved card's or official
-image's rectangle, the shared default for a classic asset or a fallback image,
-or ``null`` for every placeholder — and ``origin``, the closed
-portrait-origin discriminator vocabulary: ``runtime`` for the payload's own
-card or classic image, ``official`` for the catalog's read-only default,
-``silhouette`` when only the built-in fallback resolved, and ``placeholder``
-when nothing did.
-Every payload also carries the decorative ``fallback`` silhouette reference:
-the resolved built-in key, its committed ``/art/defaults/`` URL, and that
-key's rectangle, carried on stage-eligible payloads whether or not a real
-image resolved, so a browser whose real image later fails to load renders the
-already-resolved silhouette without a new request. The field is presentation
-data only: it never becomes a payload's own media URL, never reports the
-portrait as generated, and never changes the subject's true status.
-An official default is presented only when the catalog's URL fits
-``MAX_PORTRAIT_MEDIA_URL``, the shared wire ceiling: an official identity
-embeds an operator-chosen filename, so an over-budget URL falls through
-exactly like an absent reference instead of failing the whole panel, and an
-official payload never claims a ``done``/generated status.
+``describe_scene`` owns the SCENE source policy with the same discipline: one
+read-only walk of the authored per-room operator override, the scene
+archetype's own generated artwork, the optional operator scene default, the
+required bundled type illustration and the distinct declared terminal image,
+projected as the canonical descriptor with each position's own stable source
+id and rank, every reached fault at its position, the retained startup facts of
+each operator source, the scene's independent recorded generation truth and the
+retention authorizations that keep a still-applicable known-good image on
+screen. A scene whose authored metadata cannot be honored states that
+configuration failure explicitly and falls back to the declared town terminal —
+never an invented or silently missing scene, and never a synthetic pending
+generation.
+
+Every canonical resource carries the closed origin vocabulary: ``runtime`` for
+the scene's own generated output, ``official`` for an operator catalog image,
+``bundled_official`` for a committed bundled illustration and ``silhouette``
+for the built-in portrait alpha terminal. An official default is presented only
+when the catalog's URL fits ``MAX_PORTRAIT_MEDIA_URL``, the shared wire
+ceiling: an official identity embeds an operator-chosen filename, so an
+over-budget URL falls through exactly like an absent reference instead of
+failing the whole panel.
 It never exposes ``out_path``, the store root, or any absolute filesystem path.
 Change 23f's browser panel consumes these primitives; this change owns them.
 """
@@ -77,14 +76,6 @@ from world.art.subjects import (
     monster_subject_for,
 )
 
-# Placeholder kinds, exactly what the browser must show when no asset exists.
-PLACEHOLDER_MISSING = "missing"
-PLACEHOLDER_UNAVAILABLE = "unavailable"
-PLACEHOLDER_LABELS = {
-    PLACEHOLDER_MISSING: "未生成",
-    PLACEHOLDER_UNAVAILABLE: "無法提供",
-}
-
 # The CLOSED portrait-origin discriminator vocabulary (art-gallery-fallback
 # owns it here): ``runtime`` for a card or classic image the payload itself
 # carries, ``official`` for the mounted catalog's read-only default for the
@@ -98,9 +89,11 @@ ORIGIN_OFFICIAL = "official"
 ORIGIN_SILHOUETTE = "silhouette"
 ORIGIN_PLACEHOLDER = "placeholder"
 
-# The payload kind of a resolved official default: a real image the subject
-# presents, but not a generated asset, so it is never a ``done`` status.
-PAYLOAD_OFFICIAL = "official"
+# The declared town terminal: the closed terminal vocabulary's town member
+# (``world.art.scene_definitions.TERMINAL_SCENE_KEYS``), and the permitted
+# fallback a scene whose authored metadata cannot be honored is shown with —
+# never a normal archetype's own declared terminal.
+TOWN_TERMINAL_KEY = "city_street"
 
 # The wire ceiling every portrait payload URL must fit: the art-panel and
 # roster validators both bound a payload URL at this many code points. Card,
@@ -641,115 +634,6 @@ def _refusal_descriptor(entity, subject: ArtSubject | None) -> dict:
     )
 
 
-def _scene_attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
-    """The flat SCENE payload of one resolved canonical scene candidate.
-
-    The scene block's own projection, kept byte-identical until the scene
-    wire's separately versioned cutover: the resource's own URL, its validated
-    geometry and its authored origin, with the catalog's read-only image
-    labelled as exactly that and never as a generated asset. Selection,
-    geometry validation and diagnostics all already happened once, in the
-    enumerator. No portrait consumer reads this shape.
-    """
-    resource = attempt.resource
-    geometry = resource["geometry"]
-    official = resource["origin"] == descriptors.ORIGIN_OFFICIAL
-    return {
-        "kind": PAYLOAD_OFFICIAL if official else "asset",
-        "label": "官方圖片" if official else "已生成",
-        "status": None if official else ArtAssetStatus.DONE,
-        "url": resource["url"],
-        "aspect_ratio": geometry["aspect_ratio"],
-        "alt": subject.full(),
-        "subject_key": subject.full(),
-        "face_rect": geometry["face_rect"],
-        "stage": geometry["stage"],
-    }
-
-
-def _scene_placeholder_payload(
-    subject: ArtSubject, record: ArtAssetRecord | None, silhouette: dict | None
-) -> dict:
-    """The truthful scene placeholder closing a chain that resolved no image.
-
-    A missing or unfinished record reads ``missing`` with its own true status
-    (a claimed ``in_progress`` record is normalized to the wire-stable
-    ``pending`` status so a snapshot taken while a worker holds the claim
-    renders a placeholder instead of failing the wire schema; the persistent
-    record status is never touched), and a ``done`` record whose output cannot
-    be presented reads ``unavailable``. Never leaks ``out_path`` or the store
-    root.
-    """
-    if record is None or record.db.status != ArtAssetStatus.DONE:
-        kind = PLACEHOLDER_MISSING
-        status = record.db.status if record else ArtAssetStatus.MISSING
-        if status == ArtAssetStatus.IN_PROGRESS:
-            status = ArtAssetStatus.PENDING
-        return _carried(
-            {
-                "kind": kind,
-                "label": PLACEHOLDER_LABELS[kind],
-                "status": status,
-                "url": None,
-                "aspect_ratio": record.db.aspect_ratio if record else None,
-                "alt": PLACEHOLDER_LABELS[kind],
-                "subject_key": subject.full(),
-                "face_rect": None,
-                "stage": None,
-            },
-            silhouette,
-        )
-    return _carried(_placeholder_unavailable("無法提供"), silhouette)
-
-
-def resolve_scene_subject(subject: ArtSubject) -> dict:
-    """The flat scene payload of one validated SCENE subject.
-
-    Scene-only by construction: any other subject kind is a caller error, so
-    no portrait can ever obtain a flat payload through this seam.
-
-    The scene wire's own projection of the one canonical enumeration: the
-    scene record's ``done`` asset becomes the payload's image and the truthful
-    placeholder closes the chain when none resolved. A resolved fallback is
-    NEVER the payload's own image: it rides the decorative ``fallback`` field
-    beside the subject's true status, so a silhouette-only resolution stays the
-    truthful placeholder row it is. Nothing here is a portrait projection —
-    portraits are read through ``describe_portrait``/``describe_entity``.
-    """
-    if subject.kind is not ArtSubjectKind.SCENE:
-        raise ArtSubjectError(
-            f"the flat projection is scene-only; {subject.full()!r} is not a scene"
-        )
-    enumeration = _enumerate_portrait(subject)
-    if enumeration.attempt is not None:
-        return _carried(
-            _scene_attempt_payload(subject, enumeration.attempt),
-            enumeration.silhouette,
-            origin=enumeration.attempt.resource["origin"],
-        )
-    return _scene_placeholder_payload(
-        subject, enumeration.record, enumeration.silhouette
-    )
-
-
-def _carried(payload: dict, silhouette: dict | None, *, origin: str | None = None) -> dict:
-    """Attach the origin discriminator and the decorative silhouette.
-
-    ``origin`` states the branch that produced the payload's OWN media (a
-    resolved card or classic asset: ``runtime``; an official default:
-    ``official``). Every other payload derives it from what actually
-    resolved: ``silhouette`` when the built-in fallback did, ``placeholder``
-    when nothing did.
-    """
-    payload["fallback"] = silhouette
-    payload["origin"] = (
-        origin
-        if origin is not None
-        else ORIGIN_SILHOUETTE if silhouette is not None else ORIGIN_PLACEHOLDER
-    )
-    return payload
-
-
 def _silhouette(key: object, identity: object, face_rect: object) -> dict | None:
     """The decorative reference for one resolved fallback key, or ``None``.
 
@@ -843,41 +727,419 @@ def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:
     return subject, None
 
 
-def resolve_scene(archetype: str) -> dict:
-    """Resolve a validated scene archetype to its flat presentation payload.
+def _unique_attempts(attempts: list[dict]) -> list[dict]:
+    """Keep one entry per position the canonical wire allows exactly once.
 
-    The ONLY remaining flat projection: scenes keep their own block until the
-    scene wire's separately versioned cutover. Portraits are read through the
-    canonical descriptor seam (``describe_portrait``/``describe_entity``).
+    A descriptor may carry at most one entry per ``(type, source_id, rank)``
+    (the shared validators reject a duplicate), so a position that somehow
+    contributes two facts of one kind keeps the FIRST — the one the chain's own
+    order puts in front of the substitute that follows it — and the repeat is
+    dropped. This is a contract guard, not a policy: each position's own
+    attribution already gives its facts distinct source ids.
     """
+    seen: set[tuple[str, str, int]] = set()
+    unique: list[dict] = []
+    for attempt in attempts:
+        key = (attempt["type"], attempt["source_id"], attempt["rank"])
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(attempt)
+    return unique
+
+
+def _scene_bundled_resource(catalog, key: str) -> dict | None:
+    """The admitted bundled illustration of one scene key as a canonical resource.
+
+    ``None`` for a key the current bundled snapshot does not admit: a required
+    image that is missing, unreadable or undecodable has no resource, so the
+    chain can state the required-resource fact instead of inventing a URL.
+    """
+    image = catalog.entry(key)
+    url = catalog.url_for(key)
+    if image is None or url is None:
+        return None
+    return descriptors.resource(
+        image.identity,
+        image.fingerprint,
+        url,
+        descriptors.ORIGIN_BUNDLED_OFFICIAL,
+        geometry_payload=descriptors.geometry(
+            image_size=descriptors.image_size_payload(**image.image_size),
+        ),
+    )
+
+
+def _scene_official_resource(official_catalog, identity: str) -> dict | None:
+    """The admitted operator image of one identity as a canonical resource.
+
+    ``None`` for an identity the current operator snapshot does not admit, so a
+    URL is never built for unindexed artwork.
+    """
+    image = official_catalog.entry(identity)
+    if image is None:
+        return None
+    url = official_catalog.url_for(image.identity)
+    if url is None:
+        return None
+    return descriptors.resource(
+        image.identity,
+        image.fingerprint,
+        url,
+        descriptors.ORIGIN_OFFICIAL,
+        geometry_payload=descriptors.geometry(
+            image_size=descriptors.image_size_payload(**image.image_size),
+        ),
+    )
+
+
+def _scene_official_position(
+    kind: str, key: str, source_prefix: str, rank: int
+) -> tuple[list[tuple[str, int, str]], dict | None]:
+    """One operator scene position: its preceding faults and its default candidate.
+
+    The retained startup facts of the content directory come FIRST — a
+    directory that could not be enumerated, or a manifest-declared default a
+    deterministic substitute replaced — followed by the metadata fact of the
+    very image that resolved. A directory-scope fact keeps the position's own
+    canonical ``<prefix>:<key>`` source id; a per-image fact is attributed to
+    that exact image, exactly like the portrait chain's official slot, so two
+    facts of one position never collide on one source id. An unconfigured
+    directory contributes nothing at all: a never-mounted source is not a
+    failure.
+    """
+    from world.art import official
+
+    source_id = f"{source_prefix}:{key}"
+    catalog = official.current_catalog()
+    faults: list[tuple[str, int, str]] = []
+    for fault in catalog.source_faults(kind, key):
+        if fault.scope in (official.SOURCE_SCOPE_DEFAULT, official.SOURCE_SCOPE_SOURCE):
+            faults.append((source_id, rank, fault.reason))
+    content = catalog.content(kind, key)
+    if content is None or content.default_identity is None:
+        return faults, None
+    resource = _scene_official_resource(catalog, content.default_identity)
+    if resource is None:
+        return faults, None
+    metadata = catalog.fault_for(content.default_identity)
+    if metadata is not None:
+        faults.append(
+            (f"{source_prefix}:{content.default_identity}", rank, metadata.reason)
+        )
+    return faults, resource
+
+
+def _scene_generated_resource(
+    subject: ArtSubject, record: ArtAssetRecord
+) -> tuple[dict | None, str | None]:
+    """The scene record's generated artwork as ``(resource, fault)``.
+
+    Exactly one side is set for a ``done`` record: the resource of the output
+    identity the store still holds, or the bounded generated-output-missing
+    fact when the recorded output can no longer be presented. The URL carries
+    the bounded ``?v=<digest>`` cache version the shared resource contract
+    allows — a regeneration republishes the same stored path, so the version is
+    what makes the browser fetch the new bytes; a path whose versioned form
+    would exceed the runtime origin's own URL ceiling keeps its unversioned URL
+    rather than failing the whole payload, and the version field still changes
+    the resource identity for every consumer.
+    """
+    identity = _validated_output_identity(subject, record.db.output_identity)
+    if identity is None:
+        log_warn("art_asset_output_missing", context={"subject": subject.full()})
+        return None, descriptors.REASON_GENERATED_OUTPUT_MISSING
+    version = descriptors.generated_version(identity, str(record.db.generation_token))
+    url = media_url_for(identity)
+    versioned = f"{url}?{descriptors.VERSION_QUERY}={version}"
+    if len(versioned) > descriptors.MEDIA_URL_LIMITS[descriptors.ORIGIN_RUNTIME]:
+        versioned = url
+    return (
+        descriptors.resource(
+            identity,
+            version,
+            versioned,
+            descriptors.ORIGIN_RUNTIME,
+            geometry_payload=descriptors.geometry(),
+        ),
+        None,
+    )
+
+
+def _scene_retained_output_identity(
+    subject: ArtSubject, record: ArtAssetRecord | None
+) -> str | None:
+    """The applicable preserved output identity that authorizes scene retention.
+
+    The record's CURRENT output when the store still holds it, else its
+    PRESERVED prior output (a regeneration preserves the prior valid output
+    across the requeue and a later failed attempt), so the authorization stays
+    stable across a pending or failed regeneration and disappears the moment
+    neither output can be presented. ``None`` when no output is readable —
+    retention is never authorized by an unrelated healthy file.
+    """
+    if record is None:
+        return None
+    for identity in (record.db.output_identity, record.db.prior_output_identity):
+        validated = _validated_output_identity(subject, identity)
+        if validated is not None:
+            return validated
+    return None
+
+
+def _scene_retention_sources(target, subject: ArtSubject, record) -> list[dict]:
+    """The bounded retention authorizations of one logical scene.
+
+    Only a scene whose logical identity came from the map owner's authored
+    metadata authorizes retained content: a fallback identity cannot establish
+    that two resolutions are the same logical place, so it authorizes nothing.
+    A source is included only while its prior known-good output is still
+    applicable and readable — the generated source for as long as its preserved
+    output identity can be presented (which deliberately includes a pending or
+    failed regeneration), and the room binding for as long as the binding still
+    applies and the operator default it resolves is still admitted. Each token
+    covers the exact applicable output, so a replaced room default or a
+    vanished generated output stops authorizing the pixels it no longer
+    describes.
+    """
+    if not target.trusted_identity:
+        return []
+    sources: list[dict] = []
+    output = _scene_retained_output_identity(subject, record)
+    if output is not None:
+        sources.append(
+            descriptors.retention_source(
+                descriptors.scene_generated_source_id(subject.full()),
+                descriptors.retention_token(
+                    target.identity, subject.full(), "generated", output
+                ),
+            )
+        )
+    if target.room_art_key is not None and not target.room_binding_invalid:
+        from world.art import official
+
+        content = official.current_catalog().content("room", target.room_art_key)
+        if content is not None and content.default_identity is not None:
+            if _scene_official_resource(official.current_catalog(), content.default_identity):
+                sources.append(
+                    descriptors.retention_source(
+                        descriptors.scene_room_source_id(target.room_art_key),
+                        descriptors.retention_token(
+                            target.identity,
+                            "room",
+                            target.room_art_key,
+                            content.default_identity,
+                        ),
+                    )
+                )
+    return sources
+
+
+def _malformed_scene_descriptor(identity: str) -> dict:
+    """The explicit descriptor of a scene whose authored metadata is unusable.
+
+    The one reached fact is the configuration failure, at the terminal
+    position the town fallback occupies, followed by that town terminal itself
+    when the bundled collection admits it: the malformed scene states WHICH
+    configuration is wrong and still shows the permitted town image rather than
+    an invented one. No generation is claimed here — an unusable archetype
+    names no subject, so ``generation_subject`` and ``generation_state`` stay
+    null instead of synthesizing a pending generation.
+    """
+    from world.art.scene_definitions import current_bundled_scenes
+
+    source_id = descriptors.scene_terminal_source_id(TOWN_TERMINAL_KEY)
+    resource = _scene_bundled_resource(current_bundled_scenes(), TOWN_TERMINAL_KEY)
+    terminal_payload = (
+        None
+        if resource is None
+        else descriptors.terminal(
+            descriptors.TERMINAL_SCENE_IMAGE,
+            source_id,
+            descriptors.SCENE_RANK_TERMINAL,
+            resource,
+        )
+    )
+    return descriptors.descriptor(
+        subject_id=identity,
+        generation_subject=None,
+        generation_state=None,
+        attempts=[
+            descriptors.fault_attempt(
+                source_id,
+                descriptors.SCENE_RANK_TERMINAL,
+                descriptors.REASON_CONFIGURATION_INVALID,
+            )
+        ],
+        terminal_payload=terminal_payload,
+        retention_sources=[],
+    )
+
+
+def describe_scene(target) -> dict:
+    """The canonical descriptor of one logical scene's ordered source chain.
+
+    The scene wire's single resolution seam: it walks the authored room-art
+    override, the scene archetype's own generated artwork, the optional
+    operator scene default, the REQUIRED bundled type illustration and the
+    scene's declared terminal image, keeping every reached fault at its own
+    source position and rank. A healthy earlier candidate therefore prevents
+    every later fact from being reached, while a broken override stays visible
+    beside the substitute that follows it. An identical terminal — a scene
+    whose declared terminal IS its own bundled type illustration — is never
+    listed twice: the required position already covers that exact resource, so
+    the terminal position carries nothing and the terminal is never retried.
+
+    The walk is a pure read: nothing here creates a record, enqueues a job,
+    repairs geometry, touches a file or contacts the network, and a frozen
+    :class:`~world.rules.art_view.SceneTarget` is its whole input.
+    An archetype-less target — the room's authored metadata reduced to nothing
+    by ``world.rules.art_view.scene_target_for`` — is the malformed case stated
+    explicitly; a
+    registered archetype the art collection declares no terminal for simply has
+    no terminal position, and its required bundled position still states
+    whether that illustration is admitted.
+    """
+    from world.art.scene_definitions import current_bundled_scenes, scene_definition_for
     from world.art.subjects import scene_subject_for
+    from world.rules.art_view import INVALID_ROOM_BINDING_KEY
 
-    try:
-        subject = scene_subject_for(archetype)
-    except ArtSubjectError:  # observability: ignore R2: unregistered archetype -> specified unavailable placeholder
-        return _placeholder_unavailable("無法提供")
-    return resolve_scene_subject(subject)
+    archetype = target.archetype
+    if not isinstance(archetype, str):
+        # An absent or unregistered archetype is authored metadata this
+        # resolution cannot honor: the malformed case, stated explicitly. The
+        # frozen target already reduces every unusable authored value to
+        # ``None``, so nothing here re-reads a raw stored fact.
+        return _malformed_scene_descriptor(target.identity)
 
+    # A registered archetype's declared terminal is the art collection's own
+    # declaration: a registered archetype without one simply has no terminal
+    # position, and the required bundled position still states whether its
+    # illustration is admitted.
+    definition = scene_definition_for(archetype)
+    terminal_key = definition.terminal_key if definition is not None else None
+    subject = scene_subject_for(archetype)
+    record = _record_for(subject)
+    attempts: list[dict] = []
 
-def _placeholder_unavailable(label: str, *, silhouette: dict | None = None) -> dict:
-    """The unavailable placeholder row, with the decorative silhouette.
+    # (1) The authored per-room operator override.
+    if target.room_binding_invalid:
+        attempts.append(
+            descriptors.fault_attempt(
+                descriptors.scene_room_source_id(
+                    target.room_art_key or INVALID_ROOM_BINDING_KEY
+                ),
+                descriptors.SCENE_RANK_ROOM,
+                descriptors.REASON_CONFIGURATION_INVALID,
+            )
+        )
+    elif target.room_art_key is not None:
+        faults, resource = _scene_official_position(
+            "room",
+            target.room_art_key,
+            descriptors.SCENE_ROOM_SOURCE_PREFIX,
+            descriptors.SCENE_RANK_ROOM,
+        )
+        for source_id, rank, reason in faults:
+            attempts.append(descriptors.fault_attempt(source_id, rank, reason))
+        if resource is not None:
+            attempts.append(
+                descriptors.image_attempt(
+                    descriptors.scene_room_source_id(target.room_art_key),
+                    descriptors.SCENE_RANK_ROOM,
+                    resource,
+                )
+            )
 
-    The real fields stay null (no URL, no subject key, no rectangle, no
-    stage); the silhouette the entity's validated attributes select is carried
-    beside them, so a placeholder row still shows the attribute-selected
-    figure instead of one shared shape for every missing actor.
-    """
-    return _carried(
-        {
-            "kind": PLACEHOLDER_UNAVAILABLE,
-            "label": label,
-            "status": None,
-            "url": None,
-            "aspect_ratio": None,
-            "alt": label,
-            "subject_key": None,
-            "face_rect": None,
-            "stage": None,
-        },
-        silhouette,
+    # (2) The scene archetype's own generated artwork.
+    generated_source = descriptors.scene_generated_source_id(subject.full())
+    if record is not None and record.db.status == ArtAssetStatus.DONE:
+        resource, fault = _scene_generated_resource(subject, record)
+        if fault is not None:
+            attempts.append(
+                descriptors.fault_attempt(
+                    generated_source, descriptors.SCENE_RANK_GENERATED, fault
+                )
+            )
+        else:
+            attempts.append(
+                descriptors.image_attempt(
+                    generated_source, descriptors.SCENE_RANK_GENERATED, resource
+                )
+            )
+    elif record is not None and record.db.status == ArtAssetStatus.FAILED:
+        attempts.append(
+            descriptors.fault_attempt(
+                generated_source,
+                descriptors.SCENE_RANK_GENERATED,
+                descriptors.REASON_GENERATION_FAILED,
+            )
+        )
+
+    # (3) The optional operator scene default.
+    faults, resource = _scene_official_position(
+        "scene",
+        archetype,
+        descriptors.SCENE_OPERATOR_SOURCE_PREFIX,
+        descriptors.SCENE_RANK_OPERATOR,
+    )
+    for source_id, rank, reason in faults:
+        attempts.append(descriptors.fault_attempt(source_id, rank, reason))
+    if resource is not None:
+        attempts.append(
+            descriptors.image_attempt(
+                descriptors.scene_operator_source_id(archetype),
+                descriptors.SCENE_RANK_OPERATOR,
+                resource,
+            )
+        )
+
+    # (4) The REQUIRED bundled type illustration.
+    catalog = current_bundled_scenes()
+    bundled = _scene_bundled_resource(catalog, archetype)
+    bundled_source = descriptors.scene_bundled_source_id(archetype)
+    if bundled is None:
+        attempts.append(
+            descriptors.fault_attempt(
+                bundled_source,
+                descriptors.SCENE_RANK_BUNDLED,
+                descriptors.REASON_REQUIRED_RESOURCE_MISSING,
+            )
+        )
+    else:
+        attempts.append(
+            descriptors.image_attempt(
+                bundled_source, descriptors.SCENE_RANK_BUNDLED, bundled
+            )
+        )
+
+    # (5) The distinct declared terminal image.
+    terminal_payload = None
+    if terminal_key is not None and terminal_key != archetype:
+        terminal_source = descriptors.scene_terminal_source_id(terminal_key)
+        terminal_resource = _scene_bundled_resource(catalog, terminal_key)
+        if terminal_resource is None:
+            attempts.append(
+                descriptors.fault_attempt(
+                    terminal_source,
+                    descriptors.SCENE_RANK_TERMINAL,
+                    descriptors.REASON_REQUIRED_RESOURCE_MISSING,
+                )
+            )
+        else:
+            terminal_payload = descriptors.terminal(
+                descriptors.TERMINAL_SCENE_IMAGE,
+                terminal_source,
+                descriptors.SCENE_RANK_TERMINAL,
+                terminal_resource,
+            )
+
+    generation_subject, generation_state = _generation_facts(subject, record, False, False)
+    return descriptors.descriptor(
+        subject_id=target.identity,
+        generation_subject=generation_subject,
+        generation_state=generation_state,
+        attempts=_unique_attempts(attempts),
+        terminal_payload=terminal_payload,
+        retention_sources=_scene_retention_sources(target, subject, record),
     )

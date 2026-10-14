@@ -1,25 +1,28 @@
-"""Exact schema-version-3 ``art`` panel and presenter (webclient-art-panel).
+"""Exact schema-version-4 ``art`` panel and presenter (webclient-art-panel).
 
 The presenter composes the frozen art view owned by
 ``world.rules.art_view`` with the read-only resolution primitives in
-``world.art.presenter`` (``resolve_scene`` for the scene, ``describe_entity``
-for every catalog member) and validates its own output against the exact
-bounded schema before returning it to the presentation registry. The panel is
-available in ``exploration`` and ``combat`` modes; a creation-pending shell
-raises :class:`PanelUnavailableError` so the registry emits the common
-unavailable form.
+``world.art.presenter`` (``describe_scene`` for the scene,
+``describe_entity`` for every catalog member) and validates its own output
+against the exact bounded schema before returning it to the presentation
+registry. The panel is available in ``exploration`` and ``combat`` modes; a
+creation-pending shell raises :class:`PanelUnavailableError` so the registry
+emits the common unavailable form.
 
 The payload contains exactly ``schema_version``, ``available``, ``kind``, the
-current scene (validated archetype, label, subject key, status, same-origin
-URL, aspect, alternative text, and a nullable placeholder) and a bounded
-``portrait_catalog`` keyed by the opaque IDs of currently present focusable
-entities, each entry carrying exactly the complete canonical artwork
-descriptor (``world.art.descriptors``: stable subject identity, revision,
-independent recorded generation truth, ordered candidate/fault facts, the
-permitted alpha terminal and the retention authorizations) plus its bounded
-display ``context``. The scene keeps its prior shape until its own separately
-versioned cutover. It never exposes ``out_path``, the store root, or rejected
-prompt content.
+current scene and a bounded ``portrait_catalog`` keyed by the opaque IDs of
+currently present focusable entities. The scene is exactly ``archetype``,
+``label``, ``alt`` and ``artwork``: the canonical descriptor the scene
+resolution produced (``world.art.descriptors`` — the logical place identity,
+its revision, the independent recorded generation truth, the ordered
+candidate/fault facts of the room-aware source chain, the permitted scene
+terminal and the retention authorizations), with the archetype the room
+renders from and the two bounded display strings the stage needs. Each catalog
+entry carries the same canonical descriptor vocabulary plus its bounded display
+``context``. Both artwork vocabularies are canonical in this version — the
+retired flat scene fields (``url``/``subject_key``/``status``/``aspect_ratio``/
+``placeholder``/``stage``) fail the exact-key check instead of being adapted.
+It never exposes ``out_path``, the store root, or rejected prompt content.
 
 Catalog admission and real-image eligibility are different facts: membership
 is ``world.rules.art_view``'s decision (a currently present focusable entity),
@@ -49,9 +52,8 @@ from web.webclient.presentation.registry import PanelUnavailableError
 from world.art import descriptors
 from world.art.presenter import (
     describe_entity,
-    resolve_scene,
+    describe_scene,
 )
-from world.art.gallery import GalleryRecordError, validate_stage
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.rules.art_view import (
     MAX_PORTRAIT_CATALOG,
@@ -63,68 +65,43 @@ from world.rules.art_view import (
     build_art_view,
 )
 
-ART_SCHEMA_VERSION = 3
+ART_SCHEMA_VERSION = 4
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_ARCHETYPE = 64
 MAX_LABEL = 128
-MAX_SUBJECT_KEY = 128
 MAX_MEDIA_URL = 256
 MAX_ALT = 512
-MAX_STATUS = 16
-MAX_PLACEHOLDER_KIND = 16
-MAX_PLACEHOLDER_LABEL = 128
 MAX_CONTEXT_NAME = 64
 MAX_CONTEXT_ROLE = 16
 
-PLACEHOLDER_KINDS = frozenset({"missing", "unavailable"})
 ROLES = frozenset({ROLE_ALLY, ROLE_DIALOGUE, ROLE_FOE, ROLE_PERSON})
+
+# The bounded display strings of a room whose authored scene metadata cannot be
+# honored. The scene's own descriptor states the configuration failure and
+# carries the permitted town terminal, so this is a caption fact only — never a
+# claim about imagery.
+SCENE_UNAVAILABLE_LABEL = "場景"
 
 
 class ArtPanelError(ProtocolValidationError):
     """The available art payload violates its exact bounded schema."""
 
 
-def _validate_stage(value: Any, url: str | None) -> dict | None:
-    """Enforce asset placement and truthful placeholder nullability."""
-    if url is None:
-        if value is not None:
-            raise ProtocolValidationError("a placeholder carries no stage")
-        return None
-    try:
-        return validate_stage(value)
-    except GalleryRecordError as exc:  # observability: ignore R2: wire validation returns a typed refusal
-        raise ProtocolValidationError("invalid asset stage") from exc
-
-
-def _validate_placeholder(value: Any) -> dict[str, Any] | None:
-    if value is None:
-        return None
-    _require_exact_fields(value, "art placeholder", {"kind", "label"}, {})
-    kind = value["kind"]
-    if kind not in PLACEHOLDER_KINDS:
-        raise ProtocolValidationError("placeholder kind is not a stable value")
-    label = _require_str(value, "label", maximum=MAX_PLACEHOLDER_LABEL)
-    if not label.strip():
-        raise ProtocolValidationError("placeholder label must be non-empty")
-    return {"kind": kind, "label": label}
-
-
 def _validate_scene(value: Any) -> dict[str, Any]:
+    """Validate one exact scene wrapper: archetype, label, alt and descriptor.
+
+    The scene is exactly ``{archetype, label, alt, artwork}`` — the archetype
+    the room renders from (null when the room's authored metadata cannot be
+    honored), the two bounded display strings the stage renders outside the
+    bitmap, and the complete canonical descriptor the scene resolution
+    produced. Every retired flat scene field fails the exact-key check, so no
+    old-shape payload can be silently adapted.
+    """
     _require_exact_fields(
         value,
         "art scene",
-        {
-            "archetype",
-            "stage",
-            "label",
-            "subject_key",
-            "status",
-            "url",
-            "aspect_ratio",
-            "alt",
-            "placeholder",
-        },
+        {"archetype", "label", "alt", "artwork"},
         {},
     )
     archetype = value["archetype"]
@@ -135,46 +112,14 @@ def _validate_scene(value: Any) -> dict[str, Any]:
     label = _require_str(value, "label", maximum=MAX_LABEL)
     if not label.strip():
         raise ProtocolValidationError("scene label must be non-empty")
-    subject_key = value["subject_key"]
-    if subject_key is not None:
-        subject_key = _require_str(value, "subject_key", maximum=MAX_SUBJECT_KEY)
-        if not subject_key.strip():
-            raise ProtocolValidationError("scene subject_key must be non-empty")
-    status = value["status"]
-    if status is not None:
-        status = _require_str(value, "status", maximum=MAX_STATUS)
-        if status not in ("missing", "pending", "failed", "done"):
-            raise ProtocolValidationError("scene status is not a stable value")
-    url = value["url"]
-    if url is not None:
-        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
-        if not url.startswith("/art/"):
-            raise ProtocolValidationError("scene url must be a same-origin media URL")
-    aspect_ratio = value["aspect_ratio"]
-    if aspect_ratio is not None:
-        aspect_ratio = _require_str(value, "aspect_ratio", maximum=16)
-        if aspect_ratio != "16:9":
-            raise ProtocolValidationError("scene aspect_ratio must be 16:9")
     alt = _require_str(value, "alt", maximum=MAX_ALT)
     if not alt.strip():
         raise ProtocolValidationError("scene alt must be non-empty")
-    placeholder = _validate_placeholder(value["placeholder"])
-    stage = _validate_stage(value["stage"], url)
-    if placeholder is None and status != "done":
-        # An unavailable scene without a placeholder is not truthful.
-        raise ProtocolValidationError("scene placeholder must be present unless done")
-    if placeholder is not None and status == "done":
-        raise ProtocolValidationError("a done scene must not carry a placeholder")
     return {
         "archetype": archetype,
-        "stage": stage,
         "label": label,
-        "subject_key": subject_key,
-        "status": status,
-        "url": url,
-        "aspect_ratio": aspect_ratio,
         "alt": alt,
-        "placeholder": placeholder,
+        "artwork": validate_artwork(value["artwork"]),
     }
 
 
@@ -264,47 +209,31 @@ def validate_art(payload: Any) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def _placeholder_for(value: dict[str, Any]) -> dict[str, Any] | None:
-    """The placeholder descriptor a payload carries when no image did.
+def _serialize_scene(target: Any) -> dict[str, Any]:
+    """Serialize one logical scene target as the exact v4 scene wrapper.
 
-    ``None`` whenever the payload carries its own media URL — a runtime card,
-    a classic asset, or an official default — and the payload's own kind/label
-    otherwise. Keying on the URL rather than on the ``asset`` kind keeps the
-    official branch (a real image, but not a generated asset, so not ``done``)
-    on the same rule: the descriptor exists exactly when no image does, which
-    is also what keeps the roster row's url-XOR-placeholder rule intact.
+    The descriptor is the one the scene resolution produced for the target's
+    own logical place identity, archetype and room-art binding; the two display
+    strings come from the registered archetype's authored name, so the stage's
+    caption is authored content rather than a media fact. A room whose authored
+    metadata cannot be honored keeps its explicit archetype-less wrapper: the
+    descriptor itself carries the configuration failure and the permitted town
+    terminal, so nothing here invents an image or hides the malformed state.
     """
-    if value.get("url") is not None:
-        return None
-    return {"kind": value["kind"], "label": value["label"]}
-
-
-def _serialize_scene(archetype: str | None) -> dict[str, Any]:
-    if archetype is None:
-        return {
-            "archetype": None,
-            "stage": None,
-            "label": "無法提供",
-            "subject_key": None,
-            "status": None,
-            "url": None,
-            "aspect_ratio": None,
-            "alt": "無法提供",
-            "placeholder": {"kind": "unavailable", "label": "無法提供"},
-        }
-    registry_entry = SCENE_ARCHETYPE_REGISTRY.get(archetype)
-    label = registry_entry.display_name_zh if registry_entry is not None else "場景"
-    resolved = resolve_scene(archetype)
+    archetype = target.archetype
+    registry_entry = (
+        SCENE_ARCHETYPE_REGISTRY.get(archetype) if archetype is not None else None
+    )
+    label = (
+        registry_entry.display_name_zh
+        if registry_entry is not None
+        else SCENE_UNAVAILABLE_LABEL
+    )
     return {
         "archetype": archetype,
-        "stage": resolved.get("stage"),
         "label": label,
-        "subject_key": resolved.get("subject_key"),
-        "status": resolved.get("status"),
-        "url": resolved.get("url"),
-        "aspect_ratio": resolved.get("aspect_ratio"),
-        "alt": resolved.get("alt") or label,
-        "placeholder": _placeholder_for(resolved),
+        "alt": label,
+        "artwork": describe_scene(target),
     }
 
 
@@ -354,7 +283,7 @@ def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
 
 
 def _serialize(view: Any) -> dict[str, Any]:
-    scene = _serialize_scene(view.scene_archetype)
+    scene = _serialize_scene(view.scene)
     catalog: dict[str, Any] = {}
     for entity_view in view.entities:
         catalog[str(int(entity_view.identity))] = _serialize_catalog_entry(entity_view)
@@ -393,15 +322,10 @@ __all__ = [
     "MAX_CONTEXT_NAME",
     "MAX_CONTEXT_ROLE",
     "MAX_LABEL",
-    "MAX_PLACEHOLDER_KIND",
-    "MAX_PLACEHOLDER_LABEL",
-    "MAX_STATUS",
-    "MAX_SUBJECT_KEY",
     "MAX_MEDIA_URL",
-    "PLACEHOLDER_KINDS",
     "ROLES",
+    "SCENE_UNAVAILABLE_LABEL",
     "_missing_entity_descriptor",
-    "_placeholder_for",
     "art_presenter",
     "validate_art",
 ]
