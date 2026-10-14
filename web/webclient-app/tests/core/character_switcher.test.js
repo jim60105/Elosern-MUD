@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import CharacterSwitcher from "../../components/CharacterSwitcher.vue";
 import {
+  fixtureDigest,
   artworkDescriptor,
   artworkResource,
 } from "../../stories/fixtures/art_panels.js";
@@ -21,7 +22,7 @@ function portraitFor(identity, overrides = {}) {
         rank: 30,
         resource: artworkResource({
           resource_id: `portrait/character/char_${identity}.webp`,
-          version: `char-${identity}`.padEnd(64, "0"),
+          version: fixtureDigest(String(`char-${identity}`)),
           url: `/art/portraits/char_${identity}.webp`,
           // The avatar zoom crop: a 0.4 x 0.4 rectangle is a 2.5x enlargement.
           geometry: {

@@ -10,6 +10,7 @@ import PresenceRail from "../../components/PresenceRail.vue";
 import ExplorationMenu from "../../lib/exploration_menu.js";
 import { explorationPanelFixture, AFFORDANCES } from "../../stories/fixtures/scene_overview.js";
 import {
+  fixtureDigest,
   artworkDescriptor,
   artworkResource,
 } from "../../stories/fixtures/art_panels.js";
@@ -29,7 +30,7 @@ function faceEntry(identity, url, faceRect) {
               rank: 30,
               resource: artworkResource({
                 resource_id: url,
-                version: `${url}`.padEnd(64, "0").slice(0, 64),
+                version: fixtureDigest(String(`${url}`)),
                 url,
                 geometry: {
                   image_size: null,

@@ -2,6 +2,7 @@ import { mount } from "@vue/test-utils";
 import { describe, expect, it } from "vitest";
 import ReferenceArtwork from "../../components/ReferenceArtwork.vue";
 import {
+  fixtureDigest,
   artworkDescriptor,
   artworkResource,
   artworkTerminal,
@@ -186,7 +187,7 @@ describe("stage silhouette mask", () => {
       source_id: `portrait.alpha:${key}`,
       resource: artworkResource({
         resource_id: `defaults/${key}.webp`,
-        version: `v-${key}`.padEnd(64, "0"),
+        version: fixtureDigest(String(`v-${key}`)),
         url: `/art/defaults/${key}.webp`,
         origin: "silhouette",
         geometry: {

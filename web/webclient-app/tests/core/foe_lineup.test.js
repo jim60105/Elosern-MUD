@@ -10,7 +10,7 @@ import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
-import { artworkDescriptor, artworkResource } from "../../stories/fixtures/art_panels.js";
+import { fixtureDigest, artworkDescriptor, artworkResource } from "../../stories/fixtures/art_panels.js";
 import {
   FOE_EXPOSED,
   FOE_LINEUP_MAX,
@@ -36,7 +36,7 @@ function entry(ref, extra = {}) {
           rank: 30,
           resource: artworkResource({
             resource_id: `portrait/character/npc_${ref}.webp`,
-            version: `npc-${ref}`.padEnd(64, "0"),
+            version: fixtureDigest(String(`npc-${ref}`)),
             url: `/art/portraits/npc_${ref}.webp`,
           }),
         },

@@ -10,6 +10,7 @@ import {
   ART_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
 import {
+  fixtureDigest,
   artworkDescriptor,
   artworkResource,
 } from "../../stories/fixtures/art_panels.js";
@@ -30,7 +31,7 @@ function companionEntry(url, faceRect, identity = "101") {
               rank: 30,
               resource: artworkResource({
                 resource_id: url,
-                version: `${url}`.padEnd(64, "0").slice(0, 64),
+                version: fixtureDigest(String(`${url}`)),
                 url,
                 geometry: {
                   image_size: null,

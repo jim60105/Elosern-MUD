@@ -15,6 +15,7 @@ import MessageWindow from "../components/MessageWindow.vue";
 import PlaceCard from "../components/PlaceCard.vue";
 import SceneBackdrop from "../components/SceneBackdrop.vue";
 import StageActor from "../components/StageActor.vue";
+import { fixtureDigest } from "../stories/fixtures/art_panels.js";
 import StatusPanel from "../components/StatusPanel.vue";
 import { ART_PANEL_SAMPLE, STATUS_PANEL_SAMPLE, localMapModelFor } from "../stories/fixtures.js";
 import { stageJourneyLocalMap } from "../stories/fixtures/stage_journey.js";
@@ -216,12 +217,37 @@ describe("MessageWindow clear", () => {
 });
 
 describe("StageActor portrait crossfade", () => {
-  const PORTRAIT = { subject_key: "c", status: "done", url: "/art/defaults/man.webp", alt: "肖像", placeholder: null, face_rect: null };
+  // One committed figure position: the canonical descriptor, whose presented
+  // resource identity is what the crossfade key follows.
+  const portraitDescriptor = (url) => ({
+    subject_id: "portrait:character:c",
+    revision: "c".repeat(64),
+    generation_subject: "portrait:character:c",
+    generation_state: "done",
+    attempts: [
+      {
+        type: "image",
+        source_id: "portrait.default:1",
+        rank: 30,
+        resource: {
+          resource_id: url,
+          version: fixtureDigest(String(url)),
+          url,
+          origin: "runtime",
+          geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: "3:4" },
+        },
+      },
+    ],
+    terminal: null,
+    retention_sources: [],
+  });
+  const PANEL = { schema_version: 3, available: true };
+  const PORTRAIT = portraitDescriptor("/art/defaults/man.webp");
   const artworks = (w) => w.findAll('[data-testid="reference-artwork"]');
 
   it("a new URL leaves one inert copy while the new portrait enters", async () => {
-    wrapper = mount(StageActor, { ...REAL, props: { portrait: PORTRAIT, name: "艾莉亞" } });
-    await wrapper.setProps({ portrait: { ...PORTRAIT, url: "/art/defaults/woman.webp" } });
+    wrapper = mount(StageActor, { ...REAL, props: { artwork: PORTRAIT, panel: PANEL, name: "艾莉亞" } });
+    await wrapper.setProps({ artwork: portraitDescriptor("/art/defaults/woman.webp") });
     const both = artworks(wrapper);
     expect(both).toHaveLength(2);
     expect(both.filter((a) => a.element.inert)).toHaveLength(1);
@@ -231,15 +257,16 @@ describe("StageActor portrait crossfade", () => {
   });
 
   it("a same-URL refresh keeps the portrait, with no fade", async () => {
-    wrapper = mount(StageActor, { ...REAL, props: { portrait: PORTRAIT, name: "艾莉亞" } });
-    await wrapper.setProps({ portrait: { ...PORTRAIT, alt: "新的描述" } });
+    wrapper = mount(StageActor, { ...REAL, props: { artwork: PORTRAIT, panel: PANEL, name: "艾莉亞" } });
+    // A geometry-only re-presentation of the SAME resource keeps the key.
+    await wrapper.setProps({ artwork: PORTRAIT });
     expect(artworks(wrapper)).toHaveLength(1);
     expect(wrapper.find("[inert]").exists()).toBe(false);
   });
 
   it("a switch from an image to a placeholder crossfades too", async () => {
-    wrapper = mount(StageActor, { ...REAL, props: { portrait: PORTRAIT, name: "艾莉亞" } });
-    await wrapper.setProps({ portrait: null });
+    wrapper = mount(StageActor, { ...REAL, props: { artwork: PORTRAIT, panel: PANEL, name: "艾莉亞" } });
+    await wrapper.setProps({ artwork: null, hasReference: false });
     expect(artworks(wrapper)).toHaveLength(2);
     expect(wrapper.find('[data-testid="reference-artwork__placeholder"]').exists()).toBe(true);
   });

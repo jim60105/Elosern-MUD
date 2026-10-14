@@ -11,6 +11,7 @@ import VitalsTrack from "../../components/VitalsTrack.vue";
 import { h } from "vue";
 import CombatMenu from "../../../static/webclient/js/elosern/combat_menu.js";
 import {
+  fixtureDigest,
   artworkDescriptor,
   artworkResource,
 } from "../../stories/fixtures/art_panels.js";
@@ -33,7 +34,7 @@ function portraitEntry(identity, url, faceRect) {
                 // The resource identity follows the bytes: a republished URL is
                 // a new resource, so its own load result is computed afresh.
                 resource_id: url,
-                version: `${url}`.padEnd(64, "0").slice(0, 64),
+                version: fixtureDigest(String(`${url}`)),
                 url,
                 geometry: {
                   image_size: null,

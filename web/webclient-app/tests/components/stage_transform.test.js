@@ -4,10 +4,40 @@ import Modal from "../../components/GalleryStageTransformModal.vue";
 import ReferenceArtwork from "../../components/ReferenceArtwork.vue";
 import { clampStage, editStageField, moveStage } from "../../components/stage-transform-edit.js";
 import { galleryStoryModel } from "../../stories/gallery-fixtures.js";
-// ReferenceArtwork still consumes the portrait payload; the stage modal
-// consumes the canonical descriptor, so the two fixtures are deliberately
-// different shapes.
-const portrait = { url: "/art/defaults/man.webp", label: "肖像", stage: { scale: 0.6, x: 0, y: 0 } };
+import {
+  artworkDescriptor,
+  artworkResource,
+} from "../../stories/fixtures/art_panels.js";
+
+// One committed figure position: the canonical descriptor plus the committed
+// panel it is judged against. The stage placement lives in the presented
+// candidate resource's own geometry.
+const PANEL = { schema_version: 3, available: true };
+function portraitDescriptor(stage) {
+  return artworkDescriptor({
+    subject_id: "portrait:character:1",
+    generation_subject: "portrait:character:1",
+    attempts: [
+      {
+        type: "image",
+        source_id: "portrait.default:1",
+        rank: 30,
+        resource: artworkResource({
+          resource_id: "portrait/character/x.webp",
+          version: "stage-transform".padEnd(64, "0"),
+          url: "/art/portraits/x.webp",
+          geometry: {
+            image_size: null,
+            face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+            stage,
+            aspect_ratio: "3:4",
+          },
+        }),
+      },
+    ],
+  });
+}
+const portrait = portraitDescriptor({ scale: 0.6, x: 0, y: 0 });
 const panel = galleryStoryModel();
 const card = (() => {
   const row = structuredClone(panel.cards[0]);
@@ -22,18 +52,23 @@ describe("stage transform", () => {
   it("clamps only finite numbers and retains invalid field drafts", () => {
     expect(clampStage(null)).toEqual({ scale: 1, x: 0, y: 0 });
     expect(clampStage({ scale: 3, x: -2, y: 2 })).toEqual({ scale: 2, x: -0.5, y: 0.5 });
-    for (const value of [NaN, Infinity, true, null, ""]) expect(editStageField(portrait.stage, "scale", value)).toEqual(portrait.stage);
-    expect(moveStage(portrait.stage, 30 / 300, -40 / 400)).toEqual({ scale: 0.6, x: 0.1, y: -0.1 });
-    expect(moveStage(portrait.stage, 2, -2)).toEqual({ scale: 0.6, x: 0.5, y: -0.5 });
+    const stage = { scale: 0.6, x: 0, y: 0 };
+    for (const value of [NaN, Infinity, true, null, ""]) expect(editStageField(stage, "scale", value)).toEqual(stage);
+    expect(moveStage(stage, 30 / 300, -40 / 400)).toEqual({ scale: 0.6, x: 0.1, y: -0.1 });
+    expect(moveStage(stage, 2, -2)).toEqual({ scale: 0.6, x: 0.5, y: -0.5 });
   });
   it("binds stage only, retaining the source and cover placement", async () => {
-    const wrapper = mount(ReferenceArtwork, { props: { portrait, stage: true } });
+    const wrapper = mount(ReferenceArtwork, { props: { artwork: portrait, panel: PANEL, stage: true } });
     const image = wrapper.get("img").element;
     expect(image.style.getPropertyValue("--stage-scale")).toBe("0.6");
-    await wrapper.setProps({ portrait: { ...portrait, stage: { scale: 2, x: 0.1, y: -0.2 } } });
+    // A GEOMETRY-only re-presentation of the same resource: the placement
+    // updates in place, with no remount and no refetch.
+    await wrapper.setProps({
+      artwork: portraitDescriptor({ scale: 2, x: 0.1, y: -0.2 }),
+    });
     expect(wrapper.get("img").element).toBe(image);
     expect(image.style.getPropertyValue("--stage-x")).toBe("0.1");
-    await wrapper.setProps({ portrait: { ...portrait, stage: null } });
+    await wrapper.setProps({ artwork: portraitDescriptor(null) });
     expect(image.style.getPropertyValue("--stage-scale")).toBe("1");
     wrapper.unmount();
   });
@@ -110,13 +145,19 @@ describe("stage transform", () => {
     expect(document.activeElement).toBe(opener);
     opener.remove();
   });
-  it("cover avatars never receive the stage transform", () => {
-    const wrapper = mount(ReferenceArtwork, { props: { portrait: { ...portrait, stage: { scale: 0.6, x: 0.3, y: 0.2 } } } });
+  it("cover positions never receive the stage transform", () => {
+    const wrapper = mount(ReferenceArtwork, {
+      props: {
+        artwork: portraitDescriptor({ scale: 0.6, x: 0.3, y: 0.2 }),
+        panel: PANEL,
+      },
+    });
     const image = wrapper.get("img").element;
     expect(image.style.getPropertyValue("--stage-scale")).toBe("");
     expect(image.style.getPropertyValue("--stage-x")).toBe("");
-    // Cover placement stays face-rect driven (no face_rect here -> default centering).
-    expect(image.getAttribute("style")).toBe("object-position: 50% 50%;");
+    // Cover placement stays face-rect driven: the candidate's own rect centers
+    // at (50%, 31%).
+    expect(image.getAttribute("style")).toBe("object-position: 50% 31%;");
     wrapper.unmount();
   });
 });
