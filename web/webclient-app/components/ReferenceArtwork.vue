@@ -51,6 +51,14 @@ const props = defineProps({
   stage: { type: Boolean, default: false },
   // The small real-only avatar position.
   avatar: { type: Boolean, default: false },
+  // The avatar position's own crop policy: "zoom" enlarges and anchors the
+  // marked rectangle (the small roster/party/presence thumbnails), "recenter"
+  // keeps the recenters-only cover crop the combat participant row uses.
+  avatarCrop: {
+    type: String,
+    default: "zoom",
+    validator: (value) => value === "zoom" || value === "recenter",
+  },
   // The hooks the OWNING surface publishes for the avatar position: the
   // loaded face image and the identity-glyph fallback. They name that
   // surface's own frozen contract hooks while this one renderer owns the load.
@@ -103,7 +111,9 @@ const placementStyle = computed(() => {
     return { objectPosition: "center bottom", ...stageVars.value };
   }
   if (props.avatar) {
-    return faceCropStyle(faceRect.value, faceObjectPosition(faceRect.value));
+    return props.avatarCrop === "recenter"
+      ? { objectPosition: faceObjectPosition(faceRect.value) }
+      : faceCropStyle(faceRect.value, faceObjectPosition(faceRect.value));
   }
   return { objectPosition: faceObjectPosition(faceRect.value) };
 });

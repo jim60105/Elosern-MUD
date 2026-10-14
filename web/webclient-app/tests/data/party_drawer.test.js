@@ -9,6 +9,44 @@ import {
   PARTY_INTERACT_TARGETS_SAMPLE,
   ART_PANEL_SAMPLE,
 } from "../../stories/fixtures.js";
+import {
+  artworkDescriptor,
+  artworkResource,
+} from "../../stories/fixtures/art_panels.js";
+
+// One companion's catalog value: the canonical descriptor plus its context.
+// A null `url` models a subject with no real candidate at all.
+function companionEntry(url, faceRect, identity = "101") {
+  return {
+    artwork: artworkDescriptor({
+      subject_id: `companion:${identity}`,
+      generation_subject: `companion:${identity}`,
+      generation_state: url ? "done" : "pending",
+      attempts: url
+        ? [
+            {
+              type: "image",
+              source_id: `portrait.default:${identity}`,
+              rank: 30,
+              resource: artworkResource({
+                resource_id: url,
+                version: `${url}`.padEnd(64, "0").slice(0, 64),
+                url,
+                geometry: {
+                  image_size: null,
+                  face_rect: faceRect,
+                  stage: { scale: 1, x: 0, y: 0 },
+                  aspect_ratio: "3:4",
+                },
+              }),
+            },
+          ]
+        : [],
+      terminal: null,
+    }),
+    context: { name: `同伴${identity}`, role: "隊友" },
+  };
+}
 
 // webclient-align-05-party-hud: the 同伴 ‧ 隊伍 drawer body.
 // Renders compbig rows, bond stages, joined combat tokens,
@@ -90,12 +128,14 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     // The off-center rect is deliberate: it anchors at -x * 5 / -y * 5, which
     // a centered fixture could not distinguish from the image center.
     const artPanel = {
+      schema_version: 3,
+      available: true,
       portrait_catalog: {
-        "101": { url: "/media/portraits/reina.png", face_rect: { x: 0.6, y: 0.1, w: 0.2, h: 0.2 } },
+        "101": companionEntry("/media/portraits/reina.png", { x: 0.6, y: 0.1, w: 0.2, h: 0.2 }),
       },
     };
     const w = mountDrawer({ artPanel });
-    const img = w.get('[data-testid="party-drawer__row-101"] img');
+    const img = w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure');
     expect(img.element.style.width).toBe("500%");
     expect(img.element.style.height).toBe("500%");
     expect(img.element.style.left).toBe("-300%");
@@ -104,12 +144,14 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
 
   it("falls back to the centered cover crop for a companion portrait with no face rect", () => {
     const artPanel = {
+      schema_version: 3,
+      available: true,
       portrait_catalog: {
-        "101": { url: "/media/portraits/reina.png", face_rect: null },
+        "101": companionEntry("/media/portraits/reina.png", null),
       },
     };
     const w = mountDrawer({ artPanel });
-    const img = w.get('[data-testid="party-drawer__row-101"] img');
+    const img = w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure');
     expect(img.element.style.objectPosition).toBe("50% 50%");
     expect(img.element.style.width).toBe("");
     expect(img.element.style.height).toBe("");
@@ -123,19 +165,28 @@ describe("PartyDrawer (同伴 ‧ 隊伍 drawer)", () => {
     const w = mountDrawer();
     const frame = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]').element;
     expect(getComputedStyle(frame).position).toBe("relative");
-    expect(getComputedStyle(w.get('[data-testid="party-drawer__row-101"] img').element).position).toBe("absolute");
+    expect(
+      getComputedStyle(
+        w.get('[data-testid="party-drawer__row-101"] img.reference-artwork__figure').element,
+      ).position,
+    ).toBe("absolute");
   });
 
-  it("keeps the glyph placeholder and renders no image for a companion portrait without a url", () => {
+  it("keeps the glyph and renders no image for a companion with no real candidate", () => {
     const artPanel = {
+      schema_version: 3,
+      available: true,
       portrait_catalog: {
-        "101": { url: null, face_rect: { x: 0.6, y: 0.1, w: 0.2, h: 0.2 } },
+        "101": companionEntry(null, null),
       },
     };
     const w = mountDrawer({ artPanel });
     const avatar = w.get('[data-testid="party-drawer__row-101"] [data-testid="party-drawer__avatar"]');
     expect(avatar.find("img").exists()).toBe(false);
-    expect(avatar.get(".av-glyph").exists()).toBe(true);
+    // The identity glyph is the avatar's only fallback; an unfinished
+    // generation is expected, so no failure marker stands.
+    expect(avatar.get(".reference-artwork__avatar-glyph").exists()).toBe(true);
+    expect(avatar.find('[data-testid="artwork-failure"]').exists()).toBe(false);
   });
 
   it("leaving dispatches explore.party_leave through the two-step confirmation contract", async () => {

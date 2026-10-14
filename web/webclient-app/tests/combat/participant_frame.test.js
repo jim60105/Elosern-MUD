@@ -10,6 +10,46 @@ import FoeLineup from "../../components/FoeLineup.vue";
 import VitalsTrack from "../../components/VitalsTrack.vue";
 import { h } from "vue";
 import CombatMenu from "../../../static/webclient/js/elosern/combat_menu.js";
+import {
+  artworkDescriptor,
+  artworkResource,
+} from "../../stories/fixtures/art_panels.js";
+
+// One combat participant's catalog value: the canonical descriptor plus its
+// context. A `null` resource URL models a subject with no real candidate.
+function portraitEntry(identity, url, faceRect) {
+  return {
+    artwork: artworkDescriptor({
+      subject_id: identity,
+      generation_subject: identity,
+      generation_state: url ? "done" : "pending",
+      attempts: url
+        ? [
+            {
+              type: "image",
+              source_id: `portrait.default:${identity}`,
+              rank: 30,
+              resource: artworkResource({
+                // The resource identity follows the bytes: a republished URL is
+                // a new resource, so its own load result is computed afresh.
+                resource_id: url,
+                version: `${url}`.padEnd(64, "0").slice(0, 64),
+                url,
+                geometry: {
+                  image_size: null,
+                  face_rect: faceRect,
+                  stage: { scale: 1, x: 0, y: 0 },
+                  aspect_ratio: "3:4",
+                },
+              }),
+            },
+          ]
+        : [],
+      terminal: null,
+    }),
+    context: { name: identity, role: "敵方" },
+  };
+}
 
 describe("ParticipantFrame (task 6.9)", () => {
   let wrapper;
@@ -37,9 +77,16 @@ describe("ParticipantFrame (task 6.9)", () => {
     { identity: "f2", team: "foes", token: "オーク", display_name: "オーク", hp_current: 120, hp_maximum: 120, state: "defeated", portrait_ref: null },
   ];
   const artPanel = {
+    schema_version: 3,
+    available: true,
     portrait_catalog: {
-      portrait_mei: { url: "/static/art/mei.png", placeholder: null, face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
-      portrait_gob: { url: "", placeholder: { label: "肖像圖像尚未生成" }, face_rect: null },
+      portrait_mei: portraitEntry("portrait_mei", "/static/art/mei.png", {
+        x: 0.25,
+        y: 0.06,
+        w: 0.5,
+        h: 0.5,
+      }),
+      portrait_gob: portraitEntry("portrait_gob", null, null),
     },
   };
 
@@ -105,29 +152,41 @@ describe("ParticipantFrame (task 6.9)", () => {
     expect(states).toEqual(["倒地", "已敗退"]);
   });
 
-  it("keeps placeholder identity compact and its truthful state accessible", async () => {
+  it("keeps the glyph identity compact for a row with no real candidate", async () => {
     const w = mountFrame(participants, artPanel);
-    expect(w.get("img.participant-frame__portrait").attributes("src")).toBe("/static/art/mei.png");
-    const placeholder = w.get('[data-testid="participant-portrait-placeholder"]');
-    expect(placeholder.text()).toBe("哥");
-    expect(placeholder.attributes("aria-label")).toBe("哥布林，肖像圖像尚未生成");
+    expect(w.get("img.reference-artwork__figure").attributes("src")).toBe("/static/art/mei.png");
+    // The row with no real candidate draws the identity glyph, with no local
+    // failure marker (an unfinished generation is expected, not broken).
+    const glyphs = w.findAll(".reference-artwork__avatar-glyph").map((g) => g.text());
+    expect(glyphs).toContain("哥");
+    expect(w.findAll('[data-testid="artwork-failure"]')).toHaveLength(0);
     expect(w.findAll(".participant-frame__token")[2].text()).toBe("哥布林");
+    // An unavailable panel is a required-surface failure: no image at all, and
+    // the shared marker explains it on every admitted row.
     await w.setProps({ artPanel: { available: false, portrait_catalog: artPanel.portrait_catalog } });
-    expect(w.findAll("img, [data-testid='participant-portrait-placeholder']")).toHaveLength(0);
+    expect(w.findAll("img")).toHaveLength(0);
+    expect(w.findAll('[data-testid="artwork-failure"]')).toHaveLength(2);
     expect(w.findAll(".participant-frame__hp").map((row) => row.text())).toEqual(["80/100", "0/90", "45/45", "120/120"]);
   });
 
   it("replaces a failed catalog image with its localized accessible state", async () => {
     const w = mountFrame(participants, artPanel);
     await w.get('img[src="/static/art/mei.png"]').trigger("error");
-    const placeholder = w.findAll('[data-testid="participant-portrait-placeholder"]')[0];
-    expect(placeholder.text()).toBe("小");
-    expect(placeholder.attributes("aria-label")).toBe("小美，肖像載入失敗");
+    // The failed attempt steps past to the truthful glyph, and the reached
+    // fault keeps its persistent local marker.
+    expect(w.find('img[src="/static/art/mei.png"]').exists()).toBe(false);
+    expect(w.findAll('[data-testid="artwork-failure"]')).toHaveLength(1);
     await w.setProps({
       artPanel: {
+        available: true,
         portrait_catalog: {
           ...artPanel.portrait_catalog,
-          portrait_mei: { ...artPanel.portrait_catalog.portrait_mei, url: "/static/art/mei-v2.png" },
+          portrait_mei: portraitEntry("portrait_mei", "/static/art/mei-v2.png", {
+            x: 0.25,
+            y: 0.06,
+            w: 0.5,
+            h: 0.5,
+          }),
         },
       },
     });
@@ -187,7 +246,7 @@ describe("ParticipantFrame (task 6.9)", () => {
   it("offsets the resolved portrait crop by the catalog face rect", () => {
     const w = mountFrame(participants, artPanel);
     // 小美 resolves portrait_mei, whose rect centers at (50%, 31%).
-    const mei = w.findAll("img.participant-frame__portrait")[0];
+    const mei = w.findAll("img.reference-artwork__figure")[0];
     expect(mei.element.style.objectPosition).toBe("50% 31%");
   });
 
@@ -196,12 +255,19 @@ describe("ParticipantFrame (task 6.9)", () => {
       { identity: "f1", team: "foes", token: "オーク", display_name: "オーク", hp_current: 120, hp_maximum: 120, state: "active", portrait_ref: "portrait_ork" },
     ];
     const foePanel = {
+      schema_version: 3,
+      available: true,
       portrait_catalog: {
-        portrait_ork: { url: "/art/defaults/monster_anon.webp", placeholder: null, face_rect: { x: 0.35, y: 0.12, w: 0.4, h: 0.4 } },
+        portrait_ork: portraitEntry("portrait_ork", "/art/defaults/monster_anon.webp", {
+          x: 0.35,
+          y: 0.12,
+          w: 0.4,
+          h: 0.4,
+        }),
       },
     };
     const w = mountFrame(foeFramed, foePanel);
-    const img = w.get("img.participant-frame__portrait");
+    const img = w.get("img.reference-artwork__figure");
     expect(img.element.style.objectPosition).toBe("55% 32%");
   });
 });
