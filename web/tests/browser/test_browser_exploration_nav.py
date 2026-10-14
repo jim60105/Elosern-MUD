@@ -547,3 +547,156 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self.assertLess(placement["offAnchorX"], 2, f"{viewport}: the card is centred horizontally")
             self.assertLess(placement["offAnchorY"], 2, f"{viewport}: the card is centred vertically in the choices anchor")
             page.close()
+
+
+class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
+    """The live producer packet's references reach LOADED media, not just DOM.
+
+    Opt-in fixture branch (``ELOSERN_BROWSER_EXPLORATION_PORTRAITS=1``,
+    restore-exploration-portrait-refs task 4.1): the scripted host and an extra
+    present player-character carry admitted, server-origin DONE portraits.
+    This journey reads the ACTUAL production exploration and art packets,
+    then requires ``img.complete`` with a nonzero ``naturalWidth`` on the
+    target medallion, the bystander medallion and the non-party focus figure —
+    a DOM ``img`` alone would prove nothing about the join.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        pass
+
+    def setUp(self) -> None:
+        runtime = fixtures.create_runtime()
+        runtime.env["ELOSERN_BROWSER_EXPLORATION"] = "1"
+        # The admitted-media branch: named policies with settled portraits.
+        runtime.env["ELOSERN_BROWSER_EXPLORATION_PORTRAITS"] = "1"
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
+
+        self.server = ManagedServer(runtime=runtime)
+        self.server.start()
+        self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
+        self.webclient_url = self.server.runtime.webclient_url
+        super().setUp()
+
+    def _wait_exploration_available(self, page, timeout=30000):
+        def _ready(state: dict) -> bool:
+            panels = state.get("panels") or {}
+            exploration = panels.get("exploration") or {}
+            art = panels.get("art") or {}
+            return (
+                exploration.get("available") is True
+                and art.get("available") is True
+                and bool(art.get("portrait_catalog"))
+            )
+
+        wait_for_store_state(page, _ready, timeout=timeout)
+
+    def _focused_identities(self, page) -> set:
+        state = store_state(page)
+        party = (state.get("panels") or {}).get("party") or {}
+        return {
+            slot.get("identity")
+            for slot in party.get("slots") or []
+            if slot.get("identity") is not None
+        }
+
+    def _loaded_image(self, page, selector, url, timeout=30000):
+        """Wait until the addressed image really decoded, then return its facts."""
+        page.wait_for_function(
+            """([selector, url]) => {
+              const img = document.querySelector(selector);
+              return !!img && img.getAttribute('src') === url
+                && img.complete && img.naturalWidth > 0;
+            }""",
+            arg=[selector, url],
+            timeout=timeout,
+        )
+        return page.evaluate(
+            """(selector) => {
+              const img = document.querySelector(selector);
+              return { src: img.getAttribute('src'), complete: img.complete,
+                       naturalWidth: img.naturalWidth, naturalHeight: img.naturalHeight };
+            }""",
+            selector,
+        )
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    @covers_requirement(
+        "webclient-presence-rail::the-presence-rail-shows-people-and-objects-on-the-stage-floor"
+    )
+    def test_admitted_media_loads_on_both_medallions_and_the_non_party_focus(self):
+        page = self.logged_in_page((1451, 790))
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+
+        # The PRODUCER packet, read before any injection: the committed
+        # exploration descriptors and the committed art catalog they name.
+        state = store_state(page)
+        exploration = state["panels"]["exploration"]
+        art = state["panels"]["art"]
+        catalog = art["portrait_catalog"]
+        targets = [row for row in exploration["interact"] or [] if row.get("portrait_ref")]
+        self.assertTrue(targets, "the fixture host must carry an admitted reference")
+        target = targets[0]
+        reference = target["portrait_ref"]
+        self.assertTrue(reference.isdecimal(), "the reference is an ASCII decimal key")
+        self.assertIn(reference, catalog, "the reference names a current catalog entry")
+        target_entry = catalog[reference]
+        self.assertTrue(
+            target_entry["url"].startswith("/art/"),
+            "the catalog entry carries a same-origin media URL",
+        )
+        self.assertIsNotNone(target_entry["face_rect"])
+
+        # The gold target medallion renders that image and it really decoded.
+        medallion_face = (
+            '[data-anchor="presence"] [data-entry-key="target-%s"] '
+            '[data-testid="presence-entry-face"]' % target["identity"]
+        )
+        target_image = self._loaded_image(page, medallion_face, target_entry["url"])
+        self.assertTrue(target_image["complete"])
+        self.assertGreater(target_image["naturalWidth"], 0)
+
+        # A present look-only entity — never an interact target — carries the
+        # admitted reference of its own and shows the dashed medallion's crop.
+        interact_identities = {row["identity"] for row in exploration["interact"] or []}
+        bystanders = [
+            row
+            for row in (exploration.get("look") or {}).get("entities") or []
+            if row.get("portrait_ref") and row["identity"] not in interact_identities
+        ]
+        self.assertTrue(bystanders, "the fixture must include a reference-bearing bystander")
+        bystander = bystanders[0]
+        bystander_entry = catalog[bystander["portrait_ref"]]
+        bystander_face = (
+            '[data-anchor="presence"] [data-entry-key="entity-%s"] '
+            '[data-testid="presence-entry-face"]' % bystander["identity"]
+        )
+        bystander_image = self._loaded_image(page, bystander_face, bystander_entry["url"])
+        self.assertGreater(bystander_image["naturalWidth"], 0)
+
+        # The non-party focus figure renders the SAME catalog image with its
+        # supplied geometry; open it by keyboard and assert the loaded media.
+        self.assertNotIn(
+            target["identity"],
+            self._focused_identities(page),
+            "the focused person must be outside the companion lineup",
+        )
+        open_verb_card(page, target["identity"])
+        standee_face = (
+            '[data-testid="anchor-actor-right"] [data-testid="stage-actor"] img'
+        )
+        standee_image = self._loaded_image(page, standee_face, target_entry["url"])
+        self.assertGreater(standee_image["naturalWidth"], 0)
+        self.assertGreater(standee_image["naturalHeight"], 0)
+
+        # Unchanged controls: the card is client-local (no router frame, no
+        # action), and the exploration root still renders no dock row.
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        self.assertEqual(sent_action_count(page), 0)
+        controls = exploration_root_controls(page)
+        self.assertEqual(controls["dockRows"], [])
+        self.assertTrue(controls["look"] and controls["wait"])
+        page.close()
