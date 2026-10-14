@@ -3265,7 +3265,7 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 
 #### Scenario: Every figure shares one size and ground line
 - **WHEN** the lineup renders any number of figures
-- **THEN** every figure, including the controlled character, has the same full anchor size and ground line — no progressively smaller scale, lift ramp or depth dimming
+- **THEN** every figure, including the controlled character, has the same full anchor size and ground line; no progressively smaller scale, lift ramp or depth dimming
 
 #### Scenario: The row compresses to stay in the left half
 - **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in any mode
@@ -3276,8 +3276,8 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 - **THEN** the lineup is visible in exploration, combat and dialogue, and hidden in creation
 
 #### Scenario: A speaking companion rises in z only
-- **WHEN** a companion's committed dialogue host identity is the active host speaker in dialogue mode, and when speaking changes or ends
-- **THEN** companions use the existing StageActor listener dim otherwise; the speaking companion temporarily receives z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes; speaking focus changes only dim and z, never position, lift or size, and remains correct at off/reduced motion; and the controlled figure retains its existing speaking and beat behavior
+- **WHEN** a non-controlled rendered companion is the active host speaker in dialogue mode or the selected surviving exploration verb-card target, and when that speaking/focus changes or ends
+- **THEN** companions use the existing StageActor listener dim otherwise; the speaking companion temporarily receives z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes; dialogue speaking and exploration focus change only dim and z, never position, lift or size, and remains correct at off/reduced motion; and the controlled figure retains its existing speaking and beat behavior
 
 #### Scenario: No figure crosses the stage's centre
 - **WHEN** the lineup and the foe lineup render together
@@ -3306,6 +3306,18 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 #### Scenario: The companion line and the foe line-up do not overlap
 - **WHEN** the committed mode is combat with two companions and three active foes at 1451x790
 - **THEN** no companion figure's rendered box intersects any foe figure's rendered box
+
+#### Scenario: Exploration reuses companion emphasis
+- **WHEN** a verb card opens for a non-controlled rendered companion while another companion and the controlled figure are present
+- **THEN** only the selected companion gains the existing highest focus z and loses listener dim; the other companion keeps baseline/listener dim and the controlled figure keeps its independent dim/beat behavior, without position, size or ground-line changes
+
+#### Scenario: Exploration closure restores current baselines
+- **WHEN** that card closes through back, look-close, departure, movement or invalidation, including after lineup count changes
+- **THEN** the surviving non-controlled figures use the current geometry's exact baseline z and listener dim with no remembered focus z, at full, reduced and off motion
+
+#### Scenario: Possession preserves the controlled role during focus
+- **WHEN** possession/release swaps the front figure while an exploration card is open
+- **THEN** identity joins use the current rendered figures, a selected non-controlled companion can be emphasized at its current slot, and the controlled front never receives companion-listener elevation or loses its existing beat/dim semantics
 
 ### Requirement: Possession moves the possessed companion to the group's front
 While the possession banner is available, the possessed companion SHALL occupy the rightmost slot and A SHALL occupy exactly that companion's former slot, without moving the remaining companions. Release SHALL restore both original positions.
