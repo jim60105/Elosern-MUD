@@ -5,6 +5,8 @@
     "Core/PlaceCard",
     "Core/DesktopNavigation",
     "Core/ReferenceArtwork",
+    "Core/ArtworkFailure",
+    "Core/ArtworkAlpha",
     "Core/StageActor",
     "Core/FoeLineup",
     "Core/DialogueChoices",
