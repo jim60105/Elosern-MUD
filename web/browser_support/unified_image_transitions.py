@@ -76,8 +76,11 @@ GALLERY_MANIFEST_FILENAME = "manifest.json"
 # at once. Deterministic identities keep the seeded subjects stable across
 # runs.
 PORTRAIT_IMAGE_ID = "10000000-0000-4000-8000-0000000ed174"
-PORTRAIT_COMPANION_KEY = "browser portrait companion"
-PORTRAIT_FOCUS_KEY = "browser portrait focus"
+# The companion's own committed card: the focus/party/combat surfaces must be
+# able to present a REAL candidate, not only the fallback terminal.
+PORTRAIT_COMPANION_IMAGE_ID = "10000000-0000-4000-8000-0000000ed175"
+PORTRAIT_COMPANION_KEY = "browser_portrait_companion"
+PORTRAIT_FOCUS_KEY = "browser_portrait_focus"
 
 
 def seed_portrait_companions(character) -> list[str]:
@@ -102,13 +105,27 @@ def seed_portrait_companions(character) -> list[str]:
     if location is None:
         return []
 
+    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+
     seeded: list[str] = []
-    for key in (PORTRAIT_COMPANION_KEY, PORTRAIT_FOCUS_KEY):
+    for index, key in enumerate((PORTRAIT_COMPANION_KEY, PORTRAIT_FOCUS_KEY)):
         existing = ObjectDB.objects.filter(db_key=key).first()
         npc = existing or create_object(NPC, key=key, location=location)
         npc.location = location
         npc.db.portrait_policy = {"mode": "named", "stable_key": key}
+        # Both canonical age fields: presentation refuses a subject whose ages
+        # are missing or malformed, so a seeded companion must carry them.
+        npc.db.age = 30
+        npc.db.apparent_age = 30
         join_party(npc, character)
+        # A real committed card, written through the production gallery writer:
+        # the descriptor's own candidate, never a fixture-only shape.
+        append_original_card(
+            f"portrait:character:{npc.pk}",
+            f"{PORTRAIT_COMPANION_IMAGE_ID[:-1]}{index + 5}",
+            FIXTURE_VALID_PNG,
+            set_default=True,
+        )
         seeded.append(str(npc.pk))
     return seeded
 

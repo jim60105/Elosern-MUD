@@ -76,6 +76,7 @@ def _portrait_descriptors(character) -> None:
         return
 
     from web.browser_support.unified_image_transitions import (
+        PORTRAIT_COMPANION_IMAGE_ID,
         PORTRAIT_COMPANION_KEY,
         PORTRAIT_FOCUS_KEY,
         PORTRAIT_IMAGE_ID,
@@ -93,7 +94,7 @@ def _portrait_descriptors(character) -> None:
         "seeded portrait descriptors "
         f"player={subject_key} image={PORTRAIT_IMAGE_ID} "
         f"companion={PORTRAIT_COMPANION_KEY} focus={PORTRAIT_FOCUS_KEY} "
-        f"companions={seeded}"
+        f"companions={seeded} companion_image={PORTRAIT_COMPANION_IMAGE_ID}"
     )
 
 
