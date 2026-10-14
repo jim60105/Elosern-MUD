@@ -520,7 +520,7 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         "art-asset-lifecycle::startup-synchronization-idempotently-ensures-scene-and-generic-monster-records"
     )
     def test_a_pre_existing_classic_record_is_left_alone_and_still_resolves_classic(self):
-        from world.art.presenter import resolve_subject
+        from world.art.presenter import describe_portrait
         from world.art.queue import claim, settle
 
         tier = self.tiers[0]
@@ -549,7 +549,13 @@ class MonsterStartupSyncTests(EvenniaTestCase):
         self.assertEqual(after.db.status, ArtAssetStatus.DONE)
         self.assertEqual(after.db.output_identity, identity)
         # An empty gallery still resolves through the chain's classic step.
-        payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
-        self.assertIn(identity, payload["url"])
+        descriptor = describe_portrait(subject)
+        presented = next(
+            attempt["resource"]
+            for attempt in descriptor["attempts"]
+            if attempt["type"] == "image"
+        )
+        self.assertIn(identity, presented["url"])
+        # The classic asset is the PRESENTED image; the subject's own recorded
+        # generation truth stays the gallery job's independent fact.
+        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.PENDING)

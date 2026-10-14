@@ -204,7 +204,7 @@ class PortraitFinalizationTests(EvenniaTest):
     )
     def test_skipped_activation_establishes_the_policy_and_enqueues_nothing(self):
         from world.art import gallery as gallery_api
-        from world.art.presenter import PLACEHOLDER_MISSING, resolve_entity
+        from world.art.presenter import describe_entity
         from world.art.subjects import ArtSubject, ArtSubjectKind
 
         with self.captureOnCommitCallbacks(execute=True):
@@ -226,10 +226,16 @@ class PortraitFinalizationTests(EvenniaTest):
         # silhouette for the artless character, carried decoratively beside the
         # subject's true missing state (builtin-silhouette-stage-fallback).
         with patch("world.observability.log_info"):
-            payload = resolve_entity(self.character)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertIsNone(payload["url"])
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+            descriptor = describe_entity(self.character)
+        # An eligible but artless character resolves no candidate while still
+        # naming its own subject; only the attribute-selected alpha terminal
+        # remains.
+        self.assertEqual(descriptor["attempts"], [])
+        self.assertEqual(
+            descriptor["generation_subject"],
+            ArtSubject(ArtSubjectKind.CHARACTER, str(self.character.pk)).full(),
+        )
+        self.assertTrue(descriptor["terminal"]["resource"]["url"].startswith("/art/defaults/"))
         with patch(
             "world.art.presenter.fallback_for",
             return_value={
@@ -238,9 +244,9 @@ class PortraitFinalizationTests(EvenniaTest):
                 "face_rect": None,
             },
         ):
-            served = resolve_entity(self.character)
-        self.assertEqual(served["fallback"]["url"], "/art/defaults/man.webp")
-        self.assertIsNone(served["url"])
+            served = describe_entity(self.character)
+        self.assertEqual(served["terminal"]["resource"]["url"], "/art/defaults/man.webp")
+        self.assertEqual(served["attempts"], [])
 
     @covers_requirement(
         "art-gallery-autogen::player-creation-may-skip-the-automatic-portrait"
