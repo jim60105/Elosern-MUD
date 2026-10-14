@@ -136,7 +136,27 @@ class PossessionPresentationTests(EvenniaTest):
         self.assertEqual(combat_roster["lock_reason"], "戰鬥中無法切換角色")
         self.assertEqual(combat_roster["characters"], roster["characters"])
         release_possession(self.player)
-        self.assertEqual(party_presenter(PresentationContext(self.player, 1)), before)
+        after = party_presenter(PresentationContext(self.player, 1))
+        # The panel's own facts are unchanged by release: the same ordered rows
+        # with the same identity/display/HP/bond/membership vocabulary. The
+        # only field that may move is `portrait_ref`, because a reference names
+        # the current bounded art view's ADMISSION and release leaves the
+        # possessed companion unlocated — a remote row keeps the truthful null
+        # (the panel never expands the catalog to cover a subject that is not
+        # present).
+        self.assertEqual(
+            [slot["identity"] for slot in after["slots"]],
+            [slot["identity"] for slot in before["slots"]],
+        )
+        for old, new in zip(before["slots"], after["slots"]):
+            self.assertEqual(
+                {key: value for key, value in old.items() if key != "portrait_ref"},
+                {key: value for key, value in new.items() if key != "portrait_ref"},
+            )
+        self.assertEqual(after["slots"][0]["portrait_ref"], None)
+        self.assertIsNone(self.npc.location)
+        self.assertEqual(after["slots"][1]["portrait_ref"], str(other.pk))
+        self.assertEqual(other.location, self.room1)
         self.assertEqual(self.registry.render("roster", PresentationContext(self.player, 1)), roster_before)
 
     def test_possessed_roster_rejects_foreign_or_unbound_owner(self):

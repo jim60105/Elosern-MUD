@@ -645,17 +645,23 @@ class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcc
         self.assertIn(reference, catalog, "the reference names a current catalog entry")
         target_entry = catalog[reference]
         self.assertTrue(
-            target_entry["url"].startswith("/art/"),
+            target_entry["artwork"]["attempts"][0]["resource"]["url"].startswith("/art/"),
             "the catalog entry carries a same-origin media URL",
         )
-        self.assertIsNotNone(target_entry["face_rect"])
+        self.assertIsNotNone(
+            target_entry["artwork"]["attempts"][0]["resource"]["geometry"]["face_rect"]
+        )
 
         # The gold target medallion renders that image and it really decoded.
         medallion_face = (
             '[data-anchor="presence"] [data-entry-key="target-%s"] '
             '[data-testid="presence-entry-face"]' % target["identity"]
         )
-        target_image = self._loaded_image(page, medallion_face, target_entry["url"])
+        target_image = self._loaded_image(
+            page,
+            medallion_face,
+            target_entry["artwork"]["attempts"][0]["resource"]["url"],
+        )
         self.assertTrue(target_image["complete"])
         self.assertGreater(target_image["naturalWidth"], 0)
 
@@ -674,7 +680,11 @@ class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcc
             '[data-anchor="presence"] [data-entry-key="entity-%s"] '
             '[data-testid="presence-entry-face"]' % bystander["identity"]
         )
-        bystander_image = self._loaded_image(page, bystander_face, bystander_entry["url"])
+        bystander_image = self._loaded_image(
+            page,
+            bystander_face,
+            bystander_entry["artwork"]["attempts"][0]["resource"]["url"],
+        )
         self.assertGreater(bystander_image["naturalWidth"], 0)
 
         # The non-party focus figure renders the SAME catalog image with its
@@ -688,7 +698,11 @@ class ExplorationPortraitMediaBrowserTest(ManagedServerTearDownMixin, BrowserAcc
         standee_face = (
             '[data-testid="anchor-actor-right"] [data-testid="stage-actor"] img'
         )
-        standee_image = self._loaded_image(page, standee_face, target_entry["url"])
+        standee_image = self._loaded_image(
+            page,
+            standee_face,
+            target_entry["artwork"]["attempts"][0]["resource"]["url"],
+        )
         self.assertGreater(standee_image["naturalWidth"], 0)
         self.assertGreater(standee_image["naturalHeight"], 0)
 

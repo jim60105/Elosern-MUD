@@ -1,3 +1,5 @@
+import { fixtureDigest } from "./art_panels.js";
+
 // ---- The foe line-up (webclient-combat-foes-on-stage) ----
 // Committed combat participants and their `art` catalog entries for the
 // line-up's stories. Deterministic offline art: the committed built-in
@@ -5,30 +7,57 @@
 // for their mix of light and dark backdrops so the depth shadow and the
 // gauges are reviewed over both.
 
-// builtin-silhouette-stage-fallback: every stage-eligible catalog entry also
+// builtin-silhouette-stage-fallback: every stage-eligible catalog entry
 // carries the decorative built-in silhouette the server resolved for the
-// subject (key + committed /art/defaults/ identity + rectangle). The line-up
-// fixtures already point at committed defaults, so the key is the URL's stem.
-function foeFallback(url) {
-  return {
-    key: url.slice("/art/defaults/".length, -".webp".length),
-    url,
-    face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
-  };
-}
-
+// subject as its own alpha TERMINAL (key + committed /art/defaults/ identity +
+// rectangle). The line-up fixtures already point at committed defaults, so the
+// key is the URL's stem. Each catalog value is exactly `{artwork, context}`.
 function foeEntry(ref, url, name) {
+  const key = url.slice("/art/defaults/".length, -".webp".length);
   return {
-    subject_key: `npc_${ref}`,
-    status: "done",
-    url,
-    aspect_ratio: "3:4",
-    alt: `${name}的肖像`,
-    placeholder: null,
-    face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
-    stage: { scale: 1, x: 0, y: 0 },
-    origin: "runtime",
-    fallback: foeFallback(url),
+    artwork: {
+      subject_id: `npc_${ref}`,
+      revision: fixtureDigest(`foe-${ref}`),
+      generation_subject: `npc_${ref}`,
+      generation_state: "done",
+      attempts: [
+        {
+          type: "image",
+          source_id: `portrait.default:npc_${ref}`,
+          rank: 30,
+          resource: {
+            resource_id: url,
+            version: fixtureDigest(`foe-resource-${ref}`),
+            url,
+            origin: "runtime",
+            geometry: {
+              image_size: null,
+              face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
+              stage: { scale: 1, x: 0, y: 0 },
+              aspect_ratio: "3:4",
+            },
+          },
+        },
+      ],
+      terminal: {
+        kind: "alpha_mask",
+        source_id: `portrait.alpha:${key}`,
+        rank: 100,
+        resource: {
+          resource_id: url,
+          version: fixtureDigest(`foe-terminal-${ref}`),
+          url,
+          origin: "silhouette",
+          geometry: {
+            image_size: null,
+            face_rect: { x: 0.3, y: 0.06, w: 0.4, h: 0.36 },
+            stage: null,
+            aspect_ratio: "3:4",
+          },
+        },
+      },
+      retention_sources: [],
+    },
     context: { name, role: "敵方" },
   };
 }

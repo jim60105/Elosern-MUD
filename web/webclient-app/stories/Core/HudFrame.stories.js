@@ -35,7 +35,7 @@ const renderFrame = (args) => ({
         args.mode === "dialogue"
           ? sample("actor-right ‧ 對話對象立繪", "background:#1a1d2099;")
           : args.mode === "combat"
-            ? h(FoeLineup, { foes: foeParticipants(3), artPanel: { portrait_catalog: FOE_PORTRAIT_CATALOG } })
+            ? h(FoeLineup, { foes: foeParticipants(3), artPanel: { schema_version: 3, available: true, portrait_catalog: FOE_PORTRAIT_CATALOG } })
             : null,
       // The dialogue choice list's card (webclient-dialogue-choices-overlay
       // D6): a sample of its height, centred in the `choices` anchor's span.
@@ -184,7 +184,7 @@ const renderHoldLoop = (args) => ({
           hold.value
             ? h(FoeLineup, {
                 foes: foeParticipants(2),
-                artPanel: { portrait_catalog: FOE_PORTRAIT_CATALOG },
+                artPanel: { schema_version: 3, available: true, portrait_catalog: FOE_PORTRAIT_CATALOG },
                 inert: true,
               })
             : null,

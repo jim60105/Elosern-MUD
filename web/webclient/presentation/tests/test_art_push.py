@@ -107,7 +107,7 @@ class ArtPushPureGateTests(unittest.TestCase):
         self.assertEqual(_art_subject_keys({"scene": {"subject_key": ""}}), set())
         self.assertEqual(_art_subject_keys({"scene": {"subject_key": "scene:arena"}}), {"scene:arena"})
         catalog = {
-            "char_1": {"subject_key": "portrait:character:alice"},
+            "char_1": {"artwork": {"generation_subject": "portrait:character:alice"}},
             "char_2": {"subject_key": ""},
             "char_3": None,
         }
@@ -138,9 +138,9 @@ class ArtPushPureGateTests(unittest.TestCase):
             "available": True,
             "scene": {"subject_key": "scene:t_synth_bazaar"},
             "portrait_catalog": {
-                "11": {"subject_key": "portrait:character:alice"},
-                "12": {"subject_key": ""},
-                "13": None,
+                "11": {"artwork": {"generation_subject": "portrait:character:alice"}},
+                "12": {"artwork": {"generation_subject": ""}},
+                "13": {"artwork": {"generation_subject": None}},
             },
         }
         self.assertEqual(
@@ -158,10 +158,10 @@ class ArtPushPureGateTests(unittest.TestCase):
         self.assertEqual(_roster_subject_keys({"characters": None}), set())
         payload = {
             "characters": [
-                {"portrait": {"subject_key": "portrait:character:c1"}},
+                {"portrait": {"generation_subject": "portrait:character:c1"}},
                 {"portrait": None},
-                {"portrait": {"subject_key": ""}},
-                {"portrait": {"subject_key": "portrait:character:c2"}},
+                {"portrait": {"generation_subject": ""}},
+                {"portrait": {"generation_subject": "portrait:character:c2"}},
             ]
         }
         self.assertEqual(_roster_subject_keys(payload), {"portrait:character:c1", "portrait:character:c2"})
@@ -503,7 +503,9 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertIn("exploration", panels)
         catalog_key = str(other_char.pk)
         self.assertIsNotNone(
-            panels["art"]["portrait_catalog"][catalog_key]["url"],
+            panels["art"]["portrait_catalog"][catalog_key]["artwork"]["attempts"][0][
+                "resource"
+            ]["url"],
             "the art catalog entry for the completed subject carries its image",
         )
         self.assertEqual(
@@ -641,10 +643,11 @@ class ArtPushPresenterTests(EvenniaTestCase):
     def test_current_portrait_completion_turns_a_null_exploration_ref_real_in_one_update(self):
         """A pending-to-done CURRENT portrait refreshes the descriptors once.
 
-        The pre-completion snapshot carries the truthful null on both
-        descriptor paths; the completion notification then publishes the art
-        catalog and the exploration panel together at exactly one newer
-        revision, with the descriptor naming the admitted image.
+        The pre-completion snapshot carries the admitted reference on both
+        descriptor paths while its catalog entry has no real candidate; the
+        completion notification then publishes the art catalog and the
+        exploration panel together at exactly one newer revision, with the
+        descriptor naming the admitted image.
         """
         # An NPC with a named policy is BOTH an interact target and a look
         # entity, so this test asserts the shared reference on both descriptor
@@ -659,16 +662,29 @@ class ArtPushPresenterTests(EvenniaTestCase):
         before = session.ndb.elosern_coordinator.full_snapshot(context)
 
         panel_before = before["panels"]["exploration"]
-        self.assertIsNone(
+        # Admission, not imagery, owns the reference: the named-policy ally is
+        # a member of the bounded art view before and after completion, so the
+        # reference stands throughout and the completion changes the DESCRIPTOR
+        # behind it (from no candidate to the admitted image).
+        self.assertEqual(
             self._interact_row(panel_before, ally.pk)["portrait_ref"],
-            "an unfinished portrait leaves the target descriptor at the truthful null",
+            str(ally.pk),
+            "an admitted target keeps its reference before its image resolves",
         )
-        self.assertIsNone(
+        self.assertEqual(
             self._look_row(panel_before, ally.pk)["portrait_ref"],
-            "an unfinished portrait leaves the entity descriptor at the truthful null",
+            str(ally.pk),
+            "the look descriptor shares the same admitted reference",
         )
-        self.assertIsNone(
-            before["panels"]["art"]["portrait_catalog"][str(ally.pk)]["url"]
+        self.assertEqual(
+            [
+                attempt["type"]
+                for attempt in before["panels"]["art"]["portrait_catalog"][str(ally.pk)][
+                    "artwork"
+                ]["attempts"]
+            ],
+            [],
+            "no real candidate resolves before the portrait completes",
         )
         session.sent.clear()
 
@@ -688,7 +704,10 @@ class ArtPushPresenterTests(EvenniaTestCase):
         self.assertEqual(set(panels), {"art", "exploration"})
         catalog_key = str(ally.pk)
         self.assertEqual(
-            panels["art"]["portrait_catalog"][catalog_key]["url"], f"/art/{identity}"
+            panels["art"]["portrait_catalog"][catalog_key]["artwork"]["attempts"][0][
+                "resource"
+            ]["url"],
+            f"/art/{identity}",
         )
         self.assertEqual(
             self._interact_row(panels["exploration"], ally.pk)["portrait_ref"],

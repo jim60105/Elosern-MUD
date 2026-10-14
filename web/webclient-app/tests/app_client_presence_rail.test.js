@@ -16,6 +16,11 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import { ART_PANEL_SAMPLE, ART_PANEL_UNAVAILABLE_SAMPLE } from "../stories/fixtures.js";
+import {
+  fixtureDigest,
+  artworkDescriptor,
+  artworkResource,
+} from "../stories/fixtures/art_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 // The exploration panel is schema v4: its interact targets and look entities
@@ -33,40 +38,63 @@ const CLERK = {
   ],
 };
 
-// One committed catalog entry in the exact accepted shape: the target's own
-// face crop and stage placement.
-const CLERK_FACE = {
-  subject_key: "npc_7",
-  status: "done",
-  url: "/art/portraits/npc_7.webp",
-  aspect_ratio: "3:4",
-  alt: "店長的肖像",
-  placeholder: null,
-  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-  stage: { scale: 1, x: 0, y: 0 },
-  origin: "runtime",
-  fallback: {
-    key: "elder",
-    url: "/art/defaults/elder.webp",
-    face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 },
-  },
-  context: { name: "店長", role: "對話對象" },
-};
+// One committed catalog value in the exact accepted shape: the canonical
+// descriptor (with the target's own face crop and stage placement) plus its
+// display context. A null `url` models a subject with no real candidate.
+function faceEntry(identity, url, faceRect, name, role) {
+  return {
+    artwork: artworkDescriptor({
+      subject_id: identity,
+      generation_subject: identity,
+      generation_state: url ? "done" : "pending",
+      attempts: url
+        ? [
+            {
+              type: "image",
+              source_id: `portrait.default:${identity}`,
+              rank: 30,
+              resource: artworkResource({
+                resource_id: url,
+                version: fixtureDigest(url),
+                url,
+                geometry: {
+                  image_size: null,
+                  face_rect: faceRect,
+                  stage: { scale: 1, x: 0, y: 0 },
+                  aspect_ratio: "3:4",
+                },
+              }),
+            },
+          ]
+        : [],
+    }),
+    context: { name, role },
+  };
+}
 
-const CLERK_FACE_REPLACED = {
-  ...CLERK_FACE,
-  url: "/art/portraits/npc_7_replaced.webp",
-  face_rect: { x: 0.22, y: 0.04, w: 0.52, h: 0.52 },
-};
+const CLERK_FACE = faceEntry(
+  "npc_7",
+  "/art/portraits/npc_7.webp",
+  { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+  "店長",
+  "對話對象",
+);
 
-const BYSTANDER_FACE = {
-  ...CLERK_FACE,
-  subject_key: "npc_8",
-  url: "/art/portraits/npc_8.webp",
-  alt: "旅人的肖像",
-  face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
-  context: { name: "旅人", role: "人物" },
-};
+const CLERK_FACE_REPLACED = faceEntry(
+  "npc_7",
+  "/art/portraits/npc_7_replaced.webp",
+  { x: 0.22, y: 0.04, w: 0.52, h: 0.52 },
+  "店長",
+  "對話對象",
+);
+
+const BYSTANDER_FACE = faceEntry(
+  "npc_8",
+  "/art/portraits/npc_8.webp",
+  { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+  "旅人",
+  "人物",
+);
 
 // The bystander look entity (no interact descriptor): the rail's dashed
 // medallion.
@@ -232,16 +260,16 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     // the supplied crop; the reference is read from the committed catalog and
     // never built from identity.
     expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
-      CLERK_FACE.url,
+      CLERK_FACE.artwork.attempts[0].resource.url,
     );
     expect(entry("entity-8").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
-      BYSTANDER_FACE.url,
+      BYSTANDER_FACE.artwork.attempts[0].resource.url,
     );
     // The non-party focus figure renders the same catalog image with the
     // supplied stage geometry, opening no action and pushing no frame.
     await entry("target-7").trigger("click");
     await settle();
-    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.url);
+    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.artwork.attempts[0].resource.url);
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.router.depth()).toBe(1);
   });
@@ -278,9 +306,9 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
       }),
     });
     expect(card().exists()).toBe(true);
-    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.url);
+    expect(standee().get("img").attributes("src")).toBe(CLERK_FACE.artwork.attempts[0].resource.url);
     expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
-      CLERK_FACE.url,
+      CLERK_FACE.artwork.attempts[0].resource.url,
     );
     // The open card keeps its target, its verb order and its geometry; no
     // focus message or action is dispatched by the refresh.
@@ -312,7 +340,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(entry("target-7").get('[data-testid="presence-entry-initial"]').text()).toBe("店");
     await commit({ art: artPanel({ 7: CLERK_FACE_REPLACED }) });
     expect(entry("target-7").get('[data-testid="presence-entry-face"]').attributes("src")).toBe(
-      CLERK_FACE_REPLACED.url,
+      CLERK_FACE_REPLACED.artwork.attempts[0].resource.url,
     );
     // An unavailable art panel leaves every medallion on its initial and the
     // standee on the established placeholder — exploration stays usable.
@@ -338,21 +366,23 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
       }),
       artPanel({ 7: CLERK_FACE }),
     );
-    // The figure's PORTRAIT image only: the placeholder's silhouette mask
-    // probe is an `img` of its own and must never stand in for a figure.
-    const portraitImg = () => standee().find("img:not(.reference-artwork__mask-probe)");
+    // The figure's presented attempt image: one element per attempt, so a
+    // failed candidate hands over to the descriptor's own terminal.
+    const portraitImg = () => standee().find("img.reference-artwork__figure");
     await entry("target-7").trigger("click");
     await settle();
-    expect(portraitImg().attributes("src")).toBe(CLERK_FACE.url);
+    expect(portraitImg().attributes("src")).toBe(CLERK_FACE.artwork.attempts[0].resource.url);
     const rowsBefore = cardRows().map((row) => row.text());
 
     // The figure's own image fails: the card stays open on the same target
-    // with the same verbs, and the established placeholder takes the figure.
+    // with the same verbs, and the descriptor's own terminal takes over as the
+    // presented attempt while the reached fault keeps its local marker.
     await portraitImg().trigger("error");
     await settle();
     expect(card().exists()).toBe(true);
     expect(store.view?.presenceCard?.identity ?? null).not.toBeNull();
-    expect(portraitImg().exists()).toBe(false);
+    expect(portraitImg().attributes("src")).toBe("/art/defaults/man.webp");
+    expect(standee().find('[data-testid="artwork-failure"]').exists()).toBe(true);
     expect(cardRows().map((row) => row.text())).toEqual(rowsBefore);
 
     // One newer committed URL replaces the failed one: the still-open card
@@ -369,7 +399,7 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
       }),
     });
     expect(card().exists()).toBe(true);
-    expect(portraitImg().attributes("src")).toBe(CLERK_FACE_REPLACED.url);
+    expect(portraitImg().attributes("src")).toBe(CLERK_FACE_REPLACED.artwork.attempts[0].resource.url);
     expect(sender.sent.actions).toHaveLength(0);
     expect(store.router.depth()).toBe(1);
   });
@@ -597,24 +627,21 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
 // The roster the player's own figure resolves from (identity 1), so the
 // controlled front keeps a stable identity across possession swaps.
 const FOCUS_ROSTER = {
-  schema_version: 2,
+  schema_version: 3,
   available: true,
   characters: [{
     identity: 1,
     name: "艾莉亞",
     current: true,
     pending: false,
-    portrait: {
-      subject_key: "char_1",
-      status: "done",
-      url: "/art/defaults/man.webp",
-      aspect_ratio: "3:4",
-      alt: "艾莉亞的肖像",
-      placeholder: null,
-      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-      stage: { scale: 1, x: 0, y: 0 },
-      origin: "runtime",
-    },
+    // The row's portrait IS the complete canonical descriptor.
+    portrait: faceEntry(
+      "portrait:character:1",
+      "/art/defaults/man.webp",
+      { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      "艾莉亞",
+      "人物",
+    ).artwork,
   }],
   max_characters: 5,
   can_create: true,
@@ -830,7 +857,13 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
   });
 
   it("a same-name, same-portrait target outside the lineup keeps the actor-right standee", async () => {
-    const face = { ...CLERK_FACE, subject_key: "npc_101", url: "/art/portraits/npc_101.webp" };
+    const face = faceEntry(
+      "npc_101",
+      "/art/portraits/npc_101.webp",
+      { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      "蕾娜",
+      "對話對象",
+    );
     await mountFocus({
       exploration: focusRoom({
         interact: [focusTarget(101), focusTarget(7, { display_name: "蕾娜", portrait_ref: "101" })],

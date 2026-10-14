@@ -179,23 +179,19 @@ subject-only call stays legal.
   returns `None` for scene subjects
 
 ### Requirement: Every resolution payload carries a face rectangle or null
-`world/art/presenter.py` SHALL add `face_rect` to every resolution payload it produces. The value
-SHALL be a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]`, and a rectangle carried from a card or
-the fallback map SHALL be pixel-square on the image it ships with — every rectangle a client
-receives from a resolution marks a square region of its image. The server SHALL NOT crop, transform,
-or produce a second image: the rectangle is placement metadata for the client alone.
+Canonical portrait resources SHALL carry each original candidate or alpha terminal's own validated face rectangle in its geometry, not a top-level shared payload field. Existing card/fallback pixel-square and classic shared-anchor semantics SHALL remain. Scene geometry SHALL have null face rectangle. Metadata remains placement-only without server crop/transform or second pixels.
 
 #### Scenario: A resolved card carries its own rectangle
-- **WHEN** a card with an explicit rectangle resolves
-- **THEN** the payload carries a URL and exactly that rectangle
+- **WHEN** a card with explicit rectangle becomes a canonical candidate
+- **THEN** that candidate geometry carries its own validated rectangle and admitted URL
 
 #### Scenario: A placeholder carries a null rectangle
-- **WHEN** the chain resolves to any placeholder
-- **THEN** the payload carries a null URL and a null `face_rect`
+- **WHEN** no real portrait candidate exists
+- **THEN** no real geometry is fabricated; separately admitted alpha terminal keeps its own rectangle
 
 #### Scenario: A malformed stored rectangle degrades to the default
-- **WHEN** the resolution seam hands the presenter a card whose stored rectangle fails validation against the card's recorded image size — including one that is not pixel-square
-- **THEN** the payload carries the fitted default square for that card's image and one bounded diagnostic is logged
+- **WHEN** stored card rectangle is malformed or nonsquare
+- **THEN** safe fitted candidate geometry is used with an attributed metadata fault and bounded diagnostic
 
 #### Scenario: A classic-asset payload keeps the shared constant
 - **WHEN** a classic (non-card) asset resolves
@@ -226,14 +222,16 @@ or produce a second image: the rectangle is placement metadata for the client al
   the decoded image dimensions (see the `official-art-resolution` capability)
 
 #### Scenario: Every placeholder payload carries a null rectangle
-- **WHEN** the chain produces any placeholder payload
-- **THEN** its `face_rect` is `null`
+- **WHEN** no real image is described
+- **THEN** there is no top-level face_rect; real geometry is absent and alpha-terminal geometry remains separate
 
 #### Scenario: A bad stored rectangle degrades with a diagnostic, never failure
-- **WHEN** a stored rectangle is malformed or non-square for its image
-- **THEN** it SHALL degrade to the fitted default square for that card's `image_size` (the shared
-  default constant where no image size is known) with one bounded diagnostic, never to a failed
-  payload
+- **WHEN** stored image geometry is invalid
+- **THEN** the candidate uses safe fitted/shared geometry with source-scoped metadata fault and diagnostic, rather than failing the whole descriptor
+
+#### Scenario: All geometry locations use the exact canonical schema
+- **WHEN** roster/art catalog descriptors are serialized
+- **THEN** face_rect is inside each applicable resource.geometry; obsolete flat url/face_rect/stage fields fail validation
 
 ### Requirement: Gallery URLs are built only from validated card identities
 The presenter SHALL build a gallery media URL only from a card's stored identity that it has

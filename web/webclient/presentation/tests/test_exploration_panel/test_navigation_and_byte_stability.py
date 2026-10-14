@@ -15,6 +15,8 @@ from world.rules.map_knowledge import record_arrival
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.tests.synthetic_data import SYNTH_GUILD_BRANCH_KEY
 
+from world.rules.art_view import portrait_catalog_key
+
 from ._support import T_DIALOGUE_KEY, _context
 
 
@@ -205,12 +207,15 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                             "identity": int(self.host.pk),
                             "display_name": "公會職員",
                             "kind": "npc",
-                            "portrait_ref": None,
+                            "portrait_ref": portrait_catalog_key(self.host.pk),
                         },
                         {
                             "identity": int(self.bard.pk),
                             "display_name": "吟遊詩人",
                             "kind": "npc",
+                            # A bare LLMNPC is neither a dialogue host nor a
+                            # named-policy character, so the bounded art view
+                            # does not admit it: the truthful null stands.
                             "portrait_ref": None,
                         },
                         {
@@ -234,7 +239,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
                     {
                         "identity": int(self.host.pk),
                         "display_name": "公會職員",
-                        "portrait_ref": None,
+                        "portrait_ref": portrait_catalog_key(self.host.pk),
                         "affordances": [
                             {
                                 "kind": "action",

@@ -282,9 +282,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             )
         # The admitted portrait branch: the reused figure really loaded media.
         self.assertIsNotNone(member.get("portrait_ref"), "the portrait branch admits a reference")
-        entry = catalog[member["portrait_ref"]]
-        self.assertTrue(entry["url"].startswith("/art/"), entry)
-        self.assertEqual(selected["image"]["src"], entry["url"], "the figure renders its admitted crop")
+        entry = catalog[member["portrait_ref"]]["artwork"]
+        candidate = entry["attempts"][0]["resource"]
+        self.assertTrue(candidate["url"].startswith("/art/"), entry)
+        self.assertEqual(
+            selected["image"]["src"],
+            candidate["url"],
+            "the figure renders its admitted crop",
+        )
         self.assertTrue(selected["image"]["complete"])
         self.assertGreater(selected["image"]["naturalWidth"], 0)
 

@@ -38,7 +38,8 @@ function slotStyle(index) {
       :data-controlled="String(slot.isControlled)" :style="slotStyle(index)"
     >
       <StageActor
-        :portrait="slot.portrait" :name="slot.displayName" side="left"
+        :artwork="slot.artwork" :panel="slot.panel" :has-reference="slot.hasReference"
+        :name="slot.displayName" side="left"
         :dimmed="slot.isControlled ? dimmed : slot.identity !== speakingIdentity" :motion-level="motionLevel"
         :gesture="slot.isControlled ? gesture : null"
         :gesture-key="slot.isControlled ? gestureKey : null"

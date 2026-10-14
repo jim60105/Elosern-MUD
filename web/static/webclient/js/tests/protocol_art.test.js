@@ -1,8 +1,13 @@
 /*
- * art panel v1 mirror: allowlist, available payloads, malformed rejection, media-url bound.
+ * art panel v3 mirror: allowlist, available payloads, malformed rejection, media-url bound.
  *
  * Split sibling of the original protocol.test.js; shared fixtures live in
  * ./protocol_support.js and ./protocol_fixtures.js.
+ *
+ * v3 (change unified-portrait-image-contract) replaces the flat catalog entry
+ * with exactly `{artwork, context}` — the canonical artwork descriptor plus its
+ * bounded display context — and leaves the scene block untouched until its own
+ * separately versioned cutover.
  */
 
 "use strict";
@@ -12,7 +17,16 @@ const assert = require("node:assert/strict");
 
 const Protocol = require("../elosern/protocol.js");
 const { T_SCENE, T_SCENE_LABEL, deepMerge } = require("./protocol_support.js");
-const { validRosterCharacter, validRosterPanel, validRosterPortrait } = require("./protocol_fixtures.js");
+const {
+  fixtureDigest,
+  validArtCatalogEntry,
+  validArtwork,
+  validArtworkResource,
+  validArtworkTerminal,
+  validRosterCharacter,
+  validRosterPanel,
+  validRosterPortrait,
+} = require("./protocol_fixtures.js");
 
 
 function validArtScene(overrides) {
@@ -32,36 +46,10 @@ function validArtScene(overrides) {
   );
 }
 
-function validArtCatalogEntry(overrides) {
-  return deepMerge(
-    {
-      subject_key: "portrait:monster:low",
-      status: "done",
-      url: "/art/portrait/monster/low.png",
-      aspect_ratio: "3:4",
-      alt: "低階魔物",
-      placeholder: null,
-      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-      stage: { scale: 1, x: 0, y: 0 },
-      origin: "runtime",
-      // The decorative built-in silhouette the server resolved: it rides
-      // beside the real fields and never fills them
-      // (builtin-silhouette-stage-fallback).
-      fallback: {
-        key: "monster_anon",
-        url: "/art/defaults/monster_anon.webp",
-        face_rect: { x: 0.3403, y: 0.02, w: 0.3194, h: 0.18 },
-      },
-      context: { name: "哥布林", role: "敵方" },
-    },
-    overrides
-  );
-}
-
 function validArtPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "scene",
       scene: validArtScene(),
@@ -71,83 +59,79 @@ function validArtPanel(overrides) {
   );
 }
 
+// The catalog is replaced, never deep-merged: a merged entry would silently
+// regain the fields a rejection case deliberately removed.
+function catalogPanel(entries) {
+  const panel = validArtPanel();
+  panel.portrait_catalog = entries;
+  return panel;
+}
+
 test("art is in the production panel allowlist and validates the available payload", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.art, 2);
+  assert.equal(Protocol.PANEL_ALLOWLIST.art, 3);
   assert.doesNotThrow(() => Protocol.validateArtPanel(validArtPanel()));
-  assert.doesNotThrow(() =>
-    Protocol.validateArtPanel(
-      validArtPanel({
-        scene: validArtScene({
-          archetype: "t_fen_walk",
-          status: "pending",
-          url: null,
-          stage: null,
-          placeholder: { kind: "missing", label: "未生成" },
-        }),
-        portrait_catalog: {
-          "7": validArtCatalogEntry({
-            subject_key: null,
-            status: null,
-            url: null,
-            aspect_ratio: null,
-            face_rect: null,
-            stage: null,
-            origin: "silhouette",
-            placeholder: { kind: "unavailable", label: "無法提供" },
-            context: { name: "旅店主人", role: "對話對象" },
-          }),
-        },
-      })
-    )
-  );
+  // A pending scene keeps its own unchanged shape, and an admitted entry with
+  // no real candidate still carries its complete descriptor: no image attempt,
+  // no generated subject key, and the attribute-selected alpha terminal.
+  const pendingScene = validArtPanel({
+    scene: validArtScene({
+      archetype: "t_fen_walk",
+      status: "pending",
+      url: null,
+      stage: null,
+      placeholder: { kind: "missing", label: "未生成" },
+    }),
+  });
+  pendingScene.portrait_catalog = {
+    "7": validArtCatalogEntry({
+      artwork: validArtwork({
+        subject_id: "7",
+        generation_subject: null,
+        generation_state: null,
+        attempts: [],
+      }),
+      context: { name: "旅店主人", role: "對話對象" },
+    }),
+  };
+  assert.doesNotThrow(() => Protocol.validateArtPanel(pendingScene));
 });
 
 test("rejects malformed art panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("art", Protocol.PANEL_ALLOWLIST.art, {
-      schema_version: 2,
+      schema_version: 3,
       available: false,
     })
   );
   assert.throws(() => Protocol.validateArtPanel(validArtPanel({ kind: "combat" })));
   assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 1 })));
-  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 3 })));
-  // v2: the face rectangle exists exactly when the entry carries a media URL.
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 2 })));
+  assert.throws(() => Protocol.validateArtPanel(validArtPanel({ schema_version: 4 })));
+  // The retired flat catalog entry is refused outright: exactly artwork and
+  // context, with no dual-shape adaptation.
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validArtPanel({ portrait_catalog: { "42": validArtCatalogEntry({ face_rect: null }) } })
-    )
-  );
-  assert.throws(() =>
-    Protocol.validateArtPanel(
-      validArtPanel({
-        portrait_catalog: {
-          "42": validArtCatalogEntry({
-            url: null,
-            stage: null,
-            origin: "silhouette",
-            placeholder: { kind: "unavailable", label: "無法提供" },
-          }),
+      catalogPanel({
+        "42": {
+          subject_key: "portrait:character:42",
+          status: "done",
+          url: "/art/portrait/character/42.png",
+          aspect_ratio: "3:4",
+          alt: "英雄肖像",
+          placeholder: null,
+          face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+          stage: { scale: 1, x: 0, y: 0 },
+          origin: "runtime",
+          fallback: null,
+          context: { name: "艾莉亞", role: "人物" },
         },
       })
     )
   );
+  // ...and so is a catalog entry that tries to keep a flat field beside them.
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validArtPanel({
-        portrait_catalog: {
-          "42": validArtCatalogEntry({ face_rect: { x: 0.25, y: 0.06, w: 0.5, h: null } }),
-        },
-      })
-    )
-  );
-  assert.throws(() =>
-    Protocol.validateArtPanel(
-      validArtPanel({
-        portrait_catalog: {
-          "42": validArtCatalogEntry({ face_rect: { x: -0.1, y: 0.06, w: 0.5, h: 0.5 } }),
-        },
-      })
+      catalogPanel({ "42": Object.assign(validArtCatalogEntry(), { url: "/art/x.png" }) })
     )
   );
   // A pending scene without a placeholder is untruthful.
@@ -172,98 +156,133 @@ test("rejects malformed art panels atomically", () => {
   );
   // Catalog keys must be opaque decimal strings.
   assert.throws(() =>
-    Protocol.validateArtPanel(validArtPanel({ portrait_catalog: { abc: validArtCatalogEntry() } }))
+    Protocol.validateArtPanel(catalogPanel({ abc: validArtCatalogEntry() }))
   );
   // A malformed context role is rejected.
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validArtPanel({ portrait_catalog: { "42": validArtCatalogEntry({ context: { name: "x", role: "boss" } }) } })
+      catalogPanel({ "42": validArtCatalogEntry({ context: { name: "x", role: "boss" } }) })
     )
   );
 });
 
-// The portrait origin vocabulary and the decorative fallback reference are
-// mirrored on both validator sides (builtin-silhouette-stage-fallback): a
-// payload that names a silhouette without carrying its identity, hides a real
-// URL behind a silhouette origin, or fills a fallback from the wrong route is
-// rejected here exactly as the Python validator rejects it.
-test("the catalog origin vocabulary and its decorative fallback are enforced", () => {
-  const rect = { x: 0.3576, y: 0.03, w: 0.2847, h: 0.16 };
-  const panel = (entry) => validArtPanel({ portrait_catalog: { "42": entry } });
-  const placeholder = { kind: "unavailable", label: "無法提供" };
-  const accepts = {
-    runtime: validArtCatalogEntry(),
-    // The official read-only default: its own fingerprinted URL and never a
-    // generated status (official-art-resolution).
-    official: validArtCatalogEntry({
-      subject_key: "portrait:character:42",
-      status: null,
-      url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
-      alt: "portrait:character:42",
-      stage: { scale: 1.4, x: 0.1, y: -0.2 },
-      origin: "official",
-      fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
-      context: { name: "旅人", role: "人物" },
-    }),
-    silhouette: validArtCatalogEntry({
-      subject_key: null, status: "missing", url: null, aspect_ratio: null,
-      face_rect: null, stage: null, origin: "silhouette",
-      placeholder, fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
-    }),
-    placeholder: validArtCatalogEntry({
-      subject_key: null, status: null, url: null, aspect_ratio: null,
-      face_rect: null, stage: null, origin: "placeholder",
-      placeholder, fallback: null,
-    }),
-  };
-  Object.keys(accepts).forEach((origin) => {
-    assert.doesNotThrow(() => Protocol.validateArtPanel(panel(accepts[origin])), origin);
-  });
-  const absentOrigin = validArtCatalogEntry();
-  delete absentOrigin.origin;
-  const silhouetteEntry = (overrides) =>
-    validArtCatalogEntry(Object.assign({
-      subject_key: null, status: "missing", url: null, aspect_ratio: null,
-      face_rect: null, stage: null, origin: "silhouette", placeholder,
-      fallback: { key: "woman", url: "/art/defaults/woman.webp", face_rect: rect },
-    }, overrides));
+// The descriptor facts the catalog entry now carries are validated by the ONE
+// shared mirror, so a malformed descriptor is refused by the art panel exactly
+// as it is by the gallery: the terminal is a fallback (never a second copy of
+// a listed candidate), a fault never carries a URL, and an unranked or
+// unversioned resource is not a canonical fact.
+test("the catalog entry validates the complete canonical descriptor", () => {
+  const panel = (entry) => catalogPanel({ "42": entry });
+  const entry = (artwork) => validArtCatalogEntry({ artwork });
+  assert.doesNotThrow(() => Protocol.validateArtPanel(panel(validArtCatalogEntry())));
+
   const rejects = {
-    "unknown origin": validArtCatalogEntry({ origin: "generated" }),
-    "missing origin": absentOrigin,
-    "official without a url": validArtCatalogEntry({
-      subject_key: null, status: null, url: null, aspect_ratio: null,
-      face_rect: null, stage: null, origin: "official", placeholder, fallback: null,
-    }),
-    "official claiming a done portrait": validArtCatalogEntry({
-      origin: "official", url: "/art/official/" + "a".repeat(64) + "/preset/t_synth_preset/hero.webp",
-    }),
-    "silhouette hiding a real url": validArtCatalogEntry({ origin: "silhouette" }),
-    "placeholder carrying a fallback": silhouetteEntry({ origin: "placeholder" }),
-    "silhouette claiming a done portrait": silhouetteEntry({ status: "done", placeholder: null }),
-    "silhouette origin without an identity": silhouetteEntry({ fallback: null }),
-    "runtime origin without a url": validArtCatalogEntry({
-      subject_key: null, status: "missing", url: null, aspect_ratio: null,
-      face_rect: null, stage: null, origin: "runtime", placeholder,
-    }),
-    "fallback outside the defaults route": validArtCatalogEntry({
-      fallback: { key: "man", url: "/art/portrait/man.webp", face_rect: rect },
-    }),
-    "fallback without a rectangle": validArtCatalogEntry({
-      fallback: { key: "man", url: "/art/defaults/man.webp" },
-    }),
-    "fallback with an unknown field": validArtCatalogEntry({
-      fallback: { key: "man", url: "/art/defaults/man.webp", face_rect: rect, identity: "x" },
-    }),
-    "fallback with an out-of-range rectangle": validArtCatalogEntry({
-      fallback: { key: "man", url: "/art/defaults/man.webp", face_rect: { x: 0.5, y: 0.5, w: 1.5, h: 0.9 } },
-    }),
-    // The scene wire block is unchanged by this change: the two new fields
-    // belong to the portrait catalog only.
-    "scene carrying an origin": validArtPanel({ scene: validArtScene({ origin: "runtime" }) }),
-    "scene carrying a fallback": validArtPanel({ scene: validArtScene({ fallback: null }) }),
+    "a terminal duplicating a candidate resource": entry(
+      validArtwork({ terminal: validArtworkTerminal({ resource: validArtworkResource() }) })
+    ),
+    "a fault attempt carrying a resource": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "fault",
+            source_id: "portrait.default:1",
+            rank: 30,
+            reason: "generated_output_missing",
+            resource: validArtworkResource(),
+          },
+        ],
+      })
+    ),
+    "an unknown fault reason": entry(
+      validArtwork({
+        attempts: [{ type: "fault", source_id: "portrait.default:1", rank: 30, reason: "boom" }],
+      })
+    ),
+    "a resource version that is not a digest": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({ version: "v1" }),
+          },
+        ],
+      })
+    ),
+    "a revision that is not a digest": entry(validArtwork({ revision: "nope" })),
+    "a resource URL outside the art route": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({ url: "https://evil.test/x.png" }),
+          },
+        ],
+      })
+    ),
+    "an unknown resource origin": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({ origin: "generated" }),
+          },
+        ],
+      })
+    ),
+    "an unknown generation state": entry(validArtwork({ generation_state: "in_progress" })),
+    "a geometry with a fifth key": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({
+              geometry: {
+                image_size: null,
+                face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+                stage: { scale: 1, x: 0, y: 0 },
+                aspect_ratio: "3:4",
+                crop: "face",
+              },
+            }),
+          },
+        ],
+      })
+    ),
+    "a face rectangle outside the unit square": entry(
+      validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({
+              geometry: {
+                image_size: null,
+                face_rect: { x: -0.1, y: 0.06, w: 0.5, h: 0.5 },
+                stage: null,
+                aspect_ratio: "3:4",
+              },
+            }),
+          },
+        ],
+      })
+    ),
+    "a missing terminal resource": entry(validArtwork({ terminal: { kind: "alpha_mask", source_id: "x", rank: 100 } })),
+    "an unknown terminal kind": entry(validArtwork({ terminal: validArtworkTerminal({ kind: "cover" }) })),
+    "a retention entry with a malformed token": entry(
+      validArtwork({ retention_sources: [{ source_id: "portrait.classic:1", token: "t" }] })
+    ),
   };
   Object.keys(rejects).forEach((label) => {
-    assert.throws(() => Protocol.validateArtPanel(rejects[label]), label);
+    assert.throws(() => Protocol.validateArtPanel(panel(rejects[label])), label);
   });
 });
 
@@ -271,22 +290,30 @@ test("media url bound admits the worst-case gallery identity in both mirrors", (
   // /art/gallery/character/<64-char key>/<uuid36>.avif = 129 chars.
   const worst = "/art/gallery/character/" + "k".repeat(64) + "/" + "0".repeat(36) + ".avif";
   assert.equal(worst.length, 129);
-  const panel = validArtPanel({
-    portrait_catalog: { "42": validArtCatalogEntry({ url: worst }) },
-  });
-  assert.doesNotThrow(() => Protocol.validateArtPanel(panel));
+  const candidate = (url) =>
+    validArtwork({
+      attempts: [
+        {
+          type: "image",
+          source_id: "portrait.default:1",
+          rank: 30,
+          resource: validArtworkResource({ url, version: fixtureDigest(url) }),
+        },
+      ],
+    });
+  assert.doesNotThrow(() =>
+    Protocol.validateArtPanel(catalogPanel({ "42": validArtCatalogEntry({ artwork: candidate(worst) }) }))
+  );
   const tooLong = "/art/" + "p".repeat(256 - "/art/".length + 1);
   assert.throws(() =>
-    Protocol.validateArtPanel(
-      validArtPanel({
-        portrait_catalog: { "42": validArtCatalogEntry({ url: tooLong }) },
-      })
-    )
+    Protocol.validateArtPanel(catalogPanel({ "42": validArtCatalogEntry({ artwork: candidate(tooLong) }) }))
   );
   assert.doesNotThrow(() =>
     Protocol.validateRosterPanel(
       validRosterPanel({
-        characters: [validRosterCharacter({ portrait: validRosterPortrait({ url: worst }) })],
+        characters: [
+          validRosterCharacter({ portrait: validRosterPortrait({ attempts: candidate(worst).attempts }) }),
+        ],
       })
     )
   );
@@ -294,10 +321,9 @@ test("media url bound admits the worst-case gallery identity in both mirrors", (
     Protocol.validateRosterPanel(
       validRosterPanel({
         characters: [
-          validRosterCharacter({ portrait: validRosterPortrait({ url: tooLong }) }),
+          validRosterCharacter({ portrait: validRosterPortrait({ attempts: candidate(tooLong).attempts }) }),
         ],
       })
     )
   );
 });
-

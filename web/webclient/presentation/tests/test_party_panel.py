@@ -331,7 +331,19 @@ class PartyPresenterTests(EvenniaTest):
         slots = panels["party"]["slots"]
         self.assertEqual([slot["identity"] for slot in slots], [int(npc.pk)])
         self.assertIn(key, panels["art"]["portrait_catalog"])
-        return slots[0], panels["art"]["portrait_catalog"][key]
+        # The catalog value is exactly {artwork, context}: the row and the art
+        # panel agree on one complete canonical descriptor.
+        entry = panels["art"]["portrait_catalog"][key]
+        self.assertEqual(set(entry), {"artwork", "context"})
+        return slots[0], entry["artwork"]
+
+    @staticmethod
+    def _candidate(artwork):
+        """The presented real candidate's resource, or None for a row with none."""
+        for attempt in artwork["attempts"]:
+            if attempt["type"] == "image":
+                return attempt["resource"]
+        return None
 
     def _read_only_render_case(
         self, art, subject, companion, expected_url, expected_origin
@@ -371,10 +383,12 @@ class PartyPresenterTests(EvenniaTest):
             for call in spy.call_args_list:
                 self.assertFalse(call.kwargs.get("create", False), call)
         for snapshot in panels:
-            slot, entry = self._slot_and_entry(snapshot, companion)
+            slot, artwork = self._slot_and_entry(snapshot, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], expected_origin)
-            self.assertEqual(entry["url"], expected_url)
+            resource = self._candidate(artwork)
+            self.assertIsNotNone(resource)
+            self.assertEqual(resource["origin"], expected_origin)
+            self.assertEqual(resource["url"], expected_url)
         self.assertEqual(before, after)
 
     def _presentation_state(self, art, subject, companion):
@@ -431,25 +445,40 @@ class PartyPresenterTests(EvenniaTest):
             before = deepcopy(record.db.cards)
             rows = self._render()["slots"]
             self.assertEqual(rows[0]["portrait_ref"], str(first.pk))
-            self.assertIsNone(rows[1]["portrait_ref"])
+            # The other co-located companion is ADMITTED too (a live party
+            # member present in the room), so its reference is non-null even
+            # though it has no named policy and no real image at all: the
+            # reference names its complete descriptor, not a real portrait.
+            self.assertEqual(rows[1]["portrait_ref"], str(second.pk))
             catalog = self.registry.render("art", self.context)["portrait_catalog"]
-            self.assertEqual(catalog[rows[0]["portrait_ref"]]["url"], f"/art/{identity}")
+            self.assertEqual(
+                catalog[rows[0]["portrait_ref"]]["artwork"]["attempts"][0]["resource"]["url"],
+                f"/art/{identity}",
+            )
+            self.assertEqual(
+                catalog[rows[1]["portrait_ref"]]["artwork"]["attempts"], []
+            )
             self.assertEqual(record.db.cards, before)
-            # A default naming no card the record holds resolves nothing at
-            # step 4, so the chain continues; with no classic asset, no
-            # official reference and no other preference every later branch is
-            # absent too and the truthful null stands (silhouette artwork is
-            # decorative, never the payload's own image).
+            # Membership never depends on the imagery: a default naming no card
+            # the record holds, an empty record, or no record at all each leave
+            # the reference standing while the descriptor truthfully carries no
+            # real candidate (silhouette artwork is decorative, never the
+            # payload's own image).
             record.db.default_image_id = "bbbbbbbb-2222-4222-8222-222222222222"
-            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
             record.db.default_image_id = None
-            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
-            # An absent record is the legal empty-gallery state, not an
-            # absence-of-portrait claim: the same chain, now starting with no
-            # card at all, still resolves nothing here.
+            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
             record.delete()
-            self.assertIsNone(self._render()["slots"][0]["portrait_ref"])
+            self.assertEqual(self._render()["slots"][0]["portrait_ref"], str(first.pk))
             self.assertIsNone(record_for(subject, create=False))
+            catalog = self.registry.render("art", self.context)["portrait_catalog"]
+            self.assertEqual(
+                [
+                    attempt["type"]
+                    for attempt in catalog[str(first.pk)]["artwork"]["attempts"]
+                ],
+                [],
+            )
 
     def test_possessed_companion_keeps_owner_order_and_owner_bond_stages(self):
         first = _companion("測試同行甲", self.room)
@@ -497,7 +526,10 @@ class PartyPresenterTests(EvenniaTest):
                 "display_name": npc_display_name(first)[
                     :MAX_DISPLAY_NAME_CODE_POINTS
                 ],
-                "portrait_ref": None,
+                # Both companions are present and joined, so both are admitted
+                # to the bounded art view and carry their own catalog key even
+                # though neither has real artwork yet.
+                "portrait_ref": str(first.pk),
                 "hp_current": 60,
                 "hp_maximum": 120,
                 "bond_stage": get_config().stage_for_value(affinity_value).name,
@@ -611,12 +643,13 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
-            self.assertEqual(entry["url"], art.url(selected))
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(resource["url"], art.url(selected))
             self.assertEqual(
-                entry["url"],
+                resource["url"],
                 "/art/official/"
                 f"{current_catalog().fingerprint_for(selected)}/{selected}",
             )
@@ -641,12 +674,13 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
-            self.assertEqual(entry["url"], art.url(identity))
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(resource["url"], art.url(identity))
             self.assertEqual(
-                entry["url"],
+                resource["url"],
                 "/art/official/"
                 f"{current_catalog().fingerprint_for(identity)}/{identity}",
             )
@@ -685,11 +719,12 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
-            self.assertEqual(entry["url"], f"/art/{bound_identity}")
-            self.assertNotEqual(entry["url"], art.url(selected))
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(resource["url"], f"/art/{bound_identity}")
+            self.assertNotEqual(resource["url"], art.url(selected))
             # The selection survived the outranking presentation untouched.
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
@@ -721,10 +756,11 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
-            self.assertEqual(entry["url"], f"/art/{identity}")
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
@@ -762,10 +798,11 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_OFFICIAL)
-            self.assertEqual(entry["url"], art.url(selected))
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_OFFICIAL)
+            self.assertEqual(resource["url"], art.url(selected))
             # The runtime default card and the stored selection are untouched.
             self.assertEqual(record.db.default_image_id, image_id)
             self.assertEqual(official_preferences_for(subject).selection, selected)
@@ -796,32 +833,40 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
+            slot, artwork = self._slot_and_entry(panels, companion)
             self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
-            self.assertEqual(entry["origin"], ORIGIN_RUNTIME)
-            self.assertEqual(entry["url"], f"/art/{identity}")
+            resource = self._candidate(artwork)
+            self.assertEqual(resource["origin"], ORIGIN_RUNTIME)
+            self.assertEqual(resource["url"], f"/art/{identity}")
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
-    def test_portraitless_companion_stays_null_with_silhouette_fallback(self):
+    def test_admitted_portraitless_companion_keeps_its_reference(self):
         with _official_art_scope():
             companion = self._official_companion()
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
-            # An empty official catalog and no runtime artwork leave the
-            # truthful null: the decorative silhouette is never the payload's
-            # own image, so the client keeps its initial-letter placeholder.
-            self.assertIsNone(slot["portrait_ref"])
-            self.assertEqual(entry["origin"], ORIGIN_SILHOUETTE)
-            self.assertIsNone(entry["url"])
-            self.assertIsNotNone(entry["fallback"])
+            slot, artwork = self._slot_and_entry(panels, companion)
+            # An empty official catalog and no runtime artwork leave no real
+            # candidate, but the ADMITTED companion keeps its reference: the
+            # descriptor carries the deterministic attribute-selected alpha
+            # terminal instead, and the client renders that silhouette (never
+            # an invented real image).
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertIsNone(self._candidate(artwork))
+            self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
+            self.assertEqual(
+                artwork["terminal"]["resource"]["origin"], ORIGIN_SILHOUETTE
+            )
+            self.assertTrue(
+                artwork["terminal"]["resource"]["url"].startswith("/art/defaults/")
+            )
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
-    def test_companion_without_a_named_subject_has_no_portrait_ref(self):
+    def test_companion_without_a_named_subject_keeps_its_reference(self):
         with _official_art_scope() as art:
             art.mount("hero.png")
             companion = _companion("測試無肖像隊友", self.room)
@@ -829,10 +874,14 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, entry = self._slot_and_entry(panels, companion)
-            self.assertIsNone(slot["portrait_ref"])
-            self.assertIsNone(entry["url"])
-            self.assertNotEqual(entry["status"], ArtAssetStatus.DONE)
+            slot, artwork = self._slot_and_entry(panels, companion)
+            # Admitted by membership, so the reference stands; the descriptor
+            # exposes no real candidate and no generated subject key, so no
+            # official default is ever presented for a subject-less companion.
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertIsNone(self._candidate(artwork))
+            self.assertIsNone(artwork["generation_subject"])
+            self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
 
     @covers_requirement(
         "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
@@ -850,8 +899,12 @@ class PartyPresenterTests(EvenniaTest):
 
             panels = self._panels()
 
-            slot, _entry = self._slot_and_entry(panels, companion)
-            self.assertIsNone(slot["portrait_ref"])
+            slot, artwork = self._slot_and_entry(panels, companion)
+            # The stored preference is simply ignored: the admitted companion
+            # keeps its reference while the descriptor carries no real
+            # candidate, and the stored selection stays exactly as it was.
+            self.assertEqual(slot["portrait_ref"], portrait_catalog_key(companion.pk))
+            self.assertIsNone(self._candidate(artwork))
             self.assertEqual(official_preferences_for(subject).selection, selected)
 
     @covers_requirement(

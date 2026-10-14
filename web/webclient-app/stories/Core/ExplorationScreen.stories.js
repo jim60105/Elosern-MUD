@@ -99,7 +99,7 @@ function renderScreen(args) {
             { mode: "exploration", cardOpen, personFocus: focus },
             {
               "actor-right": () =>
-                focus ? h(StageActor, { side: "right", portrait: null, name: "葛里安‧衛登" }) : null,
+                focus ? h(StageActor, { side: "right", artwork: null, panel: ART_PANEL_SAMPLE, hasReference: false, name: "葛里安‧衛登" }) : null,
               presence: () => (cardOpen ? null : h(PresenceRail, presenceArgs(ROOM, { artPanel: ART_PANEL_SAMPLE }))),
               choices: () => centredCard(card, focus),
               map: () => [

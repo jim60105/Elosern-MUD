@@ -1,22 +1,25 @@
 <script setup>
 // StageActor (webclient-dialogue-stage-actors design D1): one standing
-// portrait on the stage. It wraps `ReferenceArtwork` (which stays the plain
-// frame of the drawer's art slot) and adds the stage's own concerns:
+// figure on the stage. It wraps `ReferenceArtwork` (the shared figure
+// renderer, which also frames the drawer's art slot) and adds the stage's own
+// concerns:
 // - the side it stands on (`left` for the player, `right` for the dialogue
 //   host), exposed as `data-side` for directional beat gestures;
 // - the speaking state: the listener is dimmed through the shared
 //   `--actor-dim` token and `data-speaking` names the state for tests. The
 //   dim is never the only cue (the message window's name plate names the
 //   host); it eases on the motion tokens (instant below `full`);
-// - stage-only artwork preserves contours and uses a grounded silhouette
-//   with identity and authoritative availability when no image is available.
+// - stage-only artwork preserves contours and uses the descriptor's own
+//   grounded alpha terminal with identity and authoritative availability when
+//   no real image is available.
 // Decorative art: no focusable element, no pointer events.
 //
-// A new portrait source (webclient-scene-transitions, design D5) — a new
-// image URL, or a switch between an image and a placeholder — crossfades:
-// the artwork is keyed by its source, the new one fades in above the old,
-// and the old one is inert from the commit on. A same-URL refresh keeps the
-// key, so it never fades.
+// A new portrait SOURCE (webclient-scene-transitions, design D5) — a new
+// resource identity, or a switch between a real candidate and the terminal —
+// crossfades: the artwork is keyed by the presented resource's own identity,
+// the new one fades in above the old, and the old one is inert from the commit
+// on. A geometry-only re-presentation of the SAME resource keeps the key, so
+// the placement updates without a remount, a refetch or a crossfade.
 //
 // The combat beat gestures (webclient-combat-beat-choreography design D4;
 // AVG stage design §10.2): while a combat round plays, the figure acts out
@@ -31,10 +34,16 @@
 import { computed, ref, watch } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
+import { artworkOriginal, artworkTerminalUrl } from "../lib/artwork.js";
 
 const props = defineProps({
-  // A roster portrait or an `art` panel `portrait_catalog` entry, or null.
-  portrait: { type: Object, default: null },
+  // The canonical artwork descriptor of this figure position, or null.
+  artwork: { type: Object, default: null },
+  // The committed panel the descriptor came from, and whether that panel
+  // admitted a reference for this position at all.
+  panel: { type: Object, default: null },
+  hasReference: { type: Boolean, default: true },
+  required: { type: Boolean, default: true },
   // The display name the placeholder states when no entry exists.
   name: { type: String, default: "" },
   side: {
@@ -62,12 +71,22 @@ const props = defineProps({
   floatAmount: { type: Number, default: null },
 });
 
+// The crossfade key is the presented RESOURCE's own identity, never the
+// descriptor revision: a geometry-only re-presentation of the same resource
+// keeps the key (so placement updates in place), while a genuinely new
+// resource — a new candidate or the switch to the terminal — re-keys it.
 const portraitKey = computed(() => {
-  const entry = props.portrait;
-  if (entry?.url) {
-    return entry.url;
+  const descriptor = props.artwork;
+  if (!descriptor) {
+    return `ph:${props.name}`;
   }
-  return `ph:${props.name}:${entry?.placeholder?.label ?? ""}`;
+  const original = artworkOriginal(descriptor);
+  const resource = original?.resource ?? null;
+  if (resource) {
+    return `${descriptor.subject_id}:${resource.resource_id}:${resource.version}`;
+  }
+  const terminal = artworkTerminalUrl(descriptor);
+  return terminal ? `${descriptor.subject_id}:terminal:${terminal}` : `ph:${descriptor.subject_id}`;
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
@@ -101,7 +120,17 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
       :data-beat="gesture || null"
     >
       <Transition name="actor-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
-        <ReferenceArtwork :key="portraitKey" :portrait="portrait" :initial-of="name" stage :motion-level="motionLevel" />
+        <ReferenceArtwork
+          :key="portraitKey"
+          :artwork="artwork"
+          :panel="panel"
+          :required="required"
+          :has-reference="hasReference"
+          :name="name"
+          :initial-of="name"
+          stage
+          :motion-level="motionLevel"
+        />
       </Transition>
     </div>
     <span

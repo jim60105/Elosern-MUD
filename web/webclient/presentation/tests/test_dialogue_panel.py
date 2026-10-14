@@ -230,10 +230,14 @@ class DialoguePresenterTests(EvenniaTest):
         entry = art["portrait_catalog"][portrait_ref]
         self.assertEqual(entry["context"]["name"], npc_display_name(self.host))
         # Membership, never resolution success, gates the key: the entry behind
-        # it is the placeholder card while the portrait is unresolved, and the
-        # panel ships the key anyway.
-        self.assertIsNone(entry["url"])
-        self.assertIsNotNone(entry["placeholder"])
+        # it is the complete canonical descriptor with no real candidate while
+        # the portrait is unresolved, and the panel ships the key anyway.
+        artwork = entry["artwork"]
+        self.assertEqual(artwork["attempts"], [])
+        self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(
+            artwork["terminal"]["resource"]["origin"], "silhouette"
+        )
 
     @covers_requirement(
         "webclient-dialogue-session::the-dialogue-panel-is-an-exact-read-only-version-2-presentation-panel"

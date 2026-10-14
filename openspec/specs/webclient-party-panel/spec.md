@@ -69,13 +69,12 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 - **THEN** `display_name` is the canonical name truncated to that bound
 
 #### Scenario: portrait_ref is the art panel's opaque reference format
-- **WHEN** the existing art resolution chain yields a real image for a companion's named portrait subject, through a matching equipment-bound card, personal official selection, record default card, classic runtime asset or mounted official default
-- **THEN** `portrait_ref` is the companion's opaque ASCII decimal catalog key of 1–32 characters, in the same format used by the art panel
-- **AND** for the companion present in the same snapshot's art view, that key resolves in `art.portrait_catalog` to the chain-selected image; an official image has `origin: official` and its admitted `/art/official/...` URL
+- **WHEN** a companion is admitted to the bounded canonical art view
+- **THEN** portrait_ref is its unchanged 1–32-character ASCII-decimal catalog key whether real art succeeds or not; that key resolves in the same committed snapshot
 
 #### Scenario: A missing portrait is null, not fabricated
-- **WHEN** the companion has no named portrait subject or the complete art chain yields no real runtime or official image, including an absent or unresolvable personal official selection and no mounted official default
-- **THEN** `portrait_ref` is `null` and the client renders its truthful initial-letter placeholder, even if decorative silhouette fallback artwork is available
+- **WHEN** a party companion is authorized and admitted to the current art catalog without real imagery
+- **THEN** portrait_ref names its complete descriptor, including expected alpha/initial presentation; null is reserved for no admitted reference and no job or private-catalog expansion occurs
 
 #### Scenario: Personal official selection works without runtime cards
 - **WHEN** a present named companion has a resolving retained personal official selection, no runtime card and no classic runtime asset
@@ -125,6 +124,10 @@ The party panel SHALL present one ordered row per exact NPC in the canonical ros
 #### Scenario: Quota, row count and commission reference bounds
 - **WHEN** a dual member or an over-quota party is presented
 - **THEN** General usage SHALL use valid general identity, total roster rows SHALL not be limited to four, and temporary commission references SHALL contain exact quest identity and protected-role reference with player-permitted labels, never private planning data. Existing portrait formatting/bounds and no-raw-affinity rules SHALL remain.
+
+#### Scenario: Unavailable data remains an availability fault
+- **WHEN** a party surface has an admitted subject but its image panel is unavailable
+- **THEN** gameplay stays usable with safe matching fallback and local availability indication, without invented pending generation
 
 ### Requirement: Party presentation stays current across membership and combat changes
 Existing exploration/combat party push seams SHALL include temporary joins, per-source releases and general identity changes after commit. Existing combat HP/portrait refresh behavior SHALL remain. Related mission state/reason, phase and offer capabilities SHALL refresh after committed changes; stale choices SHALL refuse. Text clients SHALL retain equivalent interaction and explicit reasons. No new escort-control UI SHALL be added.

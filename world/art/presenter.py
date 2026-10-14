@@ -10,9 +10,14 @@ alpha terminal. ``_enumerate_portrait`` walks that chain exactly once and
 projects it twice — as the canonical artwork descriptor
 (``describe_portrait``/``describe_entity``, using the frozen
 ``world.art.descriptors`` vocabulary with each position's stable source id and
-rank and every reached fault at its own position) and as the current
-registered flat payload ``resolve_subject`` still returns. Scenes keep their
-own path through the same classic record and truthful placeholder.
+rank and every reached fault at its own position) and, for SCENES ONLY, as the
+flat scene payload ``resolve_scene``/``resolve_scene_subject`` returns (which
+refuses every non-scene subject kind). The portrait wire cut over to the
+canonical descriptor (change ``unified-portrait-image-contract``), so no
+portrait flat projection exists any more: a portrait consumer reads
+``describe_entity``/``describe_portrait`` and the shipped serializers project
+the descriptor. Scenes keep their own path through the same classic record and
+truthful placeholder until their separately versioned cutover.
 
 Every flat payload carries ``face_rect`` — the resolved card's or official
 image's rectangle, the shared default for a classic asset or a fallback image,
@@ -579,25 +584,72 @@ def describe_entity(entity) -> dict | None:
 
     Applies exactly the presentation eligibility (explicit named policy, both
     canonical integer age fields, registered visual species) and then
-    enumerates that ONE subject. An ineligible or subject-less entity answers
-    ``None`` rather than a descriptor for a subject the caller was not already
-    authorized to show, and nothing here enumerates, scans, or discovers any
-    other subject.
+    enumerates that ONE subject. Nothing here enumerates, scans, or discovers
+    any other subject: the caller supplies the entities it is already
+    authorized to show.
+
+    An entity that carries no eligible subject (a dialogue host with no named
+    policy, a character whose canonical ages refuse it, a monster whose visual
+    species is unregistered) still answers its own complete descriptor — the
+    full fact set with no image attempt, no generated subject key and no
+    prompt, plus the deterministic attribute-selected alpha terminal — because
+    catalog admission is a membership decision the caller already made, not a
+    real-image decision. Only a genuinely absent entity — ``None``, or a value
+    carrying no runtime identity at all — answers ``None``, so no descriptor
+    is ever built around a fabricated ``subject_id``.
     """
+    if entity is None or getattr(entity, "pk", None) is None:
+        return None
     subject, refusal = _portrait_subject(entity)
     if refusal is not None:
-        return None
+        return _refusal_descriptor(entity, subject)
     return describe_portrait(subject, entity)
 
 
-def _attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
-    """The current flat payload of one resolved canonical candidate.
+def _refusal_descriptor(entity, subject: ArtSubject | None) -> dict:
+    """The complete descriptor of an admitted entity with no eligible subject.
 
-    The projection the registered portrait contract keeps until its atomic
-    canonical wire cutover: the resource's own URL, its validated geometry and
-    its authored origin, with the catalog's read-only image labelled as exactly
-    that and never as a generated asset. Selection, geometry validation and
-    diagnostics all already happened once, in the enumerator.
+    Every fact here is a REFUSAL fact: no candidate, no reached fault and no
+    recorded generation is claimed, so nothing is enqueued, created or read on
+    the refused subject's behalf, and ``generation_subject`` stays null so the
+    completion push can never match a subject the entity does not have. The
+    alpha terminal is the deterministic attribute-selected built-in the
+    presentation has always carried for such an entity — a fallback, never a
+    real candidate.
+
+    ``subject_id`` is the position's stable lifecycle identity and is
+    deliberately the entity's own opaque decimal runtime identity — NEVER the
+    refused subject's key, because a subject that failed eligibility must
+    disclose no subject key at all (its ``portrait_policy.stable_key`` is
+    operator content the refusal must not leak). It is likewise not a
+    generation key — that is ``generation_subject``, which is null here — so a
+    re-presentation of the same position keeps the same resolution epoch while
+    claiming no generation.
+    """
+    identity = getattr(entity, "pk", None)
+    if subject is not None:
+        fallback = fallback_for(subject, entity=entity, report=True)
+    else:
+        fallback = _entity_fallback(entity)
+    return descriptors.descriptor(
+        subject_id=str(identity),
+        generation_subject=None,
+        generation_state=None,
+        attempts=[],
+        terminal_payload=_alpha_terminal(fallback),
+        retention_sources=[],
+    )
+
+
+def _scene_attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
+    """The flat SCENE payload of one resolved canonical scene candidate.
+
+    The scene block's own projection, kept byte-identical until the scene
+    wire's separately versioned cutover: the resource's own URL, its validated
+    geometry and its authored origin, with the catalog's read-only image
+    labelled as exactly that and never as a generated asset. Selection,
+    geometry validation and diagnostics all already happened once, in the
+    enumerator. No portrait consumer reads this shape.
     """
     resource = attempt.resource
     geometry = resource["geometry"]
@@ -615,10 +667,10 @@ def _attempt_payload(subject: ArtSubject, attempt: _PortraitAttempt) -> dict:
     }
 
 
-def _placeholder_payload(
+def _scene_placeholder_payload(
     subject: ArtSubject, record: ArtAssetRecord | None, silhouette: dict | None
 ) -> dict:
-    """The truthful placeholder closing a chain that resolved no real image.
+    """The truthful scene placeholder closing a chain that resolved no image.
 
     A missing or unfinished record reads ``missing`` with its own true status
     (a claimed ``in_progress`` record is normalized to the wire-stable
@@ -650,35 +702,34 @@ def _placeholder_payload(
     return _carried(_placeholder_unavailable("無法提供"), silhouette)
 
 
-def resolve_subject(subject: ArtSubject, *, entity=None) -> dict:
-    """Resolve a validated subject to its current registered presentation payload.
+def resolve_scene_subject(subject: ArtSubject) -> dict:
+    """The flat scene payload of one validated SCENE subject.
 
-    The flat projection of the one canonical portrait enumeration: the first
-    resolving candidate of the ordered chain (the equipment-bound card, the
-    personal official selection, the record's default card, the classic
-    ``done`` asset, the mounted catalog's official default for the entity's
-    content reference) becomes the payload's own image, and the truthful
-    placeholder closes the chain when none resolved. A URL outside the shared
-    wire budget falls through exactly like an absent reference, and a
-    selection presentation performs the chain's step-4 read plus this
-    payload's override read.
+    Scene-only by construction: any other subject kind is a caller error, so
+    no portrait can ever obtain a flat payload through this seam.
 
-    A resolved fallback is NEVER the payload's own image: it rides the
-    decorative ``fallback`` field (key, committed ``/art/defaults/`` URL and
-    rectangle) beside the subject's true status, so a silhouette-only
-    resolution stays the truthful placeholder row it is — no ``done`` status,
-    no generated label, and the same persisted record. Payloads whose real
-    image resolved carry the same reference (without reporting a use) so the
-    browser can fall back locally when that image fails to load.
+    The scene wire's own projection of the one canonical enumeration: the
+    scene record's ``done`` asset becomes the payload's image and the truthful
+    placeholder closes the chain when none resolved. A resolved fallback is
+    NEVER the payload's own image: it rides the decorative ``fallback`` field
+    beside the subject's true status, so a silhouette-only resolution stays the
+    truthful placeholder row it is. Nothing here is a portrait projection —
+    portraits are read through ``describe_portrait``/``describe_entity``.
     """
-    enumeration = _enumerate_portrait(subject, entity)
+    if subject.kind is not ArtSubjectKind.SCENE:
+        raise ArtSubjectError(
+            f"the flat projection is scene-only; {subject.full()!r} is not a scene"
+        )
+    enumeration = _enumerate_portrait(subject)
     if enumeration.attempt is not None:
         return _carried(
-            _attempt_payload(subject, enumeration.attempt),
+            _scene_attempt_payload(subject, enumeration.attempt),
             enumeration.silhouette,
             origin=enumeration.attempt.resource["origin"],
         )
-    return _placeholder_payload(subject, enumeration.record, enumeration.silhouette)
+    return _scene_placeholder_payload(
+        subject, enumeration.record, enumeration.silhouette
+    )
 
 
 def _carried(payload: dict, silhouette: dict | None, *, origin: str | None = None) -> dict:
@@ -730,27 +781,15 @@ def _silhouette_from(fallback) -> dict | None:
     )
 
 
-def _silhouette_field(subject: ArtSubject, entity=None, *, report: bool = True) -> dict | None:
-    """The silhouette a subject's payload carries, via the terminal seam.
+def _entity_fallback(entity) -> dict | None:
+    """The SEAM-shaped fallback facts of an entity carrying no named portrait subject.
 
-    ``report`` marks whether the resolution is the payload's presented figure
-    (the chain fell all the way through) or a decorative reference carried
-    beside a real image; it rides through to the seam, which owns the
-    ``gallery_fallback_used`` event.
-    """
-    return _silhouette_from(fallback_for(subject, entity=entity, report=report))
-
-
-def _entity_silhouette(entity) -> dict | None:
-    """The decorative silhouette for an entity with no named portrait subject.
-
-    A rejected subject (no policy, malformed policy, no age pair) has no
-    subject key to hand the seam, so selection runs ``fallback_key_for_entity``
-    over the entity's validated attributes with its stable runtime identity as
-    the sole hash input; the resolved key's committed identity and rectangle
-    come from the same map. The one ``gallery_fallback_used`` event is
-    reported with ``kind`` "entity" because no portrait subject exists, and
-    nothing is installed, created, or enqueued.
+    The deterministic attribute-selected resolution for a refused subject,
+    kept in the seam's own ``{identity, key, face_rect}`` shape so it can build
+    a canonical alpha terminal (which needs the committed identity's version)
+    exactly like a subject's own resolution does. The one
+    ``gallery_fallback_used`` event is reported with ``kind`` "entity" because
+    no portrait subject exists.
     """
     identity = getattr(entity, "pk", None)
     if entity is None or identity is None:
@@ -762,7 +801,8 @@ def _entity_silhouette(entity) -> dict | None:
         "gallery_fallback_used",
         context={"subject": str(identity), "kind": "entity", "key": key},
     )
-    return _silhouette(key, *fallback_identity_and_rect(key))
+    committed, rect = fallback_identity_and_rect(key)
+    return {"key": key, "identity": committed, "face_rect": rect}
 
 
 def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:
@@ -803,55 +843,20 @@ def _portrait_subject(entity) -> tuple[ArtSubject | None, str | None]:
     return subject, None
 
 
-def resolve_character(entity) -> dict:
-    """Resolve a character's portrait through the canonical-age check and named policy.
-
-    A subject with missing or malformed canonical ages resolves only to the
-    unavailable placeholder with its explanatory label; the payload never
-    contains a rejected prompt or the offending age values.
-    """
-    subject, refusal = _portrait_subject(entity)
-    if refusal == "unnamed":
-        return _placeholder_unavailable("無肖像", silhouette=_entity_silhouette(entity))
-    if refusal == "ineligible":
-        return _placeholder_unavailable(
-            "無法提供", silhouette=_silhouette_field(subject, entity)
-        )
-    return resolve_subject(subject, entity=entity)
-
-
-def resolve_entity(entity) -> dict:
-    """Resolve one present entity's portrait by kind (design D3).
-
-    A monster (entity of typeclass ``Monster``) resolves
-    ``portrait:monster:<visual_key>`` through ``monster_subject_for`` +
-    ``resolve_subject`` with no canonical-age check. Provenance is resolved
-    from ``species_key`` if present, else ``art_species_key``.
-    A character resolves through :func:`resolve_character` (explicit named
-    policy plus both canonical age fields). Anything else yields the
-    unavailable placeholder. A rejected subject never returns a prompt, a
-    subject key, or a URL.
-    """
-    from typeclasses.monsters import Monster
-
-    if not isinstance(entity, Monster):
-        return resolve_character(entity)
-    subject, refusal = _portrait_subject(entity)
-    if refusal is not None:
-        return _placeholder_unavailable("無法提供", silhouette=_entity_silhouette(entity))
-    payload = resolve_subject(subject, entity=entity)
-    return dict(payload, subject_key=subject.full())
-
-
 def resolve_scene(archetype: str) -> dict:
-    """Resolve a validated scene archetype to its presentation payload."""
+    """Resolve a validated scene archetype to its flat presentation payload.
+
+    The ONLY remaining flat projection: scenes keep their own block until the
+    scene wire's separately versioned cutover. Portraits are read through the
+    canonical descriptor seam (``describe_portrait``/``describe_entity``).
+    """
     from world.art.subjects import scene_subject_for
 
     try:
         subject = scene_subject_for(archetype)
     except ArtSubjectError:  # observability: ignore R2: unregistered archetype -> specified unavailable placeholder
         return _placeholder_unavailable("無法提供")
-    return resolve_subject(subject)
+    return resolve_scene_subject(subject)
 
 
 def _placeholder_unavailable(label: str, *, silhouette: dict | None = None) -> dict:

@@ -61,7 +61,11 @@ const store = useElosernStore();
 const currentCharacter = computed(
   () => store.view.rosterCharacters?.find((character) => character.current) ?? null,
 );
-const currentPortrait = computed(() => currentCharacter.value?.portrait ?? null);
+// The current character's own figure position (design D4/D10): its complete
+// roster descriptor, judged against the committed roster panel that admitted
+// it — the owner's row stays the roster's current row even while a bound
+// companion is possessed.
+const currentArtwork = computed(() => currentCharacter.value?.portrait ?? null);
 // The shell handle (H5, design D1/D6) and the SceneBackdrop harness hook
 // (the __-prefixed pending-scene journey seeds the prior-image memory
 // through this handle — SceneBackdrop's exposed setPriorImage).
@@ -102,14 +106,15 @@ const {
   onRestSubmit, onRestClose, onPlaceHover, onPillHoverChange,
   onCompassTab, onRailTab, onPlaceTab, onPillTab,
 } = useAppClient(store, shellRef, sceneBackdropRef);
-// The dialogue host's standing portrait (webclient-dialogue-stage-actors
-// D2): the committed `art` panel's raw catalog entry named by the committed
-// `dialogue` panel's `host.portrait_ref` — the raw entry, so a pending entry
-// shows its own placeholder card; a null or unknown key falls to the
-// StageActor's name placeholder. The client never builds a catalog key.
+// The dialogue host's standing figure (webclient-dialogue-stage-actors D2):
+// the canonical descriptor the committed `dialogue` panel's
+// `host.portrait_ref` names in the committed `art` panel's catalog — so a
+// pending host shows its own truthful state and an admitted silhouette-only
+// host keeps its reference; a null reference is expected absence and a
+// dangling one a local failure. The client never builds a catalog key.
 const hostPortrait = computed(() => {
   const key = dialogueVM.value?.host.portraitRef;
-  return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
+  return key == null ? null : (panel("art")?.portrait_catalog?.[key]?.artwork ?? null);
 });
 // The speaking state (design D3): only a conversation with its host on the
 // stage dims anyone (a transiently unavailable panel leaves the player lit).
@@ -134,10 +139,22 @@ const renderedLineup = computed(() => displayedLineup(companionLineupSlots.value
 // no re-entry.
 const actorRightTarget = computed(() => {
   if (inDialogue.value && dialogueVM.value) {
-    return { identity: dialogueVM.value.host.identity, name: dialogueVM.value.host.displayName, portrait: hostPortrait.value };
+    return {
+      identity: dialogueVM.value.host.identity,
+      name: dialogueVM.value.host.displayName,
+      artwork: hostPortrait.value,
+      panel: panel("art"),
+      hasReference: dialogueVM.value.host.portraitRef != null,
+    };
   }
   if (store.view.mode === "exploration" && personFocus.value && focusTarget.value) {
-    return { identity: focusTarget.value.identity, name: focusTarget.value.display_name, portrait: focusPortrait.value };
+    return {
+      identity: focusTarget.value.identity,
+      name: focusTarget.value.display_name,
+      artwork: focusPortrait.value,
+      panel: panel("art"),
+      hasReference: focusTarget.value.portrait_ref != null,
+    };
   }
   return null;
 });
@@ -190,7 +207,11 @@ const isControllingCompanion = computed(() => !!possessionBanner.value?.availabl
 const companionLineupSlots = computed(() => companionFigures({
   player: {
     identity: currentCharacter.value?.identity,
-    portrait: currentPortrait.value,
+    // The player's own figure is the ROSTER position: its complete roster
+    // descriptor, judged against the committed roster panel that admitted it.
+    artwork: currentArtwork.value,
+    panel: panel("roster"),
+    hasReference: true,
     displayName: currentCharacter.value?.name || panel("status")?.actor?.name || "",
   },
   companions: store.partyAvailable ? store.partySlots : [],
@@ -357,6 +378,7 @@ function onFoeLineupGone() {
         :roster-can-create="store.rosterCanCreate"
         :roster-switch-locked="store.rosterSwitchLocked"
         :roster-lock-reason="store.rosterLockReason"
+        :roster-panel="panel('roster')"
         :epoch="store.view.epoch"
         :possession-banner="possessionBanner"
         :place-actions="placeActions"
@@ -433,7 +455,9 @@ function onFoeLineupGone() {
               :key="standee.identity"
               :data-identity="standee.identity"
               side="right"
-              :portrait="standee.portrait"
+              :artwork="standee.artwork"
+              :panel="standee.panel"
+              :has-reference="standee.hasReference"
               :name="standee.name"
               :dimmed="inDialogue && store.view.dialogueSpeaker === 'player'"
               :motion-level="store.view.motionLevel"
@@ -776,7 +800,9 @@ function onFoeLineupGone() {
            drawers provide no art slot and take the whole workspace. -->
       <template v-if="drawerHasArt" #art>
         <ReferenceArtwork
-          :portrait="currentPortrait"
+          :artwork="currentArtwork"
+          :panel="panel('roster')"
+          :name="currentCharacter?.name || ''"
           :initial-of="currentCharacter?.name || ''"
           stage
         />

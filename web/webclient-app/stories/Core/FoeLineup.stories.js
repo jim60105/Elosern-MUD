@@ -95,13 +95,12 @@ export const PendingPlaceholder = {
       portrait_catalog: {
         ...FOE_PORTRAIT_CATALOG,
         32: {
-          subject_key: "npc_32",
-          status: "pending",
-          url: null,
-          aspect_ratio: null,
-          alt: "盜賊頭目的肖像",
-          placeholder: { kind: "missing", label: "肖像生成中" },
-          face_rect: null,
+          artwork: {
+            ...FOE_PORTRAIT_CATALOG["32"].artwork,
+            generation_state: "pending",
+            attempts: [],
+            terminal: null,
+          },
           context: { name: "盜賊頭目", role: "敵方" },
         },
       },

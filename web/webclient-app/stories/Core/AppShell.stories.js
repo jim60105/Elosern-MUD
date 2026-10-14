@@ -150,16 +150,55 @@ function journeyPanels(stop) {
 
 // The mode-transition journey's host (webclient-mode-transitions): the
 // tavern keeper with a finished portrait, a greeting, and four picks.
+// The catalog value is exactly `{artwork, context}`: the complete canonical
+// descriptor (builtin-silhouette-stage-fallback rides as its own alpha
+// terminal) plus its bounded display context.
 const MODE_JOURNEY_CATALOG = {
   "7": {
-    subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
-    alt: "店長的肖像", placeholder: null,
-    face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
-    stage: { scale: 1, x: 0, y: 0 },
-    // builtin-silhouette-stage-fallback: the decorative built-in silhouette
-    // the server carries beside the entry's own resolved image.
-    origin: "runtime",
-    fallback: { key: "elder", url: "/art/defaults/elder.webp", face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 } },
+    artwork: {
+      subject_id: "npc_7",
+      revision: "7".repeat(64),
+      generation_subject: "npc_7",
+      generation_state: "done",
+      attempts: [
+        {
+          type: "image",
+          source_id: "portrait.default:npc_7",
+          rank: 30,
+          resource: {
+            resource_id: "defaults/elder.webp",
+            version: "8".repeat(64),
+            url: "/art/defaults/elder.webp",
+            origin: "runtime",
+            geometry: {
+              image_size: null,
+              face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+              stage: { scale: 1, x: 0, y: 0 },
+              aspect_ratio: "3:4",
+            },
+          },
+        },
+      ],
+      terminal: {
+        kind: "alpha_mask",
+        source_id: "portrait.alpha:elder",
+        rank: 100,
+        resource: {
+          resource_id: "defaults/elder.webp",
+          version: "9".repeat(64),
+          url: "/art/defaults/elder.webp",
+          origin: "silhouette",
+          geometry: {
+            image_size: null,
+            face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 },
+            stage: null,
+            aspect_ratio: "3:4",
+          },
+        },
+      },
+      retention_sources: [],
+    },
+    context: { name: "店長", role: "對話對象" },
   },
 };
 const MODE_JOURNEY_DIALOGUE = {
@@ -273,7 +312,7 @@ const renderPlayer = (args) => ({
           services: SERVICES_PANEL_SAMPLE,
           character: CHARACTER_PANEL_SAMPLE,
           roster: {
-            schema_version: 2,
+            schema_version: 3,
             available: true,
             characters: [
               {
@@ -282,20 +321,39 @@ const renderPlayer = (args) => ({
                 current: true,
                 pending: false,
                 portrait: args.grounding ? {
-                  subject_key: "char_1", status: args.grounding,
-                  url: null, aspect_ratio: null, alt: "艾莉亞的肖像",
-                  placeholder: { kind: "missing", label: "無肖像" }, face_rect: null,
-                  stage: null, origin: "placeholder",
+                  subject_id: "portrait:character:1",
+                  revision: "1".repeat(64),
+                  generation_subject: "portrait:character:1",
+                  generation_state: "missing",
+                  attempts: [],
+                  terminal: null,
+                  retention_sources: [],
                 } : {
-                  subject_key: "char_1",
-                  status: "done",
-                  url: "/art/defaults/man.webp",
-                  aspect_ratio: "3:4",
-                  alt: "艾莉亞的肖像",
-                  placeholder: null,
-                  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-                  stage: { scale: 1, x: 0, y: 0 },
-                  origin: "runtime",
+                  subject_id: "portrait:character:1",
+                  revision: "2".repeat(64),
+                  generation_subject: "portrait:character:1",
+                  generation_state: "done",
+                  attempts: [
+                    {
+                      type: "image",
+                      source_id: "portrait.default:portrait:character:1",
+                      rank: 30,
+                      resource: {
+                        resource_id: "defaults/man.webp",
+                        version: "3".repeat(64),
+                        url: "/art/defaults/man.webp",
+                        origin: "runtime",
+                        geometry: {
+                          image_size: null,
+                          face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+                          stage: { scale: 1, x: 0, y: 0 },
+                          aspect_ratio: "3:4",
+                        },
+                      },
+                    },
+                  ],
+                  terminal: null,
+                  retention_sources: [],
                 },
               },
             ],
@@ -314,20 +372,13 @@ const renderPlayer = (args) => ({
             portrait_catalog: {
               ...(args.populated ? COMPANION_PORTRAIT_CATALOG : {}),
               "7": args.dialogue === "pending" ? {
-                subject_key: "npc_7", status: "pending", url: null, aspect_ratio: null,
-                alt: "店長的肖像", placeholder: { kind: "missing", label: "肖像生成中" },
-                face_rect: null, context: { name: "店長", role: "對話對象" },
-                stage: null,
-                origin: "silhouette",
-                fallback: { key: "elder", url: "/art/defaults/elder.webp", face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 } },
-              } : {
-                subject_key: "npc_7", status: "done", url: "/art/defaults/elder.webp", aspect_ratio: "3:4",
-                alt: "店長的肖像", placeholder: null,
-                face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 }, context: { name: "店長", role: "對話對象" },
-                stage: { scale: 1, x: 0, y: 0 },
-                origin: "runtime",
-                fallback: { key: "elder", url: "/art/defaults/elder.webp", face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 } },
-              },
+                artwork: {
+                  ...MODE_JOURNEY_CATALOG["7"].artwork,
+                  generation_state: "pending",
+                  attempts: [],
+                },
+                context: { name: "店長", role: "對話對象" },
+              } : MODE_JOURNEY_CATALOG["7"],
             },
           } } : {}),
           ...(args.dialogue ? { dialogue: {
@@ -366,9 +417,13 @@ const renderPlayer = (args) => ({
         });
         snapshot.panels.status = protocolFixtures.statusPanel({ combat: { mode: "hostile", round: 0 } });
         snapshot.panels.art.portrait_catalog["32"] = {
-          ...FOE_PORTRAIT_CATALOG["32"], url: null, status: "pending", face_rect: null, aspect_ratio: null,
-          placeholder: { kind: "missing", label: "肖像生成中" },
-          stage: null, origin: "silhouette",
+          artwork: {
+            ...FOE_PORTRAIT_CATALOG["32"].artwork,
+            generation_state: "pending",
+            attempts: [],
+            terminal: null,
+          },
+          context: { name: "盜賊頭目", role: "敵方" },
         };
       }
       const result = store.receive(1, "ui_snapshot", [snapshot], {});

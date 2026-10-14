@@ -1,33 +1,39 @@
-"""Exact schema-version-2 ``art`` panel and presenter (webclient-art-panel).
+"""Exact schema-version-3 ``art`` panel and presenter (webclient-art-panel).
 
 The presenter composes the frozen art view owned by
 ``world.rules.art_view`` with the read-only resolution primitives in
-``world.art.presenter`` (``resolve_scene`` / ``resolve_entity``) and validates
-its own output against the exact bounded schema before returning it to the
-presentation registry. The panel is available in ``exploration`` and ``combat``
-modes; a creation-pending shell raises :class:`PanelUnavailableError` so the
-registry emits the common unavailable form.
+``world.art.presenter`` (``resolve_scene`` for the scene, ``describe_entity``
+for every catalog member) and validates its own output against the exact
+bounded schema before returning it to the presentation registry. The panel is
+available in ``exploration`` and ``combat`` modes; a creation-pending shell
+raises :class:`PanelUnavailableError` so the registry emits the common
+unavailable form.
 
 The payload contains exactly ``schema_version``, ``available``, ``kind``, the
 current scene (validated archetype, label, subject key, status, same-origin
 URL, aspect, alternative text, and a nullable placeholder) and a bounded
 ``portrait_catalog`` keyed by the opaque IDs of currently present focusable
-entities, each entry additionally carrying the resolved normalized face
-rectangle (exactly ``x``, ``y``, ``w``, ``h`` in ``[0, 1]`` whenever the entry
-has a media URL, ``null`` for every placeholder), the server-authored origin
-discriminator (the closed vocabulary ``runtime``/``official``/
-``silhouette``/``placeholder``, see ``official-art-resolution``), and the
-decorative built-in silhouette the fallback seam resolved (``key``, committed
-``/art/defaults/`` URL and rectangle, see ``art-gallery-fallback``). It never
-exposes ``out_path``, the store root, or rejected prompt content. The origin
-rules — including that an ``official`` entry always carries its own media URL
-and never a generated status — are shared with the roster row portrait
-(``_validate_portrait_origin``), so the two vocabularies cannot drift.
+entities, each entry carrying exactly the complete canonical artwork
+descriptor (``world.art.descriptors``: stable subject identity, revision,
+independent recorded generation truth, ordered candidate/fault facts, the
+permitted alpha terminal and the retention authorizations) plus its bounded
+display ``context``. The scene keeps its prior shape until its own separately
+versioned cutover. It never exposes ``out_path``, the store root, or rejected
+prompt content.
+
+Catalog admission and real-image eligibility are different facts: membership
+is ``world.rules.art_view``'s decision (a currently present focusable entity),
+while an entry's own attempts state whether any real image resolves. An
+admitted entity with no eligible portrait subject still carries its complete
+descriptor — no real candidate, no generated subject key, and the
+deterministic attribute-selected alpha terminal — so no surface ever has to
+guess imagery from the absence of a field.
 """
 
 from typing import Any
 
 from web.webclient.presentation.context import PresentationContext
+from web.webclient.presentation.artwork import validate_artwork
 from web.webclient.presentation.protocol import (
     MAX_CANONICAL_JSON_BYTES,
     MAX_SAFE_INTEGER,
@@ -40,12 +46,9 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
+from world.art import descriptors
 from world.art.presenter import (
-    ORIGIN_OFFICIAL,
-    ORIGIN_PLACEHOLDER,
-    ORIGIN_RUNTIME,
-    ORIGIN_SILHOUETTE,
-    resolve_entity,
+    describe_entity,
     resolve_scene,
 )
 from world.art.gallery import GalleryRecordError, validate_stage
@@ -60,7 +63,7 @@ from world.rules.art_view import (
     build_art_view,
 )
 
-ART_SCHEMA_VERSION = 2
+ART_SCHEMA_VERSION = 3
 
 # Stable panel-level bounds equal to or below the global protocol table.
 MAX_ARCHETYPE = 64
@@ -73,47 +76,13 @@ MAX_PLACEHOLDER_KIND = 16
 MAX_PLACEHOLDER_LABEL = 128
 MAX_CONTEXT_NAME = 64
 MAX_CONTEXT_ROLE = 16
-MAX_FALLBACK_KEY = 32
-MAX_ORIGIN = 16
 
 PLACEHOLDER_KINDS = frozenset({"missing", "unavailable"})
 ROLES = frozenset({ROLE_ALLY, ROLE_DIALOGUE, ROLE_FOE, ROLE_PERSON})
-# The closed portrait-origin vocabulary (owned by ``world.art.presenter``;
-# `official-art-resolution-contracts` extends both sides with ``official``).
-PORTRAIT_ORIGINS = frozenset(
-    {ORIGIN_OFFICIAL, ORIGIN_PLACEHOLDER, ORIGIN_RUNTIME, ORIGIN_SILHOUETTE}
-)
-# The committed built-in identities the decorative fallback may name.
-FALLBACK_URL_PREFIX = "/art/defaults/"
 
 
 class ArtPanelError(ProtocolValidationError):
     """The available art payload violates its exact bounded schema."""
-
-
-def _validate_face_rect(value: Any) -> dict[str, float] | None:
-    """Validate the wire face rectangle: ``None`` or exactly x, y, w, h reals.
-
-    Shared by the art catalog entry and the roster row portrait (the same
-    portrait field vocabulary on both wires). Every coordinate is a real
-    number in ``[0, 1]``; booleans are not numbers here. The server ships
-    placement metadata only — no crop, no second image.
-    """
-    if value is None:
-        return None
-    if not isinstance(value, dict) or set(value) != {"x", "y", "w", "h"}:
-        raise ProtocolValidationError(
-            "face_rect must be a mapping of exactly x, y, w, h"
-        )
-    rect: dict[str, float] = {}
-    for name in ("x", "y", "w", "h"):
-        coordinate = value[name]
-        if not isinstance(coordinate, (int, float)) or isinstance(coordinate, bool):
-            raise ProtocolValidationError(f"face_rect.{name} must be a real number")
-        if not 0.0 <= coordinate <= 1.0:
-            raise ProtocolValidationError(f"face_rect.{name} must lie in [0, 1]")
-        rect[name] = coordinate
-    return rect
 
 
 def _validate_stage(value: Any, url: str | None) -> dict | None:
@@ -139,68 +108,6 @@ def _validate_placeholder(value: Any) -> dict[str, Any] | None:
     if not label.strip():
         raise ProtocolValidationError("placeholder label must be non-empty")
     return {"kind": kind, "label": label}
-
-
-def _validate_portrait_fallback(value: Any) -> dict[str, Any] | None:
-    """Validate the decorative built-in silhouette reference.
-
-    ``None``, or exactly ``key``, ``url``, and ``face_rect``: the committed
-    fallback key, its ``/art/defaults/`` identity, and that key's normalized
-    rectangle. The field is presentation data for a still-absent portrait —
-    the caller keeps it out of the entry's own fields — so it carries a URL
-    only under that closed prefix and never a second portrait.
-    """
-    if value is None:
-        return None
-    _require_exact_fields(value, "art fallback", {"key", "url", "face_rect"}, {})
-    key = _require_str(value, "key", maximum=MAX_FALLBACK_KEY)
-    if not key.strip():
-        raise ProtocolValidationError("fallback key must be non-empty")
-    url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
-    if not url.startswith(FALLBACK_URL_PREFIX):
-        raise ProtocolValidationError(
-            "fallback url must name a committed built-in identity"
-        )
-    face_rect = _validate_face_rect(value["face_rect"])
-    if face_rect is None:
-        raise ProtocolValidationError("a fallback carries a face_rect")
-    return {"key": key, "url": url, "face_rect": face_rect}
-
-
-def _validate_portrait_origin(
-    field: str, noun: str, portrait: Any, url: str | None, status: str | None
-) -> str:
-    """The server-authored origin discriminator, coherent with its own media.
-
-    Shared by the art catalog entry and the roster row portrait — the same
-    portrait field vocabulary on both wires — so the two can never drift: the
-    value is inside the closed vocabulary
-    ``runtime | official | silhouette | placeholder`` and it names the branch
-    that produced the payload's OWN media, never a URL shape. A ``silhouette``
-    or ``placeholder`` origin therefore never carries that media URL, a
-    ``runtime`` or ``official`` origin always does, and an ``official`` image
-    is never reported with a generated-portrait status, because a read-only
-    catalog default is not a generated asset (``official-art-resolution``).
-    ``field`` and ``noun`` only name the surface in the refusal messages
-    ("catalog origin"/"catalog entry" or "portrait origin"/"portrait"); the
-    wire key itself is always ``origin``.
-    """
-    origin = _require_str(portrait, "origin", maximum=MAX_ORIGIN)
-    if origin not in PORTRAIT_ORIGINS:
-        raise ProtocolValidationError(f"{field} is not a stable value")
-    if url is not None and origin in (ORIGIN_SILHOUETTE, ORIGIN_PLACEHOLDER):
-        raise ProtocolValidationError(
-            f"a {noun} carrying a media URL is not a silhouette or a placeholder"
-        )
-    if url is None and origin in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL):
-        raise ProtocolValidationError(
-            f"an {origin} origin carries the {noun}'s media URL"
-        )
-    if origin == ORIGIN_OFFICIAL and status is not None:
-        raise ProtocolValidationError(
-            "an official image is not a generated portrait"
-        )
-    return origin
 
 
 def _validate_scene(value: Any) -> dict[str, Any]:
@@ -283,85 +190,20 @@ def _validate_context(value: Any) -> dict[str, Any]:
 
 
 def _validate_catalog_entry(value: Any) -> dict[str, Any]:
-    _require_exact_fields(
-        value,
-        "art catalog entry",
-        {
-            "subject_key",
-            "status",
-            "url",
-            "aspect_ratio",
-            "alt",
-            "placeholder",
-            "face_rect",
-            "stage",
-            "context",
-            "origin",
-            "fallback",
-        },
-        {},
-    )
-    subject_key = value["subject_key"]
-    if subject_key is not None:
-        subject_key = _require_str(value, "subject_key", maximum=MAX_SUBJECT_KEY)
-        if not subject_key.strip():
-            raise ProtocolValidationError("catalog subject_key must be non-empty")
-    status = value["status"]
-    if status is not None:
-        status = _require_str(value, "status", maximum=MAX_STATUS)
-        if status not in ("missing", "pending", "failed", "done"):
-            raise ProtocolValidationError("catalog status is not a stable value")
-    url = value["url"]
-    if url is not None:
-        url = _require_str(value, "url", maximum=MAX_MEDIA_URL)
-        if not url.startswith("/art/"):
-            raise ProtocolValidationError("catalog url must be a same-origin media URL")
-    aspect_ratio = value["aspect_ratio"]
-    if aspect_ratio is not None:
-        aspect_ratio = _require_str(value, "aspect_ratio", maximum=16)
-        if aspect_ratio != "3:4":
-            raise ProtocolValidationError("catalog aspect_ratio must be 3:4")
-    alt = _require_str(value, "alt", maximum=MAX_ALT)
-    if not alt.strip():
-        raise ProtocolValidationError("catalog alt must be non-empty")
-    placeholder = _validate_placeholder(value["placeholder"])
-    context = _validate_context(value["context"])
-    face_rect = _validate_face_rect(value["face_rect"])
-    stage = _validate_stage(value["stage"], url)
-    origin = _validate_portrait_origin(
-        "catalog origin", "catalog entry", value, url, status
-    )
-    fallback = _validate_portrait_fallback(value["fallback"])
-    # A client never offsets a frame it has no image for: the rectangle is
-    # present exactly when the entry carries a media URL.
-    if url is not None and face_rect is None:
-        raise ProtocolValidationError("a catalog entry with a url carries a face_rect")
-    if url is None and face_rect is not None:
-        raise ProtocolValidationError("a catalog placeholder carries no face_rect")
-    # The decorative reference has no meaning on an entry whose own media is
-    # already absent for a different reason, so it is required exactly by the
-    # silhouette origin and refused by the placeholder origin.
-    if origin == ORIGIN_SILHOUETTE:
-        if fallback is None:
-            raise ProtocolValidationError(
-                "a silhouette origin carries its fallback identity"
-            )
-        if status == "done":
-            raise ProtocolValidationError("a silhouette origin is not a done portrait")
-    elif origin == ORIGIN_PLACEHOLDER and fallback is not None:
-        raise ProtocolValidationError("a placeholder origin carries no fallback identity")
+    """Validate one catalog entry: exactly the canonical descriptor plus its context.
+
+    The entry is ``{artwork, context}`` and nothing else. ``artwork`` is the
+    complete canonical descriptor validated by the one shared wire validator
+    (``web.webclient.presentation.artwork.validate_artwork``), so the art
+    catalog and every other descriptor consumer accept byte-identical fact
+    shapes; an entry that still carries the retired flat image fields
+    (``url``/``face_rect``/``stage``/``origin``/``fallback``/``placeholder``)
+    fails the exact-key check rather than being adapted.
+    """
+    _require_exact_fields(value, "art catalog entry", {"artwork", "context"}, {})
     return {
-        "subject_key": subject_key,
-        "status": status,
-        "url": url,
-        "aspect_ratio": aspect_ratio,
-        "alt": alt,
-        "placeholder": placeholder,
-        "face_rect": face_rect,
-        "stage": stage,
-        "context": context,
-        "origin": origin,
-        "fallback": fallback,
+        "artwork": validate_artwork(value["artwork"]),
+        "context": _validate_context(value["context"]),
     }
 
 
@@ -466,37 +308,44 @@ def _serialize_scene(archetype: str | None) -> dict[str, Any]:
     }
 
 
+def _missing_entity_descriptor(identity: Any) -> dict[str, Any]:
+    """The complete descriptor of an admitted identity with no live entity row.
+
+    A catalog member whose database row no longer resolves still occupies its
+    admitted key in the committed snapshot, so the position states the truth
+    instead of failing the whole panel: its stable lifecycle identity, no
+    candidate, no reached fault and no generation claim.
+    """
+    return descriptors.descriptor(
+        subject_id=str(int(identity)),
+        generation_subject=None,
+        generation_state=None,
+        attempts=[],
+        terminal_payload=None,
+        retention_sources=[],
+    )
+
+
 def _serialize_catalog_entry(entity_view: Any) -> dict[str, Any]:
+    """Serialize one admitted entity as its complete descriptor plus display context.
+
+    Admission is ``world.rules.art_view``'s decision and is already made: this
+    builder never drops a member for lacking real imagery, never consults an
+    eligibility rule of its own, and never enqueues or creates art state. An
+    admitted entity with no eligible portrait subject still resolves its own
+    complete refusal descriptor (no candidate, no generated subject key, the
+    attribute-selected alpha terminal).
+    """
     from evennia.objects.models import ObjectDB
 
     entity = ObjectDB.objects.filter(id=int(entity_view.identity)).first()
-    if entity is None:
-        resolved = {
-            "kind": "unavailable",
-            "label": "無法提供",
-            "status": None,
-            "url": None,
-            "aspect_ratio": None,
-            "alt": "無法提供",
-            "subject_key": None,
-            "face_rect": None,
-            "stage": None,
-            "origin": ORIGIN_PLACEHOLDER,
-            "fallback": None,
-        }
-    else:
-        resolved = resolve_entity(entity)
+    artwork = (
+        _missing_entity_descriptor(entity_view.identity)
+        if entity is None
+        else describe_entity(entity)
+    )
     return {
-        "subject_key": resolved.get("subject_key"),
-        "status": resolved.get("status"),
-        "url": resolved.get("url"),
-        "aspect_ratio": resolved.get("aspect_ratio"),
-        "alt": resolved.get("alt") or "無法提供",
-        "placeholder": _placeholder_for(resolved),
-        "face_rect": resolved.get("face_rect"),
-        "stage": resolved.get("stage"),
-        "origin": resolved.get("origin"),
-        "fallback": resolved.get("fallback"),
+        "artwork": artwork,
         "context": {
             "name": entity_view.display_name,
             "role": entity_view.role,
@@ -539,25 +388,19 @@ def art_presenter(context: PresentationContext) -> dict[str, Any]:
 __all__ = [
     "ART_SCHEMA_VERSION",
     "ArtPanelError",
-    "FALLBACK_URL_PREFIX",
     "MAX_ARCHETYPE",
     "MAX_ALT",
     "MAX_CONTEXT_NAME",
     "MAX_CONTEXT_ROLE",
-    "MAX_FALLBACK_KEY",
     "MAX_LABEL",
-    "MAX_ORIGIN",
     "MAX_PLACEHOLDER_KIND",
     "MAX_PLACEHOLDER_LABEL",
     "MAX_STATUS",
     "MAX_SUBJECT_KEY",
     "MAX_MEDIA_URL",
     "PLACEHOLDER_KINDS",
-    "PORTRAIT_ORIGINS",
     "ROLES",
-    "_validate_face_rect",
-    "_validate_portrait_fallback",
-    "_validate_portrait_origin",
+    "_missing_entity_descriptor",
     "_placeholder_for",
     "art_presenter",
     "validate_art",

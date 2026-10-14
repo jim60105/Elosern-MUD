@@ -14,6 +14,12 @@
 //   same baseline as the scene caption) with a trailing bar that makes damage
 //   visible; names and non-colour cues sit above it, while HP numerals,
 //   tokens and participant states remain in the frame.
+// - Each foe's figure is the canonical artwork descriptor its combat
+//   participant row's catalog reference names, resolved against the committed
+//   `art` panel — or, while a held round stands the pre-round roster after
+//   combat ended, against the retained catalog that round captured. The row
+//   reference itself is the admission fact, so a participant the catalog does
+//   not carry is a local failure while an unadmitted one is expected absence.
 // - Each slot exposes `data-portrait-ref`, the art-catalog key the combat
 //   beats name, so the beat presentation can address a foe.
 // - A foe joining or leaving the active set inside combat enters or fades
@@ -61,17 +67,32 @@ const slots = computed(() => foeSlots(shown.value.length));
 // The raw catalog entry the participant's `portrait_ref` names: a pending
 // entry keeps its own placeholder card, and a null or unknown reference
 // falls to the StageActor's name placeholder. The client builds no key.
+// The descriptor is read from exactly the catalog the availability panel names:
+// the CURRENT committed `art` panel's catalog whenever one exists, and the held
+// round's captured catalog only when no live panel is committed. A live panel
+// that no longer carries an admitted reference therefore reports the local
+// failure it is, instead of being concealed by retained playback data.
 function entryFor(participant) {
   const ref = participant.portrait_ref;
   if (ref === null || ref === undefined) {
     return null;
   }
   const strRef = String(ref);
-  return (
-    props.artPanel?.portrait_catalog?.[strRef] ??
-    props.stage?.foeCatalog?.[strRef] ??
-    null
-  );
+  const catalog = props.artPanel ? props.artPanel.portrait_catalog : props.stage?.foeCatalog;
+  return catalog?.[strRef]?.artwork ?? null;
+}
+
+// The committed panel this position is judged against. The CURRENT committed
+// `art` panel always wins — so a panel that is now unavailable, or a reference
+// it no longer admits, is reported as the local failure it is rather than
+// concealed by retained playback data. Only when no live panel is committed at
+// all does the held round's own captured catalog stand in, as the available
+// panel it was captured from.
+function panelFor() {
+  if (props.artPanel) {
+    return props.artPanel;
+  }
+  return props.stage?.foeCatalog ? { available: true, portrait_catalog: props.stage.foeCatalog } : null;
 }
 
 function slotStyle(index) {
@@ -130,7 +151,9 @@ function gestureFor(participant) {
         :style="slotStyle(i)"
       >
         <StageActor
-          :portrait="entryFor(p)"
+          :artwork="entryFor(p)"
+          :panel="panelFor()"
+          :has-reference="p.portrait_ref !== null && p.portrait_ref !== undefined"
           :name="p.display_name"
           side="right"
           :dimmed="false"

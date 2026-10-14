@@ -37,16 +37,9 @@ var DIALOGUE_MAX_LINE = C.DIALOGUE_MAX_LINE;
 var ROSTER_SCHEMA_VERSION = C.ROSTER_SCHEMA_VERSION;
 var ROSTER_MAX_ROWS = C.ROSTER_MAX_ROWS;
 var ROSTER_MAX_NAME = C.ROSTER_MAX_NAME;
-var ROSTER_MAX_SUBJECT_KEY = C.ROSTER_MAX_SUBJECT_KEY;
-var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
-var ROSTER_MAX_ALT = C.ROSTER_MAX_ALT;
-var ROSTER_MAX_STATUS = C.ROSTER_MAX_STATUS;
 var ROSTER_LOCK_REASON = C.ROSTER_LOCK_REASON;
-var art = require("./art.js");
-var validateArtFaceRect = art.validateArtFaceRect;
-var validateArtStage = art.validateArtStage;
-var validateArtPlaceholder = art.validateArtPlaceholder;
-var validatePortraitOrigin = art.validatePortraitOrigin;
+var artwork = require("../artwork.js");
+var validateArtwork = artwork.validateArtwork;
 var questLog = require("./quest_log.js");
 var validateQuestLogPanel = questLog.validateQuestLogPanel;
 
@@ -391,69 +384,13 @@ function validateDialoguePanel(payload) {
   return result;
 }
 
-// Exact available roster panel v2 schema (mirror of
-// web.webclient.presentation.roster, webclient-character-roster).
+// Exact available roster panel v3 schema (mirror of
+// web.webclient.presentation.roster, webclient-character-roster): a row's
+// portrait IS the complete canonical artwork descriptor, validated by the one
+// shared mirror, so the roster and the art catalog cannot drift and a retired
+// flat portrait object fails the exact-key check instead of being adapted.
 function validateRosterPortrait(value) {
-  requireExactFields(
-    value,
-    "roster portrait",
-    ["subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "face_rect", "stage", "origin"],
-    []
-  );
-  if (value.subject_key !== null) {
-    requireString(value.subject_key, "portrait subject_key", ROSTER_MAX_SUBJECT_KEY);
-  }
-  var status = value.status;
-  if (status !== null) {
-    requireString(status, "portrait status", ROSTER_MAX_STATUS);
-    if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
-      throw new Error("portrait status is not a stable value");
-    }
-  }
-  var url = value.url;
-  if (url !== null) {
-    requireString(url, "portrait url", MAX_MEDIA_URL);
-    if (url.indexOf("/art/") !== 0) {
-      throw new Error("portrait url must be a same-origin media URL");
-    }
-  }
-  if (value.aspect_ratio !== null && value.aspect_ratio !== "3:4") {
-    throw new Error("portrait aspect_ratio must be 3:4");
-  }
-  var alt = requireString(value.alt, "portrait alt", ROSTER_MAX_ALT);
-  if (!alt.trim()) {
-    throw new Error("portrait alt must be non-empty");
-  }
-  var placeholder = validateArtPlaceholder(value.placeholder);
-  if (url !== null && placeholder !== null) {
-    throw new Error("portrait cannot carry both url and placeholder");
-  }
-  if (url === null && placeholder === null) {
-    throw new Error("portrait must carry either url or placeholder");
-  }
-  var faceRect = validateArtFaceRect(value.face_rect);
-  var stage = validateArtStage(value.stage, url);
-  // The art panel catalog's own origin discriminator and coherence rules
-  // (official-art-resolution): the vocabulary and its URL/status coupling are
-  // shared, so a roster row can never state an origin the art panel rejects.
-  var origin = validatePortraitOrigin("portrait origin", "portrait", value.origin, url, status);
-  if (url !== null && faceRect === null) {
-    throw new Error("a portrait with a url carries a face_rect");
-  }
-  if (url === null && faceRect !== null) {
-    throw new Error("a placeholder portrait carries no face_rect");
-  }
-  return {
-    subject_key: value.subject_key,
-    status: status,
-    url: url,
-    aspect_ratio: value.aspect_ratio,
-    alt: alt,
-    placeholder: placeholder,
-    face_rect: faceRect,
-    stage: stage,
-    origin: origin,
-  };
+  return validateArtwork(value);
 }
 
 function validateRosterCharacter(value, index) {

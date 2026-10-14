@@ -116,17 +116,37 @@ class DrawerContentBrowserTest(BrowserAcceptanceTest):
                         "character": valid_character_panel(),
                         "lore_codex": valid_lore_codex_panel(),
                         "roster": {
-                            "schema_version": 2,
+                            "schema_version": 3,
                             "available": True,
                             "characters": [{
                                 "identity": 42, "name": "燼行者", "current": True, "pending": False,
+                                # The row's portrait IS the complete canonical
+                                # descriptor: a resolved candidate with its own
+                                # geometry and no terminal of its own here.
                                 "portrait": {
-                                    "subject_key": None, "status": "done", "url": portrait_url,
-                                    "aspect_ratio": "3:4", "alt": "測試全身立繪",
-                                    "placeholder": None,
-                                    "face_rect": {"x": 0.25, "y": 0.0, "w": 0.5, "h": 0.1},
-                                    "stage": {"scale": 0.6, "x": 0.0, "y": 0.0},
-                                    "origin": "runtime",
+                                    "subject_id": "portrait:character:42",
+                                    "revision": "4" * 64,
+                                    "generation_subject": "portrait:character:42",
+                                    "generation_state": "done",
+                                    "attempts": [{
+                                        "type": "image",
+                                        "source_id": "portrait.classic:portrait:character:42",
+                                        "rank": 40,
+                                        "resource": {
+                                            "resource_id": portrait_url,
+                                            "version": "5" * 64,
+                                            "url": portrait_url,
+                                            "origin": "runtime",
+                                            "geometry": {
+                                                "image_size": None,
+                                                "face_rect": {"x": 0.25, "y": 0.0, "w": 0.5, "h": 0.1},
+                                                "stage": {"scale": 0.6, "x": 0.0, "y": 0.0},
+                                                "aspect_ratio": "3:4",
+                                            },
+                                        },
+                                    }],
+                                    "terminal": None,
+                                    "retention_sources": [],
                                 },
                             }],
                             "can_create": False, "max_characters": 3,

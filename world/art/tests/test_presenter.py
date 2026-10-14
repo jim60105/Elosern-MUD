@@ -52,11 +52,11 @@ from world.art.presenter import (
     PAYLOAD_OFFICIAL,
     PLACEHOLDER_MISSING,
     PLACEHOLDER_UNAVAILABLE,
+    describe_entity,
+    describe_portrait,
     media_url_for,
-    resolve_character,
-    resolve_entity,
     resolve_scene,
-    resolve_subject,
+    resolve_scene_subject,
 )
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -72,6 +72,23 @@ from tools.spec_traceability import covers_requirement
 
 _SYNTH_SCENE = sorted(SYNTH_ARCHETYPES)[0]
 _SYNTH_TIER = sorted(SYNTH_MONSTER_TIERS)[0]
+
+
+def candidate(descriptor: dict) -> dict | None:
+    """The descriptor's presented real candidate RESOURCE, or ``None``.
+
+    The canonical fact the retired flat payload copied as its own
+    ``url``/``face_rect``/``stage``/``aspect_ratio``/``origin``.
+    """
+    for attempt in descriptor["attempts"]:
+        if attempt["type"] == "image":
+            return attempt["resource"]
+    return None
+
+
+def terminal(descriptor: dict) -> dict | None:
+    """The descriptor's own alpha terminal RESOURCE, or ``None``."""
+    return descriptor["terminal"]["resource"] if descriptor["terminal"] else None
 
 
 def open_synthetic_scope(case, *targets, extra=None):
@@ -132,7 +149,7 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity="scene/t_synth_forest.png",
             error=None,
         )
-        payload = resolve_subject(subject)
+        payload = resolve_scene_subject(subject)
         self.assertEqual(payload["kind"], "asset")
         self.assertEqual(payload["status"], ArtAssetStatus.DONE)
         self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
@@ -151,9 +168,9 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity="scene/t_synth_forest.png",
             error=None,
         )
-        payload = resolve_subject(subject)
+        payload = resolve_scene_subject(subject)
         self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_missing_pending_failed_and_disabled_states_resolve_to_placeholders(self):
@@ -163,9 +180,9 @@ class ArtPresenterTests(EvenniaTestCase):
             _scene("not_ensured"),
             pending,
         ):
-            payload = resolve_subject(subject)
+            payload = resolve_scene_subject(subject)
             self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-            self.assertIsNone(payload["url"])
+            self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
 
         failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_dungeon")
         ensure(failed, "desc")
@@ -178,25 +195,25 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity=None,
             error="boom",
         )
-        payload = resolve_subject(failed)
+        payload = resolve_scene_subject(failed)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         self.assertEqual(payload["status"], ArtAssetStatus.FAILED)
-        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
 
     @covers_requirement("art-asset-lifecycle::rejected-prompt-content-never-reaches-the-presenter-or-browser")
     def test_malformed_subject_ages_resolve_only_to_the_unavailable_placeholder(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": str(self.player.pk)}
         self.player.age = "twenty-two"
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
-        self.assertNotIn("portrait rejected", str(payload))
-        self.assertNotIn("twenty-two", str(payload))
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertNotIn("portrait rejected", str(descriptor))
+        self.assertNotIn("twenty-two", str(descriptor))
 
     def test_character_without_a_named_policy_resolves_to_the_placeholder(self):
         self.player.db.portrait_policy = None
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_valid_character_portrait_resolves_to_a_same_origin_url(self):
@@ -212,9 +229,16 @@ class ArtPresenterTests(EvenniaTestCase):
             error=None,
         )
         self.player.db.portrait_policy = {"mode": "named", "stable_key": "42"}
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["url"], "/art/portrait/character/42.png")
+        descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["url"], "/art/portrait/character/42.png")
+
+    def test_the_flat_projection_refuses_every_non_scene_subject(self):
+        """The surviving flat payload is SCENE-only, by construction."""
+        with self.assertRaises(Exception):
+            resolve_scene_subject(ArtSubject(ArtSubjectKind.CHARACTER, "42"))
+        with self.assertRaises(Exception):
+            resolve_scene_subject(ArtSubject(ArtSubjectKind.MONSTER, "goblin"))
 
     def test_resolve_scene_handles_valid_and_unresolvable_archetypes(self):
         self.assertEqual(resolve_scene("not_a_scene")["kind"], PLACEHOLDER_UNAVAILABLE)
@@ -226,10 +250,10 @@ class ArtPresenterTests(EvenniaTestCase):
         subject = _scene()
         ensure(subject, "desc")
         claim(10)
-        payload = resolve_subject(subject)
+        payload = resolve_scene_subject(subject)
         self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         self.assertEqual(payload["status"], ArtAssetStatus.PENDING)
-        self.assertIsNone(payload["url"])
+        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
@@ -249,15 +273,15 @@ class ArtPresenterTests(EvenniaTestCase):
                     output_identity=None,
                     error="boom",
                 )
-            payload = resolve_subject(subject)
+            payload = resolve_scene_subject(subject)
             self.assertEqual(payload["status"], expected)
 
     @covers_requirement("art-subject-model::subject-producer-validation-rejects-unrepresentable-keys")
     def test_slash_portrait_key_resolves_to_unavailable_without_a_queue_record(self):
         self.player.db.portrait_policy = {"mode": "named", "stable_key": "a/b"}
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
         self.assertFalse(
             ArtAssetRecord.objects.filter(
                 db_key="art:portrait:character:a/b"
@@ -288,7 +312,7 @@ class ArtPresenterTests(EvenniaTestCase):
         with override_settings(
             ART_SD_OUTPUT_FORMAT="webp", ART_SD_OUTPUT_EXTENSION=".webp"
         ):
-            payload = resolve_subject(subject)
+            payload = resolve_scene_subject(subject)
         self.assertEqual(payload["kind"], "asset")
         self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
 
@@ -313,11 +337,12 @@ class ArtPresenterTests(EvenniaTestCase):
         # never becomes this payload's own image
         # (builtin-silhouette-stage-fallback).
         with patch("world.observability.log_info"):
-            payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+            descriptor = describe_portrait(subject)
+        # A monster identity living outside the portrait store resolves no
+        # candidate; the terminal carries the built-in silhouette.
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_all_four_store_extensions_present_as_assets(self):
@@ -334,14 +359,14 @@ class ArtPresenterTests(EvenniaTestCase):
                 output_identity=identity,
                 error=None,
             )
-            payload = resolve_subject(subject)
+            payload = resolve_scene_subject(subject)
             with self.subTest(extension=extension):
                 self.assertEqual(payload["kind"], "asset")
                 self.assertEqual(payload["url"], f"/art/{identity}")
 
 
 class ResolveEntityTests(EvenniaTestCase):
-    """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
+    """Canonical ``describe_entity`` dispatch tests (task 1.3/1.4)."""
 
     def setUp(self):
         # The monster dispatch arm validates threat_tier against the monster
@@ -393,15 +418,15 @@ class ResolveEntityTests(EvenniaTestCase):
 
     def test_named_character_resolves_through_the_canonical_age_check(self):
         with patch("world.observability.log_info"):
-            payload = resolve_entity(self.player)
-        self.assertEqual(payload["subject_key"], f"portrait:character:{self.player.pk}")
+            descriptor = describe_entity(self.player)
+        self.assertEqual(descriptor["generation_subject"], f"portrait:character:{self.player.pk}")
         # Filled seam: an artless character resolves a built-in silhouette,
         # carried decoratively beside its true missing state.
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertIsNone(payload["url"])
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
-        self.assertIn("subject_key", payload)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
+        self.assertEqual(descriptor["subject_id"], f"portrait:character:{self.player.pk}")
 
     def test_valid_canonical_ages_reach_the_generation_client(self):
         from world.art.subjects import character_subject_for
@@ -416,61 +441,61 @@ class ResolveEntityTests(EvenniaTestCase):
 
     def test_generic_monster_resolves_its_archetype_subject(self):
         with patch("world.observability.log_info"):
-            payload = resolve_entity(self.monster)
-        self.assertEqual(payload["subject_key"], "portrait:monster:goblin")
+            descriptor = describe_entity(self.monster)
+        self.assertEqual(descriptor["generation_subject"], "portrait:monster:goblin")
         # Filled seam: an artless monster resolves the monster_anon default as
         # its decorative silhouette.
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertIsNone(payload["url"])
-        self.assertEqual(payload["fallback"]["key"], "monster_anon")
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIn("monster_anon", terminal(descriptor)["url"])
+        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
 
     def test_non_integer_age_never_reaches_a_worker(self):
         self.player.age = "22"
-        payload = resolve_entity(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
         self._assert_no_generation_requested(f"portrait:character:{self.player.pk}")
 
     def test_non_integer_apparent_age_never_reaches_a_worker(self):
         self.player.apparent_age = "22"
-        payload = resolve_entity(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
         self._assert_no_generation_requested(f"portrait:character:{self.player.pk}")
 
     def test_missing_age_values_reject_without_a_prompt(self):
         self.player.attributes.remove("age")
-        payload = resolve_entity(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
 
     def test_malformed_age_values_reject_without_a_prompt(self):
         self.player.age = "twenty"
-        payload = resolve_entity(self.player)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
+        descriptor = describe_entity(self.player)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
 
     @covers_requirement(
         "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
     )
     def test_an_unregistered_art_species_key_falls_back_to_placeholder(self):
         self.monster.art_species_key = "mythical"
-        payload = resolve_entity(self.monster)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
+        descriptor = describe_entity(self.monster)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
 
     def test_entity_without_policy_resolves_to_unavailable(self):
         plain = create_object(PlayerCharacter, key="plain-entity")
         plain.age = 30
         plain.apparent_age = 30
-        payload = resolve_entity(plain)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
+        descriptor = describe_entity(plain)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
 
 
 class _CardPayloadCase(EvenniaTestCase):
@@ -532,11 +557,11 @@ class StagePayloadTests(_CardPayloadCase):
     def test_resolved_card_carries_its_stage_verbatim(self):
         triple = {"scale": 0.6, "x": -0.2, "y": 0.1}
         subject, image_id, identity = self._append_card_with_file(stage=triple)
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["stage"], triple)
+        descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], triple)
         # The stage never disturbs the asset truth it rides on.
-        self.assertEqual(payload["url"], f"/art/{identity}")
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
 
     @covers_requirement(
         "webclient-art-panel::resolved-artwork-carries-stage-without-changing-asset-or-placeholder-truth"
@@ -553,8 +578,8 @@ class StagePayloadTests(_CardPayloadCase):
                 (ChainSlot("default", card["image_id"], card),), True
             ),
         ):
-            payload = resolve_character(self.player)
-        self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+            descriptor = describe_entity(self.player)
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
         # A malformed stored triple degrades to identity with one diagnostic,
         # and the asset itself still resolves.
         broken = dict(cards_for(subject)[0])
@@ -567,9 +592,9 @@ class StagePayloadTests(_CardPayloadCase):
         ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
-            payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
+            descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
         events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_stage_invalid"]
         self.assertEqual(len(events), 1, events)
 
@@ -583,10 +608,10 @@ class FaceRectPayloadTests(_CardPayloadCase):
     def test_a_resolved_card_payload_carries_its_own_rectangle(self):
         explicit = {"x": 0.1, "y": 0.2, "w": 0.4, "h": 0.3}
         subject, image_id, identity = self._append_card_with_file(face_rect=explicit)
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["url"], f"/art/{identity}")
-        self.assertEqual(payload["face_rect"], explicit)
+        descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], explicit)
 
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
@@ -603,9 +628,9 @@ class FaceRectPayloadTests(_CardPayloadCase):
         ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
-            payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["face_rect"], default_face_rect(card["image_size"]))
+            descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], default_face_rect(card["image_size"]))
         events = [c for c in warn.call_args_list if c.args and c.args[0] == "art_face_rect_invalid"]
         self.assertEqual(len(events), 1, events)
 
@@ -629,9 +654,9 @@ class FaceRectPayloadTests(_CardPayloadCase):
             output_identity=f"portrait/character/{subject.key}.png",
             error=None,
         )
-        payload = resolve_character(self.player)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["face_rect"], dict(DEFAULT_FACE_RECT))
+        descriptor = describe_entity(self.player)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT))
 
     @covers_requirement(
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
@@ -639,18 +664,18 @@ class FaceRectPayloadTests(_CardPayloadCase):
     def test_every_placeholder_payload_carries_a_null_rectangle(self):
         # missing record -> PLACEHOLDER_MISSING
         subject = ArtSubject(ArtSubjectKind.SCENE, "rect_not_ensured")
-        payload = resolve_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        payload = resolve_scene_subject(subject)
         self.assertIsNone(payload["url"])
         self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(payload["stage"])
         # no policy -> unavailable
         plain = create_object(PlayerCharacter, key="rect-plain")
         plain.age = 30
         plain.apparent_age = 30
-        payload = resolve_character(plain)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
+        descriptor = describe_entity(plain)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
         # done record with a missing file -> unavailable
         done = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
         from world.art.queue import claim as claim2, ensure as ensure2, settle as settle2
@@ -664,10 +689,10 @@ class FaceRectPayloadTests(_CardPayloadCase):
             output_identity="scene/t_synth_tavern.png",
             error=None,
         )
-        payload = resolve_subject(done)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        payload = resolve_scene_subject(done)
         self.assertIsNone(payload["url"])
         self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(candidate(descriptor))
 
     @covers_requirement(
         "art-gallery-resolution::the-chain-ends-at-one-fallback-seam"
@@ -678,25 +703,21 @@ class FaceRectPayloadTests(_CardPayloadCase):
         seam = {"identity": "defaults/monster_default.png", "key": "man", "face_rect": None}
         no_record = ArtSubject(ArtSubjectKind.MONSTER, "seam-no-record")
         with patch("world.art.presenter.fallback_for", return_value=seam):
-            payload = resolve_subject(no_record)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
+            descriptor = describe_portrait(no_record)
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
         self.assertEqual(
-            payload["fallback"],
-            {
-                "key": "man",
-                "url": "/art/defaults/monster_default.png",
-                "face_rect": dict(DEFAULT_FACE_RECT),
-            },
+            terminal(descriptor)["url"], "/art/defaults/monster_default.png"
+        )
+        self.assertEqual(
+            terminal(descriptor)["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT)
         )
         # The unpatched seam fills persons but still returns None for scenes:
         # a scene subject keeps the byte-identical truthful placeholder.
         scene = ArtSubject(ArtSubjectKind.SCENE, "seam-no-record-scene")
-        payload = resolve_subject(scene)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertEqual(payload["origin"], ORIGIN_PLACEHOLDER)
+        payload = resolve_scene_subject(scene)
+        self.assertIsNone(payload["url"])
+        self.assertIsNone(payload["face_rect"])
         self.assertIsNone(payload["fallback"])
 
 
@@ -759,26 +780,33 @@ class SilhouettePayloadTests(EvenniaTestCase):
                 entity = self._character(stable_key)
                 subject = ArtSubject(ArtSubjectKind.CHARACTER, stable_key)
                 with patch("world.observability.log_info") as logged:
-                    payload = resolve_character(entity)
+                    descriptor = describe_entity(entity)
                 # The silhouette is carried, never presented as an image.
-                self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-                self.assertIsNone(payload["url"])
-                self.assertIsNone(payload["face_rect"])
-                self.assertIsNone(payload["stage"])
-                self.assertNotIn("已生成", str(payload))
+                self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+                self.assertIsNone(candidate(descriptor))
+                # A silhouette resolution never claims a generated image.
+                self.assertIsNone(candidate(descriptor))
                 # The subject's own key stays the subject's; the silhouette
-                # key lives only inside the decorative field.
-                self.assertEqual(payload["subject_key"], subject.full())
-                silhouette = payload["fallback"]
+                # key lives only inside the terminal's own source identity.
+                self.assertEqual(descriptor["generation_subject"], subject.full())
+                silhouette = {
+                    "key": terminal(descriptor)["url"].rsplit("/", 1)[-1][
+                        : -len(FALLBACK_EXTENSION)
+                    ],
+                    "url": terminal(descriptor)["url"],
+                }
                 self.assertIn(silhouette["key"], FALLBACK_KEYS)
                 self.assertEqual(
                     silhouette["url"],
                     f"/art/defaults/{silhouette['key']}{FALLBACK_EXTENSION}",
                 )
-                self.assertEqual(sorted(silhouette["face_rect"]), ["h", "w", "x", "y"])
+                self.assertEqual(
+                    sorted(terminal(descriptor)["geometry"]["face_rect"]),
+                    ["h", "w", "x", "y"],
+                )
                 # The true status passes through: an absent record is missing,
                 # a claimed one is wire-stable pending, a settled one is failed.
-                self.assertEqual(payload["status"], expected_status)
+                self.assertEqual(descriptor["generation_state"], expected_status)
                 events = [
                     call
                     for call in logged.call_args_list
@@ -823,14 +851,14 @@ class SilhouettePayloadTests(EvenniaTestCase):
             source="generated",
         )
         with patch("world.observability.log_info") as logged:
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{identity}")
-        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
+        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.DONE)
         # The reference rides beside the resolved image for a browser-side
         # load-failure re-render, and is not a use of the fallback.
-        self.assertIn(payload["fallback"]["key"], FALLBACK_KEYS)
-        self.assertTrue(payload["fallback"]["url"].startswith("/art/defaults/"))
+        self.assertIn(terminal(descriptor)["url"].rsplit("/", 1)[-1][:-len(".webp")], FALLBACK_KEYS)
+        self.assertTrue(terminal(descriptor)["url"].startswith("/art/defaults/"))
         events = [
             call
             for call in logged.call_args_list
@@ -846,16 +874,16 @@ class SilhouettePayloadTests(EvenniaTestCase):
         woman = create_object(PlayerCharacter, key="no-policy-woman")
         woman.sex = "female"
         woman.apparent_age = 30
-        payload = resolve_character(woman)
+        descriptor = describe_entity(woman)
         # The unavailable placeholder row: no policy, no subject key, no URL.
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
         # The decoration comes from the entity's stored attributes, never from
         # a shared shape, and installs nothing.
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertEqual(payload["fallback"]["key"], "woman")
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertIn("woman", terminal(descriptor)["url"])
         self.assertEqual(ArtAssetRecord.objects.count(), before)
         self.assertIsNone(woman.db.portrait_policy)
 
@@ -866,12 +894,12 @@ class SilhouettePayloadTests(EvenniaTestCase):
         before = ArtAssetRecord.objects.count()
         monster = create_object(Monster, key="silhouette-monster")
         monster.threat_tier = "mythical"
-        payload = resolve_entity(monster)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertEqual(payload["fallback"]["key"], "monster_anon")
+        descriptor = describe_entity(monster)
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertIn("monster_anon", terminal(descriptor)["url"])
         self.assertEqual(
-            payload["fallback"]["url"],
+            terminal(descriptor)["url"],
             f"/art/defaults/monster_anon{FALLBACK_EXTENSION}",
         )
         self.assertEqual(ArtAssetRecord.objects.count(), before)
@@ -885,17 +913,16 @@ class SilhouettePayloadTests(EvenniaTestCase):
         before = ArtAssetRecord.objects.count()
         rejected = self._character("silhouette-bad-age")
         rejected.age = "twenty"
-        payload = resolve_character(rejected)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNone(payload["stage"])
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertEqual(payload["fallback"]["key"], "man")
-        self.assertEqual(payload["fallback"]["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
+        descriptor = describe_entity(rejected)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(terminal(descriptor)["url"], f"/art/defaults/man{FALLBACK_EXTENSION}")
         self.assertEqual(ArtAssetRecord.objects.count(), before)
-        self.assertNotIn("twenty", str(payload))
+        self.assertNotIn("twenty", str(descriptor))
 
 
 # A file-local synthetic preset key, a real decodable PNG, and the geometry
@@ -1019,25 +1046,28 @@ class OfficialPayloadTests(EvenniaTestCase):
         entity = self._character()
         subject = self._subject()
         with patch("world.observability.log_info") as logged:
-            payload = resolve_character(entity)
-        self.assertEqual(payload["kind"], PAYLOAD_OFFICIAL)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        # An official image is never a generated/done portrait.
-        self.assertIsNone(payload["status"])
-        self.assertNotIn("已生成", str(payload))
+            descriptor = describe_entity(entity)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        # The presentation is official; the subject's own recorded generation
+        # truth stays an independent fact of the descriptor.
+        self.assertIn(
+            descriptor["generation_state"], (None, "missing", "pending", "done", "failed")
+        )
         # The fingerprinted same-origin URL, the declared rectangle and the
         # non-identity declared stage all survive to the payload.
-        self.assertEqual(payload["url"], current_catalog().url_for(identity))
-        self.assertIn(current_catalog().fingerprint_for(identity), payload["url"])
-        self.assertTrue(payload["url"].startswith("/art/official/"))
-        self.assertEqual(payload["face_rect"], _OFFICIAL_RECT)
-        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
-        self.assertEqual(payload["aspect_ratio"], GALLERY_ASPECT_RATIO)
-        self.assertEqual(payload["subject_key"], subject.full())
-        self.assertEqual(payload["alt"], subject.full())
+        self.assertEqual(candidate(descriptor)["url"], current_catalog().url_for(identity))
+        self.assertIn(current_catalog().fingerprint_for(identity), candidate(descriptor)["url"])
+        self.assertTrue(candidate(descriptor)["url"].startswith("/art/official/"))
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], _OFFICIAL_RECT)
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], _OFFICIAL_STAGE)
+        self.assertEqual(candidate(descriptor)["geometry"]["aspect_ratio"], GALLERY_ASPECT_RATIO)
+        self.assertEqual(descriptor["generation_subject"], subject.full())
+        # (the retired flat ``alt`` echoed the subject identity, which the
+        # ``generation_subject`` assertion above already states once)
         # The decorative silhouette rides beside the presented image and
         # reports no use (report=False on the real-image rungs).
-        self.assertIsNotNone(payload["fallback"])
+        self.assertIsNotNone(terminal(descriptor))
         self.assertEqual(
             [
                 call
@@ -1048,7 +1078,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         )
         # No path, license, manifest, or prompt text, and no state acquired.
         for leaked in ("ART_OFFICIAL_ROOT", str(self.official_root), "LICENSE", "prompt"):
-            self.assertNotIn(leaked, str(payload))
+            self.assertNotIn(leaked, str(descriptor))
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
         self.assertEqual(GalleryRecord.objects.count(), 0)
         self.assertEqual(
@@ -1089,10 +1119,10 @@ class OfficialPayloadTests(EvenniaTestCase):
             "world.art.presenter.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{identity}")
-        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
+        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.DONE)
 
     def test_a_classic_done_asset_outranks_the_official_default(self):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
@@ -1115,9 +1145,9 @@ class OfficialPayloadTests(EvenniaTestCase):
             "world.art.presenter.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{identity}")
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{identity}")
 
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
@@ -1125,17 +1155,17 @@ class OfficialPayloadTests(EvenniaTestCase):
     def test_a_disappeared_official_entry_falls_through_to_the_seam(self):
         self._index(face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE))
         entity = self._character()
-        self.assertEqual(resolve_character(entity)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(describe_entity(entity))["origin"], ORIGIN_OFFICIAL)
         # The artwork update removed the content directory; the new snapshot
         # simply lacks it, with no restart gap and no preference deletion.
         shutil.rmtree(self.official_root / "preset")
         load_catalog()
         with patch.object(official_refs, "log_warn") as warned:
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNotNone(payload["fallback"])
+            descriptor = describe_entity(entity)
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNotNone(terminal(descriptor))
         self.assertEqual(
             [
                 call
@@ -1161,10 +1191,10 @@ class OfficialPayloadTests(EvenniaTestCase):
             patch.object(official, "_CATALOG", snapshot),
             patch("world.art.presenter.log_warn") as warned,
         ):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["face_rect"], default_face_rect({"width": 4, "height": 4}))
-        self.assertEqual(payload["stage"], identity_stage())
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], default_face_rect({"width": 4, "height": 4}))
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], identity_stage())
         events = [call.args[0] for call in warned.call_args_list if call.args]
         self.assertIn("art_face_rect_invalid", events)
         self.assertIn("art_stage_invalid", events)
@@ -1176,9 +1206,9 @@ class OfficialPayloadTests(EvenniaTestCase):
         identity = f"preset/{_PRESET_KEY}/{at_budget}"
         self.assertEqual(len(f"/art/official/{_FINGERPRINT}/{identity}"), MAX_PORTRAIT_MEDIA_URL)
         with patch.object(official, "_CATALOG", _snapshot(identity)):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["url"], f"/art/official/{_FINGERPRINT}/{identity}")
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/official/{_FINGERPRINT}/{identity}")
 
         # One character over the ceiling: the catalog's URL cannot travel the
         # wire, so the step falls through exactly like an absent reference
@@ -1192,9 +1222,9 @@ class OfficialPayloadTests(EvenniaTestCase):
             patch.object(official, "_CATALOG", _snapshot(over_identity)),
             patch("world.art.presenter.log_warn") as warned,
         ):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertIsNone(payload["url"])
+            descriptor = describe_entity(entity)
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(candidate(descriptor))
         events = [call.args[0] for call in warned.call_args_list if call.args]
         self.assertEqual(events.count("art_official_url_over_wire_budget"), 1)
 
@@ -1214,13 +1244,13 @@ class OfficialPayloadTests(EvenniaTestCase):
             ),
             patch("world.observability.log_info") as logged,
         ):
-            payload = resolve_character(entity)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNone(payload["subject_key"])
-        self.assertNotIn(ORIGIN_OFFICIAL, str(payload["origin"]))
+            descriptor = describe_entity(entity)
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(candidate(descriptor))
+        self.assertIsNone(descriptor["generation_subject"])
+        self.assertIsNone(candidate(descriptor))
         self.assertEqual(
             len(
                 [
@@ -1232,7 +1262,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             1,
         )
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
-        self.assertNotIn("portrait rejected", repr(payload))
+        self.assertNotIn("portrait rejected", repr(descriptor))
 
     def test_a_tier_only_monster_never_presents_an_official_origin(self):
         folder = self.official_root / "monster" / "official-monster"
@@ -1245,11 +1275,11 @@ class OfficialPayloadTests(EvenniaTestCase):
         # ...and a monster carrying no stored species identity still resolves no
         # reference, so the official step resolves nothing for it — a directory
         # named after the monster's key or display text is never selected.
-        payload = resolve_subject(
+        descriptor = describe_portrait(
             ArtSubject(ArtSubjectKind.MONSTER, "official-monster"), entity=monster
         )
-        self.assertNotEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertIsNone(payload["url"])
+        self.assertNotEqual(terminal(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertIsNone(candidate(descriptor))
 
     @covers_requirement(
         "official-art-resolution::the-extended-chain-stays-deterministic-offline-and-side-effect-free"
@@ -1281,10 +1311,10 @@ class OfficialPayloadTests(EvenniaTestCase):
             for tripwire in tripwires:
                 stack.enter_context(tripwire)
             before = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
-            payloads = [resolve_character(entity) for _ in range(100)]
+            payloads = [describe_entity(entity) for _ in range(100)]
             after = (GalleryRecord.objects.count(), ArtAssetRecord.objects.count(), self._state(entity))
         self.assertTrue(all(payload == payloads[0] for payload in payloads))
-        self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(payloads[0])["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(before, after)
 
 
@@ -1415,15 +1445,17 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         subject = self._subject()
         set_official_selection(subject, identity)
         card = self._card(subject)
-        payload = resolve_character(entity)
-        self.assertEqual(payload["kind"], PAYLOAD_OFFICIAL)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["url"], current_catalog().url_for(identity))
-        self.assertEqual(payload["face_rect"], _OFFICIAL_RECT)
-        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
-        # An official image is never a generated/done portrait...
-        self.assertIsNone(payload["status"])
-        self.assertNotIn("已生成", str(payload))
+        descriptor = describe_entity(entity)
+        self.assertIsNotNone(candidate(descriptor))
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(descriptor)["url"], current_catalog().url_for(identity))
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], _OFFICIAL_RECT)
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], _OFFICIAL_STAGE)
+        # ...and the presentation is official while the subject's own recorded
+        # generation truth stays an independent fact of the descriptor.
+        self.assertIn(
+            descriptor["generation_state"], (None, "missing", "pending", "done", "failed")
+        )
         # ...and the runtime card, its default, and its file are untouched.
         record = record_for(subject)
         self.assertEqual(record.db.default_image_id, card["image_id"])
@@ -1444,9 +1476,9 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
             binding={"mask": ["armor"], "snapshot": {"armor": "t_coat"}},
         )
         set_official_selection(subject, identity)
-        payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{bound['stored_identity']}")
+        descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{bound['stored_identity']}")
         self.assertEqual(official_preferences_for(subject).selection, identity)
 
     @covers_requirement(
@@ -1462,15 +1494,15 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         classic = self._classic_done_asset(subject)
         set_official_selection(subject, identity)
         # Step 4 outranks step 5 while the selection resolves...
-        self.assertEqual(resolve_character(entity)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(describe_entity(entity))["origin"], ORIGIN_OFFICIAL)
         # ...and a maintenance update that removes the directory (no restart
         # gap) falls through to the classic asset with the preference retained.
         shutil.rmtree(self.official_root / "preset")
         load_catalog()
-        payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{classic}")
-        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
+        descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(candidate(descriptor)["url"], f"/art/{classic}")
+        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.DONE)
         self.assertEqual(official_preferences_for(subject).selection, identity)
 
     # -- personal geometry ------------------------------------------------
@@ -1492,10 +1524,10 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         set_official_geometry(subject, identity, face_rect=dict(rect), stage=dict(stage))
         source = self.official_root / "preset" / _PRESET_KEY / "hero.png"
         before = source.read_bytes()
-        payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["face_rect"], rect)
-        self.assertEqual(payload["stage"], stage)
+        descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(descriptor)["geometry"]["face_rect"], rect)
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], stage)
         # The mounted source and the catalog's own facts are unchanged: an
         # override is entity-local presentation state.
         self.assertEqual(source.read_bytes(), before)
@@ -1516,16 +1548,17 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         stored_rect = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
         set_official_selection(subject, identity)
         set_official_geometry(subject, identity, face_rect=dict(stored_rect))
-        self.assertEqual(resolve_character(entity)["face_rect"], stored_rect)
+        self.assertEqual(candidate(describe_entity(entity))["geometry"]["face_rect"], stored_rect)
         # The artwork update replaces the bytes at the same identity with a
         # taller image, so the stored square is no longer square on it.
         self._write_image("hero.png", width=4, height=8)
         load_catalog()
         with patch("world.art.presenter.log_warn") as warn:
-            payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+            descriptor = describe_entity(entity)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(
-            payload["face_rect"], default_face_rect({"width": 4, "height": 8})
+            candidate(descriptor)["geometry"]["face_rect"],
+            default_face_rect({"width": 4, "height": 8}),
         )
         events = [
             call
@@ -1557,10 +1590,10 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
         with patch("world.art.gallery.log_warn") as read_warn, patch(
             "world.art.presenter.log_warn"
         ) as warn:
-            payload = resolve_character(entity)
+            descriptor = describe_entity(entity)
         self.assertEqual(single_read.geometry, {})
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
+        self.assertEqual(candidate(descriptor)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(descriptor)["geometry"]["stage"], _OFFICIAL_STAGE)
         invalid = [
             call
             for call in read_warn.call_args_list
@@ -1616,17 +1649,25 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
             path: path.read_bytes()
             for path in (self.official_root / "preset" / _PRESET_KEY).iterdir()
         }
-        one_payload = resolve_character(one)
-        two_payload = resolve_character(two)
-        self.assertEqual(one_payload["url"], current_catalog().url_for(first_identity))
-        self.assertEqual(two_payload["url"], current_catalog().url_for(second_identity))
-        self.assertEqual(one_payload["face_rect"], one_rect)
-        self.assertEqual(two_payload["face_rect"], fitted)
-        self.assertEqual(two_payload["stage"], two_stage)
-        self.assertEqual(one_payload["stage"], _OFFICIAL_STAGE)
-        self.assertNotEqual(one_payload["url"], two_payload["url"])
-        self.assertNotEqual(one_payload["face_rect"], two_payload["face_rect"])
-        self.assertNotEqual(one_payload["stage"], two_payload["stage"])
+        one_descriptor = describe_entity(one)
+        two_descriptor = describe_entity(two)
+        self.assertEqual(candidate(one_descriptor)["url"], current_catalog().url_for(first_identity))
+        self.assertEqual(candidate(two_descriptor)["url"], current_catalog().url_for(second_identity))
+        self.assertEqual(candidate(one_descriptor)["geometry"]["face_rect"], one_rect)
+        self.assertEqual(candidate(two_descriptor)["geometry"]["face_rect"], fitted)
+        self.assertEqual(candidate(two_descriptor)["geometry"]["stage"], two_stage)
+        self.assertEqual(candidate(one_descriptor)["geometry"]["stage"], _OFFICIAL_STAGE)
+        self.assertNotEqual(
+            candidate(one_descriptor)["url"], candidate(two_descriptor)["url"]
+        )
+        self.assertNotEqual(
+            candidate(one_descriptor)["geometry"]["face_rect"],
+            candidate(two_descriptor)["geometry"]["face_rect"],
+        )
+        self.assertNotEqual(
+            candidate(one_descriptor)["geometry"]["stage"],
+            candidate(two_descriptor)["geometry"]["stage"],
+        )
         # Neither character's state, nor the shared mounted source, moved.
         self.assertEqual(official_preferences_for(one_subject).selection, first_identity)
         self.assertEqual(official_preferences_for(two_subject).selection, second_identity)
@@ -1683,15 +1724,15 @@ class PersonalOfficialPayloadTests(EvenniaTestCase):
                 ArtAssetRecord.objects.count(),
                 repr(record_for(subject).attributes.all()),
             )
-            payloads = [resolve_character(entity) for _ in range(100)]
+            payloads = [describe_entity(entity) for _ in range(100)]
             after = (
                 GalleryRecord.objects.count(),
                 ArtAssetRecord.objects.count(),
                 repr(record_for(subject).attributes.all()),
             )
         self.assertTrue(all(payload == payloads[0] for payload in payloads))
-        self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payloads[0]["url"], current_catalog().url_for(identity))
+        self.assertEqual(candidate(payloads[0])["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(payloads[0])["url"], current_catalog().url_for(identity))
         self.assertEqual(before, after)
 
 

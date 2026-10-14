@@ -7,13 +7,12 @@
 // and the three fixed 跟隨規則 lines verbatim.
 import { computed, ref, watch } from "vue";
 import EmptyState from "./EmptyState.vue";
+import ReferenceArtwork from "./ReferenceArtwork.vue";
 import {
   buildCombatTokenMap,
   hpFillRatio,
   portraitFor,
-  portraitGlyph,
 } from "./party-helpers.js";
-import { faceCropStyle, faceObjectPosition } from "./face-rect.js";
 
 const props = defineProps({
   // The committed `party.slots` array.
@@ -249,19 +248,18 @@ function onInviteCurrentNpc() {
       :data-testid="`party-drawer__row-${slot.identity}`"
     >
       <div class="av" data-testid="party-drawer__avatar">
-        <img
-          v-if="portraitEntry(slot)?.url"
-          class="av-img"
-          :src="portraitEntry(slot).url"
-          :alt="slot.display_name"
-          :style="
-            faceCropStyle(
-              portraitEntry(slot).face_rect,
-              faceObjectPosition(portraitEntry(slot).face_rect),
-            )
-          "
+        <!-- The shared figure renderer's avatar position: the canonical
+             descriptor through the shared real-only load, the successful
+             candidate's own face-rect zoom crop, the identity glyph as the
+             only fallback and the shared persistent failure marker. -->
+        <ReferenceArtwork
+          avatar
+          :artwork="portraitEntry(slot)"
+          :panel="artPanel"
+          :has-reference="slot.portrait_ref !== null && slot.portrait_ref !== undefined"
+          :name="slot.display_name"
+          :initial-of="slot.display_name"
         />
-        <span v-else class="mono av-glyph">{{ portraitGlyph(slot.display_name) }}</span>
       </div>
       <div class="info">
         <div class="nm" data-testid="party-drawer__name">
@@ -451,17 +449,11 @@ function onInviteCurrentNpc() {
   background: var(--ink-820);
 }
 
-/* Absolute so a bound zoom anchors against the .av frame; unbound, the 100% box
-   is exactly that frame's padding box. */
-.av-img {
+/* The shared figure renderer fills the clipping frame; its avatar position
+   anchors a bound zoom against this same frame. */
+.compbig .av .reference-artwork {
   position: absolute;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.av-glyph {
-  line-height: 1;
+  inset: 0;
 }
 
 .compbig .info {

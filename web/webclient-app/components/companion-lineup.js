@@ -39,6 +39,18 @@ export function lineupSlotByIdentity(slots, identity) {
   return displayedLineup(slots).find((slot) => String(slot.identity) === key) || null;
 }
 
+// One joined figure position: the committed reference's canonical descriptor,
+// the committed panel it is judged against, and whether that panel admitted a
+// reference at all (so a deliberately unadmitted figure is expected absence,
+// never a local failure marker). No client-built art key.
+function position(portraitFor, artPanel, portraitRef) {
+  return {
+    artwork: portraitFor(artPanel, portraitRef),
+    panel: artPanel,
+    hasReference: portraitRef !== null && portraitRef !== undefined,
+  };
+}
+
 // Slots retain positions across possession; only the front and possessed
 // companion's original slot exchange portraits. No client-built art key.
 export function companionFigures({ player, companions, actorIdentity, possessing, controlledName = "", artPanel, portraitFor }) {
@@ -46,11 +58,13 @@ export function companionFigures({ player, companions, actorIdentity, possessing
   // status v2 has a bounded string identity; party v2 has safe integers.
   const controlledIndex = possessing ? rows.findIndex((row) => String(row.identity) === actorIdentity) : -1;
   const figure = (row) => ({
-    identity: row.identity, portrait: portraitFor(artPanel, row.portrait_ref),
+    identity: row.identity, ...position(portraitFor, artPanel, row.portrait_ref),
     displayName: row.display_name, isControlled: false,
   });
   const back = rows.map((row, index) => index === controlledIndex ? { ...player, isControlled: false } : figure(row));
   const front = controlledIndex >= 0 ? figure(rows[controlledIndex])
-    : possessing ? { identity: actorIdentity, portrait: null, displayName: controlledName } : player;
+    : possessing
+      ? { identity: actorIdentity, artwork: null, panel: artPanel, hasReference: false, displayName: controlledName }
+      : player;
   return [{ ...front, isControlled: true }, ...back];
 }

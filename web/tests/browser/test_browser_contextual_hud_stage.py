@@ -1416,22 +1416,20 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # roster: the name is bounded and truncated, so the cluster never
         # grows into the navigation.
         inject_snapshot(small, {"roster": {
-            "schema_version": 2,
+            "schema_version": 3,
             "available": True,
             "characters": [{
                 "identity": 1, "name": "長" * 128, "current": True, "pending": False,
+                # The row's portrait IS the complete canonical descriptor: an
+                # owned character with no real candidate and no terminal yet.
                 "portrait": {
-                    "subject_key": None, "status": "missing", "url": None,
-                    "aspect_ratio": None, "alt": "角色肖像",
-                    "placeholder": {"kind": "missing", "label": "尚無肖像"},
-                    "face_rect": None,
-                    # A placeholder portrait carries no stage (the wire
-                    # contract: stage is non-null only beside a url).
-                    "stage": None,
-                    # ...and still names its own origin
-                    # (official-art-resolution): a placeholder row is never a
-                    # runtime or official image.
-                    "origin": "placeholder",
+                    "subject_id": "portrait:character:1",
+                    "revision": "1" * 64,
+                    "generation_subject": "portrait:character:1",
+                    "generation_state": "missing",
+                    "attempts": [],
+                    "terminal": None,
+                    "retention_sources": [],
                 },
             }],
             "can_create": False,
@@ -1547,7 +1545,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                 "lore_codex": valid_lore_codex_panel(),
                 "gallery": _GALLERY_PANEL,
                 "roster": {
-                    "schema_version": 2,
+                    "schema_version": 3,
                     "available": True,
                     "characters": [{
                         "identity": 1,
@@ -1555,15 +1553,13 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
                         "current": True,
                         "pending": False,
                         "portrait": {
-                            "subject_key": None,
-                            "status": "missing",
-                            "url": None,
-                            "aspect_ratio": None,
-                            "alt": "角色肖像",
-                            "placeholder": {"kind": "missing", "label": "尚無肖像"},
-                            "face_rect": None,
-                            "stage": None,
-                            "origin": "placeholder",
+                            "subject_id": "portrait:character:1",
+                            "revision": "1" * 64,
+                            "generation_subject": "portrait:character:1",
+                            "generation_state": "missing",
+                            "attempts": [],
+                            "terminal": None,
+                            "retention_sources": [],
                         },
                     }],
                     "can_create": False,

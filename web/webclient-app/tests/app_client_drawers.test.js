@@ -911,11 +911,17 @@ describe("H4 reference-drawer layer (task 7.7)", () => {
     store.beginTransport(1);
     store.setConnected(true);
     const roster = {
-      schema_version: 2, available: true,
+      schema_version: 3, available: true,
+      // The row's portrait IS the complete canonical descriptor: an owned
+      // character with no real candidate and no terminal yet.
       characters: [{ identity: 1, name: "測試主角", current: true, pending: false, portrait: {
-        subject_key: null, status: null, url: null, aspect_ratio: null, alt: "測試主角",
-        placeholder: { kind: "missing", label: "無肖像" }, face_rect: null, stage: null,
-        origin: "placeholder",
+        subject_id: "portrait:character:1",
+        revision: "1".repeat(64),
+        generation_subject: "portrait:character:1",
+        generation_state: "missing",
+        attempts: [],
+        terminal: null,
+        retention_sources: [],
       } }],
       max_characters: 5, can_create: true, switch_locked: false, lock_reason: null,
     };

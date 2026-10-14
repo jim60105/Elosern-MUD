@@ -411,23 +411,26 @@ var DIALOGUE_MAX_KEYWORD_ID = 64;
 var DIALOGUE_MAX_KEYWORD_LABEL = 128;
 var DIALOGUE_MAX_LINE = 2000;
 
+// The art panel's schema version (mirror of
+// web.webclient.presentation.art.ART_SCHEMA_VERSION): v3 replaces the flat
+// portrait-catalog entry with exactly `{artwork, context}` — the canonical
+// artwork descriptor plus its bounded display context.
+var ART_SCHEMA_VERSION = 3;
+
 // Roster panel bounds (mirror of web.webclient.presentation.roster,
 // webclient-character-roster): at most ten character rows in ascending
 // identity order; exactly one current character; locked exactly when in
-// active combat.
-var ROSTER_SCHEMA_VERSION = 2;
+// active combat. v3 replaces the flat row portrait with the complete
+// canonical artwork descriptor.
+var ROSTER_SCHEMA_VERSION = 3;
 var ROSTER_MAX_ROWS = 10;
 var ROSTER_MAX_NAME = 128;
-var ROSTER_MAX_SUBJECT_KEY = 128;
 var MAX_MEDIA_URL = 256;
-var ROSTER_MAX_ALT = 512;
-var ROSTER_MAX_STATUS = 16;
-var ROSTER_MAX_PLACEHOLDER_LABEL = 128;
 var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
 
 var PANEL_ALLOWLIST = {
   gallery: 3,
-  art: 2,
+  art: ART_SCHEMA_VERSION,
   status: 3,
   context_actions: 5,
   local_map: 1,
@@ -441,7 +444,7 @@ var PANEL_ALLOWLIST = {
   dialogue: 2,
   title_ballot: 1,
   title_codex: 1,
-  roster: 2,
+  roster: ROSTER_SCHEMA_VERSION,
   possession_banner: 1,
   lore_codex: 1,
   quest_log: 2,
@@ -670,12 +673,9 @@ module.exports = {
   ROSTER_SCHEMA_VERSION: ROSTER_SCHEMA_VERSION,
   ROSTER_MAX_ROWS: ROSTER_MAX_ROWS,
   ROSTER_MAX_NAME: ROSTER_MAX_NAME,
-  ROSTER_MAX_SUBJECT_KEY: ROSTER_MAX_SUBJECT_KEY,
   MAX_MEDIA_URL: MAX_MEDIA_URL,
-  ROSTER_MAX_ALT: ROSTER_MAX_ALT,
-  ROSTER_MAX_STATUS: ROSTER_MAX_STATUS,
-  ROSTER_MAX_PLACEHOLDER_LABEL: ROSTER_MAX_PLACEHOLDER_LABEL,
   ROSTER_LOCK_REASON: ROSTER_LOCK_REASON,
+  ART_SCHEMA_VERSION: ART_SCHEMA_VERSION,
   PANEL_ALLOWLIST: PANEL_ALLOWLIST,
   EPOCH_RE: EPOCH_RE,
   PANEL_NAME_RE: PANEL_NAME_RE,

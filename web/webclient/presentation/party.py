@@ -20,15 +20,17 @@ unavailable branch. Creation-pending and no-location puppets raise
 :class:`PanelUnavailableError` and receive the registry-owned shared
 unavailable form.
 
-``portrait_ref`` is the art catalog key of the companion's OWN resolved
-image, answered by the art presenter's complete read-only chain
-(``world.art.presenter.resolve_entity``: equipment-bound card, personal
-official selection, record default card, classic runtime asset, mounted
-official default). One chain owner keeps this row and the art panel's catalog
-entry for the same entity in agreement, so a companion whose only artwork is
-mounted official content presents it, while a silhouette-only or genuinely
-portraitless companion stays a truthful ``null`` and the client renders its
-initial-letter placeholder.
+``portrait_ref`` is the art catalog key of the companion while the current
+bounded art view ADMITS it (``world.rules.art_view.build_art_view`` — the one
+membership owner), answered without any real-image gate: an admitted companion
+whose only artwork is its own committed silhouette still carries the
+reference, and the same snapshot's ``art.portrait_catalog`` entry carries its
+complete canonical descriptor (its ordered source facts, its independent
+recorded generation truth and its alpha terminal). A companion the current
+view does not admit — a remote row in another room, one dropped by the
+catalog cap, or a session whose art view cannot be built — stays the truthful
+``null``, and the client renders its own placeholder from the row it already
+carries. The client never builds a catalog key.
 
 Bounds note: both HP fields accept zero and no ``hp_current <= hp_maximum``
 cross-field rule is asserted — traits are truth, bounds only (the delta spec
@@ -52,9 +54,8 @@ from web.webclient.presentation.protocol import (
     json_byte_size,
 )
 from web.webclient.presentation.registry import PanelUnavailableError
-from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME, resolve_entity
 from world.rules.action import stored_gauge_pair
-from world.rules.art_view import portrait_catalog_key
+from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
 from world.rules.npc_identity import npc_display_name
 from world.rules.party import (
     PARTY_MAX_COMPANIONS,
@@ -243,25 +244,31 @@ def validate_party(payload: Any) -> dict[str, Any]:
     return result
 
 
-def _resolve_portrait_ref(npc: Any) -> str | None:
-    """Read the art chain's own real image, never create or generate.
+def _admitted_identities(actor: Any) -> frozenset[int] | None:
+    """The current art view's admitted entity identities, or ``None``.
 
-    Eligibility is delegated to the single read-only chain owner
-    (``world.art.presenter.resolve_entity``), so the row agrees with the art
-    panel's catalog entry for the same entity instead of re-deriving the
-    precedence here: an equipment-bound matching card, then the personal
-    official selection, then the record's default card, then a classic
-    runtime asset, then the mounted official default. Only a payload carrying
-    its OWN media URL under a ``runtime`` or ``official`` origin is a real
-    portrait; a resolution of steps 1-6 (including a malformed or missing
-    named subject, an unresolvable retained selection, and the canonical-age
-    eligibility check) leaves the truthful ``None``, and the decorative
-    silhouette a placeholder row carries can never satisfy this gate.
+    Builds the membership owner once per presentation and reuses it for every
+    row, so the panel and the art catalog are judged by exactly one rule.
+    ``None`` means the committed art panel cannot supply a view at all; every
+    reference then degrades to ``None`` and the party panel stays available.
     """
-    payload = resolve_entity(npc)
-    if payload.get("url") is None:
+    try:
+        return frozenset(int(view.identity) for view in build_art_view(actor).entities)
+    except ArtViewError:
         return None
-    if payload.get("origin") not in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL):
+
+
+def _resolve_portrait_ref(npc: Any, members: frozenset[int] | None) -> str | None:
+    """The companion's own art-catalog key while the view admits it, else ``None``.
+
+    Membership is the ONE admission rule (``world.rules.art_view``), so this
+    row and the art panel's catalog entry for the same companion can never
+    disagree. The reference is emitted for every admitted companion whether or
+    not real imagery resolves — the reference names a complete descriptor in
+    the same committed snapshot, not a real image. Nothing here reads, creates
+    or enqueues art state.
+    """
+    if members is None or int(npc.pk) not in members:
         return None
     return portrait_catalog_key(npc.pk)
 
@@ -296,6 +303,9 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
         )[:MAX_PARTY_COMMISSION_LABEL]
 
     slots: list[dict[str, Any]] = []
+    # The committed art view's admission set, resolved once for the whole
+    # roster: a companion the view does not admit is the truthful null.
+    members = _admitted_identities(actor)
     # The complete ordered effective roster: temporary members sit beyond the
     # general quota, so no four-row slice truncates a valid roster.
     for npc in live_companions(owner):
@@ -314,7 +324,7 @@ def party_presenter(context: PresentationContext) -> dict[str, Any]:
                 "display_name": npc_display_name(npc)[
                     :MAX_DISPLAY_NAME_CODE_POINTS
                 ],
-                "portrait_ref": _resolve_portrait_ref(npc),
+                "portrait_ref": _resolve_portrait_ref(npc, members),
                 "hp_current": hp_current,
                 "hp_maximum": hp_maximum,
                 "bond_stage": npc.relations.stage_for(owner).name,

@@ -37,7 +37,17 @@ TRANSITIONS = frozenset(
 
 # The transitions this slice owns. Every other name belongs to another mode's
 # owning change and is rejected rather than guessed at.
-OWNED_TRANSITIONS = frozenset({"repaired_original"})
+#
+# ``revoke_source`` is the portrait mode's own availability transition
+# (unified-portrait-image-contract): it removes the subject's committed real
+# artwork through the production writer, so the very next presentation states
+# the truth — the descriptor keeps its admission and its alpha terminal while
+# carrying no real candidate. ``unavailable_panel`` is deliberately NOT a
+# server mutation: a missing or unavailable panel is a committed-payload fact,
+# so journeys express it by injecting the panel's own unavailable form (the
+# client's ``artworkAvailability`` then reports ``failed`` locally) rather than
+# by corrupting art state.
+OWNED_TRANSITIONS = frozenset({"repaired_original", "revoke_source"})
 
 # Deterministic identities for the seeded and the repaired original. The
 # repaired card is deliberately distinct from the seeded one, so a recovery
@@ -57,6 +67,77 @@ GALLERY_FAILED_ERROR_CODE = "sd_connection_error"
 # The manifest-declared filename of the seeded operator content directory.
 GALLERY_OFFICIAL_FILENAME = "a.png"
 GALLERY_MANIFEST_FILENAME = "manifest.json"
+
+# The portrait descriptor mode (``unified-portrait-image-contract``). The
+# player's own activated character carries the committed card every roster
+# figure reads; the companion and focus identities below are the co-located
+# party member and the present focus entity a journey admits beside it, so one
+# bounded art view covers the roster, party, focus, dialogue and combat scopes
+# at once. Deterministic identities keep the seeded subjects stable across
+# runs.
+PORTRAIT_IMAGE_ID = "10000000-0000-4000-8000-0000000ed174"
+# The companion's own committed card: the focus/party/combat surfaces must be
+# able to present a REAL candidate, not only the fallback terminal.
+PORTRAIT_COMPANION_IMAGE_ID = "10000000-0000-4000-8000-0000000ed175"
+PORTRAIT_COMPANION_KEY = "browser_portrait_companion"
+PORTRAIT_FOCUS_KEY = "browser_portrait_focus"
+
+
+def seed_portrait_companions(character) -> list[str]:
+    """Seed one co-located live party companion and one present focus entity.
+
+    Both are created through the ordinary Evennia object API and joined to the
+    player's party through the production party writer, so the exploration art
+    view admits them by its own membership rule (a live companion present in
+    the room, and a present named-policy character) rather than by any test-only
+    back door. The focus entity carries a named portrait policy so its own
+    subject exists; neither is given real artwork, because the point of the
+    mode is that an admitted subject without imagery still carries its complete
+    descriptor.
+    """
+    from evennia.objects.models import ObjectDB
+    from evennia.utils.create import create_object
+
+    from typeclasses.npcs import LLMNPC
+    from world.rules.party import join_party
+    from world.rules.traits import trait_config_for_values
+    from world.art.subjects import character_subject_for
+
+    location = character.location
+    if location is None:
+        return []
+
+    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
+
+    seeded: list[str] = []
+    for index, key in enumerate((PORTRAIT_COMPANION_KEY, PORTRAIT_FOCUS_KEY)):
+        existing = ObjectDB.objects.filter(db_key=key).first()
+        npc = existing or create_object(LLMNPC, key=key, location=location)
+        npc.location = location
+        npc.db.portrait_policy = {"mode": "named", "stable_key": key}
+        # Both canonical age fields: presentation refuses a subject whose ages
+        # are missing or malformed, so a seeded companion must carry them.
+        npc.db.age = 30
+        npc.db.apparent_age = 30
+        # A living companion's mechanical baseline: the party and combat
+        # readers require the stored HP gauge, which only an initialized trait
+        # configuration supplies.
+        npc._apply_trait_config(trait_config_for_values({}))
+        join_party(npc, character)
+        # The committed card is written under the subject PRESENTATION derives
+        # from the policy's stable key, not under the object identity: a card
+        # in any other gallery can never be the descriptor's candidate.
+        subject = character_subject_for(npc)
+        if subject is None:
+            raise AssertionError(f"seeded companion {key!r} carries no portrait subject")
+        append_original_card(
+            subject.full(),
+            f"{PORTRAIT_COMPANION_IMAGE_ID[:-1]}{index + 5}",
+            FIXTURE_VALID_PNG,
+            set_default=True,
+        )
+        seeded.append(str(npc.pk))
+    return seeded
 
 
 class UnsupportedTransitionError(ValueError):
@@ -118,8 +199,28 @@ def _repaired_original(subject_key: str, image_id: str, payload: bytes) -> dict:
     return append_original_card(subject_key, image_id, payload, set_default=True)
 
 
+def _revoke_source(subject_key: str, image_id: str | None, payload: bytes) -> dict:
+    """Remove the subject's committed real artwork (the portrait fallback case).
+
+    Every stored card of the subject goes through the production writer, so the
+    next presentation enumerates the same subject with no real candidate and
+    the descriptor's own alpha terminal is all that remains. The subject stays
+    admitted and keeps its reference: only its imagery is revoked.
+    """
+    from world.art import gallery as gallery_api
+    from world.art.subjects import parse_subject
+
+    subject = parse_subject(subject_key)
+    snapshot = gallery_api.snapshot_for(subject)
+    removed = [card["image_id"] for card in snapshot.get("cards", [])]
+    for stored_id in removed:
+        gallery_api.remove_card(subject, stored_id)
+    return {"subject_key": subject.full(), "revoked": removed}
+
+
 _APPLIERS = {
     "repaired_original": _repaired_original,
+    "revoke_source": _revoke_source,
 }
 
 
@@ -216,6 +317,8 @@ def apply_transition(
         payload = FIXTURE_VALID_PNG
     if name == "repaired_original" and image_id is None:
         image_id = REPAIRED_ORIGINAL_IMAGE_ID
+    if name == "revoke_source":
+        return handler(subject_key, image_id, payload)
     return handler(subject_key, image_id, payload)
 
 
@@ -239,7 +342,8 @@ class CmdUnifiedImageTransition(Command):
         except UnsupportedTransitionError as error:
             self.caller.msg(str(error))
             return
-        self.caller.msg(f"transition {name} applied: {stored['image_id']}")
+        summary = stored.get("image_id") or ",".join(stored.get("revoked") or []) or "none"
+        self.caller.msg(f"transition {name} applied: {summary}")
         session = getattr(self, "session", None)
         if session is not None:
             from web.webclient.presentation.ingress import refresh_after_command

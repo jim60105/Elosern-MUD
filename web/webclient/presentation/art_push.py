@@ -56,13 +56,22 @@ def _art_portrait_catalog_keys(payload: dict[str, Any]) -> set[str]:
     Design D3 distinguishes this set from the scene reference: only a current
     portrait-catalog match may add the bounded exploration companion panel, so
     a scene-only completion never widens the publication.
+
+    A catalog value is ``{artwork, context}`` and its descriptor's
+    ``generation_subject`` is the subject's own generation key — the same
+    stable key a completion event carries — so the match is read from the
+    canonical fact rather than from a copied display field. An admitted entry
+    with no eligible subject carries a null generation subject and therefore
+    never matches, exactly as before.
     """
     keys: set[str] = set()
     catalog = payload.get("portrait_catalog")
     if isinstance(catalog, dict):
         for entry in catalog.values():
-            if isinstance(entry, dict) and entry.get("subject_key"):
-                keys.add(entry["subject_key"])
+            artwork = entry.get("artwork") if isinstance(entry, dict) else None
+            subject = artwork.get("generation_subject") if isinstance(artwork, dict) else None
+            if isinstance(subject, str) and subject:
+                keys.add(subject)
     return keys
 
 
@@ -81,8 +90,10 @@ def _gallery_subject_keys(payload: dict[str, Any]) -> set[str]:
 def _roster_subject_keys(payload: dict[str, Any]) -> set[str]:
     """Return the subject keys the rendered roster payload references.
 
-    Per D2, roster matches on every ``characters[*].portrait.subject_key``,
-    not only the current puppet row.
+    Per D2, roster matches on every ``characters[*].portrait`` descriptor's
+    ``generation_subject`` — the portrait row IS the canonical descriptor — and
+    not only on the current puppet row. A creation-pending row's empty
+    descriptor carries a null generation subject and never matches.
     """
     keys: set[str] = set()
     characters = payload.get("characters")
@@ -91,9 +102,9 @@ def _roster_subject_keys(payload: dict[str, Any]) -> set[str]:
             if isinstance(char, dict):
                 portrait = char.get("portrait")
                 if isinstance(portrait, dict):
-                    subject_key = portrait.get("subject_key")
-                    if isinstance(subject_key, str) and subject_key:
-                        keys.add(subject_key)
+                    subject = portrait.get("generation_subject")
+                    if isinstance(subject, str) and subject:
+                        keys.add(subject)
     return keys
 
 

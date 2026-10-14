@@ -16,21 +16,27 @@ export default {
   title: "Core/CompanionLineup", component: CompanionLineup,
   parameters: { layout: "fullscreen" },
 };
+// The player's own figure is a ROSTER position: the descriptor plus the
+// committed roster panel that admitted it.
+const ROSTER_PANEL = { schema_version: 3, available: true };
 const player = {
   identity: 1, displayName: "測試主角",
-  portrait: { ...COMPANION_PORTRAIT_CATALOG["103"], url: "/art/defaults/man.webp" },
+  artwork: COMPANION_PORTRAIT_CATALOG["103"].artwork,
+  panel: ROSTER_PANEL,
+  hasReference: true,
 };
+const ART_PANEL = { schema_version: 3, available: true, portrait_catalog: COMPANION_PORTRAIT_CATALOG };
 const renderLineup = (args) => ({
   setup() {
     const possessing = ref(!!args.possession);
     const speaking = ref(!!args.speaking);
     const slots = computed(() => companionFigures({
-      player: args.placeholders ? { ...player, portrait: null } : player,
+      player: args.placeholders ? { ...player, artwork: null, hasReference: false } : player,
       companions: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, args.companions).map((row) => ({
         ...row, portrait_ref: args.placeholders ? null : String(row.identity),
       })),
       actorIdentity: possessing.value ? "102" : "1", possessing: possessing.value,
-      artPanel: { portrait_catalog: COMPANION_PORTRAIT_CATALOG }, portraitFor,
+      artPanel: ART_PANEL, portraitFor,
     }));
     return () => h("div", { style: "height:100vh;position:relative;background:var(--ink-900)" }, [
       h(HudFrame, { mode: "exploration", motionLevel: args.motionLevel || "full" }, {

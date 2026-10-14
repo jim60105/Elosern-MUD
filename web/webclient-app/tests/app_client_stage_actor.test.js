@@ -15,25 +15,35 @@ import { createPinia, setActivePinia } from "pinia";
 import AppClient from "../AppClient.vue";
 import { useElosernStore } from "../stores/elosern.js";
 import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
+import {
+  fixtureDigest,
+  artworkDescriptor,
+  artworkResource,
+} from "../stories/fixtures/art_panels.js";
 import * as fx from "./store/protocol_fixtures.js";
 
+// One committed catalog value: the canonical descriptor plus its context. The
+// descriptor's own terminal is the server-resolved built-in silhouette the
+// stage draws when the real image cannot.
 const HOST_ENTRY = {
-  subject_key: "npc_7",
-  status: "done",
-  url: "/art/portraits/npc_7.webp",
-  aspect_ratio: "3:4",
-  alt: "店長的肖像",
-  placeholder: null,
-  face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-  stage: { scale: 1, x: 0, y: 0 },
-  // builtin-silhouette-stage-fallback: the stage-eligible entry carries the
-  // server-resolved built-in silhouette beside its own fields.
-  origin: "runtime",
-  fallback: {
-    key: "elder",
-    url: "/art/defaults/elder.webp",
-    face_rect: { x: 0.35, y: 0.03, w: 0.29, h: 0.16 },
-  },
+  artwork: artworkDescriptor({
+    subject_id: "npc_7",
+    generation_subject: "npc_7",
+    generation_state: "done",
+    attempts: [
+      {
+        type: "image",
+        source_id: "portrait.default:7",
+        rank: 30,
+        resource: artworkResource({
+          resource_id: "portrait/character/npc_7.webp",
+          version: fixtureDigest("npc-7"),
+          url: "/art/portraits/npc_7.webp",
+        }),
+      },
+    ],
+    terminal: artworkDescriptor().terminal,
+  }),
   context: { name: "店長", role: "對話對象" },
 };
 
@@ -88,7 +98,7 @@ describe("the stage actors in the portrait anchors", () => {
       panels.dialogue = dialogue;
     }
     const response = store.receive(1, "ui_snapshot", [fx.snapshot({ revision, mode, panels })], {});
-    expect(response.accepted).toBe(true);
+    expect(response.accepted, JSON.stringify(response)).toBe(true);
     revision += 1;
   }
 
@@ -101,8 +111,13 @@ describe("the stage actors in the portrait anchors", () => {
     expect(player.attributes("data-speaking")).toBe("true");
     const actorLeft = wrapper.get('[data-testid="anchor-actor-left"]');
     expect(actorLeft.findAll("button, a, input, textarea, select, [tabindex]")).toHaveLength(0);
-    // Exactly one stage portrait, and none left behind in the backdrop.
-    expect(wrapper.findAll('[data-testid="elosern-stage"] [data-testid="reference-artwork"]')).toHaveLength(1);
+    // Exactly one stage portrait in the portrait anchors, and none left behind
+    // in the backdrop.
+    expect(
+      wrapper.findAll(
+        '[data-testid="anchor-actor-left"] [data-testid="reference-artwork"], [data-testid="anchor-actor-right"] [data-testid="reference-artwork"]',
+      ),
+    ).toHaveLength(1);
     // The host Transition (webclient-mode-transitions D3) holds no actor.
     expect(wrapper.get('[data-testid="anchor-actor-right"]').findAll('[data-testid="stage-actor"]')).toHaveLength(0);
   });
@@ -137,7 +152,7 @@ describe("the stage actors in the portrait anchors", () => {
       [fx.snapshot({ revision, mode: "combat", panels: { ...basePanels(), context_actions: fx.combatActions({ participants }) } })],
       {},
     );
-    expect(response.accepted).toBe(true);
+    expect(response.accepted, JSON.stringify(response)).toBe(true);
     revision += 1;
     await nextTick();
     const right = wrapper.get('[data-testid="anchor-actor-right"]');
@@ -166,18 +181,24 @@ describe("the stage actors in the portrait anchors", () => {
   });
 
   it("falls back to the host's name placeholder when the key is null or names no entry", async () => {
+    // A null reference is intentional absence: the identity glyph and the
+    // truthful no-portrait line, with no failure marker.
     commit("dialogue", dialoguePanel(null));
     await nextTick();
     let host = actorIn("actor-right");
     expect(host.find("img").exists()).toBe(false);
     expect(host.get(".reference-artwork__placeholder-glyph").text()).toBe("店");
     expect(host.get("figcaption").text()).toBe("店長，無肖像");
+    expect(host.find('[data-testid="artwork-failure"]').exists()).toBe(false);
 
+    // An ADMITTED reference the committed catalog does not carry is a local
+    // failure: the same identity text stands with the shared marker.
     commit("dialogue", dialoguePanel("999"));
     await nextTick();
     host = actorIn("actor-right");
     expect(host.find("img").exists()).toBe(false);
-    expect(host.get("figcaption").text()).toBe("店長，無肖像");
+    expect(host.get("figcaption").text()).toBe("店長，無法提供");
+    expect(host.find('[data-testid="artwork-failure"]').exists()).toBe(true);
   });
 
   it("renders no host actor while the dialogue panel is unavailable", async () => {

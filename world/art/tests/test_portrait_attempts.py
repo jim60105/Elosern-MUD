@@ -49,7 +49,6 @@ from world.art.presenter import (
     PLACEHOLDER_UNAVAILABLE,
     describe_entity,
     describe_portrait,
-    resolve_subject,
 )
 from world.art.queue import claim, ensure, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
@@ -286,9 +285,8 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertNotIn("url", json.dumps(fault))
         # The default remains selectable and the preference survives untouched.
         self.assertEqual(official_preferences_for(subject).selection, selection)
-        payload = resolve_subject(subject, entity=entity)
-        self.assertEqual(payload["url"], f"/art/{card['stored_identity']}")
-        self.assertEqual(payload["origin"], descriptors.ORIGIN_RUNTIME)
+        # (the descriptor assertions above already state the presented source
+        # and its origin once; the retired flat cross-check is not repeated)
         self.assertEqual(official_preferences_for(subject).selection, selection)
 
     @covers_requirement(
@@ -354,8 +352,17 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
         events = [call.args[0] for call in warned.call_args_list if call.args]
         self.assertEqual(events.count("art_asset_output_missing"), 1)
-        # The flat contract keeps its own truthful placeholder for the same case.
-        self.assertEqual(resolve_subject(subject)["kind"], PLACEHOLDER_UNAVAILABLE)
+        # The same case states no candidate at all (the descriptor facts above).
+        self.assertIsNone(
+            next(
+                (
+                    attempt
+                    for attempt in descriptor["attempts"]
+                    if attempt["type"] == "image"
+                ),
+                None,
+            )
+        )
 
     @covers_requirement(
         "art-gallery-resolution::display-resolution-is-one-deterministic-chain-from-equipment-to-fallback"
@@ -389,8 +396,9 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(descriptor["generation_subject"], subject.full())
         # Generation disabled and nothing presentable: the terminal carries the
         # presentation while the state stays truthful.
-        self.assertEqual(descriptor["terminal"]["resource"]["origin"], descriptors.ORIGIN_SILHOUETTE)
-        self.assertEqual(resolve_subject(subject, entity=entity)["origin"], "silhouette")
+        self.assertEqual(
+            descriptor["terminal"]["resource"]["origin"], descriptors.ORIGIN_SILHOUETTE
+        )
 
     @covers_requirement(
         "official-art-resolution::every-presentation-payload-distinguishes-official-runtime-and-silhouette-origin"
@@ -425,10 +433,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         # Availability of the read-only image and the recorded failure are
         # independent facts of the same descriptor.
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
-        payload = resolve_subject(subject, entity=entity)
-        self.assertEqual(payload["origin"], descriptors.ORIGIN_OFFICIAL)
-        self.assertEqual(payload["url"], candidate["url"])
-        self.assertIsNone(payload["status"])
 
     @covers_requirement(
         "art-source-fault-facts::faults-are-attributed-to-requested-sources"
@@ -458,9 +462,6 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         fitted = default_face_rect({"width": 4, "height": 4})
         self.assertEqual(candidate["geometry"]["face_rect"], fitted)
         self.assertEqual(candidate["geometry"]["aspect_ratio"], GALLERY_ASPECT_RATIO)
-        payload = resolve_subject(subject, entity=entity)
-        self.assertEqual(payload["face_rect"], fitted)
-        self.assertEqual(payload["status"], None)
 
     @covers_requirement(
         "art-source-fault-facts::faults-are-attributed-to-requested-sources"
@@ -569,13 +570,37 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
     )
-    def test_describe_entity_refuses_an_ineligible_entity(self):
+    def test_describe_entity_answers_a_refusal_descriptor(self):
+        """An admitted entity with no eligible subject still gets its own facts.
+
+        Catalog admission is a membership decision the caller already made, so
+        the enumerator never answers ``None`` for an entity it was handed: it
+        answers the complete REFUSAL descriptor — no image attempt, no
+        generated subject key, no prompt — plus the deterministic
+        attribute-selected alpha terminal. Only a genuinely absent entity is
+        ``None``.
+        """
         plain = create_object(PlayerCharacter, key="attempt-ineligible")
         plain.age = plain.apparent_age = 30
-        self.assertIsNone(describe_entity(plain))
+        refused = describe_entity(plain)
+        self.assertEqual(refused["attempts"], [])
+        self.assertIsNone(refused["generation_subject"])
+        self.assertIsNone(refused["generation_state"])
+        self.assertEqual(refused["retention_sources"], [])
+        self.assertEqual(refused["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(refused["terminal"]["resource"]["origin"], "silhouette")
+        self.assertEqual(refused["subject_id"], str(plain.pk))
         plain.db.portrait_policy = {"mode": "named", "stable_key": "ineligible"}
         plain.age = "thirty"
-        self.assertIsNone(describe_entity(plain))
+        ineligible = describe_entity(plain)
+        self.assertEqual(ineligible["attempts"], [])
+        self.assertIsNone(ineligible["generation_subject"])
+        self.assertEqual(ineligible["terminal"]["kind"], "alpha_mask")
+        # A refused subject discloses NO subject key: the descriptor names the
+        # position's opaque runtime identity, never the rejected policy's own
+        # stable key.
+        self.assertEqual(ineligible["subject_id"], str(plain.pk))
+        self.assertNotIn("ineligible", repr(ineligible))
         plain.age = 30
         descriptor = describe_entity(plain)
         self.assertEqual(descriptor["subject_id"], "portrait:character:ineligible")
@@ -620,25 +645,22 @@ class PortraitAttemptSmokeTests(_PortraitAttemptCase):
         before = self._state(subject)
         # Step 1: the readable default card is what production presents, and the
         # canonical enumeration names exactly that source at its own rank.
-        payload = resolve_subject(subject, entity=entity)
         descriptor = describe_portrait(subject, entity)
         candidate = descriptor["attempts"][-1]
-        self.assertEqual(payload["origin"], descriptors.ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{card['stored_identity']}")
         self.assertEqual(candidate["source_id"], f"portrait.default:{card['image_id']}")
-        self.assertEqual(candidate["resource"]["url"], payload["url"])
-        self.assertEqual(candidate["resource"]["geometry"]["face_rect"], payload["face_rect"])
-        self.assertEqual(candidate["resource"]["geometry"]["stage"], payload["stage"])
-        self.assertEqual(candidate["resource"]["geometry"]["aspect_ratio"], payload["aspect_ratio"])
+        self.assertEqual(candidate["resource"]["origin"], descriptors.ORIGIN_RUNTIME)
+        self.assertEqual(candidate["resource"]["url"], f"/art/{card['stored_identity']}")
+        self.assertEqual(
+            sorted(candidate["resource"]["geometry"]),
+            ["aspect_ratio", "face_rect", "image_size", "stage"],
+        )
         self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
-        self.assertEqual(descriptor["terminal"]["resource"]["url"], payload["fallback"]["url"])
         self.assertEqual(descriptor["retention_sources"], [])
         # Step 2: the stored card's file vanishes (no restart gap: the next read
         # simply finds it gone), so the explicit default fault leads and the
         # admitted official image becomes the first real candidate.
         (self.store / card["stored_identity"]).unlink()
         expected = self._state(subject)
-        payload = resolve_subject(subject, entity=entity)
         descriptor = describe_portrait(subject, entity)
         self.assertEqual(
             self._ordered(descriptor),
@@ -660,18 +682,17 @@ class PortraitAttemptSmokeTests(_PortraitAttemptCase):
         self.assertEqual(official["origin"], descriptors.ORIGIN_OFFICIAL)
         self.assertEqual(official["geometry"]["face_rect"], dict(_OFFICIAL_RECT))
         self.assertEqual(official["geometry"]["stage"], dict(_OFFICIAL_STAGE))
-        self.assertEqual(payload["origin"], descriptors.ORIGIN_OFFICIAL)
-        self.assertEqual(payload["url"], official["url"])
-        self.assertEqual(payload["face_rect"], dict(_OFFICIAL_RECT))
-        self.assertEqual(payload["stage"], dict(_OFFICIAL_STAGE))
-        self.assertIsNone(payload["status"])
+        self.assertEqual(official["url"], current_catalog().url_for(identity))
+        self.assertEqual(official["geometry"]["face_rect"], dict(_OFFICIAL_RECT))
+        self.assertEqual(official["geometry"]["stage"], dict(_OFFICIAL_STAGE))
         # The alpha terminal is the subject's own committed silhouette, carried
         # beside the presented image.
         self.assertTrue(descriptor["terminal"]["source_id"].startswith("portrait.alpha:"))
         self.assertEqual(descriptor["terminal"]["rank"], descriptors.PORTRAIT_RANK_ALPHA)
-        self.assertEqual(payload["fallback"]["url"], descriptor["terminal"]["resource"]["url"])
+        self.assertTrue(descriptor["terminal"]["resource"]["url"].startswith("/art/defaults/"))
         self.assertEqual(
-            payload["fallback"]["face_rect"], descriptor["terminal"]["resource"]["geometry"]["face_rect"]
+            sorted(descriptor["terminal"]["resource"]["geometry"]["face_rect"]),
+            ["h", "w", "x", "y"],
         )
         # Nothing was created, deleted, repaired, or written by any of it: the
         # only difference from the first phase is the file this test deleted.

@@ -105,14 +105,11 @@ numeric identity.
 - **THEN** the panel synthesizes no display label; pending is the disambiguating fact, and its presentation belongs to the client
 
 #### Scenario: The wire shape stays unchanged apart from the origin discriminator
-- **WHEN** the roster's portrait vocabulary gains the server-authored origin discriminator added by the `official-art-resolution` capability
-- **THEN** it is one bounded enum field on the portrait object, and portrait resolution, the roster wire shape, the row's own facts and every other field stay read-only and exactly as they are
+- **WHEN** roster portraits adopt canonical descriptors
+- **THEN** only the portrait vocabulary and schema version change; identity/current/pending/capacity/lock facts, privacy and read-only semantics remain unchanged
 
 ### Requirement: Roster portraits resolve through the named-portrait subject mechanism
-Each roster row's portrait SHALL be resolved through the same named-portrait resolution the art
-panel's portrait catalog uses: an explicit named `portrait_policy` on the character, the
-canonical-age eligibility check, and the resolved asset or its placeholder. Resolution SHALL NOT
-require the character to be present in the rendering actor's current room.
+Owned roster portraits SHALL use the same complete canonical descriptor, eligibility and ordered source vocabulary as the art catalog, regardless of room presence. No field-copy omission SHALL discard terminal geometry or source faults. Roster schema 3 SHALL replace flat portrait image fields atomically across serializer, validators and all consumers.
 
 #### Scenario: An activated character resolves its generated portrait
 - **WHEN** a roster row is built for an activated character whose portrait asset is complete
@@ -124,31 +121,28 @@ require the character to be present in the rendering actor's current room.
 - **THEN** the row carries the no-portrait placeholder with a null URL and a null subject key
 
 #### Scenario: A not-yet-generated portrait resolves to its pending placeholder
-- **WHEN** a roster row is built for an activated character whose portrait asset has not been
-  generated yet
-- **THEN** the row carries the placeholder descriptor and the asset's pending status rather than
-  a URL
+- **WHEN** an activated owned character has no successful generated image yet
+- **THEN** its descriptor truthfully states missing/pending generation and supplies applicable expected fallback without synthetic success
 
 #### Scenario: A resolved roster row carries its face rectangle
 - **WHEN** a roster row is built for an activated character that resolves to an image
 - **THEN** the row carries the media URL and a face rectangle of exactly `x`, `y`, `w`, `h` in `[0, 1]`
 
 #### Scenario: A placeholder roster row carries a null face rectangle
-- **WHEN** a roster row resolves to any truthful placeholder
-- **THEN** the row carries a null URL and a null face rectangle
+- **WHEN** an owned subject has no real image candidate
+- **THEN** real geometry is absent and alpha-terminal geometry remains separate
 
 #### Scenario: An official-resolved roster portrait names its origin
 - **WHEN** a roster row's portrait resolves to an official read-only image through the presentation chain
 - **THEN** the row carries the official-origin discriminator beside its media URL and the subject's own generation state remains untouched
 
 #### Scenario: A roster row carries the catalog's portrait vocabulary
-- **WHEN** a roster row carries a portrait
-- **THEN** it carries the same portrait field vocabulary the art panel's catalog entries carry — the subject key, the asset status, the same-origin media URL, the aspect ratio, the alt text, the placeholder descriptor, and the normalized face rectangle
-- **AND** the client renders roster portraits through its existing portrait treatment rather than a second vocabulary
+- **WHEN** an owned roster row is serialized
+- **THEN** it carries the complete canonical descriptor, including independent generation state, ordered candidate/fault facts and alpha terminal, rather than a copied subset
 
 #### Scenario: The face rectangle is normalized or null
-- **WHEN** a roster row's face rectangle is serialized
-- **THEN** it is a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` when the row carries a URL, and `null` when it carries a placeholder
+- **WHEN** a roster portrait is serialized
+- **THEN** each real candidate and alpha terminal carries its own bounded applicable geometry without merging them
 
 #### Scenario: Every media-bearing row names its portrait origin
 - **WHEN** a roster row carries a media value

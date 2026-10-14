@@ -16,6 +16,12 @@ const assert = require("node:assert/strict");
 const Protocol = require("../elosern/protocol.js");
 const ArtPanel = require("../elosern/art_panel.js");
 const ArtFocus = require("../elosern/art_focus.js");
+const {
+  fixtureDigest,
+  validArtCatalogEntry,
+  validArtwork,
+  validArtworkResource,
+} = require("./protocol_fixtures.js");
 
 function validScene(overrides) {
   return Object.assign(
@@ -34,33 +40,38 @@ function validScene(overrides) {
   );
 }
 
+// One catalog value: the canonical descriptor plus its bounded display
+// context. The URL/aspect facts the model reduces come from the descriptor's
+// own highest-ranked image attempt.
 function validEntry(overrides) {
-  return Object.assign(
-    {
-      subject_key: "portrait:monster:low",
-      status: "done",
-      url: "/art/portrait/monster/low.png",
-      aspect_ratio: "3:4",
-      alt: "低階魔物",
-      placeholder: null,
-      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
-      stage: { scale: 1, x: 0, y: 0 },
-      origin: "runtime",
-      fallback: {
-        key: "monster_anon",
-        url: "/art/defaults/monster_anon.webp",
-        face_rect: { x: 0.3403, y: 0.02, w: 0.3194, h: 0.18 },
+  return validArtCatalogEntry(
+    Object.assign(
+      {
+        artwork: validArtwork({
+          attempts: [
+            {
+              type: "image",
+              source_id: "portrait.default:1",
+              rank: 30,
+              resource: validArtworkResource({
+                resource_id: "portrait/monster/low.png",
+                version: fixtureDigest("monster-low"),
+                url: "/art/portrait/monster/low.png",
+              }),
+            },
+          ],
+        }),
+        context: { name: "哥布林", role: "敵方" },
       },
-      context: { name: "哥布林", role: "敵方" },
-    },
-    overrides
+      overrides
+    )
   );
 }
 
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       kind: "scene",
       scene: validScene(),
@@ -73,6 +84,14 @@ function validPanel(overrides) {
   );
 }
 
+// The catalog is replaced, never deep-merged: a merged entry would silently
+// regain the facts a rejection case deliberately removed.
+function catalogPanel(entries) {
+  const panel = validPanel();
+  panel.portrait_catalog = entries;
+  return panel;
+}
+
 test("the validated art payload is accepted by the protocol reducer", () => {
   const panel = Protocol.validateArtPanel(validPanel());
   assert.equal(panel.available, true);
@@ -82,54 +101,59 @@ test("the validated art payload is accepted by the protocol reducer", () => {
 test("malformed art payloads are rejected by the protocol validator", () => {
   assert.throws(() => Protocol.validateArtPanel(validPanel({ kind: "combat" })));
   assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 1 })));
+  assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 2 })));
   assert.throws(() =>
     Protocol.validateArtPanel(validPanel({ scene: validScene({ url: "https://x.test/a.png" }) }))
   );
-  assert.throws(() =>
-    Protocol.validateArtPanel(validPanel({ portrait_catalog: { x: validEntry() } }))
-  );
+  assert.throws(() => Protocol.validateArtPanel(catalogPanel({ x: validEntry() })));
   assert.throws(() =>
     Protocol.validateArtPanel(
       validPanel({ scene: validScene({ status: "pending", url: null, placeholder: null }) })
     )
   );
-  // v2: a URL-bearing entry carries a face rectangle; a placeholder never does.
+  // v3: the entry is exactly {artwork, context}, and the descriptor's own
+  // geometry is validated — a malformed face rectangle is refused, and the
+  // retired flat entry shape is refused outright.
+  const withGeometry = (geometry) =>
+    validEntry({
+      artwork: validArtwork({
+        attempts: [
+          {
+            type: "image",
+            source_id: "portrait.default:1",
+            rank: 30,
+            resource: validArtworkResource({ geometry }),
+          },
+        ],
+      }),
+    });
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validPanel({ portrait_catalog: { "1": validEntry({ face_rect: null }) } })
-    )
-  );
-  assert.throws(() =>
-    Protocol.validateArtPanel(
-      validPanel({
-        portrait_catalog: {
-          "1": validEntry({
-            url: null,
-            stage: null,
-            origin: "silhouette",
-            placeholder: { kind: "unavailable", label: "無法提供" },
-            face_rect: { x: 0.1, y: 0.1, w: 0.5, h: 0.5 },
-          }),
-        },
+      catalogPanel({
+        "1": withGeometry({
+          image_size: null,
+          face_rect: { x: 0.25, y: 0.06, w: 0.5 },
+          stage: null,
+          aspect_ratio: "3:4",
+        }),
       })
     )
   );
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validPanel({
-        portrait_catalog: {
-          "1": validEntry({ face_rect: { x: 0.25, y: 0.06, w: 0.5 } }),
-        },
+      catalogPanel({
+        "1": withGeometry({
+          image_size: null,
+          face_rect: { x: 1.5, y: 0.06, w: 0.5, h: 0.5 },
+          stage: null,
+          aspect_ratio: "3:4",
+        }),
       })
     )
   );
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validPanel({
-        portrait_catalog: {
-          "1": validEntry({ face_rect: { x: 1.5, y: 0.06, w: 0.5, h: 0.5 } }),
-        },
-      })
+      catalogPanel({ "1": Object.assign(validEntry(), { url: "/art/portrait/monster/low.png" }) })
     )
   );
 });
@@ -192,6 +216,8 @@ test("catalog reduction keys entries by opaque catalog IDs", () => {
   assert.equal(model.catalog["2"].name, "哥布林");
   assert.equal(model.catalog["2"].role, "敵方");
   assert.equal(model.catalog["2"].url, "/art/portrait/monster/low.png");
+  assert.equal(model.catalog["2"].generationState, "done");
+  assert.equal(model.catalog["2"].terminalUrl, "/art/defaults/man.webp");
 });
 
 test("focus survives when its catalog ID survives", () => {
@@ -204,7 +230,7 @@ test("focus survives when its catalog ID survives", () => {
 test("a vanished focus adopts the mode rule", () => {
   // Exploration: a vanished focus means no focus.
   const model = ArtPanel.reducePanel(
-    validPanel({ portrait_catalog: { "3": validEntry() } }),
+    catalogPanel({ "3": validEntry() }),
     "exploration",
     { focusKey: "2" }
   );
@@ -213,7 +239,7 @@ test("a vanished focus adopts the mode rule", () => {
 
   // Combat: a vanished focus selects the first valid participant.
   const combat = ArtPanel.reducePanel(
-    validPanel({ portrait_catalog: { "3": validEntry() } }),
+    catalogPanel({ "3": validEntry() }),
     "combat",
     { focusKey: "2" }
   );
@@ -249,22 +275,26 @@ test("scene and portrait full-view state is preserved across reduction", () => {
   assert.equal(model.portraitFullView, false);
 });
 
-test("a placeholder catalog entry has no URL", () => {
-  const panel = validPanel({
-    portrait_catalog: {
-      "2": validEntry({
-        subject_key: null,
-        status: null,
-        url: null,
-        aspect_ratio: null,
-        face_rect: null,
-        placeholder: { kind: "unavailable", label: "無法提供" },
+test("an entry with no real candidate has no URL and keeps its terminal", () => {
+  const panel = catalogPanel({
+    "2": validEntry({
+      artwork: validArtwork({
+        subject_id: "2",
+        generation_subject: null,
+        generation_state: "missing",
+        attempts: [
+          { type: "fault", source_id: "portrait.default:1", rank: 30, reason: "generated_output_missing" },
+        ],
       }),
-    },
+    }),
   });
   const model = ArtPanel.reducePanel(panel, "combat", {});
   assert.equal(model.catalog["2"].url, null);
-  assert.equal(model.catalog["2"].placeholderKind, "unavailable");
+  assert.equal(model.catalog["2"].aspectRatio, null);
+  assert.equal(model.catalog["2"].generationState, "missing");
+  // The alpha terminal stays available for a local fallback, separately from
+  // any real candidate.
+  assert.equal(model.catalog["2"].terminalUrl, "/art/defaults/man.webp");
 });
 
 test("the client-local focus bus publishes and delivers without a packet", () => {

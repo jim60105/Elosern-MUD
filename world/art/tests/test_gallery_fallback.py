@@ -36,7 +36,7 @@ from world.art.gallery_fallback import (
 )
 from world.art.gallery_fallback import FALLBACK_FACE_RECTS
 from world.art.gallery_match import fallback_for
-from world.art.presenter import ORIGIN_SILHOUETTE, resolve_subject
+from world.art.presenter import ORIGIN_SILHOUETTE, describe_portrait
 from world.art.store import ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.lore import monsters, player_presets
@@ -451,21 +451,38 @@ class EntityMonsterConstantTests(EvenniaTestCase):
         )
 
 
+def candidate(descriptor: dict) -> dict | None:
+    """The descriptor's presented real candidate resource, or ``None``."""
+    for attempt in descriptor["attempts"]:
+        if attempt["type"] == "image":
+            return attempt["resource"]
+    return None
+
+
+def terminal(descriptor: dict) -> dict | None:
+    """The descriptor's own alpha terminal resource, or ``None``."""
+    return descriptor["terminal"]["resource"] if descriptor["terminal"] else None
+
+
 class SeamPayloadTests(EvenniaTestCase):
     @covers_requirement("art-gallery-fallback::the-fallback-seam-supplies-a-url-and-a-face-rectangle-and-reports-its-use")
     def test_the_presenter_carries_a_fallback_image_and_logs_one_event(self):
         subject = _character("fallbackhero")
         with patch("world.observability.log_info") as logged:
-            payload = resolve_subject(subject)
-        # The resolved silhouette rides the decorative `fallback` field: the
-        # payload's own media URL stays null and its true status stands
-        # (builtin-silhouette-stage-fallback).
-        self.assertEqual(payload["origin"], ORIGIN_SILHOUETTE)
-        self.assertIsNone(payload["url"])
-        self.assertEqual(payload["kind"], "missing")
-        self.assertEqual(payload["status"], ArtAssetStatus.MISSING)
-        self.assertNotIn("已生成", str(payload))
-        silhouette = payload["fallback"]
+            descriptor = describe_portrait(subject)
+        # The resolved silhouette rides the descriptor's own alpha terminal:
+        # the position presents no real candidate and its recorded generation
+        # truth stands (builtin-silhouette-stage-fallback).
+        self.assertIsNone(candidate(descriptor))
+        self.assertEqual(terminal(descriptor)["origin"], ORIGIN_SILHOUETTE)
+        self.assertEqual(descriptor["generation_state"], ArtAssetStatus.MISSING)
+        silhouette = {
+            "key": terminal(descriptor)["url"].rsplit("/", 1)[-1][
+                : -len(FALLBACK_EXTENSION)
+            ],
+            "url": terminal(descriptor)["url"],
+            "face_rect": terminal(descriptor)["geometry"]["face_rect"],
+        }
         self.assertIn(silhouette["key"], FALLBACK_KEYS)
         self.assertEqual(
             silhouette["url"],

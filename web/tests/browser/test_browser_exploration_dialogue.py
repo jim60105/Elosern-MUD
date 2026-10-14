@@ -1047,8 +1047,14 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         goblin_pk = str(goblin["identity"])
         self.assertIn(goblin_pk, catalog)
         goblin_entry = catalog[goblin_pk]
-        self.assertEqual(goblin_entry.get("fallback", {}).get("key"), "monster_anon")
-        self.assertIsNone(goblin_entry.get("url"))
+        artwork = goblin_entry["artwork"]
+        # The admitted entry's descriptor exposes no real candidate here and
+        # carries the committed ``monster_anon`` alpha terminal.
+        self.assertEqual(
+            [a["type"] for a in artwork["attempts"] if a["type"] == "image"], []
+        )
+        self.assertEqual(artwork["terminal"]["kind"], "alpha_mask")
+        self.assertIn("monster_anon", artwork["terminal"]["resource"]["url"])
 
         # Ensure standing humanoid SVG is absent from the stage
         svg_count = page.locator('[data-anchor="actor-right"] [data-testid="reference-artwork"] svg').count()

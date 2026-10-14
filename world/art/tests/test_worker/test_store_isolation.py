@@ -179,9 +179,10 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.last_error_code, "sd_connection_error")
-        from world.art.presenter import resolve_subject
+        from world.art.presenter import resolve_scene_subject
 
-        payload = resolve_subject(subject)
+        # A scene position: the scene block keeps its own flat projection.
+        payload = resolve_scene_subject(subject)
         self.assertEqual(payload["kind"], "missing")
         self.assertIsNone(payload["url"])
 

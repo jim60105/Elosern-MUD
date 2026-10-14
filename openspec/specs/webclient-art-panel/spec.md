@@ -9,7 +9,7 @@ offline degradation, and keyboard-first desktop-bounded browser acceptance.
 ## Requirements
 
 ### Requirement: The art panel is an exact read-only panel available in exploration and combat modes
-The production presentation registry SHALL register `art` schema version 2. Its available payload
+The production presentation registry SHALL register `art` schema version 3. Its available payload
 SHALL contain exactly `schema_version`, `available`, `kind`, `scene`, and `portrait_catalog`;
 `available` SHALL be true and `kind` SHALL be `scene`. The panel SHALL be available in `exploration`
 and `combat` modes and SHALL use the registered common unavailable form in `creation` mode.
@@ -46,6 +46,10 @@ and `combat` modes and SHALL use the registered common unavailable form in `crea
 - **WHEN** the presenter emits the `art` payload
 - **THEN** it contains no live object reference, no filesystem path, no store root, and no
   rejected prompt content
+
+#### Scenario: Portrait wire and all readers cut over together
+- **WHEN** art schema 3 and roster schema 3 ship
+- **THEN** portrait_catalog values and roster portraits carry the complete canonical artwork descriptor plus authorized display context; active validators and every portrait consumer reject the old flat image fields while scene retains its prior shape until its separately versioned cutover
 
 ### Requirement: The scene payload resolves only validated archetypes with truthful placeholders
 The art panel scene SHALL resolve through `world.art.presenter.resolve_scene` from the current room's
@@ -84,10 +88,7 @@ expose `out_path` or the store root, and SHALL derive its URL only from a valida
   label
 
 ### Requirement: The portrait catalog is server-authored, age-checked, and bounded
-The art panel `portrait_catalog` SHALL be a bounded object keyed by the opaque IDs of currently
-present focusable entities, in deterministic order. Each catalog value SHALL contain the
-server-resolved subject key, asset status, same-origin media URL or placeholder, aspect ratio,
-alternative text, and bounded display context (name plus role/target label).
+The portrait catalog SHALL be bounded, deterministic and keyed by opaque identities admitted to the current visible/focusable art view; owned roster portraits remain independently scoped and do not expand this catalog. Each value SHALL carry the complete canonical descriptor and bounded display context. Existing named-policy/canonical-age checks and monster visual-species provenance SHALL remain. Ineligible subjects SHALL expose no real candidate or generated subject key.
 
 #### Scenario: Combat catalog mirrors the context_actions participants
 - **WHEN** combat presentation resolves participants and the art panel resolves its portrait catalog
@@ -95,10 +96,8 @@ alternative text, and bounded display context (name plus role/target label).
   exactly one catalog value keyed by that identity
 
 #### Scenario: A named present character resolves to a verified portrait value
-- **WHEN** a present character carries an explicit named portrait policy and passes the canonical-age
-  check
-- **THEN** its catalog entry carries the resolved subject key and status, a same-origin URL or
-  truthful placeholder, and its display context, and no browser-constructed key or URL exists
+- **WHEN** an authorized named-policy character passes canonical-age checks
+- **THEN** its descriptor carries truthful generation and ordered source facts with no client-built key or URL
 
 #### Scenario: A generic monster shares one portrait per bestiary archetype
 - **WHEN** a present monster has registered visual-species provenance
@@ -129,20 +128,20 @@ alternative text, and bounded display context (name plus role/target label).
 - **THEN** its catalog entry carries a media URL and a face rectangle of exactly `x`, `y`, `w`, `h` in `[0, 1]`
 
 #### Scenario: A placeholder entry carries a null face rectangle
-- **WHEN** a present entity resolves to any truthful placeholder
-- **THEN** its catalog entry carries a null URL and a null face rectangle
+- **WHEN** a subject has no real candidate
+- **THEN** real geometry is absent; its separate alpha terminal geometry remains available
 
 #### Scenario: A placeholder row can still carry the attribute-selected decorative silhouette
-- **WHEN** a present dialogue-host NPC with no named portrait policy and stored sex/apparent-age attributes resolves to the unavailable placeholder
-- **THEN** the entry's real URL, subject key, and face rectangle are null, and its decorative `fallback` field carries the attribute-selected identity — not one shared shape for every missing actor — with no policy, gallery record, or job created for the entity
+- **WHEN** an admitted dialogue host has no real image or named portrait policy
+- **THEN** its descriptor carries the deterministic attribute-selected alpha terminal, without creating policy, gallery record or job
 
 #### Scenario: A resolved real row retains the decorative reference
-- **WHEN** a catalog entry resolves a real runtime image
-- **THEN** the entry's real fields carry the image with the `runtime` origin and the decorative `fallback` field remains available for a browser-side load-failure re-render
+- **WHEN** a subject has real candidate attempts
+- **THEN** its separate alpha terminal remains available for browser failure and does not change generation truth
 
 #### Scenario: Catalog entries name their image origin
-- **WHEN** present entities resolve an official image, a runtime card image, and a built-in silhouette respectively in one snapshot
-- **THEN** each entry carries the discriminator naming its own server-resolved source, and no client-side URL inspection is needed or performed to tell them apart
+- **WHEN** real image candidates and a silhouette terminal occur in the descriptor
+- **THEN** each resource carries its server-authored origin independently of generation state
 
 #### Scenario: An official-backed entry carries no mutable state claim
 - **WHEN** a catalog entry resolves an official image for a subject whose gallery is empty
@@ -155,30 +154,20 @@ alternative text, and bounded display context (name plus role/target label).
   companions of the player character present in the current room
 
 #### Scenario: Every media-bearing entry names its authored origin
-- **WHEN** a catalog entry carries a media value
-- **THEN** it carries the server-authored portrait origin discriminator — the closed vocabulary
-  established by `art-gallery-fallback` (`runtime | silhouette | placeholder`), extended with
-  `official` (see the `official-art-resolution` capability) — so an official image, a runtime
-  image, and a silhouette are distinguishable without inspecting the URL
+- **WHEN** a descriptor contains media resources
+- **THEN** each candidate/terminal names its authored origin without URL inference
 
 #### Scenario: Stage carries the exact bounded triple or null
-- **WHEN** a catalog entry resolves
-- **THEN** stage is an exact finite bounded `{scale, x, y}` mapping for assets and null for
-  placeholders, and malformed stored card stage degrades to identity rather than failing a
-  snapshot
+- **WHEN** a real portrait candidate or alpha terminal is described
+- **THEN** each carries its applicable geometry separately; malformed stored stage uses safe identity geometry with an attributed metadata fault
 
 #### Scenario: The face rectangle is bounded for images and null for placeholders
-- **WHEN** a catalog entry resolves
-- **THEN** the face rectangle is a mapping of exactly `x`, `y`, `w`, `h` in `[0, 1]` whenever the
-  entry carries a media URL, and `null` whenever the entry is a placeholder, so a client never
-  offsets a frame it has no image for
-- **AND** the resolved normalized face rectangle and stage triple accompany the other value
-  fields
+- **WHEN** portrait candidate geometry is serialized
+- **THEN** its face rectangle is the exact validated bounded mapping; no-real-candidate state has no real geometry and retains separate terminal geometry
 
 #### Scenario: The catalog carries no detection, crop, or second image
-- **WHEN** the catalog payload is inspected
-- **THEN** it carries no face-detection result and no crop, and — beyond the decorative
-  `fallback` field established by `art-gallery-fallback` — no second image reference
+- **WHEN** a descriptor is inspected
+- **THEN** it contains ordered original resources and terminal metadata without face detection, pre-cropped pixels or unrelated private images
 
 #### Scenario: Subject resolution dispatches by entity kind
 - **WHEN** a present entity portrait is resolved
@@ -508,10 +497,7 @@ the image's p% point with the frame's p% point, which centers the rectangle's ce
   requirement
 
 ### Requirement: The reference artwork frame presents a portrait entry truthfully through cover fit and rect crop
-The ReferenceArtwork component SHALL retain separate cover and stage modes. Its cover mode SHALL
-render one URL-bearing image with the shared face_rect crop. The component SHALL remain
-manifest-listed as Core/ReferenceArtwork in the frozen required set and covered by the
-deterministic coverage gate.
+The shared figure frame SHALL consume canonical load state in both cover and stage layouts. Both SHALL use the deterministic alpha silhouette when no real portrait succeeds, preserving identity, real-versus-silhouette geometry and accessible state. Layout modes SHALL not disable silhouette policy. The manifest-listed Core/ReferenceArtwork family and coverage gate SHALL remain.
 
 #### Scenario: A resolved entry renders the cropped image
 - **WHEN** cover mode receives an entry with a media URL and a well-formed rectangle
@@ -522,20 +508,20 @@ deterministic coverage gate.
 - **THEN** the drawer figure uses contain/bottom alignment, scale 0.6 and frame offsets 10%/-20%, while avatar cover crops remain face_rect-driven and unchanged
 
 #### Scenario: A placeholder entry renders no image
-- **WHEN** either mode receives a null entry or null URL with a placeholder label
-- **THEN** no image element exists and the truthful placeholder state is rendered
+- **WHEN** either figure layout has no successful real portrait
+- **THEN** an admitted alpha terminal is observed through the shared lifecycle and drawn only after success; absent/failed alpha leaves identity text
 
 #### Scenario: A stage silhouette is the attribute-selected alpha mask
 - **WHEN** a stage-mode entry carries the server-resolved fallback identity for, respectively, an adult male, adult female, boy, girl, elder, and monster subject
 - **THEN** the frame renders each committed image's own alpha mask as the dark silhouette at the current stage position — floor-aligned, aspect-preserved, unstretched — with name and state labels outside the mask, and the former inline SVG is no longer rendered
 
 #### Scenario: A silhouette is not a completed portrait
-- **WHEN** a stage-mode entry carries silhouette origin with an underlying pending or failed status
-- **THEN** the frame shows the mask plus the truthful pending/failed label, runs the pending shimmer only at full motion, and claims no generated success
+- **WHEN** pending or failed generation reaches a healthy alpha terminal
+- **THEN** the mask is available while generation stays pending/failed; only a reached failed job has persistent error styling and no generated-success claim is made
 
 #### Scenario: A failed load degrades and a URL change recovers
-- **WHEN** an image fails to load and the frame later receives a different URL
-- **THEN** failure replaces the image with the labelled placeholder and the changed URL renders a new image element with the replacement URL
+- **WHEN** a real source fails then a new descriptor version repairs it
+- **THEN** resolution advances through ordered attempts and alpha terminal, retains reached failure, and successful repaired version can recover
 
 #### Scenario: A failed bundled mask keeps the frame usable
 - **WHEN** the fallback mask resource itself fails to load in stage mode
@@ -547,11 +533,8 @@ deterministic coverage gate.
   positioning and bottom-center stage scale/translation, without a face_rect crop
 
 #### Scenario: Placeholders and load outcomes degrade per mode
-- **WHEN** a null entry or placeholder entry (null URL) reaches either mode, an image load fails,
-  or the frame receives a changed URL
-- **THEN** a null or placeholder entry renders its truthful labelled placeholder with no image, a
-  failed load degrades to that mode's labelled placeholder, and a changed URL re-attempts the new
-  image without remounting the surface
+- **WHEN** missing/pending/failed artwork reaches either figure layout
+- **THEN** both layouts use their applicable shared alpha/text result and truthful independent generation state without caller-local failure flags
 
 #### Scenario: The stage silhouette replaces the inline standing SVG as an alpha mask
 - **WHEN** a stage-mode placeholder renders its silhouette
@@ -574,6 +557,10 @@ deterministic coverage gate.
 #### Scenario: Failed species imagery uses its authoritative monster fallback
 - **WHEN** a monster species image fails to load while its entry carries monster_anon
 - **THEN** stage mode renders that committed alpha mask with a load-failure state; a failed mask leaves text only and a new species URL can recover without remount
+
+#### Scenario: Alpha resource failure never makes a rectangle
+- **WHEN** the observed alpha terminal fails
+- **THEN** no mask fill is rendered, identity text remains and a persistent local indication explains the failure
 
 ### Requirement: Resolved artwork carries stage without changing asset or placeholder truth
 Resolved gallery-card portraits SHALL carry validated card stage. A malformed stored stage reaching presentation SHALL degrade to `{scale: 1.0, x: 0.0, y: 0.0}` with one bounded `art_stage_invalid` warning carrying the subject. Placeholders SHALL carry null stage.

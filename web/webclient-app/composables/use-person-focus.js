@@ -119,11 +119,13 @@ export function usePersonFocus(store, { panel, compassRef, onRailHover, showRead
   // The message window's speaker line while a person is in focus.
   const speaker = computed(() => (personFocus.value ? card.value.name : null));
 
-  // The standee in focus (design D3): its committed portrait entry, or null
-  // for the dialogue silhouette treatment.
+  // The standee in focus (design D3): the canonical descriptor its committed
+  // exploration reference names, or null for the dialogue silhouette
+  // treatment. The reference itself is the admission fact, so an unadmitted
+  // target is expected absence and a dangling one is a local failure.
   const focusPortrait = computed(() => {
     const key = focusTarget.value?.portrait_ref;
-    return key == null ? null : (panel("art")?.portrait_catalog?.[key] ?? null);
+    return key == null ? null : (panel("art")?.portrait_catalog?.[key]?.artwork ?? null);
   });
 
   function onRailActivate(key) {

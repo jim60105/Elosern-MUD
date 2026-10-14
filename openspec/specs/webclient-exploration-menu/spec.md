@@ -745,7 +745,7 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 - **THEN** the adapter rejects with a stable code and message and does not advance the clock
 
 ### Requirement: Portrait focus stays client-local against the art catalog seam
-Exploration interact and look-entity descriptors SHALL carry null or a 1..32-character ASCII-decimal `portrait_ref`. Non-null refs SHALL name an entry in the current bounded server art view whose canonical resolution supplies its own runtime or official image. The browser SHALL use supplied catalog values without constructing subject keys or URLs or sending focus messages.
+Exploration look/interact descriptors SHALL carry null or an unchanged bounded ASCII-decimal portrait_ref. Every non-null reference SHALL name an admitted canonical entry regardless of real-image availability. Existing visibility, capacity, age eligibility and no client-built URL/key rules SHALL remain; admitted missing/pending/failed/alpha-only subjects SHALL retain their reference.
 
 #### Scenario: Absence of art never blocks exploration
 - **WHEN** the art catalog is absent or a descriptor carries `portrait_ref: null`
@@ -756,12 +756,12 @@ Exploration interact and look-entity descriptors SHALL carry null or a 1..32-cha
 - **THEN** client-local focus switches only to that server-verified value and no subject key or URL is constructed by the browser
 
 #### Scenario: Missing art is never a failure
-- **WHEN** a descriptor carries `portrait_ref: null` or the catalog is absent
-- **THEN** it is not treated as a failure; look, interact, and dialogue proceed normally with no portrait card
+- **WHEN** an admitted descriptor has expected missing imagery, or no subject is admitted
+- **THEN** expected absence has no error marker; a real panel availability failure is indicated locally while look/interact/dialogue remain usable
 
 #### Scenario: Both descriptor paths join the same current image
-- **WHEN** a present interact target also has a look-entity row, belongs to the current capped art view and resolves to an eligible real official or runtime portrait
-- **THEN** both rows carry the same server-authored catalog ref, and the normally rendered art catalog entry at that ref carries that resolved image
+- **WHEN** the same authorized entity occurs in look and interact and the bounded art view
+- **THEN** both rows carry the same catalog reference and complete descriptor including missing-source facts
 
 #### Scenario: A non-interact entity can carry an admitted portrait
 - **WHEN** a present named-policy character is catalogued with real imagery and appears only in the look-entity list
@@ -772,8 +772,8 @@ Exploration interact and look-entity descriptors SHALL carry null or a 1..32-cha
 - **THEN** its exploration reference is null and no catalog expansion or browser-generated key occurs
 
 #### Scenario: Missing and ineligible imagery never becomes a real reference
-- **WHEN** a catalogued entity resolves to missing, pending, failed, malformed-policy, age-ineligible or silhouette-only art without its own runtime/official media URL
-- **THEN** its descriptor carries null, no generation or gameplay mutation occurs, and exploration remains usable
+- **WHEN** an authorized catalogued entity lacks real art or fails named-policy/age eligibility
+- **THEN** its reference names the admitted safe descriptor without forbidden real candidates; no job or gameplay mutation occurs and exploration remains usable
 
 #### Scenario: Exact validators preserve admitted reference values
 - **WHEN** either descriptor carries null or an ASCII-decimal reference of length 1 or 32, and then an empty, overlong, numeric, Unicode-digit, subject-key or URL-like value

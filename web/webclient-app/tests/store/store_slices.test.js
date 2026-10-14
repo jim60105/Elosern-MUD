@@ -721,7 +721,7 @@ describe("store view slices", () => {
   it("exposes roster slice when roster panel is available in snapshot", () => {
     openActiveSession(store);
     const rosterPanel = {
-      schema_version: 2,
+      schema_version: 3,
       available: true,
       characters: [
         {
@@ -729,16 +729,33 @@ describe("store view slices", () => {
           name: "艾莉亞",
           current: true,
           pending: false,
+          // The row's portrait IS the complete canonical descriptor.
           portrait: {
-            subject_key: "character:1",
-            status: "done",
-            url: "/art/portraits/character_1.png",
-            aspect_ratio: "3:4",
-            alt: "英雄肖像",
-            placeholder: null,
-            face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
-            stage: { scale: 1, x: 0, y: 0 },
-            origin: "runtime",
+            subject_id: "character:1",
+            revision: "1".repeat(64),
+            generation_subject: "character:1",
+            generation_state: "done",
+            attempts: [
+              {
+                type: "image",
+                source_id: "portrait.classic:character:1",
+                rank: 40,
+                resource: {
+                  resource_id: "portrait/character/character_1.png",
+                  version: "2".repeat(64),
+                  url: "/art/portraits/character_1.png",
+                  origin: "runtime",
+                  geometry: {
+                    image_size: null,
+                    face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+                    stage: { scale: 1, x: 0, y: 0 },
+                    aspect_ratio: "3:4",
+                  },
+                },
+              },
+            ],
+            terminal: null,
+            retention_sources: [],
           },
         },
         {
@@ -746,16 +763,15 @@ describe("store view slices", () => {
           name: "凱恩",
           current: false,
           pending: true,
+          // A creation-pending shell: the EMPTY canonical descriptor.
           portrait: {
-            subject_key: null,
-            status: null,
-            url: null,
-            aspect_ratio: null,
-            alt: "無肖像",
-            placeholder: { kind: "unavailable", label: "無肖像" },
-            face_rect: null,
-            stage: null,
-            origin: "placeholder",
+            subject_id: "2",
+            revision: "3".repeat(64),
+            generation_subject: null,
+            generation_state: null,
+            attempts: [],
+            terminal: null,
+            retention_sources: [],
           },
         },
       ],

@@ -9,11 +9,24 @@ import {
   lineupSlotByIdentity,
 } from "../../components/companion-lineup.js";
 import { portraitFor } from "../../components/party-helpers.js";
+import { artworkDescriptor } from "../../stories/fixtures/art_panels.js";
 
-const player = { identity: 1, portrait: null, displayName: "測試主角" };
+// The player's own figure is the roster position: no admitted reference here.
+const player = { identity: 1, artwork: null, panel: null, hasReference: false, displayName: "測試主角" };
 const companions = Array.from({ length: 4 }, (_, i) => ({ identity: i + 2, portrait_ref: i === 0 ? "2" : null, display_name: `同行${i}` }));
-const entry = { url: null, status: "pending", placeholder: { kind: "missing", label: "尚未生成" } };
-const artPanel = { portrait_catalog: { "2": entry } };
+// An admitted companion whose own generation is still pending: no real
+// candidate, no terminal, and a reference that stands anyway.
+const entry = {
+  artwork: artworkDescriptor({
+    subject_id: "companion:2",
+    generation_subject: "companion:2",
+    generation_state: "pending",
+    attempts: [],
+    terminal: null,
+  }),
+  context: { name: "同行0", role: "隊友" },
+};
+const artPanel = { schema_version: 3, available: true, portrait_catalog: { "2": entry } };
 const figures = (overrides = {}) => companionFigures({ player, companions, actorIdentity: "1", possessing: false, artPanel, portraitFor, ...overrides });
 
 describe("companion standing lineup", () => {
@@ -58,17 +71,17 @@ describe("companion standing lineup", () => {
     const possessed = figures({ actorIdentity: "3", possessing: true });
     expect(normal.map((s) => s.identity)).toEqual([1, 2, 3, 4, 5]);
     expect(possessed.map((s) => s.identity)).toEqual([3, 2, 1, 4, 5]);
-    expect(possessed[0].portrait).toBeNull();
+    expect(possessed[0].artwork).toBeNull();
     expect(possessed[0].displayName).toBe("同行1");
     expect(possessed.filter((s) => s.isControlled)).toHaveLength(1);
     expect(figures()).toEqual(normal);
     expect(figures({ actorIdentity: "3", possessing: false })).toEqual(normal);
     const unknown = figures({ actorIdentity: "99", possessing: true, controlledName: "測試宿主" });
-    expect(unknown[0]).toEqual({ identity: "99", portrait: null, displayName: "測試宿主", isControlled: true });
+    expect(unknown[0]).toEqual({ identity: "99", artwork: null, panel: artPanel, hasReference: false, displayName: "測試宿主", isControlled: true });
     expect(unknown.slice(1)).toEqual(normal.slice(1));
   });
   it("retains pending catalog entries and uses null for missing refs without inventing art", () => {
-    expect(figures()[1].portrait).toBe(entry);
+    expect(figures()[1].artwork).toBe(entry.artwork);
     expect(portraitFor(artPanel, "missing")).toBeNull();
     expect(portraitFor(artPanel, null)).toBeNull();
   });
@@ -95,10 +108,10 @@ describe("companion standing lineup", () => {
     // still does.
     expect(slots[1].displayName).toBe("同行0");
     expect(lineupSlotByIdentity(slots, "同行0")).toBeNull();
-    expect(slots[2].portrait).toBeNull();
+    expect(slots[2].artwork).toBeNull();
     expect(lineupSlotByIdentity(slots, 3)).toBe(slots[2]);
     // A row beyond the displayed maximum is not a figure, so not a member.
-    const wide = [...slots, { identity: 99, portrait: null, displayName: "同行4", isControlled: false }];
+    const wide = [...slots, { identity: 99, artwork: null, panel: null, hasReference: false, displayName: "同行4", isControlled: false }];
     expect(displayedLineup(wide)).toHaveLength(5);
     expect(lineupSlotByIdentity(wide, 99)).toBeNull();
   });
