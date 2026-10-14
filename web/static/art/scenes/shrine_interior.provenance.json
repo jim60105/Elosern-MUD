@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "shrine_interior",
+  "label_zh": "神殿內部",
+  "scene_sentence_zh": "莊嚴的神殿內燭光搖曳，香氣裊繞，虔誠的信徒在神像前低聲祈禱。",
+  "asset": "web/static/art/scenes/shrine_interior.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 138038,
+    "sha256": "3bbd546b068eb3cd982a25dcff1a420755d1e30a5622bb2a5089849f6e7e2753"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 2093457411,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a solemn stone shrine hall interior with a carved altar on a raised dais, rows of tall wax candles with warm flickering flames, drifting incense smoke, worn stone pillars and a vaulted ceiling, a wide clear approach of polished flagstones, subdued amber candlelight against cool shadowed stone, an unobstructed open floor across the lower foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG shrine hall interior — a carved stone altar on a raised dais lit by rows of tall wax candles, drifting incense smoke, worn stone pillars and a vaulted ceiling over a broad polished flagstone floor — with an unobstructed open foreground for stage figures, no interface, watermark or readable lettering, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_sacred_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside cave_interior and dream_throne: scene identity, palette and composition are distinct for every sibling."
+  }
+}

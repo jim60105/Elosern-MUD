@@ -37,7 +37,8 @@ and prompt library, encoded by `world.art.formats.encode`, and reviewed at
 native scale and under the desktop cover crop:
 
 - the outdoor pack — `wilderness_path`, `mountain_path`, `coastal_path`;
-- the interior pack — `tavern_interior`, `dungeon_interior`, `ruin_interior`.
+- the interior pack — `tavern_interior`, `dungeon_interior`, `ruin_interior`;
+- the sacred pack — `cave_interior`, `shrine_interior`, `dream_throne`.
 
 Every file is original, redistributable work by the project maintainers (no
 third-party stock or externally licensed imagery) and its
