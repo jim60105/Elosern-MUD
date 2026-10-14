@@ -358,29 +358,55 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_figure_gone(member_id)
         wait_for_right([member_id])
         self.assertEqual(stage()["right"], [str(member_id)])
-        # Close the card and read the anchor inside one task: the standee's CSS
-        # leave is still running (350ms at full motion), which is the state the
-        # committed membership change below has to finish.
-        leaving = page.evaluate(
-            """async (rightSelector) => {
+        # Close the card, then commit the membership change that overtakes its
+        # leave, and read the anchor — all inside ONE task: the standee's CSS
+        # leave (350ms at full motion) is provably still running when the left
+        # figure is drawn, so the empty anchor afterwards can only come from
+        # finishing that copy rather than from the transition ending.
+        overtaken = page.evaluate(
+            """async (args) => {
+              const [rightSelector, panel, identity] = args;
               document
                 .querySelector('[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="back"]')
                 .click();
-              await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-              return Array.from(document.querySelectorAll(rightSelector))
+              const nextFrame = () =>
+                new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              await nextFrame();
+              const leaving = Array.from(document.querySelectorAll(rightSelector))
                 .map((el) => el.getAttribute('data-identity'));
+              const s = window.__elosernBridge.store.view;
+              const envelope = {
+                protocol_version: 1,
+                presentation_epoch: s.epoch,
+                revision: s.revision + 1,
+                mode: s.mode,
+                layout_version: s.layoutVersion ?? 1,
+                panels: { party: panel },
+                server_time: s.serverTime,
+              };
+              const result = window.__elosernBridge.store.receive(s.generation, 'ui_update', [envelope], {});
+              await nextFrame();
+              return {
+                leaving,
+                accepted: !!result.accepted,
+                left: !!document.querySelector(
+                  '[data-testid="companion-figure"][data-identity="' + identity + '"]'
+                ),
+                after: Array.from(document.querySelectorAll(rightSelector))
+                  .map((el) => el.getAttribute('data-identity')),
+              };
             }""",
-            right_selector,
+            [right_selector, party_panel(rows), str(member_id)],
         )
-        self.assertEqual(leaving, [str(member_id)], "the standee is still leaving")
-        inject_update(page, {"party": party_panel(rows)})
-        wait_for_store_state(page, lambda s: slots_of(s) == len(rows))
-        wait_for_right([])
+        self.assertEqual(overtaken["leaving"], [str(member_id)], "the standee is still leaving")
+        self.assertTrue(overtaken["accepted"], "the membership update must be admitted")
+        self.assertTrue(overtaken["left"], "the left figure is drawn in the same task")
         self.assertEqual(
-            stage()["right"],
+            overtaken["after"],
             [],
-            "a leave overtaken by the transfer leaves no second figure",
+            "the overtaken leave is finished in the same task",
         )
+        wait_for_store_state(page, lambda s: slots_of(s) == len(rows))
         open_verb_card(page, member_id)
         wait_for_right([])
         reopened = stage()

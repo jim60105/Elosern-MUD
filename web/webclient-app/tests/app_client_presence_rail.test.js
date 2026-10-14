@@ -1257,4 +1257,77 @@ describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
     expect(rightActors()).toHaveLength(0);
     expect(sender.sent.actions).toHaveLength(1);
   });
+
+  // Everything above mounts AppClient before the store commits. The shell also
+  // has to survive a mount against an already-committed store — a hot reload,
+  // or a remount while a card is open or a conversation is on — because the
+  // derivations and the transfer watcher are read during setup.
+  it("mounts against an already-committed card and an already-committed dialogue", async () => {
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    revision = 1;
+    const result = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision,
+          panels: {
+            status: fx.statusPanel({ actor: { identity: "1" } }),
+            exploration: focusRoom(),
+            local_map: fx.localMapPanel(),
+            context_actions: fx.explorationActions(),
+            art: artPanel(),
+            roster: FOCUS_ROSTER,
+            party: focusParty(101, 102),
+          },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    expect(store.activatePresence("target-101").handled).toBe(true);
+
+    wrapper = mount(AppClient, { attachTo: document.body });
+    await settle();
+    expect(zOf("101")).toBe("6");
+    expect(speaks("101")).toBe("true");
+    expect(rightActors()).toHaveLength(0);
+    wrapper.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+
+    revision += 1;
+    const dialogue = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision,
+          mode: "dialogue",
+          panels: {
+            dialogue: {
+              schema_version: 2,
+              available: true,
+              kind: "dialogue",
+              host: { identity: 101, display_name: "蕾娜", portrait_ref: null },
+              bond_stage: null,
+              line: "歡迎。",
+              choices: [],
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(dialogue.accepted).toBe(true);
+
+    wrapper = mount(AppClient, { attachTo: document.body });
+    await settle();
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(zOf("101")).toBe("6");
+    expect(speaks("101")).toBe("true");
+  });
 });

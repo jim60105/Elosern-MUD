@@ -186,30 +186,6 @@ const dialogueSpeakingIdentity = computed(() =>
     : null,
 );
 const companionSpeakingIdentity = computed(() => dialogueSpeakingIdentity.value ?? explorationSpeakingIdentity.value);
-// Vue keeps a leaving stage actor until its CSS phase ends and cannot cancel a
-// started leave without a re-entering child, and the lineup's own slots use no
-// transition, so a copy still leaving when its identity becomes drawn in the
-// lineup would paint a second figure of the represented person (D1). A
-// transfer therefore finishes exactly that copy: the stage actor carries the
-// identity it was drawn for, and only a leaving copy of the now-represented
-// identity is removed. Vue's own leave completion stays a no-op on the
-// detached element, and an unrelated in-flight leave is untouched.
-watch(
-  () => actorRightFigure.value?.identity ?? null,
-  (identity) => {
-    if (identity === null) {
-      return;
-    }
-    document
-      .querySelectorAll('[data-testid="anchor-actor-right"] [data-testid="stage-actor"][data-identity]')
-      .forEach((el) => {
-        if (el.getAttribute("data-identity") === String(identity)) {
-          el.remove();
-        }
-      });
-  },
-  { flush: "post" },
-);
 const isControllingCompanion = computed(() => !!possessionBanner.value?.available);
 const companionLineupSlots = computed(() => companionFigures({
   player: {
@@ -223,6 +199,37 @@ const companionLineupSlots = computed(() => companionFigures({
   controlledName: possessionBanner.value?.host_name || "",
   artPanel: panel("art"), portraitFor,
 }));
+// Vue keeps a leaving stage actor until its CSS phase ends and cannot cancel a
+// started leave without a re-entering child, and the lineup's own slots use no
+// transition, so a copy still leaving when its identity becomes drawn in the
+// lineup would paint a second figure of the represented person (D1). Every
+// committed membership change therefore finishes exactly the copies it
+// overtakes: the stage actor carries the identity it was drawn for, and a
+// stage actor still in `actor-right` whose identity is now drawn on the left
+// is by construction such a copy. Vue's own leave completion stays a no-op on
+// the detached element, and a leave of an unrepresented identity is untouched.
+// The trigger is the rendered identities, not the current focus, so a leave
+// that started before the transfer (an earlier card close) is finished too.
+const renderedIdentities = computed(() =>
+  renderedLineup.value.map((slot) => String(slot.identity)).join(","),
+);
+watch(
+  renderedIdentities,
+  (key) => {
+    if (!key) {
+      return;
+    }
+    const drawn = new Set(key.split(","));
+    document
+      .querySelectorAll('[data-testid="anchor-actor-right"] [data-testid="stage-actor"][data-identity]')
+      .forEach((el) => {
+        if (drawn.has(el.getAttribute("data-identity"))) {
+          el.remove();
+        }
+      });
+  },
+  { flush: "post" },
+);
 // The player's displayed hit points while a combat round plays
 // (webclient-combat-beat-queue D7): the published playback value keyed by the
 // committed actor identity, else null, so the vitals island reads the
