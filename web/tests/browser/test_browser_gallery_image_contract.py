@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import re
 import unittest
+from urllib.parse import urlsplit
 
 from tools.spec_traceability import covers_requirement
 
@@ -143,7 +144,12 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
         self.assertEqual(figure.get_attribute("src"), terminal["url"])
         self.assertNotEqual(figure.get_attribute("src"), candidate["url"])
         self.assertTrue(self._media_requests, "the original media URL was never requested")
-        self.assertEqual(self._media_requests, [candidate["url"]])
+        # Interception is counted by the canonical source resource's own path
+        # (the browser reports the absolute request URL; the descriptor carries
+        # the same-origin route).
+        self.assertEqual(
+            [urlsplit(url).path for url in self._media_requests], [candidate["url"]]
+        )
 
         # The reached failure keeps a persistent, keyboard-accessible marker
         # with bounded text (never a raw URL, path or exception).

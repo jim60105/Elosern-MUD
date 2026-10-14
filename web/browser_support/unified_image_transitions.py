@@ -131,20 +131,32 @@ def seed_official_content(character) -> str | None:
     them exactly like a deployed catalog and the gallery's official rows come
     from the real snapshot. ``None`` when the character declares no preset
     provenance or the journey configured no official root.
+
+    A character whose activation path wrote no (or an unregistered) preset
+    provenance is given the first registered shipped preset key: a
+    preset-born character's reference is exactly that provenance, so the
+    journey exercises the real resolver rather than a synthetic shortcut.
     """
     import json
     import os
 
     from django.conf import settings
 
+    from world.art.official_refs import PLAYER_PRESET_REGISTRY, PRESET_PROVENANCE_ATTRIBUTE
     from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
 
     root = os.environ.get("ART_OFFICIAL_ROOT") or str(
         getattr(settings, "ART_OFFICIAL_ROOT", "") or ""
     )
-    key = character.attributes.get("creation_preset_key")
-    if not root or not isinstance(key, str) or not key:
+    if not root:
         return None
+    key = character.attributes.get(PRESET_PROVENANCE_ATTRIBUTE)
+    if not isinstance(key, str) or not key or key not in PLAYER_PRESET_REGISTRY:
+        registered = sorted(PLAYER_PRESET_REGISTRY)
+        if not registered:
+            return None
+        key = registered[0]
+        character.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, key)
     folder = Path(root) / "preset" / key
     folder.mkdir(parents=True, exist_ok=True)
     (folder / GALLERY_OFFICIAL_FILENAME).write_bytes(FIXTURE_VALID_PNG)
