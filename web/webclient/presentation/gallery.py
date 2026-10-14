@@ -241,10 +241,12 @@ def _validate_card_artwork(row, selected):
         return
     _validate_gallery_terminal(descriptor["terminal"])
     source = descriptors.gallery_original_source_id(row["image_id"])
-    candidates = [entry for entry in attempts if entry["source_id"] == source]
-    if len(candidates) != 1:
+    # Exactly one attempt overall, naming this row's own exact image: a second
+    # entry (a candidate or an unrelated fault) would let another source stand
+    # in for the requested original.
+    if len(attempts) != 1 or attempts[0]["source_id"] != source:
         raise ProtocolValidationError("a card row carries exactly one exact-original attempt")
-    entry = candidates[0]
+    entry = attempts[0]
     if entry["rank"] != descriptors.GALLERY_RANK_ORIGINAL:
         raise ProtocolValidationError("the exact original must carry its own rank")
     if entry["type"] == "fault":
@@ -273,10 +275,15 @@ def _validate_official_artwork(row):
     artwork_wire.validate_artwork(descriptor)
     _validate_gallery_terminal(descriptor["terminal"])
     source = descriptors.gallery_official_source_id(row["identity"])
-    candidates = [entry for entry in descriptor["attempts"] if entry["source_id"] == source]
-    if len(candidates) != 1 or candidates[0]["type"] != "image":
+    # Exactly ONE image candidate overall, and it must be this row's own exact
+    # identity: a second candidate (from any source) would let a substitute
+    # become the official original the editors measure. Fault entries are
+    # unconstrained by source — a declared-default fault legitimately names the
+    # refused declared identity, not this row's.
+    images = [entry for entry in descriptor["attempts"] if entry["type"] == "image"]
+    if len(images) != 1 or images[0]["source_id"] != source:
         raise ProtocolValidationError("an official row carries its exact official candidate")
-    entry = candidates[0]
+    entry = images[0]
     if entry["rank"] != descriptors.GALLERY_RANK_ORIGINAL:
         raise ProtocolValidationError("the official candidate must carry its own rank")
     resource = entry["resource"]

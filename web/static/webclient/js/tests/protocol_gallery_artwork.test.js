@@ -327,3 +327,74 @@ test("an official row carries its exact candidate and no stage", () => {
   foreign.official_entries[0].artwork.attempts[0].resource.resource_id = "preset/other/dusk.webp";
   assert.throws(() => Protocol.validateGalleryPanel(foreign));
 });
+
+test("an official row keeps its retained faults but only ONE image candidate", () => {
+  const identity = "preset/synthetic_preset/dawn.webp";
+  const source = `gallery.official:${identity}`;
+  const row = {
+    identity,
+    artwork: {
+      subject_id: `${DIGEST}:${DIGEST.slice(0, 36)}`,
+      revision: "f".repeat(64),
+      generation_subject: SUBJECT,
+      generation_state: "done",
+      attempts: [
+        // The directory's declared-default fault precedes the substitute it
+        // caused, and names the refused declared identity.
+        { type: "fault", source_id: "gallery.official:preset/synthetic_preset/gone.webp", rank: 10, reason: "explicit_reference_missing" },
+        // The image's own metadata fault shares its candidate's source/rank.
+        { type: "fault", source_id: source, rank: 10, reason: "metadata_invalid" },
+        {
+          type: "image",
+          source_id: source,
+          rank: 10,
+          resource: {
+            resource_id: identity,
+            version: FINGERPRINT,
+            url: `/art/official/${FINGERPRINT}/${identity}`,
+            origin: "official",
+            geometry: { image_size: SIZE, face_rect: RECT, stage: null, aspect_ratio: "3:4" },
+          },
+        },
+      ],
+      terminal: alpha("elder"),
+      retention_sources: [{ source_id: source, token: DIGEST }],
+    },
+    is_current: false,
+    is_catalog_default: true,
+  };
+  const official = panel({
+    cards: [],
+    official_entries: [row],
+    filters: { all: 0, defaults: 0, bound: 0, pending: 0, failed: 0 },
+  });
+  assert.doesNotThrow(() => Protocol.validateGalleryPanel(official));
+
+  // A second image candidate from another source would let a substitute become
+  // the official original the editors measure.
+  const substitute = structuredClone(official);
+  substitute.official_entries[0].artwork.attempts.unshift({
+    type: "image",
+    source_id: "gallery.extra:man",
+    rank: 0,
+    resource: {
+      resource_id: "defaults/man.webp",
+      version: DIGEST,
+      url: "/art/defaults/man.webp",
+      origin: "silhouette",
+      geometry: null,
+    },
+  });
+  assert.throws(() => Protocol.validateGalleryPanel(substitute));
+});
+
+test("a card row carries exactly one attempt, naming its exact original", () => {
+  const extraFault = cardDescriptor();
+  extraFault.attempts.push({
+    type: "fault",
+    source_id: "gallery.other:1",
+    rank: 10,
+    reason: "source_rejected",
+  });
+  assert.throws(() => Protocol.validateGalleryPanel(withCard({ artwork: extraFault })));
+});

@@ -66,7 +66,12 @@ def _exact(value, keys, name):
 
 
 def _text(value, maximum, name):
-    if not isinstance(value, str) or not value or len(value) > maximum:
+    if (
+        not isinstance(value, str)
+        or not value
+        or len(value) > maximum
+        or any(0xD800 <= ord(char) <= 0xDFFF for char in value)
+    ):
         raise ProtocolValidationError(f"invalid {name}")
     return value
 

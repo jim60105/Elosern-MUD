@@ -73,3 +73,9 @@ export function artworkTerminalUrl(artwork) {
   const terminal = artwork?.terminal;
   return terminal?.kind === "alpha_mask" ? terminal.resource?.url ?? null : null;
 }
+
+// The terminal alpha-mask resource's applicable geometry, or null.
+export function artworkTerminalGeometry(artwork) {
+  const terminal = artwork?.terminal;
+  return terminal?.kind === "alpha_mask" ? terminal.resource?.geometry ?? null : null;
+}

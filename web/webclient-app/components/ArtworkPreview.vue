@@ -16,7 +16,12 @@ import { computed, onBeforeUnmount } from "vue";
 
 import ArtworkAlpha from "./ArtworkAlpha.vue";
 import ArtworkFailure from "./ArtworkFailure.vue";
-import { artworkAvailability, artworkGeometry, artworkTerminalUrl } from "../lib/artwork.js";
+import {
+  artworkAvailability,
+  artworkGeometry,
+  artworkTerminalGeometry,
+  artworkTerminalUrl,
+} from "../lib/artwork.js";
 import { useArtwork } from "../composables/useArtwork.js";
 import { faceObjectPosition } from "./face-rect.js";
 
@@ -41,7 +46,7 @@ const availability = computed(() => artworkAvailability({
   artwork: props.artwork,
   viewSubjectId: props.viewSubjectId,
 }));
-const { attempt, phase, selected, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+const { attempt, phase, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
   () => props.artwork,
   availability,
 );
@@ -54,12 +59,15 @@ const silhouette = computed(() => !!probeUrl.value && probeUrl.value === termina
 const alphaResult = computed(() => (
   silhouette.value && phase.value === "success" ? { url: probeUrl.value, phase: "success" } : null
 ));
-// The crop follows the resource actually selected; before any load it falls
-// back to the descriptor's exact-original geometry.
-const objectPosition = computed(() => faceObjectPosition(
-  (selected.value?.geometry ?? artworkGeometry(props.artwork))?.face_rect,
+// The crop always follows the LIVE descriptor: the exact original's own
+// geometry, or the silhouette terminal's once the terminal is the presented
+// resource. Reading the committed descriptor rather than the driver's snapshot
+// means a geometry-only re-presentation published while a load is in flight
+// applies as soon as it lands, with no stale crop window.
+const geometry = computed(() => (
+  silhouette.value ? artworkTerminalGeometry(props.artwork) : artworkGeometry(props.artwork)
 ));
-const loading = computed(() => phase.value === "loading");
+const objectPosition = computed(() => faceObjectPosition(geometry.value?.face_rect));
 const failure = computed(() => reachedFaults.value[reachedFaults.value.length - 1] ?? null);
 const failureKind = computed(() => (
   panelUnavailable.value || failure.value ? "failure" : null

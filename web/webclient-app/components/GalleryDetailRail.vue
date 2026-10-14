@@ -55,7 +55,7 @@ function confirmDelete() {
          preview, and the player's own geometry overrides — never delete,
          replace, or regenerate. The backend refuses those independently. -->
     <template v-if="entry">
-      <ArtworkPreview class="gallery-detail__image" :artwork="entry.artwork" :panel="model" :view-subject-id="entry.identity" :alt="galleryOfficialName(entry)" />
+      <ArtworkPreview class="gallery-detail__image" :artwork="entry.artwork" :panel="panel" :view-subject-id="entry.identity" :alt="galleryOfficialName(entry)" />
       <h4>{{ GALLERY_OFFICIAL_LABEL }}</h4>
       <p class="gallery-detail__identity gallery-muted">{{ entry.identity }}</p>
       <div class="gallery-chips">
@@ -81,7 +81,7 @@ function confirmDelete() {
       </section>
     </template>
     <template v-else-if="card">
-      <ArtworkPreview v-if="card.status === 'card'" class="gallery-detail__image" :artwork="card.artwork" :panel="model" :view-subject-id="card.image_id" :alt="galleryCardName(card)" />
+      <ArtworkPreview v-if="card.status === 'card'" class="gallery-detail__image" :artwork="card.artwork" :panel="panel" :view-subject-id="card.image_id" :alt="galleryCardName(card)" />
       <p v-else class="gallery-note">{{ card.label }}</p>
       <h4>{{ card.label }}</h4>
       <p class="gallery-detail__date"><time :datetime="date.iso">{{ date.relative }}</time><span v-if="date.exact" class="gallery-muted">{{ date.exact }}</span></p>

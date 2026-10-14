@@ -179,9 +179,10 @@ def identity_version(identity: str) -> str:
     A stored card, a catalog-admitted official image and a committed built-in
     silhouette are all immutable: their identity IS their version input, so a
     replacement is a new identity rather than a mutation of old bytes. Whole
-    image bytes are never hashed here.
+    image bytes are never hashed here. It uses the one digest convention of
+    this module, so a lone surrogate in a fact is escaped rather than fatal.
     """
-    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+    return _digest(identity)
 
 
 # --- Builders -------------------------------------------------------------
@@ -203,7 +204,10 @@ def geometry(
 
     A scene resource carries null face/stage; a silhouette alpha mask carries
     its own rectangle with no decoded size; a runtime original carries all of
-    the facts its card stored plus the subject's aspect ratio.
+    the facts its card stored plus the subject's aspect ratio. The returned
+    container is always fresh; the nested facts are the caller's own
+    already-fresh mappings (a reader hands over the dicts it just validated,
+    never shared mutable state).
     """
     return {
         "image_size": image_size,
@@ -323,8 +327,12 @@ def descriptor(
 
 
 def _digest(facts: object) -> str:
-    """The one digest convention: sha256 over the canonical JSON of the facts."""
-    encoded = json.dumps(
-        facts, separators=(",", ":"), sort_keys=True, ensure_ascii=False
-    ).encode("utf-8")
+    """The one digest convention: sha256 over the canonical JSON of the facts.
+
+    The canonical form is ASCII-escaped: it is byte-stable for every input a
+    validated fact can carry (including a lone surrogate, which the active
+    validators reject at the wire but which must never turn a digest into a
+    UnicodeEncodeError).
+    """
+    encoded = json.dumps(facts, separators=(",", ":"), sort_keys=True).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()

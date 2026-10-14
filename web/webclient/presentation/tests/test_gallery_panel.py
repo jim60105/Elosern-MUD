@@ -484,6 +484,44 @@ class GalleryWireTests(unittest.TestCase):
             ] = None
         add("official rect null", official_rect_null)
         add("official terminal missing", lambda p: official_row_with(p, terminal=False))
+        def official_metadata_fault(p):
+            # The directory degraded its manifest whole: the image's own
+            # `metadata_invalid` fact sits at its candidate's source and rank.
+            official_row_with(p)
+            artwork = p["official_entries"][0]["artwork"]
+            identity = p["official_entries"][0]["identity"]
+            artwork["attempts"].insert(0, descriptors.fault_attempt(
+                descriptors.gallery_official_source_id(identity),
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.REASON_METADATA_INVALID,
+            ))
+        add("official metadata fault before its candidate", official_metadata_fault, True)
+        def official_declared_default_fault(p):
+            # The declared default was refused: its fault names that identity
+            # and precedes the substitute this row presents.
+            official_row_with(p)
+            p["official_entries"][0]["artwork"]["attempts"].insert(0, descriptors.fault_attempt(
+                descriptors.gallery_official_source_id("preset/t_gallery_preset/missing.png"),
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.REASON_EXPLICIT_REFERENCE_MISSING,
+            ))
+        add("official declared-default fault", official_declared_default_fault, True)
+        def official_substitute_candidate(p):
+            official_row_with(p)
+            artwork = p["official_entries"][0]["artwork"]
+            artwork["attempts"].insert(0, descriptors.image_attempt(
+                "gallery.extra:man", 0, descriptors.resource(
+                    "defaults/man.webp", _digest("man"), "/art/defaults/man.webp",
+                    descriptors.ORIGIN_SILHOUETTE,
+                ),
+            ))
+        add("official substitute candidate", official_substitute_candidate)
+        def card_unrelated_attempt(p):
+            p["cards"][0]["artwork"]["attempts"].append(descriptors.fault_attempt(
+                "gallery.other:1", descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.REASON_SOURCE_REJECTED,
+            ))
+        add("card unrelated extra attempt", card_unrelated_attempt)
         def official_candidate_identity(p):
             official(p, [official_row()])
             p["official_entries"][0]["artwork"]["attempts"][0]["resource"][

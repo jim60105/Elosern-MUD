@@ -178,6 +178,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # big windows from the obsidian-gold wave.
                 "Core/DesktopNavigation",
                 "Core/ReferenceArtwork",
+                # The gallery image contract added the shared descriptor
+                # preview position (unified-gallery-image-contract).
+                "Core/ArtworkPreview",
                 "World/TitleBallotMenu",
                 "Overlays/LineagePanel",
                 "Overlays/TitleCodexPanel",

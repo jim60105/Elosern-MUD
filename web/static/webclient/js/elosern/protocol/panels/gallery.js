@@ -237,11 +237,16 @@ function validateGalleryOfficialArtwork(row) {
   artwork.validateArtwork(descriptor);
   validateGalleryTerminal(descriptor.terminal);
   var source = artwork.SOURCE_PREFIX.official + row.identity;
-  var candidates = descriptor.attempts.filter(function (entry) { return entry.source_id === source; });
-  if (candidates.length !== 1 || candidates[0].type !== "image") {
+  // Exactly ONE image candidate overall, and it must be this row's own exact
+  // identity: a second candidate (from any source) would let a substitute
+  // become the official original the editors measure. Fault entries are
+  // unconstrained by source — a declared-default fault legitimately names the
+  // refused declared identity, not this row's.
+  var images = descriptor.attempts.filter(function (entry) { return entry.type === "image"; });
+  if (images.length !== 1 || images[0].source_id !== source) {
     throw new Error("an official row carries its exact official candidate");
   }
-  var entry = candidates[0];
+  var entry = images[0];
   if (entry.rank !== GALLERY_RANK_ORIGINAL) {
     throw new Error("the official candidate must carry its own rank");
   }

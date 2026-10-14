@@ -113,4 +113,22 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 - **可用性輸入** `{ state: ready|expected_absent|failed, view_subject_id }` 與描述子分離：`failed` 讓本地 `panel_unavailable` 持續，並使過期回呼與原始儲存資格失效；`expected_absent` 與載入中不得使用錯誤樣式，也不得聲稱生成正在進行。
 - **公開結果** 為 `{ selected, reachedFaults, phase, dimensions }`；`selected` 攜帶實際成功的資源、穩定的 source_id/rank 與觀測到的自然尺寸。消費者可以另外持有顯示內容，但不能自行設定載入成功或重設 reachedFaults。
 - **`ArtworkFailure.vue`／`ArtworkAlpha.vue`** 是共用的呈現原語：失敗標記持續、非模態且具鍵盤／輔助技術說明；alpha 填色只在同一 URL 已被觀測成功後才上色，因此缺席的資源不可能被畫成不透明矩形。
-- **內部請求與未來標準線路的區別：** 本變更讓既有 gallery v2 編輯器**只**以它已提交的單一原始身分／URL／幾何建構一個 rank-10 原始請求（`terminal: null`）——不製造主體解析、不接受多種線路形狀、也不新增面板欄位，現行序列化器與作用中的驗證器維持不變。之後的 gallery v3 切換會把這個呼叫端輸入換成後端描述子；同一個資源驅動不變。
+- **內部請求與標準線路的區別：** 本變更讓既有 gallery v2 編輯器**只**以它已提交的單一原始身分／URL／幾何建構一個 rank-10 原始請求（`terminal: null`）——不製造主體解析、不接受多種線路形狀、也不新增面板欄位。gallery v3 切換（`unified-gallery-image-contract`）已把該呼叫端輸入換成後端描述子（見下一節）；同一個資源驅動不變。
+
+## 作品描述子與圖庫 v3 的單一來源（unified-gallery-image-contract）
+
+圖庫（以及其後的立繪／場景／頭像）不再各自解讀線路形狀：**一個**標準描述子攜帶全部圖像事實，**一個**共用綁定把它餵進上面的載入生命週期。v2 的扁平列欄位（`url`／`face_rect`／`stage`）已移除，兩個驗證器都會拒絕它們，沒有新舊雙形狀或轉接器。
+
+- **描述子** `{subject_id, revision, generation_subject, generation_state, attempts, terminal, retention_sources}`：
+  `subject_id` 為穩定的主體身分（雜湊前綴加精確圖像鍵，128 字元上限）；
+  `revision` 為有序來源／失敗事實、來源版本、幾何、綁定／存取適用性與生成事實的 64 字元摘要；
+  `generation_state` 為 `missing|pending|done|failed`（既有 `in_progress` 正規化為 `pending`），描述已記錄的生成狀態而**與可見來源無關**——官方候選可在生成為 pending／failed 時呈現，且不得抹除已記錄的失敗。
+  `attempts` 最多 16 筆：image 為 `{type, source_id, rank, resource}`，fault 為 `{type, source_id, rank, reason}` 且**永不**帶 URL。`resource` 為 `{resource_id, version, url, origin, geometry}`，`origin ∈ runtime|official|bundled_official|silhouette`，URL 限同源且各 origin 有各自上限（runtime／silhouette 129；official／bundled_official 256），並只接受單一封閉的 `?v=<sha256>` 快取版本查詢。`geometry` 固定為 `{image_size, face_rect, stage, aspect_ratio}`，不適用者為 `null`。
+  `terminal` 為 `null` 或 `{kind: alpha_mask|scene_image, source_id, rank, resource}`：圖庫列一律附帶主體已提交的剪影 alpha 遮罩（rank 100），其資源與嘗試中的候選去重。
+  `retention_sources` 為最多 16 筆 `{source_id, token}`：token 涵蓋主體／生成主體與當前授權的綁定／存取適用性，**不含**幾何與 pending／failed 重新生成狀態，因此重新生成不會撤銷仍有效的既有輸出；輸出已知遺失或來源被拒時不授權保留。
+- **來源順序**由穩定 `rank` 決定，與陣列索引無關（圖庫：精確原始 10、alpha 終端 100）；fault 與其候選共用同一 `source_id`/`rank`，新增 fault 永不改變來源優先序。
+- **`composables/useArtwork.js`** 是唯一的面板描述子綁定：它把描述子轉成正規化載入請求（epoch 為穩定主體身分，因此**僅幾何變更**的修訂仍重用已解碼位元組），並轉發驅動的 `{subjectId, revision, phase, selected, reachedFaults, exhausted}` 與元素處理器。消費者可以保留自己的顯示內容，但不能設定載入成功或清除已到達的失敗。
+- **`lib/artwork.js`** 提供唯一的可用性翻譯 `artworkAvailability({panel, required, hasReference, artwork, viewSubjectId})`：非必要介面或刻意無參照的可用面板為 `expected_absent`；必要面板缺席／`available:false`／懸空參照為 `failed`；`ready` 需要真正的描述子。不可用面板**永不**被讀成生成進度。同一模組亦提供描述子選擇器（最高優先 image 候選、其幾何、終端 URL）。
+- **`components/ArtworkPreview.vue`** 是唯一的預覽位置：它渲染精確原始；原始失敗時由描述子的終端 alpha 遮罩接手，且**只在同一遮罩資源本身載入成功後**才由 `ArtworkAlpha` 上色（失敗不會留下實心矩形）。已到達的失敗維持持續、可鍵盤存取的標記，且永不改變卡片狀態、永不切換原圖、永不啟用替代編輯。預覽**不**顯示載入中文字。
+- **編輯器**（`GalleryFaceRectModal`／`GalleryStageTransformModal`）消費同一描述子，但其載入請求**不含**終端圖像（`useArtwork(..., {terminal: false})`）：剪影不是可量測的幾何參照，因此原始載入失敗時編輯器保持不可儲存。
+- **圖庫線路 v3：** 卡片列為 `{image_id, status, label, artwork, is_default, chips, requested_fields, binding_present, created_at}`，官方列為 `{identity, artwork, is_current, is_catalog_default}`。可讀卡片若輸出遺失或被拒，仍以**該精確卡片**的身分保留為 rank-10 具名 fault 且無 URL（不再略過、也不以其他卡片替代）；pending／failed 列則完全不含圖像（無候選、無幾何、無終端），只帶真實的生成狀態。

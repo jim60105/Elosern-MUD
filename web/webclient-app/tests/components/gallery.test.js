@@ -558,3 +558,56 @@ describe("official-only empty-card guidance", () => {
     expect(dispatch).not.toHaveBeenCalled();
   });
 });
+
+// The shared availability translation (lib/artwork.js + useArtwork): a required
+// panel that is missing or unavailable is a FAILURE, never a synthesized
+// loading state, and recovery to a new ready input recomputes the attempts
+// normally.
+describe("gallery preview availability through the shared binding", () => {
+  const UNAVAILABLE = {
+    schema_version: 3,
+    available: false,
+    reason: { code: "presentation_unavailable", message: "圖庫資料暫時無法使用。" },
+  };
+
+  it("renders a required unavailable panel as a failure, then recovers when it returns", async () => {
+    const wrapper = mountSurface(GalleryPanel, { model: GALLERY_SAMPLE });
+    const cardId = GALLERY_SAMPLE.cards[0].image_id;
+    expect(wrapper.find(".gallery-card__artwork").exists()).toBe(true);
+    expect(wrapper.find(".gallery-card__artwork img").exists()).toBe(true);
+    expect(wrapper.find('[data-testid="artwork-failure"]').exists()).toBe(false);
+
+    // Required-but-unavailable: an availability failure, with no image attempt
+    // and no pending claim anywhere.
+    await wrapper.setProps({ model: UNAVAILABLE });
+    expect(wrapper.find('[data-testid="gallery-panel"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="artwork-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="artwork-loading"]').exists()).toBe(false);
+
+    // Back to a ready panel: the exact original loads again from the committed
+    // descriptor (the same card, the same source, no substitute).
+    await wrapper.setProps({ model: GALLERY_SAMPLE });
+    const artwork = wrapper.get(".gallery-card__artwork");
+    expect(artwork.find("img").exists()).toBe(true);
+    expect(artwork.get("img").attributes("src")).toBe(
+      GALLERY_SAMPLE.cards[0].artwork.attempts[0].resource.url,
+    );
+    expect(wrapper.get(`[data-image-id="${cardId}"]`).exists()).toBe(true);
+  });
+
+  it("treats a deliberate absence as expected, not as an error", async () => {
+    // A card position with no committed artwork at all is an intentional
+    // absence: no error styling and no synthesized image claim.
+    const wrapper = mountSurface(GalleryPanel, {
+      model: {
+        ...GALLERY_SAMPLE,
+        cards: [GALLERY_SAMPLE.cards[6]],
+        official_entries: [],
+        filters: { all: 1, defaults: 0, bound: 0, pending: 1, failed: 0 },
+      },
+    });
+    expect(wrapper.find('[data-testid="artwork-preview"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="artwork-failure"]').exists()).toBe(false);
+    expect(wrapper.find(".gallery-card__spinner").exists()).toBe(true);
+  });
+});
