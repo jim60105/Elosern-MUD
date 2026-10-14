@@ -307,15 +307,24 @@ describe("useImageAttempts local driver", () => {
 });
 
 describe("face-rect original editor lifecycle", () => {
+  const PANEL = GALLERY_SAMPLE;
   const CARD = GALLERY_SAMPLE.cards[0];
-  const OTHER = {
-    ...CARD,
-    image_id: "10000000-0000-4000-8000-000000000002",
-    url: "/art/gallery/character/7001/10000000-0000-4000-8000-000000000002.webp",
-  };
+  // One exact-original row in the v3 shape the editor reads: the media URL and
+  // the committed rectangle live inside the row's own canonical descriptor.
+  function row(imageId, rect = CARD.artwork.attempts[0].resource.geometry.face_rect, revision = CARD.artwork.revision) {
+    const next = structuredClone(CARD);
+    next.image_id = imageId;
+    const candidate = next.artwork.attempts[0].resource;
+    candidate.resource_id = `gallery/character/7001/${imageId}.webp`;
+    candidate.url = `/art/gallery/character/7001/${imageId}.webp`;
+    candidate.geometry.face_rect = { ...rect };
+    next.artwork.revision = revision;
+    return next;
+  }
+  const OTHER = row("10000000-0000-4000-8000-000000000002");
 
   it("keeps a loading or failed original unsaveable and removes the broken image", async () => {
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     // Loading: no save, no crop preview yet.
     expect(button(wrapper, "儲存框選").attributes("disabled")).toBeDefined();
     expect(wrapper.get(".gallery-face__original > img").exists()).toBe(true);
@@ -334,7 +343,7 @@ describe("face-rect original editor lifecycle", () => {
   });
 
   it("cannot restore save eligibility from a retired original's late decode and recovers on a new exact original", async () => {
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     const first = wrapper.get(".gallery-face__original > img");
     declareImage(first.element, 768, 1024);
     await first.trigger("load");
@@ -357,13 +366,8 @@ describe("face-rect original editor lifecycle", () => {
   });
 
   it("seeds a replacement original's crop from its own committed rectangle", async () => {
-    const REPLACEMENT = {
-      ...CARD,
-      image_id: "10000000-0000-4000-8000-000000000003",
-      url: "/art/gallery/character/7001/10000000-0000-4000-8000-000000000003.webp",
-      face_rect: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
-    };
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const REPLACEMENT = row("10000000-0000-4000-8000-000000000003", { x: 0.1, y: 0.1, w: 0.2, h: 0.2 });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     const first = wrapper.get(".gallery-face__original > img");
     declareImage(first.element, 768, 1024);
     await first.trigger("load");
@@ -385,14 +389,14 @@ describe("face-rect original editor lifecycle", () => {
   });
 
   it("reuses the decoded original on a geometry-only committed change", async () => {
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     const img = wrapper.get(".gallery-face__original > img");
     declareImage(img.element, 768, 1024);
     await img.trigger("load");
     const element = img.element;
 
     // Same image id and url, a different committed rectangle: no refetch.
-    await wrapper.setProps({ card: { ...CARD, face_rect: { x: 0.2, y: 0.2, w: 0.4, h: 0.3 } } });
+    await wrapper.setProps({ card: row(CARD.image_id, { x: 0.2, y: 0.2, w: 0.4, h: 0.3 }, "f".repeat(64)) });
     expect(wrapper.get(".gallery-face__original > img").element).toBe(element);
     expect(button(wrapper, "儲存框選").attributes("disabled")).toBeUndefined();
     await button(wrapper, "儲存框選").trigger("click");
@@ -401,7 +405,7 @@ describe("face-rect original editor lifecycle", () => {
   });
 
   it("preserves numeric draft editing, the pixel-square payload and Escape cancel", async () => {
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     const img = wrapper.get(".gallery-face__original > img");
     declareImage(img.element, 768, 1024);
     await img.trigger("load");
@@ -414,7 +418,7 @@ describe("face-rect original editor lifecycle", () => {
     expect(payload.face_rect.w).toBeCloseTo(0.2);
     expect(payload.face_rect.h).toBeCloseTo(0.15);
 
-    const cancel = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const cancel = mountSurface(GalleryFaceRectModal, { panel: PANEL, card: CARD });
     await cancel.get('[role="dialog"]').trigger("keydown", { key: "Escape" });
     expect(cancel.emitted("close")).toHaveLength(1);
     expect(cancel.emitted("submit")).toBeUndefined();

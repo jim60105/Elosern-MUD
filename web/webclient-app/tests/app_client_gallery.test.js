@@ -54,7 +54,7 @@ describe("gallery application integration", () => {
 
     opener.element.focus();
     await opener.trigger("click");
-    await snapshot({ schema_version: 2, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
+    await snapshot({ schema_version: 3, available: false, reason: { code: "gallery_unavailable", message: "圖庫資料暫時無法使用。" } }, 3);
     expect(wrapper.find('[data-testid="gallery-opener"]').exists()).toBe(false);
     expect(wrapper.get('[data-testid="gallery-panel"]').text()).toContain("圖庫資料暫時無法使用。");
   }, 20000);
@@ -111,7 +111,11 @@ describe("gallery application integration", () => {
     const modal = wrapper.getComponent(GalleryStageTransformModal);
     const save = () => modal.findAll("button").find((item) => item.text() === "儲存調整");
     expect(save().element.disabled).toBe(true);
-    await modal.get(".stage-transform__figure").trigger("load");
+    // The shared lifecycle reports success only for a REAL decoded size.
+    const figure = modal.get(".stage-transform__figure");
+    Object.defineProperty(figure.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(figure.element, "naturalHeight", { value: 1024, configurable: true });
+    await figure.trigger("load");
     await modal.get('input[type="range"]').setValue("0.6");
     expect(save().element.disabled).toBe(false);
     await save().trigger("click");
@@ -133,7 +137,10 @@ describe("gallery application integration", () => {
     await panel().get(`[data-image-id="${GALLERY_SAMPLE.cards[0].image_id}"]`).trigger("click");
     await button(wrapper.get('[data-testid="gallery-detail"]'), "比例調整").trigger("click");
     const retry = wrapper.getComponent(GalleryStageTransformModal);
-    await retry.get(".stage-transform__figure").trigger("load");
+    const retryFigure = retry.get(".stage-transform__figure");
+    Object.defineProperty(retryFigure.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(retryFigure.element, "naturalHeight", { value: 1024, configurable: true });
+    await retryFigure.trigger("load");
     await retry.get('input[type="range"]').setValue("0.6");
     await retry.findAll("button").find((item) => item.text() === "儲存調整").trigger("click");
     const rejection = fx.actionResult({ request_id: "session:2", outcome: "rejected", code: "gallery_rejected", message: "暫時無法儲存比例調整。", presentation_revision: 2 });

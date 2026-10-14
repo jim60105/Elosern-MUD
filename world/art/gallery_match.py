@@ -73,35 +73,51 @@ from world.art.subjects import ArtSubject
 from world.observability import log_debug
 
 
-def validated_card_identity(subject: ArtSubject, card: dict) -> str | None:
-    """Return the card's stored identity only when it is presentable.
+def card_identity_resolution(subject: ArtSubject, card: dict) -> tuple[str | None, str | None]:
+    """Resolve the card's stored identity to ``(identity, fault_reason)``.
 
-    Checks, in order: the identity names the subject's own
-    ``gallery/<kind>/<subject-key>/`` prefix; its extension is in the closed
-    set of every store extension; ``resolved_under_store_root`` confines it
-    (rejecting ``..``, symlinks, and out-of-root resolutions); and the
-    resolved file exists. ``None`` means "skip this card" — one bounded
-    ``gallery_card_skipped`` debug event, never a raise.
+    Exactly one side of the pair is set. The identity is returned only when
+    the card is presentable, checked in order: the identity names the
+    subject's own ``gallery/<kind>/<subject-key>/`` prefix; its extension is
+    in the closed set of every store extension; ``resolved_under_store_root``
+    confines it (rejecting ``..``, symlinks, and out-of-root resolutions); and
+    the resolved file exists.
+
+    A refusal returns the canonical bounded fault reason of the check that
+    refused it — ''source_rejected'' for a structurally unusable identity and
+    ''generated_output_missing'' for one whose readable output is gone — so a
+    caller can carry the exact requested card forward as an attributed known
+    fault instead of silently dropping it, and emits the same one bounded
+    ``gallery_card_skipped`` debug event as before. Never a raise.
     """
+    from world.art import descriptors
+
     identity = card.get("stored_identity")
     capability = gallery_kinds.capabilities_for(subject.kind.value)
     kind_directory = capability.store_directory if capability.has_gallery else None
     reason = None
+    fault = None
     resolved = None
     if kind_directory is None:
         reason = "subject kind has no gallery"
+        fault = descriptors.REASON_SOURCE_UNAVAILABLE
     elif not isinstance(identity, str):
         reason = "identity is not text"
+        fault = descriptors.REASON_SOURCE_REJECTED
     elif not identity.startswith(f"gallery/{kind_directory}/{subject.key}/"):
         reason = "identity addresses another subject"
+        fault = descriptors.REASON_SOURCE_REJECTED
     elif _identity_extension(identity) not in STORE_EXTENSIONS:
         reason = "identity extension is not a store extension"
+        fault = descriptors.REASON_SOURCE_REJECTED
     else:
         resolved = resolved_under_store_root(identity)
         if resolved is None:
             reason = "identity fails store-root confinement"
+            fault = descriptors.REASON_SOURCE_REJECTED
         elif not resolved.is_file():
             reason = "referenced file is missing"
+            fault = descriptors.REASON_GENERATED_OUTPUT_MISSING
     if reason is not None:
         log_debug(
             "gallery_card_skipped",
@@ -111,8 +127,17 @@ def validated_card_identity(subject: ArtSubject, card: dict) -> str | None:
                 "reason": reason,
             },
         )
-        return None
-    return identity
+        return None, fault
+    return identity, None
+
+
+def validated_card_identity(subject: ArtSubject, card: dict) -> str | None:
+    """The card's stored identity only when it is presentable, else ``None``.
+
+    The identity-only projection of :func:`card_identity_resolution`, for the
+    callers that skip an unusable card instead of carrying it as a fault.
+    """
+    return card_identity_resolution(subject, card)[0]
 
 
 def _identity_extension(identity: str) -> str:

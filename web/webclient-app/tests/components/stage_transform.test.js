@@ -3,31 +3,47 @@ import { mount } from "@vue/test-utils";
 import Modal from "../../components/GalleryStageTransformModal.vue";
 import ReferenceArtwork from "../../components/ReferenceArtwork.vue";
 import { clampStage, editStageField, moveStage } from "../../components/stage-transform-edit.js";
-const card = { url: "/art/defaults/man.webp", label: "肖像", stage: { scale: 0.6, x: 0, y: 0 } };
+import { galleryStoryModel } from "../../stories/gallery-fixtures.js";
+// ReferenceArtwork still consumes the portrait payload; the stage modal
+// consumes the canonical descriptor, so the two fixtures are deliberately
+// different shapes.
+const portrait = { url: "/art/defaults/man.webp", label: "肖像", stage: { scale: 0.6, x: 0, y: 0 } };
+const panel = galleryStoryModel();
+const card = (() => {
+  const row = structuredClone(panel.cards[0]);
+  row.artwork.attempts[0].resource.geometry.stage = { scale: 0.6, x: 0, y: 0 };
+  return row;
+})();
+function declareImage(element, width = 768, height = 1024) {
+  Object.defineProperty(element, "naturalWidth", { value: width, configurable: true });
+  Object.defineProperty(element, "naturalHeight", { value: height, configurable: true });
+}
 describe("stage transform", () => {
   it("clamps only finite numbers and retains invalid field drafts", () => {
     expect(clampStage(null)).toEqual({ scale: 1, x: 0, y: 0 });
     expect(clampStage({ scale: 3, x: -2, y: 2 })).toEqual({ scale: 2, x: -0.5, y: 0.5 });
-    for (const value of [NaN, Infinity, true, null, ""]) expect(editStageField(card.stage, "scale", value)).toEqual(card.stage);
-    expect(moveStage(card.stage, 30 / 300, -40 / 400)).toEqual({ scale: 0.6, x: 0.1, y: -0.1 });
-    expect(moveStage(card.stage, 2, -2)).toEqual({ scale: 0.6, x: 0.5, y: -0.5 });
+    for (const value of [NaN, Infinity, true, null, ""]) expect(editStageField(portrait.stage, "scale", value)).toEqual(portrait.stage);
+    expect(moveStage(portrait.stage, 30 / 300, -40 / 400)).toEqual({ scale: 0.6, x: 0.1, y: -0.1 });
+    expect(moveStage(portrait.stage, 2, -2)).toEqual({ scale: 0.6, x: 0.5, y: -0.5 });
   });
   it("binds stage only, retaining the source and cover placement", async () => {
-    const wrapper = mount(ReferenceArtwork, { props: { portrait: card, stage: true } });
+    const wrapper = mount(ReferenceArtwork, { props: { portrait, stage: true } });
     const image = wrapper.get("img").element;
     expect(image.style.getPropertyValue("--stage-scale")).toBe("0.6");
-    await wrapper.setProps({ portrait: { ...card, stage: { scale: 2, x: 0.1, y: -0.2 } } });
+    await wrapper.setProps({ portrait: { ...portrait, stage: { scale: 2, x: 0.1, y: -0.2 } } });
     expect(wrapper.get("img").element).toBe(image);
     expect(image.style.getPropertyValue("--stage-x")).toBe("0.1");
-    await wrapper.setProps({ portrait: { ...card, stage: null } });
+    await wrapper.setProps({ portrait: { ...portrait, stage: null } });
     expect(image.style.getPropertyValue("--stage-scale")).toBe("1");
     wrapper.unmount();
   });
   it("keeps edits local, waits for load, resets and submits once", async () => {
-    const wrapper = mount(Modal, { props: { card }, attachTo: document.body });
+    const wrapper = mount(Modal, { props: { panel, card }, attachTo: document.body });
     const save = wrapper.findAll("button").find(button => button.text() === "儲存調整");
     expect(save.element.disabled).toBe(true);
-    await wrapper.get("img").trigger("load");
+    const image = wrapper.get("img");
+    declareImage(image.element);
+    await image.trigger("load");
     await wrapper.get('input[type="range"]').setValue("0.8");
     expect(wrapper.get('input[type="number"]').element.value).toBe("0.8");
     expect(wrapper.emitted("submit")).toBeUndefined();
@@ -38,7 +54,7 @@ describe("stage transform", () => {
     wrapper.unmount();
   });
   it("failed image keeps reference and refuses save", async () => {
-    const wrapper = mount(Modal, { props: { card } });
+    const wrapper = mount(Modal, { props: { panel, card } });
     await wrapper.get("img").trigger("error");
     expect(wrapper.find("img").exists()).toBe(false);
     expect(wrapper.get(".stage-transform__adult").attributes("aria-hidden")).toBe("true");
@@ -46,8 +62,10 @@ describe("stage transform", () => {
     wrapper.unmount();
   });
   it("drag moves the figure in frame fractions while the adult stays static", async () => {
-    const wrapper = mount(Modal, { props: { card }, attachTo: document.body });
-    await wrapper.get("img").trigger("load");
+    const wrapper = mount(Modal, { props: { panel, card }, attachTo: document.body });
+    const image = wrapper.get("img");
+    declareImage(image.element);
+    await image.trigger("load");
     const frame = wrapper.get(".stage-transform__frame").element;
     frame.getBoundingClientRect = () => ({ width: 300, height: 400, top: 0, left: 0, right: 300, bottom: 400, x: 0, y: 0 });
     frame.setPointerCapture = () => {};
@@ -73,8 +91,10 @@ describe("stage transform", () => {
     const opener = document.createElement("button");
     document.body.append(opener);
     opener.focus();
-    const wrapper = mount(Modal, { props: { card }, attachTo: document.body });
-    await wrapper.get("img").trigger("load");
+    const wrapper = mount(Modal, { props: { panel, card }, attachTo: document.body });
+    const image = wrapper.get("img");
+    declareImage(image.element);
+    await image.trigger("load");
     const number = wrapper.findAll('input[type="number"]')[0];
     await number.setValue("0.7");
     expect(wrapper.get(".stage-transform__figure").element.style.getPropertyValue("--stage-scale")).toBe("0.7");
@@ -88,7 +108,7 @@ describe("stage transform", () => {
     opener.remove();
   });
   it("cover avatars never receive the stage transform", () => {
-    const wrapper = mount(ReferenceArtwork, { props: { portrait: { ...card, stage: { scale: 0.6, x: 0.3, y: 0.2 } } } });
+    const wrapper = mount(ReferenceArtwork, { props: { portrait: { ...portrait, stage: { scale: 0.6, x: 0.3, y: 0.2 } } } });
     const image = wrapper.get("img").element;
     expect(image.style.getPropertyValue("--stage-scale")).toBe("");
     expect(image.style.getPropertyValue("--stage-x")).toBe("");

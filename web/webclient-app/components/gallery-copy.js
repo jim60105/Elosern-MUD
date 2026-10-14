@@ -28,18 +28,18 @@ export function galleryOfficialName(entry) {
   return `${GALLERY_OFFICIAL_LABEL}，${entry?.identity ?? ""}`;
 }
 
-// The shared face-rect and stage editors take a card-shaped object. An
-// official row carries exactly five committed facts by contract — no stage
-// and no timestamp — so the editors receive those facts plus static chrome:
-// the committed identity stands in for the card name, no date is claimed
-// (日期不詳), and the stage draft starts from the identity placement the row
-// cannot report. Saving one component never rewrites the other, because the
-// dispatched payload carries only the component the player edited.
+// The shared face-rect and stage editors take the same minimal object for
+// every row kind: the row's canonical descriptor, a display label, and the
+// identity the row is addressed by. An official row carries exactly four
+// committed facts by contract — its descriptor, its identity, and the two
+// markers — so the editors read the geometry out of the descriptor's own
+// candidate, claim no date (日期不詳), and start the stage draft from the
+// identity placement the row cannot report. Saving one component never
+// rewrites the other, because the dispatched payload carries only the
+// component the player edited.
 export function galleryOfficialEditorCard(entry) {
   return {
-    url: entry.url,
-    face_rect: entry.face_rect,
-    stage: null,
+    artwork: entry.artwork,
     label: GALLERY_OFFICIAL_LABEL,
     image_id: entry.identity,
     created_at: null,

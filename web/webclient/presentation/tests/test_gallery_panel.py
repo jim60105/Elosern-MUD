@@ -1,6 +1,7 @@
 """Gallery read-only projection, transport lifecycle, and executable wire parity."""
 
 from copy import deepcopy
+import hashlib
 import io
 import json
 from pathlib import Path
@@ -20,6 +21,7 @@ from evennia.utils.test_resources import EvenniaTest
 from typeclasses.characters import PlayerCharacter
 from typeclasses.npcs import NPC
 from world.art import gallery as api
+from world.art import descriptors
 from world.art import official, official_refs
 from world.art.official import current_catalog, load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
@@ -52,14 +54,137 @@ def image_id(number):
 
 
 _OFFICIAL_FINGERPRINT = "a" * 64
+_SUBJECT_KEY = "portrait:character:t_gallery"
+_RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
+_SIZE = {"width": 1000, "height": 1000}
+_STAGE = {"scale": 1, "x": 0, "y": 0}
+
+
+def _digest(seed):
+    """A stable 64-character digest for a synthetic fixture fact."""
+    return hashlib.sha256(str(seed).encode("utf-8")).hexdigest()
+
+
+def alpha_terminal(key="woman", rect=None):
+    """The subject's committed silhouette as the descriptor's alpha terminal."""
+    identity = f"defaults/{key}.webp"
+    return descriptors.terminal(
+        descriptors.TERMINAL_ALPHA_MASK,
+        descriptors.gallery_alpha_source_id(key),
+        descriptors.GALLERY_RANK_ALPHA,
+        descriptors.resource(
+            identity,
+            descriptors.identity_version(identity),
+            f"/art/defaults/{key}.webp",
+            descriptors.ORIGIN_SILHOUETTE,
+            geometry_payload=descriptors.geometry(
+                face_rect=dict(rect or _RECT), aspect_ratio="3:4"
+            ),
+        ),
+    )
+
+
+def card_descriptor(
+    number,
+    *,
+    url=None,
+    face_rect=None,
+    stage=None,
+    image_size=None,
+    fault=None,
+    generation="done",
+    terminal=True,
+    subject_key=_SUBJECT_KEY,
+):
+    """One card row's canonical descriptor, built from the production vocabulary."""
+    image = image_id(number)
+    source = descriptors.gallery_original_source_id(image)
+    if fault is not None:
+        attempts = [
+            descriptors.fault_attempt(source, descriptors.GALLERY_RANK_ORIGINAL, fault)
+        ]
+        retention = []
+    else:
+        identity = f"gallery/character/t_gallery/{image}.png"
+        attempts = [
+            descriptors.image_attempt(
+                source,
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity,
+                    descriptors.identity_version(identity),
+                    url or f"/art/{identity}",
+                    descriptors.ORIGIN_RUNTIME,
+                    geometry_payload=descriptors.geometry(
+                        image_size=dict(image_size or _SIZE),
+                        face_rect=dict(face_rect or _RECT),
+                        stage=dict(stage or _STAGE),
+                        aspect_ratio="3:4",
+                    ),
+                ),
+            )
+        ]
+        retention = [
+            descriptors.retention_source(
+                source, descriptors.retention_token(subject_key, subject_key, image)
+            )
+        ]
+    return descriptors.descriptor(
+        subject_id=f"{_digest(subject_key)}:{image}",
+        generation_subject=subject_key,
+        generation_state=generation,
+        attempts=attempts,
+        terminal_payload=alpha_terminal() if terminal else None,
+        retention_sources=retention,
+    )
+
+
+def official_descriptor(
+    identity="preset/t_gallery_preset/a.png",
+    *,
+    url=None,
+    face_rect=None,
+    image_size=None,
+    stage=None,
+    generation="done",
+    terminal=True,
+):
+    """One official row's canonical descriptor: its exact admitted candidate."""
+    source = descriptors.gallery_official_source_id(identity)
+    return descriptors.descriptor(
+        subject_id=f"{_digest(_SUBJECT_KEY)}:{descriptors.identity_version(identity)[:36]}",
+        generation_subject=_SUBJECT_KEY,
+        generation_state=generation,
+        attempts=[
+            descriptors.image_attempt(
+                source,
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity,
+                    _OFFICIAL_FINGERPRINT,
+                    url or f"/art/official/{_OFFICIAL_FINGERPRINT}/{identity}",
+                    descriptors.ORIGIN_OFFICIAL,
+                    geometry_payload=descriptors.geometry(
+                        image_size=dict(image_size or _SIZE),
+                        face_rect=dict(face_rect or _RECT),
+                        stage=stage,
+                        aspect_ratio="3:4",
+                    ),
+                ),
+            )
+        ],
+        terminal_payload=alpha_terminal() if terminal else None,
+        retention_sources=[
+            descriptors.retention_source(source, _digest(f"retention:{identity}"))
+        ],
+    )
 
 
 def official_row(identity="preset/t_gallery_preset/a.png", **changes):
     """A file-local synthetic official row; the fingerprint is fixed."""
     row = {
         "identity": identity,
-        "url": f"/art/official/{_OFFICIAL_FINGERPRINT}/{identity}",
-        "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+        "artwork": official_descriptor(identity),
         "is_current": False,
         "is_catalog_default": True,
     }
@@ -67,18 +192,26 @@ def official_row(identity="preset/t_gallery_preset/a.png", **changes):
     return row
 
 
+def candidate(panel, index=0):
+    """The rank-10 image candidate resource of one card row."""
+    return panel["cards"][index]["artwork"]["attempts"][0]["resource"]
+
+
+def geometry(panel, index=0):
+    """The candidate geometry of one card row."""
+    return candidate(panel, index)["geometry"]
+
+
 def payload():
     """File-local synthetic character wire fixture, independent of shipped content."""
     return {
-        "schema_version": 2, "available": True, "kind": "gallery",
-        "subjects": [{"subject_key": "portrait:character:t_gallery", "kind": "portrait:character", "display_name": "測試角色", "is_puppet": True}],
-        "selected": "portrait:character:t_gallery",
+        "schema_version": 3, "available": True, "kind": "gallery",
+        "subjects": [{"subject_key": _SUBJECT_KEY, "kind": "portrait:character", "display_name": "測試角色", "is_puppet": True}],
+        "selected": _SUBJECT_KEY,
         "filters": {"all": 1, "defaults": 1, "bound": 0, "pending": 0, "failed": 0},
         "cards": [{
             "image_id": image_id(1), "status": "card", "label": "測試肖像",
-            "url": f"/art/gallery/character/t_gallery/{image_id(1)}.png",
-            "face_rect": dict(api.DEFAULT_FACE_RECT), "is_default": True,
-            "stage": {"scale": 1, "x": 0, "y": 0},
+            "artwork": card_descriptor(1), "is_default": True,
             "chips": ["預設臉框", "目前預設"], "requested_fields": ["appearance"],
             "binding_present": False, "created_at": 100,
         }],
@@ -106,30 +239,111 @@ class GalleryWireTests(unittest.TestCase):
         add("unknown top key", lambda p: p.update(extra=1))
         add("unknown nested key", lambda p: p["cards"][0].update(extra=1))
         add("wrong schema boolean", lambda p: p.update(schema_version=True))
-        add("integral numeric schema", lambda p: p.update(schema_version=2.0), True)
+        add("integral numeric schema", lambda p: p.update(schema_version=3.0), True)
         add("unknown selection", lambda p: p.update(selected="portrait:character:absent"))
         add("surrogate", lambda p: p["subjects"][0].update(display_name="\ud800"))
         add("name at cap", lambda p: p["subjects"][0].update(display_name="𠮷" * 64), True)
         add("name over cap", lambda p: p["subjects"][0].update(display_name="𠮷" * 65))
         add("label at cap", lambda p: p["cards"][0].update(label="畫" * 128), True)
         add("label over cap", lambda p: p["cards"][0].update(label="畫" * 129))
-        add("rect zero", lambda p: p["cards"][0]["face_rect"].update(w=0))
-        add("rect overflow", lambda p: p["cards"][0]["face_rect"].update(x=0.9))
-        add("rect boolean", lambda p: p["cards"][0]["face_rect"].update(x=True))
-        add("stage boundary", lambda p: p["cards"][0].update(stage={"scale": 0.2, "x": -0.5, "y": 0.5}), True)
-        add("stage scale too large", lambda p: p["cards"][0]["stage"].update(scale=2.01))
-        add("stage bool", lambda p: p["cards"][0]["stage"].update(x=True))
-        add("stage missing", lambda p: p["cards"][0].pop("stage"))
-        add("stage null on card", lambda p: p["cards"][0].update(stage=None))
+        add("rect zero", lambda p: geometry(p)["face_rect"].update(w=0))
+        add("rect overflow", lambda p: geometry(p)["face_rect"].update(x=0.9))
+        add("rect boolean", lambda p: geometry(p)["face_rect"].update(x=True))
+        add("stage boundary", lambda p: geometry(p).update(stage={"scale": 0.2, "x": -0.5, "y": 0.5}), True)
+        add("stage scale too large", lambda p: geometry(p)["stage"].update(scale=2.01))
+        add("stage bool", lambda p: geometry(p)["stage"].update(x=True))
+        add("stage missing", lambda p: geometry(p).pop("stage"))
+        add("stage null on card", lambda p: geometry(p).update(stage=None))
+        add("image size zero", lambda p: geometry(p).update(image_size={"width": 0, "height": 100}))
+        add("image size boolean", lambda p: geometry(p).update(image_size={"width": True, "height": 100}))
+        add("image size over the decoded ceiling", lambda p: geometry(p).update(image_size={"width": 8192, "height": 8192}))
+        add("geometry extra key", lambda p: geometry(p).update(extra=1))
+        add("geometry missing key", lambda p: geometry(p).pop("aspect_ratio"))
         add("fractional timestamp", lambda p: p["cards"][0].update(created_at=100.125), True)
         add("timestamp boolean", lambda p: p["cards"][0].update(created_at=True))
         add("unsafe timestamp", lambda p: p["cards"][0].update(created_at=2**53))
         add("wrong count", lambda p: p["filters"].update(all=2))
         add("boolean count", lambda p: p["filters"].update(all=True))
         add("integral numeric count", lambda p: p["filters"].update(all=1.0), True)
-        add("foreign URL", lambda p: p["cards"][0].update(url=f"/art/gallery/character/other/{image_id(1)}.png"))
-        add("unsupported extension", lambda p: p["cards"][0].update(url=p["cards"][0]["url"] + ".svg"))
-        add("jpg extension", lambda p: p["cards"][0].update(url=p["cards"][0]["url"][:-4] + ".jpg"), True)
+        add("foreign URL", lambda p: candidate(p).update(url=f"/art/gallery/character/other/{image_id(1)}.png"))
+        add("unsupported extension", lambda p: candidate(p).update(url=candidate(p)["url"] + ".svg"))
+        add("jpg extension", lambda p: candidate(p).update(url=candidate(p)["url"][:-4] + ".jpg"), True)
+        add("foreign origin", lambda p: candidate(p).update(origin="official"))
+        add("unknown origin", lambda p: candidate(p).update(origin="placeholder"))
+        add("foreign media host", lambda p: candidate(p).update(url="https://example.invalid/art/x.png"))
+        add("media url traversal", lambda p: candidate(p).update(url="/art/../secret.png"))
+        add("media url over the runtime ceiling", lambda p: candidate(p).update(url=f"/art/{'x' * 130}.png"))
+        # A gallery runtime URL never carries a cache version: its 129-code-point
+        # ceiling is what an exact card's own route needs, and the closed
+        # `?v=<sha256>` form is a general-media affordance (the canonical
+        # vocabulary and its Node gate cover it).
+        add(
+            "media url cache version over the gallery ceiling",
+            lambda p: candidate(p).update(url=candidate(p)["url"] + f"?v={_digest('v')}"),
+        )
+        add(
+            "media url foreign query",
+            lambda p: candidate(p).update(url=candidate(p)["url"] + "?other=1"),
+        )
+        add("resource version short", lambda p: candidate(p).update(version="abc"))
+        add("resource version upper", lambda p: candidate(p).update(version="A" * 64))
+        add("resource identity over cap", lambda p: candidate(p).update(resource_id="x" * 257))
+        add("attempt rank", lambda p: p["cards"][0]["artwork"]["attempts"][0].update(rank=20))
+        add("attempt negative rank", lambda p: p["cards"][0]["artwork"]["attempts"][0].update(rank=-1))
+        add("attempt source identity", lambda p: p["cards"][0]["artwork"]["attempts"][0].update(source_id=descriptors.gallery_original_source_id(image_id(2))))
+        add("attempt unknown type", lambda p: p["cards"][0]["artwork"]["attempts"][0].update(type="video"))
+        add("attempt extra key", lambda p: p["cards"][0]["artwork"]["attempts"][0].update(extra=1))
+        add("attempts over cap", lambda p: p["cards"][0]["artwork"].update(attempts=[dict(p["cards"][0]["artwork"]["attempts"][0]) for _ in range(17)]))
+        add("descriptor subject identity over cap", lambda p: p["cards"][0]["artwork"].update(subject_id="x" * 129))
+        add("descriptor revision", lambda p: p["cards"][0]["artwork"].update(revision="C" * 64))
+        add("descriptor unknown generation state", lambda p: p["cards"][0]["artwork"].update(generation_state="in_progress"))
+        add("descriptor generation subject over cap", lambda p: p["cards"][0]["artwork"].update(generation_subject="x" * 129))
+        add("descriptor missing key", lambda p: p["cards"][0]["artwork"].pop("retention_sources"))
+        add("descriptor extra key", lambda p: p["cards"][0]["artwork"].update(extra=1))
+        add("retention over cap", lambda p: p["cards"][0]["artwork"].update(retention_sources=[{"source_id": f"gallery.original:{i}", "token": _digest(i)} for i in range(17)]))
+        add("retention token short", lambda p: p["cards"][0]["artwork"]["retention_sources"][0].update(token="abc"))
+        add("retention duplicate source", lambda p: p["cards"][0]["artwork"].update(retention_sources=[dict(p["cards"][0]["artwork"]["retention_sources"][0])] * 2))
+        # A known fault names its failed source and NEVER a URL: the entry has
+        # no resource at all, so no URL can ride along.
+        def fault_row(p, **changes):
+            artwork = card_descriptor(1, fault="generated_output_missing")
+            artwork.update(changes)
+            p["cards"][0]["artwork"] = artwork
+        add("known fault row", fault_row, True)
+        add("known fault reason", lambda p: fault_row(p, attempts=[{**card_descriptor(1, fault="generated_output_missing")["attempts"][0], "reason": "not_a_reason"}]))
+        add("known fault with a resource", lambda p: fault_row(p, attempts=[{**card_descriptor(1, fault="generated_output_missing")["attempts"][0], "resource": card_descriptor(1)["attempts"][0]["resource"]}]))
+        add("known fault terminal", lambda p: fault_row(p, terminal=None))
+        # The retired v2 flat fields are rejected outright.
+        for field, value in (("url", None), ("face_rect", None), ("stage", None), ("image_size", None)):
+            add(f"old flat field {field}", lambda p, field=field, value=value: p["cards"][0].update({field: value}))
+        # A pending/failed row carries no image at all.
+        def synthetic(p, status, generation):
+            p["cards"] = [{
+                "image_id": image_id(2), "status": status, "label": "肖像", "is_default": False,
+                "chips": [], "requested_fields": [], "binding_present": False, "created_at": 200,
+                "artwork": card_descriptor(2, fault=None, generation=generation, terminal=False, subject_key=_SUBJECT_KEY),
+            }]
+            p["cards"][0]["artwork"]["attempts"] = []
+            p["cards"][0]["artwork"]["retention_sources"] = []
+            p["filters"] = {
+                "all": 1, "defaults": 0, "bound": 0,
+                "pending": int(status == "pending"), "failed": int(status == "failed"),
+            }
+            p["error_state"] = (
+                {"code": "sd_connection_error", "at": 200}
+                if status == "failed"
+                else None
+            )
+        add("pending row without an image", lambda p: synthetic(p, "pending", "pending"), True)
+        add("failed row without an image", lambda p: synthetic(p, "failed", "failed"), True)
+        def synthetic_with_image(p):
+            synthetic(p, "pending", "pending")
+            p["cards"][0]["artwork"]["attempts"] = card_descriptor(2)["attempts"]
+        add("synthetic row fabricating an image", synthetic_with_image)
+        def synthetic_with_terminal(p):
+            synthetic(p, "pending", "pending")
+            p["cards"][0]["artwork"]["terminal"] = alpha_terminal()
+        add("synthetic row fabricating a terminal", synthetic_with_terminal)
         add("duplicate card", lambda p: p["cards"].append(deepcopy(p["cards"][0])))
         add("pending with URL", lambda p: p["cards"][0].update(status="pending"))
         add("unknown field", lambda p: p["cards"][0].update(requested_fields=["unknown"]))
@@ -184,7 +398,7 @@ class GalleryWireTests(unittest.TestCase):
         add(
             "official row missing key",
             lambda p: official(
-                p, [{key: value for key, value in official_row().items() if key != "url"}]
+                p, [{key: value for key, value in official_row().items() if key != "artwork"}]
             ),
         )
         add("official row duplicate", lambda p: official(p, [official_row(), official_row()]))
@@ -213,67 +427,73 @@ class GalleryWireTests(unittest.TestCase):
             ),
         )
         add("official flag not boolean", lambda p: official(p, [official_row(is_current=1)]))
+        def official_change(p, **changes):
+            """Replace the one official row's descriptor with changed candidate facts."""
+            row = p["official_entries"][0]
+            row["artwork"] = official_descriptor(row["identity"], **changes)
+        def official_row_with(p, **changes):
+            official(p, [official_row()])
+            official_change(p, **changes)
+        add("official candidate", lambda p: official(p, [official_row()]), True)
         add(
             "official url foreign route",
-            lambda p: official(
-                p,
-                [official_row(url=f"/art/gallery/character/t_gallery/{image_id(1)}.png")],
-            ),
+            lambda p: official_row_with(p, url=f"/art/gallery/character/t_gallery/{image_id(1)}.png"),
         )
         add(
             "official url short fingerprint",
-            lambda p: official(
-                p, [official_row(url=f"/art/official/{'a' * 63}/preset/x/a.png")]
-            ),
+            lambda p: official_row_with(p, url=f"/art/official/{'a' * 63}/preset/x/a.png"),
         )
         add(
             "official url upper fingerprint",
-            lambda p: official(
-                p, [official_row(url=f"/art/official/{'A' * 64}/preset/x/a.png")]
-            ),
+            lambda p: official_row_with(p, url=f"/art/official/{'A' * 64}/preset/x/a.png"),
         )
         add(
             "official url empty tail",
-            lambda p: official(p, [official_row(url=f"/art/official/{_OFFICIAL_FINGERPRINT}/")]),
+            lambda p: official_row_with(p, url=f"/art/official/{_OFFICIAL_FINGERPRINT}/"),
         )
         add(
             "official url space",
-            lambda p: official(
-                p,
-                [official_row(url=f"/art/official/{_OFFICIAL_FINGERPRINT}/preset/x/a b.png")],
-            ),
+            lambda p: official_row_with(p, url=f"/art/official/{_OFFICIAL_FINGERPRINT}/preset/x/a b.png"),
         )
         add(
             "official url over cap",
-            lambda p: official(
-                p,
-                [
-                    official_row(
-                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/"
-                        + "x" * GALLERY_MAX_OFFICIAL_URL
-                    )
-                ],
+            lambda p: official_row_with(
+                p, url=f"/art/official/{_OFFICIAL_FINGERPRINT}/" + "x" * GALLERY_MAX_OFFICIAL_URL
             ),
+        )
+        add(
+            "official candidate stage",
+            lambda p: official_row_with(p, stage={"scale": 1, "x": 0, "y": 0}),
         )
         add(
             "official rect overflow",
-            lambda p: official(
-                p, [official_row(face_rect={"x": 0.9, "y": 0.0, "w": 0.5, "h": 0.5})]
-            ),
+            lambda p: official_row_with(p, face_rect={"x": 0.9, "y": 0.0, "w": 0.5, "h": 0.5}),
         )
         add(
             "official rect zero",
-            lambda p: official(
-                p, [official_row(face_rect={"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.5})]
-            ),
+            lambda p: official_row_with(p, face_rect={"x": 0.0, "y": 0.0, "w": 0.0, "h": 0.5}),
         )
         add(
             "official rect boolean",
-            lambda p: official(
-                p, [official_row(face_rect={"x": True, "y": 0.0, "w": 0.5, "h": 0.5})]
-            ),
+            lambda p: official_row_with(p, face_rect={"x": True, "y": 0.0, "w": 0.5, "h": 0.5}),
         )
-        add("official rect null", lambda p: official(p, [official_row(face_rect=None)]))
+        def official_rect_null(p):
+            official_row_with(p)
+            p["official_entries"][0]["artwork"]["attempts"][0]["resource"]["geometry"][
+                "face_rect"
+            ] = None
+        add("official rect null", official_rect_null)
+        add("official terminal missing", lambda p: official_row_with(p, terminal=False))
+        def official_candidate_identity(p):
+            official(p, [official_row()])
+            p["official_entries"][0]["artwork"]["attempts"][0]["resource"][
+                "resource_id"
+            ] = "preset/t_gallery_preset/b.png"
+        add("official candidate identity", official_candidate_identity)
+        add(
+            "official row old flat url",
+            lambda p: official(p, [dict(official_row(), url=f"/art/official/{_OFFICIAL_FINGERPRINT}/preset/t_gallery_preset/a.png")]),
+        )
         add(
             "official identity two segments",
             lambda p: official(p, [official_row(identity="preset/a.png")]),
@@ -308,30 +528,22 @@ class GalleryWireTests(unittest.TestCase):
         )
         def official_identity_length(length):
             return "preset/" + "k" * (length - len("preset/") - len("/a.png")) + "/a.png"
+        def official_identity_case(p, length):
+            identity = official_identity_length(length)
+            official(p, [official_row(identity=identity)])
+            # A compact synthetic route keeps the URL inside its own ceiling so
+            # the IDENTITY bound is the fact under test.
+            p["official_entries"][0]["artwork"] = official_descriptor(
+                identity, url=f"/art/official/{_OFFICIAL_FINGERPRINT}/x.png"
+            )
         add(
             "official identity at cap",
-            lambda p: official(
-                p,
-                [
-                    official_row(
-                        identity=official_identity_length(GALLERY_MAX_OFFICIAL_IDENTITY),
-                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/x.png",
-                    )
-                ],
-            ),
+            lambda p: official_identity_case(p, GALLERY_MAX_OFFICIAL_IDENTITY),
             True,
         )
         add(
             "official identity over cap",
-            lambda p: official(
-                p,
-                [
-                    official_row(
-                        identity=official_identity_length(GALLERY_MAX_OFFICIAL_IDENTITY + 1),
-                        url=f"/art/official/{_OFFICIAL_FINGERPRINT}/x.png",
-                    )
-                ],
-            ),
+            lambda p: official_identity_case(p, GALLERY_MAX_OFFICIAL_IDENTITY + 1),
         )
         add("warning missing card", lambda p: p["binding_warnings"].append({"image_id": image_id(99), "label": "不存在", "conditions": ["防具：未裝備"]}))
         def subjects(p, count):
@@ -340,7 +552,7 @@ class GalleryWireTests(unittest.TestCase):
         add("rail over cap", lambda p: subjects(p, 25))
         def subject_key(p, key):
             p["selected"] = p["subjects"][0]["subject_key"] = f"portrait:character:{key}"
-            p["cards"][0]["url"] = f"/art/gallery/character/{key}/{image_id(1)}.avif"
+            candidate(p)["url"] = f"/art/gallery/character/{key}/{image_id(1)}.avif"
         add("URL 129", lambda p: subject_key(p, "a" * 64), True)
         add("key byte cap", lambda p: subject_key(p, "𠮷" * 50), True)
         add("key byte overflow", lambda p: subject_key(p, "𠮷" * 51))
@@ -355,7 +567,14 @@ class GalleryWireTests(unittest.TestCase):
         add("accessories unsorted", lambda p: accessories(p, ["t_z", "t_a"]))
         add("Unicode sort", lambda p: accessories(p, ["\ue000", "𠮷"]), True)
         def failed(p):
-            p["cards"] = [{"image_id": image_id(2), "status": "failed", "label": "暫時無法生成，稍後再試", "url": None, "face_rect": None, "stage": None, "is_default": False, "chips": [], "requested_fields": [], "binding_present": False, "created_at": 200}]
+            p["cards"] = [{
+                "image_id": image_id(2), "status": "failed", "label": "暫時無法生成，稍後再試",
+                "artwork": card_descriptor(2, generation="failed", terminal=False),
+                "is_default": False, "chips": [], "requested_fields": [],
+                "binding_present": False, "created_at": 200,
+            }]
+            p["cards"][0]["artwork"]["attempts"] = []
+            p["cards"][0]["artwork"]["retention_sources"] = []
             p["filters"] = {"all": 1, "defaults": 0, "bound": 0, "pending": 0, "failed": 1}
             p["error_state"] = {"code": "sd_connection_error", "at": 200}
         add("failed row", failed, True)
@@ -364,6 +583,7 @@ class GalleryWireTests(unittest.TestCase):
             p["error_state"] = None
             first = p["cards"][0]
             first.update(status="pending", label="肖像（生成中）")
+            first["artwork"]["generation_state"] = "pending"
             p["cards"] = [dict(first, image_id=image_id(i + 1)) for i in range(count)]
             p["filters"].update(all=count, pending=count, failed=0)
         add("pending at cap", lambda p: pending_rows(p, 8), True)
@@ -373,7 +593,9 @@ class GalleryWireTests(unittest.TestCase):
             first.update(is_default=False, binding_present=True, chips=[SLOT_LABELS["armor"], "預設臉框"])
             p["cards"] = []
             for i in range(count):
-                row = dict(first, image_id=image_id(i + 1), url=f"/art/gallery/character/t_gallery/{image_id(i + 1)}.png")
+                row = deepcopy(first)
+                row["image_id"] = image_id(i + 1)
+                row["artwork"] = card_descriptor(i + 1)
                 p["cards"].append(row)
             p["filters"].update(all=count, defaults=0, bound=count)
             p["binding_warnings"] = [{"image_id": row["image_id"], "label": row["label"], "conditions": ["條" * condition_length]} for row in p["cards"]]
@@ -387,7 +609,8 @@ class GalleryWireTests(unittest.TestCase):
             p["cards"] = []
             for i in range(110):
                 row = deepcopy(first)
-                row.update(image_id=image_id(i + 1), url=f"/art/gallery/character/t_gallery/{image_id(i + 1)}.png")
+                row["image_id"] = image_id(i + 1)
+                row["artwork"] = card_descriptor(i + 1)
                 p["cards"].append(row)
             p["filters"].update(all=110, defaults=0)
         add("envelope byte overflow", over_bytes)
@@ -592,14 +815,22 @@ class GalleryPresenterTests(EvenniaTest):
         self.assertEqual(len(failed), 1)
         self.assertIn("暫時無法生成，稍後再試", failed[0]["label"])
         self.assertIn("sd_connection_error", failed[0]["label"])
-        self.assertIsNone(failed[0]["url"])
+        # A synthetic row carries no image at all and keeps its truthful
+        # recorded generation state.
+        self.assertEqual(failed[0]["artwork"]["attempts"], [])
+        self.assertIsNone(failed[0]["artwork"]["terminal"])
+        self.assertEqual(failed[0]["artwork"]["generation_state"], "failed")
+        self.assertEqual(failed[0]["artwork"]["generation_subject"], self.subject.full())
         self.assertEqual(value, gallery_presenter(self.context))
         self.assertEqual(len(api.cards_for(self.subject)), 1)
 
     @covers_requirement(
         "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media"
     )
-    def test_missing_and_symlink_files_are_omitted(self):
+    def test_missing_and_symlinked_outputs_stay_attributable(self):
+        # A readable card whose output is gone or refused keeps its EXACT
+        # requested identity as an attributed known fault with no original URL;
+        # it is never silently omitted and no other card is substituted.
         first = self.card(1)
         second = self.card(2)
         (self.root / first["stored_identity"]).unlink()
@@ -607,8 +838,31 @@ class GalleryPresenterTests(EvenniaTest):
         target.unlink()
         target.symlink_to(__file__)
         value = gallery_presenter(self.context)
-        self.assertEqual(value["cards"], [])
-        self.assertEqual(value["filters"]["all"], 0)
+        self.assertEqual(
+            {row["image_id"] for row in value["cards"]},
+            {image_id(1), image_id(2)},
+        )
+        self.assertEqual(value["filters"]["all"], 2)
+        self.assertTrue(all(row["status"] == "card" for row in value["cards"]))
+        reasons = {}
+        for row in value["cards"]:
+            artwork = row["artwork"]
+            attempts = artwork["attempts"]
+            self.assertEqual(len(attempts), 1)
+            self.assertEqual(attempts[0]["type"], "fault")
+            self.assertEqual(attempts[0]["rank"], descriptors.GALLERY_RANK_ORIGINAL)
+            self.assertEqual(
+                attempts[0]["source_id"],
+                descriptors.gallery_original_source_id(row["image_id"]),
+            )
+            self.assertNotIn("resource", attempts[0])
+            # The prior output is known missing/invalid, so it authorizes no
+            # retention; the subject silhouette stays available.
+            self.assertEqual(artwork["retention_sources"], [])
+            self.assertEqual(artwork["terminal"]["kind"], descriptors.TERMINAL_ALPHA_MASK)
+            reasons[row["image_id"]] = attempts[0]["reason"]
+        self.assertEqual(reasons[image_id(1)], descriptors.REASON_GENERATED_OUTPUT_MISSING)
+        self.assertEqual(reasons[image_id(2)], descriptors.REASON_SOURCE_REJECTED)
 
     @covers_requirement(
         "webclient-gallery-panel::subject-selection-is-session-presentation-state-retired-with-the-options-layer"
@@ -770,10 +1024,6 @@ class OfficialEntryProjectionTests(EvenniaTest):
             [first, f"preset/{_PRESET_KEY}/b.png", third],
         )
         self.assertEqual(
-            [row["url"] for row in value["official_entries"]],
-            [catalog.url_for(row["identity"]) for row in value["official_entries"]],
-        )
-        self.assertEqual(
             [row["is_current"] for row in value["official_entries"]], [False, False, True]
         )
         self.assertEqual(
@@ -781,16 +1031,53 @@ class OfficialEntryProjectionTests(EvenniaTest):
             [True, False, False],
         )
         for row in value["official_entries"]:
-            self.assertEqual(
-                row["face_rect"], catalog.entry(row["identity"]).face_rect
-            )
+            entry = catalog.entry(row["identity"])
             self.assertEqual(set(row), {
                 "identity",
-                "url",
-                "face_rect",
+                "artwork",
                 "is_current",
                 "is_catalog_default",
             })
+            artwork = row["artwork"]
+            self.assertEqual(set(artwork), {
+                "subject_id",
+                "revision",
+                "generation_subject",
+                "generation_state",
+                "attempts",
+                "terminal",
+                "retention_sources",
+            })
+            # The one exact admitted image is the row's rank-10 official
+            # candidate, with the fingerprinted route, the admitted decoded
+            # size, the fitted rectangle and no stage.
+            candidate = artwork["attempts"][0]
+            self.assertEqual(candidate["type"], "image")
+            self.assertEqual(candidate["rank"], descriptors.GALLERY_RANK_ORIGINAL)
+            self.assertEqual(
+                candidate["source_id"],
+                descriptors.gallery_official_source_id(row["identity"]),
+            )
+            resource = candidate["resource"]
+            self.assertEqual(resource["origin"], descriptors.ORIGIN_OFFICIAL)
+            self.assertEqual(resource["resource_id"], row["identity"])
+            self.assertEqual(resource["version"], entry.fingerprint)
+            self.assertEqual(resource["url"], catalog.url_for(row["identity"]))
+            self.assertEqual(resource["geometry"]["image_size"], entry.image_size)
+            self.assertEqual(resource["geometry"]["face_rect"], entry.face_rect)
+            self.assertIsNone(resource["geometry"]["stage"])
+            # The subject's silhouette rides as the terminal fallback, and the
+            # recorded generation state is independent of the official origin.
+            self.assertEqual(
+                artwork["terminal"]["kind"], descriptors.TERMINAL_ALPHA_MASK
+            )
+            self.assertEqual(artwork["terminal"]["rank"], descriptors.GALLERY_RANK_ALPHA)
+            self.assertEqual(artwork["generation_state"], "done")
+            self.assertEqual(artwork["generation_subject"], self.subject.full())
+            self.assertEqual(
+                [entry["source_id"] for entry in artwork["retention_sources"]],
+                [descriptors.gallery_official_source_id(row["identity"])],
+            )
         # Official rows are never cards, and the filter tabs keep counting only
         # the card rows.
         self.assertEqual([row["image_id"] for row in value["cards"]], [card["image_id"]])

@@ -5,6 +5,7 @@ import GalleryGenerateDrawer from "./GalleryGenerateDrawer.vue";
 import GalleryBindingDrawer from "./GalleryBindingDrawer.vue";
 import GalleryFaceRectModal from "./GalleryFaceRectModal.vue";
 import GalleryStageTransformModal from "./GalleryStageTransformModal.vue";
+import ArtworkPreview from "./ArtworkPreview.vue";
 import {
   GALLERY_FILTERS,
   GALLERY_OFFICIAL_CHIPS,
@@ -14,7 +15,7 @@ import {
   galleryOfficialEditorCard,
   galleryOfficialName,
 } from "./gallery-copy.js";
-import { faceObjectPosition } from "./face-rect.js";
+import { artworkGeometry } from "../lib/artwork.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -141,6 +142,11 @@ function sendOfficial(action, extra = {}, editorName = null) {
 function sameRect(left, right) {
   return !!left && !!right && ["x", "y", "w", "h"].every((field) => Math.abs(left[field] - right[field]) < 1e-9);
 }
+// An official row's committed rectangle lives in its descriptor's own exact
+// candidate; the editor seeds from that and nothing else.
+function officialRect(entry) {
+  return artworkGeometry(entry?.artwork)?.face_rect ?? null;
+}
 function isIdentityStage(value) {
   return !!value && value.scale === 1 && value.x === 0 && value.y === 0;
 }
@@ -157,7 +163,7 @@ function submitOfficialGeometry(component, value) {
     closeEditor();
     return;
   }
-  const untouched = component === "face_rect" ? sameRect(value, entry.face_rect) : isIdentityStage(value);
+  const untouched = component === "face_rect" ? sameRect(value, officialRect(entry)) : isIdentityStage(value);
   if (untouched) {
     closeEditor();
     return;
@@ -209,7 +215,7 @@ function selectSubject(subject) {
         <div class="gallery-panel__cards" :class="{ 'gallery-panel__cards--list': layout === 'list' }">
           <button v-for="card in visibleCards" :key="card.image_id" class="gallery-card" :class="`gallery-card--${card.status}`" :aria-pressed="selected === card.image_id" :data-image-id="card.image_id" @click="selectCard(card.image_id)">
             <div class="gallery-card__visual">
-              <img v-if="card.status === 'card' && card.url" :src="card.url" :alt="galleryCardName(card)" :style="{ objectPosition: faceObjectPosition(card.face_rect) }">
+              <ArtworkPreview v-if="card.status === 'card'" class="gallery-card__artwork" :artwork="card.artwork" :panel="model" :view-subject-id="card.image_id" :alt="galleryCardName(card)" />
               <span v-else-if="card.status === 'pending'" class="gallery-card__spinner" aria-hidden="true"></span>
               <span v-else-if="card.status === 'failed'" class="gallery-card__failure" aria-hidden="true">△</span>
               <span v-if="card.is_default" class="gallery-card__crown">♛ 目前預設</span>
@@ -234,7 +240,7 @@ function selectSubject(subject) {
           <h4 class="gallery-muted">官方圖片（唯讀，共 {{ officialEntries.length }} 張）</h4>
           <div class="gallery-official__rows">
             <button v-for="entry in officialEntries" :key="entry.identity" class="gallery-official__row" :class="{ 'gallery-official__row--current': entry.is_current }" :aria-pressed="selectedOfficial === entry.identity" :data-identity="entry.identity" @click="selectEntry(entry.identity)">
-              <img class="gallery-official__image" :src="entry.url" :alt="galleryOfficialName(entry)" :style="{ objectPosition: faceObjectPosition(entry.face_rect) }">
+              <ArtworkPreview class="gallery-official__image" :artwork="entry.artwork" :panel="model" :view-subject-id="entry.identity" :alt="galleryOfficialName(entry)" />
               <span class="gallery-official__badges">
                 <span v-if="entry.is_current" class="gallery-chip">{{ GALLERY_OFFICIAL_CHIPS.current }}</span>
                 <span v-if="entry.is_catalog_default" class="gallery-chip">{{ GALLERY_OFFICIAL_CHIPS.catalogDefault }}</span>
@@ -245,7 +251,7 @@ function selectSubject(subject) {
         </section>
         <p v-if="rejected && !editor && !entryEditor" class="gallery-feedback" role="status">操作未完成。<button @click="emit('log')">查看伺服器訊息</button></p>
       </div>
-      <GalleryDetailRail :card="selectedCard" :entry="selectedEntry" :now="now" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
+      <GalleryDetailRail :panel="model" :card="selectedCard" :entry="selectedEntry" :now="now" :capabilities="model.capabilities" :warnings="model.binding_warnings" :disabled="locked"
         @default="send('gallery.default.set')" @delete="send('gallery.card.delete')"
         @generate="openEditor('generate')" @binding="openEditor('binding')" @face="openEditor('face')" @stage="openEditor('stage')"
         @official-select="sendOfficial('gallery.official.select')" @official-clear="sendOfficial('gallery.official.clear_selection')"
@@ -256,13 +262,13 @@ function selectSubject(subject) {
           @close="closeEditor" @submit="send('gallery.generate', $event)" @character="emit('character')" @log="emit('log')" />
         <GalleryBindingDrawer v-if="editor === 'binding' && selectedCard" :model="model" :card="selectedCard" :disabled="locked" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.binding.save', $event)" @select-card="selectCard" @log="emit('log')" />
-        <GalleryFaceRectModal v-if="editor === 'face' && selectedCard" :card="selectedCard" :disabled="locked" :rejected="rejected"
+        <GalleryFaceRectModal v-if="editor === 'face' && selectedCard" :panel="model" :card="selectedCard" :disabled="locked" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.face_rect.update', $event)" @log="emit('log')" />
-        <GalleryStageTransformModal v-if="editor === 'stage' && selectedCard?.status === 'card'" :card="selectedCard" :disabled="locked || !!pending" :rejected="rejected"
+        <GalleryStageTransformModal v-if="editor === 'stage' && selectedCard?.status === 'card'" :panel="model" :card="selectedCard" :disabled="locked || !!pending" :rejected="rejected"
           @close="closeEditor" @submit="send('gallery.stage.update', $event)" @log="emit('log')" />
-        <GalleryFaceRectModal v-if="entryEditor === 'face' && selectedEntry" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
+        <GalleryFaceRectModal v-if="entryEditor === 'face' && selectedEntry" :panel="model" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
           @close="closeEditor" @submit="submitOfficialGeometry('face_rect', $event.face_rect)" @log="emit('log')" />
-        <GalleryStageTransformModal v-if="entryEditor === 'stage' && selectedEntry" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
+        <GalleryStageTransformModal v-if="entryEditor === 'stage' && selectedEntry" :panel="model" :card="galleryOfficialEditorCard(selectedEntry)" :disabled="locked || !!pending" :rejected="rejected"
           @close="closeEditor" @submit="submitOfficialGeometry('stage', $event.stage)" @log="emit('log')" />
       </Teleport>
     </template>
@@ -287,7 +293,7 @@ function selectSubject(subject) {
 .gallery-panel .gallery-card { display: flex; flex-direction: column; padding: calc(4px * var(--ui-scale)); min-width: 0; text-align: left; overflow: hidden; background: #14151c; border: 1px solid #6e6a665e; border-radius: var(--radius); }
 .gallery-panel .gallery-card[aria-pressed="true"] { box-shadow: 0 0 calc(12px * var(--ui-scale)) #c6a96240, inset 0 0 0 1px #d2b56e55; }
 .gallery-card__visual { position: relative; width: 100%; height: clamp(150px * var(--ui-scale), 20vh, 215px * var(--ui-scale)); background: radial-gradient(ellipse at top, #2b2c3d, #11131b); display: grid; place-items: center; border-radius: var(--radius-sm); overflow: hidden; }
-.gallery-card__visual > img { width: 100%; height: 100%; object-fit: cover; position: absolute; }
+.gallery-card__artwork { position: absolute; inset: 0; }
 .gallery-card__visual .gallery-chips { position: absolute; bottom: calc(6px * var(--ui-scale)); left: calc(5px * var(--ui-scale)); right: calc(5px * var(--ui-scale)); }
 .gallery-card__crown { position: absolute; top: calc(5px * var(--ui-scale)); left: calc(5px * var(--ui-scale)); padding: calc(3px * var(--ui-scale)) calc(7px * var(--ui-scale)); background: #221c0fe8; border: 1px solid #cfb16b; color: #e5c982; border-radius: var(--radius); font-size: var(--text-xs); }
 .gallery-card__caption { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)); padding: calc(9px * var(--ui-scale)) calc(6px * var(--ui-scale)); overflow-wrap: anywhere; }

@@ -210,7 +210,7 @@ describe("gallery card dates", () => {
 
 describe("gallery detail rail", () => {
   it("cancels deletion, confirms once, and never invents missing binding conditions", async () => {
-    const wrapper = mountSurface(GalleryDetailRail, { card: GALLERY_SAMPLE.cards[2], capabilities: GALLERY_SAMPLE.capabilities, warnings: GALLERY_SAMPLE.binding_warnings });
+    const wrapper = mountSurface(GalleryDetailRail, { panel: GALLERY_SAMPLE, card: GALLERY_SAMPLE.cards[2], capabilities: GALLERY_SAMPLE.capabilities, warnings: GALLERY_SAMPLE.binding_warnings });
     expect(wrapper.text()).not.toContain("暗影劍刃");
     await button(wrapper, "刪除").trigger("click");
     await button(wrapper, "取消").trigger("click");
@@ -296,7 +296,7 @@ describe("face geometry", () => {
   });
 
   it("uses the displayed non-square image bounds, and submits the keyboard-adjusted rectangle without pixels", async () => {
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: GALLERY_SAMPLE.cards[0] });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: GALLERY_SAMPLE, card: GALLERY_SAMPLE.cards[0] });
     const image = wrapper.get(".gallery-face__original > img");
     image.element.getBoundingClientRect = () => ({ left: 100, top: 50, width: 200, height: 400 });
     Object.defineProperty(image.element, "naturalWidth", { value: 768, configurable: true });
@@ -330,7 +330,7 @@ describe("face geometry", () => {
     const opener = document.createElement("button");
     document.body.appendChild(opener);
     opener.focus();
-    const wrapper = mountSurface(GalleryFaceRectModal, { card: GALLERY_SAMPLE.cards[0] });
+    const wrapper = mountSurface(GalleryFaceRectModal, { panel: GALLERY_SAMPLE, card: GALLERY_SAMPLE.cards[0] });
     await wrapper.get('[role="dialog"]').trigger("keydown", { key: "Escape" });
     expect(wrapper.emitted("submit")).toBeUndefined();
     expect(wrapper.emitted("close")).toHaveLength(1);
@@ -433,7 +433,11 @@ describe("official read-only entries", () => {
     await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
     await button(rail(wrapper), "比例調整").trigger("click");
     const modal = wrapper.getComponent(GalleryStageTransformModal);
-    await modal.get(".stage-transform__figure").trigger("load");
+    // The shared lifecycle only reports success for a REAL decoded size.
+    const figure = modal.get(".stage-transform__figure");
+    Object.defineProperty(figure.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(figure.element, "naturalHeight", { value: 1024, configurable: true });
+    await figure.trigger("load");
     await modal.get('input[type="range"]').setValue("0.6");
     await button(modal, "儲存調整").trigger("click");
     expect(dispatch).toHaveBeenCalledExactlyOnceWith("gallery.official.geometry.set", {
@@ -452,7 +456,10 @@ describe("official read-only entries", () => {
     await wrapper.get(`[data-identity="${OFFICIAL_CURRENT.identity}"]`).trigger("click");
     await button(rail(wrapper), "比例調整").trigger("click");
     const modal = wrapper.getComponent(GalleryStageTransformModal);
-    await modal.get(".stage-transform__figure").trigger("load");
+    const figure = modal.get(".stage-transform__figure");
+    Object.defineProperty(figure.element, "naturalWidth", { value: 768, configurable: true });
+    Object.defineProperty(figure.element, "naturalHeight", { value: 1024, configurable: true });
+    await figure.trigger("load");
     await button(modal, "儲存調整").trigger("click");
     expect(dispatch).not.toHaveBeenCalled();
     expect(wrapper.findComponent(GalleryStageTransformModal).exists()).toBe(false);

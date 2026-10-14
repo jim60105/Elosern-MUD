@@ -426,7 +426,7 @@ var ROSTER_MAX_PLACEHOLDER_LABEL = 128;
 var ROSTER_LOCK_REASON = "戰鬥中無法切換角色";
 
 var PANEL_ALLOWLIST = {
-  gallery: 2,
+  gallery: 3,
   art: 2,
   status: 3,
   context_actions: 5,

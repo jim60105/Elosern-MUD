@@ -33,6 +33,7 @@ var creation = require("./protocol/panels/creation.js");
 var exploration = require("./protocol/panels/exploration.js");
 var character = require("./protocol/panels/character.js");
 var art = require("./protocol/panels/art.js");
+var gallery = require("./protocol/panels/gallery.js");
 var titles = require("./protocol/panels/titles.js");
 var misc = require("./protocol/panels/misc.js");
 var exotic = require("./protocol/panels/exotic.js");
@@ -188,19 +189,19 @@ var skill_use = require("./protocol/panels/skill_use.js");
     validateProtocolError: env.validateProtocolError,
     validateStatusPanel: status.validateStatusPanel,
     validateArtPanel: art.validateArtPanel,
-    validateGalleryPanel: art.validateGalleryPanel,
-    validateGalleryActionPayload: art.validateGalleryActionPayload,
-    GALLERY_SCHEMA_VERSION: art.GALLERY_SCHEMA_VERSION,
-    GALLERY_MAX_SUBJECTS: art.GALLERY_MAX_SUBJECTS,
-    GALLERY_MAX_LABEL: art.GALLERY_MAX_LABEL,
-    GALLERY_MAX_NAME: art.GALLERY_MAX_NAME,
-    GALLERY_MAX_CHIP: art.GALLERY_MAX_CHIP,
-    GALLERY_MAX_URL: art.GALLERY_MAX_URL,
-    GALLERY_MAX_WARNINGS: art.GALLERY_MAX_WARNINGS,
-    GALLERY_MAX_CONDITION: art.GALLERY_MAX_CONDITION,
-    GALLERY_MAX_OFFICIAL_ENTRIES: art.GALLERY_MAX_OFFICIAL_ENTRIES,
-    GALLERY_MAX_OFFICIAL_IDENTITY: art.GALLERY_MAX_OFFICIAL_IDENTITY,
-    GALLERY_MAX_OFFICIAL_URL: art.GALLERY_MAX_OFFICIAL_URL,
+    validateGalleryPanel: gallery.validateGalleryPanel,
+    validateGalleryActionPayload: gallery.validateGalleryActionPayload,
+    GALLERY_SCHEMA_VERSION: gallery.GALLERY_SCHEMA_VERSION,
+    GALLERY_MAX_SUBJECTS: gallery.GALLERY_MAX_SUBJECTS,
+    GALLERY_MAX_LABEL: gallery.GALLERY_MAX_LABEL,
+    GALLERY_MAX_NAME: gallery.GALLERY_MAX_NAME,
+    GALLERY_MAX_CHIP: gallery.GALLERY_MAX_CHIP,
+    GALLERY_MAX_URL: gallery.GALLERY_MAX_URL,
+    GALLERY_MAX_WARNINGS: gallery.GALLERY_MAX_WARNINGS,
+    GALLERY_MAX_CONDITION: gallery.GALLERY_MAX_CONDITION,
+    GALLERY_MAX_OFFICIAL_ENTRIES: gallery.GALLERY_MAX_OFFICIAL_ENTRIES,
+    GALLERY_MAX_OFFICIAL_IDENTITY: gallery.GALLERY_MAX_OFFICIAL_IDENTITY,
+    GALLERY_MAX_OFFICIAL_URL: gallery.GALLERY_MAX_OFFICIAL_URL,
     validateExplorationPanel: exploration.validateExplorationPanel,
     validateCharacterPanel: character.validateCharacterPanel,
     validateCharacterTraitRow: character.validateCharacterTraitRow,
