@@ -244,30 +244,65 @@ def _combat_panel() -> dict:
     }
 
 
+def _fixture_digest(label: str) -> str:
+    """A deterministic 64-character lowercase digest for one fixture fact."""
+    import hashlib
+
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _artwork_resource(url: str, face_rect: dict | None = None) -> dict:
+    """One canonical runtime candidate resource for a fixture URL."""
+    return {
+        "resource_id": url,
+        "version": _fixture_digest(url),
+        "url": url,
+        "origin": "runtime",
+        "geometry": {
+            "image_size": None,
+            "face_rect": face_rect or {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
+            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
+            "aspect_ratio": "3:4",
+        },
+    }
+
+
+def _artwork_descriptor(subject_id: str, url: str, **overrides) -> dict:
+    """One complete canonical artwork descriptor for a fixture subject."""
+    value = {
+        "subject_id": subject_id,
+        "revision": _fixture_digest(subject_id + url),
+        "generation_subject": subject_id,
+        "generation_state": "done",
+        "attempts": [
+            {
+                "type": "image",
+                "source_id": "portrait.default:" + subject_id,
+                "rank": 30,
+                "resource": _artwork_resource(url),
+            }
+        ],
+        "terminal": None,
+        "retention_sources": [],
+    }
+    value.update(overrides)
+    return value
+
+
 def _art_panel(portrait_refs: list) -> dict:
-    """A schema-valid available art panel with a done scene + portrait catalog."""
+    """A schema-valid available art panel (v3) with a done scene + catalog.
+
+    Each catalog value is exactly ``{artwork, context}``: the complete
+    canonical descriptor plus its bounded display context.
+    """
     catalog = {}
     for ref in portrait_refs:
         catalog[ref] = {
-            "subject_key": "subject_" + ref,
-            "status": "done",
-            "url": "/art/portrait_" + ref + ".png",
-            "aspect_ratio": "3:4",
-            "alt": "角色肖像",
-            "placeholder": None,
-            "face_rect": {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5},
-            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
-            # The closed portrait-origin discriminator and its decorative
-            # silhouette reference are required exact fields of a catalog
-            # entry on both validators (builtin-silhouette-stage-fallback,
-            # official-art-resolution-contracts): a runtime card carries its
-            # own media URL and has no committed built-in identity to offer.
-            "origin": "runtime",
-            "fallback": None,
+            "artwork": _artwork_descriptor("subject_" + ref, "/art/portrait_" + ref + ".png"),
             "context": {"name": "角色", "role": "人物"},
         }
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "kind": "scene",
         "scene": {

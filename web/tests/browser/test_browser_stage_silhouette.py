@@ -24,7 +24,12 @@ from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import inject_snapshot, valid_local_map_panel
-from ._journey_support import _SCENE_PNG_BYTES, _wait_mode
+from ._journey_support import (
+    _SCENE_PNG_BYTES,
+    _artwork_descriptor,
+    _artwork_resource,
+    _wait_mode,
+)
 
 SCENE_URL = "/art/scene.png"
 REAL_URL = "/art/portrait_7.png"
@@ -37,8 +42,10 @@ FACE_RECT = {"x": 0.25, "y": 0.06, "w": 0.5, "h": 0.5}
 
 # The active host actor (a leaving crossfade copy is inert).
 ACTOR = '[data-anchor="actor-right"] [data-testid="stage-actor"]:not([inert])'
-MASK = ACTOR + " .reference-artwork__mask"
-MASK_FILL = ACTOR + " .reference-artwork__mask-fill"
+# The shared alpha primitive (ArtworkAlpha) the frame paints the committed
+# silhouette with, and its observed-success fill.
+MASK = ACTOR + ' [data-testid="artwork-alpha"]'
+MASK_FILL = ACTOR + ' [data-testid="artwork-alpha-fill"]'
 PLACEHOLDER_CARD = ACTOR + " .reference-artwork__chest"
 
 # ReferenceArtwork's dark silhouette fill (`#17191f`), with the tolerance an
@@ -62,32 +69,68 @@ FIGURE_RATIO_TOLERANCE = 0.06
 FIGURE_AREA_FLOOR = 0.7
 
 
-def _fallback(key: str) -> dict:
-    return {"key": key, "url": f"/art/defaults/{key}.webp", "face_rect": dict(FALLBACK_FACE_RECT)}
+def _terminal(key: str, url: str | None = None) -> dict:
+    """The descriptor's own alpha terminal for one committed built-in key."""
+    return {
+        "kind": "alpha_mask",
+        "source_id": f"portrait.alpha:{key}",
+        "rank": 100,
+        "resource": {
+            "resource_id": f"defaults/{key}.webp",
+            "version": _fixture_digest(f"terminal-{key}"),
+            "url": url or f"/art/defaults/{key}.webp",
+            "origin": "silhouette",
+            "geometry": {
+                "image_size": None,
+                "face_rect": dict(FALLBACK_FACE_RECT),
+                "stage": None,
+                "aspect_ratio": "3:4",
+            },
+        },
+    }
 
 
-def _entry(**overrides) -> dict:
-    """One schema-valid host catalog entry (a silhouette placeholder row)."""
-    value = {
-        "subject_key": "npc_7",
-        "status": "pending",
-        "url": None,
-        "aspect_ratio": None,
-        "alt": "店長的肖像",
-        "placeholder": {"kind": "missing", "label": "肖像生成中"},
-        "face_rect": None,
-        "stage": None,
-        "origin": "silhouette",
-        "fallback": _fallback("elder"),
+def _fixture_digest(label: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def _entry(key: str = "elder", **overrides) -> dict:
+    """One schema-valid host catalog value: the canonical descriptor + context.
+
+    With no real candidate the descriptor states the pending generation and
+    carries only the attribute-selected alpha terminal (``key``).
+    """
+    descriptor = _artwork_descriptor("npc_7", SCENE_URL, terminal=_terminal(key))
+    descriptor["generation_state"] = "pending"
+    descriptor["attempts"] = []
+    descriptor.update(overrides)
+    return {
+        "artwork": descriptor,
         "context": {"name": "店長", "role": "對話對象"},
     }
-    value.update(overrides)
-    return value
+
+
+def _resolved_entry(url: str, **overrides) -> dict:
+    """The same host with a real candidate ahead of its terminal."""
+    descriptor = _artwork_descriptor("npc_7", url, terminal=_terminal("elder"))
+    descriptor["attempts"][0]["resource"]["geometry"] = {
+        "image_size": None,
+        "face_rect": dict(FACE_RECT),
+        "stage": dict(STAGE_TRIPLE),
+        "aspect_ratio": "3:4",
+    }
+    descriptor.update(overrides)
+    return {
+        "artwork": descriptor,
+        "context": {"name": "店長", "role": "對話對象"},
+    }
 
 
 def _art_panel(entry: dict) -> dict:
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "kind": "scene",
         "scene": {
@@ -149,9 +192,9 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         return page
 
     def _masked_url(self, page) -> str:
+        """The mask URL the shared alpha fill binds, from its own custom property."""
         return page.evaluate(
-            "(sel) => { const s = getComputedStyle(document.querySelector(sel));"
-            " return s.maskImage || s.webkitMaskImage || ''; }",
+            "(sel) => document.querySelector(sel).style.getPropertyValue('--artwork-alpha-mask')",
             MASK_FILL,
         )
 
@@ -188,7 +231,8 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         return page.evaluate(
             """async (sel) => {
               const fill = document.querySelector(sel);
-              const probe = fill.parentElement.querySelector('.reference-artwork__mask-probe');
+              const declaration = fill.style.getPropertyValue('--artwork-alpha-mask');
+              const probe = { src: declaration.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '') };
               const image = new Image();
               image.src = probe.src;
               await image.decode();
@@ -284,22 +328,23 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         — never one shared shape — drawn as the committed image's own alpha
         mask, with the former inline SVG gone and the actor's name and state
         label outside the decorative mask."""
-        page = self._open_dialogue(_entry(fallback=_fallback(FALLBACK_KEYS[0])))
+        page = self._open_dialogue(_entry(FALLBACK_KEYS[0]))
         page.wait_for_selector(MASK_FILL, timeout=15000)
         first = page.evaluate(
             """(sel) => {
               const actor = document.querySelector(sel);
-              const fill = actor.querySelector('.reference-artwork__mask-fill');
+              const fill = actor.querySelector('[data-testid="artwork-alpha-fill"]');
               const style = getComputedStyle(fill);
+              const alpha = fill.closest('[data-testid="artwork-alpha"]');
               return {
                 maskImage: style.maskImage || style.webkitMaskImage,
                 maskSize: style.maskSize,
                 background: style.backgroundColor,
                 chestOutside: !fill.querySelector('.reference-artwork__chest'),
-                svg: fill.parentElement.querySelector('svg') !== null,
+                svg: alpha.parentElement.querySelector('svg') !== null,
                 label: actor.querySelector('.reference-artwork__placeholder-label').textContent,
                 name: actor.querySelector('.reference-artwork__identity').textContent,
-                decorative: actor.querySelector('.reference-artwork__mask').getAttribute('aria-hidden'),
+                decorative: alpha.getAttribute('aria-hidden'),
               };
             }""",
             ACTOR,
@@ -315,7 +360,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(first["label"], "肖像生成中")
         for key in FALLBACK_KEYS:
             with self.subTest(key=key):
-                self._stand_host(page, _entry(fallback=_fallback(key)))
+                self._stand_host(page, _entry(key))
                 page.wait_for_selector(MASK_FILL, timeout=15000)
                 self.assertIn(f"/art/defaults/{key}.webp", self._masked_url(page))
         page.close()
@@ -337,7 +382,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         — this measures the geometry those bounds imply instead of assuming an
         empty top strip.
         """
-        page = self._open_dialogue(_entry(fallback=_fallback("woman")))
+        page = self._open_dialogue(_entry("woman"))
         page.wait_for_selector(MASK_FILL, timeout=15000)
         page.wait_for_timeout(200)
         geometry = page.evaluate(
@@ -431,18 +476,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
                 status=200, content_type="image/png", body=_SCENE_PNG_BYTES
             ),
         )
-        self._stand_host(
-            page,
-            _entry(
-                status="done",
-                url=REAL_URL,
-                aspect_ratio="3:4",
-                placeholder=None,
-                face_rect=dict(FACE_RECT),
-                stage=dict(STAGE_TRIPLE),
-                origin="runtime",
-            ),
-        )
+        self._stand_host(page, _resolved_entry(REAL_URL, generation_state="done"))
         page.wait_for_selector(f'{ACTOR} img[src$="{REAL_URL}"]', timeout=15000)
         self.assertEqual(page.locator(MASK).count(), 0, "the real image stands alone")
 
@@ -453,18 +487,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         # A later snapshot hands the same subject a URL that fails to load:
         # the frame returns to the silhouette the payload already carried.
         page.route(f"**{BROKEN_URL}", _abort)
-        self._stand_host(
-            page,
-            _entry(
-                status="done",
-                url=BROKEN_URL,
-                aspect_ratio="3:4",
-                placeholder=None,
-                face_rect=dict(FACE_RECT),
-                stage=dict(STAGE_TRIPLE),
-                origin="runtime",
-            ),
-        )
+        self._stand_host(page, _resolved_entry(BROKEN_URL, generation_state="done"))
         page.wait_for_selector(MASK_FILL, timeout=15000)
         state = page.evaluate(
             """(sel) => {
@@ -472,7 +495,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
               return {
                 status: actor.querySelector('figure').dataset.status,
                 label: actor.querySelector('.reference-artwork__placeholder-label').textContent,
-                mask: (getComputedStyle(actor.querySelector('.reference-artwork__mask-fill')).maskImage || ''),
+                mask: actor.querySelector('[data-testid="artwork-alpha-fill"]').style.getPropertyValue('--artwork-alpha-mask'),
                 text: actor.innerText,
               };
             }""",

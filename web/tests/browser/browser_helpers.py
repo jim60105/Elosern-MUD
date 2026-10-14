@@ -1154,7 +1154,7 @@ def valid_art_panel() -> dict:
     else:
         archetype, label = SHIPPED_ART_ARCHETYPE, SHIPPED_ART_SCENE_LABEL
     return {
-        "schema_version": 2,
+        "schema_version": 3,
         "available": True,
         "kind": "scene",
         "scene": {
