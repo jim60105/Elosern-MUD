@@ -206,6 +206,10 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         """Every committed outdoor scene serves and decodes as its own image."""
         self._assert_pack_static_decode(OUTDOOR_SCENE_ASSETS)
 
+    @covers_requirement(
+        "bundled-interior-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
+        "bundled-interior-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
+    )
     def test_interior_pack_static_decode(self):
         """Every committed interior scene serves and decodes as its own image."""
         self._assert_pack_static_decode(INTERIOR_SCENE_ASSETS)
