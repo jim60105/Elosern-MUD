@@ -6,15 +6,22 @@ from __future__ import annotations
 from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
+    CARD_SELECTOR,
     SUGGESTIONS_CARD_SELECTOR,
     WAIT_CARD_SELECTOR,
+    activate_card_row,
     activate_first_compass_exit,
+    activate_presence_entry,
+    card_row_keys,
     compass_target_refs,
     activate_overview_chip,
     fixture_home_node_id,
+    inject_update,
     install_outbound_recorder,
     open_dialogue_choices,
+    open_verb_card,
     outbound_messages,
+    presence_entry_keys,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -26,6 +33,17 @@ from . import fixtures
 def _press(page, key, wait_ms=80):
     page.keyboard.press(key)
     page.wait_for_timeout(wait_ms)
+
+
+# The methods that need the synthetic companion lineup (a committed four-slot
+# party of present LLMNPCs). The companion-focus journey additionally opts into
+# the portrait branch's admitted media, so the reused figure is asserted against
+# loaded art rather than a placeholder.
+COMPANION_LINEUP_METHODS = (
+    "test_companion_lineup_dialogue_geometry_and_real_possession",
+    "test_exploration_companion_focus_reuses_the_lineup_figure",
+)
+COMPANION_FOCUS_METHOD = "test_exploration_companion_focus_reuses_the_lineup_figure"
 
 
 class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -42,9 +60,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # These journeys assert shipped fixture identity end to end and were
         # never migrated to kit seams.
         runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "0"
-        if self._testMethodName == "test_companion_lineup_dialogue_geometry_and_real_possession":
+        if self._testMethodName in COMPANION_LINEUP_METHODS:
             runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = "1"
             runtime.env["ELOSERN_BROWSER_COMPANION_LINEUP"] = "1"
+        if self._testMethodName == COMPANION_FOCUS_METHOD:
+            runtime.env["ELOSERN_BROWSER_EXPLORATION_PORTRAITS"] = "1"
 
         self.server = ManagedServer(runtime=runtime)
         self.server.start()
@@ -112,6 +132,292 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(sent_action_count(page, "explore.possess_release"), 1)
         wait_for_store_state(page, lambda s: s["panels"]["status"]["actor"]["identity"] == str(player_id))
         self.assertEqual(identities(), expected)
+
+    @covers_requirement(
+        "webclient-presence-rail::the-person-focus-verb-card-is-client-local-and-replaces-the-verb-popover"
+    )
+    @covers_requirement(
+        "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor"
+    )
+    def test_exploration_companion_focus_reuses_the_lineup_figure(self):
+        """reuse-lineup-person-focus 4.1 on the live client at 1451x790.
+
+        The committed four-slot party and its admitted portrait (the portrait
+        branch), read from the ACTUAL exploration/art/party packets: opening a
+        rendered companion's verb card from its real medallion — and from the
+        overflow card — sends nothing and pushes no frame, keeps exactly one
+        representation of that identity (no actor-right stage actor), lights the
+        existing actor-left figure above every baseline with its loaded media and
+        its byte-identical box, restores the current baseline on 返回, transfers
+        representation both ways when the committed lineup changes (finishing a
+        leave the transfer overtakes), and hands the companion over to dialogue
+        once, still represented once.
+        """
+        # FULL motion on purpose: the rest of the suite runs at `off` so no
+        # journey races an animation, but this one has to prove the DOM counts
+        # while the real CSS phases run — the representation transfer must skip
+        # its own leave phase, and a leave the transfer overtakes must be
+        # finished rather than painted beside the left figure.
+        page = self.logged_in_page((1451, 790), motion_level="full")
+        install_outbound_recorder(page)
+        self._wait_exploration_available(page)
+        self._wait_panel(page, "party", lambda p: p.get("available") and len(p["slots"]) == 4)
+        state = store_state(page)
+        rows = state["panels"]["party"]["slots"]
+        catalog = state["panels"]["art"]["portrait_catalog"]
+        present = {row["identity"] for row in self._live_exploration_panel(page)["interact"]}
+        present_rows = [row for row in rows if row["identity"] in present]
+        self.assertTrue(present_rows, "a committed party companion must be present as an interact target")
+        # Prefer the companion the fixture admitted a portrait for, so the
+        # reused figure is asserted against loaded media.
+        member = next((row for row in present_rows if row.get("portrait_ref")), present_rows[0])
+        member_id = member["identity"]
+        figure_selector = '[data-testid="companion-figure"][data-identity="%s"]' % member_id
+        right_selector = '[data-testid="anchor-actor-right"] [data-testid="stage-actor"]'
+        page.wait_for_selector(figure_selector, timeout=15000)
+
+        def stage() -> dict:
+            """The committed stage: each actor-left figure's identity, props, z,
+            rounded box and portrait image, and the actor-right stage actors."""
+            return page.evaluate(
+                """(rightSelector) => {
+                  const box = (el) => {
+                    const r = el.getBoundingClientRect();
+                    return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)];
+                  };
+                  return {
+                    figures: Array.from(document.querySelectorAll('[data-testid="companion-figure"]')).map((el) => {
+                      const actor = el.querySelector('[data-testid="stage-actor"]');
+                      const portrait = el.querySelector('img:not(.reference-artwork__mask-probe)');
+                      return {
+                        identity: el.dataset.identity,
+                        controlled: el.dataset.controlled === 'true',
+                        z: Number(el.style.zIndex),
+                        speaking: actor.getAttribute('data-speaking'),
+                        beat: actor.getAttribute('data-beat'),
+                        box: box(el),
+                        image: portrait ? {
+                          src: portrait.getAttribute('src'),
+                          complete: portrait.complete,
+                          naturalWidth: portrait.naturalWidth,
+                        } : null,
+                      };
+                    }),
+                    right: Array.from(document.querySelectorAll(rightSelector))
+                      .map((el) => el.getAttribute('data-identity')),
+                  };
+                }""",
+                right_selector,
+            )
+
+        def one(state_now: dict, identity) -> dict:
+            matches = [item for item in state_now["figures"] if item["identity"] == str(identity)]
+            self.assertEqual(len(matches), 1, state_now["figures"])
+            return matches[0]
+
+        def party_panel(subset) -> dict:
+            committed = store_state(page)["panels"]["party"]
+            return {
+                "schema_version": committed["schema_version"],
+                "available": True,
+                "general_quota": committed["general_quota"],
+                "slots": list(subset),
+            }
+
+        def slots_of(state_now: dict) -> int:
+            return len(((state_now.get("panels") or {}).get("party") or {}).get("slots") or [])
+
+        def wait_for_right(identities, timeout: int = 15000) -> None:
+            """Wait until actor-right's stage actors are exactly `identities`.
+
+            A store wait alone would not prove the DOM: at full motion a leave
+            is still painted after the commit that removes it, so every leg
+            settles the anchor before it asserts a count.
+            """
+            page.wait_for_function(
+                "(args) => { const [selector, expected] = args;"
+                " const actual = Array.from(document.querySelectorAll(selector))"
+                "   .map((el) => el.getAttribute('data-identity')).sort();"
+                " return JSON.stringify(actual) === JSON.stringify(expected.slice().sort()); }",
+                arg=[right_selector, [str(identity) for identity in identities]],
+                timeout=timeout,
+            )
+
+        def wait_for_figure_gone(identity, timeout: int = 15000) -> None:
+            page.wait_for_function(
+                "(args) => !document.querySelector(args[0].replace('%s', args[1]))",
+                arg=['[data-testid="companion-figure"][data-identity="%s"]', str(identity)],
+                timeout=timeout,
+            )
+
+        before = stage()
+        wait_for_right([], timeout=5000)
+        self.assertEqual(before["right"], [], "the exploration root stands no actor-right stage actor")
+
+        # --- the actual medallion: client-local, singular, lit, unmoved ------ #
+        open_verb_card(page, member_id)
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        self.assertEqual(sent_action_count(page), 0, "opening the card dispatches nothing")
+        wait_for_right([])
+        opened = stage()
+        self.assertEqual(opened["right"], [], "a rendered companion gets no actor-right copy")
+        selected = one(opened, member_id)
+        self.assertFalse(selected["controlled"])
+        self.assertEqual(selected["speaking"], "true")
+        self.assertEqual(selected["z"], 6, "the selected companion takes the focus z")
+        for other in opened["figures"]:
+            if other["identity"] == str(member_id):
+                continue
+            self.assertLess(other["z"], selected["z"], other)
+            if not other["controlled"]:
+                self.assertEqual(other["speaking"], "false", "the other companions keep the listener dim")
+        controlled = [item for item in opened["figures"] if item["controlled"]]
+        self.assertEqual(len(controlled), 1, "exactly one controlled front figure")
+        self.assertIsNone(controlled[0]["beat"], "the controlled figure keeps its own props")
+        for earlier in before["figures"]:
+            self.assertEqual(
+                one(opened, earlier["identity"])["box"],
+                earlier["box"],
+                "focus changes no figure's box",
+            )
+        # The admitted portrait branch: the reused figure really loaded media.
+        self.assertIsNotNone(member.get("portrait_ref"), "the portrait branch admits a reference")
+        entry = catalog[member["portrait_ref"]]
+        self.assertTrue(entry["url"].startswith("/art/"), entry)
+        self.assertEqual(selected["image"]["src"], entry["url"], "the figure renders its admitted crop")
+        self.assertTrue(selected["image"]["complete"])
+        self.assertGreater(selected["image"]["naturalWidth"], 0)
+
+        activate_card_row(page, "back")
+        wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
+        wait_for_right([])
+        closed = stage()
+        self.assertEqual(closed["right"], [], "closing restores the baseline with no right-side figure")
+        self.assertEqual(one(closed, member_id)["z"], one(before, member_id)["z"])
+        self.assertEqual(one(closed, member_id)["speaking"], "false")
+        self.assertEqual(one(closed, member_id)["box"], one(before, member_id)["box"])
+        self.assertEqual(sent_action_count(page), 0)
+
+        # --- the overflow card: the same membership rule for a folded entry -- #
+        self.assertIn("presence-more", presence_entry_keys(page), "the fixture crowd must fold entries")
+        activate_presence_entry(page, "presence-more")
+        page.wait_for_selector(CARD_SELECTOR, timeout=15000)
+        folded = next(
+            (key for key in card_row_keys(page) if key.startswith("target-")),
+            None,
+        )
+        self.assertIsNotNone(folded, "the overflow card must list an interact target")
+        folded_id = int(folded.split("-", 1)[1])
+        activate_card_row(page, folded)
+        wait_for_store_state(page, lambda s: (s.get("presenceCard") or {}).get("identity") == folded_id)
+        wait_for_right([] if folded_id in {row["identity"] for row in rows} else [folded_id])
+        overflow = stage()
+        self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), 1)
+        self.assertEqual(sent_action_count(page), 0)
+        if folded_id in {row["identity"] for row in rows}:
+            self.assertEqual(overflow["right"], [], "a folded lineup entry reuses its figure too")
+            self.assertEqual(one(overflow, folded_id)["speaking"], "true")
+        else:
+            self.assertEqual(overflow["right"], [str(folded_id)], "a non-lineup entry keeps actor-right")
+            for item in overflow["figures"]:
+                if not item["controlled"]:
+                    self.assertEqual(item["speaking"], "false", "no unrelated companion gains emphasis")
+        activate_card_row(page, "back")
+        wait_for_store_state(page, lambda s: s.get("presenceCard") is None)
+        wait_for_right([])
+
+        # --- membership decides representation, both ways ------------------- #
+        other_rows = [row for row in rows if row["identity"] != member_id]
+        open_verb_card(page, member_id)
+        inject_update(page, {"party": party_panel(other_rows)})
+        wait_for_store_state(page, lambda s: slots_of(s) == len(other_rows))
+        wait_for_figure_gone(member_id)
+        wait_for_right([member_id])
+        transferred_out = stage()
+        self.assertEqual(
+            [item for item in transferred_out["figures"] if item["identity"] == str(member_id)],
+            [],
+            "an unrendered identity leaves no left figure",
+        )
+        self.assertEqual(
+            transferred_out["right"], [str(member_id)],
+            "the surviving target takes the ordinary actor-right standee",
+        )
+        inject_update(page, {"party": party_panel(rows)})
+        wait_for_store_state(page, lambda s: slots_of(s) == len(rows))
+        page.wait_for_selector(figure_selector, timeout=15000)
+        wait_for_right([])
+        transferred_in = stage()
+        self.assertEqual(transferred_in["right"], [], "the transfer back leaves no right-side copy")
+        self.assertEqual(one(transferred_in, member_id)["z"], 6)
+        self.assertEqual(one(transferred_in, member_id)["speaking"], "true")
+
+        # --- a leave the transfer overtakes paints no second figure --------- #
+        inject_update(page, {"party": party_panel(other_rows)})
+        wait_for_store_state(page, lambda s: slots_of(s) == len(other_rows))
+        wait_for_figure_gone(member_id)
+        wait_for_right([member_id])
+        self.assertEqual(stage()["right"], [str(member_id)])
+        # Close the card and read the anchor inside one task: the standee's CSS
+        # leave is still running (350ms at full motion), which is the state the
+        # committed membership change below has to finish.
+        leaving = page.evaluate(
+            """async (rightSelector) => {
+              document
+                .querySelector('[data-anchor="choices"] [data-testid="presence-card"] [data-row-key="back"]')
+                .click();
+              await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+              return Array.from(document.querySelectorAll(rightSelector))
+                .map((el) => el.getAttribute('data-identity'));
+            }""",
+            right_selector,
+        )
+        self.assertEqual(leaving, [str(member_id)], "the standee is still leaving")
+        inject_update(page, {"party": party_panel(rows)})
+        wait_for_store_state(page, lambda s: slots_of(s) == len(rows))
+        wait_for_right([])
+        self.assertEqual(
+            stage()["right"],
+            [],
+            "a leave overtaken by the transfer leaves no second figure",
+        )
+        open_verb_card(page, member_id)
+        wait_for_right([])
+        reopened = stage()
+        self.assertEqual(reopened["right"], [], "reopening stays singular")
+        self.assertEqual(one(reopened, member_id)["z"], 6)
+
+        # --- the talk handover --------------------------------------------- #
+        activate_card_row(page, "talk-open")
+        self.assertEqual(sent_action_count(page, "explore.talk_open"), 1)
+        inject_update(
+            page,
+            {
+                "dialogue": {
+                    "schema_version": 2,
+                    "available": True,
+                    "kind": "dialogue",
+                    "host": {
+                        "identity": member_id,
+                        "display_name": member["display_name"],
+                        "portrait_ref": member.get("portrait_ref"),
+                    },
+                    "bond_stage": None,
+                    "line": "……",
+                    "choices": [],
+                },
+            },
+            mode="dialogue",
+        )
+        wait_for_store_state(page, lambda s: s.get("mode") == "dialogue")
+        wait_for_right([])
+        handed = stage()
+        self.assertEqual(handed["right"], [], "the lineup host keeps actor-right empty in dialogue")
+        self.assertEqual(one(handed, member_id)["z"], 6, "the existing host speaker signal owns z")
+        self.assertEqual(one(handed, member_id)["speaking"], "true")
+        self.assertEqual(page.locator(CARD_SELECTOR).count(), 0, "the mode change closes the card")
+        self.assertEqual(sent_action_count(page), 1)
+        page.close()
 
     def _live_exploration_panel(self, page):
         # The panels mapping can be observed mid-snapshot-adoption without the

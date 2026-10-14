@@ -144,12 +144,22 @@ def _exploration_fixture(character) -> None:
         # The preset activation already bound its declared starting
         # companions; top the party up to the cap so the lineup journey
         # always sees exactly PARTY_MAX_COMPANIONS companions.
+        companions = []
         for index in range(PARTY_MAX_COMPANIONS - party_size(character)):
             npc = create_object(LLMNPC, key=f"測試同行{index}", location=south_gate)
             npc.race = companion_race
             npc.apply_race_baseline()
             npc.db.age = npc.db.apparent_age = 30
             join_party(npc, character)
+            companions.append(npc)
+
+        if companions and os.environ.get("ELOSERN_BROWSER_EXPLORATION_PORTRAITS") == "1":
+            # Opt-in admitted media for a party member (reuse-lineup-person-
+            # focus 4.1): the first companion carries a real, server-served DONE
+            # portrait, so the exploration companion-focus journey can assert
+            # the reused left figure against loaded media instead of a
+            # placeholder. Only the run that sets both flags sees it.
+            _settle_admitted_portrait(companions[0], "browser-exploration-companion")
 
     bard = create_object(LLMNPC, key=SYNTH_BARD_KEY if synth else "吟遊詩人", location=south_gate)
     bard.components.add(
