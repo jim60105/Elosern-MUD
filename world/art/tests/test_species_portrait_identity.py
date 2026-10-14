@@ -65,11 +65,22 @@ from world.art.official_refs import (
 )
 from world.art.presenter import (
     ORIGIN_OFFICIAL,
-    PAYLOAD_OFFICIAL,
-    PLACEHOLDER_UNAVAILABLE,
-    resolve_entity,
-    resolve_subject,
+    describe_entity,
+    describe_portrait,
 )
+
+
+def candidate(descriptor: dict) -> dict | None:
+    """The descriptor's presented real candidate resource, or ``None``."""
+    for attempt in descriptor["attempts"]:
+        if attempt["type"] == "image":
+            return attempt["resource"]
+    return None
+
+
+def terminal(descriptor: dict) -> dict | None:
+    """The descriptor's own alpha terminal resource, or ``None``."""
+    return descriptor["terminal"]["resource"] if descriptor["terminal"] else None
 from world.art.store import ArtAssetRecord
 from world.art.subjects import (
     ArtSubject,
@@ -441,20 +452,20 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             _SYNTH_SPECIES, face_rect=dict(_OFFICIAL_RECT), stage=dict(_OFFICIAL_STAGE)
         )
         monster = self._monster(species=_SYNTH_SPECIES, variant=_VARIANTS_OF_SPECIES[0])
-        payload = resolve_entity(monster)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["kind"], PAYLOAD_OFFICIAL)
-        self.assertEqual(payload["url"], current_catalog().url_for(identity))
+        payload = describe_entity(monster)
+        self.assertEqual(candidate(payload)["origin"], ORIGIN_OFFICIAL)
+        self.assertIsNotNone(candidate(payload))
+        self.assertEqual(candidate(payload)["url"], current_catalog().url_for(identity))
         self.assertEqual(
-            payload["url"],
+            candidate(payload)["url"],
             f"/art/official/{current_catalog().fingerprint_for(identity)}/{identity}",
         )
         # The presentation rides the ordinary step and the ordinary generic
         # subject: no monster special case was installed for it.
-        self.assertEqual(payload["subject_key"], self._subject().full())
-        self.assertEqual(payload["face_rect"], _OFFICIAL_RECT)
-        self.assertEqual(payload["stage"], _OFFICIAL_STAGE)
-        self.assertIsNone(payload["status"])
+        self.assertEqual(payload["generation_subject"], self._subject().full())
+        self.assertEqual(candidate(payload)["geometry"]["face_rect"], _OFFICIAL_RECT)
+        self.assertEqual(candidate(payload)["geometry"]["stage"], _OFFICIAL_STAGE)
+        self.assertEqual(candidate(payload)["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(GalleryRecord.objects.count(), 0)
         self.assertEqual(ArtAssetRecord.objects.count(), 0)
 
@@ -467,8 +478,8 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         backed = self._monster(species=_SYNTH_SPECIES)
         plain = self._monster()
         with patch.object(official_refs, "log_warn") as warned:
-            backed_payload = resolve_subject(self._subject(), entity=backed)
-            plain_payload = resolve_subject(self._subject(), entity=plain)
+            backed_payload = describe_portrait(self._subject(), backed)
+            plain_payload = describe_portrait(self._subject(), plain)
         # Byte-identity of the presented row: the canonical serialization is
         # equal, and the branch fields are equal explicitly rather than by
         # implication.
@@ -476,10 +487,10 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             json.dumps(backed_payload, sort_keys=True),
             json.dumps(plain_payload, sort_keys=True),
         )
-        self.assertEqual(backed_payload["origin"], plain_payload["origin"])
-        self.assertEqual(backed_payload["fallback"], plain_payload["fallback"])
-        self.assertNotEqual(backed_payload["origin"], ORIGIN_OFFICIAL)
-        self.assertIsNone(backed_payload["url"])
+        self.assertEqual(candidate(backed_payload), candidate(plain_payload))
+        self.assertEqual(terminal(backed_payload), terminal(plain_payload))
+        self.assertIsNone(candidate(backed_payload))
+        self.assertIsNone(candidate(backed_payload))
         # The reference itself resolved; only the snapshot lacks its content,
         # so the fall-through is silent (no diagnostic at all).
         self.assertEqual(_unresolved_events(warned), [])
@@ -495,18 +506,18 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         sibling = self._monster(species=_OTHER_SPECIES)
         unmatched = self._monster(species=_UNREGISTERED_SPECIES)
 
-        matched_payload = resolve_subject(self._subject(), entity=matched)
-        sibling_payload = resolve_subject(self._subject(), entity=sibling)
-        unmatched_payload = resolve_subject(self._subject(), entity=unmatched)
+        matched_payload = describe_portrait(self._subject(), matched)
+        sibling_payload = describe_portrait(self._subject(), sibling)
+        unmatched_payload = describe_portrait(self._subject(), unmatched)
 
         # Each species presents its own bytes...
-        self.assertEqual(matched_payload["url"], current_catalog().url_for(owned))
-        self.assertEqual(sibling_payload["url"], current_catalog().url_for(other))
+        self.assertEqual(candidate(matched_payload)["url"], current_catalog().url_for(owned))
+        self.assertEqual(candidate(sibling_payload)["url"], current_catalog().url_for(other))
         # ...and a key no registry holds reaches none of them.
         self.assertIsNone(official_content_reference_for_entity(unmatched))
         self.assertIsNone(official_default_for(self._subject(), unmatched))
         self.assertIsNone(official_selection_for(self._subject(), unmatched))
-        self.assertNotEqual(unmatched_payload["origin"], ORIGIN_OFFICIAL)
+        self.assertIsNone(candidate(unmatched_payload))
         serialized = json.dumps(unmatched_payload, sort_keys=True)
         for forbidden in (
             _SYNTH_SPECIES,
@@ -536,8 +547,8 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertIsNotNone(current_catalog().content(OFFICIAL_KIND_MONSTER, _SYNTH_TIER))
         monster = self._monster()
         self.assertIsNone(official_content_reference_for_entity(monster))
-        payload = resolve_subject(self._subject(), entity=monster)
-        self.assertNotEqual(payload["origin"], ORIGIN_OFFICIAL)
+        payload = describe_portrait(self._subject(), monster)
+        self.assertIsNone(candidate(payload))
         self.assertNotIn(tier_identity, json.dumps(payload, sort_keys=True))
 
     # -- shared reference, personal layer beside it -----------------------
@@ -560,23 +571,23 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             first_reference.key = _UNREGISTERED_SPECIES
 
         before = self._tree(self.official_root)
-        first_payload = resolve_subject(self._subject(), entity=first)
-        second_payload = resolve_subject(self._subject(), entity=second)
+        first_payload = describe_portrait(self._subject(), first)
+        second_payload = describe_portrait(self._subject(), second)
         self.assertEqual(
             json.dumps(first_payload, sort_keys=True),
             json.dumps(second_payload, sort_keys=True),
         )
-        self.assertEqual(first_payload["url"], current_catalog().url_for(identity))
+        self.assertEqual(candidate(first_payload)["url"], current_catalog().url_for(identity))
 
         # Personal overrides are entity-local for monsters: an override written on
         # one monster does NOT leak to another individual of the same species.
         override = {"x": 0.5, "y": 0.5, "w": 0.25, "h": 0.25}
         set_official_geometry(self._subject(), identity, face_rect=override, entity=first)
-        overridden = resolve_subject(self._subject(), entity=first)
-        sibling = resolve_subject(self._subject(), entity=second)
-        self.assertEqual(overridden["face_rect"], override)
-        self.assertEqual(overridden["url"], first_payload["url"])
-        self.assertNotEqual(sibling["face_rect"], override)
+        overridden = describe_portrait(self._subject(), first)
+        sibling = describe_portrait(self._subject(), second)
+        self.assertEqual(candidate(overridden)["geometry"]["face_rect"], override)
+        self.assertEqual(candidate(overridden)["url"], candidate(first_payload)["url"])
+        self.assertNotEqual(candidate(sibling)["geometry"]["face_rect"], override)
         self.assertEqual(self._tree(self.official_root), before)
 
     @covers_requirement(
@@ -593,12 +604,16 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
         # ...and never resolves outside the individual's own reference.
         self.assertIsNone(official_selection_for(self._subject(), monster))
-        payload = resolve_subject(self._subject(), entity=monster)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
+        payload = describe_portrait(self._subject(), monster)
+        self.assertEqual(candidate(payload)["origin"], ORIGIN_OFFICIAL)
         self.assertEqual(
-            payload["url"], current_catalog().url_for(f"{OFFICIAL_KIND_MONSTER}/{_SYNTH_SPECIES}/a.png")
+            candidate(payload)["url"],
+            current_catalog().url_for(f"{OFFICIAL_KIND_MONSTER}/{_SYNTH_SPECIES}/a.png"),
         )
-        self.assertNotIn(foreign_identity, json.dumps(payload, sort_keys=True))
+        # The foreign identity may appear only as the REACHED FAULT's own
+        # source position (the chain records every fault where it happened);
+        # it never becomes a presented candidate.
+        self.assertNotEqual(candidate(payload)["resource_id"], foreign_identity)
 
     def test_a_personal_selection_inside_the_species_reference_presents_for_a_monster(self):
         # The personal layer's positive path, through the gallery API's own
@@ -615,10 +630,10 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertEqual(
             official_selection_for(self._subject(), monster)["identity"], chosen_identity
         )
-        payload = resolve_subject(self._subject(), entity=monster)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertEqual(payload["url"], current_catalog().url_for(chosen_identity))
-        self.assertNotEqual(payload["url"], current_catalog().url_for(default_identity))
+        payload = describe_portrait(self._subject(), monster)
+        self.assertEqual(candidate(payload)["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(payload)["url"], current_catalog().url_for(chosen_identity))
+        self.assertNotEqual(candidate(payload)["url"], current_catalog().url_for(default_identity))
 
     @covers_requirement(
         "species-portrait-identity::monster-portraits-never-borrow-runtime-state-across-visual-species"
@@ -650,12 +665,12 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         )
         self.assertEqual([card["image_id"] for card in cards_for(subject)], [image_id])
         self.assertEqual(cards_for(other_subject), [])
-        backed_payload = resolve_entity(backed)
-        bystander_payload = resolve_entity(bystander)
-        self.assertEqual(backed_payload["subject_key"], subject.full())
-        self.assertEqual(bystander_payload["subject_key"], other_subject.full())
-        self.assertIsNotNone(backed_payload["url"])
-        self.assertIsNone(bystander_payload["url"])
+        backed_payload = describe_entity(backed)
+        bystander_payload = describe_entity(bystander)
+        self.assertEqual(backed_payload["generation_subject"], subject.full())
+        self.assertEqual(bystander_payload["generation_subject"], other_subject.full())
+        self.assertIsNotNone(candidate(backed_payload))
+        self.assertIsNone(candidate(bystander_payload))
         self.assertNotIn(identity, json.dumps(bystander_payload, sort_keys=True))
 
     @covers_requirement(
@@ -668,10 +683,10 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
         self.assertIsNotNone(monster_subject_for(_ART_ONLY_KEY))
         # ...but a declared, unresolvable complete species does not fall back
         # to it: the individual resolves no art identity at all.
-        payload = resolve_entity(monster)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertIsNone(payload["subject_key"])
-        self.assertIsNone(payload["url"])
+        payload = describe_entity(monster)
+        self.assertIsNone(candidate(payload))
+        self.assertIsNone(payload["generation_subject"])
+        self.assertIsNone(candidate(payload))
 
     @covers_requirement(
         "monster-visual-identity::monster-visual-provenance-is-explicit-and-authoritative"
@@ -679,12 +694,12 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
     def test_renaming_a_monster_never_changes_its_art_identity(self):
         monster = self._monster()
         monster.art_species_key = _ART_ONLY_KEY
-        before = resolve_entity(monster)
+        before = describe_entity(monster)
         monster.key = "renamed-display-name"
-        after = resolve_entity(monster)
-        self.assertEqual(before["subject_key"], after["subject_key"])
+        after = describe_entity(monster)
+        self.assertEqual(before["generation_subject"], after["generation_subject"])
         self.assertEqual(
-            before["subject_key"], monster_subject_for(_ART_ONLY_KEY).full()
+            before["generation_subject"], monster_subject_for(_ART_ONLY_KEY).full()
         )
 
     # -- purity -----------------------------------------------------------
@@ -721,14 +736,14 @@ class SpeciesPortraitChainTests(EvenniaTestCase):
             before = self._state(monster)
             references = [official_content_reference_for_entity(monster) for _ in range(50)]
             defaults = [official_default_for(subject, monster) for _ in range(50)]
-            payloads = [resolve_subject(subject, entity=monster) for _ in range(50)]
+            payloads = [describe_portrait(subject, monster) for _ in range(50)]
             after = self._state(monster)
         self.assertEqual(before, after)
         self.assertTrue(all(reference == references[0] for reference in references))
         self.assertEqual(references[0].key, _SYNTH_SPECIES)
         self.assertTrue(all(default == defaults[0] for default in defaults))
         self.assertTrue(all(payload == payloads[0] for payload in payloads))
-        self.assertEqual(payloads[0]["origin"], ORIGIN_OFFICIAL)
+        self.assertEqual(candidate(payloads[0])["origin"], ORIGIN_OFFICIAL)
 
 
 if __name__ == "__main__":
