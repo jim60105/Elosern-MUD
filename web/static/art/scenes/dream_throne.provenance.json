@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "dream_throne",
+  "label_zh": "夢境雲端王座",
+  "scene_sentence_zh": "雲海之上的夢境王座靜靜矗立，極光在天際流轉，腳下是無垠的蒼穹。",
+  "asset": "web/static/art/scenes/dream_throne.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 131638,
+    "sha256": "2aded634d7b35fd9a26eacf316778e9acbf7a411b890765b8b88e66858c5a9c5"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 1573636748,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "an ethereal cloud-throne vista, a high throne of pale luminous stone atop a sea of rolling clouds, a vast dreamlike sky of drifting nebulae and soft aurora light, floating islands dissolving into mist, a broad clear platform of pale marble before the throne, a dreamlike pastel violet and gold palette, an unobstructed open foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG dream cloud-throne vista — a pale luminous throne rising from a sea of rolling clouds beneath green-violet aurora bands, floating rocky islands dissolving into mist, and a broad open marble platform across the lower foreground — with no interface, watermark or readable lettering, no physical-room background, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_sacred_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside cave_interior and shrine_interior: scene identity, palette and composition are distinct for every sibling."
+  }
+}
