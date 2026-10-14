@@ -10,8 +10,11 @@ per boot into an in-memory snapshot. The layout is::
       monster/<species-key>/<image-file>
       preset/<preset-key>/<image-file>
       npc/<npc-or-profile-key>/<image-file>
+      scene/<scene-key>/<image-file>
+      room/<room-art-key>/<image-file>
 
-The content kind is exactly ``monster``, ``preset``, or ``npc``; a content
+The INDEX content kind is exactly ``monster``, ``preset``, ``npc``, ``scene``,
+or ``room`` (``unified-scene-catalog`` added the last two); a content
 directory's key identifies registered authored content (never a runtime
 database row or a translated display name), and an image's root-relative path
 is its stable official asset identity. A content directory may hold several
@@ -35,11 +38,21 @@ once there) and keeps everything in memory.
 non-regular, unsupported-format, unreadable, undecodable, or oversized entry is
 refused with one bounded diagnostic while every unrelated valid entry still
 indexes; an unsupported top-level directory and a content key outside the
-shared stable-key contract (or, for ``preset``, outside the player-preset
-registry) are skipped the same way. The ``npc`` and ``monster`` kinds have no
-registry membership check yet — the authored npc/profile provenance and the
-monster species catalog land with their own changes — so those kinds index any
-structurally valid key.
+shared stable-key contract (or outside the kind's authored registry, for the
+registry-backed ``preset``, ``scene`` and ``room`` kinds) are skipped the same
+way. The ``npc`` and ``monster`` kinds have no registry membership check yet —
+the authored npc/profile provenance and the monster species catalog land with
+their own changes — so those kinds index any structurally valid key.
+
+**The bundled scene collection is admitted alongside.** ``load_catalog``
+publishes ``world.art.scene_definitions``' bundled snapshot FIRST and
+unconditionally, on every exit path: the eleven committed scene illustrations
+must serve in the no-operator-art configuration that absence is exactly for.
+The two publishes are independent (neither can zero the other), and the
+bundled collection has its own event id, so this catalog's contract of exactly
+one ``official_art_catalog_loaded`` boundary event per load is untouched. This
+module references ``world.art.scene_definitions`` only INSIDE function bodies
+— that module imports this one's shared bounded decoder at import time.
 
 **One fingerprint per image, computed here.** :func:`_content_fingerprint` is
 the sole hashing site and catalog load is its only caller: the digest is the
@@ -64,9 +77,9 @@ root-relative paths, kinds, and keys.
 
 Imports stay on the deterministic-path side of the package: stdlib, Django
 settings, Pillow, the gallery geometry validators, the shared confinement and
-no-follow helpers, the shared stable-key contract, the player-preset registry,
-and the observability facade — never the worker, the sd-webui client, or any
-connectivity surface.
+no-follow helpers, the shared stable-key contract, the authored lore/art
+registries, and the observability facade — never the worker, the sd-webui
+client, or any connectivity surface.
 """
 
 from collections.abc import Mapping
@@ -102,8 +115,18 @@ OFFICIAL_CATALOG_EVENT = "official_art_catalog_loaded"
 # is ever parsed as one (the seed-metadata convention).
 OFFICIAL_MANIFEST_FILENAME = "manifest.json"
 
-# The closed content-kind vocabulary, in the documented layout order.
+# The closed ENTITY-REFERENCE content-kind vocabulary, in the documented
+# layout order. It is the vocabulary ``world.art.official_refs`` mirrors for
+# entity-carried official references (``official-content-provenance``): a kind
+# here must have a provenance attribute that resolver can map, so extending it
+# is a data-owner change, never an indexing change.
 OFFICIAL_CONTENT_KINDS = ("monster", "preset", "npc")
+
+# The closed INDEX layout vocabulary, in the documented layout order. This is
+# the vocabulary the startup walk accepts: the reference vocabulary above plus
+# the two operator-only content kinds ``unified-scene-catalog`` adds, whose
+# entity metadata is owned by the map owner and the scene renderer.
+OFFICIAL_LAYOUT_KINDS = OFFICIAL_CONTENT_KINDS + ("scene", "room")
 
 # The exact manifest key contract: anything else makes the manifest invalid.
 _MANIFEST_KEYS = frozenset({"default", "face_rect", "stage"})
@@ -112,7 +135,8 @@ _MANIFEST_KEYS = frozenset({"default", "face_rect", "stage"})
 # ``npc``/``monster`` membership arrives with the authored npc/profile
 # provenance and the separate monster species catalog respectively; until then
 # those kinds admit any structurally valid key (never a tier or display name).
-_REGISTRY_BACKED_KINDS = ("preset",)
+_REGISTRY_BACKED_KINDS = ("preset", "scene", "room")
+
 
 # Per-load budget for bounded leaf diagnostics. Beyond it the walk still
 # continues; only the event emission is capped and the suppressed count is
@@ -274,13 +298,61 @@ def _registered_preset_keys() -> frozenset[str]:
     return frozenset(PLAYER_PRESET_REGISTRY)
 
 
-def _admit_image(payload: bytes) -> tuple[dict | None, str | None]:
+def _registered_scene_keys() -> frozenset[str]:
+    """The authored scene-art keys — the ``scene`` kind's registry.
+
+    The closed eleven-key vocabulary (every registered archetype plus the
+    explicit dream type) the bundled collection and the media boundary use, so
+    an operator ``scene/<key>/`` directory can only name a scene that actually
+    exists in the game. Imported per call (this module may not import the art
+    definitions at module level; see the module docstring).
+    """
+    from world.art.scene_definitions import SCENE_ART_DEFINITIONS
+
+    return frozenset(SCENE_ART_DEFINITIONS)
+
+
+def _registered_room_art_keys() -> frozenset[str]:
+    """The authored room-art keys — the ``room`` kind's registry.
+
+    The closed vocabulary of authored room content the map owner declares
+    ``room_art_key`` metadata from; a ``room/<key>/`` directory keyed to a
+    room no authored place declares is skipped like any other unregistered
+    reference (never inferred from a room name or a database row).
+    """
+    from world.art.scene_definitions import ROOM_ART_KEY_SET
+
+    return ROOM_ART_KEY_SET
+
+
+def _registered_kind_keys(kind: str) -> frozenset[str]:
+    """The authored keys one registry-backed kind accepts (empty when none).
+
+    The three loaders are resolved through their module globals at call time,
+    so a test patches one kind's lookup without disturbing the others (the
+    long-standing preset seam) and a new kind adds one arm here.
+    """
+    if kind == "preset":
+        return _registered_preset_keys()
+    if kind == "scene":
+        return _registered_scene_keys()
+    if kind == "room":
+        return _registered_room_art_keys()
+    return frozenset()
+
+
+def admit_image_header(payload: bytes) -> tuple[dict | None, str | None]:
     """Return ``(image_size, refusal_reason)`` with exactly one of them ``None``.
 
     Decoding reads the HEADER only (``Image.open`` + ``size``, never a pixel
     decode): a file declaring hostile dimensions is refused from its header
     under the same bounded limits the sd-webui client applies, so admission can
-    never allocate a giant pixel buffer.
+    never allocate a giant pixel buffer. This is the ONE bounded header decoder
+    of the art domain: the operator catalog and ``world.art.scene_definitions``'
+    bundled scene admission both call it, so the two roots cannot drift into
+    two definitions of "an admissible image". (A full pixel decode belongs to
+    the scene collection's data contract, which must also reject a truncated
+    file that a header read cannot see.)
     """
     try:
         with Image.open(io.BytesIO(payload)) as image:
@@ -413,7 +485,7 @@ def _admitted_entries(
             counters["refused"] += 1
             diagnostics.emit("source_rejected", kind=kind, key=key, entry=name)
             continue
-        image_size, refusal = _admit_image(payload)
+        image_size, refusal = admit_image_header(payload)
         if image_size is None:
             counters["refused"] += 1
             diagnostics.emit(refusal or "image_undecodable", kind=kind, key=key, entry=name)
@@ -524,7 +596,7 @@ def _index_kind(
                     "invalid_content_key_skipped", kind=kind, key=content_name
                 )
                 continue
-            if kind in _REGISTRY_BACKED_KINDS and content_name not in _registered_preset_keys():
+            if kind in _REGISTRY_BACKED_KINDS and content_name not in _registered_kind_keys(kind):
                 counters["refused"] += 1
                 diagnostics.emit(
                     "unknown_registry_reference", kind=kind, key=content_name
@@ -566,6 +638,38 @@ def _record(
     return summary
 
 
+def _publish_bundled_scenes() -> None:
+    """Publish the committed bundled scene collection beside this catalog.
+
+    The bundled load owns its snapshot, counters and event id, and carries its
+    own outermost guard, so a broken scene collection never disturbs the
+    operator snapshot (or the reverse). The try/except here is the last-resort
+    isolation of the two publishes: an unforeseen fault in the bundled pass is
+    reported as one bounded diagnostic on the bundled event and the operator
+    walk continues. Both the art definitions import and the load itself are
+    inside the guard, so even an import-time fault in the bundled module (whose
+    module-level imports include this one's shared bounded decoder) can never
+    escape ``load_catalog``.
+    """
+    try:
+        # The definitions module is imported inside the body because it imports
+        # this module's shared bounded decoder at import time.
+        from world.art.scene_definitions import (
+            BUNDLED_SCENE_CATALOG_EVENT,
+            load_bundled_scene_catalog,
+        )
+
+        load_bundled_scene_catalog()
+    except Exception as error:  # pragma: no cover - last-resort isolation
+        # The bundled collection's own boundary event id, spelled literally
+        # because this guard must report even when that module cannot import.
+        log_warn(
+            "bundled_scene_catalog_loaded",
+            context={"phase": "bundled_scenes_failed", "reason": "bundled_scenes_failed"},
+            exc=error,
+        )
+
+
 def load_catalog() -> dict:
     """Index the official-artwork root once (startup step); never raises.
 
@@ -578,7 +682,14 @@ def load_catalog() -> dict:
     runtime-art and fallback behavior unchanged. The outermost catch exists
     only for unforeseen faults — a broken artwork tree is never a startup
     failure. Nothing is acquired here: the walk is the only I/O.
+
+    The committed bundled scene collection is published FIRST and on every exit
+    path, under its own guard and its own event id: a missing operator mount is
+    exactly the configuration the bundled art has to serve, and neither publish
+    may zero the other. This catalog's own counts, snapshot and single boundary
+    event are unaffected by the bundled pass.
     """
+    _publish_bundled_scenes()
     counters: dict[str, int] = {"contents": 0, "images": 0, "refused": 0}
     diagnostics = _Diagnostics()
     try:
@@ -614,7 +725,7 @@ def load_catalog() -> dict:
                     # The root's ``LICENSE`` and other plain files carry no
                     # content identity; only directories can hold artwork.
                     continue
-                if entry_name not in OFFICIAL_CONTENT_KINDS:
+                if entry_name not in OFFICIAL_LAYOUT_KINDS:
                     counters["refused"] += 1
                     diagnostics.emit("unknown_kind_directory_skipped", entry=entry_name)
                     continue

@@ -88,7 +88,9 @@ APPROVED_NON_RUNTIME_IMAGES = frozenset(
 # here need not exist yet — the list is an allowlist, not a coverage claim.
 # This pack asserts its own three actual files in
 # ``test_the_owned_bundled_scene_pack_is_tracked``; the complete
-# eleven-key inventory lands with the scene catalog.
+# eleven-key inventory is asserted by the scene catalog that now resolves
+# these keys (``world.art.tests.test_bundled_scenes``), which fails if the
+# committed directory ever holds fewer or more files than the declarations.
 TRACKED_SCENE_ART_PATHS = frozenset(
     {
         "web/static/art/scenes/forest_path.webp",

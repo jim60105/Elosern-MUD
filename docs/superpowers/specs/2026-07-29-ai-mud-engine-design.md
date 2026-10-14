@@ -828,6 +828,23 @@ The shared image-resolution design owns the complete state and rendering
 rules, including per-room identities and the exception for bundled official
 artwork. No per-room generation is added.
 
+**Operator scene layout, 2026-10-14 (change `unified-scene-catalog`).** The
+external official-artwork directory (`ART_OFFICIAL_ROOT`) gains the two content
+kinds `scene/<scene-key>/<image-file>` and `room/<room-art-key>/<image-file>`
+beside `monster`/`preset`/`npc`, with the same per-entry admission, optional
+per-content `manifest.json`, deterministic default selection and restart-only
+snapshot semantics. Scene keys are the eleven declared scene-art keys
+(`world/art/scene_definitions.py`: every registered archetype plus the explicit
+dream scene); room-art keys are the authored room vocabulary of the same
+module, and neither kind's directory key is ever a database row id, a
+translated display name, an inferred name or a nearby-location guess. The
+required bundled collection keeps its own separate trusted root: the
+repository's `web/static/art/scenes/` directory, served as the closed
+`/art/bundled-scene/<scene-key>/<sha256>.webp` namespace with startup content
+fingerprints and no new runtime setting, so an operator file can never replace
+a bundled identity or a terminal image and the two namespaces cannot collide.
+The engine still never writes `ART_OFFICIAL_ROOT` or the bundled root.
+
 ```
 SceneArchetype registry
   key             "tavern_interior"

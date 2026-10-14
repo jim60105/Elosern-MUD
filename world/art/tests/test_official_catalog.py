@@ -2,8 +2,9 @@
 
 ``EvenniaTestCase`` classes run :func:`world.art.official.load_catalog` against
 synthetic artwork trees under a temporary ``ART_OFFICIAL_ROOT`` and prove: the
-snapshot indexes the closed ``monster``/``preset``/``npc`` layout with
-root-relative identities and deterministic ordering; admission refuses
+sorted snapshot indexes the closed ``monster``/``preset``/``npc``/``scene``/
+``room`` layout with root-relative identities and deterministic ordering;
+admission refuses
 symlinked, out-of-root, unsupported, undecodable, oversized, nested, and
 non-regular entries per entry without blocking unrelated valid artwork; the
 optional per-content manifest supplies a default/rectangle/stage and degrades
@@ -13,9 +14,15 @@ never during resolution; an absent/empty/unreadable root is a supported no-art
 configuration that acquires nothing; and load emits exactly one boundary event
 plus budgeted per-entry diagnostics carrying no absolute root. The boot-step
 registration is pinned against the real startup catalog.
+
+``unified-scene-catalog`` added the two operator-only ``scene``/``room`` kinds;
+their registry membership (the authored scene-art and room-art vocabularies),
+the layout/reference vocabulary distinction and the bundled scene collection's
+independent publish are pinned here too.
 """
 
 import base64
+import hashlib
 import io
 import json
 import os
@@ -32,11 +39,18 @@ from world.art import official
 from world.art.gallery import GalleryRecord, default_face_rect, identity_stage
 from world.art.official import (
     OFFICIAL_CATALOG_EVENT,
+    OFFICIAL_CONTENT_KINDS,
+    OFFICIAL_LAYOUT_KINDS,
     OFFICIAL_MANIFEST_FILENAME,
     current_catalog,
     fingerprint_for,
     load_catalog,
     reset_catalog,
+)
+from world.art.scene_definitions import (
+    BUNDLED_SCENE_CATALOG_EVENT,
+    current_bundled_scenes,
+    reset_bundled_scenes,
 )
 from world.art.store import ArtAssetRecord
 from tools.spec_traceability import covers_requirement
@@ -57,6 +71,8 @@ _TALL_PNG = base64.b64decode(
 _PRESET_KEY = "t_synth_preset"
 _NPC_KEY = "t_synth_profile"
 _MONSTER_KEY = "t_synth_species"
+_SCENE_KEY = "t_synth_scene"
+_ROOM_KEY = "t_synth_room"
 
 
 def _real_png(width: int, height: int) -> bytes:
@@ -77,6 +93,8 @@ class _CatalogCase(EvenniaTestCase):
         self._settings.enable()
         reset_catalog()
         self.addCleanup(reset_catalog)
+        reset_bundled_scenes()
+        self.addCleanup(reset_bundled_scenes)
         registry = patch.object(
             official,
             "_registered_preset_keys",
@@ -366,6 +384,152 @@ class AdmissionRefusalTests(_CatalogCase):
             ("npc", _NPC_KEY),
         ):
             self.assertIsNotNone(catalog.entry(f"{kind}/{key}/ok.png"))
+
+
+class SceneAndRoomKindTests(_CatalogCase):
+    """The two operator-only content kinds this change adds to the index.
+
+    The synthetic registry patches mirror the preset seam: the catalog owns
+    the indexing mechanics, so these cases never name shipped content. The
+    authored vocabularies themselves are exercised in
+    :class:`AuthoredKeyAdmissionTests` below.
+    """
+
+    def setUp(self):
+        super().setUp()
+        scene_registry = patch.object(
+            official, "_registered_scene_keys", return_value=frozenset({_SCENE_KEY})
+        )
+        self.addCleanup(scene_registry.stop)
+        scene_registry.start()
+        room_registry = patch.object(
+            official, "_registered_room_art_keys", return_value=frozenset({_ROOM_KEY})
+        )
+        self.addCleanup(room_registry.stop)
+        room_registry.start()
+
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
+    def test_scene_and_room_content_index_with_root_relative_identities(self):
+        scene_path = self.image("scene", _SCENE_KEY, "a.png")
+        room_path = self.image("room", _ROOM_KEY, "b.png")
+        summary = self.load()
+        self.assertEqual(summary["contents"], 2)
+        self.assertEqual(summary["images"], 2)
+        catalog = current_catalog()
+        for kind, key, path in (
+            ("scene", _SCENE_KEY, scene_path),
+            ("room", _ROOM_KEY, room_path),
+        ):
+            with self.subTest(kind=kind):
+                identity = f"{kind}/{key}/{path.name}"
+                entry = catalog.entry(identity)
+                self.assertIsNotNone(entry)
+                self.assertEqual(entry.kind, kind)
+                self.assertEqual(entry.key, key)
+                self.assertEqual(
+                    entry.fingerprint, hashlib.sha256(path.read_bytes()).hexdigest()
+                )
+                self.assertEqual(catalog.content(kind, key).default_identity, identity)
+                self.assertIsNotNone(catalog.url_for(identity))
+
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
+    def test_an_unknown_scene_or_room_key_is_skipped_not_fatal(self):
+        self.image("scene", _SCENE_KEY, "a.png")
+        self.image("scene", "t_synth_ghost", "b.png")
+        self.image("room", _ROOM_KEY, "a.png")
+        self.image("room", "t_synth_ghost", "b.png")
+        summary = self.load()
+        self.assertEqual(summary["contents"], 2)
+        self.assertEqual(summary["images"], 2)
+        unknown = [
+            context
+            for context in self.contexts(self.warn)
+            if context["reason"] == "unknown_registry_reference"
+        ]
+        self.assertEqual(sorted(context["kind"] for context in unknown), ["room", "scene"])
+        for context in unknown:
+            self.assertEqual(context["key"], "t_synth_ghost")
+
+    @covers_requirement(
+        "official-artwork-catalog::admission-admits-only-valid-images-confined-to-the-configured-root"
+    )
+    def test_a_scene_directory_refuses_bad_entries_per_entry(self):
+        self.image("scene", _SCENE_KEY, "ok.png")
+        folder = self.root / "scene" / _SCENE_KEY
+        (folder / "broken.png").write_bytes(b"definitely not an image")
+        (folder / "unsupported.jxl").write_bytes(_TINY_PNG)
+        outside = Path(self.tempdir.name) / "precious.png"
+        outside.write_bytes(_TINY_PNG)
+        (folder / "link.png").symlink_to(outside)
+        summary = self.load()
+        self.assertEqual(summary["images"], 1)
+        self.assertEqual(summary["refused"], 3)
+        self.assertIsNotNone(
+            current_catalog().entry(f"scene/{_SCENE_KEY}/ok.png")
+        )
+        self.assertTrue(outside.exists())
+
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
+    def test_a_scene_directory_uses_filename_order_or_its_manifest_default(self):
+        self.image("scene", _SCENE_KEY, "z.png")
+        self.image("scene", _SCENE_KEY, "a.png")
+        self.load()
+        self.assertEqual(
+            current_catalog().content("scene", _SCENE_KEY).default_identity,
+            f"scene/{_SCENE_KEY}/a.png",
+        )
+        self.manifest("scene", _SCENE_KEY, {"default": "z.png"})
+        self.load()
+        self.assertEqual(
+            current_catalog().content("scene", _SCENE_KEY).default_identity,
+            f"scene/{_SCENE_KEY}/z.png",
+        )
+
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
+    def test_a_bundled_identity_directory_is_never_an_operator_content_kind(self):
+        """The bundled namespace can never be mounted into the operator root."""
+        self.image("scene", _SCENE_KEY, "a.png")
+        bundled = self.root / "bundled-scene" / _SCENE_KEY
+        bundled.mkdir(parents=True)
+        (bundled / "a.png").write_bytes(_TINY_PNG)
+        summary = self.load()
+        self.assertEqual(summary["images"], 1)
+        self.assertIsNone(current_catalog().entry(f"bundled-scene/{_SCENE_KEY}/a.png"))
+        skipped = [
+            context
+            for context in self.contexts(self.warn)
+            if context["reason"] == "unknown_kind_directory_skipped"
+        ]
+        self.assertEqual([context["entry"] for context in skipped], ["bundled-scene"])
+
+
+class AuthoredKeyAdmissionTests(_CatalogCase):
+    """Registry membership as the running game declares it (no patched seam)."""
+
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
+    def test_a_declared_scene_key_and_a_declared_room_key_index(self):
+        from world.art import scene_definitions
+
+        scene_key = scene_definitions.SCENE_ART_KEYS[0]
+        room_key = scene_definitions.ROOM_ART_KEYS[0]
+        self.image("scene", scene_key, "a.png")
+        self.image("room", room_key, "a.png")
+        self.image("scene", "t_synth_ghost", "a.png")
+        summary = self.load()
+        self.assertEqual(summary["images"], 2)
+        self.assertIsNotNone(current_catalog().entry(f"scene/{scene_key}/a.png"))
+        self.assertIsNotNone(current_catalog().entry(f"room/{room_key}/a.png"))
+        self.assertIsNone(current_catalog().entry("scene/t_synth_ghost/a.png"))
 
 
 class ManifestTests(_CatalogCase):
@@ -672,6 +836,48 @@ class ObservabilityTests(_CatalogCase):
             self.assertEqual(call.args[0], OFFICIAL_CATALOG_EVENT)
 
 
+class BundledCollectionPublishTests(_CatalogCase):
+    """The bundled scene collection is published by the same startup step.
+
+    Its publish is independent of the operator root: it runs on every exit
+    path (including the no-operator-art configuration bundled art exists for),
+    it never touches this catalog's counts, snapshot or single boundary event,
+    and the two identity families stay disjoint.
+    """
+
+    @covers_requirement(
+        "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
+    )
+    def test_load_publishes_the_bundled_collection_beside_the_operator_snapshot(self):
+        from world.art import scene_definitions
+
+        self.image("preset", _PRESET_KEY, "a.png")
+        with patch.object(scene_definitions, "log_info") as bundled_info:
+            summary = self.load()
+        self.assertEqual(summary["images"], 1)
+        context = self.boundary()
+        self.assertEqual(context["reason"], "official_root_indexed")
+        self.assertEqual(len(current_bundled_scenes()), 11)
+        self.assertEqual(bundled_info.call_args.args[0], BUNDLED_SCENE_CATALOG_EVENT)
+        self.assertEqual(bundled_info.call_args.kwargs["context"]["images"], 11)
+        for identity in current_catalog().identities():
+            self.assertFalse(identity.startswith("bundled-scene/"))
+        for identity in current_bundled_scenes().identities():
+            self.assertTrue(identity.startswith("bundled-scene/"))
+            self.assertIsNone(current_catalog().entry(identity))
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_the_bundled_collection_is_published_without_an_operator_root(self):
+        self.root = Path(self.tempdir.name) / "absent"
+        with override_settings(ART_OFFICIAL_ROOT=str(self.root)):
+            summary = self.load()
+        self.assertTrue(summary["skipped"])
+        self.assertEqual(len(current_catalog()), 0)
+        self.assertEqual(len(current_bundled_scenes()), 11)
+
+
 class StartupWiringTests(unittest.TestCase):
     @covers_requirement(
         "official-artwork-catalog::the-catalog-indexes-the-mounted-layout-once-at-startup-and-serves-from-that-snapshot"
@@ -706,6 +912,25 @@ class OfficialReferenceContractTests(unittest.TestCase):
         from world.art import official_refs
 
         self.assertEqual(official_refs.OFFICIAL_CONTENT_KINDS, official.OFFICIAL_CONTENT_KINDS)
+
+    def test_the_layout_vocabulary_adds_exactly_the_two_operator_content_kinds(self):
+        """The index vocabulary and the entity-reference vocabulary differ by design.
+
+        ``OFFICIAL_CONTENT_KINDS`` is the ENTITY-REFERENCE vocabulary
+        ``world.art.official_refs`` mirrors (``official-content-provenance``),
+        where every kind must have a provenance attribute the resolver can map;
+        ``OFFICIAL_LAYOUT_KINDS`` is the closed vocabulary of the startup walk,
+        which ``unified-scene-catalog`` extended with the operator-only
+        ``scene`` and ``room`` content. Growing the reference vocabulary would
+        change that resolver's contract, so it is pinned unchanged here.
+        """
+        from world.art import official_refs
+
+        self.assertEqual(OFFICIAL_CONTENT_KINDS, ("monster", "preset", "npc"))
+        self.assertEqual(
+            OFFICIAL_LAYOUT_KINDS, OFFICIAL_CONTENT_KINDS + ("scene", "room")
+        )
+        self.assertEqual(official_refs.OFFICIAL_CONTENT_KINDS, OFFICIAL_CONTENT_KINDS)
 
     def test_the_key_grammar_has_exactly_one_implementation(self):
         from world.art import official_refs

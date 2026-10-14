@@ -40,7 +40,17 @@ A missing, empty, or unreadable `ART_OFFICIAL_ROOT` directory SHALL be a support
 - **THEN** resolution uses only the loaded snapshot and the existing chain, with no filesystem acquisition attempt
 
 ### Requirement: The catalog indexes the mounted layout once at startup and serves from that snapshot
-`world/art/official.py` SHALL index the official root once at startup and ordinary resolution SHALL read from that in-memory snapshot only. The index SHALL cover the layout `monster/<species-key>/<image-file>`, `preset/<preset-key>/<image-file>`, `npc/<npc-or-profile-key>/<image-file>`, where the content kind is exactly one of `monster`, `preset`, `npc`. An image's root-relative path SHALL be its stable official asset identity.
+`world/art/official.py` SHALL index the official root once at startup and ordinary resolution SHALL read from that in-memory snapshot only. An image's root-relative path SHALL be its stable official asset identity.
+
+The index SHALL cover this content layout, where the content kind is exactly one of `monster`, `preset`, `npc`, `scene`, `room`:
+
+```
+monster/<species-key>/<image-file>
+preset/<preset-key>/<image-file>
+npc/<npc-or-profile-key>/<image-file>
+scene/<scene-key>/<image-file>
+room/<room-art-key>/<image-file>
+```
 
 #### Scenario: The snapshot is built at startup and reused
 - **WHEN** the server starts with a populated official root and ten portraits resolve during ordinary play
@@ -51,7 +61,7 @@ A missing, empty, or unreadable `ART_OFFICIAL_ROOT` directory SHALL be a support
 - **THEN** the catalog continues to serve the previously indexed identity and fingerprint, and the replacement appears only after the next startup
 
 #### Scenario: Unsupported content directories are ignored with a diagnostic
-- **WHEN** the root contains a top-level directory whose name is not `monster`, `preset`, or `npc`
+- **WHEN** the root contains a top-level directory whose name is outside `monster`, `preset`, `npc`, `scene`, or `room`
 - **THEN** it is skipped with one bounded diagnostic and valid known-kind directories still index
 
 #### Scenario: Unknown registry references are skipped, not fatal
@@ -69,6 +79,10 @@ A missing, empty, or unreadable `ART_OFFICIAL_ROOT` directory SHALL be a support
 #### Scenario: Indexing is owned by the art service's startup steps
 - **WHEN** the official root is indexed
 - **THEN** it is owned by the art service alongside the other startup synchronization steps
+
+#### Scenario: Scene and room keys are authored
+- **WHEN** operator scene/room directories are indexed
+- **THEN** scene keys and room-art keys must be registered authored content, not database ids or translated labels
 
 ### Requirement: Admission admits only valid images confined to the configured root
 Catalog admission SHALL accept only regular, non-symlinked image files that (a) match the existing closed image-format extension vocabulary, (b) decode successfully under the existing bounded image limits, and (c) resolve strictly inside `ART_OFFICIAL_ROOT`. Every other entry SHALL be refused with bounded diagnostics. Each refusal SHALL be per-entry: the catalog SHALL never reject the whole root.

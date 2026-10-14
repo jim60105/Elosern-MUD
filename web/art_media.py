@@ -1,6 +1,6 @@
 """Same-origin media serving for validated art-store identities.
 
-The route serves four closed identity vocabularies and nothing else:
+The route serves five closed identity vocabularies and nothing else:
 
 * classic identities (``scene/``, ``portrait/monster/``, ``portrait/character/``)
   — served only when a ``done`` asset record references them (unchanged);
@@ -16,11 +16,33 @@ The route serves four closed identity vocabularies and nothing else:
   the request is answered from the catalog lookup alone: a caller-supplied
   filesystem path is never accepted, no historical artwork is retained for an
   outdated fingerprint, and nothing is ever copied into the store.
+* bundled scene identities (``bundled-scene/<scene-key>/<sha256>.webp``) —
+  served only when the startup bundled-scene snapshot admits that scene key at
+  that exact fingerprint. The key is a closed allowlist of declared scene-art
+  keys and the root is the FIXED in-repo ``web/static/art/scenes`` directory,
+  which never overlaps ``ART_OFFICIAL_ROOT`` or ``ART_STORE_ROOT``: an operator
+  file cannot replace a bundled identity or a terminal scene image, and a
+  bundled request can never be answered from an operator root.
 
 Every branch applies the same confinement discipline: path traversal,
 symlinks, unexpected directories or extensions, absolute paths, and missing
 or out-of-root identities all return 404 without exposing the store root
-(design D8).
+(design D8). The shared :func:`_serve_confined` helper is the one place that
+turns a root plus a root-relative name into a response, so the five families
+cannot drift into five definitions of "a confined, existing file".
+
+**Admission versus serving, deliberately asymmetric.** Startup admission reads
+each file through the no-follow primitives, which refuse a hard-linked or
+oversized file; a served request resolves through
+:func:`world.art.paths.resolved_under_root`, which rejects traversal and every
+symlinked component but does not re-check the link count. That asymmetry is
+accepted: the bytes are identical, the identity is fingerprint-authorized, and
+the trusted bundled root is in-repo and git-tracked, so it is never
+player-writable. As in the other four families, a component swapped for a
+symlink between the confinement check and ``FileResponse``'s open could be
+followed — the operator and bundled roots are read-only mounts/repository
+paths, and the fingerprint admission is what bounds which paths are reachable
+at all.
 """
 
 from pathlib import Path
@@ -33,6 +55,12 @@ from world.art import official
 from world.art.gallery import cards_for
 from world.art.paths import resolved_under_root, resolved_under_store_root
 from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
+from world.art.scene_definitions import (
+    BUNDLED_SCENE_EXTENSION,
+    bundled_asset_filename,
+    bundled_scene_root,
+    current_bundled_scenes,
+)
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectError, ArtSubjectKind
 from world.lore.monster_visuals import is_registered_monster_visual_key
@@ -67,6 +95,15 @@ _DEFAULTS_IDENTITY = re.compile(r"^defaults/[^/]+\.(png|webp|jpg|avif)$")
 # catalog's snapshot to index that path at that fingerprint.
 _OFFICIAL_IDENTITY = re.compile(
     r"^official/([^/]+)/((?:[^/]+/)*[^/]+\.(png|webp|jpg|avif))$"
+)
+
+# The exact bundled-scene identity shape: `bundled-scene/<scene-key>/<sha256>
+# .webp`, the key one clean segment (never a sub-path) and the fingerprint
+# exactly 64 lowercase hex digits. Matching the shape is only the cheap
+# pre-gate: `_serve_bundled_scene` then requires the bundled snapshot to admit
+# that key at that fingerprint.
+_BUNDLED_SCENE_IDENTITY = re.compile(
+    rf"^bundled-scene/([^/]+)/([0-9a-f]{{64}})\{BUNDLED_SCENE_EXTENSION}$"
 )
 
 _MIME_BY_EXTENSION = {
@@ -128,13 +165,34 @@ def _serve(resolved: Path) -> FileResponse:
     )
 
 
-def _serve_gallery(identity: str, match: re.Match) -> FileResponse:
-    if not _referenced_by_gallery_card(identity, match.group(1), match.group(2)):
+def _serve_confined(root: Path, relative_name: str) -> FileResponse:
+    """Serve one root-relative file strictly confined to ``root``, or 404.
+
+    The one shared open/response primitive of this boundary: the name is
+    resolved through :func:`world.art.paths.resolved_under_root` (no traversal,
+    no absolute path, no symlinked component, strictly inside the root) and
+    must be an existing regular file, so a missing or escaping identity is an
+    actual 404 — never a substitute image and never a successful status with
+    no bytes.
+    """
+    resolved = resolved_under_root(root, relative_name)
+    if resolved is None or not resolved.is_file():
         raise Http404
+    return _serve(resolved)
+
+
+def _serve_stored(identity: str) -> FileResponse:
+    """The store-root pin of :func:`_serve_confined`, or 404."""
     resolved = resolved_under_store_root(identity)
     if resolved is None or not resolved.is_file():
         raise Http404
     return _serve(resolved)
+
+
+def _serve_gallery(identity: str, match: re.Match) -> FileResponse:
+    if not _referenced_by_gallery_card(identity, match.group(1), match.group(2)):
+        raise Http404
+    return _serve_stored(identity)
 
 
 def _serve_defaults(identity: str) -> FileResponse:
@@ -157,10 +215,26 @@ def _serve_defaults(identity: str) -> FileResponse:
         raise Http404
     if filename[: -len(FALLBACK_EXTENSION)] not in FALLBACK_KEYS:
         raise Http404
-    resolved = resolved_under_root(_defaults_root(), identity[len("defaults/"):])
-    if resolved is None or not resolved.is_file():
+    return _serve_confined(_defaults_root(), identity[len("defaults/"):])
+
+
+def _serve_bundled_scene(match: re.Match) -> FileResponse:
+    """Serve one snapshot-admitted bundled scene image under root confinement.
+
+    The bundled snapshot lookup is the authorization: only a DECLARED scene-art
+    key the current startup snapshot admits at exactly the requested
+    fingerprint is served, so an unregistered key, an outdated fingerprint (the
+    committed bytes were replaced and the server restarted) or a key no
+    declaration names returns 404 — the closed scene-key allowlist is the
+    snapshot itself, and no request ever reaches an operator root. The recorded
+    filename is then re-resolved strictly inside the fixed in-repo scene
+    directory through the shared confinement helper (no symlinked component,
+    which also refuses a file swapped for a symlink after load).
+    """
+    key, fingerprint = match.group(1), match.group(2)
+    if not current_bundled_scenes().admits(key, fingerprint):
         raise Http404
-    return _serve(resolved)
+    return _serve_confined(bundled_scene_root(), bundled_asset_filename(key))
 
 
 def _serve_official(match: re.Match) -> FileResponse:
@@ -186,16 +260,16 @@ def _serve_official(match: re.Match) -> FileResponse:
     fingerprint, relative_path = match.group(1), match.group(2)
     if not official.current_catalog().admits(relative_path, fingerprint):
         raise Http404
-    resolved = resolved_under_root(Path(settings.ART_OFFICIAL_ROOT), relative_path)
-    if resolved is None or not resolved.is_file():
-        raise Http404
-    return _serve(resolved)
+    return _serve_confined(Path(settings.ART_OFFICIAL_ROOT), relative_path)
 
 
 def art_media(request, identity: str):
-    """Serve one validated identity from the store, gallery, defaults, or official root."""
+    """Serve one validated identity from the store, gallery, defaults, official, or bundled root."""
     if not identity:
         raise Http404
+    bundled_match = _BUNDLED_SCENE_IDENTITY.fullmatch(identity)
+    if bundled_match is not None:
+        return _serve_bundled_scene(bundled_match)
     gallery_match = _GALLERY_IDENTITY.fullmatch(identity)
     if gallery_match is not None:
         return _serve_gallery(identity, gallery_match)
@@ -208,7 +282,4 @@ def art_media(request, identity: str):
         raise Http404
     if not _referenced_by_done_record(identity):
         raise Http404
-    resolved = resolved_under_store_root(identity)
-    if resolved is None or not resolved.is_file():
-        raise Http404
-    return _serve(resolved)
+    return _serve_stored(identity)
