@@ -7,14 +7,23 @@ IS the descriptor, and every figure/avatar surface reads that ONE shape
 through the shared loading core instead of a per-component copy of flat image
 fields.
 
-This managed journey proves the claim on the real client: one committed
+This managed journey proves the claim on the real client. One committed
 exploration snapshot carries the same descriptor for the player's own roster
-row, the focused target, the co-located party companion and the presence rail,
-and each surface renders that descriptor's own candidate URL through the
-shared renderer; a later snapshot whose descriptor carries no real candidate
-leaves every surface on the descriptor's OWN committed alpha terminal, painted
+row, the focused target, the co-located party companion and the presence rail;
+each surface renders that descriptor's own candidate URL through the shared
+renderer; a later snapshot whose descriptor carries no real candidate leaves
+every FIGURE surface on the descriptor's OWN committed alpha terminal (painted
 by the shared alpha primitive only after that resource itself loaded, with no
-local failure marker (a fallback is not a failure).
+local failure marker, because a fallback is not a failure) while the real-only
+avatar medallion draws its identity glyph; and a committed dialogue snapshot
+shows the host's standee presenting the SAME descriptor.
+
+It drives the committed panels through the real store and the real client, so
+it covers the wire shape, the admission facts and the rendering contract on
+every named surface. It does NOT exercise the seeded server-side portrait
+producer (the `PORTRAIT_DESCRIPTORS` seed mode) or a source failure
+intercepted after server resolution: those live in the seed fixture and in
+`test_browser_stage_silhouette`'s route-abort leg respectively.
 
 Everything is deterministic and local: the descriptor payload is injected as a
 schema-valid snapshot and the one portrait image is served by a route, so no
@@ -354,4 +363,32 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(self._image_src(page, MEDALLION), None)
         self.assertEqual(page.locator(f"[data-anchor='presence'] {ALPHA}").count(), 0)
         self.assertEqual(page.locator(f"[data-anchor='presence'] {FAILURE}").count(), 0)
+
+        # The DIALOGUE join reads the same descriptor: the host's reference
+        # names the same catalog entry, and the actor-right standee presents it.
+        page.close()
+        page = self.logged_in_page((1451, 790), "off")
+        self._serve_media(page)
+        inject_snapshot(
+            page,
+            {
+                "status": valid_status_panel("測試主角", "1"),
+                "local_map": valid_local_map_panel(),
+                "art": _art_panel(),
+                "dialogue": {
+                    "schema_version": 2,
+                    "available": True,
+                    "kind": "dialogue",
+                    "host": {"identity": 7, "display_name": "店長", "portrait_ref": "7"},
+                    "bond_stage": "熟識",
+                    "line": "又見面了。今晚爐火正旺。",
+                    "choices": [{"keyword_id": "news", "label": "最近有什麼消息？"}],
+                },
+            },
+            mode="dialogue",
+        )
+        _wait_mode(page, "dialogue")
+        page.wait_for_selector(f'{STANDEE} img[src$="{SHARED_URL}"]', timeout=15000)
+        self.assertEqual(self._image_src(page, STANDEE), SHARED_URL)
+        self.assertEqual(page.locator(f"{STANDEE} {ALPHA}").count(), 0)
         page.close()
