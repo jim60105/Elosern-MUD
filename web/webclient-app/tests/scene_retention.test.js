@@ -429,6 +429,26 @@ describe("SceneBackdrop retention and provisional behaviour", () => {
     ).toBe("image_load_failed");
   });
 
+  it("settles a resource whose element is already complete", async () => {
+    // A commit can re-issue a load for a resource the element already holds
+    // (the browser cached it, or a re-resolution followed the first paint). No
+    // second load event ever arrives, so the component reports the element's
+    // own completeness instead of leaving the resolution parked.
+    wrapper = mountBackdrop();
+    const layer = wrapper.findAll("img").find((img) => img.attributes("src") === GENERATED_URL);
+    Object.defineProperty(layer.element, "complete", { value: true, configurable: true });
+    Object.defineProperty(layer.element, "naturalWidth", { value: 1536, configurable: true });
+    Object.defineProperty(layer.element, "naturalHeight", { value: 864, configurable: true });
+    // A fresh commit re-issues the load for the SAME resource (its facts
+    // changed, its bytes did not): the element is already complete, so no new
+    // load event can arrive and the component reports what the element holds.
+    await wrapper.setProps({
+      art: panel({ subject_id: "grid:t_synth_map:5,5", revision: "e".repeat(64) }),
+    });
+    await frames();
+    expect(displayedUrl(wrapper)).toBe(GENERATED_URL);
+  });
+
   it("ignores a late load event from a retired element", async () => {
     wrapper = mountBackdrop();
     const stale = wrapper.findAll("img").find((img) => img.attributes("src") === BUNDLED_URL);

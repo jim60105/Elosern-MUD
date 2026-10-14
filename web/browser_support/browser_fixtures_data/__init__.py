@@ -139,6 +139,7 @@ from web.browser_support.browser_fixtures_data.fixture_values import (
     SYNTH_STORE_OPEN_SECONDS,
     art_dialogue_host_key,
     art_room_monster_key,
+    scene_fixture_monster_key,
     art_scene_values,
     guild_offer_quest_key,
     guild_offer_reward_copper,

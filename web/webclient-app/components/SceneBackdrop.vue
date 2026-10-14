@@ -29,7 +29,7 @@
 //
 // The scene full view shares this same displayed resource and failure state:
 // there is no second resolution, and it never opens a broken-image-only view.
-import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { artworkAvailability } from "../lib/artwork.js";
 import { artworkFailureCategory } from "../lib/artwork-failure.js";
 import { applicableRetained, displayedScene, retainedEntry } from "../lib/scene-artwork.js";
@@ -229,6 +229,10 @@ function layerFor(url, role, token) {
   return { url, role, token };
 }
 
+// The root element, so the already-loaded check below can read the real
+// elements this component rendered.
+const rootEl = ref(null);
+
 const presented = computed(() => {
   const shown = display.value;
   if (!shown) {
@@ -295,11 +299,15 @@ const failureText = computed(() =>
 const resolving = computed(
   () => load.phase.value === "loading" && !reachedFailure.value && !panelUnavailable.value,
 );
+// ONE local indication, never two: while a bitmap is on screen the reached
+// failure is stated by the caption row's own leading fact, and the standalone
+// status badge belongs to the states with nothing to show (the panel's
+// availability failure, a chain that ran out, or a reached failure that left no
+// image at all). A resolution that is still walking shows neither.
 const showPlaceholder = computed(
   () =>
     panelUnavailable.value ||
-    !!reachedFailure.value ||
-    (!displayPresented.value && !resolving.value),
+    (!displayPresented.value && (!resolving.value || !!reachedFailure.value)),
 );
 const placeholderKind = computed(() =>
   panelUnavailable.value
@@ -338,6 +346,36 @@ watch(display, (value) => {
     closeFullView(false);
   }
 });
+
+// An element that ALREADY holds the bytes never fires another load.
+//
+// A commit can re-issue a load for a resource whose element is on screen and
+// complete (the browser served it from its cache, or a re-resolution followed
+// the first paint). Waiting for an event that will never come would leave the
+// resolution parked on a resource it has, so every rendered layer whose
+// element reports `complete` is reported to its owning driver once. The
+// driver's own token and cursor checks make a repeated report a no-op.
+function reportCompleteLayers() {
+  const root = rootEl.value;
+  if (!root || typeof root.querySelectorAll !== "function") {
+    return;
+  }
+  for (const element of root.querySelectorAll("img[data-role]")) {
+    if (!element.complete || !element.naturalWidth) {
+      continue;
+    }
+    const url = element.getAttribute("src");
+    const layer = [...probes.value, presented.value].find((item) => item?.url === url);
+    if (layer) {
+      onLayerLoad(layer, { target: element });
+    }
+  }
+}
+
+watch([probes, presented], () => {
+  void nextTick().then(reportCompleteLayers);
+}, { flush: "post" });
+onMounted(reportCompleteLayers);
 
 // Which shared driver owns one rendered layer's load/error observations.
 function onLayerLoad(layer, event) {
@@ -436,6 +474,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 
 <template>
   <div
+    ref="rootEl"
     class="scene-backdrop"
     data-testid="scene-backdrop"
     :data-available="unavailable ? 'false' : 'true'"

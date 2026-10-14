@@ -78,5 +78,40 @@ def _scene_fixture(character) -> None:
     _operator_directory(root, "room", room_art_key)
     _operator_directory(root, "scene", room.scene_archetype)
 
+    _seed_engageable_monster(character)
     install_transition_cmdset(character)
     print(f"seeded unified scene fixture: room_art_key={room_art_key}")
+
+
+def _seed_engageable_monster(character) -> None:
+    """One present monster the art panel admits AND the combat contract accepts.
+
+    The scene journeys change mode through the production ``explore.engage``
+    action, so the room needs a monster the panel's catalog really admits (a
+    named portrait policy gives it a monster subject instead of the
+    unavailable-entity placeholder) and that carries a live threat tier.
+    """
+    from evennia.utils.create import create_object
+
+    from typeclasses.monsters import Monster
+    from web.browser_support.browser_fixtures_data import (
+        SHIPPED_MONSTER_TIER_ATTR,
+        SHIPPED_MONSTER_TIER_KEY,
+        scene_fixture_monster_key,
+    )
+
+    monster = create_object(
+        Monster,
+        key=scene_fixture_monster_key(),
+        location=character.location,
+        nohome=True,
+    )
+    monster.threat_tier = SHIPPED_MONSTER_TIER_ATTR
+    monster.apply_monster_tier(SHIPPED_MONSTER_TIER_KEY)
+    monster.traits.hp.base = 24
+    monster.traits.hp.current = 24
+    monster.db.portrait_policy = {
+        "mode": "named",
+        "stable_key": f"browser-scene-monster-{character.pk}",
+    }
+    monster.save()

@@ -363,8 +363,12 @@ def _settle_scene(character, status: str, *, publish: bool) -> dict:
         "failed_scene": ArtAssetStatus.FAILED,
         "done_scene": ArtAssetStatus.DONE,
     }[status]
+    # Every one of these transitions is a REGENERATION of the same scene: the
+    # record must be requeued first (which also preserves its prior valid
+    # output, so the descriptor keeps authorizing it) before a fresh claim can
+    # own a token. Claiming a done record directly would find nothing.
+    requeue(subject)
     if job == ArtAssetStatus.PENDING:
-        requeue(subject)
         return {"subject_key": subject.full(), "status": job}
     claimed = claim(ArtAssetRecord.objects.count() + 1)
     record = next((item for item in claimed if item.db_key == record_key(subject)), None)
