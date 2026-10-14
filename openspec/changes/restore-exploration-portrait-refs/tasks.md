@@ -10,8 +10,8 @@ All tasks are implementation work for a later apply assignment. Acceptance follo
 
 ## 2. Current portrait completion refresh (1.5h)
 
-- [ ] 2.1 Extend `art_push.py` so a current matching portrait-catalog subject in exploration includes the freshly rendered available exploration panel with qualifying art/gallery/roster panels in the same `panel_update`; verify `web/webclient/tests/test_art_push.py` detects null-to-real refs in one revision, scene-only exclusion, unavailable exploration isolation and old-room/departed-subject no-push behavior, preserving the existing facade logging.
-- [ ] 2.2 Document the bounded companion-panel addition beside the completion publisher and frontend art-refresh contract; verify focused completion tests exercise actual notification and accepted update content without a new subscriber, full snapshot broadcast or focus action.
+- [x] 2.1 Extend `art_push.py` so a current matching portrait-catalog subject in exploration includes the freshly rendered available exploration panel with qualifying art/gallery/roster panels in the same `panel_update`; verify `web/webclient/tests/test_art_push.py` detects null-to-real refs in one revision, scene-only exclusion, unavailable exploration isolation and old-room/departed-subject no-push behavior, preserving the existing facade logging.
+- [x] 2.2 Document the bounded companion-panel addition beside the completion publisher and frontend art-refresh contract; verify focused completion tests exercise actual notification and accepted update content without a new subscriber, full snapshot broadcast or focus action.
 
 ## 3. Consumer image and truthful fallback proof (1.5h)
 
