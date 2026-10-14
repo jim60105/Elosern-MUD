@@ -156,7 +156,7 @@ describe("the room card slice (exploration-room-actions)", () => {
     expect(store.view.roomCard).toBeNull();
 
     store.openRoomCard("wait");
-    commit({ exploration: { schema_version: 3, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
+    commit({ exploration: { schema_version: 4, available: false, reason: { code: "scene_lost", message: "暫時不可用。" } } });
     expect(store.view.roomCard).toBeNull();
   });
 
