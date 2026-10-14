@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "tavern_interior",
+  "label_zh": "酒館內部",
+  "scene_sentence_zh": "爐火映照的木造酒館內，酒客的低語與杯盤碰撞聲交織成喧鬧的背景。",
+  "asset": "web/static/art/scenes/tavern_interior.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 142366,
+    "sha256": "c75605ccd3903ad50e56aa0cd72f254289b50d5658249d5f49bc0bc54430dffc"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 612014001,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "the interior of a timber tavern with a broad open plank floor, a great stone hearth with a crackling fire on the left, a long polished wooden service counter with shelves of tankards and bottles along the back wall, heavy oak beams overhead, scattered round tables and benches in the middle distance, warm amber firelight and hanging lantern glow with cool shadowed timbers, an unobstructed open timber floor across the lower foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG timber tavern interior — stone hearth with a live fire at the left, a long wooden service counter, bottle shelves, hanging lanterns and heavy oak beams over a broad plank floor — with an unobstructed open foreground for stage figures, no interface, watermark or readable lettering, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_interior_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside dungeon_interior and ruin_interior: scene identity, palette and composition are distinct for every sibling."
+  }
+}
