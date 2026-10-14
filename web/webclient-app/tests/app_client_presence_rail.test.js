@@ -326,6 +326,54 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     expect(store.router.depth()).toBe(1);
   });
 
+  it("a failed standee image keeps the open card and recovers on a newer URL", async () => {
+    await mountWith(
+      exploration({
+        interact: [{ ...CLERK, portrait_ref: "7" }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [TRAVELLER],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+      artPanel({ 7: CLERK_FACE }),
+    );
+    // The figure's PORTRAIT image only: the placeholder's silhouette mask
+    // probe is an `img` of its own and must never stand in for a figure.
+    const portraitImg = () => standee().find("img:not(.reference-artwork__mask-probe)");
+    await entry("target-7").trigger("click");
+    await settle();
+    expect(portraitImg().attributes("src")).toBe(CLERK_FACE.url);
+    const rowsBefore = cardRows().map((row) => row.text());
+
+    // The figure's own image fails: the card stays open on the same target
+    // with the same verbs, and the established placeholder takes the figure.
+    await portraitImg().trigger("error");
+    await settle();
+    expect(card().exists()).toBe(true);
+    expect(store.view?.presenceCard?.identity ?? null).not.toBeNull();
+    expect(portraitImg().exists()).toBe(false);
+    expect(cardRows().map((row) => row.text())).toEqual(rowsBefore);
+
+    // One newer committed URL replaces the failed one: the still-open card
+    // renders the new figure without reopening or dispatching anything.
+    await commit({
+      art: artPanel({ 7: CLERK_FACE_REPLACED }),
+      exploration: exploration({
+        interact: [{ ...CLERK, portrait_ref: "7" }],
+        look: {
+          room: { identity: 42, display_name: "石板廣場", room: true },
+          entities: [TRAVELLER],
+          objects: [{ identity: 3, display_name: "木箱" }],
+        },
+      }),
+    });
+    expect(card().exists()).toBe(true);
+    expect(portraitImg().attributes("src")).toBe(CLERK_FACE_REPLACED.url);
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.router.depth()).toBe(1);
+  });
+
   it("Escape and 返回 close the card and return focus to the medallion that opened it", async () => {
     await mountWith();
     for (const close of ["escape", "back-row"]) {
