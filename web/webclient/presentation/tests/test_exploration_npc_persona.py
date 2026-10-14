@@ -110,7 +110,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
             # Verify silent check: no warning logged
             mock_warn.assert_not_called()
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-4-presentation-panel")
     def test_version_3_validator_accepts_surface_and_rejects_extra_fields(self):
         self.assertIn("npc_persona", SURFACES)
         valid_row = {
@@ -137,7 +137,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
         with self.assertRaises(ProtocolValidationError):
             validate_exploration(bad_payload)
 
-    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-3-presentation-panel")
+    @covers_requirement("webclient-exploration-menu::the-exploration-panel-is-an-exact-read-only-version-4-presentation-panel")
     def test_maximal_room_fixture_fits_envelope(self):
         # 32 NPC targets * 8 affordances with maximal names
         interact_targets = []

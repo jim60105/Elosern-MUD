@@ -4,12 +4,12 @@ The read-only version-3 `exploration` panel and version-7 `character` panel, the
 
 ## Requirements
 
-### Requirement: The exploration panel is an exact read-only version-3 presentation panel
-The production presentation registry SHALL register panel name `exploration` at schema version 3 with `available` true and `kind` `exploration`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`.
+### Requirement: The exploration panel is an exact read-only version-4 presentation panel
+The production presentation registry SHALL register panel name `exploration` at schema version 4 with `available` true and `kind` `exploration`, and its available payload SHALL contain exactly `schema_version`, `available`, `kind`, `move`, `look`, `interact`, `character`, `quests`, and `inventory`.
 
 #### Scenario: Exploration snapshot carries the exploration root
 - **WHEN** a puppeted WebClient in exploration mode receives a full snapshot
-- **THEN** `exploration` reports schema version 3 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
+- **THEN** `exploration` reports schema version 4 and `kind == "exploration"`, the current Exits in `move`, the present room/entities/objects in `look`, and the present interact targets with their legal affordances, while a before/after comparison of canonical game state is unchanged
 
 #### Scenario: A bound companion's possess affordance never degrades the panel
 - **WHEN** the room contains a bound companion of the actor and the full `exploration` panel is
@@ -38,7 +38,7 @@ The production presentation registry SHALL register panel name `exploration` at 
 - **THEN** the target descriptor carries the `explore.deliver` affordance with exactly the normalized `params` (`npc_id` and `item_key`), and no other action affordance carries a `params` field
 
 #### Scenario: In-conversation codes and keyword lists are rejected
-- **WHEN** the server validator or the client mirror receives an exploration payload whose target carries a `keywords` list, or an affordance naming `explore.talk_scripted` or `explore.talk_freeform`, or whose `schema_version` is 2
+- **WHEN** the server validator or the client mirror receives an exploration payload whose target carries a `keywords` list, or an affordance naming `explore.talk_scripted` or `explore.talk_freeform`, or whose `schema_version` is 2 or 3
 - **THEN** the payload is rejected as a protocol error and is never adopted
 
 #### Scenario: The author-editor navigation descriptor is accepted and carries no card
@@ -71,12 +71,12 @@ The production presentation registry SHALL register panel name `exploration` at 
 
 #### Scenario: Only the deliver affordance carries params
 - **WHEN** the presenter emits target action affordances
-- **THEN** exactly the `explore.deliver` action affordance additionally carries `params` — the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`) — and every other action affordance carries no `params`, its dispatch payload being re-derived from the target identity at the dock
+- **THEN** exactly the `explore.deliver` action affordance additionally carries `params`, the shared delivery validator's normalized dispatch payload (`npc_id` and the bounded ASCII `item_key`), and every other action affordance carries no `params`, its dispatch payload being re-derived from the target identity at the dock
 
 #### Scenario: A navigation affordance carries exactly its five fields and opens only a drawer
 - **WHEN** the presenter serializes a navigation affordance
 - **THEN** it contains exactly `kind` (`"navigate"`), `surface` (one of `"guild"` or `"shop"`), `label`, `enabled`, and nullable `disabled_reason`
-- **AND** navigation affordances are dock-navigation descriptors only — they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
+- **AND** navigation affordances are dock-navigation descriptors only; they are NOT registered action adapters, never enter a `ui_action` payload, and only tell the browser to open the corresponding service drawer
 
 #### Scenario: Availability entries carry only the available boolean
 - **WHEN** the presenter builds `character`, `quests`, and `inventory`
@@ -89,6 +89,10 @@ The production presentation registry SHALL register panel name `exploration` at 
 #### Scenario: The presenter stays read-only over canonical data
 - **WHEN** the `exploration` presenter builds its payload
 - **THEN** it is built only from canonical room, entity, component, object, and service data, emits no live object or filesystem reference, does not mutate location, traits, knowledge, dialogue, quests, inventory, or world time, and uses the registered common unavailable form outside exploration mode
+
+#### Scenario: Available schema versions cut over together
+- **WHEN** either validator receives an available exploration panel with schema version 4, and then otherwise identical panels with version 3 or another unsupported version
+- **THEN** only version 4 is accepted, including its non-null reference fields, and no dual-version conversion is performed
 
 ### Requirement: explore.talk_open opens a conversation with the host's greeting
 The production action registry SHALL register `explore.talk_open`, whose payload SHALL accept exactly `npc_id` (a positive integer). The adapter SHALL obtain the actor from the authenticated session and SHALL reject, before writing anything: a possessed actor, an unresolvable `npc_id`, a schedule-blocked host, and a non-conversable host. On success it SHALL record the session through the deterministic dialogue-session seam and publish a full snapshot at one newer revision.
@@ -741,7 +745,7 @@ The production action registry SHALL register `explore.wait`. Its payload SHALL 
 - **THEN** the adapter rejects with a stable code and message and does not advance the clock
 
 ### Requirement: Portrait focus stays client-local against the art catalog seam
-Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that references entries in the server-authored art `portrait_catalog` when the art capability supplies one and `null` otherwise. The browser SHALL switch portrait focus only among verified catalog values emitted by the server, SHALL NOT construct portrait subject keys or URLs from entity data, and SHALL NOT send a focus mutation or input message.
+Exploration interact and look-entity descriptors SHALL carry null or a 1..32-character ASCII-decimal `portrait_ref`. Non-null refs SHALL name an entry in the current bounded server art view whose canonical resolution supplies its own runtime or official image. The browser SHALL use supplied catalog values without constructing subject keys or URLs or sending focus messages.
 
 #### Scenario: Absence of art never blocks exploration
 - **WHEN** the art catalog is absent or a descriptor carries `portrait_ref: null`
@@ -753,7 +757,31 @@ Exploration descriptors SHALL carry a nullable opaque `portrait_ref` that refere
 
 #### Scenario: Missing art is never a failure
 - **WHEN** a descriptor carries `portrait_ref: null` or the catalog is absent
-- **THEN** it is not treated as a failure — look, interact, and dialogue proceed normally with no portrait card
+- **THEN** it is not treated as a failure; look, interact, and dialogue proceed normally with no portrait card
+
+#### Scenario: Both descriptor paths join the same current image
+- **WHEN** a present interact target also has a look-entity row, belongs to the current capped art view and resolves to an eligible real official or runtime portrait
+- **THEN** both rows carry the same server-authored catalog ref, and the normally rendered art catalog entry at that ref carries that resolved image
+
+#### Scenario: A non-interact entity can carry an admitted portrait
+- **WHEN** a present named-policy character is catalogued with real imagery and appears only in the look-entity list
+- **THEN** its entity row carries the catalog reference while its existing look payload and bystander eligibility remain unchanged
+
+#### Scenario: Catalog exclusion remains a truthful null
+- **WHEN** an entity is excluded from the existing art membership or dropped by its 32-entry cap, including a non-catalogued monster with otherwise resolvable art
+- **THEN** its exploration reference is null and no catalog expansion or browser-generated key occurs
+
+#### Scenario: Missing and ineligible imagery never becomes a real reference
+- **WHEN** a catalogued entity resolves to missing, pending, failed, malformed-policy, age-ineligible or silhouette-only art without its own runtime/official media URL
+- **THEN** its descriptor carries null, no generation or gameplay mutation occurs, and exploration remains usable
+
+#### Scenario: Exact validators preserve admitted reference values
+- **WHEN** either descriptor carries null or an ASCII-decimal reference of length 1 or 32, and then an empty, overlong, numeric, Unicode-digit, subject-key or URL-like value
+- **THEN** both validators accept and preserve the first values and reject the latter values without coercion; exact fields and envelope bounds still apply
+
+#### Scenario: Available exploration survives unavailable art
+- **WHEN** the art capability cannot supply its view or the client receives an unavailable art panel
+- **THEN** exploration actions remain available, refs without a supplied view are null and unresolved client refs use the established fallback without a focus request
 
 ### Requirement: Exploration actions reject stale, duplicate, and tampered input without mutation
 Every exploration action SHALL pass the existing dispatcher's epoch, base revision, in-flight, and request-ID checks before adapter invocation; a `presentation_epoch` or `base_revision` mismatch SHALL return the dispatcher's `stale` outcome with a fresh full snapshot and SHALL invoke no adapter. A duplicate live request ID SHALL return its cached result without re-executing.
