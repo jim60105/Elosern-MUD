@@ -472,6 +472,28 @@ class BundledAdmissionTests(unittest.TestCase):
             self.assertEqual(summary["reason"], "bundled_root_symlink")
             self.assertEqual(len(current_bundled_scenes()), 0)
 
+    def test_a_registry_defect_is_reported_as_a_bounded_diagnostic(self):
+        """The declaration-level defect path counts and names its scene key.
+
+        The production registry is valid, so the runtime report of a broken one
+        is exercised by injecting the problem the pure registry check produces.
+        """
+        with patch.object(
+            scene_definitions,
+            "scene_art_registry_problems",
+            return_value=(f"{_PLANTED_KEY}: no scene-art definition",),
+        ):
+            with patch.object(scene_definitions, "log_warn") as warned:
+                summary = load_bundled_scene_catalog()
+        self.assertEqual(summary["refused"], 1)
+        self.assertEqual(summary["images"], 11)
+        self.assertEqual(summary["diagnostics"], 1)
+        self.assertEqual(warned.call_count, 1)
+        context = warned.call_args.kwargs["context"]
+        self.assertEqual(context["reason"], "registry_invalid")
+        self.assertEqual(context["key"], _PLANTED_KEY)
+        self.assertEqual(context["detail"], "no scene-art definition")
+
     def test_the_reset_drops_every_admission(self):
         load_bundled_scene_catalog()
         self.assertEqual(len(current_bundled_scenes()), 11)

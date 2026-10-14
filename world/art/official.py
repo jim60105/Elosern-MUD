@@ -646,21 +646,26 @@ def _publish_bundled_scenes() -> None:
     operator snapshot (or the reverse). The try/except here is the last-resort
     isolation of the two publishes: an unforeseen fault in the bundled pass is
     reported as one bounded diagnostic on the bundled event and the operator
-    walk continues. The art definitions module is imported here, inside the
-    body, because it imports this module's shared bounded decoder at import
-    time.
+    walk continues. Both the art definitions import and the load itself are
+    inside the guard, so even an import-time fault in the bundled module (whose
+    module-level imports include this one's shared bounded decoder) can never
+    escape ``load_catalog``.
     """
-    from world.art.scene_definitions import (
-        BUNDLED_SCENE_CATALOG_EVENT,
-        load_bundled_scene_catalog,
-    )
-
     try:
+        # The definitions module is imported inside the body because it imports
+        # this module's shared bounded decoder at import time.
+        from world.art.scene_definitions import (
+            BUNDLED_SCENE_CATALOG_EVENT,
+            load_bundled_scene_catalog,
+        )
+
         load_bundled_scene_catalog()
     except Exception as error:  # pragma: no cover - last-resort isolation
+        # The bundled collection's own boundary event id, spelled literally
+        # because this guard must report even when that module cannot import.
         log_warn(
-            BUNDLED_SCENE_CATALOG_EVENT,
-            context={"phase": "bundled_scenes_failed"},
+            "bundled_scene_catalog_loaded",
+            context={"phase": "bundled_scenes_failed", "reason": "bundled_scenes_failed"},
             exc=error,
         )
 
