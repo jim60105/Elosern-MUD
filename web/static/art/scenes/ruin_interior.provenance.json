@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "ruin_interior",
+  "label_zh": "遺跡內部",
+  "scene_sentence_zh": "殘破的古代遺跡內，斷裂的立柱與斑駁的壁畫訴說著失落時代的過往。",
+  "asset": "web/static/art/scenes/ruin_interior.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 194232,
+    "sha256": "6bff2be1f58826644009467b88ea3b90399414ec24fca9634c1a36cd67521533"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 55120931,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "the ruined interior of a forgotten ancient temple, a shattered colonnade of broken and toppled fluted stone columns, jagged collapsed arches and crumbling weathered wall fragments, faded eroded murals beneath cracked plaster, heaps of fallen masonry blocks and creeping ivy and moss across a cracked uneven stone floor, dust motes drifting in shafts of cold daylight falling through the caved-in roof, an unobstructed open stone floor across the lower foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG ruined-temple interior — cracked and broken fluted columns, a collapsed arcade open to the sky, weathered wall fragments with eroded murals, tumbled masonry beams, ivy and candles across a cracked stone floor — with an unobstructed open foreground for stage figures, no interface, watermark or readable lettering, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_interior_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside tavern_interior and dungeon_interior: scene identity, palette and composition are distinct for every sibling."
+  }
+}

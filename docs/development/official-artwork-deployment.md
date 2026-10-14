@@ -32,6 +32,20 @@ registry that resolves the bundled scene keys, and the media boundary that
 serves their fingerprints, arrive with their own change; until then the
 committed files are ordinary static assets under `web/static/`.
 
+Delivered so far, each produced through the repository's own sd-webui client
+and prompt library, encoded by `world.art.formats.encode`, and reviewed at
+native scale and under the desktop cover crop:
+
+- the outdoor pack — `wilderness_path`, `mountain_path`, `coastal_path`;
+- the interior pack — `tavern_interior`, `dungeon_interior`, `ruin_interior`.
+
+Every file is original, redistributable work by the project maintainers (no
+third-party stock or externally licensed imagery) and its
+`<key>.provenance.json` sidecar records the source, distribution terms,
+production method, WebP processing, SHA-256 of the shipped bytes and the
+visual review. These paths are static assets only: the scene registry and the
+media boundary that own their runtime resolution are still their own change.
+
 ## The directory contract
 
 One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:

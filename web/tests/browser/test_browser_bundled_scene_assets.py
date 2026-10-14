@@ -1,9 +1,11 @@
-"""Static-asset browser acceptance for the bundled outdoor scene pack.
+"""Static-asset browser acceptance for the bundled scene art packs.
 
-Requests the three committed ``/static/art/scenes/<key>.webp`` illustrations
-through the running application's own static-media boundary — with no operator
-artwork root and no generation service — and decodes each one in a real browser
-at the 1451x790 desktop reference viewport under cover cropping.
+Requests the committed ``/static/art/scenes/<key>.webp`` illustrations — the
+outdoor pack (``unified-scenes-outdoor-art``) and the interior pack
+(``unified-scenes-interior-art``) — through the running application's own
+static-media boundary, with no operator artwork root and no generation
+service, and decodes each one in a real browser at the 1451x790 desktop
+reference viewport under cover cropping.
 
 Fixture ownership (design.md, "Concrete browser fixture ownership"): the
 journey allocates its own isolated runtime, pins the shipped (non-synthetic)
@@ -30,6 +32,15 @@ OUTDOOR_SCENE_ASSETS = (
     "web/static/art/scenes/wilderness_path.webp",
     "web/static/art/scenes/mountain_path.webp",
     "web/static/art/scenes/coastal_path.webp",
+)
+
+# The three committed interior illustrations, addressed by full repository
+# path for the same gate reason as the outdoor pack above; the keys are pinned
+# by world/art/tests/test_bundled_interior_art.py.
+INTERIOR_SCENE_ASSETS = (
+    "web/static/art/scenes/tavern_interior.webp",
+    "web/static/art/scenes/dungeon_interior.webp",
+    "web/static/art/scenes/ruin_interior.webp",
 )
 
 # The repository path prefix that the served ``/static/`` root strips.
@@ -95,12 +106,13 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         # Each test boots its own isolated server; never the shared one.
         pass
 
-    @covers_requirement(
-        "bundled-outdoor-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
-        "bundled-outdoor-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
-    )
-    def test_outdoor_pack_static_decode(self):
-        """Every committed outdoor scene serves and decodes as its own image."""
+    def _assert_pack_static_decode(self, assets) -> None:
+        """Serve and decode one pack's committed illustrations for real.
+
+        Shared by the per-pack journeys: one isolated real server, no operator
+        artwork root, no generation service, and the browser's own decode at
+        the desktop reference viewport under cover cropping.
+        """
         self.assertNotIn(
             "ART_OFFICIAL_ROOT",
             self.server.runtime.env,
@@ -111,7 +123,7 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         page.on("response", lambda response: requested.append(response.url))
 
         observed_sizes: list[str] = []
-        for asset in OUTDOOR_SCENE_ASSETS:
+        for asset in assets:
             with self.subTest(asset=asset):
                 served = f"{self.base_url}/static/{asset.removeprefix(STATIC_SOURCE_PREFIX)}"
                 response = page.goto(served, wait_until="load")
@@ -178,13 +190,29 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
             if "/art/" in url and "/static/art/scenes/" not in url
         ]
         self.assertEqual(offenders, [], "an operator/generated media identity was requested")
-        if len(observed_sizes) == len(OUTDOOR_SCENE_ASSETS):
+        if len(observed_sizes) == len(assets):
             self.assertEqual(
                 len(set(observed_sizes)),
-                len(OUTDOOR_SCENE_ASSETS),
+                len(assets),
                 "the three scene URLs served identical byte counts, so one file "
                 "is standing in for several keys",
             )
+
+    @covers_requirement(
+        "bundled-outdoor-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
+        "bundled-outdoor-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
+    )
+    def test_outdoor_pack_static_decode(self):
+        """Every committed outdoor scene serves and decodes as its own image."""
+        self._assert_pack_static_decode(OUTDOOR_SCENE_ASSETS)
+
+    @covers_requirement(
+        "bundled-interior-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
+        "bundled-interior-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
+    )
+    def test_interior_pack_static_decode(self):
+        """Every committed interior scene serves and decodes as its own image."""
+        self._assert_pack_static_decode(INTERIOR_SCENE_ASSETS)
 
 
 if __name__ == "__main__":
