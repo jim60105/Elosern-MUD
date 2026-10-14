@@ -344,7 +344,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
                 svg: alpha.parentElement.querySelector('svg') !== null,
                 label: actor.querySelector('.reference-artwork__placeholder-label').textContent,
                 name: actor.querySelector('.reference-artwork__identity').textContent,
-                decorative: alpha.getAttribute('aria-hidden'),
+                decorative: alpha.closest('.reference-artwork__silhouette').getAttribute('aria-hidden'),
               };
             }""",
             ACTOR,
@@ -527,7 +527,12 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator(MASK_FILL).count(), 0)
         card = page.locator(PLACEHOLDER_CARD).first.inner_text()
         self.assertIn("店長", card)
-        self.assertIn("肖像生成中", card)
+        # The bundled resource itself failed, so the local fact is a load
+        # failure rather than an unfinished generation — and the frame keeps
+        # the shared persistent local marker.
+        self.assertIn("肖像載入失敗", card)
+        self.assertEqual(page.locator(ACTOR + ' [data-testid="artwork-failure"]').count(), 1)
+        self.assertEqual(page.get_attribute(ACTOR + " figure", "data-status"), "load-failed")
         # Nothing dark stands in for the missing figure: the actor's box is
         # sampled above the ground shadow's own band.
         box = page.locator(ACTOR).bounding_box()

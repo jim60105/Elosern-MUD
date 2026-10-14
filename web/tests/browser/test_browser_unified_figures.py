@@ -28,6 +28,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     inject_snapshot,
+    open_verb_card,
     store_state,
     valid_local_map_panel,
     valid_status_panel,
@@ -111,7 +112,14 @@ def _art_panel(*, with_candidate: bool = True) -> dict:
             "7": {
                 "artwork": _shared_descriptor("npc_7", with_candidate=with_candidate),
                 "context": {"name": "店長", "role": "對話對象"},
-            }
+            },
+            # A second admitted subject outside the party lineup: focusing it
+            # raises the actor-right standee instead of elevating a lineup
+            # figure, so the journey covers both figure paths.
+            "8": {
+                "artwork": _shared_descriptor("npc_8", with_candidate=with_candidate),
+                "context": {"name": "旅人", "role": "人物"},
+            },
         },
     }
 
@@ -120,9 +128,17 @@ def _exploration_panel() -> dict:
     return {
         "schema_version": 4,
         "available": True,
+        "kind": "exploration",
+        "move": [],
+        "character": {"available": True},
+        "quests": {"available": True},
+        "inventory": {"available": True},
         "look": {
             "room": {"identity": 42, "display_name": "南門街道", "room": True},
-            "entities": [{"identity": 7, "display_name": "店長", "kind": "npc", "portrait_ref": "7"}],
+            "entities": [
+                {"identity": 7, "display_name": "店長", "kind": "npc", "portrait_ref": "7"},
+                {"identity": 8, "display_name": "旅人", "kind": "character", "portrait_ref": "8"},
+            ],
             "objects": [],
         },
         "interact": [
@@ -139,7 +155,21 @@ def _exploration_panel() -> dict:
                         "disabled_reason": None,
                     }
                 ],
-            }
+            },
+            {
+                "identity": 8,
+                "display_name": "旅人",
+                "portrait_ref": "8",
+                "affordances": [
+                    {
+                        "kind": "action",
+                        "action_id": "explore.talk_open",
+                        "label": "交談",
+                        "enabled": True,
+                        "disabled_reason": None,
+                    }
+                ],
+            },
         ],
     }
 
@@ -248,7 +278,18 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         self._serve_media(page)
         self._commit(page)
         _wait_mode(page, "exploration")
+        # Focus the admitted target so the actor-right standee stands, then
+        # open the status drawer so its art slot renders the roster figure too.
+        page.wait_for_selector('[data-anchor="presence"] [data-entry-key="target-8"]', timeout=15000)
+        open_verb_card(page, 8)
         page.wait_for_selector(STANDEE, timeout=15000)
+        page.evaluate(
+            "() => window.__elosernBridge.store.openHudDrawer('status')"
+        )
+        page.wait_for_selector(
+            '[data-testid="hud-drawer"][data-drawer-key="status"] [data-testid="reference-artwork"]',
+            timeout=15000,
+        )
 
         # The committed wire shape is the canonical one: the catalog value is
         # exactly {artwork, context} and the roster portrait is the descriptor.
@@ -291,15 +332,26 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         # shared primitive, from the terminal's own URL, with no local failure
         # marker, because a committed fallback is not a failure.
         self._commit(page, with_candidate=False)
+        # The FIGURE surfaces paint the descriptor's own committed alpha
+        # terminal, only after that same resource loaded.
         page.wait_for_selector(f"{STANDEE} {ALPHA_FILL}", timeout=15000)
-        page.wait_for_selector(f"[data-anchor='presence'] {ALPHA_FILL}", timeout=15000)
-        self.assertEqual(self._mask_url(page, f"{STANDEE} {ALPHA_FILL}"), f"url('{TERMINAL_URL}')")
-        self.assertEqual(
-            self._mask_url(page, f"[data-anchor='presence'] {ALPHA_FILL}"),
-            f"url('{TERMINAL_URL}')",
+        page.wait_for_selector(f"{PLAYER_FIGURE} {ALPHA_FILL}", timeout=15000)
+        page.wait_for_selector(f"{DRAWER_ART} {ALPHA_FILL}", timeout=15000)
+        for surface in (STANDEE, PLAYER_FIGURE, DRAWER_ART):
+            with self.subTest(surface=surface):
+                self.assertEqual(
+                    self._mask_url(page, f"{surface} {ALPHA_FILL}"),
+                    f"url('{TERMINAL_URL}')",
+                )
+                self.assertEqual(page.locator(f"{surface} {FAILURE}").count(), 0)
+        # The AVATAR position is real-only: a silhouette is not an avatar, so
+        # the medallion draws its identity glyph instead of the terminal.
+        page.wait_for_selector(
+            "[data-anchor='presence'] [data-testid='presence-entry-initial']",
+            state="attached",
+            timeout=15000,
         )
-        self.assertEqual(self._image_src(page, PLAYER_FIGURE), TERMINAL_URL)
-        self.assertEqual(self._image_src(page, DRAWER_ART), TERMINAL_URL)
-        self.assertEqual(page.locator(f"{STANDEE} {FAILURE}").count(), 0)
-        self.assertEqual(page.locator(f"{PLAYER_FIGURE} {FAILURE}").count(), 0)
+        self.assertEqual(self._image_src(page, MEDALLION), None)
+        self.assertEqual(page.locator(f"[data-anchor='presence'] {ALPHA}").count(), 0)
+        self.assertEqual(page.locator(f"[data-anchor='presence'] {FAILURE}").count(), 0)
         page.close()
