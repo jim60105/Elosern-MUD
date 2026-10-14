@@ -26,8 +26,6 @@ import unittest
 
 from PIL import Image
 
-from tools.spec_traceability import covers_requirement
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 SCENES_DIRECTORY = REPO_ROOT / "web/static/art/scenes"
 
