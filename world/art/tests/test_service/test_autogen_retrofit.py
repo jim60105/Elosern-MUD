@@ -18,7 +18,19 @@ from world.art.queue import ensure, record_key, source_hash
 from world.art import gallery as gallery_api, official, official_refs
 from world.art.official import load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
-from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME, resolve_character
+from world.art.presenter import (
+    ORIGIN_OFFICIAL,
+    ORIGIN_RUNTIME,
+    describe_entity,
+)
+
+
+def candidate(descriptor: dict) -> dict | None:
+    """The descriptor's presented real candidate resource, or ``None``."""
+    for attempt in descriptor["attempts"]:
+        if attempt["type"] == "image":
+            return attempt["resource"]
+    return None
 from world.art.fake_sd_client import FakeSDWebUIClient
 from world.art.gallery_prompt import (
     CUSTOM_PROMPT_MAX,
@@ -393,10 +405,10 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
             entity.db.portrait_policy,
             {"mode": "named", "stable_key": str(entity.pk)},
         )
-        payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_OFFICIAL)
-        self.assertIsNone(payload["status"])
-        self.assertTrue(payload["url"].startswith("/art/official/"))
+        descriptor = describe_entity(entity)
+        presented = candidate(descriptor)
+        self.assertEqual(presented["origin"], ORIGIN_OFFICIAL)
+        self.assertTrue(presented["url"].startswith("/art/official/"))
 
     def test_an_unsatisfied_reference_enqueues_exactly_as_before(self):
         # The directory is built once (by the no-provenance case, which needs
@@ -426,9 +438,9 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
                     load_catalog()
                 self._schedule(entity)
                 self.assertEqual(len(self._gallery_jobs(entity)), 1, label)
-                self.assertNotEqual(
-                    resolve_character(entity)["origin"], ORIGIN_OFFICIAL
-                )
+                # An unsatisfied reference presents no real image at all, so
+                # the official origin can never be claimed.
+                self.assertIsNone(candidate(describe_entity(entity)))
 
     def test_an_ineligible_character_is_skipped_exactly_as_before(self):
         entity = self._character("ineligible")
@@ -438,7 +450,7 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
         self.assertEqual(len(callbacks), 0)
         self.assertEqual(self._gallery_jobs(entity), [])
         # Eligibility still outranks official presentation.
-        self.assertNotEqual(resolve_character(entity)["origin"], ORIGIN_OFFICIAL)
+        self.assertIsNone(candidate(describe_entity(entity)))
 
     def test_manual_generation_still_works_and_its_card_outranks_the_official(self):
         entity = self._character("manual")
@@ -451,9 +463,10 @@ class OfficialSatisfiedSuppressionTests(EvenniaTestCase):
         self._drain()
         cards = gallery_api.cards_for(self._subject(entity))
         self.assertEqual(len(cards), 1)
-        payload = resolve_character(entity)
-        self.assertEqual(payload["origin"], ORIGIN_RUNTIME)
-        self.assertEqual(payload["url"], f"/art/{cards[0]['stored_identity']}")
+        descriptor = describe_entity(entity)
+        presented = candidate(descriptor)
+        self.assertEqual(presented["origin"], ORIGIN_RUNTIME)
+        self.assertEqual(presented["url"], f"/art/{cards[0]['stored_identity']}")
 
     def test_a_later_directory_update_does_not_retroactively_enqueue(self):
         entity = self._character()
