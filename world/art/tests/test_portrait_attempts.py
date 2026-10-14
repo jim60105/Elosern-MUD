@@ -569,13 +569,34 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
     @covers_requirement(
         "official-art-resolution::official-payloads-are-catalog-derived-confined-and-fall-through-when-unresolvable"
     )
-    def test_describe_entity_refuses_an_ineligible_entity(self):
+    def test_describe_entity_answers_a_refusal_descriptor(self):
+        """An admitted entity with no eligible subject still gets its own facts.
+
+        Catalog admission is a membership decision the caller already made, so
+        the enumerator never answers ``None`` for an entity it was handed: it
+        answers the complete REFUSAL descriptor — no image attempt, no
+        generated subject key, no prompt — plus the deterministic
+        attribute-selected alpha terminal. Only a genuinely absent entity is
+        ``None``.
+        """
         plain = create_object(PlayerCharacter, key="attempt-ineligible")
         plain.age = plain.apparent_age = 30
-        self.assertIsNone(describe_entity(plain))
+        refused = describe_entity(plain)
+        self.assertEqual(refused["attempts"], [])
+        self.assertIsNone(refused["generation_subject"])
+        self.assertIsNone(refused["generation_state"])
+        self.assertEqual(refused["retention_sources"], [])
+        self.assertEqual(refused["terminal"]["kind"], "alpha_mask")
+        self.assertEqual(refused["terminal"]["resource"]["origin"], "silhouette")
+        self.assertEqual(refused["subject_id"], str(plain.pk))
         plain.db.portrait_policy = {"mode": "named", "stable_key": "ineligible"}
         plain.age = "thirty"
-        self.assertIsNone(describe_entity(plain))
+        ineligible = describe_entity(plain)
+        self.assertEqual(ineligible["attempts"], [])
+        self.assertIsNone(ineligible["generation_subject"])
+        self.assertEqual(ineligible["terminal"]["kind"], "alpha_mask")
+        # An age-refused character still names the subject its policy declares.
+        self.assertEqual(ineligible["subject_id"], "portrait:character:ineligible")
         plain.age = 30
         descriptor = describe_entity(plain)
         self.assertEqual(descriptor["subject_id"], "portrait:character:ineligible")

@@ -589,9 +589,11 @@ def describe_entity(entity) -> dict | None:
     full fact set with no image attempt, no generated subject key and no
     prompt, plus the deterministic attribute-selected alpha terminal — because
     catalog admission is a membership decision the caller already made, not a
-    real-image decision. Only a genuinely absent entity answers ``None``.
+    real-image decision. Only a genuinely absent entity — ``None``, or a value
+    carrying no runtime identity at all — answers ``None``, so no descriptor
+    is ever built around a fabricated ``subject_id``.
     """
-    if entity is None:
+    if entity is None or getattr(entity, "pk", None) is None:
         return None
     subject, refusal = _portrait_subject(entity)
     if refusal is not None:
