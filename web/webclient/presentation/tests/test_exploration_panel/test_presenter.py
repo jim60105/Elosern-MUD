@@ -731,7 +731,7 @@ class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
 
     The reference is the same opaque decimal catalog key the party row emits:
     membership follows ``build_art_view`` and eligibility follows one
-    ``resolve_entity`` result per identity (its own URL with origin
+    ``describe_entity``-backed membership fact per identity (its own URL with origin
     runtime/official). Every case asserts through the production presenter.
     """
 

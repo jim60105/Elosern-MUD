@@ -357,7 +357,7 @@ class ArtPresenterTests(EvenniaTestCase):
 
 
 class ResolveEntityTests(EvenniaTestCase):
-    """Additive ``resolve_entity`` dispatch tests (task 1.3/1.4)."""
+    """Canonical ``describe_entity`` dispatch tests (task 1.3/1.4)."""
 
     def setUp(self):
         # The monster dispatch arm validates threat_tier against the monster
