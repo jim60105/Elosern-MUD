@@ -18,7 +18,7 @@ An absent default optional root or healthy empty root SHALL remain valid offline
 - **THEN** startup succeeds but its snapshot and boundary diagnostic retain configured-root unavailability
 
 ### Requirement: The optional per-content manifest follows the seed-metadata convention
-A content directory MAY carry a `manifest.json` declaring a `default` filename, a `face_rect`, and a `stage` placement, following the existing seed-metadata convention. When no valid explicit default is declared, the content's default image SHALL be the first valid image in deterministic filename order. An invalid or unreadable manifest SHALL emit bounded diagnostics and preserve source-scoped metadata/default faults while using safe deterministic selection and geometry; valid images SHALL still load.
+A content directory MAY carry a `manifest.json` declaring a `default` filename, a `face_rect`, and a `stage` placement, following the seed-metadata convention. When no valid explicit default is declared, the content's default image SHALL be the first valid image in deterministic filename order. An invalid or unreadable manifest SHALL emit bounded diagnostics and preserve source-scoped metadata/default faults while using safe deterministic selection and geometry; valid images SHALL still load.
 
 #### Scenario: No manifest uses deterministic filename order
 - **WHEN** a preset content directory holds three valid images and no manifest

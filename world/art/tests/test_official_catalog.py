@@ -19,6 +19,14 @@ registration is pinned against the real startup catalog.
 their registry membership (the authored scene-art and room-art vocabularies),
 the layout/reference vocabulary distinction and the bundled scene collection's
 independent publish are pinned here too.
+
+``unified-art-source-faults`` added the retained root-health fact: every
+configuration of ``ART_OFFICIAL_ROOT`` (a default absence, an empty root, an
+explicitly configured missing root, an unreadable root, a refused symlink or an
+existing non-directory) starts normally and keeps its own bounded state and
+fault flag. The per-source fault facts (a declared default, rejected identity,
+malformed metadata, per-entry refusal reason) live in
+``world.art.tests.test_art_source_faults``.
 """
 
 import base64
@@ -89,7 +97,13 @@ class _CatalogCase(EvenniaTestCase):
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.root = Path(self.tempdir.name).resolve() / "art-official"
-        self._settings = override_settings(ART_OFFICIAL_ROOT=str(self.root))
+        # The fixture's root is a settings override, never an environment
+        # binding, so the import-time configuration provenance is pinned False
+        # here: the module's cases stay environment-independent, and a
+        # configured-root case opts in with its own nested override.
+        self._settings = override_settings(
+            ART_OFFICIAL_ROOT=str(self.root), ART_OFFICIAL_ROOT_EXPLICIT=False
+        )
         self._settings.enable()
         reset_catalog()
         self.addCleanup(reset_catalog)
@@ -746,6 +760,134 @@ class StartupConfigurationTests(_CatalogCase):
         self.assertTrue(summary["skipped"])
         self.assertEqual(self.boundary()["reason"], "official_root_symlink")
         self.assertEqual(len(current_catalog()), 0)
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_a_default_absent_root_retains_no_availability_fault(self):
+        """An absent DEFAULT optional root is normal, never a retained failure.
+
+        The provenance is what separates the two absences: the same missing path
+        is the documented no-art configuration without an explicit binding and a
+        retained availability failure with one.
+        """
+        absent = Path(self.tempdir.name) / "absent"
+        with override_settings(
+            ART_OFFICIAL_ROOT=str(absent), ART_OFFICIAL_ROOT_EXPLICIT=False
+        ):
+            summary = self.load()
+        health = current_catalog().root_health()
+        self.assertEqual(
+            (health.state, health.configured, health.fault),
+            ("absent_default", False, False),
+        )
+        self.assertEqual(health.reason, "official_root_absent")
+        self.assertEqual(summary["root_state"], "absent_default")
+        self.assertFalse(summary["root_fault"])
+        self.assertEqual(len(current_catalog()), 0)
+        self.warn.assert_not_called()
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_a_configured_missing_root_retains_an_unavailable_fault(self):
+        """A configured root that is missing survives the empty index as a fault."""
+        absent = Path(self.tempdir.name) / "absent"
+        with override_settings(
+            ART_OFFICIAL_ROOT=str(absent), ART_OFFICIAL_ROOT_EXPLICIT=True
+        ):
+            summary = self.load()
+        health = current_catalog().root_health()
+        self.assertEqual(
+            (health.state, health.configured, health.fault),
+            ("unavailable", True, True),
+        )
+        self.assertEqual(health.reason, "official_root_absent")
+        self.assertEqual(summary["root_state"], "unavailable")
+        self.assertTrue(summary["root_fault"])
+        self.assertEqual(len(current_catalog()), 0)
+        # The retained failure is observable: exactly one bounded diagnostic
+        # naming the failure category, with no absolute root in its context.
+        self.assertEqual(self.reasons(self.warn), ["source_unavailable"])
+        event = self.contexts(self.warn)[0]
+        self.assertEqual(event["root_state"], "unavailable")
+        self.assertTrue(event["configured"])
+        self.assertNotIn(str(absent), str(event))
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_an_empty_root_retains_the_healthy_empty_state(self):
+        """A readable root that holds nothing is healthy, not a failure."""
+        self.root.mkdir(parents=True)
+        summary = self.load()
+        health = current_catalog().root_health()
+        self.assertEqual(
+            (health.state, health.configured, health.fault),
+            ("empty", False, False),
+        )
+        self.assertEqual(summary["root_state"], "empty")
+        self.assertFalse(summary["root_fault"])
+        self.warn.assert_not_called()
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_an_unreadable_root_retains_an_unavailable_fault_either_way(self):
+        """An I/O failure is a retained fault at inspection and at open time."""
+        self.root.mkdir(parents=True)
+        # Inspection: the root itself cannot even be stat'ed (an unsearchable
+        # parent). Patched narrowly, because the load returns on its first call.
+        with patch("world.art.official.os.lstat", side_effect=PermissionError("denied")):
+            self.load()
+        health = current_catalog().root_health()
+        self.assertEqual(
+            (health.state, health.configured, health.fault),
+            ("unavailable", False, True),
+        )
+        self.assertEqual(health.reason, "official_root_unreadable")
+        self.assertEqual(self.reasons(self.warn), ["source_unavailable"])
+        self.warn.reset_mock()
+        self.info.reset_mock()
+        reset_catalog()
+        # Open: the directory entry exists but cannot be opened.
+        with patch.object(official, "open_dir_fd", side_effect=OSError("denied")):
+            self.load()
+        self.assertEqual(current_catalog().root_health().fault, True)
+        self.assertEqual(self.boundary()["reason"], "official_root_unreadable")
+        self.assertEqual(self.reasons(self.warn), ["source_unavailable"])
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_a_refused_or_unusable_root_retains_an_unavailable_fault(self):
+        """A refused symlink and an existing non-directory are never "absent"."""
+        target = Path(self.tempdir.name) / "real-root"
+        target.mkdir(parents=True)
+        self.root.symlink_to(target)
+        self.load()
+        self.assertEqual(
+            current_catalog().root_health().state,
+            "unavailable",
+        )
+        self.assertTrue(current_catalog().root_health().fault)
+        self.warn.reset_mock()
+        self.info.reset_mock()
+        reset_catalog()
+        # An existing regular file at the configured root: the walk can never
+        # read it, so it is a retained failure rather than a normal absence.
+        plain = Path(self.tempdir.name) / "not-a-directory"
+        plain.write_text("not artwork", encoding="utf-8")
+        with override_settings(
+            ART_OFFICIAL_ROOT=str(plain), ART_OFFICIAL_ROOT_EXPLICIT=False
+        ):
+            summary = self.load()
+        health = current_catalog().root_health()
+        self.assertEqual(health.reason, "official_root_not_a_directory")
+        self.assertEqual(health.state, "unavailable")
+        self.assertTrue(health.fault)
+        self.assertTrue(summary["root_fault"])
+        self.assertEqual(self.boundary()["reason"], "official_root_not_a_directory")
 
 
 class ObservabilityTests(_CatalogCase):
