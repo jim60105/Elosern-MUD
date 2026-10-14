@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import HudDrawer from "./HudDrawer.vue";
+import ArtworkPreview from "./ArtworkPreview.vue";
 import { GALLERY_FIELDS, GALLERY_SLOTS } from "./gallery-copy.js";
 import "./gallery.css";
 
@@ -29,7 +30,7 @@ function submit() {
       <p class="gallery-muted">透過目前的角色資料，生成全新的角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
-        <img v-if="preview?.url" :src="preview.url" :alt="preview.label" class="gallery-editor-portrait">
+        <ArtworkPreview v-if="preview?.artwork" class="gallery-editor-portrait" :artwork="preview.artwork" :panel="model" :view-subject-id="preview.image_id" :alt="preview.label" />
         <p v-else class="gallery-editor-placeholder">新的相遇<br>即將誕生</p>
         <p class="gallery-muted">用文字描繪想像<br>讓角色在此刻現身。</p>
       </aside>

@@ -7,6 +7,7 @@
     "Core/ReferenceArtwork",
     "Core/ArtworkFailure",
     "Core/ArtworkAlpha",
+    "Core/ArtworkPreview",
     "Core/StageActor",
     "Core/FoeLineup",
     "Core/DialogueChoices",

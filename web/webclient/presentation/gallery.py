@@ -1,5 +1,7 @@
-"""Version-one gallery projection and exact wire schema; no mutation or service probe."""
+"""Version-three gallery projection and exact wire schema; no mutation or service probe."""
 
+import hashlib
+import json
 import math
 import re
 import uuid
@@ -8,11 +10,14 @@ from evennia.objects.models import ObjectDB
 
 from typeclasses.entities import LivingEntity
 from world.art import gallery as gallery_api
+from world.art import official as official_api
+from world.art import descriptors
+from world.art.fallback_keys import FALLBACK_EXTENSION, FALLBACK_KEYS
 from world.art.formats import STORE_EXTENSIONS
 from world.art.gallery_kinds import capabilities_for
-from world.art.gallery_match import validated_card_identity
+from world.art.gallery_match import card_identity_resolution, fallback_for
 from world.art.gallery_prompt import GALLERY_PROMPT_FIELDS
-from world.art.presenter import MAX_PORTRAIT_MEDIA_URL, media_url_for
+from world.art.presenter import GALLERY_ASPECT_RATIO, MAX_PORTRAIT_MEDIA_URL, media_url_for
 from world.art.queue import MAX_PENDING_GALLERY_JOBS, pending_gallery_jobs
 from world.art.subjects import (
     ArtSubject, ArtSubjectError, ArtSubjectKind, character_subject_for,
@@ -23,6 +28,7 @@ from world.lore.items import ITEM_REGISTRY
 from world.observability import log_warn
 from world.rules.party import live_companions
 
+from . import artwork as artwork_wire
 from .context import PresentationContext
 from .protocol import (
     MAX_CANONICAL_JSON_BYTES, MAX_LIST_ITEMS, MAX_SAFE_INTEGER,
@@ -30,12 +36,14 @@ from .protocol import (
 )
 from .registry import PanelUnavailableError
 
-GALLERY_SCHEMA_VERSION = 2
+GALLERY_SCHEMA_VERSION = 3
 GALLERY_MAX_SUBJECTS = 24
 GALLERY_MAX_LABEL = 128
 GALLERY_MAX_NAME = 64
 GALLERY_MAX_CHIP = 16
-GALLERY_MAX_URL = 129
+# One source of truth for the runtime gallery URL ceiling: the canonical
+# descriptor vocabulary's origin ceiling, which the client mirror reads too.
+GALLERY_MAX_URL = descriptors.MEDIA_URL_LIMITS[descriptors.ORIGIN_RUNTIME]
 GALLERY_MAX_WARNINGS = 5
 GALLERY_MAX_CONDITION = 512
 # The official-entry read model's bounds (change
@@ -47,7 +55,11 @@ GALLERY_MAX_OFFICIAL_ENTRIES = 32
 GALLERY_MAX_OFFICIAL_IDENTITY = gallery_api.OFFICIAL_IDENTITY_MAX
 GALLERY_MAX_OFFICIAL_URL = MAX_PORTRAIT_MEDIA_URL
 OFFICIAL_URL_PREFIX = "/art/official/"
-OFFICIAL_ROW_FIELDS = ("identity", "url", "face_rect", "is_current", "is_catalog_default")
+# The committed built-in silhouette route (``gallery-builtin-fallbacks``),
+# the one origin the alpha terminal may name.
+DEFAULTS_URL_PREFIX = "/art/defaults/"
+DEFAULTS_IDENTITY_PREFIX = "defaults/"
+OFFICIAL_ROW_FIELDS = ("identity", "artwork", "is_current", "is_catalog_default")
 SLOT_LABELS = {"weapon_main": "主手", "weapon_off": "副手", "armor": "防具", "accessories": "飾品"}
 SLOTS = gallery_api.SLOT_ORDER
 FIELDS = GALLERY_PROMPT_FIELDS
@@ -56,7 +68,7 @@ CAPABILITY_FIELDS = (
     "supports_personal_official_preferences", "max_cards"
 )
 CARD_FIELDS = {
-    "image_id", "status", "label", "url", "face_rect", "stage", "is_default", "chips",
+    "image_id", "status", "label", "artwork", "is_default", "chips",
     "requested_fields", "binding_present", "created_at",
 }
 PANEL_FIELDS = {
@@ -156,6 +168,133 @@ def _validate_official_url(url):
         raise ProtocolValidationError("official url must carry an identity path")
 
 
+def _silhouette_key(resource):
+    """The committed built-in key one alpha-terminal resource names, or a refusal.
+
+    The one origin a gallery preview's silhouette may carry: the fixed in-repo
+    ``defaults/`` route, a key of the closed fallback vocabulary, the single
+    committed extension, and a URL built from that very identity — so a
+    terminal can never point at a store file, an official path, or an
+    arbitrary name standing in for a figure.
+    """
+    identity = resource["resource_id"]
+    if not identity.startswith(DEFAULTS_IDENTITY_PREFIX):
+        raise ProtocolValidationError("silhouette must name the committed defaults route")
+    tail = identity[len(DEFAULTS_IDENTITY_PREFIX):]
+    if not tail.endswith(FALLBACK_EXTENSION):
+        raise ProtocolValidationError("silhouette must name the committed defaults route")
+    key = tail[: -len(FALLBACK_EXTENSION)]
+    if key not in FALLBACK_KEYS or resource["url"] != DEFAULTS_URL_PREFIX + tail:
+        raise ProtocolValidationError("silhouette must name a committed built-in key")
+    return key
+
+
+def _validate_gallery_terminal(terminal):
+    """The gallery's one permitted terminal: the subject's silhouette alpha mask.
+
+    Required on every row that carries an image (a card row always has one), so
+    a failed preview can always fall back to the subject's own silhouette
+    without selecting another original.
+    """
+    if terminal is None:
+        raise ProtocolValidationError("a gallery row with an image carries its alpha terminal")
+    if terminal["kind"] != descriptors.TERMINAL_ALPHA_MASK or terminal["rank"] != descriptors.GALLERY_RANK_ALPHA:
+        raise ProtocolValidationError("gallery terminal must be the alpha mask at its own rank")
+    resource = terminal["resource"]
+    if resource["origin"] != descriptors.ORIGIN_SILHOUETTE:
+        raise ProtocolValidationError("alpha terminal must be the committed silhouette")
+    if terminal["source_id"] != descriptors.gallery_alpha_source_id(_silhouette_key(resource)):
+        raise ProtocolValidationError("alpha terminal must name its own fallback key")
+
+
+def _validate_gallery_url(url, selected, image_id):
+    """One exact card's runtime media URL, exactly as the presenter builds it.
+
+    The path must name the selected subject's own image with a store
+    extension; the descriptor validator has already accepted at most the one
+    closed ``?v=<sha256>`` cache-version suffix.
+    """
+    directory = "character" if selected.kind is ArtSubjectKind.CHARACTER else "monster"
+    prefix = f"/art/gallery/{directory}/{selected.key}/{image_id}"
+    path = url.partition("?")[0]
+    if not path.startswith(prefix) or path[len(prefix):] not in STORE_EXTENSIONS:
+        raise ProtocolValidationError("url must name selected subject and image")
+
+
+def _validate_card_artwork(row, selected):
+    """One card row's descriptor: its exact original at its own rank, or its named fault.
+
+    A stored card contributes exactly one rank-10 runtime candidate naming the
+    selected subject's own image, carrying the exact stored geometry. A card
+    whose output is missing or refused contributes exactly one rank-10 known
+    fault for that same exact image and NO URL, so the row stays identified
+    with the requested card. A pending or failed row contributes neither: no
+    original candidate, no geometry and no terminal, only its truthful
+    recorded generation state.
+    """
+    descriptor = row["artwork"]
+    artwork_wire.validate_artwork(descriptor)
+    attempts = descriptor["attempts"]
+    if row["status"] != "card":
+        if attempts or descriptor["terminal"] is not None:
+            raise ProtocolValidationError("synthetic row fabricated an image")
+        return
+    _validate_gallery_terminal(descriptor["terminal"])
+    source = descriptors.gallery_original_source_id(row["image_id"])
+    # Exactly one attempt overall, naming this row's own exact image: a second
+    # entry (a candidate or an unrelated fault) would let another source stand
+    # in for the requested original.
+    if len(attempts) != 1 or attempts[0]["source_id"] != source:
+        raise ProtocolValidationError("a card row carries exactly one exact-original attempt")
+    entry = attempts[0]
+    if entry["rank"] != descriptors.GALLERY_RANK_ORIGINAL:
+        raise ProtocolValidationError("the exact original must carry its own rank")
+    if entry["type"] == "fault":
+        return
+    resource = entry["resource"]
+    if resource["origin"] != descriptors.ORIGIN_RUNTIME:
+        raise ProtocolValidationError("the exact original must be a runtime resource")
+    _validate_gallery_url(resource["url"], selected, row["image_id"])
+    geometry = resource["geometry"]
+    if geometry is None or None in (geometry["image_size"], geometry["face_rect"], geometry["stage"]):
+        raise ProtocolValidationError("the exact original must carry its stored geometry")
+
+
+def _validate_official_artwork(row):
+    """One official row's descriptor: its exact official candidate, plus named faults.
+
+    The candidate names the row's own catalog identity at the fingerprint route
+    the catalog builds, carrying the admitted decoded size and fitted
+    rectangle. Retained startup faults (change ``unified-art-source-faults``)
+    ride at their own source and rank: an image's ``metadata_invalid`` fault
+    shares its candidate's source/rank and precedes it, and a declared-default
+    fault names the refused declared identity — so a substituted default is
+    attributable without tainting a healthy sibling.
+    """
+    descriptor = row["artwork"]
+    artwork_wire.validate_artwork(descriptor)
+    _validate_gallery_terminal(descriptor["terminal"])
+    source = descriptors.gallery_official_source_id(row["identity"])
+    # Exactly ONE image candidate overall, and it must be this row's own exact
+    # identity: a second candidate (from any source) would let a substitute
+    # become the official original the editors measure. Fault entries are
+    # unconstrained by source — a declared-default fault legitimately names the
+    # refused declared identity, not this row's.
+    images = [entry for entry in descriptor["attempts"] if entry["type"] == "image"]
+    if len(images) != 1 or images[0]["source_id"] != source:
+        raise ProtocolValidationError("an official row carries its exact official candidate")
+    entry = images[0]
+    if entry["rank"] != descriptors.GALLERY_RANK_ORIGINAL:
+        raise ProtocolValidationError("the official candidate must carry its own rank")
+    resource = entry["resource"]
+    if resource["origin"] != descriptors.ORIGIN_OFFICIAL or resource["resource_id"] != row["identity"]:
+        raise ProtocolValidationError("the official candidate must name the row identity")
+    _validate_official_url(_text(resource["url"], GALLERY_MAX_OFFICIAL_URL, "official url"))
+    geometry = resource["geometry"]
+    if geometry is None or geometry["face_rect"] is None or geometry["stage"] is not None:
+        raise ProtocolValidationError("the official candidate carries its fitted rectangle and no stage")
+
+
 def _validate_official_entries(entries):
     """Exactly the official-row list: shape, bounds, vocabulary, uniqueness."""
     if not isinstance(entries, list) or len(entries) > GALLERY_MAX_OFFICIAL_ENTRIES:
@@ -173,11 +312,7 @@ def _validate_official_entries(entries):
         if identity in identities:
             raise ProtocolValidationError("duplicate official identity")
         identities.add(identity)
-        _validate_official_url(_text(row["url"], GALLERY_MAX_OFFICIAL_URL, "official url"))
-        try:
-            gallery_api.validate_face_rect(row["face_rect"])
-        except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire rectangle rejection is returned to the caller
-            raise ProtocolValidationError("invalid official face_rect") from exc
+        _validate_official_artwork(row)
         for flag in ("is_current", "is_catalog_default"):
             if type(row[flag]) is not bool:
                 raise ProtocolValidationError("official row flags must be booleans")
@@ -250,20 +385,15 @@ def validate_gallery(payload):
                 raise ProtocolValidationError("unknown requested field")
         if len(set(chips)) != len(chips) or len(set(fields)) != len(fields):
             raise ProtocolValidationError("duplicate chip/field")
+        if row["status"] != "card" and (
+            row["is_default"] or row["binding_present"] or chips or fields
+        ):
+            raise ProtocolValidationError("synthetic row fabricated card data")
+        if row["binding_present"] and not capability["supports_bindings"] or fields and not capability["supports_field_selection"]:
+            raise ProtocolValidationError("unsupported card facts")
+        _validate_card_artwork(row, selected)
         if row["status"] != "card":
-            if row["url"] is not None or row["face_rect"] is not None or row["stage"] is not None or row["is_default"] or row["binding_present"] or chips or fields:
-                raise ProtocolValidationError("synthetic row fabricated card data")
             continue
-        url = _text(row["url"], GALLERY_MAX_URL, "gallery url")
-        directory = "character" if selected.kind is ArtSubjectKind.CHARACTER else "monster"
-        prefix = f"/art/gallery/{directory}/{selected.key}/{row['image_id']}"
-        if not url.startswith(prefix) or url[len(prefix):] not in STORE_EXTENSIONS:
-            raise ProtocolValidationError("url must name selected subject and image")
-        try:
-            gallery_api.validate_face_rect(row["face_rect"])
-            gallery_api.validate_stage(row["stage"])
-        except gallery_api.GalleryRecordError as exc:  # observability: ignore R2: wire rectangle rejection is returned to the caller
-            raise ProtocolValidationError("invalid face_rect or stage") from exc
         slot_chips = [label for label in SLOT_LABELS.values() if label in chips]
         face_chips = [c for c in chips if c in ("預設臉框", "自訂臉框")]
         if len(face_chips) != 1:
@@ -271,8 +401,6 @@ def validate_gallery(payload):
         expected = slot_chips + face_chips + (["目前預設"] if row["is_default"] else [])
         if chips != expected or bool(slot_chips) != row["binding_present"]:
             raise ProtocolValidationError("incoherent chips")
-        if row["binding_present"] and not capability["supports_bindings"] or fields and not capability["supports_field_selection"]:
-            raise ProtocolValidationError("unsupported card facts")
     filters = payload["filters"]
     _exact(filters, ("all", "defaults", "bound", "pending", "failed"), "filters")
     if any(_integer(value, "filter count") < 0 for value in filters.values()) or filters != _filters(cards):
@@ -380,28 +508,190 @@ def _equipment(snapshot):
 CARD_LABEL = "肖像"
 PENDING_LABEL = "肖像（生成中）"
 
+# The exact-image tail of a descriptor's subject identity: a card's canonical
+# UUID verbatim, or the digest prefix of a catalog identity that has no UUID,
+# cut to the same length so ONE descriptor subject-identity bound covers both.
+EXACT_IMAGE_TAIL = 36
 
-def _synthetic(image_id, timestamp, status, label):
+
+def _subject_digest(subject):
+    """The bounded stable hash half of one descriptor's subject identity."""
+    return hashlib.sha256(subject.full().encode("utf-8")).hexdigest()
+
+
+def _card_subject_id(subject, image_id):
+    """One card's exact subject identity: the subject digest plus its image UUID."""
+    return f"{_subject_digest(subject)}:{image_id}"
+
+
+def _official_subject_id(subject, identity):
+    """One official row's exact subject identity, same shape and bound as a card's."""
+    return f"{_subject_digest(subject)}:{descriptors.identity_version(identity)[:EXACT_IMAGE_TAIL]}"
+
+
+def _generation_facts(subject, record, cards, pending):
+    """The subject's recorded generation key and state, independent of any candidate.
+
+    The gallery's own recorded generation truth: a live in-flight request is
+    ``pending``, a recorded failure is ``failed``, a stored card means a
+    completed generation exists, and a subject with none of the three is
+    factually ``missing``. Nothing here erases a recorded failure, and nothing
+    here invents an active job: a deliberately disabled or merely unstarted
+    subject claims nothing.
+    """
+    if pending:
+        state = descriptors.GENERATION_PENDING
+    elif record is not None and record.db.last_error_code:
+        state = descriptors.GENERATION_FAILED
+    elif cards:
+        state = descriptors.GENERATION_DONE
+    else:
+        state = descriptors.GENERATION_MISSING
+    return subject.full(), state
+
+
+def _alpha_terminal(subject, entity):
+    """The subject's committed silhouette as a descriptor's terminal alpha mask.
+
+    Read-only: the seam is consulted with ``report=False`` because the
+    silhouette rides beside the exact original as a decorative fallback rather
+    than being the presented figure. A subject with no resolvable silhouette (a
+    scene) contributes no terminal; every gallery subject resolves one.
+    """
+    fallback = fallback_for(subject, entity=entity, report=False)
+    if not isinstance(fallback, dict):
+        return None
+    identity, key = fallback.get("identity"), fallback.get("key")
+    if not isinstance(identity, str) or not identity or not isinstance(key, str) or not key:
+        return None
+    try:
+        rect = gallery_api.validate_face_rect(fallback.get("face_rect"))
+    except gallery_api.GalleryRecordError:  # observability: ignore R2: the seam's rectangle defaults per contract
+        rect = dict(gallery_api.DEFAULT_FACE_RECT)
+    return descriptors.terminal(
+        descriptors.TERMINAL_ALPHA_MASK,
+        descriptors.gallery_alpha_source_id(key),
+        descriptors.GALLERY_RANK_ALPHA,
+        descriptors.resource(
+            identity,
+            descriptors.identity_version(identity),
+            media_url_for(identity),
+            descriptors.ORIGIN_SILHOUETTE,
+            geometry_payload=descriptors.geometry(
+                face_rect=rect, aspect_ratio=GALLERY_ASPECT_RATIO
+            ),
+        ),
+    )
+
+
+def _card_artwork(subject, card, generation, terminal):
+    """The exact-original descriptor of one stored card row.
+
+    One original identity plus its attributed source facts. A readable card
+    contributes its rank-10 runtime candidate carrying the exact stored
+    geometry, and authorizes retention of that same source while it stays
+    applicable; a card whose output is missing or refused contributes a
+    rank-10 known fault naming that exact image with NO URL, and authorizes no
+    retention — so a vanished output can never leave old pixels standing in
+    for it and never hands the original role to another card.
+    """
+    generation_subject, generation_state = generation
+    source_id = descriptors.gallery_original_source_id(card["image_id"])
+    identity, fault_reason = card_identity_resolution(subject, card)
+    if fault_reason is not None:
+        attempts = [
+            descriptors.fault_attempt(
+                source_id, descriptors.GALLERY_RANK_ORIGINAL, fault_reason
+            )
+        ]
+        retention = []
+    else:
+        attempts = [
+            descriptors.image_attempt(
+                source_id,
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity,
+                    descriptors.identity_version(identity),
+                    media_url_for(identity),
+                    descriptors.ORIGIN_RUNTIME,
+                    geometry_payload=descriptors.geometry(
+                        image_size=descriptors.image_size_payload(**card["image_size"]),
+                        face_rect=card["face_rect"],
+                        stage=card["stage"],
+                        aspect_ratio=GALLERY_ASPECT_RATIO,
+                    ),
+                ),
+            )
+        ]
+        # The token covers the subject, the generation subject, the exact image
+        # and its current authorized binding — never its geometry and never the
+        # pending/failed regeneration state, so a re-render or an in-flight
+        # regeneration cannot revoke a still-valid known-good card.
+        retention = [
+            descriptors.retention_source(
+                source_id,
+                descriptors.retention_token(
+                    subject.full(),
+                    generation_subject,
+                    card["image_id"],
+                    json.dumps(card["binding"], sort_keys=True),
+                    identity,
+                ),
+            )
+        ]
+    return descriptors.descriptor(
+        subject_id=_card_subject_id(subject, card["image_id"]),
+        generation_subject=generation_subject,
+        generation_state=generation_state,
+        attempts=attempts,
+        terminal_payload=terminal,
+        retention_sources=retention,
+    )
+
+
+def _synthetic(subject, image_id, timestamp, status, label, generation_subject, generation_state):
+    """One pending or failed row: truthful generation state and no image at all.
+
+    A request with no stored output carries no candidate, no geometry and no
+    terminal — only the subject's recorded generation state — so a client
+    renders its synthetic treatment and can never mistake a placeholder for an
+    image, nor read a generation state off a candidate. The state is the ROW's
+    own recorded fact: an in-flight request reads ``pending`` and a recorded
+    failure reads ``failed``, even while other requests of the same subject are
+    still in flight.
+    """
     return {
-        "image_id": image_id, "status": status, "label": label, "url": None,
-        "face_rect": None, "stage": None, "is_default": False, "chips": [], "requested_fields": [],
+        "image_id": image_id, "status": status, "label": label,
+        "artwork": descriptors.descriptor(
+            subject_id=_card_subject_id(subject, image_id),
+            generation_subject=generation_subject,
+            generation_state=generation_state,
+            attempts=[], terminal_payload=None, retention_sources=[],
+        ),
+        "is_default": False, "chips": [], "requested_fields": [],
         "binding_present": False, "created_at": timestamp,
     }
 
 
-def _official_entries(subject, entity) -> list[dict]:
+def _official_entries(subject, entity, generation, terminal) -> list[dict]:
     """The selected subject's catalog-admitted official images, as wire rows.
 
     Read-only and bounded. The subject's OFFICIAL CONTENT REFERENCE — never a
     display name or a threat tier — names one catalog content directory, and
     its admitted images become rows in the catalog's deterministic filename
-    order. ``is_current`` marks the subject's retained personal selection and
-    ``is_catalog_default`` the content's default image; the rectangle is the
-    catalog's own validated metadata-or-fitted value. An identity or URL
-    outside the shared wire budget is omitted with one bounded diagnostic
-    instead of failing the panel, exactly as the portrait payload's official
-    branch falls through over budget. An entity declaring no reference, or a
-    reference the snapshot does not hold, yields an empty list.
+    order. Each row's descriptor carries that ONE exact image as its rank-10
+    official candidate — the admitted decoded size and the catalog's validated
+    metadata-or-fitted rectangle — plus the retained startup faults the source
+    facts recorded: the directory's declared-default fault precedes the
+    deterministic substitute it caused, and an image's own metadata fault sits
+    at its candidate's source and rank. ``is_current`` marks the subject's
+    retained personal selection and ``is_catalog_default`` the content's
+    default image. An identity or URL outside the shared wire budget is
+    omitted with one bounded diagnostic instead of failing the panel, exactly
+    as the portrait payload's official branch falls through over budget. An
+    entity declaring no reference, or a reference the snapshot does not hold,
+    yields an empty list.
     """
     from world.art.official import current_catalog
     from world.art.official_refs import official_content_reference_for_entity
@@ -416,6 +706,12 @@ def _official_entries(subject, entity) -> list[dict]:
     if content is None:
         return []
     selection = gallery_api.official_preferences_for(subject).selection
+    generation_subject, generation_state = generation
+    declared_faults = [
+        (descriptors.gallery_official_source_id(fault.identity), fault.reason)
+        for fault in catalog.source_faults(reference.kind, reference.key)
+        if fault.scope == official_api.SOURCE_SCOPE_DEFAULT
+    ]
     entries: list[dict] = []
     for identity in content.images:
         if len(entries) >= GALLERY_MAX_OFFICIAL_ENTRIES:
@@ -433,11 +729,63 @@ def _official_entries(subject, entity) -> list[dict]:
                 context={"subject": subject.full(), "identity": identity},
             )
             continue
+        source_id = descriptors.gallery_official_source_id(identity)
+        attempts: list[dict] = []
+        if identity == content.default_identity:
+            # The directory's declared-default fault precedes the substitute it
+            # forced, and never taints a healthy sibling.
+            for fault_source, reason in declared_faults:
+                if fault_source != source_id:
+                    attempts.append(
+                        descriptors.fault_attempt(
+                            fault_source, descriptors.GALLERY_RANK_ORIGINAL, reason
+                        )
+                    )
+        own_fault = catalog.fault_for(identity)
+        if own_fault is not None:
+            attempts.append(
+                descriptors.fault_attempt(
+                    source_id, descriptors.GALLERY_RANK_ORIGINAL, own_fault.reason
+                )
+            )
+        attempts.append(
+            descriptors.image_attempt(
+                source_id,
+                descriptors.GALLERY_RANK_ORIGINAL,
+                descriptors.resource(
+                    identity,
+                    image.fingerprint,
+                    url,
+                    descriptors.ORIGIN_OFFICIAL,
+                    geometry_payload=descriptors.geometry(
+                        image_size=descriptors.image_size_payload(**image.image_size),
+                        face_rect=dict(image.face_rect),
+                        aspect_ratio=GALLERY_ASPECT_RATIO,
+                    ),
+                ),
+            )
+        )
         entries.append(
             {
                 "identity": identity,
-                "url": url,
-                "face_rect": dict(image.face_rect),
+                "artwork": descriptors.descriptor(
+                    subject_id=_official_subject_id(subject, identity),
+                    generation_subject=generation_subject,
+                    generation_state=generation_state,
+                    attempts=attempts,
+                    terminal_payload=terminal,
+                    retention_sources=[
+                        descriptors.retention_source(
+                            source_id,
+                            descriptors.retention_token(
+                                subject.full(),
+                                generation_subject,
+                                identity,
+                                image.fingerprint,
+                            ),
+                        )
+                    ],
+                ),
                 "is_current": identity == selection,
                 "is_catalog_default": identity == content.default_identity,
             }
@@ -463,9 +811,13 @@ def gallery_presenter(context: PresentationContext):
     snapshot = gallery_api.snapshot_for(entity) if capability.supports_bindings else None
     rows, warnings, seen = [], [], set()
     cards = sorted(gallery_api.cards_for(subject), key=lambda card: -card["created_at"])
+    # One generation fact pair and one silhouette per panel: every row's
+    # descriptor carries the same subject-level truth, and the exact-original
+    # candidates it is presented beside never change it.
+    generation = _generation_facts(subject, record, cards, pending)
+    terminal = _alpha_terminal(subject, entity)
     for card in cards:
-        identity = validated_card_identity(subject, card)
-        if identity is None or card["image_id"] in seen:
+        if card["image_id"] in seen:
             continue
         seen.add(card["image_id"])
         binding = card["binding"] if capability.supports_bindings else None
@@ -477,8 +829,7 @@ def gallery_presenter(context: PresentationContext):
         label = CARD_LABEL
         rows.append({
             "image_id": card["image_id"], "status": "card", "label": label,
-            "url": media_url_for(identity), "face_rect": card["face_rect"],
-            "stage": card["stage"],
+            "artwork": _card_artwork(subject, card, generation, terminal),
             "is_default": is_default, "chips": chips,
             "requested_fields": card["requested_fields"], "binding_present": binding is not None,
             "created_at": card["created_at"],
@@ -494,16 +845,23 @@ def gallery_presenter(context: PresentationContext):
             warnings.append({"image_id": card["image_id"], "label": label, "conditions": conditions})
     for job in pending:
         if job["image_id"] not in seen:
-            rows.append(_synthetic(job["image_id"], job["enqueued_at"], "pending", PENDING_LABEL))
+            rows.append(_synthetic(
+                subject, job["image_id"], job["enqueued_at"], "pending", PENDING_LABEL,
+                generation[0], descriptors.GENERATION_PENDING,
+            ))
     if error:
         image_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{subject.full()}:{error['at']}:{error['code']}"))
-        rows.append(_synthetic(image_id, error["at"], "failed", f"暫時無法生成，稍後再試（{error['code']}）"))
+        rows.append(_synthetic(
+            subject, image_id, error["at"], "failed",
+            f"暫時無法生成，稍後再試（{error['code']}）",
+            generation[0], descriptors.GENERATION_FAILED,
+        ))
     rows.sort(key=lambda row: -row["created_at"])
     return validate_gallery({
         "schema_version": GALLERY_SCHEMA_VERSION, "available": True, "kind": "gallery",
         "subjects": [entry[0] for entry in rail], "selected": subject.full(),
         "filters": _filters(rows), "cards": rows,
-        "official_entries": _official_entries(subject, entity),
+        "official_entries": _official_entries(subject, entity, generation, terminal),
         "equipment_summary": _equipment(snapshot) if snapshot is not None else None,
         "capabilities": {field: (subject.kind is ArtSubjectKind.CHARACTER if field == "supports_personal_official_preferences" else getattr(capability, field)) for field in CAPABILITY_FIELDS},
         "binding_warnings": warnings, "error_state": error,

@@ -12,56 +12,49 @@ import {
   resizeFaceRect,
 } from "./face-rect-edit.js";
 import { galleryCardName, galleryDate } from "./gallery-copy.js";
-import { useImageAttempts } from "../composables/useImageAttempts.js";
+import { artworkAvailability, artworkGeometry } from "../lib/artwork.js";
+import { useArtwork } from "../composables/useArtwork.js";
 import "./gallery.css";
 
 const props = defineProps({
+  // The committed gallery panel the edited row came from: its availability is
+  // the fact this editor position is judged against.
+  panel: { type: Object, default: null },
   card: { type: Object, required: true },
   disabled: { type: Boolean, default: false },
   rejected: { type: Boolean, default: false },
 });
 const emit = defineEmits(["close", "submit", "log"]);
-const rect = ref(props.card.face_rect ? clampFaceRect(props.card.face_rect) : defaultFaceRect());
+// The exact original this editor edits, read from the row's own canonical
+// descriptor: its committed rectangle, its decoded size and its resource. The
+// editor keeps its local geometry lifecycle (drag/resize/numeric fields) but
+// takes its loading from the shared ordered-attempt driver — there is no
+// second request builder and no local failed-URL cache.
+const geometry = computed(() => artworkGeometry(props.card.artwork));
+const rect = ref(geometry.value?.face_rect ? clampFaceRect(geometry.value.face_rect) : defaultFaceRect());
 const root = ref(null);
 const image = ref(null);
 let trap;
 let drag = null;
 
-// One rank-10 original resource request built from the exact committed card
-// facts this editor already receives (change unified-image-loading-core). This
-// is ordinary internal loading input for one existing exact original: no
-// subject descriptor, no panel-version parsing, and no reader accepts a new
-// shape — the gallery v2 serializer and its active validator stay unchanged.
-// The later gallery-v3 cutover replaces this caller input with its backend
-// descriptor; the same resource driver remains.
-const request = computed(() => {
-  const url = typeof props.card.url === "string" && props.card.url ? props.card.url : null;
-  if (!url) return null;
-  return {
-    subjectId: url,
-    epoch: props.card.image_id,
-    attempts: [{
-      type: "image",
-      source_id: `gallery.original:${props.card.image_id}`,
-      rank: 10,
-      resource: {
-        resource_id: url,
-        version: props.card.image_id,
-        url,
-        origin: "runtime",
-        geometry: {
-          face_rect: props.card.face_rect ?? null,
-          image_size: props.card.image_size ?? null,
-        },
-      },
-    }],
-    terminal: null,
-  };
-});
-const availability = computed(() => ({ state: "ready", view_subject_id: props.card.image_id }));
-const { attempt, phase, dimensions, reachedFaults, saveEligible, onImageLoad, onImageError, dispose } = useImageAttempts(request, availability);
+const availability = computed(() => artworkAvailability({
+  panel: props.panel,
+  hasReference: !!props.card.artwork,
+  artwork: props.card.artwork,
+  viewSubjectId: props.card.image_id,
+}));
+const { attempt, phase, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+  () => props.card.artwork,
+  availability,
+  // This editor MEASURES the exact original: the descriptor's silhouette
+  // terminal is not a geometry reference, so the request excludes it.
+  { terminal: false },
+);
 
+// With no terminal in the request, a successful phase can only be the exact
+// original: a failed original exhausts and leaves the editor unsavable.
 const loaded = computed(() => phase.value === "success");
+const saveReady = computed(() => loaded.value && !!dimensions.value && !panelUnavailable.value);
 const imageUrl = computed(() => attempt.value?.url ?? null);
 // The crop preview reuses the already observed successful resource; it is never
 // a second original that can fail on its own.
@@ -83,9 +76,9 @@ const rectStyle = computed(() => ({
 // edits, because the watcher only fires on a new attempt token.
 let seededKey = null;
 watch([phase, () => attempt.value?.token], ([value, token]) => {
-  if (value !== "success" || token == null || token === seededKey) return;
+  if (!loaded.value || token == null || token === seededKey) return;
   seededKey = token;
-  const anchor = props.card.face_rect;
+  const anchor = geometry.value?.face_rect;
   if (!anchor || (anchor.x === 0.25 && anchor.y === 0.06 && anchor.w === 0.5 && anchor.h === 0.5)) {
     rect.value = defaultFaceRect(dimensions.value);
   } else {
@@ -121,7 +114,7 @@ function edit(field, event) {
   rect.value = editFaceRectField(rect.value, field, event.target.valueAsNumber, dimensions.value);
 }
 function submit() {
-  if (!saveEligible.value || !dimensions.value) return;
+  if (!saveReady.value) return;
   const finalRect = clampFaceRect(rect.value, dimensions.value);
   emit("submit", { face_rect: finalRect });
 }

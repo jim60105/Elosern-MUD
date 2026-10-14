@@ -163,6 +163,32 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   unreadable, undecodable, and oversized files are refused with bounded
   diagnostics while unrelated artwork still loads. Keep the tree to ordinary
   files and directories.
+
+### What the gallery shows an operator about these facts
+
+The gallery's official rows (schema version 3) present each admitted image as
+the exact catalog identity inside the canonical artwork descriptor, so the
+retained startup facts above reach the player-facing read model instead of
+staying in the boot log:
+
+- each row carries that ONE exact image as its rank-10 official candidate — the
+  fingerprinted `/art/official/<sha256>/<identity>` route, the admitted decoded
+  size and the catalog's validated metadata-or-fitted rectangle, with no stage;
+- the directory's **declared-default fault precedes the deterministic
+  substitute it caused** (`source_id` naming the refused declared identity), and
+  an image's own `metadata_invalid` fact sits at that candidate's own source and
+  rank. Adding either fault changes no source priority, and neither ever taints
+  a healthy sibling;
+- the selected subject's own committed silhouette rides as the row's terminal
+  alpha mask, so a preview still has a subject-appropriate fallback if the
+  official bytes fail to load in the browser;
+- an identity whose fingerprinted URL would exceed the shared media ceiling
+  (256 code points) is still omitted with the single bounded
+  `gallery_official_entry_skipped` diagnostic rather than failing the panel.
+
+Nothing in this path writes: the mounted directory stays read-only and no
+preference, card or file is touched by rendering the panel.
+
 - Place the license notice for the artwork itself as a top-level `LICENSE`
   (or alongside the artwork in your own distribution); the server ignores
   non-directory root entries and never serves or logs the file. Official

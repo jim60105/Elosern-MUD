@@ -64,6 +64,7 @@ var creation = require("./panels/creation.js");
 var exploration = require("./panels/exploration.js");
 var character = require("./panels/character.js");
 var art = require("./panels/art.js");
+var gallery = require("./panels/gallery.js");
 var titles = require("./panels/titles.js");
 var misc = require("./panels/misc.js");
 var exotic = require("./panels/exotic.js");
@@ -73,7 +74,7 @@ var skillUse = require("./panels/skill_use.js");
 
 var PANEL_VALIDATORS = {
   art: art.validateArtPanel,
-  gallery: art.validateGalleryPanel,
+  gallery: gallery.validateGalleryPanel,
   exploration: exploration.validateExplorationPanel,
   character: character.validateCharacterPanel,
   title_codex: titles.validateTitleCodexPanel,

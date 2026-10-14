@@ -4,16 +4,39 @@ import DrawerHeader from "./DrawerHeader.vue";
 import { createFocusTrap } from "./focus-trap.js";
 import { clampStage, editStageField, moveStage } from "./stage-transform-edit.js";
 import { galleryCardName } from "./gallery-copy.js";
+import { artworkAvailability, artworkGeometry } from "../lib/artwork.js";
+import { useArtwork } from "../composables/useArtwork.js";
 import "./gallery.css";
-const props = defineProps({ card: { type: Object, required: true }, disabled: Boolean, rejected: Boolean });
+const props = defineProps({ panel: { type: Object, default: null }, card: { type: Object, required: true }, disabled: Boolean, rejected: Boolean });
 const emit = defineEmits(["close", "submit", "log"]);
 const titleId = useId();
 const root = ref(null);
-const image = ref(null);
-const draft = ref(clampStage(props.card.stage));
+// The exact original's committed placement, read from the row's own canonical
+// descriptor; the loading itself goes through the shared ordered-attempt
+// driver, so this editor has no request builder and no failed-URL cache.
+const geometry = computed(() => artworkGeometry(props.card.artwork));
+const availability = computed(() => artworkAvailability({
+  panel: props.panel,
+  hasReference: !!props.card.artwork,
+  artwork: props.card.artwork,
+  viewSubjectId: props.card.image_id,
+}));
+const { attempt, phase, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+  () => props.card.artwork,
+  availability,
+  // This editor MEASURES the exact original: the descriptor's silhouette
+  // terminal is not a stage reference, so the request excludes it.
+  { terminal: false },
+);
+const draft = ref(clampStage(geometry.value?.stage));
 const numberDraft = ref(Object.fromEntries(Object.entries(draft.value).map(([field, value]) => [field, String(value)])));
-const loaded = ref(false);
-const failed = ref(false);
+// With no terminal in the request, a successful phase can only be the exact
+// original.
+const loaded = computed(() => phase.value === "success");
+// A reached fault (the original's own load/decode failure) or an unavailable
+// panel: either way this editor has no reference to measure and cannot save.
+const failed = computed(() => !loaded.value && (panelUnavailable.value || reachedFaults.value.length > 0));
+const imageUrl = computed(() => attempt.value?.url ?? null);
 const submitted = ref(false);
 let trap;
 let drag = null;
@@ -27,9 +50,8 @@ const figureStyle = computed(() => ({ "--stage-scale": draft.value.scale, "--sta
 onMounted(() => {
   trap = createFocusTrap(root.value, { openerEl: document.activeElement });
   trap.enter();
-  if (image.value?.complete && image.value.naturalWidth > 0) loaded.value = true;
 });
-onBeforeUnmount(() => trap?.restore());
+onBeforeUnmount(() => { trap?.restore(); dispose(); });
 function keydown(event) {
   event.stopPropagation();
   if (event.key === "Escape") { event.preventDefault(); emit("close"); }
@@ -65,7 +87,7 @@ function move(event) {
 function end(event) { if (drag?.id === event.pointerId) drag = null; }
 function reset() { if (!locked.value) { draft.value = clampStage(null); numberDraft.value = { scale: "1", x: "0", y: "0" }; submitted.value = false; } }
 function submit() {
-  if (locked.value || !loaded.value || failed.value) return;
+  if (locked.value || !loaded.value || panelUnavailable.value) return;
   submitted.value = true;
   emit("submit", { stage: { ...draft.value } });
 }
@@ -85,7 +107,7 @@ function readout(field) {
           <div class="stage-transform__well">
             <div class="stage-transform__frame" :class="{ 'is-ready': loaded && !locked }" @pointerdown="start" @pointermove="move" @pointerup="end" @pointercancel="end" @lostpointercapture="end">
               <span class="stage-transform__adult" aria-hidden="true"></span>
-              <img v-if="!failed" ref="image" class="stage-transform__figure" :src="card.url" :alt="galleryCardName(card)" :style="figureStyle" draggable="false" @load="loaded = true" @error="failed = true; loaded = false">
+              <img v-if="imageUrl" :key="attempt.token" class="stage-transform__figure" :src="imageUrl" :data-attempt-token="attempt.token" :alt="galleryCardName(card)" :style="figureStyle" draggable="false" @load="onImageLoad" @error="onImageError">
               <span class="stage-transform__floor" aria-hidden="true"></span>
             </div>
           </div>
@@ -103,7 +125,7 @@ function readout(field) {
           </div>
           <button :disabled="locked" class="stage-transform__reset" @click="reset">重設</button>
           <div class="stage-transform__state" role="status">
-            <p v-if="failed" class="stage-transform__error">圖片載入失敗，無法儲存調整。</p>
+            <p v-if="failed" class="stage-transform__error">{{ panelUnavailable ? "圖片面板目前無法提供資料。" : "圖片載入失敗，無法儲存調整。" }}</p>
             <p v-else-if="!loaded" class="gallery-muted">圖片載入中，暫時無法儲存。</p>
             <p v-else-if="locked" class="gallery-muted">調整暫時無法操作，請等待儲存完成或連線恢復。</p>
             <p v-if="rejected" class="gallery-feedback">操作未完成，調整已保留。<button class="gallery-link" @click="emit('log')">查看伺服器訊息</button></p>

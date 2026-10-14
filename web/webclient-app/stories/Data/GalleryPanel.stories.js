@@ -7,7 +7,7 @@ export default { title: "Data/GalleryPanel", component: GalleryPanel };
 export const Populated = { args: { model: galleryStoryModel() } };
 export const Empty = { args: { model: galleryStoryModel(GALLERY_EMPTY) } };
 export const Monster = { args: { model: galleryStoryModel(GALLERY_MONSTER) } };
-export const Unavailable = { args: { model: { schema_version: 1, available: false, reason: { code: "gallery_unavailable", message: "目前無法讀取肖像圖庫。" } } } };
+export const Unavailable = { args: { model: { schema_version: 3, available: false, reason: { code: "gallery_unavailable", message: "目前無法讀取肖像圖庫。" } } } };
 export const Locked = { args: { model: galleryStoryModel(), disabled: true } };
 
 // The two empty-guidance frames the storyboard publishes explicitly: three
@@ -60,7 +60,12 @@ export const Storyboard = {
               row.chips = row.chips.filter((chip) => chip !== "目前預設");
               if (row.is_default) row.chips.push("目前預設");
             });
-            if (action === "gallery.face_rect.update") next.cards.find((row) => row.image_id === payload.image_id).face_rect = { ...payload.face_rect };
+            // The rectangle lives in the row's own canonical descriptor: the
+            // story server rewrites that exact candidate's geometry.
+            if (action === "gallery.face_rect.update") {
+              const row = next.cards.find((item) => item.image_id === payload.image_id);
+              row.artwork.attempts[0].resource.geometry.face_rect = { ...payload.face_rect };
+            }
             if (action === "gallery.binding.save") {
               const row = next.cards.find((item) => item.image_id === payload.image_id);
               row.binding_present = true;

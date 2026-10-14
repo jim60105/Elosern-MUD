@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from "vue";
 import HudDrawer from "./HudDrawer.vue";
+import ArtworkPreview from "./ArtworkPreview.vue";
 import { GALLERY_SLOTS, galleryCardName, galleryDate } from "./gallery-copy.js";
 import "./gallery.css";
 
@@ -28,7 +29,7 @@ function warningDate(warning) {
       <p class="gallery-muted">僅符合指定的裝備條件時，將自動顯示此角色肖像。</p>
       <div class="gallery-editor-layout">
       <aside class="gallery-editor-reference">
-      <img v-if="card.url" :src="card.url" :alt="galleryCardName(card)" class="gallery-editor-portrait">
+      <ArtworkPreview v-if="card.artwork" class="gallery-editor-portrait" :artwork="card.artwork" :panel="model" :view-subject-id="card.image_id" :alt="galleryCardName(card)" />
       <p>{{ card.label }}<br><span class="gallery-muted">{{ galleryDate(card.created_at).exact ?? galleryDate(card.created_at).relative }}</span></p>
       </aside>
       <div>
