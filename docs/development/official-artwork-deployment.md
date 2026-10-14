@@ -148,7 +148,17 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   filename, a `face_rect`, and a `stage` placement. Without a valid explicit
   default, the first image in deterministic filename order is used; a missing
   manifest is normal and a broken one degrades to the fitted defaults without
-  blocking the directory's other images.
+  blocking the directory's other images. The startup snapshot keeps those
+  outcomes as bounded, attributable facts. A declared `default` that is missing
+  or was refused at admission is reported against that declared name and
+  **before** the deterministic substitute (`explicit_reference_missing`, or
+  `source_rejected` when a file of that name was present but inadmissible); a
+  declared default that was admitted keeps no fault. Rejected or inapplicable
+  manifest metadata is reported as `metadata_invalid` beside the fitted
+  geometry the image actually renders with — the valid image bytes are still
+  served. Only a source's own default/metadata facts are attributed to it: a
+  refused unselected sibling stays a bounded admission diagnostic and never
+  makes a healthy image look broken.
 - Admission is per entry: symlinked, out-of-root, non-regular, unsupported,
   unreadable, undecodable, and oversized files are refused with bounded
   diagnostics while unrelated artwork still loads. Keep the tree to ordinary
@@ -335,8 +345,24 @@ podman compose logs --since 5m | grep bundled_scene_catalog_loaded
 ```
 
 A container that is merely "up" is not proof that artwork is being served: a
-missing, empty, or unreadable root starts normally with
-`reason=official_root_empty`, and the game then uses the built-in silhouettes.
+missing, empty, unreadable or unusable root starts normally, and the game then
+uses the built-in silhouettes. The boundary event carries the root's retained
+health, so the cases are distinguishable instead of guesses:
+
+- `reason=official_root_absent root_state=absent_default root_fault=False` —
+  the optional root was never configured (or `ART_OFFICIAL_ROOT` is empty).
+  This is the supported no-art configuration; there is nothing to fix.
+- `reason=official_root_empty root_state=empty root_fault=False` — a mounted
+  root that holds no admissible content: the volume is mounted but still empty.
+- `root_state=unavailable root_fault=True` — a real failure. Either the root was
+  **explicitly configured** (the environment bound `ART_OFFICIAL_ROOT`) and is
+  missing, or it cannot be read, or it is a symlink, or it is an existing
+  non-directory entry. The same boot logs one further bounded
+  `reason=source_unavailable` diagnostic on the same event, and neither line
+  names the absolute root. A failed operator root never hides the committed
+  bundled collection and never becomes a substitute image: every identity the
+  catalog did not admit answers 404.
+
 After preparing artwork, require the same event to report the indexed content
 directories and images with `reason=official_root_indexed` (for example
 `contents=1 images=7 refused=0`), and treat any refusal count as a to-do
@@ -363,5 +389,7 @@ which the stage survives by design).
 | `permission denied` while creating the content directory | The named volume must be writable by the preparation service's user (UID 1001 of the image). Podman creates a fresh named volume owned by that user; if your engine creates it root-owned, either `chown` the volume to UID 1001 or run one preparation as root (`podman compose --profile artwork-prepare run --rm --user 0 artwork-prepare`) and then **repair ownership**, because root-owned content is unreadable to the game (UID 1001), which would start and silently serve silhouettes: `podman unshare chown -R 1001:1001 "$(podman volume inspect <project>_evennia-art-official --format '{{.Mountpoint}}')"`. |
 | Artwork replaced but the game serves the old bytes | The catalog refreshes only at startup, and old fingerprint URLs intentionally 404. Restart the service. |
 | `official_art_catalog_loaded` reports refusals | Per-entry admission refused unsupported, symlinked, out-of-root, or oversized files; the event and its bounded diagnostics name the offending root-relative paths and the unrelated artwork still loads. |
+| `official_art_catalog_loaded` reports `root_state=unavailable` (with `root_fault=True` and a `reason=source_unavailable` line) | The configured root cannot be used: missing while explicitly bound, unreadable, a symlink, or an existing non-directory entry. Fix the mount or the `ART_OFFICIAL_ROOT` path; a bare `root_state=absent_default root_fault=False` line is the normal unconfigured case and needs no action. |
+| A manifest's declared `default` is not the image the game resolves | The declared filename is missing or was refused at admission. The directory's bounded `manifest_default_not_an_admitted_file` diagnostic names the cause, and the first filename in deterministic order is served instead (a declared default that was admitted is always the one used). |
 | `bundled_scene_catalog_loaded` reports fewer than eleven images | The checkout is missing or has a corrupt `web/static/art/scenes/<scene-key>.webp`; the diagnostics name the affected scene keys. The served identity for a lost file is a real 404 — never another image. |
 | A `scene/<key>/` or `room/<key>/` directory was ignored | The directory key is not registered authored content (the declared scene keys and the authored room-art vocabulary of `world/art/scene_definitions.py`), or the directory entry was refused; the bounded diagnostic names it. |
