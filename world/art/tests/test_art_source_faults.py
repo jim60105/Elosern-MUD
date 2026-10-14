@@ -47,6 +47,7 @@ from world.art.official import (
     SOURCE_REASON_UNAVAILABLE,
     SOURCE_SCOPE_DEFAULT,
     SOURCE_SCOPE_METADATA,
+    SOURCE_SCOPE_SOURCE,
     SourceFault,
     current_catalog,
     load_catalog,
@@ -523,6 +524,166 @@ class FactRetentionTests(_FaultCase):
             f"npc/{_NPC_KEY}/ghost.png",
         )
         self.assertEqual(catalog.source_faults("preset", "t_synth_absent"), ())
+
+    @covers_requirement(
+        "official-artwork-catalog::the-optional-per-content-manifest-follows-the-seed-metadata-convention"
+    )
+    def test_an_unknown_manifest_key_never_loses_the_declared_default(self):
+        """A manifest rejected for an unrelated key still keeps its default fact."""
+        cases = (
+            ("hero.png", SOURCE_REASON_REFERENCE_MISSING, False),
+            ("broken.png", SOURCE_REASON_REJECTED, False),
+            ("a.png", None, True),
+        )
+        for index, (declared, reason, admitted) in enumerate(cases):
+            with self.subTest(declared=declared):
+                self.warn.reset_mock()
+                self.info.reset_mock()
+                reset_catalog()
+                with self.fresh_root(f"unknown-key-{index}"):
+                    identity = self.image("a.png")
+                    self.image("broken.png", content=_UNDECODABLE)
+                    self.manifest({"default": declared, "package_id": "x"})
+                    self.load()
+                catalog = current_catalog()
+                faults = catalog.source_faults("preset", _PRESET_KEY)
+                if reason is None:
+                    self.assertEqual(faults[0].scope, SOURCE_SCOPE_METADATA)
+                    self.assertEqual(
+                        catalog.content("preset", _PRESET_KEY).requested_default,
+                        identity,
+                    )
+                else:
+                    self.assertEqual(
+                        faults[0],
+                        SourceFault(
+                            SOURCE_SCOPE_DEFAULT,
+                            f"preset/{_PRESET_KEY}/{declared}",
+                            reason,
+                        ),
+                    )
+                # Still exactly one manifest diagnostic for the degraded whole.
+                self.assertEqual(
+                    [
+                        candidate
+                        for candidate in self.reasons(self.warn)
+                        if candidate.startswith("manifest_")
+                    ],
+                    ["manifest_not_a_valid_object"],
+                )
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_an_unopenable_content_directory_keeps_a_source_availability_fault(self):
+        self.image("a.png")
+        real_open_dir_fd = official.open_dir_fd
+
+        def _denied(name, **kwargs):
+            if name == _PRESET_KEY:
+                raise PermissionError("denied")
+            return real_open_dir_fd(name, **kwargs)
+
+        with patch.object(official, "open_dir_fd", side_effect=_denied):
+            self.load()
+        catalog = current_catalog()
+        self.assertEqual(
+            catalog.source_faults("preset", _PRESET_KEY),
+            (
+                SourceFault(
+                    SOURCE_SCOPE_SOURCE,
+                    f"preset/{_PRESET_KEY}",
+                    SOURCE_REASON_UNAVAILABLE,
+                ),
+            ),
+        )
+        self.assertIsNone(catalog.content("preset", _PRESET_KEY))
+        self.assertEqual(catalog.refusal_reason(f"preset/{_PRESET_KEY}/a.png"), None)
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_a_failed_enumeration_is_a_source_fault_never_a_missing_reference(self):
+        """A listing failure must not classify an on-disk default as missing.
+
+        The walk lists the root, then the kind, then the content directory, so
+        the third listing call is the content directory's: it fails while the
+        manifest (whose declared default does exist on disk) stays readable.
+        """
+        identity = self.image("a.png")
+        self.manifest({"default": "a.png"})
+        listings = {"calls": 0}
+        real_listdir = official.os.listdir
+
+        def _fail_the_content_listing(target, *args, **kwargs):
+            listings["calls"] += 1
+            if listings["calls"] == 3:
+                raise OSError("denied")
+            return real_listdir(target, *args, **kwargs)
+
+        with patch.object(official.os, "listdir", side_effect=_fail_the_content_listing):
+            self.load()
+        catalog = current_catalog()
+        self.assertEqual(
+            catalog.source_faults("preset", _PRESET_KEY),
+            (
+                SourceFault(
+                    SOURCE_SCOPE_SOURCE,
+                    f"preset/{_PRESET_KEY}",
+                    SOURCE_REASON_UNAVAILABLE,
+                ),
+            ),
+        )
+        self.assertIsNone(catalog.content("preset", _PRESET_KEY))
+        self.assertNotIn("manifest_default_not_an_admitted_file", self.reasons(self.warn))
+        self.assertEqual(catalog.refusal_reason(identity), None)
+
+    @covers_requirement(
+        "official-artwork-catalog::a-missing-or-empty-official-root-is-a-valid-no-art-configuration"
+    )
+    def test_the_unforeseen_fault_path_keeps_the_facts_already_collected(self):
+        """The last-resort handler republishes the facts, not a bare snapshot."""
+        first, second = "t_synth_aaa", "t_synth_zzz"
+        registry = patch.object(
+            official,
+            "_registered_preset_keys",
+            return_value=frozenset({first, second}),
+        )
+        registry.start()
+        self.addCleanup(registry.stop)
+        self.image("bad.jxl", kind="preset", key=first)
+        self.manifest({"default": "hero.png"}, kind="preset", key=first)
+        self.image("a.png", kind="preset", key=second)
+        real_parse_manifest = official._parse_manifest
+
+        def _explode_on_the_second(content_fd, admitted_names, diagnostics, kind, key):
+            if key == second:
+                raise RuntimeError("unforeseen")
+            return real_parse_manifest(
+                content_fd, admitted_names, diagnostics, kind, key
+            )
+
+        with patch.object(official, "_parse_manifest", side_effect=_explode_on_the_second):
+            summary = self.load()
+        catalog = current_catalog()
+        self.assertEqual(catalog.root_health().reason, "catalog_load_failed")
+        self.assertTrue(catalog.root_health().fault)
+        self.assertTrue(summary["root_fault"])
+        self.assertEqual(len(catalog), 0)
+        self.assertEqual(
+            catalog.source_faults("preset", first),
+            (
+                SourceFault(
+                    SOURCE_SCOPE_DEFAULT,
+                    f"preset/{first}/hero.png",
+                    SOURCE_REASON_REFERENCE_MISSING,
+                ),
+            ),
+        )
+        self.assertEqual(
+            catalog.refusal_reason(f"preset/{first}/bad.jxl"),
+            "unsupported_extension_skipped",
+        )
 
 
 class RuntimeLookupSmokeTests(_FaultCase):

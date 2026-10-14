@@ -98,7 +98,11 @@ identity built from a validated single-segment filename, never an echoed raw
 manifest string, an absolute root, or exception text. The facts are recorded
 independently of the diagnostic emission budget, and reading one is a single
 in-memory lookup for a supplied identity: never an enumeration and never a
-filesystem probe.
+filesystem probe. The refusal map is the one fact whose SIZE follows the tree
+(one small entry per refused candidate, for the restart's lifetime) rather than
+the per-load diagnostic budget: silently capping it would make a lookup for a
+supplied identity claim "healthy" about an entry the load actually refused. Its
+peak footprint stays the order of the listing the walk already materializes.
 
 Imports stay on the deterministic-path side of the package: stdlib, Django
 settings, Pillow, the gallery geometry validators, the shared confinement and
@@ -180,9 +184,12 @@ SOURCE_REASON_METADATA_INVALID = "metadata_invalid"
 
 # The closed fact scopes: a fault attributable to a content directory's
 # manifest-declared default (it precedes every deterministic substitute) or to
-# one admitted image whose declared metadata was replaced by the fitted one.
+# one admitted image whose declared metadata was replaced by the fitted one,
+# plus the availability failure of one authorized content directory the walk
+# could not enumerate at all.
 SOURCE_SCOPE_DEFAULT = "default"
 SOURCE_SCOPE_METADATA = "metadata"
+SOURCE_SCOPE_SOURCE = "source"
 
 # The closed root-health vocabulary of one load. ``absent_default`` is the
 # normal no-art configuration (a deliberately unbound or deliberately empty
@@ -397,9 +404,13 @@ class OfficialCatalog:
     def fault_for(self, identity: str) -> SourceFault | None:
         """The bounded metadata fault attributed to one exact admitted image.
 
-        ``None`` for a healthy image — including a healthy image whose sibling
-        was refused or whose directory declared a default that failed (that
-        fault belongs to the declared default, not to this image).
+        ``None`` for an image whose declared metadata was applied as written —
+        including an image whose sibling was refused (a refusal is an
+        operational diagnostic, never a fault of this identity). An image whose
+        directory degraded its manifest WHOLE has its declared metadata replaced
+        by the fitted one, so it carries ``metadata_invalid``; that is a
+        separate fact from the directory's declared-default fault, which
+        :meth:`source_faults` reports under the declared identity instead.
         """
         return self._identity_faults.get(identity)
 
@@ -651,10 +662,18 @@ def _parse_manifest(
     except (UnicodeDecodeError, ValueError):  # observability: ignore R2: malformed JSON degrades whole via the diagnostic below
         diagnostics.emit("manifest_unreadable", kind=kind, key=key)
         return _ContentManifest(None, None, None, None, "manifest_unreadable")
-    if not isinstance(raw, dict) or not set(raw) <= _MANIFEST_KEYS:
+    if not isinstance(raw, dict):
         diagnostics.emit("manifest_not_a_valid_object", kind=kind, key=key)
         return _ContentManifest(None, None, None, None, "manifest_not_a_valid_object")
+    # The declared default is extracted BEFORE the key contract is checked, so a
+    # manifest that is rejected for an unrelated unknown key still keeps its
+    # bounded requested-default fact instead of silently losing it.
     declared_default = _bounded_declared_default(raw.get("default"))
+    if not set(raw) <= _MANIFEST_KEYS:
+        diagnostics.emit("manifest_not_a_valid_object", kind=kind, key=key)
+        return _ContentManifest(
+            None, None, None, declared_default, "manifest_not_a_valid_object"
+        )
     face_rect = None
     if "face_rect" in raw:
         try:
@@ -697,7 +716,7 @@ def _admitted_entries(
     diagnostics: _Diagnostics,
     counters: dict[str, int],
     refused: dict[str, str],
-) -> list[tuple[str, bytes, dict]]:
+) -> list[tuple[str, bytes, dict]] | None:
     """Admit one content folder's images: ``(filename, payload, image_size)``.
 
     Listing order is sorted filename order (the deterministic order the default
@@ -707,12 +726,15 @@ def _admitted_entries(
     refused identity keeps its reason even when the diagnostic budget is
     exhausted), and the walk continues — so the remaining valid images in this
     folder and every other folder still index.
+
+    ``None`` (rather than an empty list) when the listing itself failed: nothing
+    was enumerated, so no caller may infer that a declared filename is absent.
     """
     try:
         names = sorted(os.listdir(content_fd))
     except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
         diagnostics.emit("content_directory_unreadable", kind=kind, key=key)
-        return []
+        return None
     admitted: list[tuple[str, bytes, dict]] = []
     for name in names:
         if name == OFFICIAL_MANIFEST_FILENAME:
@@ -773,28 +795,49 @@ def _index_content(
     admitted: a directory whose every candidate was refused (or whose manifest
     declares a default that no listing entry carries) still keeps its
     attributable declared-default fault and its per-entry refusal reasons, even
-    though no ``OfficialContent`` is published for it.
+    though no ``OfficialContent`` is published for it. A directory the walk
+    cannot open or enumerate at all retains the coarse source-availability
+    fault instead, and nothing is classified from an enumeration that failed.
     """
     try:
         content_fd = open_dir_fd(key, dir_fd=kind_fd)
     except OSError:  # observability: ignore R2: reported through the bounded diagnostic emitter below
         counters["refused"] += 1
         diagnostics.emit("content_directory_unreadable", kind=kind, key=key)
+        facts.source_faults[(kind, key)] = (
+            SourceFault(
+                SOURCE_SCOPE_SOURCE, f"{kind}/{key}", SOURCE_REASON_UNAVAILABLE
+            ),
+        )
         return
     refused: dict[str, str] = {}
     try:
-        admitted = _admitted_entries(
+        entries = _admitted_entries(
             kind, key, content_fd, diagnostics, counters, refused
         )
+        admitted = entries or []
         admitted_names = {name for name, _, _ in admitted}
-        manifest = _parse_manifest(
-            content_fd, admitted_names, diagnostics, kind, key
+        # A failed enumeration made no reference knowable, so no manifest is
+        # consulted: the directory keeps only its availability fact.
+        manifest = (
+            None
+            if entries is None
+            else _parse_manifest(
+                content_fd, admitted_names, diagnostics, kind, key
+            )
         )
     finally:
         os.close(content_fd)
     facts.refusals.update(
         {f"{kind}/{key}/{name}": reason for name, reason in refused.items()}
     )
+    if manifest is None:
+        facts.source_faults[(kind, key)] = (
+            SourceFault(
+                SOURCE_SCOPE_SOURCE, f"{kind}/{key}", SOURCE_REASON_UNAVAILABLE
+            ),
+        )
+        return
     identities: list[str] = []
     metadata_faults: list[SourceFault] = []
     for name, payload, image_size in admitted:
@@ -1131,8 +1174,11 @@ def load_catalog() -> dict:
         )
     except Exception as error:
         # A broken artwork tree is never a startup failure, and the unforeseen
-        # fault must not erase the retained health fact either: the snapshot is
-        # republished fault-bearing instead of reset to an empty one.
+        # fault must not erase the health or source facts collected so far: the
+        # snapshot is republished fault-bearing — with every fact already
+        # retained — instead of reset to an empty one. Only the partially walked
+        # admitted images are dropped, because a partial index is not a snapshot
+        # this catalog can serve from.
         health = _root_health("catalog_load_failed", facts.configured)
         log_warn(
             OFFICIAL_CATALOG_EVENT,
@@ -1145,7 +1191,9 @@ def load_catalog() -> dict:
             },
             exc=error,
         )
-        _CATALOG = OfficialCatalog({}, {}, health)
+        _CATALOG = OfficialCatalog(
+            {}, {}, health, facts.source_faults, facts.refusals
+        )
         return {
             "skipped": True,
             **counters,

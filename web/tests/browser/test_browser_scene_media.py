@@ -52,9 +52,11 @@ SCENES_DIRECTORY = (
 BUNDLED_MEDIA_PREFIX = "/art/bundled-scene/"
 
 # The one method of this class that boots an EXPLICITLY CONFIGURED but
-# unavailable optional operator root: ``runtime.env`` binds ART_OFFICIAL_ROOT to
-# an uncreated runtime child. Every other method leaves the environment binding
-# unset, which is what the unconfigured (normal absence) provenance means.
+# UNAVAILABLE optional operator root: ``runtime.env`` binds ART_OFFICIAL_ROOT to
+# an uncreated runtime child, so the startup index retains a configured-root
+# failure. The sibling method binds the same variable to a prepared root that
+# really exists and indexes normally; a journey that must exercise the
+# unconfigured (normal default absence) meaning never binds the variable at all.
 CONFIGURED_ROOT_FAILURE_METHOD = "test_configured_root_failure_keeps_bundled_media"
 
 # The startup boundary event id and the retained failure category the
