@@ -15,8 +15,7 @@ still shows a dignified portrait instead of a placeholder.
 ### Requirement: The built-in fallback set is a closed vocabulary committed to the repository
 The project SHALL commit exactly one image per key of the closed fallback vocabulary `man`, `woman`,
 `boy`, `girl`, `elder`, `monster_anon` into one fixed in-repo defaults directory, served through the
-existing `/art/defaults/<key>.<ext>` route. These SHALL be the only generated-art files the
-repository tracks: every runtime and seed-synced image stays outside git under the art store root.
+existing `/art/defaults/<key>.<ext>` route. Required bundled official scenes SHALL be an additional tracked-art exception; every runtime and seed-synced image stays outside git under the art store root.
 Each committed image SHALL be bounded in size and SHALL depict no sexualized content.
 
 #### Scenario: Every key resolves to a committed file
@@ -28,12 +27,8 @@ Each committed image SHALL be bounded in size and SHALL depict no sexualized con
 - **THEN** every file corresponds to a vocabulary key and nothing else is present
 
 #### Scenario: Runtime art is still absent from git
-- **WHEN** the repository is inspected for tracked art files
-- **THEN** the defaults directory carries the only generated-art images: a
-  reviewed, exact allowlist of non-runtime images (the
-  `docs/design/elosern-redesign2/` documentation mockups and the
-  `web/webclient-app/assets/redesign/` webclient fixture samples) and the
-  art store root and the seed directory remain untracked
+- **WHEN** tracked artwork is inspected
+- **THEN** the six alpha defaults, required bundled scenes and existing reviewed documentation fixtures are tracked; runtime store, seed images and operator artwork remain untracked
 
 #### Scenario: A contract test locks the vocabulary and directory together
 - **WHEN** the contract test locks the fallback vocabulary and the defaults directory to each other

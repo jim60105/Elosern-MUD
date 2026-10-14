@@ -146,6 +146,16 @@ STATIC_ROOT = _env_path("ELOSERN_BROWSER_STATIC_ROOT", STATIC_ROOT)
 # overridable through the environment) so the harness generates images without
 # a socket.
 ART_STORE_ROOT = _env_path("ELOSERN_BROWSER_ART_ROOT", os.path.join(CACHE_DIR, "art"))
+
+# Operator official-artwork root (official-artwork-catalog). This module does
+# not import the production settings, so the knob is declared with the
+# production default shape: an uncreated child of the runtime cache directory,
+# i.e. the supported "no official artwork" configuration every bundled-art
+# journey boots against. A configured-root fault journey sets
+# ART_OFFICIAL_ROOT explicitly; normal absence never sets an override.
+ART_OFFICIAL_ROOT = _env_path(
+    "ART_OFFICIAL_ROOT", os.path.join(CACHE_DIR, "art-official")
+)
 ART_SD_CLIENT = _env_path(
     "ELOSERN_BROWSER_SD_CLIENT",
     "world.art.fake_sd_client.FakeSDWebUIClient",

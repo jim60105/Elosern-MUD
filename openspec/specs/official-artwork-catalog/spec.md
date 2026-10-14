@@ -13,8 +13,8 @@ Define the read-only external official-artwork directory: the `ART_OFFICIAL_ROOT
 - **THEN** the effective `ART_OFFICIAL_ROOT` is that directory and ordinary startup reads it
 
 #### Scenario: The default directory is not tracked
-- **WHEN** the repository is inspected for tracked paths
-- **THEN** `art-official/` is gitignored and no official artwork blob is tracked, while the six committed built-in defaults remain tracked
+- **WHEN** tracked artwork paths are inspected
+- **THEN** art-official/ remains gitignored; only the closed eleven scene paths under web/static/art/scenes and the existing six alpha defaults are permitted tracked exceptions; packs validate owned files and the complete collection gate begins with catalog integration, while operator artwork stays external
 
 #### Scenario: The game never writes the official root
 - **WHEN** the production modules are inspected for filesystem writes

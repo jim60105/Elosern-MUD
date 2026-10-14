@@ -1,0 +1,57 @@
+{
+  "schema_version": 1,
+  "key": "coastal_path",
+  "label_zh": "海岸小徑",
+  "scene_sentence_zh": "海風挾著鹹味迎面吹來，浪濤拍打著岸邊的礁石，海平線延伸到視線盡頭。",
+  "asset": "web/static/art/scenes/coastal_path.webp",
+  "file": {
+    "format": "webp",
+    "media_type": "image/webp",
+    "width": 1536,
+    "height": 864,
+    "aspect_ratio": "16:9",
+    "bytes": 218182,
+    "sha256": "71b2841eb89e39e918cddc2c9d532120726649cdbc30da30075b19035ee978ed"
+  },
+  "source": {
+    "kind": "internal_generation",
+    "author": "Elosern project maintainers",
+    "model": "anima/oneObsessionAnima_v40.safetensors",
+    "styles": [
+      "anima-rpg-style",
+      "turbo-anima"
+    ],
+    "modules": [
+      "qwen_3_06b_base.safetensors",
+      "qwen_image_vae.safetensors"
+    ],
+    "seed": 4084266599,
+    "created": "2026-10-14"
+  },
+  "license": {
+    "distribution": "permitted",
+    "terms": "Original artwork generated for this repository by its maintainers and committed with the project; it may be redistributed under the project's own repository terms. No third-party stock imagery, scraped artwork, or externally licensed asset is included."
+  },
+  "production": {
+    "method": "sd-webui txt2img through the repository's internal client (world.art.sd_worker.SDWebUIClient.generate) using the shipped prompt library, then local WebP encoding through world.art.formats.encode",
+    "prompt_template": "art.scene_prompt",
+    "negative_prompt_template": "art.negative_prompt",
+    "prompt_library": "prompts/art.yaml",
+    "description": "a shore path of pale sand and flat stones winding between weathered dark rocks above a churning sea, white surf breaking against reefs below, tall sea grass and driftwood along the trail's edge, the ocean horizon stretching to the far edge of the frame under a windswept sky with scattered gulls, bright saline light with cool shadows, an unobstructed open coastal foreground",
+    "steps": 12,
+    "cfg_scale": 1.5,
+    "sampler": "ER SDE",
+    "scheduler": "beta"
+  },
+  "processing": {
+    "encoder": "world.art.formats.encode",
+    "output_format": "webp",
+    "quality": 88,
+    "metadata": "a1111_parameters"
+  },
+  "visual_review": {
+    "native_scale": "Reviewed at native 1536x864: a painterly JRPG shore path between rocks above breaking surf, with an unobstructed lower foreground for stage figures, no interface, watermark or readable lettering, and no town/forest reuse.",
+    "desktop_cover_crop": "Reviewed under the desktop 1451x790 cover crop (browser method web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_outdoor_pack_static_decode): the full-bleed composition holds and the illustration stays distinguishable from its siblings at that viewport.",
+    "contact_sheet": "Reviewed as a three-up contact sheet beside wilderness_path and mountain_path: scene identity, palette and composition are distinct for every sibling."
+  }
+}

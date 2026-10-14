@@ -386,6 +386,7 @@
       "index": 16,
       "name": "art-16",
       "files_a": [
+        "web.tests.browser.test_browser_bundled_scene_assets.BundledSceneAssetsBrowserTest.test_outdoor_pack_static_decode",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_combat_portrait_overlay_shows_name_and_role",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_keyboard_focus_switches_the_portrait_without_a_packet",
         "web.tests.browser.test_browser_art.ArtCombatBrowserTest.test_portrait_overlay_usable_at_the_reference_viewport",
