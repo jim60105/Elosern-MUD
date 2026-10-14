@@ -37,12 +37,12 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def test_combat_participant_frame_presents_participants_and_portraits(self):
         """The combat participant frame presents the session's participants and portraits."""
         page = self.logged_in_page()
-        # The injected catalog's fake URLs must actually load: since
-        # webclient-combat-participant-polish a failed portrait load swaps the
-        # image for an accessible placeholder, so an unresolvable URL would
-        # assert placeholder behavior instead of the catalog-image behavior
-        # this journey owns (same route-stub technique as test_browser_art's
-        # degradation journey, here fulfilling instead of aborting).
+        # The injected catalog's fake URLs must actually load: a failed
+        # portrait load steps past to the row's identity glyph and keeps the
+        # shared local failure marker, so an unresolvable URL would assert the
+        # failure behavior instead of the catalog-image behavior this journey
+        # owns (same route-stub technique as test_browser_art's degradation
+        # journey, here fulfilling instead of aborting).
         page.route(
             "**/art/portrait_*.png",
             lambda route: route.fulfill(
@@ -73,11 +73,26 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # A non-active participant carries an explicit text state marker.
         self.assertIn("倒地", frame_text, "a knocked-out participant is marked in text, not colour alone")
 
-        # Portraits resolve only through the committed art portrait catalog.
-        imgs = frame.locator("img.participant-frame__portrait")
-        placeholders = frame.locator('[data-testid="participant-portrait-placeholder"]')
+        # Portraits resolve only through the committed art portrait catalog: the
+        # shared figure renderer's avatar position carries one attempt element
+        # per admitted row, and a null reference draws the identity glyph
+        # instead (never a failure marker).
+        imgs = frame.locator(
+            '[data-testid="reference-artwork"] img.reference-artwork__figure'
+        )
         self.assertEqual(imgs.count(), 2, "resolvable portrait references render the catalog image")
-        self.assertEqual(placeholders.count(), 0, "a null portrait_ref renders no placeholder card")
+        imgs.first.wait_for(state="attached", timeout=15000)
+        page.wait_for_function(
+            "() => Array.from(document.querySelectorAll("
+            "'[data-testid=\"participant-frame\"] img.reference-artwork__figure'))"
+            ".every((img) => img.complete && img.naturalWidth > 0)",
+            timeout=15000,
+        )
+        self.assertEqual(
+            frame.locator('[data-testid="artwork-failure"]').count(),
+            0,
+            "a resolvable portrait reference reports no local failure",
+        )
         # actor-right holds only the foe line-up's decorative actors
         # (webclient-combat-foes-on-stage): the active foes, no frame content.
         right = page.locator('[data-anchor="actor-right"]')

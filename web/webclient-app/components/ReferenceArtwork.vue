@@ -196,9 +196,16 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
         <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
       </div>
     </div>
+    <!-- The framed layout takes the descriptor's terminal too: the committed
+         silhouette paints once its own resource loaded, and the identity text
+         always stands (a placeholder is never a bare rectangle). -->
     <div v-else-if="!stage && !avatar && !realImage && !loading" class="reference-artwork__placeholder" data-testid="reference-artwork__placeholder">
-      <span class="reference-artwork__placeholder-glyph">{{ glyph }}</span>
-      <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
+      <ArtworkAlpha v-if="alphaResult" :result="alphaResult" />
+      <span class="reference-artwork__cover-text">
+        <span class="reference-artwork__placeholder-glyph">{{ glyph }}</span>
+        <span class="reference-artwork__identity">{{ name }}</span>
+        <span class="reference-artwork__placeholder-label">{{ stateLabel }}</span>
+      </span>
     </div>
     <span v-else-if="avatar && !realImage && !loading" class="reference-artwork__avatar-glyph" :data-testid="initialTestId ?? 'reference-artwork__placeholder'" aria-hidden="true">{{ glyph }}</span>
     <figcaption v-if="stage" class="reference-artwork__stage-caption">{{ name }}{{ name && stateLabel ? "，" : "" }}{{ stateLabel }}</figcaption>
@@ -238,6 +245,17 @@ const glyph = computed(() => portraitGlyph(glyphSource.value));
   gap: calc(6px * var(--ui-scale));
   background: linear-gradient(160deg, #1a1d20, #101214);
   mask-image: linear-gradient(to bottom, #000 78%, transparent 100%);
+}
+.reference-artwork__placeholder > .artwork-alpha {
+  position: absolute;
+  inset: 0;
+}
+.reference-artwork__cover-text {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: calc(6px * var(--ui-scale));
+  text-align: center;
 }
 .reference-artwork__placeholder-glyph {
   color: var(--gold-600, #8a6d3b);

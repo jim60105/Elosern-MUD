@@ -612,13 +612,14 @@ def _refusal_descriptor(entity, subject: ArtSubject | None) -> dict:
     presentation has always carried for such an entity — a fallback, never a
     real candidate.
 
-    ``subject_id`` is the position's stable lifecycle identity: the portrait
-    subject key when the entity has one (an age-refused character, whose
-    policy still names a subject) and the entity's own stable decimal runtime
-    identity otherwise. It is deliberately NOT a generation key — that is
-    ``generation_subject``, which is null here — so a re-presentation of the
-    same position keeps the same resolution epoch while claiming no
-    generation.
+    ``subject_id`` is the position's stable lifecycle identity and is
+    deliberately the entity's own opaque decimal runtime identity — NEVER the
+    refused subject's key, because a subject that failed eligibility must
+    disclose no subject key at all (its ``portrait_policy.stable_key`` is
+    operator content the refusal must not leak). It is likewise not a
+    generation key — that is ``generation_subject``, which is null here — so a
+    re-presentation of the same position keeps the same resolution epoch while
+    claiming no generation.
     """
     identity = getattr(entity, "pk", None)
     if subject is not None:
@@ -626,7 +627,7 @@ def _refusal_descriptor(entity, subject: ArtSubject | None) -> dict:
     else:
         fallback = _entity_fallback(entity)
     return descriptors.descriptor(
-        subject_id=subject.full() if subject is not None else str(identity),
+        subject_id=str(identity),
         generation_subject=None,
         generation_state=None,
         attempts=[],

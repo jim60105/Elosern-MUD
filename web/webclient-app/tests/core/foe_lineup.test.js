@@ -228,7 +228,10 @@ describe("FoeLineup", () => {
       expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2", "3", "4"]);
     });
 
-    it("resolves current entry before held entry and retains pre-round foe artwork", () => {
+    it("a live catalog omission is a local failure, never concealed by playback data", () => {
+      // The CURRENT committed art panel is authoritative: a held foe whose
+      // reference the live catalog no longer carries reports the local failure
+      // it is, even though the round captured an older entry for it.
       const heldEntry = entry(99);
       heldEntry.artwork.attempts[0].resource = {
         ...heldEntry.artwork.attempts[0].resource,
@@ -248,8 +251,34 @@ describe("FoeLineup", () => {
         },
       });
       const slot = slots()[0];
-      expect(slot.find("img").exists()).toBe(true);
+      expect(slot.find("img").exists()).toBe(false);
+      expect(slot.find('[data-testid="artwork-failure"]').exists()).toBe(true);
+    });
+
+    it("permits the captured catalog only when no live panel is committed", () => {
+      // With no committed `art` panel at all, the round's own captured catalog
+      // (an available panel's catalog when the round began) stands in.
+      const heldEntry = entry(99);
+      heldEntry.artwork.attempts[0].resource = {
+        ...heldEntry.artwork.attempts[0].resource,
+        url: "/art/portraits/held_foe.webp",
+      };
+      const foe99 = foe(99, { display_name: "殘留敵手" });
+      wrapper = mount(FoeLineup, {
+        props: {
+          foes: [foe99],
+          artPanel: null,
+          stage: {
+            key: "round:1",
+            foes: [foe99],
+            foeCatalog: { "99": heldEntry },
+            gestures: {},
+          },
+        },
+      });
+      const slot = slots()[0];
       expect(slot.find("img").attributes("src")).toBe("/art/portraits/held_foe.webp");
+      expect(slot.find('[data-testid="artwork-failure"]').exists()).toBe(false);
     });
 
     it("follows the displayed hit points on each gauge, with no numerals", async () => {

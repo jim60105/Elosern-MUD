@@ -595,8 +595,11 @@ class PortraitAttemptOrderTests(_PortraitAttemptCase):
         self.assertEqual(ineligible["attempts"], [])
         self.assertIsNone(ineligible["generation_subject"])
         self.assertEqual(ineligible["terminal"]["kind"], "alpha_mask")
-        # An age-refused character still names the subject its policy declares.
-        self.assertEqual(ineligible["subject_id"], "portrait:character:ineligible")
+        # A refused subject discloses NO subject key: the descriptor names the
+        # position's opaque runtime identity, never the rejected policy's own
+        # stable key.
+        self.assertEqual(ineligible["subject_id"], str(plain.pk))
+        self.assertNotIn("ineligible", repr(ineligible))
         plain.age = 30
         descriptor = describe_entity(plain)
         self.assertEqual(descriptor["subject_id"], "portrait:character:ineligible")

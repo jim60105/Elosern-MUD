@@ -67,14 +67,19 @@ const slots = computed(() => foeSlots(shown.value.length));
 // The raw catalog entry the participant's `portrait_ref` names: a pending
 // entry keeps its own placeholder card, and a null or unknown reference
 // falls to the StageActor's name placeholder. The client builds no key.
+// The descriptor is read from exactly the catalog the availability panel names:
+// the CURRENT committed `art` panel's catalog whenever one exists, and the held
+// round's captured catalog only when no live panel is committed. A live panel
+// that no longer carries an admitted reference therefore reports the local
+// failure it is, instead of being concealed by retained playback data.
 function entryFor(participant) {
   const ref = participant.portrait_ref;
   if (ref === null || ref === undefined) {
     return null;
   }
   const strRef = String(ref);
-  const entry = props.artPanel?.portrait_catalog?.[strRef] ?? props.stage?.foeCatalog?.[strRef] ?? null;
-  return entry?.artwork ?? null;
+  const catalog = props.artPanel ? props.artPanel.portrait_catalog : props.stage?.foeCatalog;
+  return catalog?.[strRef]?.artwork ?? null;
 }
 
 // The committed panel this position is judged against. The CURRENT committed

@@ -355,7 +355,7 @@ describe("stage silhouette mask", () => {
     wrapper.unmount();
   });
 
-  it("leaves the cover surface free of the silhouette", () => {
+  it("renders the real image alone in cover mode while a candidate loads", () => {
     const wrapper = mount(ReferenceArtwork, {
       props: {
         artwork: resolvedEntry(),
@@ -363,9 +363,43 @@ describe("stage silhouette mask", () => {
         name: "肖像",
       },
     });
+    expect(wrapper.get("img").element.style.objectPosition).toBe("50% 31%");
     expect(wrapper.find(ALPHA).exists()).toBe(false);
     expect(wrapper.find("svg").exists()).toBe(false);
-    expect(wrapper.get("img").element.style.objectPosition).toBe("50% 31%");
+    wrapper.unmount();
+  });
+
+  it("paints the descriptor's terminal in cover mode too, with the identity text", async () => {
+    // A framed layout permits the terminal exactly like the stage: the
+    // committed silhouette paints once its own resource loaded, and the
+    // identity text always stands beside it.
+    const wrapper = mount(ReferenceArtwork, {
+      props: { artwork: silhouetteEntry("man"), panel: PANEL, name: "灰婆婆", initialOf: "灰婆婆" },
+    });
+    expect(wrapper.find(ALPHA).exists()).toBe(false);
+    declareImage(wrapper.get("img").element);
+    await wrapper.get("img").trigger("load");
+    expect(wrapper.find(ALPHA_FILL).exists()).toBe(true);
+    expect(wrapper.get(ALPHA_FILL).element.style.getPropertyValue("--artwork-alpha-mask")).toBe(
+      "url('/art/defaults/man.webp')",
+    );
+    const card = wrapper.get('[data-testid="reference-artwork__placeholder"]');
+    expect(card.text()).toContain("灰婆婆");
+    expect(card.text()).toContain("無肖像");
+    expect(wrapper.find("svg").exists()).toBe(false);
+    wrapper.unmount();
+  });
+
+  it("keeps the identity text and no fill when the cover terminal fails", async () => {
+    const wrapper = mount(ReferenceArtwork, {
+      props: { artwork: silhouetteEntry("man"), panel: PANEL, name: "灰婆婆", initialOf: "灰婆婆" },
+    });
+    await wrapper.get("img").trigger("error");
+    expect(wrapper.find(ALPHA).exists()).toBe(false);
+    const card = wrapper.get('[data-testid="reference-artwork__placeholder"]');
+    expect(card.text()).toContain("灰婆婆");
+    expect(card.text()).toContain("肖像載入失敗");
+    expect(wrapper.get('[data-testid="artwork-failure"]').exists()).toBe(true);
     wrapper.unmount();
   });
 
