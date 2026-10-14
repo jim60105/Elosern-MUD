@@ -16,10 +16,12 @@ const config = {
   // at web/static/art/defaults/) instead of inventing asset-import URLs the
   // wire validators reject.
   //
-  // The redesign's sample scene paintings are served under `/art/showcase/`
-  // too, so the stage-transition stories can hand the real `art` validator
-  // (which accepts only `/art/`-rooted URLs) two distinct scene bitmaps to
-  // crossfade between. Storybook only: the product never serves this path.
+  // The redesign's remaining sample painting (the unrelated guild hall) is
+  // served under `/art/showcase/` for the stories that still frame a
+  // decorative backdrop. The committed bundled scene illustrations under
+  // `web/static/art/scenes/` reach the stories through the `../web/static`
+  // mapping above as `/art/scenes/<key>.webp`, which is the same path the
+  // running game serves them from.
   staticDirs: [
     { from: "../web/static", to: "/" },
     { from: "../web/webclient-app/assets/redesign", to: "/art/showcase" },

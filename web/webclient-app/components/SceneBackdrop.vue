@@ -32,7 +32,7 @@
 import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { artworkAvailability } from "../lib/artwork.js";
 import { artworkFailureCategory } from "../lib/artwork-failure.js";
-import { displayedScene, retainedEntry } from "../lib/scene-artwork.js";
+import { applicableRetained, displayedScene, retainedEntry } from "../lib/scene-artwork.js";
 import { useArtwork } from "../composables/useArtwork.js";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
@@ -128,47 +128,140 @@ watch(
 
 const display = computed(() =>
   displayedScene({
-    retained: retained.value,
+    // The retained entry is re-validated against the COMMITTED descriptor at
+    // read time, so a commit that revokes its authorization (a move, a removed
+    // binding, a changed token) can never paint the previous place's pixels —
+    // not even for the one frame a watcher might lag behind.
+    retained: applicableRetained(retained.value, artwork.value),
     selected: load.selected.value,
     provisional: load.provisionalSelected.value,
     available: availability.value.state,
   }),
 );
 
-// The layers on screen: the displayed bitmap, plus one hidden probe element per
-// resource currently being fetched (the ordered attempt, and the provisional
-// source). A probe is never presented and never carries the image test hook; it
-// exists so the shared driver observes real natural dimensions from the element
-// that owns each attempt. A URL that IS displayed is rendered once, by the
-// displaying layer, so no resource is ever fetched by two elements at once.
-const layers = computed(() => {
+// The crossfade is a SAME-PLACE replacement only.
+//
+// A committed bitmap may fade into its replacement while the logical place and
+// the displayed pixels are the same scene's — a successful candidate replacing
+// this scene's own provisional background, or a same-scene replacement. Every
+// other swap renders instantly: a move, an authorization loss or a dropped
+// image must never leave the previous place's painting fading across the
+// stage, so those swaps have no CSS phase at all and their outgoing layer is
+// gone in the commit's frame.
+const crossfade = ref(false);
+let shownPlace = null;
+watch(
+  () => [display.value?.url ?? null, artwork.value?.subject_id ?? null],
+  () => {
+    const place = artwork.value?.subject_id ?? null;
+    crossfade.value = !!display.value && shownPlace !== null && place === shownPlace;
+    shownPlace = display.value ? place : null;
+  },
+  { immediate: true },
+);
+
+// The crossfade phase's own hooks.
+//
+// The swap's enter/leave is driven from here rather than from transition
+// classes, so a swap that must NOT animate completes in the commit's frame
+// (the hooks call `done` immediately) while a same-place replacement fades
+// over the one motion-token duration the client's motion level publishes —
+// with no case that can leave an outdated layer on the stage because a CSS
+// phase never ended.
+const transitionCss = computed(() => props.motionLevel !== "off");
+
+function motionDurationMs() {
+  if (typeof getComputedStyle !== "function" || typeof document === "undefined") {
+    return 0;
+  }
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-scene").trim();
+  const value = Number.parseFloat(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return raw.endsWith("ms") ? value : value * 1000;
+}
+
+const layerHooks = {
+  onBeforeEnter(el) {
+    el.inert = false;
+  },
+  onEnter(el, done) {
+    if (!transitionCss.value || !crossfade.value) {
+      done();
+      return;
+    }
+    const duration = motionDurationMs();
+    el.style.opacity = "0";
+    void el.offsetWidth;
+    el.style.transition = `opacity ${duration}ms var(--ease-standard)`;
+    el.style.opacity = "1";
+    setTimeout(done, duration);
+  },
+  onBeforeLeave(el) {
+    el.inert = true;
+  },
+  onLeave(el, done) {
+    if (!transitionCss.value || !crossfade.value) {
+      done();
+      return;
+    }
+    const duration = motionDurationMs();
+    el.style.transition = `opacity ${duration}ms var(--ease-exit)`;
+    el.style.opacity = "0";
+    setTimeout(done, duration);
+  },
+  onAfterLeave(el) {
+    el.inert = false;
+  },
+  onLeaveCancelled(el) {
+    el.inert = false;
+  },
+};
+
+// The layer that presents the scene: the displayed bitmap, rendered on its
+// own so the same-place crossfade is one CSS phase of one element. A layer
+// whose URL is the live ordered attempt (or the live provisional one) carries
+// that element's token, so the shared driver observes the real load/decode of
+// the element it issued; a retained or reused bitmap carries no token and
+// settles nothing twice.
+function layerFor(url, role, token) {
+  return { url, role, token };
+}
+
+const presented = computed(() => {
   const shown = display.value;
-  const out = [];
+  if (!shown) {
+    return null;
+  }
   const ordered = load.attempt.value;
   const provisional = load.provisionalAttempt.value;
-  if (shown) {
-    const role =
-      ordered?.url === shown.url ? "attempt" : provisional?.url === shown.url ? "provisional" : "content";
-    out.push({
-      url: shown.url,
-      role,
-      visible: true,
-      token: role === "attempt" ? ordered.token : role === "provisional" ? provisional.token : null,
-    });
+  if (ordered?.url === shown.url) {
+    return layerFor(shown.url, "attempt", ordered.token);
   }
+  if (provisional?.url === shown.url) {
+    return layerFor(shown.url, "provisional", provisional.token);
+  }
+  return layerFor(shown.url, "content", null);
+});
+
+// The hidden probes: one per resource currently being fetched that is not
+// already on screen. They report the real natural dimensions the driver needs
+// and never paint anything.
+const probes = computed(() => {
+  const shown = display.value;
+  const out = [];
   for (const [candidate, role] of [
-    [ordered, "attempt"],
-    [provisional, "provisional"],
+    [load.attempt.value, "attempt"],
+    [load.provisionalAttempt.value, "provisional"],
   ]) {
     if (!candidate?.url || candidate.url === shown?.url) {
       continue;
     }
-    out.push({ url: candidate.url, role, visible: false, token: candidate.token });
+    out.push(layerFor(candidate.url, role, candidate.token));
   }
   return out;
 });
-
-const transitionCss = computed(() => props.motionLevel !== "off");
 
 // The scene label, the alternative text and the status facts always render as
 // DOM text outside the bitmap.
@@ -194,8 +287,19 @@ const failureText = computed(() =>
       ? artworkFailureCategory(reachedFailure.value.reason)
       : null,
 );
+// A resolution that is still walking its chain has NOT concluded anything, so
+// it shows the stage's own gradient rather than a badge claiming absence: the
+// status badge is for a reached failure, for the panel's own availability
+// failure, and for a chain that genuinely ran out — never for the moment
+// between a commit and its pixels.
+const resolving = computed(
+  () => load.phase.value === "loading" && !reachedFailure.value && !panelUnavailable.value,
+);
 const showPlaceholder = computed(
-  () => panelUnavailable.value || !!reachedFailure.value || !displayPresented.value,
+  () =>
+    panelUnavailable.value ||
+    !!reachedFailure.value ||
+    (!displayPresented.value && !resolving.value),
 );
 const placeholderKind = computed(() =>
   panelUnavailable.value
@@ -338,28 +442,41 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
     :data-scene-state="generationState"
     :style="{ background: stageGradient }"
   >
-    <!-- Every image layer: the displayed bitmap plus the hidden probes that
-         report real load/decode observations for the resources currently being
-         fetched. A layer is keyed by its resource URL, so the element that
-         loaded the bytes IS the element that presents them — no second fetch
-         when a probe's resource becomes the display. -->
-    <TransitionGroup name="scene-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
+    <!-- The presented bitmap: one element, one CSS phase per swap. A swap the
+         spec does not allow to animate (a move, a revocation, the off motion
+         level) has no CSS phase at all and is gone in the commit's frame. -->
+    <Transition name="scene-xfade" :css="false" v-bind="layerHooks">
       <img
-        v-for="layer in layers"
-        :key="layer.url"
+        v-if="presented"
+        :key="presented.url"
         class="scene-backdrop__image"
-        :class="{ 'scene-backdrop__image--probe': !layer.visible }"
-        :data-testid="layer.visible ? 'scene-backdrop-image' : null"
-        :data-role="layer.role"
-        :data-attempt-token="layer.role === 'attempt' ? String(layer.token) : null"
-        :data-provisional-token="layer.role === 'provisional' ? String(layer.token) : null"
-        :src="layer.url"
+        data-testid="scene-backdrop-image"
+        :data-role="presented.role"
+        :data-attempt-token="presented.role === 'attempt' ? String(presented.token) : null"
+        :data-provisional-token="presented.role === 'provisional' ? String(presented.token) : null"
+        :src="presented.url"
         alt=""
         aria-hidden="true"
-        @load="onLayerLoad(layer, $event)"
-        @error="onLayerError(layer, $event)"
+        @load="onLayerLoad(presented, $event)"
+        @error="onLayerError(presented, $event)"
       />
-    </TransitionGroup>
+    </Transition>
+
+    <!-- The probes: the resources the shared driver is fetching right now.
+         Invisible, never presented, and never carrying the image test hook. -->
+    <img
+      v-for="probe in probes"
+      :key="probe.url"
+      class="scene-backdrop__image scene-backdrop__image--probe"
+      :data-role="probe.role"
+      :data-attempt-token="probe.role === 'attempt' ? String(probe.token) : null"
+      :data-provisional-token="probe.role === 'provisional' ? String(probe.token) : null"
+      :src="probe.url"
+      alt=""
+      aria-hidden="true"
+      @load="onLayerLoad(probe, $event)"
+      @error="onLayerError(probe, $event)"
+    />
 
     <div
       v-if="showPlaceholder"
@@ -482,28 +599,13 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   pointer-events: none;
 }
 
-/* The scene crossfade (webclient-scene-transitions, design D2). The new
-   painting fades in ABOVE the old one on a fast-rising curve while the old
-   one thins on a slow-starting curve, so the pair never drops through the
-   dark gradient beneath them (no dip in brightness mid-fade). The entering
-   layer also settles from a hair larger than cover — a slight arrival, not a
-   zoom — and only where travel is allowed. */
-.scene-backdrop .scene-xfade-enter-active {
+/* The scene crossfade (webclient-scene-transitions, design D2): the entering
+   painting fades in OVER the leaving one (it is the later sibling, so it
+   paints above), and the leaving one thins on the slower exit curve, so the
+   pair never drops through the dark gradient beneath them. Both phases take
+   their duration from the one motion token the client publishes. */
+.scene-backdrop .scene-backdrop__image:first-of-type {
   z-index: 1;
-  transition:
-    opacity var(--motion-scene) var(--ease-standard),
-    transform var(--motion-scene) var(--ease-standard);
-}
-.scene-backdrop .scene-xfade-leave-active {
-  z-index: 0;
-  transition: opacity var(--motion-scene) var(--ease-exit);
-}
-.scene-backdrop .scene-xfade-enter-from {
-  opacity: 0;
-  transform: scale(calc(1 + 0.025 * var(--motion-travel)));
-}
-.scene-backdrop .scene-xfade-leave-to {
-  opacity: 0;
 }
 
 .scene-backdrop .scene-backdrop__placeholder {

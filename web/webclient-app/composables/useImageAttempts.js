@@ -177,6 +177,13 @@ export function useImageAttempts(request, availability, options = {}) {
       provisionalAttempt.value = null;
       return;
     }
+    if (phase.value !== LOAD_PHASE.loading) {
+      // Resolution already settled (or exhausted): an out-of-band background
+      // has nothing left to stand in for, so its element is retired rather
+      // than left fetching a resource that will not be displayed.
+      provisionalAttempt.value = null;
+      return;
+    }
     const settledProvisional = provisionalOutcomes.value.get(key);
     if (settledProvisional && settledProvisional.phase !== LOAD_PHASE.loading) {
       provisionalAttempt.value = null;
@@ -451,10 +458,17 @@ export function useImageAttempts(request, availability, options = {}) {
     panelUnavailable.value = false;
   }
 
-  watch(factsKey, restart, { immediate: true });
+  // The resolution facts are the commit boundary of this surface, so the
+  // restart runs SYNCHRONOUSLY with them: any other watcher of the same commit
+  // (a consumer keeping its own display content) then reads a cleared
+  // selection rather than a stale one, and no surface can pair this commit's
+  // facts with the previous commit's result.
+  watch(factsKey, restart, { immediate: true, flush: "sync" });
   watch(geometryKey, refreshGeometry);
   watch(provisionalKey, resume);
-  watch(provisionalSourceKey, syncProvisional);
+  // A settled resolution retires the out-of-band element too: the provisional
+  // background exists to stand in WHILE a higher-priority source loads.
+  watch([provisionalSourceKey, () => phase.value], syncProvisional);
 
   return {
     attempt,
