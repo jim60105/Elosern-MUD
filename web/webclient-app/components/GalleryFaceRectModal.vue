@@ -44,7 +44,7 @@ const availability = computed(() => artworkAvailability({
   artwork: props.card.artwork,
   viewSubjectId: props.card.image_id,
 }));
-const { attempt, phase, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+const { attempt, phase, selected, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
   () => props.card.artwork,
   availability,
   // This editor MEASURES the exact original: the descriptor's silhouette
@@ -59,7 +59,7 @@ const { attempt, phase, dimensions, reachedFaults, panelUnavailable, onImageLoad
 const { decoded: loaded, saveReady } = useOriginalEligibility(
   () => props.card.artwork,
   phase,
-  dimensions,
+  selected,
   panelUnavailable,
 );
 // Loading and a failed original are different facts with different copy: the

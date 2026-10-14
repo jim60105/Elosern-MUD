@@ -3,14 +3,17 @@
 //
 // An original editor may dispatch geometry only for the exact original it is
 // showing, and only after that very resource decoded with usable dimensions.
-// The shared driver already scopes every observation to its own attempt element
-// and clears its result on a restart; this composable adds the *synchronous*
-// half of the same rule: it records the exact original identity a successful
-// decode proved and requires the LIVE descriptor to still carry that same
-// original. A subject, card or resource replacement therefore retires
-// eligibility in the same tick — before the driver's pre-flush restart can run
-// — while a geometry-only revision (the same original) keeps the decoded proof
-// and its save.
+// The proof is therefore taken from the driver's OWN successful observation —
+// the selected resource's source layer, resource identity and version — and
+// never from the editor's live descriptor: an observation that settled while the
+// descriptor had already moved on names the original that really decoded, and
+// the comparison below refuses it.
+//
+// The LIVE descriptor still has to carry that same original, which adds the
+// *synchronous* half of the rule: a subject, card or resource replacement
+// retires eligibility in the same tick — before the driver's own pre-flush
+// restart can run — while a geometry-only revision (the same original) keeps the
+// decoded proof and its save.
 //
 // A silhouette, another card, a scene background or the fixed adult ruler is
 // never part of this proof: the editors request the exact original with no
@@ -18,7 +21,7 @@
 
 import { computed, ref, toValue, watch } from "vue";
 
-import { artworkOriginalIdentity } from "../lib/artwork.js";
+import { artworkOriginalIdentity, artworkSelectedIdentity } from "../lib/artwork.js";
 import { LOAD_PHASE } from "../lib/image-attempts.js";
 
 // A decoded size only counts while it is a real, positive pixel size: an
@@ -27,22 +30,23 @@ function usableDimensions(value) {
   return !!value && Number(value.width) > 0 && Number(value.height) > 0;
 }
 
-export function useOriginalEligibility(artwork, phase, dimensions, panelUnavailable = null) {
-  // The exact original whose decode is proven: the identity recorded at the
-  // moment the driver observed a successful decode.
+export function useOriginalEligibility(artwork, phase, selected, panelUnavailable = null) {
+  // The exact original whose decode is proven: the identity of the resource the
+  // driver actually resolved, recorded the moment its phase reported success.
   const proven = ref(null);
   watch(phase, () => {
     proven.value = phase.value === LOAD_PHASE.success
-      ? artworkOriginalIdentity(toValue(artwork))
+      ? artworkSelectedIdentity(toValue(selected))
       : null;
   }, { flush: "sync", immediate: true });
   // A decode authorizes a save only while it still belongs to the original the
-  // editor is displaying, and only with the driver's own observed dimensions.
-  const decoded = computed(() => (
-    proven.value !== null
-    && proven.value === artworkOriginalIdentity(toValue(artwork))
-    && usableDimensions(toValue(dimensions))
-  ));
+  // descriptor states, and only with that same observation's own decoded size.
+  const decoded = computed(() => {
+    const observation = toValue(selected);
+    return proven.value !== null
+      && proven.value === artworkOriginalIdentity(toValue(artwork))
+      && usableDimensions(observation?.dimensions);
+  });
   const saveReady = computed(() => (
     decoded.value && !(panelUnavailable && toValue(panelUnavailable))
   ));

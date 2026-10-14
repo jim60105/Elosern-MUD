@@ -29,6 +29,7 @@ from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     install_outbound_recorder,
     open_command_line,
+    outbound_messages,
     sent_action_count,
     store_state,
     wait_for_store_state,
@@ -54,6 +55,7 @@ _FACE_MODAL = '[role="dialog"][aria-label="臉部框選"]'
 # face dialog's markup.
 _STAGE_MODAL = '[role="dialog"]:has(.stage-transform__body)'
 _FACE_CLOSE = f'{_FACE_MODAL} button[aria-label="關閉臉部框選"]'
+_STAGE_CLOSE = f'{_STAGE_MODAL} button[aria-label="關閉"]'
 _FACE_ORIGINAL = f"{_FACE_MODAL} .gallery-face__original > img"
 _FACE_CROP = f"{_FACE_MODAL} .gallery-face__preview img"
 _FACE_MARKER = f'{_FACE_MODAL} [data-testid="artwork-failure"]'
@@ -86,6 +88,37 @@ def _wait_for_actions(page, action_id: str, count: int, timeout: int = 30000) ->
     )
 
 
+def _wait_enabled(locator, timeout: int = 30000) -> None:
+    """Wait (bounded) until one control is enabled, i.e. its gate opened."""
+    deadline = time.monotonic() + timeout / 1000
+    while time.monotonic() < deadline:
+        if not locator.is_disabled():
+            return
+        locator.page.wait_for_timeout(100)
+    raise AssertionError(f"{locator} never became enabled")
+
+
+def _action_envelopes(page, action_id: str) -> list[dict]:
+    """The recorded ``ui_action`` envelopes of one action id (the outbound boundary)."""
+    return [
+        args[0]
+        for cmdname, args, _kwargs in outbound_messages(page)
+        if cmdname == "ui_action" and args and args[0].get("action_id") == action_id
+    ]
+
+
+def _action_payloads(page, action_id: str) -> list[dict]:
+    """The recorded ``ui_action`` payloads of one action id, in order."""
+    return [envelope.get("payload") for envelope in _action_envelopes(page, action_id)]
+
+
+def _seeded_original_image_id() -> str:
+    """The seeded exact original's id (imported lazily: the helper needs settings)."""
+    from web.browser_support.unified_image_transitions import SEEDED_ORIGINAL_IMAGE_ID
+
+    return SEEDED_ORIGINAL_IMAGE_ID
+
+
 class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Original-editor eligibility journeys on a per-test isolated server."""
 
@@ -111,17 +144,22 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         pass
 
     def _fail_original_media(self, page) -> None:
-        """Answer every gallery original media request with invalid media.
+        """Answer the seeded original's own media request with invalid media.
 
         The interception happens after the server resolved and serialized the
         committed descriptor; the request itself succeeds on the wire, so the
-        failure each editor observes is its own decode failure.
+        failure each editor observes is its own decode failure. Every other
+        gallery original (a repaired replacement, for instance) is served for
+        real, so one journey can observe a failure and then observe recovery.
         """
-        page.route(_ORIGINAL_MEDIA, self._serve_invalid_original)
+        page.route(_ORIGINAL_MEDIA, self._serve_original)
 
-    def _serve_invalid_original(self, route) -> None:
+    def _serve_original(self, route) -> None:
         self._original_requests.append(route.request.url)
-        route.fulfill(status=200, content_type="image/png", body=b"not-an-image")
+        if _seeded_original_image_id() in route.request.url:
+            route.fulfill(status=200, content_type="image/png", body=b"not-an-image")
+        else:
+            route.continue_()
 
     def _fail_adult_reference(self, page) -> None:
         """Answer the fixed adult reference's own request with invalid media."""
@@ -232,9 +270,29 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
 
         page = self.logged_in_page()
         install_outbound_recorder(page)
+        # Only the SEEDED original's media is broken; the repaired replacement
+        # this journey publishes afterwards is served for real.
+        self._fail_original_media(page)
         self._fail_adult_reference(page)
         self._open_gallery(page)
         page.wait_for_selector(_card(SEEDED_ORIGINAL_IMAGE_ID), timeout=30000)
+        subject_key = store_state(page)["panels"]["gallery"]["selected"]
+
+        # This session observes the failure first, in both original editors.
+        self._open_card_editor(page, SEEDED_ORIGINAL_IMAGE_ID, _FACE_BUTTON, _FACE_MODAL)
+        page.locator(_FACE_MARKER).wait_for(state="visible", timeout=30000)
+        self.assertTrue(page.locator(_FACE_SAVE).is_disabled())
+        page.locator(_FACE_CLOSE).click()
+        page.wait_for_selector(_FACE_MODAL, state="detached", timeout=30000)
+        self._open_card_editor(page, SEEDED_ORIGINAL_IMAGE_ID, _STAGE_BUTTON, _STAGE_MODAL)
+        # The failure settles asynchronously: wait for the broken figure to be
+        # removed before asserting the editor's own gate.
+        page.wait_for_selector(_STAGE_FIGURE, state="detached", timeout=30000)
+        self.assertTrue(page.locator(_STAGE_SAVE).is_disabled())
+        page.locator(_STAGE_CLOSE).click()
+        page.wait_for_selector(_STAGE_MODAL, state="detached", timeout=30000)
+        self.assertEqual(sent_action_count(page, "gallery.face_rect.update"), 0)
+        self.assertEqual(sent_action_count(page, "gallery.stage.update"), 0)
 
         # Real gallery recovery: the bounded test-only transition appends a
         # distinct original through the production writer and selects it, so a
@@ -258,36 +316,60 @@ class OriginalEditorsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         self.assertEqual(repaired_candidate["geometry"]["image_size"], ORIGINAL_IMAGE_SIZE)
         self.assertNotEqual(REPAIRED_ORIGINAL_IMAGE_ID, SEEDED_ORIGINAL_IMAGE_ID)
 
-        # The repaired original's real decoded size enables exactly one save.
+        # The repaired original's own decode, observed by the browser, is what
+        # re-enables the save.
         self._open_card_editor(page, REPAIRED_ORIGINAL_IMAGE_ID, _FACE_BUTTON, _FACE_MODAL)
-        page.locator(_FACE_ORIGINAL).wait_for(state="visible", timeout=30000)
         save = page.locator(_FACE_SAVE)
-        self.assertFalse(save.is_disabled())
+        _wait_enabled(save)
+        self.assertEqual(
+            page.locator(_FACE_ORIGINAL).evaluate("el => [el.naturalWidth, el.naturalHeight]"),
+            [ORIGINAL_IMAGE_SIZE["width"], ORIGINAL_IMAGE_SIZE["height"]],
+        )
+        # A real numeric edit is what dispatches, and its payload names the exact
+        # edited card and the squared geometry the browser measured.
+        page.get_by_role("spinbutton", name="寬度").fill("0.3")
         save.click()
         _wait_for_actions(page, "gallery.face_rect.update", 1)
         # The dialog closes only on its own successful result and the committed
         # presentation revision that carries it, and exactly one save left it.
         page.wait_for_selector(_FACE_MODAL, state="detached", timeout=30000)
-        self.assertEqual(sent_action_count(page, "gallery.face_rect.update"), 1)
+        face_saves = _action_payloads(page, "gallery.face_rect.update")
+        self.assertEqual(len(face_saves), 1, face_saves)
+        # Only the edited component crosses the wire for the exact edited card.
+        self.assertEqual(set(face_saves[0]), {"subject_key", "image_id", "face_rect"})
+        self.assertEqual(face_saves[0]["subject_key"], subject_key)
+        self.assertEqual(face_saves[0]["image_id"], REPAIRED_ORIGINAL_IMAGE_ID)
+        self.assertEqual(set(face_saves[0]["face_rect"]), {"x", "y", "w", "h"})
+        self.assertAlmostEqual(face_saves[0]["face_rect"]["w"], 0.3, places=3)
+        self.assertAlmostEqual(face_saves[0]["face_rect"]["h"], 0.3, places=3)
 
         # --- The ruler's own failure: its own indication, never the original's.
         self._open_card_editor(page, REPAIRED_ORIGINAL_IMAGE_ID, _STAGE_BUTTON, _STAGE_MODAL)
-        page.locator(_STAGE_FIGURE).wait_for(state="visible", timeout=30000)
-        self.assertEqual(page.locator(_STAGE_ADULT).count(), 0)
         ruler_marker = page.locator(_STAGE_RULER_MARKER)
         ruler_marker.wait_for(state="visible", timeout=30000)
         self.assertEqual(ruler_marker.get_attribute("role"), "status")
         self.assertIn("圖片載入失敗", ruler_marker.inner_text())
         self.assertTrue(self._ruler_requests, "the adult reference was never requested")
+        # Only once the ruler's own failure has settled is its fill gone.
+        self.assertEqual(page.locator(_STAGE_ADULT).count(), 0)
 
         # The healthy original is still the one save target, and it dispatches
         # exactly once even though the ruler is broken.
         stage_save = page.locator(_STAGE_SAVE)
-        self.assertFalse(stage_save.is_disabled())
+        _wait_enabled(stage_save)
+        self.assertEqual(page.locator(_STAGE_FIGURE).count(), 1)
+        page.locator(f'{_STAGE_MODAL} input[type="range"]').first.fill("0.6")
         stage_save.click()
         _wait_for_actions(page, "gallery.stage.update", 1)
         page.wait_for_selector(_STAGE_MODAL, state="detached", timeout=30000)
-        self.assertEqual(sent_action_count(page, "gallery.stage.update"), 1)
+        self.assertEqual(
+            _action_payloads(page, "gallery.stage.update"),
+            [{
+                "subject_key": subject_key,
+                "image_id": REPAIRED_ORIGINAL_IMAGE_ID,
+                "stage": {"scale": 0.6, "x": 0, "y": 0},
+            }],
+        )
 
         # The ruler's failure changed nothing about the edited original: the
         # same exact card is still committed, with the same exact resource.

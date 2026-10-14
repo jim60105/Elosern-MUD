@@ -24,7 +24,7 @@ const availability = computed(() => artworkAvailability({
   artwork: props.card.artwork,
   viewSubjectId: props.card.image_id,
 }));
-const { attempt, phase, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
+const { attempt, phase, selected, dimensions, reachedFaults, panelUnavailable, onImageLoad, onImageError, dispose } = useArtwork(
   () => props.card.artwork,
   availability,
   // This editor MEASURES the exact original: the descriptor's silhouette
@@ -38,7 +38,7 @@ const numberDraft = ref(Object.fromEntries(Object.entries(draft.value).map(([fie
 const { decoded: loaded, saveReady } = useOriginalEligibility(
   () => props.card.artwork,
   phase,
-  dimensions,
+  selected,
   panelUnavailable,
 );
 // A reached fault (the original's own load/decode failure) or an unavailable
@@ -64,6 +64,11 @@ const rulerFailure = computed(() => rulerFaults.value[rulerFaults.value.length -
 // observed to have failed; a failure removes it and reports itself locally,
 // while a healthy original stays the only possible save target.
 const rulerFailed = computed(() => rulerPhase.value === "exhausted" && rulerFailure.value !== null);
+// The explanation only claims what this editor's own state supports: a broken
+// ruler is never itself the reason a save is unavailable.
+const rulerNote = computed(() => (loaded.value
+  ? "成人身形參照無法載入；它只是比例尺，這張肖像仍可調整並儲存。"
+  : "成人身形參照無法載入；它只是比例尺，不影響原始圖片。"));
 const submitted = ref(false);
 let trap;
 let drag = null;
@@ -141,7 +146,7 @@ function readout(field) {
           </div>
           <p class="gallery-muted">拖曳肖像調整位置。背景成人身形維持原比例。</p>
           <div v-if="rulerFailed" class="stage-transform__ruler-status">
-            <p class="gallery-muted">成人身形參照無法載入；它只是比例尺，仍可調整並儲存這張肖像。</p>
+            <p class="gallery-muted">{{ rulerNote }}</p>
             <ArtworkFailure kind="failure" :reason="rulerFailure.reason" />
           </div>
         </section>

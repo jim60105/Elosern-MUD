@@ -6,11 +6,12 @@
 // gallery rows.
 import { mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
-import { defineComponent, h, onBeforeUnmount, ref } from "vue";
+import { computed, defineComponent, h, nextTick, onBeforeUnmount, ref } from "vue";
 import ArtworkFailure from "../../components/ArtworkFailure.vue";
 import GalleryFaceRectModal from "../../components/GalleryFaceRectModal.vue";
 import GalleryStageTransformModal from "../../components/GalleryStageTransformModal.vue";
 import { useImageAttempts } from "../../composables/useImageAttempts.js";
+import { useArtwork } from "../../composables/useArtwork.js";
 import { useOriginalEligibility } from "../../composables/useOriginalEligibility.js";
 import { canonicalOrder } from "../../lib/image-attempts.js";
 import { GALLERY_SAMPLE } from "../../stories/gallery-fixtures.js";
@@ -485,14 +486,14 @@ describe("face-rect original editor lifecycle", () => {
 
 // The gate both editors hand their save to. Its own harness drives the same
 // reads the editors make: a live descriptor, the driver's phase and the
-// driver's observed dimensions.
+// driver's own selected observation.
 const GateHarness = defineComponent({
   props: { artwork: { type: Object, default: null } },
   setup(props, { expose }) {
     const artwork = ref(props.artwork);
     const phase = ref("exhausted");
-    const dimensions = ref(null);
-    const gate = useOriginalEligibility(artwork, phase, dimensions, null);
+    const selected = ref(null);
+    const gate = useOriginalEligibility(artwork, phase, selected, null);
     // Driving state through the harness's own methods keeps the reads and the
     // writes on the same refs the gate holds. The gate's answers are read
     // through the composable itself — synchronously, without waiting for a
@@ -502,12 +503,25 @@ const GateHarness = defineComponent({
       saveReady: () => gate.saveReady.value,
       setArtwork: (value) => { artwork.value = value; },
       setPhase: (value) => { phase.value = value; },
-      setDimensions: (value) => { dimensions.value = value; },
-      read: () => ({ phase: phase.value, dimensions: dimensions.value }),
+      setObservation: (value) => { selected.value = value; },
+      read: () => ({ phase: phase.value, observation: selected.value }),
     });
     return () => h("span");
   },
 });
+
+// One normalized successful observation of a descriptor's exact original, in
+// the shape the shared driver publishes (`lib/image-attempts.js:selectedFrom`).
+function observation(artwork, dimensions = { width: 768, height: 1024 }) {
+  const entry = artwork.attempts[0];
+  return {
+    sourceId: entry.source_id,
+    resourceId: entry.resource.resource_id,
+    version: entry.resource.version,
+    url: entry.resource.url,
+    dimensions,
+  };
+}
 
 describe("exact-original eligibility gate", () => {
   function original(imageId, version = "a".repeat(64)) {
@@ -531,25 +545,36 @@ describe("exact-original eligibility gate", () => {
   }
   const A = original("10000000-0000-4000-8000-00000000000a");
   const B = original("10000000-0000-4000-8000-00000000000b");
+  // The same card as B with a new resource version: a new original.
+  const B2 = original("10000000-0000-4000-8000-00000000000b", "c".repeat(64));
 
-  it("retires a decoded proof the moment the live descriptor changes", () => {
+  it("proves only the observation that matches the live descriptor's original", () => {
     const wrapper = mountSurface(GateHarness, { artwork: A });
     const gate = wrapper.vm;
+    gate.setObservation(observation(A));
     gate.setPhase("success");
-    gate.setDimensions({ width: 768, height: 1024 });
     expect(gate.saveReady()).toBe(true);
 
     // The live descriptor becomes another exact original while the driver still
     // reports the retired success: the very next synchronous read refuses.
     gate.setArtwork(B);
-    expect(gate.read()).toEqual({ phase: "success", dimensions: { width: 768, height: 1024 } });
+    expect(gate.read().phase).toBe("success");
     expect(gate.decoded()).toBe(false);
+    expect(gate.saveReady()).toBe(false);
+
+    // The reverse order is refused too: an observation that settles AFTER the
+    // descriptor was replaced names the original that really decoded (A), so it
+    // can never authorize B — not even while the driver's own restart is still
+    // pending and the phase reports success.
+    gate.setPhase("loading");
+    gate.setObservation(observation(A));
+    gate.setPhase("success");
     expect(gate.saveReady()).toBe(false);
 
     // Only the replacement's own decode authorizes it.
     gate.setPhase("loading");
     expect(gate.saveReady()).toBe(false);
-    gate.setDimensions({ width: 512, height: 512 });
+    gate.setObservation(observation(B, { width: 512, height: 512 }));
     gate.setPhase("success");
     expect(gate.saveReady()).toBe(true);
 
@@ -559,19 +584,21 @@ describe("exact-original eligibility gate", () => {
     expect(gate.saveReady()).toBe(true);
 
     // A new resource version of the same card is a new original.
-    gate.setArtwork(original("10000000-0000-4000-8000-00000000000b", "c".repeat(64)));
+    gate.setArtwork(B2);
     expect(gate.saveReady()).toBe(false);
+    expect(gate.decoded()).toBe(false);
     wrapper.unmount();
   });
 
   it("never authorizes a save without a usable decoded size", () => {
     const wrapper = mountSurface(GateHarness, { artwork: A });
     const gate = wrapper.vm;
+    gate.setObservation(observation(A, null));
     gate.setPhase("success");
     expect(gate.saveReady()).toBe(false);
-    gate.setDimensions({ width: 0, height: 0 });
+    gate.setObservation(observation(A, { width: 0, height: 0 }));
     expect(gate.saveReady()).toBe(false);
-    gate.setDimensions({ width: 768, height: 1024 });
+    gate.setObservation(observation(A));
     expect(gate.saveReady()).toBe(true);
     // A reported failure retires the proof even with a size still in hand.
     gate.setPhase("exhausted");
@@ -597,10 +624,100 @@ describe("exact-original eligibility gate", () => {
       },
     };
     const wrapper = mountSurface(GateHarness, { artwork: silhouette });
+    // Even a successful observation of the substitute itself proves nothing:
+    // this descriptor states no exact original at all.
+    wrapper.vm.setObservation({
+      sourceId: "gallery.alpha:man",
+      resourceId: "defaults/man.webp",
+      version: "b".repeat(64),
+      url: "/art/defaults/man.webp",
+      dimensions: { width: 864, height: 1536 },
+    });
     wrapper.vm.setPhase("success");
-    wrapper.vm.setDimensions({ width: 864, height: 1536 });
     expect(wrapper.vm.decoded()).toBe(false);
     expect(wrapper.vm.saveReady()).toBe(false);
+    wrapper.unmount();
+  });
+});
+
+// The gate around the REAL driver: its own elements and handlers, so the two
+// orderings between a descriptor change and an in-flight decode can be driven
+// synchronously (a raw DOM dispatch, before Vue's flush).
+const IntegratedHarness = defineComponent({
+  props: { artwork: { type: Object, default: null } },
+  setup(props, { expose }) {
+    const artwork = ref(props.artwork);
+    const availability = computed(() => ({
+      state: "ready",
+      view_subject_id: artwork.value?.subject_id ?? null,
+    }));
+    const driver = useArtwork(artwork, availability, { terminal: false });
+    const gate = useOriginalEligibility(artwork, driver.phase, driver.selected, driver.panelUnavailable);
+    onBeforeUnmount(() => driver.dispose());
+    expose({
+      saveReady: () => gate.saveReady.value,
+      setArtwork: (value) => { artwork.value = value; },
+    });
+    return () => {
+      const attempt = driver.attempt.value;
+      return h("div", [
+        attempt?.url
+          ? h("img", {
+              key: attempt.token,
+              src: attempt.url,
+              "data-attempt-token": attempt.token,
+              onLoad: driver.onImageLoad,
+              onError: driver.onImageError,
+            })
+          : null,
+      ]);
+    };
+  },
+});
+
+describe("exact-original eligibility gate over the real driver", () => {
+  // The descriptors themselves: the driver loads exactly one descriptor.
+  const A = GALLERY_SAMPLE.cards[0].artwork;
+  const B = structuredClone(GALLERY_SAMPLE.cards[1].artwork);
+
+  it("refuses an observation that settled after its own descriptor was replaced", async () => {
+    const wrapper = mountSurface(IntegratedHarness, { artwork: A });
+    const first = wrapper.get("img");
+    declareImage(first.element, 768, 1024);
+
+    // The descriptor is replaced and the retired element settles in the SAME
+    // tick, before Vue's flush can restart the driver. The observation names the
+    // original that decoded (A), so it cannot authorize the replacement (B).
+    wrapper.vm.setArtwork(B);
+    first.element.dispatchEvent(new Event("load"));
+    expect(wrapper.vm.saveReady()).toBe(false);
+
+    // The flush restarts the driver for B; only B's own decode authorizes.
+    await nextTick();
+    const second = wrapper.get("img");
+    expect(second.element).not.toBe(first.element);
+    expect(wrapper.vm.saveReady()).toBe(false);
+    declareImage(second.element, 512, 512);
+    second.element.dispatchEvent(new Event("load"));
+    expect(wrapper.vm.saveReady()).toBe(true);
+    wrapper.unmount();
+  });
+
+  it("retires a settled proof in the same tick its descriptor changes", async () => {
+    const wrapper = mountSurface(IntegratedHarness, { artwork: A });
+    const first = wrapper.get("img");
+    declareImage(first.element, 768, 1024);
+    first.element.dispatchEvent(new Event("load"));
+    expect(wrapper.vm.saveReady()).toBe(true);
+
+    wrapper.vm.setArtwork(B);
+    expect(wrapper.vm.saveReady()).toBe(false);
+
+    await nextTick();
+    const second = wrapper.get("img");
+    declareImage(second.element, 512, 512);
+    second.element.dispatchEvent(new Event("load"));
+    expect(wrapper.vm.saveReady()).toBe(true);
     wrapper.unmount();
   });
 });
