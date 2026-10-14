@@ -245,6 +245,20 @@ const renderPlayer = (args) => ({
               { identity: 8, display_name: "守衛", portrait_ref: null, affordances: [
                 { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
               ] },
+              // The exploration companion-focus variants (reuse-lineup-person-
+              // focus 3.1): a member of the SAME committed party panel is
+              // present as an interact target, so its medallion opens the verb
+              // card for an identity the actor-left lineup already draws.
+              ...(args.explorationFocus ? [{
+                identity: args.explorationFocus,
+                display_name: PARTY_PANEL_FULL_SAMPLE.slots.find(
+                  (slot) => slot.identity === args.explorationFocus,
+                )?.display_name ?? "同行",
+                portrait_ref: null,
+                affordances: [
+                  { kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null },
+                ],
+              }] : []),
             ],
           }),
           context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat) : protocolFixtures.explorationActions({
@@ -360,6 +374,26 @@ const renderPlayer = (args) => ({
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      // The exploration companion-focus variants (reuse-lineup-person-focus
+      // 3.1): the client-local verb card of a RENDERED companion. Opening it
+      // lights that existing actor-left figure and lifts it above every
+      // baseline with no actor-right copy; `explorationFocusClosed` closes it
+      // again in the same run, so the restored baseline is on screen too. The
+      // host exposes `__companionFocus.open()`/`.close()` for a reviewer.
+      // Fixture rendering only: the wire acceptance of this join is the managed
+      // browser journey and the store-driven Vitest regressions.
+      if (args.explorationFocus) {
+        const focusKey = `target-${args.explorationFocus}`;
+        const focus = {
+          store,
+          open: () => store.activatePresence(focusKey),
+          close: () => store.closePresenceCard(),
+        };
+        host.value.__companionFocus = focus;
+        window.__companionFocus = focus;
+        store.activatePresence(focusKey);
+        if (args.explorationFocusClosed) store.closePresenceCard();
+      }
       if (args.participantPolish) {
         let revision = 1;
         const sender = protocolFixtures.createFakeSender();
@@ -507,6 +541,7 @@ const renderPlayer = (args) => ({
       if (window.__stageJourney && host.value?.__stageJourney === window.__stageJourney) delete window.__stageJourney;
       if (window.__modeJourney && host.value?.__modeJourney === window.__modeJourney) delete window.__modeJourney;
       if (window.__participantPolish && host.value?.__participantPolish === window.__participantPolish) delete window.__participantPolish;
+      if (window.__companionFocus && host.value?.__companionFocus === window.__companionFocus) delete window.__companionFocus;
       bridge?.uninstall();
       app?.unmount();
       disposePinia(pinia);
@@ -549,6 +584,22 @@ export const PopulatedFullParty = { render: renderPlayer, args: { populated: tru
 export const PopulatedSolo = { render: renderPlayer, args: { populated: true, companions: 0 } };
 export const PopulatedPossession = { render: renderPlayer, args: { populated: true, companions: 4, possession: true } };
 export const PopulatedPlaceholders = { render: renderPlayer, args: { populated: true, companions: 4, placeholders: true } };
+// The exploration companion focus (reuse-lineup-person-focus 3.1): the
+// committed party's own companion is the interact target, so its medallion
+// opens the client-local verb card ON the existing actor-left figure — lit with
+// the highest z — while the other companions keep the listener dim and the
+// controlled figure keeps its own props. Fixture rendering; the real join
+// acceptance is the managed browser journey.
+export const ExplorationCompanionFocus = {
+  render: renderPlayer,
+  args: { populated: true, companions: 2, explorationFocus: 101 },
+};
+// The same committed lineup after that card closes: every figure is back on the
+// current baseline, with no remembered focus z and no right-side standee.
+export const ExplorationCompanionFocusRestored = {
+  render: renderPlayer,
+  args: { populated: true, companions: 2, explorationFocus: 101, explorationFocusClosed: true },
+};
 export const DialogueFullParty = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true } };
 export const DialogueCompanionSpeaks = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true, companionSpeaks: true } };
 // Combat: the minimap and the objective line are hidden, and the participant

@@ -579,3 +579,755 @@ describe("AppClient presence rail and person focus (exploration-presence-rail)",
     wrapper.get('[data-anchor="map"]').element.removeAttribute("inert");
   });
 });
+
+// ---------------------------------------------------------------------------
+// reuse-lineup-person-focus: an opened verb card whose target is already drawn
+// in the actor-left lineup reuses that figure — no actor-right copy — and the
+// selected companion is lit and elevated through the existing companion
+// speaking signal, restoring its baseline when the card closes, the target
+// leaves, the lineup changes or the mode hands over to dialogue.
+//
+// Every case drives accepted snapshots/updates through the store (party,
+// roster, status, possession banner, art and dialogue included) and reads the
+// committed stage: the actor-left figures with their z/dim/geometry, the
+// actor-right anchor's DOM counts, the centred card, the speaker line and the
+// readout flash.
+// ---------------------------------------------------------------------------
+
+// The roster the player's own figure resolves from (identity 1), so the
+// controlled front keeps a stable identity across possession swaps.
+const FOCUS_ROSTER = {
+  schema_version: 2,
+  available: true,
+  characters: [{
+    identity: 1,
+    name: "艾莉亞",
+    current: true,
+    pending: false,
+    portrait: {
+      subject_key: "char_1",
+      status: "done",
+      url: "/art/defaults/man.webp",
+      aspect_ratio: "3:4",
+      alt: "艾莉亞的肖像",
+      placeholder: null,
+      face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 },
+      stage: { scale: 1, x: 0, y: 0 },
+      origin: "runtime",
+    },
+  }],
+  max_characters: 5,
+  can_create: true,
+  switch_locked: false,
+  lock_reason: null,
+};
+const FOCUS_NAMES = { 101: "蕾娜", 102: "幽", 103: "艾德蒙", 104: "雪莉", 105: "旅人見習" };
+const FOCUS_TALK = {
+  kind: "action", action_id: "explore.talk_open", label: "交談", enabled: true, disabled_reason: null,
+};
+function focusMember(identity) {
+  return {
+    identity,
+    display_name: FOCUS_NAMES[identity] ?? `同行${identity}`,
+    portrait_ref: null,
+    hp_current: 120,
+    hp_maximum: 160,
+    bond_stage: "親睦",
+    membership: { general: true, temporary_commissions: [] },
+  };
+}
+function focusParty(...identities) {
+  return {
+    schema_version: 2,
+    available: true,
+    // The general quota is a separate bound from the rendered row: the
+    // truncated-row case carries more rows than the quota allows.
+    general_quota: { used: Math.min(identities.length, 4), limit: 4 },
+    slots: identities.map(focusMember),
+  };
+}
+const FOCUS_PARTY_UNAVAILABLE = {
+  schema_version: 2,
+  available: false,
+  reason: { code: "party_unavailable", message: "隊伍資訊目前無法顯示" },
+};
+function focusTarget(identity, overrides = {}) {
+  return {
+    identity,
+    display_name: FOCUS_NAMES[identity] ?? "目標",
+    portrait_ref: null,
+    affordances: [FOCUS_TALK],
+    ...overrides,
+  };
+}
+// The five present people: two party companions in the default lineup, the
+// truncated-row and reorder cases' extra identities, and one non-party control.
+function focusRoom(overrides = {}) {
+  return fx.explorationPanel({
+    interact: [101, 102, 103, 104, 105].map((identity) => focusTarget(identity)),
+    look: {
+      room: { identity: 42, display_name: "石板廣場", room: true },
+      entities: [],
+      objects: [{ identity: 3, display_name: "木箱" }],
+    },
+    ...overrides,
+  });
+}
+
+describe("AppClient companion focus (reuse-lineup-person-focus)", () => {
+  let store;
+  let wrapper;
+  let sender;
+  let revision;
+  // The committed actor identity the status panel carries: the wire identity
+  // the possession cases swap. `fx.update` deep-merges into the shared fixture
+  // snapshot, so every commit names the panels it depends on instead of
+  // inheriting the fixture's own default `status` panel.
+  let actorIdentity;
+  const statusWithActor = () => fx.statusPanel({ actor: { identity: actorIdentity } });
+
+  async function settle() {
+    for (let i = 0; i < 4; i += 1) {
+      await nextTick();
+    }
+  }
+
+  async function mountFocus({
+    rows = [101, 102],
+    exploration = focusRoom(),
+    art = artPanel(),
+    actor = "1",
+    extra = {},
+  } = {}) {
+    actorIdentity = actor;
+    wrapper = mount(AppClient, { attachTo: document.body });
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    revision = 1;
+    const result = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision,
+          panels: {
+            status: statusWithActor(),
+            exploration,
+            local_map: fx.localMapPanel(),
+            context_actions: fx.explorationActions(),
+            art,
+            roster: FOCUS_ROSTER,
+            party: focusParty(...rows),
+            ...extra,
+          },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    await settle();
+  }
+
+  async function commit(panels = {}, extra = {}) {
+    revision += 1;
+    const result = store.receive(
+      1,
+      "ui_update",
+      [fx.update({ revision, panels: { status: statusWithActor(), ...panels }, ...extra })],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    await settle();
+  }
+
+  // The one 交談 submission's reply, rejected: it releases the submission lock.
+  async function releaseLock() {
+    store.receive(
+      1,
+      "ui_action_result",
+      [fx.actionResult({ outcome: "rejected", code: "invalid", message: "不行。" })],
+      {},
+    );
+    await settle();
+  }
+
+  const card = () => wrapper.find('[data-anchor="choices"] [data-testid="presence-card"]');
+  const cardRows = () => card().findAll('[role="menuitem"]');
+  const rail = () => wrapper.get('[data-anchor="presence"] [data-testid="presence-rail"]');
+  const entry = (key) => wrapper.get(`[data-anchor="presence"] [data-entry-key="${key}"]`);
+  const stage = () => wrapper.get('[data-testid="elosern-stage"]');
+  const readoutText = () => wrapper.get('[data-testid="exploration-readout-text"]').text();
+  const figures = () => wrapper.findAll('[data-testid="companion-figure"]');
+  const figureIds = () => figures().map((slot) => slot.attributes("data-identity"));
+  const figure = (identity) => wrapper.get(`[data-testid="companion-figure"][data-identity="${identity}"]`);
+  const actorOf = (identity) => figure(identity).get('[data-testid="stage-actor"]');
+  const speaks = (identity) => actorOf(identity).attributes("data-speaking");
+  const zOf = (identity) => figure(identity).element.style.zIndex;
+  const boxOf = (identity) => {
+    const style = figure(identity).element.style;
+    return [style.height, style.width, style.right, style.bottom];
+  };
+  const rightActors = () =>
+    wrapper.findAll('[data-testid="anchor-actor-right"] [data-testid="stage-actor"]');
+
+  async function open(key) {
+    await entry(key).trigger("click");
+    await settle();
+  }
+
+  function key(element, name, init = {}) {
+    element.dispatchEvent(new KeyboardEvent("keydown", { key: name, bubbles: true, cancelable: true, ...init }));
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia());
+    store = useElosernStore();
+    sender = fx.createFakeSender();
+    store.setSender(sender);
+  });
+
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+  });
+
+  it("opens a rendered companion's card on its own figure: no copy, no action, no frame", async () => {
+    await mountFocus();
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    const selectedBox = boxOf("101");
+    const otherBox = boxOf("102");
+    const controlledBox = boxOf("1");
+
+    await open("target-101");
+
+    // Client-local: no request and no router frame.
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.router.depth()).toBe(1);
+    expect(card().attributes("data-card-kind")).toBe("verbs");
+    expect(cardRows().map((row) => row.text())).toEqual(["1交談", "2查看", "返回"]);
+    expect(stage().attributes("data-person-focus")).toBe("true");
+    expect(wrapper.get('[data-testid="message-name-plate"]').text()).toContain("蕾娜");
+    // One representation of that identity: the existing left figure, never an
+    // actor-right copy.
+    expect(rightActors()).toHaveLength(0);
+    // The selected non-controlled companion is lit and above every baseline
+    // figure; the other companion keeps the listener dim at its own baseline z.
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    expect(speaks("102")).toBe("false");
+    expect(zOf("102")).toBe("1");
+    // The controlled front keeps its exploration props: lit, baseline z, and
+    // no beat gesture of its own here.
+    expect(speaks("1")).toBe("true");
+    expect(zOf("1")).toBe("3");
+    expect(actorOf("1").attributes("data-beat")).toBeUndefined();
+    // Focus changes no geometry: the same committed lineup, byte for byte.
+    expect(boxOf("101")).toEqual(selectedBox);
+    expect(boxOf("102")).toEqual(otherBox);
+    expect(boxOf("1")).toEqual(controlledBox);
+  });
+
+  it("a same-name, same-portrait target outside the lineup keeps the actor-right standee", async () => {
+    const face = { ...CLERK_FACE, subject_key: "npc_101", url: "/art/portraits/npc_101.webp" };
+    await mountFocus({
+      exploration: focusRoom({
+        interact: [focusTarget(101), focusTarget(7, { display_name: "蕾娜", portrait_ref: "101" })],
+      }),
+      art: artPanel({ 101: face }),
+    });
+    await open("target-7");
+
+    // The different identity selects the normal standee — the equal name and
+    // the equal reference prove nothing about membership.
+    expect(rightActors()).toHaveLength(1);
+    expect(rightActors()[0].attributes("data-identity")).toBe("7");
+    expect(rightActors()[0].text()).toContain("蕾娜");
+    // No lineup companion gains exploration emphasis.
+    expect(speaks("101")).toBe("false");
+    expect(zOf("101")).toBe("2");
+    expect(speaks("102")).toBe("false");
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("a raw party row outside the displayed lineup is not a rendered figure", async () => {
+    await mountFocus({ rows: [101, 102, 103, 104, 105], exploration: focusRoom() });
+    // The bounded row draws the controlled front plus four companions; the
+    // fifth raw party row is never rendered.
+    expect(figureIds()).toEqual(["1", "101", "102", "103", "104"]);
+
+    await open("target-105");
+
+    expect(rightActors()).toHaveLength(1);
+    expect(rightActors()[0].attributes("data-identity")).toBe("105");
+    for (const identity of ["101", "102", "103", "104"]) {
+      expect(speaks(identity), identity).toBe("false");
+    }
+    expect(zOf("101")).toBe("4");
+  });
+
+  it("membership is identity-only: a null portrait and an unavailable catalog change nothing", async () => {
+    await mountFocus({ art: ART_PANEL_UNAVAILABLE_SAMPLE });
+    // Every figure keeps its truthful initial: no art is resolved at all.
+    expect(actorOf("101").find("img").exists()).toBe(false);
+
+    await open("target-101");
+
+    expect(rightActors()).toHaveLength(0);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
+  it("emphasis follows the selected identity through a party reorder, not its slot index", async () => {
+    await mountFocus();
+    await open("target-101");
+    expect(zOf("101")).toBe("6");
+
+    await commit({ party: focusParty(103, 101) });
+
+    expect(figureIds()).toEqual(["1", "103", "101"]);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    // The companion that took the selected identity's old index stays a
+    // listener at the new lineup's baseline z.
+    expect(speaks("103")).toBe("false");
+    expect(zOf("103")).toBe("2");
+    expect(zOf("1")).toBe("3");
+  });
+
+  it("a possession swap of the selected companion never elevates the controlled front", async () => {
+    await mountFocus();
+    await open("target-101");
+    expect(zOf("101")).toBe("6");
+
+    // The player possesses the focused companion: it becomes the controlled
+    // front, so it holds no listener elevation and keeps its own props.
+    actorIdentity = "101";
+    await commit({
+      possession_banner: { schema_version: 1, available: true, host_name: "蕾娜", since_tick: 0 },
+    });
+    expect(figureIds()).toEqual(["101", "1", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("3");
+    expect(speaks("102")).toBe("false");
+
+    // Releasing it returns the emphasis to the still-open card's target.
+    actorIdentity = "1";
+    await commit({
+      possession_banner: {
+        schema_version: 1, available: false,
+        reason: { code: "unavailable", message: "目前沒有附身" },
+      },
+    });
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(zOf("101")).toBe("6");
+    expect(speaks("101")).toBe("true");
+    expect(rightActors()).toHaveLength(0);
+  });
+
+  it("the controlled placeholder front (string status identity, no party rows) is never elevated", async () => {
+    await mountFocus({
+      rows: [],
+      actor: "101",
+      extra: {
+        possession_banner: { schema_version: 1, available: true, host_name: "蕾娜", since_tick: 0 },
+      },
+    });
+    // The unrendered party leaves the controlled placeholder: the wire string
+    // identity joins the numeric interact identity, so no actor-right copy
+    // appears either — and the controlled figure stays at its baseline.
+    expect(figureIds()).toEqual(["101"]);
+
+    await open("target-101");
+    expect(rightActors()).toHaveLength(0);
+    expect(zOf("101")).toBe("1");
+    expect(speaks("101")).toBe("true");
+
+    // An unavailable party panel keeps that same single controlled figure.
+    await commit({ party: FOCUS_PARTY_UNAVAILABLE });
+    expect(figureIds()).toEqual(["101"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(zOf("101")).toBe("1");
+  });
+
+  it("transfers representation both ways between the left figure and actor-right", async () => {
+    // 101 is present but not a party member: its card stands a right figure.
+    await mountFocus({ rows: [102] });
+    await open("target-101");
+    expect(figureIds()).toEqual(["1", "102"]);
+    expect(rightActors()).toHaveLength(1);
+    expect(rightActors()[0].attributes("data-identity")).toBe("101");
+
+    // It joins the committed rendered lineup: the left figure takes over in
+    // that commit and the right standee is gone rather than leaving behind a
+    // duplicate (the live DOM count through the transfer is pinned by the
+    // managed browser method, where a CSS leave phase really runs).
+    await commit({ party: focusParty(101, 102) });
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+
+    // It leaves the lineup again while the card survives: the ordinary
+    // actor-right standee takes over, still exactly one representation.
+    await commit({ party: focusParty(102) });
+    expect(figureIds()).toEqual(["1", "102"]);
+    expect(rightActors()).toHaveLength(1);
+    expect(rightActors()[0].attributes("data-identity")).toBe("101");
+    expect(speaks("102")).toBe("false");
+  });
+
+  it("closing through Escape, 返回 and 查看 restores the baseline and the opener", async () => {
+    await mountFocus();
+    for (const close of ["escape", "back-row", "look-row"]) {
+      await open("target-101");
+      expect(zOf("101"), close).toBe("6");
+      expect(speaks("101"), close).toBe("true");
+      if (close === "escape") {
+        key(card().element, "Escape");
+        await settle();
+      } else if (close === "back-row") {
+        await cardRows().at(-1).trigger("click");
+        await settle();
+      } else {
+        await cardRows().at(-2).trigger("click");
+        await settle();
+      }
+      expect(card().exists(), close).toBe(false);
+      // The current baseline is restored with no remembered focus z, and the
+      // lineage never had a right-side figure to leave behind.
+      expect(zOf("101"), close).toBe("2");
+      expect(speaks("101"), close).toBe("false");
+      expect(rightActors(), close).toHaveLength(0);
+      if (close === "look-row") {
+        expect(sender.sent.actions).toHaveLength(1);
+        expect(sender.sent.actions[0]).toMatchObject({
+          action_id: "explore.look",
+          payload: { target_id: 101 },
+        });
+      } else {
+        expect(sender.sent.actions).toHaveLength(0);
+      }
+      // Focus returns to the medallion that opened the card.
+      expect(
+        document.getElementById(rail().attributes("aria-activedescendant")).dataset.entryKey,
+        close,
+      ).toBe("target-101");
+    }
+  });
+
+  it("a locked departure clears the emphasis at once and settles the card once", async () => {
+    await mountFocus();
+    await open("target-101");
+    // An unrelated 交談 submission holds the settlement lock.
+    expect(store.activatePresenceVerb("talk-open").sent).toBe(true);
+
+    await commit({ exploration: focusRoom({ interact: [focusTarget(102)] }) });
+
+    // The committed target is gone, so the derived list emphasis is gone in
+    // that commit — while the locked settlement still holds the card open and
+    // claims no departure.
+    expect(card().exists()).toBe(true);
+    expect(speaks("101")).toBe("false");
+    expect(zOf("101")).toBe("2");
+    expect(rightActors()).toHaveLength(0);
+    expect(store.view.presenceNotice).toBe(null);
+
+    // The lock releases: the normal settlement closes the card and flashes the
+    // departure exactly once.
+    await releaseLock();
+    expect(card().exists()).toBe(false);
+    expect(store.view.presenceNotice.seq).toBe(1);
+    expect(readoutText()).toBe("蕾娜 已經離開了。");
+    expect(wrapper.get('[data-testid="exploration-readout"]').attributes("data-flash")).toBe("true");
+    expect(zOf("101")).toBe("2");
+    expect(rightActors()).toHaveLength(0);
+  });
+
+  it("a committed move closes the card with no departure claim and no stale emphasis", async () => {
+    await mountFocus();
+    await open("target-101");
+
+    await commit({
+      exploration: focusRoom({
+        look: {
+          room: { identity: 77, display_name: "渡口", room: true },
+          entities: [],
+          objects: [],
+        },
+      }),
+    });
+
+    expect(card().exists()).toBe(false);
+    expect(store.view.presenceNotice).toBe(null);
+    expect(zOf("101")).toBe("2");
+    expect(speaks("101")).toBe("false");
+    expect(rightActors()).toHaveLength(0);
+  });
+
+  // The emphasis is derived state, so the final focus state does not depend on
+  // a transition running: full, reduced and off all land on the same props.
+  for (const level of ["full", "reduced", "off"]) {
+    it(`reaches the same focus and restoration state at ${level} motion`, async () => {
+      await mountFocus();
+      store.setMotionLevel(level);
+      await settle();
+
+      await open("target-101");
+      expect(zOf("101")).toBe("6");
+      expect(speaks("101")).toBe("true");
+      expect(speaks("102")).toBe("false");
+      expect(rightActors()).toHaveLength(0);
+
+      key(card().element, "Escape");
+      await settle();
+      expect(card().exists()).toBe(false);
+      expect(zOf("101")).toBe("2");
+      expect(speaks("101")).toBe("false");
+      expect(rightActors()).toHaveLength(0);
+    });
+  }
+
+  it("an unavailable panel and an epoch reset cannot retain a former selected slot", async () => {
+    await mountFocus();
+    await open("target-101");
+    expect(zOf("101")).toBe("6");
+
+    // The exploration panel goes away: the derived emphasis clears while the
+    // store's own lifecycle keeps the card (the settled rule).
+    await commit({
+      exploration: {
+        schema_version: 4,
+        available: false,
+        reason: { code: "scene_lost", message: "場景暫時無法顯示" },
+      },
+    });
+    expect(store.view.presenceCard).toMatchObject({ kind: "verbs", identity: 101 });
+    expect(speaks("101")).toBe("false");
+    expect(zOf("101")).toBe("2");
+    expect(rightActors()).toHaveLength(0);
+
+    // A transport reset (a fresh generation and epoch) leaves no card, no
+    // emphasis and no right-side figure; the companion that is no longer a
+    // rendered member cannot stay selected.
+    store.beginTransport(2);
+    store.setConnected(true);
+    const result = store.receive(
+      2,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision: 1,
+          presentation_epoch: fx.EPOCH_B,
+          panels: {
+            status: statusWithActor(),
+            exploration: focusRoom(),
+            local_map: fx.localMapPanel(),
+            context_actions: fx.explorationActions(),
+            art: artPanel(),
+            roster: FOCUS_ROSTER,
+            party: FOCUS_PARTY_UNAVAILABLE,
+          },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    await settle();
+    expect(card().exists()).toBe(false);
+    expect(figureIds()).toEqual(["1"]);
+    expect(zOf("1")).toBe("1");
+    expect(rightActors()).toHaveLength(0);
+  });
+
+  it("交談 submits once and hands the companion over to dialogue without a duplicate", async () => {
+    await mountFocus();
+    await open("target-101");
+
+    expect(store.activatePresenceVerb("talk-open").sent).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+    expect(sender.sent.actions[0]).toMatchObject({
+      action_id: "explore.talk_open",
+      payload: { npc_id: 101 },
+    });
+
+    // An intermediate exploration commit still carries the target: the card
+    // and the companion's emphasis survive it.
+    await commit({ exploration: focusRoom() });
+    expect(card().exists()).toBe(true);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    expect(rightActors()).toHaveLength(0);
+
+    // The dialogue commit hands over: the same identity is still represented
+    // once on the left, and the existing dialogue speaking signal owns dim/z.
+    revision += 1;
+    const dialogue = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision,
+          mode: "dialogue",
+          panels: {
+            status: fx.statusPanel({ actor: { identity: "1" } }),
+            exploration: focusRoom(),
+            local_map: fx.localMapPanel(),
+            context_actions: fx.explorationActions(),
+            art: artPanel(),
+            roster: FOCUS_ROSTER,
+            party: focusParty(101, 102),
+            dialogue: {
+              schema_version: 2,
+              available: true,
+              kind: "dialogue",
+              host: { identity: 101, display_name: "蕾娜", portrait_ref: null },
+              bond_stage: "熟識",
+              line: "歡迎。",
+              choices: [{ keyword_id: "news", label: "最近有什麼消息？" }],
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(dialogue.accepted).toBe(true);
+    await settle();
+    expect(store.view.mode).toBe("dialogue");
+    expect(card().exists()).toBe(false);
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    expect(speaks("1")).toBe("false");
+    expect(sender.sent.actions).toHaveLength(1);
+
+    // 交談's own reply releases the submission lock (its declared revision is
+    // the committed one), exactly as the live transport's result would.
+    store.receive(1, "ui_action_result", [fx.actionResult({ presentation_revision: revision })], {});
+    await settle();
+    expect(store.view.dispatch.inFlight).toBe(null);
+
+    // The player speaks: the existing dialogue host/player signals take over
+    // and the hosted companion is dimmed again.
+    expect(store.dispatchAction("explore.talk_scripted", { npc_id: 101, keyword_id: "news" }, null)).not.toBe(null);
+    await settle();
+    expect(store.view.dialogueSpeaker).toBe("player");
+    expect(speaks("101")).toBe("false");
+    expect(zOf("101")).toBe("2");
+    expect(speaks("1")).toBe("true");
+    expect(sender.sent.actions).toHaveLength(2);
+  });
+
+  it("a failed talk keeps the surviving card and the companion emphasis", async () => {
+    await mountFocus();
+    await open("target-101");
+    expect(store.activatePresenceVerb("talk-open").sent).toBe(true);
+    expect(sender.sent.actions).toHaveLength(1);
+
+    // The submission is rejected while its target and rendered figure survive:
+    // the existing action feedback speaks once, the card and the emphasis stay,
+    // and nothing is resubmitted or mutated.
+    store.receive(
+      1,
+      "ui_action_result",
+      [
+        fx.actionResult({
+          outcome: "rejected",
+          code: "talk_unavailable",
+          message: "對方現在無法交談。",
+          presentation_revision: revision,
+        }),
+      ],
+      {},
+    );
+    await settle();
+    expect(store.narrative.filter((line) => line.kind === "err").map((line) => line.text)).toEqual([
+      "對方現在無法交談。",
+    ]);
+    expect(store.view.dispatch.inFlight).toBe(null);
+    expect(card().exists()).toBe(true);
+    expect(card().attributes("data-card-kind")).toBe("verbs");
+    expect(speaks("101")).toBe("true");
+    expect(zOf("101")).toBe("6");
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(sender.sent.actions).toHaveLength(1);
+  });
+
+  // Everything above mounts AppClient before the store commits. The shell also
+  // has to survive a mount against an already-committed store — a hot reload,
+  // or a remount while a card is open or a conversation is on — because the
+  // derivations and the transfer watcher are read during setup.
+  it("mounts against an already-committed card and an already-committed dialogue", async () => {
+    store.beginTransport(1);
+    store.setConnected(true);
+    store.setLoggedIn(true);
+    revision = 1;
+    const result = store.receive(
+      1,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          revision,
+          panels: {
+            status: fx.statusPanel({ actor: { identity: "1" } }),
+            exploration: focusRoom(),
+            local_map: fx.localMapPanel(),
+            context_actions: fx.explorationActions(),
+            art: artPanel(),
+            roster: FOCUS_ROSTER,
+            party: focusParty(101, 102),
+          },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted).toBe(true);
+    expect(store.activatePresence("target-101").handled).toBe(true);
+
+    wrapper = mount(AppClient, { attachTo: document.body });
+    await settle();
+    expect(zOf("101")).toBe("6");
+    expect(speaks("101")).toBe("true");
+    expect(rightActors()).toHaveLength(0);
+    wrapper.unmount();
+    wrapper = null;
+    document.body.innerHTML = "";
+
+    revision += 1;
+    const dialogue = store.receive(
+      1,
+      "ui_update",
+      [
+        fx.update({
+          revision,
+          mode: "dialogue",
+          panels: {
+            dialogue: {
+              schema_version: 2,
+              available: true,
+              kind: "dialogue",
+              host: { identity: 101, display_name: "蕾娜", portrait_ref: null },
+              bond_stage: null,
+              line: "歡迎。",
+              choices: [],
+            },
+          },
+        }),
+      ],
+      {},
+    );
+    expect(dialogue.accepted).toBe(true);
+
+    wrapper = mount(AppClient, { attachTo: document.body });
+    await settle();
+    expect(figureIds()).toEqual(["1", "101", "102"]);
+    expect(rightActors()).toHaveLength(0);
+    expect(zOf("101")).toBe("6");
+    expect(speaks("101")).toBe("true");
+  });
+});

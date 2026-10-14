@@ -16,6 +16,29 @@ export function companionLineupSpan(count, maximumSpan = Infinity) {
   return last ? last.scale - last.x : 0;
 }
 
+// The figures `CompanionLineup` actually displays: the slot list bounded by its
+// own maximum. The shell's actor-right membership join reads this same list, so
+// a person counts as represented exactly when a figure is drawn for them
+// (reuse-lineup-person-focus D1) — never from raw `party.slots`, a display name,
+// a portrait key or art availability.
+export function displayedLineup(slots) {
+  return (Array.isArray(slots) ? slots : []).slice(0, COMPANION_LINEUP_MAX);
+}
+
+// The rendered figure for one wire identity, or null. `String(identity)` is the
+// existing wire-identity convention — party rows carry safe integers and
+// `status.actor.identity` is a bounded string — and it is applied only inside
+// this join: the matched slot keeps its own native identity for the companion
+// speaking signal. A null/undefined identity joins nothing, and a null portrait
+// still matches (membership is identity-only).
+export function lineupSlotByIdentity(slots, identity) {
+  if (identity === null || identity === undefined) {
+    return null;
+  }
+  const key = String(identity);
+  return displayedLineup(slots).find((slot) => String(slot.identity) === key) || null;
+}
+
 // Slots retain positions across possession; only the front and possessed
 // companion's original slot exchange portraits. No client-built art key.
 export function companionFigures({ player, companions, actorIdentity, possessing, controlledName = "", artPanel, portraitFor }) {

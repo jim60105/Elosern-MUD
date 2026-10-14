@@ -8,6 +8,15 @@
 // card's state is the store's client-local slice
 // (`store.view.presenceCard`); this composable owns no state of its own but
 // the template refs.
+//
+// A target the rendered actor-left lineup already draws is represented once:
+// `AppClient.vue` joins it by identity to the displayed figures, leaves
+// `actor-right` empty for it and lights that figure through the companion
+// speaking signal (reuse-lineup-person-focus D1/D2). Nothing about the card's
+// lifecycle changes here: a committed target that leaves the room still clears
+// the derived `focusTarget` at once, while the store's own commit-time
+// settlement remains the only owner of closing the card and flashing the
+// departure.
 import { computed, nextTick, ref, watch } from "vue";
 import { disabledRowReason } from "../components/dock-exits.js";
 import { railOverflow } from "../components/presence-rail.js";
