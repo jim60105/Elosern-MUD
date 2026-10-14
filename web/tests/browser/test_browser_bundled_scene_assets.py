@@ -15,6 +15,8 @@ lifecycle rather than the synthetic shared server.
 
 from __future__ import annotations
 
+from tools.spec_traceability import covers_requirement
+
 from .browser_base import BrowserAcceptanceTest, DEFAULT_VIEWPORT
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
@@ -93,6 +95,10 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         # Each test boots its own isolated server; never the shared one.
         pass
 
+    @covers_requirement(
+        "bundled-outdoor-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
+        "bundled-outdoor-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
+    )
     def test_outdoor_pack_static_decode(self):
         """Every committed outdoor scene serves and decodes as its own image."""
         self.assertNotIn(
