@@ -14,6 +14,7 @@ import {
 import { galleryCardName, galleryDate } from "./gallery-copy.js";
 import { artworkAvailability, artworkGeometry } from "../lib/artwork.js";
 import { useArtwork } from "../composables/useArtwork.js";
+import { useOriginalEligibility } from "../composables/useOriginalEligibility.js";
 import "./gallery.css";
 
 const props = defineProps({
@@ -51,17 +52,31 @@ const { attempt, phase, dimensions, reachedFaults, panelUnavailable, onImageLoad
   { terminal: false },
 );
 
-// With no terminal in the request, a successful phase can only be the exact
-// original: a failed original exhausts and leaves the editor unsavable.
-const loaded = computed(() => phase.value === "success");
-const saveReady = computed(() => loaded.value && !!dimensions.value && !panelUnavailable.value);
+// Only the exact original's own decoded resource enables saving, and only while
+// the editor still shows that same original. A silhouette, another card or a
+// scene background is never a candidate here: the request carries no terminal
+// and the draft is squared against the decoded original's dimensions alone.
+const { decoded: loaded, saveReady } = useOriginalEligibility(
+  () => props.card.artwork,
+  phase,
+  dimensions,
+  panelUnavailable,
+);
+// Loading and a failed original are different facts with different copy: the
+// editor says which one it is rather than showing one vague "not yet" line.
+const loading = computed(() => phase.value === "loading");
+const failed = computed(() => !loaded.value && (panelUnavailable.value || reachedFaults.value.length > 0));
 const imageUrl = computed(() => attempt.value?.url ?? null);
 // The crop preview reuses the already observed successful resource; it is never
 // a second original that can fail on its own.
 const previewUrl = computed(() => (loaded.value ? imageUrl.value : null));
 const failure = computed(() => reachedFaults.value[reachedFaults.value.length - 1] ?? null);
-const failureKind = computed(() => (failure.value ? "failure" : null));
-const failureReason = computed(() => failure.value?.reason ?? null);
+const failureKind = computed(() => (
+  panelUnavailable.value || failure.value ? "failure" : (loading.value ? "loading" : null)
+));
+const failureReason = computed(() => (
+  panelUnavailable.value ? "panel_unavailable" : failure.value?.reason ?? null
+));
 const previewStyle = computed(() => {
   // By construction rect is pixel-square when loaded, so aspect ratio is 1:1
   return { width: "100%", height: "100%" };
@@ -152,11 +167,13 @@ function submit() {
           <h4>方形裁切預覽（1:1）</h4>
           <div v-if="previewUrl" class="gallery-face__preview"><div class="gallery-face__crop" :style="previewStyle"><img :src="previewUrl" :alt="`${galleryCardName(card)}，框選預覽`" :style="faceCropStyle(rect)"></div></div>
           <p class="gallery-muted">依真實比例呈顯方形頭像，鎖定等長像素範圍。</p>
-          <p v-if="!loaded" class="gallery-muted">圖片尚未載入，無法儲存框選。</p>
+          <p v-if="loading" class="gallery-muted">原始圖片載入中，暫時無法儲存框選。</p>
+          <p v-else-if="failed" class="gallery-muted gallery-face__failure">原始圖片載入失敗，無法儲存框選。仍可用數值調整框選，修復後即可儲存。</p>
+          <p v-else-if="!loaded" class="gallery-muted">這張肖像沒有可編輯的原始圖片，無法儲存框選。</p>
           <p v-if="rejected" class="gallery-feedback" role="status">操作未完成，框選已保留。<button @click="emit('log')">查看伺服器訊息</button></p>
         </section>
       </div>
-      <footer class="gallery-actions"><button @click="close">取消</button><button class="gallery-primary" :disabled="disabled || !loaded" @click="submit">儲存框選</button></footer>
+      <footer class="gallery-actions"><button @click="close">取消</button><button class="gallery-primary" :disabled="disabled || !saveReady" @click="submit">儲存框選</button></footer>
     </section>
   </div>
 </template>
@@ -181,6 +198,7 @@ function submit() {
 .gallery-face__numbers label { color: var(--paper-500); font-size: var(--text-xs); }
 .gallery-face__numbers input { width: 100%; background: #10121a; color: var(--paper-100); padding: calc(6px * var(--ui-scale)); border: 1px solid #a5967755; }
 .gallery-face__identity { overflow-wrap: anywhere; }
+.gallery-face__failure { color: var(--seal-300, #f49595); }
 .gallery-face footer { margin: calc(20px * var(--ui-scale)) 0 0 auto; max-width: calc(480px * var(--ui-scale)); }
 @media (max-width: 800px) { .gallery-face__body { grid-template-columns: 1fr; } }
 </style>

@@ -46,8 +46,11 @@ export function artworkAvailability({ panel, required = true, hasReference = tru
   return { state: ARTWORK_STATE_READY, ...view };
 }
 
-// The ordered image candidates of one descriptor, faults excluded.
-export function artworkCandidates(artwork) {
+// The ONE ordering rule for a descriptor's exact-original candidates: ranked
+// image attempts, faults excluded. Rank decides priority; ties keep declaration
+// order (`Array.prototype.sort` is stable), exactly like the shared reducer's
+// own canonical order.
+function orderedImageAttempts(artwork) {
   const attempts = Array.isArray(artwork?.attempts) ? artwork.attempts : [];
   return attempts
     .filter((entry) => entry?.type === "image" && entry.resource)
@@ -55,10 +58,41 @@ export function artworkCandidates(artwork) {
     .sort((left, right) => (left.rank ?? 0) - (right.rank ?? 0));
 }
 
+// The ordered image candidates of one descriptor, faults excluded.
+export function artworkCandidates(artwork) {
+  return orderedImageAttempts(artwork).map((entry) => entry.resource);
+}
+
 // The descriptor's exact original: its highest-ranked image candidate, or null
 // for a row that carries a named fault (or nothing at all) instead.
 export function artworkCandidate(artwork) {
-  return artworkCandidates(artwork)[0]?.resource ?? null;
+  return artworkOriginal(artwork)?.resource ?? null;
+}
+
+// The exact original's own attempt entry (its stable source identity plus its
+// resource), or null for a descriptor with no image candidate at all.
+export function artworkOriginal(artwork) {
+  return orderedImageAttempts(artwork)[0] ?? null;
+}
+
+// The exact identity one successful decode has to still match to authorize a
+// save: the descriptor's stable subject, the original's source layer and its
+// resource identity/version. It deliberately excludes the descriptor revision,
+// which also covers geometry — the shared lifecycle keeps a decoded resource
+// across a geometry-only re-presentation (`lib/image-attempts.js`), and a
+// geometry-only revision must not retire a save the player can still make.
+export function artworkOriginalIdentity(artwork) {
+  const entry = artworkOriginal(artwork);
+  if (!artwork || !entry) {
+    return null;
+  }
+  const resource = entry.resource;
+  return [
+    artwork.subject_id ?? "",
+    entry.source_id ?? "",
+    resource?.resource_id ?? "",
+    resource?.version ?? "",
+  ].join("|");
 }
 
 // The applicable geometry of the descriptor's exact original, or null.
