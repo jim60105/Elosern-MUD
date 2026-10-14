@@ -11,6 +11,7 @@ serialization size.
 from pathlib import Path
 import base64
 import hashlib
+import json
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -306,6 +307,81 @@ class ArtSchemaTests(unittest.TestCase):
         )
         with self.assertRaises(Exception):
             validate_art(payload)
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_v3_portraits_coexist_with_the_unchanged_scene_block(self):
+        """One v3 payload carries canonical descriptors AND the untouched scene.
+
+        The scene block keeps its own prior shape until its separately
+        versioned cutover: the catalog value is exactly ``{artwork, context}``
+        with the seven canonical descriptor keys, while the scene keeps its
+        nine flat keys and never gains a descriptor field.
+        """
+        payload = validate_art(_valid_payload())
+        self.assertEqual(
+            set(payload["scene"]),
+            {
+                "archetype",
+                "stage",
+                "label",
+                "subject_key",
+                "status",
+                "url",
+                "aspect_ratio",
+                "alt",
+                "placeholder",
+            },
+        )
+        entry = payload["portrait_catalog"]["42"]
+        self.assertEqual(set(entry), {"artwork", "context"})
+        self.assertEqual(
+            set(entry["artwork"]),
+            {
+                "subject_id",
+                "revision",
+                "generation_subject",
+                "generation_state",
+                "attempts",
+                "terminal",
+                "retention_sources",
+            },
+        )
+        # The retired flat portrait vocabulary appears nowhere in the payload.
+        flat = json.dumps(payload, ensure_ascii=False)
+        # (a resource legitimately carries its own ``origin``; the retired
+        # FLAT portrait fields do not appear)
+        for retired in (
+            '"subject_key": "portrait:monster:low"',
+            '"fallback"',
+            '"placeholder": {"kind"',
+        ):
+            self.assertNotIn(retired, flat)
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    def test_version_and_catalog_keys_parity_with_the_client_mirror(self):
+        """The registered version and the catalog key set agree across mirrors.
+
+        The client validator corpus is the shipped module graph, so scanning
+        its source text is the parity check: both sides register the same
+        version, the allowlist row binds it, and the retired flat portrait
+        vocabulary is gone from the mirror.
+        """
+        from tools.protocol_client_source import protocol_client_source
+
+        source = protocol_client_source()
+        self.assertIn(f"ART_SCHEMA_VERSION = {ART_SCHEMA_VERSION}", source)
+        self.assertIn("art: ART_SCHEMA_VERSION", source)
+        self.assertIn(
+            'requireExactFields(value, "art catalog entry", ["artwork", "context"], [])',
+            source,
+        )
+        for retired in (
+            "ART_ORIGINS",
+            "ART_MAX_FALLBACK_KEY",
+            "validateArtFallback",
+            "validatePortraitOrigin",
+        ):
+            self.assertNotIn(retired, source)
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_catalog_geometry_is_exact_per_resource(self):
