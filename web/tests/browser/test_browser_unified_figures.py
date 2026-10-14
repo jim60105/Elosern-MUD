@@ -232,10 +232,10 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         "webclient-art-panel::the-reference-artwork-frame-presents-a-portrait-entry-truthfully-through-cover-fit-and-rect-crop"
     )
     @covers_requirement(
-        "webclient-character-roster::the-roster-row-portrait-is-the-complete-canonical-artwork-descriptor"
+        "webclient-character-roster::roster-portraits-resolve-through-the-named-portrait-subject-mechanism"
     )
     @covers_requirement(
-        "webclient-party-panel::portrait-ref-is-the-art-panels-opaque-reference-format"
+        "webclient-party-panel::the-party-panel-is-an-exact-read-only-version-2-presentation-panel"
     )
     def test_exploration_dialogue_combat_and_drawer_share_descriptor(self):
         """One descriptor, every surface: the player's roster figure, the

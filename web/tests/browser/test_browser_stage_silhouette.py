@@ -232,7 +232,7 @@ class StageSilhouetteBrowserTest(BrowserAcceptanceTest):
             """async (sel) => {
               const fill = document.querySelector(sel);
               const declaration = fill.style.getPropertyValue('--artwork-alpha-mask');
-              const probe = { src: declaration.replace(/^url\(['"]?/, '').replace(/['"]?\)$/, '') };
+              const probe = { src: declaration.replace(/^url[(]['"]?/, '').replace(/['"]?[)]$/, '') };
               const image = new Image();
               image.src = probe.src;
               await image.decode();

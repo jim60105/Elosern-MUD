@@ -209,9 +209,11 @@ describe("CharacterSwitcher (MC5, multichar-05-topbar-switcher-ui)", () => {
     expect(wrapper.get('[data-testid="character-switcher-name"]').text()).toBe("雷恩");
     // No real candidate: the avatar position draws the identity glyph and
     // carries no failure marker (an unfinished generation is expected).
+    // The glyph is the identity's first grapheme, never a copied label.
+    const firstName = Array.from(chars[0].name)[0];
     expect(
       wrapper.get(".character-switcher__thumb-wrapper .reference-artwork__avatar-glyph").text(),
-    ).toBe("雷");
+    ).toBe(firstName);
     expect(
       wrapper.find(".character-switcher__thumb-wrapper [data-testid='artwork-failure']").exists(),
     ).toBe(false);
