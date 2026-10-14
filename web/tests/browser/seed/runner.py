@@ -17,6 +17,7 @@ from web.tests.browser.seed.identity import (
 )
 from web.tests.browser.seed.art_fixture import _art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
+from web.tests.browser.seed.image_editor_fixture import _image_editor_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
 from web.tests.browser.seed.npc_persona_fixture import _npc_persona_fixture
 from web.tests.browser.seed.options_surface_fixture import _options_surface_fixture
@@ -263,6 +264,10 @@ def main() -> None:
     _services_fixture(character)
 
     _art_fixture(character, room)
+    # The unified-image family's editor/portrait/scene/dream journeys each seed
+    # their own real records only under their own flag; an unset flag is a
+    # no-op, so this never affects the unrelated browser suites.
+    _image_editor_fixture(character)
     _exploration_fixture(character)
     _options_surface_fixture(character)
     _titles_fixture(character)

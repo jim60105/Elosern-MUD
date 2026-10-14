@@ -335,8 +335,3 @@ export function resolutionFacts(request) {
       : ["image", entry.sourceId, entry.rank, entry.key, entry.terminal]
   ));
 }
-
-// The ordered resource keys that define *which bytes* the resolution needs.
-export function resourceKeys(request) {
-  return canonicalOrder(request).map((entry) => (entry.kind === "image" ? entry.key : null));
-}
