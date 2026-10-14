@@ -41,6 +41,10 @@ and `combat` modes and SHALL use the registered common unavailable form in `crea
 - **THEN** it contains no live object reference, no filesystem path, no store root, and no
   rejected prompt content
 
+#### Scenario: Portrait wire and all readers cut over together
+- **WHEN** art schema 3 and roster schema 3 ship
+- **THEN** portrait_catalog values and roster portraits carry the complete canonical artwork descriptor plus authorized display context; active validators and every portrait consumer reject the old flat image fields while scene retains its prior shape until its separately versioned cutover
+
 #### Scenario: Both artwork vocabularies are canonical
 - **WHEN** art schema 4 is shipped
 - **THEN** scene is exactly {archetype, label, alt, artwork} with the canonical scene descriptor; portrait_catalog retains the complete canonical portrait values from schema 3; server/client validators and all scene consumers switch atomically and old scene image fields are rejected
