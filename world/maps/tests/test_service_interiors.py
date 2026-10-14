@@ -76,6 +76,44 @@ class ServiceInteriorTests(EvenniaTestCase):
             self.assertEqual(room.location, None)
             self.assertEqual(room.db.desc, place.room_desc_zh)
 
+    def test_interiors_converge_onto_the_authored_scene_metadata(self):
+        # unified-room-art-metadata: a permanent interior is a plain Room that
+        # now carries readable scene metadata. Every authored place declares a
+        # registered scene archetype; its place key IS its registered room-art
+        # key; and its identity is the authored place identity. A second sync
+        # re-applies the same facts in place without duplicating a room.
+        from world.art.scene_definitions import (
+            is_registered_room_art_key,
+            is_registered_scene_key,
+        )
+        from world.maps.room_art import PLACE_SCENE_ARCHETYPES, place_scene_identity
+
+        sync_service_interiors()
+        for place in _places().values():
+            room = self._interior(place)
+            self.assertEqual(room.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
+            self.assertTrue(is_registered_scene_key(room.scene_archetype), place.key)
+            self.assertEqual(room.room_art_key, place.key)
+            self.assertTrue(is_registered_room_art_key(room.room_art_key), place.key)
+            self.assertEqual(room.scene_identity, place_scene_identity(place.key))
+
+        room_count = Room.objects.all_family().count()
+        for place in _places().values():
+            room = self._interior(place)
+            room.scene_archetype = None
+            room.room_art_key = None
+            room.scene_identity = "drifted"
+            room.save()
+
+        sync_service_interiors()
+
+        self.assertEqual(Room.objects.all_family().count(), room_count)
+        for place in _places().values():
+            room = self._interior(place)
+            self.assertEqual(room.scene_archetype, PLACE_SCENE_ARCHETYPES[place.key])
+            self.assertEqual(room.room_art_key, place.key)
+            self.assertEqual(room.scene_identity, place_scene_identity(place.key))
+
     def test_interiors_have_bidirectional_doorways_to_documented_exteriors(self):
         sync_service_interiors()
         for place in _places().values():

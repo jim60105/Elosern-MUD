@@ -16,6 +16,9 @@ from typeclasses.characters import PlayerCharacter
 from typeclasses.entities import LivingEntity
 from typeclasses.exits import Exit
 from typeclasses.rooms import InstanceRoom
+from world.art.scene_definitions import is_registered_room_art_key
+from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
+from world.maps.room_art import instance_scene_identity
 from world.observability import log_warn
 from world.rules.clock import (
     ScheduledEvent,
@@ -84,6 +87,9 @@ def spawn_instance_room(
     ttl_seconds=None,
     named=False,
     caller=None,
+    scene_archetype=None,
+    room_art_key=None,
+    scene_identity=None,
 ) -> InstanceRoom:
     """Create one ``InstanceRoom`` reached from ``origin_room`` via a plain Exit pair.
 
@@ -94,12 +100,30 @@ def spawn_instance_room(
     caller never observes or leaves a half-wired instance. ``expire_tick`` is
     set from the rulebook default TTL unless ``ttl_seconds`` overrides it
     (map-instance design.md D-2/D-7/D-9).
+
+    ``scene_archetype`` is the explicitly authored registered scene archetype
+    the instance renders (``None`` for a dynamic undeclared instance, which
+    then has no room-art key and uses no scene art). ``room_art_key`` is the
+    explicitly authored registered room-art key an operator override may
+    address. Both are validated here, BEFORE any object is spawned, so a bad
+    declaration can never leave a partial room behind. ``scene_identity`` is
+    the stable non-pooled logical identity; it defaults to the room's own
+    stable identity and is never inferred from the art key
+    (unified-room-art-metadata design).
     """
     if ttl_seconds is not None and (
         not isinstance(ttl_seconds, int) or isinstance(ttl_seconds, bool) or ttl_seconds < 0
     ):
         raise ValueError(
             f"ttl_seconds must be a non-negative int, got {ttl_seconds!r}"
+        )
+    if scene_archetype is not None and scene_archetype not in SCENE_ARCHETYPE_REGISTRY:
+        raise ValueError(
+            f"scene_archetype {scene_archetype!r} is not a registered scene archetype"
+        )
+    if room_art_key is not None and not is_registered_room_art_key(room_art_key):
+        raise ValueError(
+            f"room_art_key {room_art_key!r} is not a registered room-art key"
         )
     if isinstance(origin_room, InstanceRoom):
         raise ValueError(
@@ -133,6 +157,13 @@ def spawn_instance_room(
         )
         room.db.named = named
         room.db.origin_room = origin_room
+        room.db.scene_archetype = scene_archetype
+        room.db.room_art_key = room_art_key
+        room.db.scene_identity = (
+            scene_identity
+            if scene_identity is not None
+            else instance_scene_identity(room.pk)
+        )
         Exit.create(key=exit_key, location=origin_room, destination=room)
         Exit.create(key=return_key, location=room, destination=origin_room)
     return room

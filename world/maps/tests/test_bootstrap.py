@@ -648,7 +648,14 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
             enter_wilderness,
         )
 
-        from world.maps.wilderness_provider import terrain_description
+        from world.maps.room_art import (
+            REGION_SCENE_ARCHETYPES,
+            wilderness_scene_identity,
+        )
+        from world.maps.wilderness_provider import (
+            region_for_coordinates,
+            terrain_description,
+        )
 
         script = WildernessScript.objects.get(db_key=WILDERNESS_NAME)
         ok = enter_wilderness(self.char1, coordinates=(63, 100), name=WILDERNESS_NAME)
@@ -661,7 +668,14 @@ class WildernessBootstrapTests(BattlefieldIsolation, RegistryIsolationMixin, Eve
         # sync_wilderness must re-prepare it.
         sync_wilderness()
         self.assertEqual(room.ndb.active_desc, terrain_description(63, 100))
-        self.assertEqual(room.scene_archetype, "western_hills_valleys")
+        self.assertEqual(
+            room.scene_archetype,
+            REGION_SCENE_ARCHETYPES[region_for_coordinates(63, 100)],
+        )
+        self.assertEqual(
+            room.scene_identity,
+            wilderness_scene_identity(WILDERNESS_NAME, 63, 100),
+        )
 
     def test_sync_wilderness_heals_miskeyed_gate(self):
         create_object(Room, key=LIMBO_KEY, location=None)

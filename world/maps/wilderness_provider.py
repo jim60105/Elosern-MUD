@@ -4,6 +4,10 @@ from evennia.contrib.grid.wilderness.wilderness import WildernessMapProvider
 
 from typeclasses.rooms import TerrainRoom
 from world.lore.wilderness_regions import WILDERNESS_REGION_REGISTRY
+from world.maps.room_art import (
+    REGION_SCENE_ARCHETYPES,
+    wilderness_scene_identity,
+)
 # Read the entry registry as a MODULE attribute at call time (never a
 # from-import binding): a test rebinding world.lore.wilderness_entry.
 # WILDERNESS_ENTRY_REGISTRY must be observed here (wilderness-map-provider
@@ -136,10 +140,19 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         return WILDERNESS_REGION_REGISTRY[region_for_coordinates(*coordinates)].display_name_zh
 
     def at_prepare_room(self, coordinates, caller, room):
-        # D-3: re-set unconditionally on every call -- a TerrainRoom is pooled
-        # and reused across coordinates, so a stale value from a previous
-        # coordinate would silently persist if this were not re-assigned.
-        room.scene_archetype = region_for_coordinates(*coordinates)
+        # D-3/unified-room-art-metadata: re-set EVERY scene fact unconditionally
+        # on every call -- a TerrainRoom is pooled and reused across
+        # coordinates, so a stale archetype, identity or room-art key from a
+        # previous place would silently persist if these were not re-assigned.
+        # The archetype is the authored region->scene mapping (a registered
+        # scene key, never the raw terrain region key), the identity is the
+        # wilderness name plus the current coordinates, and the room-art key is
+        # cleared because wilderness declares none -- an earlier place's key
+        # must never leak into another coordinate.
+        region = region_for_coordinates(*coordinates)
+        room.scene_archetype = REGION_SCENE_ARCHETYPES[region]
+        room.scene_identity = wilderness_scene_identity(WILDERNESS_NAME, *coordinates)
+        room.room_art_key = None
         room.ndb.active_desc = terrain_description(*coordinates)
         # wilderness-monster-population D-4: ensure the deterministic monster
         # population for this coordinate whenever a wilderness script is

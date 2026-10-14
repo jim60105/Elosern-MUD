@@ -27,6 +27,12 @@ from world.maps.limbo import (
     LIMBO_KEY,
     LIMBO_LEGACY_KEY,
 )
+from world.maps.room_art import (
+    GRID_NODE_SCENE_ARCHETYPES,
+    PLACE_SCENE_ARCHETYPES,
+    grid_scene_identity,
+    place_scene_identity,
+)
 from world.maps.wilderness_provider import (
     LONG_DIRECTIONS,
     WILDERNESS_NAME,
@@ -67,6 +73,19 @@ def _ensure_interior(key, tag, desc):
         )
     room.db.desc = desc
     return room
+
+
+def _apply_room_art(room, *, scene_archetype, room_art_key, scene_identity):
+    """Write one room's authored scene facts (idempotent, map-owned).
+
+    Re-assigned unconditionally on every sync so a boot converges a room whose
+    stored metadata drifted (an older boot, a manual edit) onto the authored
+    declaration. The values come only from the authored tables in
+    ``world.maps.room_art``; nothing here infers a key from a name or id.
+    """
+    room.scene_archetype = scene_archetype
+    room.room_art_key = room_art_key
+    room.scene_identity = scene_identity
 
 
 def _ensure_interior_doorways(interior, exterior, interior_key, interior_aliases):
@@ -113,6 +132,23 @@ def sync_service_interiors() -> None:
                 place.key,
                 place.room_desc_zh,
             )
+            scene_archetype = PLACE_SCENE_ARCHETYPES.get(place.key)
+            if scene_archetype is None:
+                # The import-time contract guarantees every authored place is
+                # declared; a runtime-patched registry (a test seam) that adds
+                # an undeclared row is reported rather than silently left
+                # without scene art.
+                log_warn(
+                    "bootstrap_interior_scene_missing",
+                    context={"place": place.key, "action": "skip_scene_metadata"},
+                )
+            else:
+                _apply_room_art(
+                    interior,
+                    scene_archetype=scene_archetype,
+                    room_art_key=place.key,
+                    scene_identity=place_scene_identity(place.key),
+                )
             _ensure_interior_doorways(
                 interior,
                 exterior,
@@ -304,6 +340,8 @@ def sync_grid() -> None:
     grid.reload()
     grid.spawn()
 
+    _sync_grid_room_art()
+
     register_instance_reclamation()
 
     limbo = find_starting_rooms(LIMBO_KEY)
@@ -330,6 +368,36 @@ def sync_grid() -> None:
         _ensure_exit(limbo, gate, key=row.exit_key, aliases=list(row.exit_aliases))
 
     _prune_exits_into(limbo)
+
+
+def _sync_grid_room_art() -> None:
+    """Converge every authored grid node onto its declared scene facts.
+
+    A boot re-applies the authored table to the real rooms (an already-spawned
+    node is never re-created by the contrib), so startup is idempotent. A node
+    with no materialized room warns naming the coordinate and is skipped; the
+    remaining nodes still converge. Every ``scene_archetype`` written here is a
+    registered scene archetype, every ``room_art_key`` is cleared (authored
+    grid nodes declare none), and the identity is the authored coordinate.
+    """
+    for (map_key, x, y), scene_archetype in GRID_NODE_SCENE_ARCHETYPES.items():
+        room = GridRoom.objects.filter_xyz((x, y, map_key)).first()
+        if room is None:
+            log_warn(
+                "bootstrap_grid_room_art_missing_room",
+                context={
+                    "map_id": map_key,
+                    "xyz": (x, y, map_key),
+                    "action": "skip_grid_node",
+                },
+            )
+            continue
+        _apply_room_art(
+            room,
+            scene_archetype=scene_archetype,
+            room_art_key=None,
+            scene_identity=grid_scene_identity(map_key, x, y),
+        )
 
 
 def _prune_exits_into(limbo) -> None:
