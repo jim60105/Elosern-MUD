@@ -64,7 +64,13 @@ const Harness = defineComponent({
       const selected = driver.selected.value;
       return h("div", [
         attempt?.url
-          ? h("img", { key: attempt.key, src: attempt.url, onLoad: driver.onImageLoad, onError: driver.onImageError })
+          ? h("img", {
+              key: attempt.token,
+              src: attempt.url,
+              "data-attempt-token": attempt.token,
+              onLoad: driver.onImageLoad,
+              onError: driver.onImageError,
+            })
           : null,
         h("span", { class: "phase" }, driver.phase.value),
         h("span", { class: "dims" }, driver.dimensions.value ? `${driver.dimensions.value.width}x${driver.dimensions.value.height}` : ""),
@@ -153,6 +159,48 @@ describe("useImageAttempts local driver", () => {
     expect(wrapper.get(".phase").text()).toBe("success");
   });
 
+  it("binds each event to the attempt that created its element, even at an identical URL", async () => {
+    // A same-resource, new-epoch revision must still start a real load (a fresh
+    // element, so the browser re-requests), and the retired element's late
+    // event must not settle it.
+    const wrapper = mountSurface(Harness, { request: singleRequest("/art/a.webp"), availability: { ...READY } });
+    const first = wrapper.get("img");
+    declareImage(first.element, 768, 1024);
+    await first.trigger("load");
+    expect(wrapper.get(".phase").text()).toBe("success");
+
+    await wrapper.setProps({ request: singleRequest("/art/a.webp", { epoch: 2 }) });
+    const second = wrapper.get("img");
+    expect(second.element).not.toBe(first.element);
+    expect(second.attributes("data-attempt-token")).not.toBe(first.attributes("data-attempt-token"));
+    expect(wrapper.get(".phase").text()).toBe("loading");
+    expect(wrapper.get(".dims").text()).toBe("");
+    expect(wrapper.get(".eligible").text()).toBe("false");
+
+    // The retired element's late load and error are both rejected.
+    await first.trigger("load");
+    await first.trigger("error");
+    expect(wrapper.get(".phase").text()).toBe("loading");
+    expect(wrapper.get(".dims").text()).toBe("");
+    expect(wrapper.get(".faults").text()).toBe("");
+
+    declareImage(second.element, 30, 40);
+    await second.trigger("load");
+    expect(wrapper.get(".phase").text()).toBe("success");
+    expect(wrapper.get(".dims").text()).toBe("30x40");
+  });
+
+  it("treats a load with unusable natural dimensions as a decode failure", async () => {
+    const wrapper = mountSurface(Harness, { request: singleRequest("/art/a.webp"), availability: { ...READY } });
+    const img = wrapper.get("img");
+    // A load event with no decodable size (the browser reports zero for an
+    // undecodable body) is an observed decode failure, not a success.
+    await img.trigger("load");
+    expect(wrapper.get(".phase").text()).toBe("exhausted");
+    expect(wrapper.get(".eligible").text()).toBe("false");
+    expect(wrapper.get(".faults").text()).toBe("original:/art/a.webp:image_decode_failed");
+  });
+
   it("reuses decoded bytes on a geometry-only update with no request", async () => {
     const wrapper = mountSurface(Harness, {
       request: singleRequest("/art/a.webp", { geometry: { face_rect: { x: 0, y: 0, w: 1, h: 1 } } }),
@@ -222,6 +270,40 @@ describe("useImageAttempts local driver", () => {
     expect(wrapper.get(".faults").text()).toBe("preferred:image_load_failed");
     expect(wrapper.get("img").attributes("src")).toBe("/art/b.webp");
   });
+
+  it("takes the newest provisional snapshot when it changes during a real request", async () => {
+    const A = { resource_id: "a", version: "v1", url: "/art/a.webp", origin: "runtime", geometry: null };
+    const B = { resource_id: "b", version: "v1", url: "/art/b.webp", origin: "runtime", geometry: null };
+    const request = {
+      subjectId: "subject",
+      epoch: 1,
+      attempts: [
+        { type: "image", source_id: "preferred", rank: 10, resource: A },
+        { type: "image", source_id: "fallback", rank: 20, resource: B },
+      ],
+      terminal: null,
+    };
+    const wrapper = mountSurface(Harness, {
+      request,
+      availability: { ...READY },
+      provisional: new Map([["b@v1", { epoch: 1, phase: "loading" }]]),
+    });
+    // The preferred source is a real in-flight DOM request.
+    const img = wrapper.get("img");
+    expect(img.attributes("src")).toBe("/art/a.webp");
+
+    // The fallback's provisional outcome arrives while A is still loading.
+    await wrapper.setProps({
+      provisional: new Map([["b@v1", { epoch: 1, phase: "success", dimensions: { width: 6, height: 6 } }]]),
+    });
+    expect(wrapper.get(".phase").text()).toBe("loading");
+
+    // A's failure then resolves against the fresh snapshot, not the stale one.
+    await img.trigger("error");
+    expect(wrapper.get(".phase").text()).toBe("success");
+    expect(wrapper.get(".dims").text()).toBe("6x6");
+    expect(wrapper.get(".faults").text()).toBe("preferred:image_load_failed");
+  });
 });
 
 describe("face-rect original editor lifecycle", () => {
@@ -272,6 +354,34 @@ describe("face-rect original editor lifecycle", () => {
     await button(wrapper, "儲存框選").trigger("click");
     expect(wrapper.emitted("submit")).toHaveLength(1);
     expect(Object.keys(wrapper.emitted("submit")[0][0])).toEqual(["face_rect"]);
+  });
+
+  it("seeds a replacement original's crop from its own committed rectangle", async () => {
+    const REPLACEMENT = {
+      ...CARD,
+      image_id: "10000000-0000-4000-8000-000000000003",
+      url: "/art/gallery/character/7001/10000000-0000-4000-8000-000000000003.webp",
+      face_rect: { x: 0.1, y: 0.1, w: 0.2, h: 0.2 },
+    };
+    const wrapper = mountSurface(GalleryFaceRectModal, { card: CARD });
+    const first = wrapper.get(".gallery-face__original > img");
+    declareImage(first.element, 768, 1024);
+    await first.trigger("load");
+    // The first original's own committed rectangle is the seed.
+    await button(wrapper, "儲存框選").trigger("click");
+    expect(wrapper.emitted("submit")[0][0].face_rect.w).toBeCloseTo(0.5);
+
+    await wrapper.setProps({ card: REPLACEMENT });
+    const second = wrapper.get(".gallery-face__original > img");
+    declareImage(second.element, 512, 512);
+    await second.trigger("load");
+    await button(wrapper, "儲存框選").trigger("click");
+    const payload = wrapper.emitted("submit")[1][0].face_rect;
+    // Seeded from the replacement's committed rect, not the retired draft.
+    expect(payload.x).toBeCloseTo(0.1);
+    expect(payload.y).toBeCloseTo(0.1);
+    expect(payload.w).toBeCloseTo(0.2);
+    expect(payload.h).toBeCloseTo(0.2);
   });
 
   it("reuses the decoded original on a geometry-only committed change", async () => {

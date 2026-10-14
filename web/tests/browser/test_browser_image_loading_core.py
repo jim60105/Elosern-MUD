@@ -62,12 +62,17 @@ class ImageLoadingCoreBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceT
         pass
 
     def _fail_original_media(self, page) -> None:
-        """Abort the seeded original's media request (after server resolution)."""
-        page.route(_ORIGINAL_MEDIA, self._abort_original)
+        """Answer the seeded original's media request with invalid media.
 
-    def _abort_original(self, route) -> None:
+        The interception happens after the server resolved and serialized the
+        committed panel; the request itself succeeds on the wire, so the
+        failure the editor observes is the browser's own decode failure.
+        """
+        page.route(_ORIGINAL_MEDIA, self._serve_invalid_original)
+
+    def _serve_invalid_original(self, route) -> None:
         self._media_requests.append(route.request.url)
-        route.abort("failed")
+        route.fulfill(status=200, content_type="image/png", body=b"not-an-image")
 
     def _open_face_editor(self, page) -> None:
         press_control(page, '[data-testid="gallery-opener"]')

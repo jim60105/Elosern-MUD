@@ -77,17 +77,19 @@ const rectStyle = computed(() => ({
   left: `${rect.value.x * 100}%`, top: `${rect.value.y * 100}%`,
   width: `${rect.value.w * 100}%`, height: `${rect.value.h * 100}%`,
 }));
-// Seed the draft from the committed rectangle once per decoded original: a new
-// exact original recovers, while an unchanged one keeps the player's edits.
+// Seed the draft from the committed rectangle once per decoded original. A
+// genuinely new original (a replacement or a recovered resource) re-seeds from
+// that original's own committed rectangle; an unchanged one keeps the player's
+// edits, because the watcher only fires on a new attempt token.
 let seededKey = null;
-watch([phase, () => attempt.value?.key], ([value, key]) => {
-  if (value !== "success" || key == null || key === seededKey) return;
-  seededKey = key;
+watch([phase, () => attempt.value?.token], ([value, token]) => {
+  if (value !== "success" || token == null || token === seededKey) return;
+  seededKey = token;
   const anchor = props.card.face_rect;
   if (!anchor || (anchor.x === 0.25 && anchor.y === 0.06 && anchor.w === 0.5 && anchor.h === 0.5)) {
     rect.value = defaultFaceRect(dimensions.value);
   } else {
-    rect.value = refitFaceRectOnLoad(rect.value, dimensions.value);
+    rect.value = refitFaceRectOnLoad(clampFaceRect(anchor), dimensions.value);
   }
 }, { immediate: true });
 onMounted(() => {
@@ -136,7 +138,7 @@ function submit() {
         <section>
           <h4>原始圖片<span class="gallery-muted">（可拖曳調整框選範圍）</span></h4>
           <div class="gallery-face__original">
-            <img v-if="imageUrl" :key="attempt.key" ref="image" :src="imageUrl" :alt="galleryCardName(card)" draggable="false" @load="onImageLoad" @error="onImageError">
+            <img v-if="imageUrl" :key="attempt.token" ref="image" :src="imageUrl" :data-attempt-token="attempt.token" :alt="galleryCardName(card)" draggable="false" @load="onImageLoad" @error="onImageError">
             <ArtworkFailure v-else :kind="failureKind" :reason="failureReason" />
             <div v-if="loaded" class="gallery-face__rect" :style="rectStyle" @pointerdown="start($event)" @pointermove="move" @pointerup="drag = null" @pointercancel="drag = null" @lostpointercapture="drag = null">
               <span class="gallery-face__cross"></span>

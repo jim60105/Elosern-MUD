@@ -10,9 +10,11 @@
 // The caller passes the normalized internal load request (see
 // `lib/image-attempts.js`) and the shared availability input. Loading is
 // element-driven: the caller binds the returned `attempt` to one `<img>`
-// (`:key="attempt.key"` and `:src="attempt.url"`), so the component loads the
-// resource exactly once and the driver reads the natural dimensions off that
-// same element — no probe double-fetch and no source crossfade.
+// (`:key="attempt.token"`, `:src="attempt.url"` and
+// `:data-attempt-token="attempt.token"`), so each attempt owns its own element
+// exactly once and the driver reads the natural dimensions off that same
+// element — no probe double-fetch, no source crossfade, and no late event from
+// a retired element can settle a newer attempt.
 //
 // Restart identity is the ordered *resolution* facts plus subject/epoch and
 // availability, so:
@@ -72,7 +74,10 @@ export function useImageAttempts(request, availability, options = {}) {
   const panelUnavailable = ref(false);
 
   let machine = null;
-  let generation = 0;
+  // One immutable token per concrete attempt. The caller keys its `<img>` on
+  // `attempt.token`, so every attempt owns its own element and any late
+  // load/error from a retired element is rejected by the attribute it carries.
+  let attemptToken = 0;
   let disposed = false;
   let knownEpoch;
   const knownOutcomes = new Map();
@@ -129,6 +134,9 @@ export function useImageAttempts(request, availability, options = {}) {
     machine = next.state;
     reachedFaults.value = next.state.reachedFaults;
     const { action } = next;
+    if (action.type !== "done") {
+      attemptToken += 1;
+    }
     if (action.type === "load") {
       attempt.value = {
         key: action.key,
@@ -136,7 +144,7 @@ export function useImageAttempts(request, availability, options = {}) {
         rank: action.rank,
         resource: action.resource,
         url: action.resource.url,
-        generation,
+        token: attemptToken,
       };
       phase.value = LOAD_PHASE.loading;
       selected.value = null;
@@ -148,7 +156,7 @@ export function useImageAttempts(request, availability, options = {}) {
         rank: action.rank,
         resource: null,
         url: null,
-        generation,
+        token: attemptToken,
       };
       phase.value = LOAD_PHASE.loading;
       selected.value = null;
@@ -161,7 +169,7 @@ export function useImageAttempts(request, availability, options = {}) {
         rank: action.rank,
         resource: resourceFor(action.key),
         url: next.state.selected?.url ?? null,
-        generation,
+        token: attemptToken,
       };
       phase.value = LOAD_PHASE.success;
       exhausted.value = false;
@@ -180,7 +188,6 @@ export function useImageAttempts(request, availability, options = {}) {
     if (disposed) {
       return;
     }
-    generation += 1;
     const req = requestValue();
     const avail = availabilityValue();
     const epoch = req?.epoch ?? null;
@@ -216,16 +223,19 @@ export function useImageAttempts(request, availability, options = {}) {
     if (disposed || !machine || phase.value !== LOAD_PHASE.loading) {
       return;
     }
-    // Only a parked `wait` resumes here; an in-flight real load is never
-    // re-issued by a provisional update.
+    // Always take the newest provisional snapshot: an outcome that changed
+    // while a real request was in flight must be visible to the resolution
+    // that follows that request's failure. Only a parked `wait` advances now;
+    // an in-flight real load is never re-issued by a provisional update.
+    machine = withProvisional(machine, provisionalValue());
     if (!attempt.value || attempt.value.resource !== null) {
       return;
     }
-    step(withProvisional(machine, provisionalValue()));
+    step(machine);
   }
 
   function settle(current, outcome) {
-    if (disposed || !machine || current.generation !== generation) {
+    if (disposed || !machine || current.token !== attemptToken) {
       return;
     }
     const advanced = outcome.phase === LOAD_PHASE.success
@@ -254,7 +264,7 @@ export function useImageAttempts(request, availability, options = {}) {
     if (!current?.url || !target || typeof target.getAttribute !== "function") {
       return;
     }
-    if (target.getAttribute("src") !== current.url || current.generation !== generation) {
+    if (target.getAttribute("data-attempt-token") !== String(current.token)) {
       return;
     }
     const width = Number(target.naturalWidth) || 0;
@@ -269,10 +279,13 @@ export function useImageAttempts(request, availability, options = {}) {
   function onImageError(event) {
     const target = event?.target;
     const current = attempt.value;
-    if (!current?.url || current.generation !== generation) {
+    if (!current?.url) {
       return;
     }
-    if (target && typeof target.getAttribute === "function" && target.getAttribute("src") !== current.url) {
+    if (!target || typeof target.getAttribute !== "function") {
+      return;
+    }
+    if (target.getAttribute("data-attempt-token") !== String(current.token)) {
       return;
     }
     settle(current, { phase: "failed", reason: IMAGE_LOAD_FAILED });
@@ -280,7 +293,6 @@ export function useImageAttempts(request, availability, options = {}) {
 
   function dispose() {
     disposed = true;
-    generation += 1;
     knownOutcomes.clear();
     machine = null;
     clearResult();
