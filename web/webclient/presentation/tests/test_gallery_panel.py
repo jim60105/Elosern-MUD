@@ -736,6 +736,9 @@ class GalleryPresenterTests(EvenniaTest):
     @covers_requirement(
         "webclient-gallery-panel::the-subject-rail-names-every-gallery-bearing-subject-with-companion-first-ordering"
     )
+    @covers_requirement(
+        "artwork-descriptor::descriptors-reveal-only-authorized-exact-subjects"
+    )
     def test_rail_prioritizes_companions_reserves_monsters_and_skips_corruption(self):
         other = create_object(NPC, key="其他角色")
         other.db.portrait_policy = {"mode": "named", "stable_key": "t_other"}
@@ -864,6 +867,9 @@ class GalleryPresenterTests(EvenniaTest):
 
     @covers_requirement(
         "webclient-gallery-panel::card-rows-are-server-authored-with-chips-crown-and-validated-media"
+    )
+    @covers_requirement(
+        "artwork-descriptor::descriptors-reveal-only-authorized-exact-subjects"
     )
     def test_missing_and_symlinked_outputs_stay_attributable(self):
         # A readable card whose output is gone or refused keeps its EXACT

@@ -250,3 +250,7 @@ The presenter SHALL never expose an absolute path or the store root.
 - **WHEN** a card's file no longer exists or its identity fails validation
 - **THEN** the card SHALL be skipped, with resolution continuing at the next remaining candidate of
   the current step or the next step, rather than the chain emitting a broken URL
+
+#### Scenario: Exact requested card remains attributable after loss
+- **WHEN** a readable gallery card record has missing or rejected output
+- **THEN** its exact requested descriptor contains a bounded source fault and no broken original URL; previews may use alpha but cannot change the original image id

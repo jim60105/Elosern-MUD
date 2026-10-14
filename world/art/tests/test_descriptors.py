@@ -10,6 +10,8 @@ import json
 import re
 import unittest
 
+from tools.spec_traceability import covers_requirement
+
 from world.art import descriptors
 
 _FINGERPRINT = re.compile(r"[0-9a-f]{64}")
@@ -180,6 +182,9 @@ class BuilderShapeTests(unittest.TestCase):
         # Every inapplicable fact is a factual null rather than an absent key.
         self.assertTrue(all(value is None for value in descriptors.geometry().values()))
 
+    @covers_requirement(
+        "artwork-descriptor::descriptors-preserve-independent-artwork-facts"
+    )
     def test_resource_and_attempt_shapes_are_exact(self):
         resource = descriptors.resource("id", "v" * 64, "/art/x.png", "runtime")
         self.assertEqual(
@@ -212,6 +217,9 @@ class BuilderShapeTests(unittest.TestCase):
 
 
 class RankOrderTests(unittest.TestCase):
+    @covers_requirement(
+        "artwork-descriptor::source-priority-and-retained-access-are-explicit"
+    )
     def test_priority_is_the_declared_rank_not_the_array_index(self):
         # The same facts declared in the opposite array order keep the same
         # ranks: array position never decides precedence.
@@ -338,6 +346,9 @@ class DigestTests(unittest.TestCase):
             ),
         )
 
+    @covers_requirement(
+        "artwork-descriptor::source-priority-and-retained-access-are-explicit"
+    )
     def test_retention_tokens_distinguish_authorization_from_geometry(self):
         # The token covers subject/generation/access applicability; a geometry
         # or regeneration-state change must not revoke a still-valid output.
@@ -379,6 +390,9 @@ class DigestTests(unittest.TestCase):
 
 
 class DescriptorShapeTests(unittest.TestCase):
+    @covers_requirement(
+        "artwork-descriptor::descriptors-preserve-independent-artwork-facts"
+    )
     def test_a_descriptor_carries_exactly_its_seven_keys(self):
         descriptor = _sample_descriptor()
         self.assertEqual(

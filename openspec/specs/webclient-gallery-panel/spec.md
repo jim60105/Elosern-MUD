@@ -13,7 +13,7 @@ of rendering, and never reachable by any mutation path.
 
 ### Requirement: The gallery panel is an exact read-only version-2 presentation panel
 
-The presentation registry SHALL register a `gallery` panel at schema version 2,
+The presentation registry SHALL register a `gallery` panel at schema version 3,
 available in exploration mode. Its available form SHALL contain exactly
 `schema_version`, `available`, `kind` (the literal `gallery`), `subjects`,
 `selected`, `filters`, `cards`, `official_entries`, `equipment_summary`, `capabilities`,
@@ -51,9 +51,8 @@ reason, and semantics.
 - **THEN** it creates, mutates, and deletes no `GalleryRecord`, card, gallery job, or official-art preference, and consults neither the connectivity probe nor any image-generation service
 
 #### Scenario: Official rows carry the defined row shape and field semantics
-
-- **WHEN** `official_entries` is computed
-- **THEN** it is the server-computed bounded list of the selected subject's content reference's catalog-admitted official images (see the `official-art-personalization` capability), each row exactly `{identity, url, face_rect, is_current, is_catalog_default}` where `identity` is the stable root-relative official identity, `url` is the fingerprinted same-origin official media URL, `face_rect` is the metadata-or-fitted validated rectangle, `is_current` marks the subject's retained personal selection, and `is_catalog_default` marks the content's default image
+- **WHEN** official_entries is computed
+- **THEN** each row is exactly {identity, artwork, is_current, is_catalog_default}; artwork is the canonical exact-image descriptor with fingerprinted same-origin URL and geometry in its candidate; the other identity/preference fields keep their current meaning
 
 #### Scenario: Official rows never merge into the cards list
 
@@ -71,9 +70,8 @@ reason, and semantics.
 - **THEN** both the Python and JavaScript mirrored validators enforce the exact row shape, bounds, and URL vocabulary, rejecting payloads accepted on only one side
 
 #### Scenario: The official list and rows are bounded
-
-- **WHEN** `official_entries` is assembled
-- **THEN** it holds at most 32 rows, each row's `identity` is at most 192 code points, and each row's `url` stays inside a per-row budget of 256 code points — pinned equal to `world/art/presenter.py::MAX_PORTRAIT_MEDIA_URL`
+- **WHEN** official_entries is assembled
+- **THEN** it holds at most 32 rows; identity stays at most 192 code points; descriptor candidate URLs stay within the shared 256-code-point bound and the entire canonical envelope bound remains enforced
 
 #### Scenario: The URL budget is pinned because official URLs embed filenames
 
@@ -88,6 +86,10 @@ reason, and semantics.
 #### Scenario: Personal preference availability is explicit
 - **WHEN** a species gallery row has no live individual preference target
 - **THEN** capabilities.supports_personal_official_preferences is false, official rows remain previewable, and both validators enforce the new boolean; eligible character rows retain true
+
+#### Scenario: Gallery consumers cut over together
+- **WHEN** gallery schema 3 is shipped
+- **THEN** all previews, detail/binding/generation readers and both original editors consume descriptors directly; old url/face_rect/stage row fields are rejected, without a dual-shape adapter
 
 ### Requirement: The subject rail names every gallery-bearing subject with companion-first ordering
 
@@ -180,12 +182,7 @@ unpuppet, and account character switch, exactly like the session options state.
 - **THEN** it mutates no gallery record, card, or job
 
 ### Requirement: Card rows are server-authored with chips, crown, and validated media
-
-Each entry of `cards` SHALL contain exactly `image_id`, `status` (`"card"`,
-`"pending"`, or `"failed"`), `label`, `url` or null, `face_rect` or null, `stage` or null, `is_default`,
-`chips`, `requested_fields`, `binding_present`, and `created_at`. Card rows come
-only from the tolerant card read. `cards` SHALL be ordered newest-first by
-`created_at` with append order as the stable tiebreaker.
+Each card row SHALL contain exactly image_id, status, label, artwork, is_default, chips, requested_fields, binding_present and created_at. Artwork SHALL identify that exact original through the canonical descriptor. Existing newest-first ordering, truthful synthetic status, chips and preference semantics SHALL remain.
 
 #### Scenario: A bound custom-face default card carries its exact chips
 
@@ -207,12 +204,12 @@ only from the tolerant card read. `cards` SHALL be ordered newest-first by
 - **THEN** both accept the row, because neither re-derives the chip from a literal-constant comparison
 
 #### Scenario: A row never carries an image size
-- **WHEN** any card row is checked for the key `image_size`
-- **THEN** it fails the exact-key validation — the squareness reference never crosses the wire
+- **WHEN** a row is validated
+- **THEN** there is no top-level image_size key; admitted decoded dimensions may occur only inside exact canonical candidate geometry
 
 #### Scenario: Real rows carry stage without new chips
-- **WHEN** a stored card with stage `{scale: 0.6, x: 0.1, y: -0.2}` is projected
-- **THEN** its row carries that validated triple and the existing exactly-one-face-chip contract is unchanged, with no stage chip or filter
+- **WHEN** a real card with nonidentity stage is projected
+- **THEN** its original candidate geometry carries the exact stage and no new chip/filter is added
 
 #### Scenario: The label is the server-authored zh-TW display line
 - **WHEN** a stored-card row or a pending row is projected
@@ -227,8 +224,8 @@ only from the tolerant card read. `cards` SHALL be ordered newest-first by
 - **THEN** it comes only from a card's stored identity validated against the subject's own gallery prefix, the closed extension set, the store-root confinement check, and the file-existence check — exactly the `art-gallery-resolution` presenter discipline
 
 #### Scenario: A card whose file vanished is omitted
-- **WHEN** a card's stored file has vanished
-- **THEN** the card is omitted from `cards`, never emitted with a broken URL
+- **WHEN** a readable card record names a vanished or invalid output
+- **THEN** its card row remains identified with an attributed known-fault descriptor and no original URL; it is never silently omitted or replaced by another card
 
 #### Scenario: Binding chips come from the card's binding mask
 - **WHEN** a row's `chips` list is authored
@@ -244,7 +241,7 @@ only from the tolerant card read. `cards` SHALL be ordered newest-first by
 
 #### Scenario: Validators never re-derive the face chip
 - **WHEN** either validator side checks a row's face chip
-- **THEN** it SHALL NOT re-derive which face chip a row must carry from the rect's numeric relation to the literal `DEFAULT_FACE_RECT` constant — the chip is authored server-side against the card's recorded `image_size`, which rows never carry (no row admits an `image_size` key), and both validator sides accept either face chip so a fitted-default row on a non-square image stays valid across the wire
+- **THEN** it SHALL NOT re-derive which face chip a row must carry from the rect's numeric relation to the literal `DEFAULT_FACE_RECT` constant — the chip is authored server-side against the card's recorded `image_size`, which is not a top-level row field (candidate geometry may carry decoded dimensions), and both validator sides accept either face chip so a fitted-default row on a non-square image stays valid across the wire
 
 ### Requirement: Pending jobs and the recorded error render as truthful synthetic rows
 
@@ -374,7 +371,7 @@ equipment state without materializing a handler; otherwise it SHALL be null.
 
 The panel's schema version SHALL be one server-side constant shared by the
 presenter and the registry registration; `web/static/webclient/js/elosern/protocol.js`
-SHALL register `gallery: 2` in `PANEL_ALLOWLIST` and mirror every bound in an
+SHALL register `gallery: 3` in `PANEL_ALLOWLIST` and mirror every bound in an
 exact per-panel validator, and the dual-direction parity tests SHALL reject a
 payload accepted on one side and rejected on the other. No existing other
 panel's schema or envelope changes. Server and client SHALL ship together.
@@ -383,9 +380,7 @@ panel's schema or envelope changes. Server and client SHALL ship together.
 - **WHEN** a gallery payload carries a field outside the mirrored exact schema
 - **THEN** both validators reject it and the panel degrades to its recovery path
 
-Real card stage SHALL satisfy the exact bounded finite triple contract; both
-validator sides SHALL reject a missing stage key, null stage on a real card
-or non-null stage on a synthetic row. Schema version SHALL be 2.
+Real candidate geometry SHALL satisfy the exact bounded finite triple contract; both validator sides SHALL validate canonical descriptor attempts and reject obsolete row geometry keys. Schema version SHALL be 3.
 
 #### Scenario: Both validators enforce identity, ordering, and URL facts
 - **WHEN** either validator side checks a gallery payload
@@ -393,11 +388,11 @@ or non-null stage on a synthetic row. Schema version SHALL be 2.
 
 #### Scenario: Synthetic rows are bounded and neutralized
 - **WHEN** synthetic rows are validated
-- **THEN** pending rows are bounded to eight and failed rows to one, and synthetic rows carry null URL/rectangle/stage, false flags, and empty chips/provenance
+- **THEN** pending rows stay bounded to eight and failed rows to one; descriptors retain truthful generation state, no original candidate, false flags and empty chips/provenance
 
 #### Scenario: Every field carries its documented bound
-- **WHEN** payload fields are validated
-- **THEN** defaults are at most one, labels at most 128 code points, chips at most 16, URLs at most 129, and warning conditions at most four nonempty lines of at most 512 code points
+- **WHEN** gallery descriptors are validated
+- **THEN** existing row/chip/warning bounds remain; generated original URLs keep their 129 bound, official URLs keep 256, canonical attempts are bounded and the 65,536-byte envelope fails closed
 
 #### Scenario: Warnings name unique visible cards newest-first
 - **WHEN** warning entries are validated
@@ -412,12 +407,12 @@ or non-null stage on a synthetic row. Schema version SHALL be 2.
 - **THEN** it fails closed and does not silently truncate cards
 
 #### Scenario: Invalid stage fails both wire validators
-- **WHEN** a real row has out-of-range stage, a missing stage key or null stage, or a pending/failed row carries a fabricated triple
-- **THEN** both Python and dependency-free Node validators reject the payload
+- **WHEN** a canonical original candidate carries invalid stage or a row carries old url/face_rect/stage keys
+- **THEN** both Python and active Node validators reject the payload
 
 #### Scenario: Null synthetic stage is accepted at the existing version
-- **WHEN** otherwise valid pending and failed rows carry stage null
-- **THEN** both validators accept at schema version 2 without new chips or counts
+- **WHEN** otherwise valid pending/failed rows carry canonical descriptors without real-image geometry
+- **THEN** both validators accept schema version 3 without new chips or counts
 
 ### Requirement: The personal selection state is server-authored in the panel payload
 

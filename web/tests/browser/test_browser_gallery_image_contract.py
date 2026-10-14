@@ -108,6 +108,7 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
     @covers_requirement(
         "art-gallery-resolution::gallery-urls-are-built-only-from-validated-card-identities",
         "webclient-gallery-ui::the-gallery-surface-renders-only-committed-panel-facts",
+        "webclient-gallery-ui::gallery-previews-retain-exact-image-identity-and-reached-failures",
     )
     def test_original_404_falls_back_with_local_failure(self) -> None:
         from web.browser_support.unified_image_transitions import (
