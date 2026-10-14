@@ -96,6 +96,10 @@ mutation.
 - **WHEN** the chain reaches step 8 with nothing resolved
 - **THEN** it produces the existing truthful placeholder
 
+#### Scenario: Failures keep their source position
+- **WHEN** an explicit selection/default/classic source cannot resolve
+- **THEN** the canonical internal attempts retain its bounded fault before remaining candidates, while first valid candidate selection preserves existing deterministic policy and no mutation occurs
+
 ### Requirement: An unbound card is never auto-selected
 A card whose `binding` is `None` SHALL be eligible ONLY as the subject's explicit default. When no
 binding matches the current equipment and `default_image_id` is `None`, the chain SHALL fall through
@@ -158,17 +162,16 @@ presenter threads the entity it already resolved to the seam as an optional para
 subject-only call stays legal.
 
 #### Scenario: The seam returning nothing preserves today's placeholder
-- **WHEN** nothing resolves for a subject and the seam returns `None` (e.g. a scene subject)
-- **THEN** the payload is exactly the truthful placeholder this project produces today
+- **WHEN** no person alpha terminal is admitted
+- **THEN** identity text remains as the terminal non-image result; scenes use their distinct art-domain chain rather than a person silhouette
 
 #### Scenario: The seam still runs when the official step resolves nothing
 - **WHEN** a subject reaches the official-default step and its reference is absent from the snapshot
 - **THEN** the chain consults the terminal seam exactly as before the official step existed
 
 #### Scenario: The seam was introduced inert and is now filled
-- **WHEN** the seam's history is read against `art-gallery-fallback`
-- **THEN** it was introduced inert (returning `None`, byte-for-byte today's placeholder) and is now
-  filled by `art-gallery-fallback`, without the chain itself being modified
+- **WHEN** the current person chain is read
+- **THEN** one authoritative deterministic alpha selector supplies its terminal without duplicate selector or legacy aliases
 
 #### Scenario: The filled seam serves persons and declines scenes
 - **WHEN** the filled seam resolves

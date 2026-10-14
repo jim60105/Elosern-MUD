@@ -818,6 +818,50 @@ class ArtPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
 
     @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
+    @covers_requirement("webclient-art-panel::the-scene-payload-resolves-only-validated-archetypes-with-truthful-placeholders")
+    @covers_requirement("portrait-source-attempts::portrait-source-order-retains-current-policy")
+    def test_canonical_source_enumeration_keeps_v2_portraits_and_scenes_valid(self):
+        # The internal portrait source enumerator ships NO alternate shape: the
+        # registered panel contract still round-trips through its own validator
+        # for a real portrait entry and the unchanged scene block at once.
+        self._settle_done(
+            ArtSubject(ArtSubjectKind.SCENE, "t_synth_bazaar"),
+            "scene/t_synth_bazaar.png",
+        )
+        guest = _player(key="enumeration guest")
+        guest.location = self.room
+        guest.db.portrait_policy = {"mode": "named", "stable_key": "enumeration-guest"}
+        self._settle_done(
+            ArtSubject(ArtSubjectKind.CHARACTER, "enumeration-guest"),
+            "portrait/character/enumeration-guest.png",
+        )
+        normalized = validate_art(self._render())
+        self.assertEqual(normalized["schema_version"], ART_SCHEMA_VERSION)
+        self.assertEqual(normalized["kind"], "scene")
+        entry = normalized["portrait_catalog"][str(guest.pk)]
+        self.assertEqual(entry["origin"], "runtime")
+        self.assertEqual(entry["url"], "/art/portrait/character/enumeration-guest.png")
+        self.assertEqual(entry["status"], ArtAssetStatus.DONE)
+        self.assertIsNone(entry["placeholder"])
+        self.assertEqual(
+            normalized["scene"]["url"], "/art/scene/t_synth_bazaar.png"
+        )
+        self.assertEqual(
+            sorted(normalized["scene"]),
+            [
+                "alt",
+                "archetype",
+                "aspect_ratio",
+                "label",
+                "placeholder",
+                "stage",
+                "status",
+                "subject_key",
+                "url",
+            ],
+        )
+
+    @covers_requirement("webclient-art-panel::the-portrait-catalog-is-server-authored-age-checked-and-bounded")
     def test_a_present_entity_resolves_the_official_default_it_references(self):
         # The whole wire path for the official branch: a present named-policy
         # character whose preset provenance resolves the snapshot's default

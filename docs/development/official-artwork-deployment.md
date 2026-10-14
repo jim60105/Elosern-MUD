@@ -189,6 +189,39 @@ staying in the boot log:
 Nothing in this path writes: the mounted directory stays read-only and no
 preference, card or file is touched by rendering the panel.
 
+### What the portrait resolver shows about the same facts
+
+One art-owned enumerator in `world/art/presenter.py` decides which portrait a
+subject presents, and it is the single place the portrait source policy lives:
+the equipment-bound card, the player's explicit personal official selection,
+the record's default card, the classic generated asset, the reference's
+official default and the subject's committed silhouette, in that precedence.
+The mounted directory contributes only the official positions of that order:
+
+- the entity's official content reference is ONE source position
+  (`portrait.official:<kind>/<key>`), so the admitted default image and every
+  fault retained against that source share one identity and one rank;
+- an entity whose stored provenance declares no reference adds **no** official
+  attempt and no fault — a never-mounted directory is the ordinary
+  no-artwork configuration, exactly as it is for the gallery;
+- root-level availability (`official_art_catalog_loaded`'s `root_state` and
+  `root_fault`) stays a deployment fact of the whole catalog rather than a
+  per-subject fault: an explicitly configured but unreadable root is reported
+  once at startup, and no subject's attempts carry a directory-wide taint;
+- a personal selection or a named default card that can no longer resolve
+  keeps its bounded fault at its own position, before the substitute that
+  follows it, and the stored preference is never deleted;
+- the recorded generation truth (pending, failed, done or missing) is a fact
+  of the subject's own records, so an admitted official image can present
+  while a recorded generation stays failed, and a deliberate no-generation
+  configuration claims nothing.
+
+`world.art.presenter.resolve_subject` still returns the ONE registered flat
+portrait shape the art panel, roster and party surfaces consume today; the
+canonical descriptor `describe_portrait`/`describe_entity` both project the
+same single resolution, so no second selector and no alternate accepted wire
+shape exists while the atomic portrait contract is still pending.
+
 - Place the license notice for the artwork itself as a top-level `LICENSE`
   (or alongside the artwork in your own distribution); the server ignores
   non-directory root entries and never serves or logs the file. Official

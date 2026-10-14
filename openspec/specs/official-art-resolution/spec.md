@@ -6,7 +6,7 @@ Define official artwork's presentation semantics: the origin discriminator that 
 ## Requirements
 
 ### Requirement: Every presentation payload distinguishes official, runtime, and silhouette origin
-Every portrait presentation payload SHALL carry a server-authored origin discriminator distinguishing an official read-only image from the subject's existing runtime sources (generated/seed card, classic asset) and from a built-in silhouette. The discriminator SHALL be computed by the server from the resolution branch that produced the payload, and NO consumer SHALL infer origin, source, or generation success from the mere presence of a media URL.
+Every canonical portrait source description SHALL distinguish each real resource's authored origin and separate alpha terminal from independent generation state. Consumers SHALL use the server-authored resource origin and successful load state, never infer source or generated success from URL presence. The art owner SHALL supply this vocabulary to the owning canonical wire cutovers; unchanged current flat serializers remain on their existing registered contract until then.
 
 #### Scenario: Three sources, three discriminators
 - **WHEN** three subjects resolve an official image, a generated card, and a built-in silhouette respectively
@@ -21,7 +21,7 @@ Every portrait presentation payload SHALL carry a server-authored origin discrim
 - **THEN** all of them use the same origin-discriminator vocabulary, the surfaces today being the art panel portrait catalog and the roster row portraits
 
 ### Requirement: Official payloads are catalog-derived, confined, and fall through when unresolvable
-An official payload SHALL carry: the fingerprinted same-origin media URL for the content reference's default image, the face rectangle and stage from valid directory metadata or fitted defaults validated by the existing geometry rules, and the runtime entity's existing name/identity fields. It SHALL NOT expose filesystem roots, deployment sources, license text, manifest text, or prompts, and SHALL NOT count as a generated portrait — an official image is not a `done` asset.
+Official candidates SHALL use snapshot-admitted fingerprinted same-origin URLs and validated metadata or personal geometry. Applicable missing/rejected/configured-source faults SHALL remain attributed at their precedence positions before fallthrough. Optional never-configured sources SHALL add no fault. Official availability SHALL never complete a generation job or expose roots, prompts or license text.
 
 #### Scenario: A resolved official default presents with metadata geometry
 - **WHEN** a preset-born character's preset content reference has a valid catalog directory declaring a manifest rectangle and a non-identity stage
@@ -36,16 +36,16 @@ An official payload SHALL carry: the fingerprinted same-origin media URL for the
 - **THEN** resolution falls through to the built-in silhouette with no exception, no preference deletion, and no acquisition attempt
 
 #### Scenario: An official image is never labeled generated
-- **WHEN** a subject presents an official image while its classic/gallery state is untouched
-- **THEN** the payload does not report a generated/done portrait status for the subject's own art state, and no asset or gallery record was created or mutated
+- **WHEN** an official image can display while a recorded generation job is pending or failed
+- **THEN** the descriptor preserves that independent generation state without fabricating completion or mutating any asset/gallery record
 
 #### Scenario: A personal selection joins the payload in the personalization capability
 - **WHEN** an entity has an explicit personal official selection made through the personalization capability
 - **THEN** that explicit personal selection joins the official payload in place of the default image, selection behavior owned by the personalization capability
 
 #### Scenario: An absent or refused catalog entry falls through cleanly
-- **WHEN** the content reference resolves no catalog entry because it is absent or was refused at admission
-- **THEN** resolution continues through the remaining chain (built-in silhouette) without error, without deleting any stored preference, and without a network attempt
+- **WHEN** an official source is unconfigured, or explicitly selected/configured but missing or refused
+- **THEN** normal unconfigured absence contributes no fault; broken explicit/configured sources contribute an attributed fault before remaining candidates, with no preference deletion or network acquisition
 
 #### Scenario: Replaced bytes update the image under the same stable identity
 - **WHEN** the bytes at the same root-relative path are replaced and the server restarts

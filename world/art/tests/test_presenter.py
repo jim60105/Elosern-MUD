@@ -32,6 +32,7 @@ from world.art.gallery import (
     set_official_geometry,
     set_official_selection,
 )
+from world.art.gallery_match import ChainSlot, DisplayChain
 from world.art.official import (
     OfficialCatalog,
     OfficialContent,
@@ -546,7 +547,12 @@ class StagePayloadTests(_CardPayloadCase):
         # A card stored without the key reads as identity.
         card = dict(cards_for(subject)[0])
         card.pop("stage")
-        with patch("world.art.presenter.resolve_display", return_value=("card", card)):
+        with patch(
+            "world.art.presenter.resolve_display_chain",
+            return_value=DisplayChain(
+                (ChainSlot("default", card["image_id"], card),), True
+            ),
+        ):
             payload = resolve_character(self.player)
         self.assertEqual(payload["stage"], {"scale": 1.0, "x": 0.0, "y": 0.0})
         # A malformed stored triple degrades to identity with one diagnostic,
@@ -554,7 +560,10 @@ class StagePayloadTests(_CardPayloadCase):
         broken = dict(cards_for(subject)[0])
         broken["stage"] = {"scale": 3.5, "x": 0, "y": 0}
         with patch(
-            "world.art.presenter.resolve_display", return_value=("card", broken)
+            "world.art.presenter.resolve_display_chain",
+            return_value=DisplayChain(
+                (ChainSlot("default", broken["image_id"], broken),), True
+            ),
         ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
@@ -587,7 +596,10 @@ class FaceRectPayloadTests(_CardPayloadCase):
         card = dict(cards_for(subject)[0])
         card["face_rect"] = {"x": 0.5, "y": 0.0, "w": 0.9, "h": 0.9}
         with patch(
-            "world.art.presenter.resolve_display", return_value=("card", card)
+            "world.art.presenter.resolve_display_chain",
+            return_value=DisplayChain(
+                (ChainSlot("default", card["image_id"], card),), True
+            ),
         ), patch(
             "world.art.presenter.log_warn"
         ) as warn:
@@ -1074,7 +1086,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             source="generated",
         )
         with patch(
-            "world.art.presenter.official_default_for",
+            "world.art.presenter.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
             payload = resolve_character(entity)
@@ -1100,7 +1112,7 @@ class OfficialPayloadTests(EvenniaTestCase):
             error=None,
         )
         with patch(
-            "world.art.presenter.official_default_for",
+            "world.art.presenter.official_default_slot",
             side_effect=AssertionError("the official step must never be consulted"),
         ):
             payload = resolve_character(entity)
@@ -1197,7 +1209,7 @@ class OfficialPayloadTests(EvenniaTestCase):
         entity = self._character(age=None, apparent_age=30)
         with (
             patch(
-                "world.art.presenter.official_default_for",
+                "world.art.presenter.official_default_slot",
                 side_effect=AssertionError("the official step must not run"),
             ),
             patch("world.observability.log_info") as logged,

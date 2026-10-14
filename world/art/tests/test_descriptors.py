@@ -141,6 +141,19 @@ class VocabularyTests(unittest.TestCase):
         self.assertEqual(descriptors.MAX_RETENTION_SOURCES, 16)
         self.assertEqual(descriptors.GALLERY_RANK_ORIGINAL, 10)
         self.assertEqual(descriptors.GALLERY_RANK_ALPHA, 100)
+        # The portrait chain's own positions, in precedence order, ending at
+        # the one authoritative alpha terminal both surfaces share.
+        self.assertEqual(
+            (
+                descriptors.PORTRAIT_RANK_BOUND,
+                descriptors.PORTRAIT_RANK_PERSONAL,
+                descriptors.PORTRAIT_RANK_DEFAULT,
+                descriptors.PORTRAIT_RANK_CLASSIC,
+                descriptors.PORTRAIT_RANK_OFFICIAL,
+            ),
+            (10, 20, 30, 40, 50),
+        )
+        self.assertEqual(descriptors.PORTRAIT_RANK_ALPHA, descriptors.GALLERY_RANK_ALPHA)
         # The decoded-size ceiling mirrors the shipped ART_SD_MAX_IMAGE_* pair.
         self.assertEqual(descriptors.MAX_IMAGE_DIMENSION, 4096)
         self.assertEqual(descriptors.MAX_IMAGE_PIXELS, 4096 * 4096)
@@ -214,6 +227,41 @@ class BuilderShapeTests(unittest.TestCase):
             "gallery.official:preset/k/a.png",
         )
         self.assertEqual(descriptors.gallery_alpha_source_id("woman"), "gallery.alpha:woman")
+        self.assertEqual(descriptors.portrait_bound_source_id("img"), "portrait.bound:img")
+        self.assertEqual(
+            descriptors.portrait_personal_source_id("preset/k/a.png"),
+            "portrait.personal:preset/k/a.png",
+        )
+        self.assertEqual(
+            descriptors.portrait_default_source_id("img"), "portrait.default:img"
+        )
+        self.assertEqual(
+            descriptors.portrait_classic_source_id("portrait:character:7"),
+            "portrait.classic:portrait:character:7",
+        )
+        self.assertEqual(
+            descriptors.portrait_official_source_id("preset/k"),
+            "portrait.official:preset/k",
+        )
+        self.assertEqual(descriptors.portrait_alpha_source_id("man"), "portrait.alpha:man")
+
+    @covers_requirement("artwork-descriptor::descriptors-preserve-independent-artwork-facts")
+    def test_resource_versions_distinguish_immutable_bytes_from_regenerated_bytes(self):
+        # An immutable admitted identity IS its version: replacing the bytes is
+        # a new identity rather than a mutation.
+        self.assertEqual(
+            descriptors.identity_version("/art/x.png"),
+            descriptors.identity_version("/art/x.png"),
+        )
+        # A regenerated resource at one republishable identity versions by the
+        # successful generation that published it, never by pending geometry.
+        first = descriptors.generated_version("portrait/character/7.png", "token-a")
+        second = descriptors.generated_version("portrait/character/7.png", "token-b")
+        self.assertRegex(first, r"^[0-9a-f]{64}$")
+        self.assertNotEqual(first, second)
+        self.assertEqual(
+            first, descriptors.generated_version("portrait/character/7.png", "token-a")
+        )
 
 
 class RankOrderTests(unittest.TestCase):
