@@ -180,6 +180,12 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
     @covers_requirement(
         "webclient-art-panel::small-avatar-thumbnails-zoom-crop-their-portrait-image-to-the-carried-face-rectangle-through-one-shared-pure-function"
     )
+    @covers_requirement(
+        "avatar-artwork-presentation::every-avatar-uses-a-real-portrait-or-a-grapheme-initial"
+    )
+    @covers_requirement(
+        "avatar-artwork-presentation::compact-avatar-failures-remain-accessible"
+    )
     def test_roster_presence_party_participant_fallback_is_accessible(self) -> None:
         """Switcher, presence, party and combat avatars share one renderer: a
         real-only attempt whose browser decode failure keeps the grapheme

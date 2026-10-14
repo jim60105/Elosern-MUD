@@ -653,6 +653,14 @@ face rectangle (extents w, h) substantially fills the frame.
 - **THEN** the server stores rectangles verbatim and does not crop, resize, or derive any second
   image
 
+#### Scenario: Shared avatar loading uses the actual successful candidate
+- **WHEN** the first image fails and a different source succeeds
+- **THEN** all avatar surfaces use that successful source face rectangle, ignore stage placement and retain reached faults
+
+#### Scenario: Name fallback never requests alpha resources
+- **WHEN** no real avatar image succeeds
+- **THEN** the first trimmed-name grapheme or neutral empty-name symbol renders without a silhouette request
+
 ### Requirement: Combat portrait references and catalog are committed coherently
 A publication that starts combat SHALL include the current participant descriptors and their freshly rendered art catalog in one authoritative revision. Subsequent actions, round playback and reconnect SHALL preserve opaque participant identity and authoritative species artwork or monster_anon, without tier art or browser-derived sources.
 
