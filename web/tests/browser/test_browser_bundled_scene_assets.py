@@ -224,6 +224,10 @@ class BundledSceneAssetsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanc
         """Every committed interior scene serves and decodes as its own image."""
         self._assert_pack_static_decode(INTERIOR_SCENE_ASSETS)
 
+    @covers_requirement(
+        "bundled-sacred-scene-art::each-supported-pack-scene-has-its-own-finished-illustration",
+        "bundled-sacred-scene-art::scene-artwork-is-distributable-with-recorded-provenance",
+    )
     def test_sacred_pack_static_decode(self):
         """Every committed sacred scene serves and decodes as its own image."""
         self._assert_pack_static_decode(SACRED_SCENE_ASSETS)
