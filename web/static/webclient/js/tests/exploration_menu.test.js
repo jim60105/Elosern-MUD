@@ -20,7 +20,7 @@ const { SYNTH_ITEM } = require("./support/synthetic-data.js");
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "exploration",
       move: [

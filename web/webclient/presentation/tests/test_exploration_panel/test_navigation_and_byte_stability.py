@@ -172,7 +172,7 @@ class ExplorationByteStabilityTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(
             payload,
             {
-                "schema_version": 3,
+                "schema_version": 4,
                 "available": True,
                 "kind": "exploration",
                 "move": [

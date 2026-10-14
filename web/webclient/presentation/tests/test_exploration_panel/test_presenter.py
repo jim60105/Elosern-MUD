@@ -1,6 +1,13 @@
 from tools.spec_traceability import covers_requirement
+import contextlib
+import hashlib
+import io
+from pathlib import Path
 import unittest
+import tempfile
 from unittest.mock import patch
+from django.test import override_settings
+from PIL import Image
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
@@ -12,14 +19,94 @@ from typeclasses.rooms import GridRoom, Room
 from web.webclient.presentation.exploration import ACTION_IDS
 from web.webclient.presentation.registry import build_production_registry
 from world.maps.bootstrap import sync_grid, sync_wilderness
+from world.art import official, official_refs
+from world.art.gallery import append_card, record_for
+from world.art.official import load_catalog, reset_catalog
+from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME
+from world.art.subjects import character_subject_for
+from world.rules.art_view import portrait_catalog_key
 from world.rules.clock import get_world_clock
 from world.rules.dialogue import greeting_for, open_or_refresh_dialogue
 from world.rules.map_knowledge import record_arrival
+from world.rules.party import join_party
 from world.rules.tests._combat_session_helpers import open_synthetic_scope
 from world.tests.synthetic_data import SYNTH_DIALOGUE, SYNTH_GUILD_BRANCH_KEY
 
 from ._support import T_DIALOGUE_KEY, _context
 
+
+
+# The official-art harness below mirrors ``test_party_panel.py`` (which mirrors
+# ``world/art/tests/test_gallery_match.py``) with file-local identities: the
+# preset key, named portrait stable key and record-default image identity are
+# synthetic, never shipped content.
+_PRESET_KEY = "t_synth_preset"
+_COMPANION_KEY = "t_synth_companion"
+_CARD_IMAGE_ID = "eeeeeeee-5555-4555-8555-555555555555"
+
+
+def _png(width=4, height=4) -> bytes:
+    """A real, decodable PNG: the official catalog reads the header only."""
+    buffer = io.BytesIO()
+    Image.new("L", (width, height)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
+class _OfficialArt:
+    """A synthetic official root beside an isolated runtime store."""
+
+    def __init__(self, tempdir: Path) -> None:
+        self.root = tempdir / "official"
+        self.store = tempdir / "store"
+        self.store.mkdir()
+
+    @property
+    def content(self) -> Path:
+        return self.root / "preset" / _PRESET_KEY
+
+    def mount(self, name="hero.png") -> str:
+        """Write one admitted image and reload the catalog snapshot."""
+        self.content.mkdir(parents=True, exist_ok=True)
+        (self.content / name).write_bytes(_png())
+        load_catalog()
+        return f"preset/{_PRESET_KEY}/{name}"
+
+    def write_store_file(self, identity: str, data=b"synthetic image") -> None:
+        """Place one runtime file under the isolated store root."""
+        target = self.store / identity
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(data)
+
+
+@contextlib.contextmanager
+def _official_art_scope():
+    """Isolate both artwork roots and admit one synthetic preset key."""
+    with contextlib.ExitStack() as stack:
+        tempdir = Path(stack.enter_context(tempfile.TemporaryDirectory())).resolve()
+        art = _OfficialArt(tempdir)
+        stack.enter_context(
+            override_settings(
+                ART_OFFICIAL_ROOT=str(art.root),
+                ART_STORE_ROOT=str(art.store),
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                official_refs, "PLAYER_PRESET_REGISTRY", {_PRESET_KEY: object()}
+            )
+        )
+        stack.enter_context(
+            patch.object(
+                official,
+                "_registered_preset_keys",
+                return_value=frozenset({_PRESET_KEY}),
+            )
+        )
+        official_refs._reported_unresolved.clear()
+        stack.callback(official_refs._reported_unresolved.clear)
+        reset_catalog()
+        stack.callback(reset_catalog)
+        yield art
 
 
 class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
@@ -637,6 +724,279 @@ class ExplorationPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertTrue(release_affordance["enabled"])
         finally:
             release_possession(self.player, npc=companion, reason="handback")
+
+
+class ExplorationPortraitRefTests(BattlefieldIsolation, EvenniaTestCase):
+    """Schema-4 server-authored portrait references over the current art view.
+
+    The reference is the same opaque decimal catalog key the party row emits:
+    membership follows ``build_art_view`` and eligibility follows one
+    ``resolve_entity`` result per identity (its own URL with origin
+    runtime/official). Every case asserts through the production presenter.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        get_world_clock()
+        sync_grid()
+
+    def setUp(self):
+        self.south_gate = create_object(Room, key="肖像大廳")
+        self.player = create_object(PlayerCharacter, key="肖像測試")
+        self.player.race = "human"
+        self.player.apply_race_baseline()
+        self.player.location = self.south_gate
+        record_arrival(self.player)
+
+    def _named_host(self, key, stable):
+        """A present named-policy conversable NPC: an art-view member that
+        also carries interact descriptor rows."""
+        npc = create_object(LLMNPC, key=key, location=self.south_gate)
+        npc.race = "human"
+        npc.apply_race_baseline()
+        npc.db.portrait_policy = {"mode": "named", "stable_key": stable}
+        npc.db.age = npc.db.apparent_age = 30
+        npc.db.creation_preset_key = _PRESET_KEY
+        return npc
+
+    def _registry(self):
+        return build_production_registry()
+
+    def _panels(self):
+        registry = self._registry()
+        context = _context(self.player)
+        with patch("web.webclient.presentation.registry.log_error") as mock_log:
+            exploration = registry.render("exploration", context)
+            art = registry.render("art", context)
+            mock_log.assert_not_called()
+        return exploration, art
+
+    def _rows_for(self, payload, npc):
+        identity = int(npc.pk)
+        entity = next(
+            (row for row in payload["look"]["entities"] if row["identity"] == identity),
+            None,
+        )
+        target = next(
+            (row for row in payload["interact"] if row["identity"] == identity), None
+        )
+        return entity, target
+
+    @staticmethod
+    def _root_digests(art) -> dict:
+        digests = {}
+        for root in (art.root, art.store):
+            if not root.exists():
+                continue
+            for path in sorted(root.rglob("*")):
+                if path.is_file():
+                    digests[path.relative_to(root.parent).as_posix()] = (
+                        hashlib.sha256(path.read_bytes()).hexdigest()
+                    )
+        return digests
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_official_and_runtime_images_yield_catalog_refs_in_both_lists(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            official_host = self._named_host("官方肖像host", "t_synth_portrait_official")
+            runtime_host = self._named_host("runtime肖像host", "t_synth_portrait_runtime")
+            join_party(official_host, self.player)
+            join_party(runtime_host, self.player)
+            subject = character_subject_for(runtime_host)
+            # The party harness's stored-card identity shape.
+            stored = f"gallery/character/t_synth_portrait_runtime/{_CARD_IMAGE_ID}.png"
+            art.write_store_file(stored)
+            append_card(
+                subject,
+                image_id=_CARD_IMAGE_ID,
+                stored_identity=stored,
+                prompt=None,
+                seed=None,
+                checkpoint=None,
+                requested_fields=[],
+                binding=None,
+                source="seed",
+                created_at=100,
+                image_size={"width": 768, "height": 1024},
+            )
+
+            before = self._root_digests(art)
+            payload, art_panel = self._panels()
+            after = self._root_digests(art)
+            self.assertEqual(before, after)
+
+            catalog = art_panel["portrait_catalog"]
+            for npc, expected_origin in (
+                (official_host, ORIGIN_OFFICIAL),
+                (runtime_host, ORIGIN_RUNTIME),
+            ):
+                key = portrait_catalog_key(npc.pk)
+                entity, target = self._rows_for(payload, npc)
+                self.assertIsNotNone(entity)
+                self.assertIsNotNone(target)
+                # Both descriptor paths join the same current image.
+                self.assertEqual(entity["portrait_ref"], key)
+                self.assertEqual(target["portrait_ref"], key)
+                entry = catalog[key]
+                self.assertEqual(entry["origin"], expected_origin)
+                self.assertTrue(entry["url"])
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_non_interact_named_character_carries_a_ref_in_look_only(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            bystander = create_object(PlayerCharacter, key="旁觀者", location=self.south_gate)
+            bystander.race = "human"
+            bystander.apply_race_baseline()
+            bystander.db.portrait_policy = {
+                "mode": "named",
+                "stable_key": "t_synth_portrait_bystander",
+            }
+            bystander.db.age = bystander.db.apparent_age = 30
+            bystander.db.creation_preset_key = _PRESET_KEY
+
+            payload, _ = self._panels()
+            entity = next(
+                row
+                for row in payload["look"]["entities"]
+                if row["identity"] == int(bystander.pk)
+            )
+            self.assertEqual(entity["kind"], "character")
+            self.assertEqual(entity["portrait_ref"], portrait_catalog_key(bystander.pk))
+            self.assertNotIn(
+                int(bystander.pk), {row["identity"] for row in payload["interact"]}
+            )
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_uncatalogued_monster_is_an_excluded_null_control(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            monster = create_object(Monster, key="無圖哥布林", location=self.south_gate)
+            monster.threat_tier = "low"
+            monster.apply_monster_tier("floor")
+            monster.traits.hp.base = 100
+            monster.traits.hp.current = 100
+
+            payload, art_panel = self._panels()
+            target = next(
+                row for row in payload["interact"] if row["identity"] == int(monster.pk)
+            )
+            self.assertIsNone(target["portrait_ref"])
+            self.assertNotIn(portrait_catalog_key(monster.pk), art_panel["portrait_catalog"])
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_cap_dropped_member_keeps_a_truthful_null(self):
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            first = self._named_host("cap_first", "t_synth_portrait_cap_first")
+            second = self._named_host("cap_second", "t_synth_portrait_cap_second")
+            self.assertLess(int(first.pk), int(second.pk))
+
+            # Render once at the real ceiling first (this also completes the
+            # art module import outside the patch: the panel module snapshots
+            # its bound at import time). Baseline: both members carry refs.
+            baseline, _ = self._panels()
+            baseline_first, _ = self._rows_for(baseline, first)
+            baseline_second, baseline_second_target = self._rows_for(baseline, second)
+            self.assertEqual(
+                baseline_first["portrait_ref"], portrait_catalog_key(first.pk)
+            )
+            self.assertEqual(
+                baseline_second["portrait_ref"], portrait_catalog_key(second.pk)
+            )
+            self.assertEqual(
+                baseline_second_target["portrait_ref"], portrait_catalog_key(second.pk)
+            )
+
+            # One-entry catalog ceiling: the first member keeps its ref, the
+            # cap-dropped second is a truthful null in both descriptor paths
+            # (membership, not resolvability, owns the boundary).
+            with patch("world.rules.art_view.MAX_PORTRAIT_CATALOG", 1):
+                payload, art_panel = self._panels()
+            first_entity, _ = self._rows_for(payload, first)
+            second_entity, second_target = self._rows_for(payload, second)
+            self.assertEqual(first_entity["portrait_ref"], portrait_catalog_key(first.pk))
+            self.assertIsNone(second_entity["portrait_ref"])
+            self.assertIsNone(second_target["portrait_ref"])
+            self.assertNotIn(
+                portrait_catalog_key(second.pk), art_panel["portrait_catalog"]
+            )
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_silhouette_only_and_age_ineligible_stay_null(self):
+        with _official_art_scope():
+            # No image mounted anywhere: the named host resolves to the
+            # silhouette-only placeholder, which is not its own media URL.
+            silhouette_host = self._named_host("輪廓host", "t_synth_portrait_silhouette")
+            age_host = self._named_host("年齡不符host", "t_synth_portrait_aged")
+            age_host.db.age = 20000
+
+            payload, art_panel = self._panels()
+            for npc in (silhouette_host, age_host):
+                entity, target = self._rows_for(payload, npc)
+                self.assertIsNone(entity["portrait_ref"])
+                if target is not None:
+                    self.assertIsNone(target["portrait_ref"])
+            for key in (
+                portrait_catalog_key(silhouette_host.pk),
+                portrait_catalog_key(age_host.pk),
+            ):
+                entry = art_panel["portrait_catalog"].get(key)
+                if entry is not None:
+                    self.assertIsNone(entry["url"])
+
+    @covers_requirement(
+        "webclient-exploration-menu::portrait-focus-stays-client-local-against-the-art-catalog-seam"
+    )
+    def test_possession_resolves_refs_without_art_writes(self):
+        from world.rules.possession import enter_possession, release_possession
+
+        with _official_art_scope() as art:
+            art.mount("hero.png")
+            puppet = self._named_host("附身傀儡", "t_synth_portrait_puppet")
+            join_party(puppet, self.player)
+            bystander = self._named_host("附身目擊者", "t_synth_portrait_witness")
+            join_party(bystander, self.player)
+
+            before = self._root_digests(art)
+            enter_possession(self.player, puppet)
+            try:
+                registry = self._registry()
+                with patch(
+                    "web.webclient.presentation.registry.log_error"
+                ) as mock_log:
+                    payload = registry.render("exploration", _context(puppet))
+                    mock_log.assert_not_called()
+                self.assertTrue(payload["available"])
+                # The controlled companion stays a catalog member beside the
+                # owner's roster: the bystander row keeps its admitted ref.
+                entity, target = self._rows_for(payload, bystander)
+                self.assertEqual(
+                    entity["portrait_ref"], portrait_catalog_key(bystander.pk)
+                )
+                self.assertEqual(
+                    target["portrait_ref"], portrait_catalog_key(bystander.pk)
+                )
+            finally:
+                release_possession(self.player, npc=puppet, reason="handback")
+            # Read-only: nothing under either artwork root moved, and no
+            # gallery record was created for a host that never had one (the
+            # named official default presents without a record).
+            self.assertEqual(before, self._root_digests(art))
+            for npc in (puppet, bystander):
+                self.assertIsNone(record_for(character_subject_for(npc), create=False))
 
 
 if __name__ == "__main__":

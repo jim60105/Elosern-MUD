@@ -126,7 +126,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
 
         payload = exploration_presenter(self._context())
         validated = validate_exploration(payload)
-        self.assertEqual(validated["schema_version"], 3)
+        self.assertEqual(validated["schema_version"], 4)
 
         # Extra field on navigate affordance rejects
         bad_payload = dict(payload)
@@ -166,7 +166,7 @@ class ExplorationNpcPersonaAffordanceTest(EvenniaTest):
             })
 
         max_payload = {
-            "schema_version": 3,
+            "schema_version": 4,
             "available": True,
             "kind": "exploration",
             "move": [],

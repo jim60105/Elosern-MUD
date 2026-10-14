@@ -1,4 +1,4 @@
-"""Exact schema-version-3 ``exploration`` panel and presenter (webclient-exploration-menu).
+"""Exact schema-version-4 ``exploration`` panel and presenter (webclient-exploration-menu).
 
 The presenter serializes a read-only exploration surface from canonical room,
 entity, component, and service data. It is registered beside ``status``,
@@ -24,12 +24,23 @@ adapter uses; the target-level ``keywords`` list and the in-conversation
 ``explore.talk_scripted`` / ``explore.talk_freeform`` target codes are gone
 (the open session's ``dialogue`` panel carries the keyword choices).
 
+Version 4 adds one nullable ``portrait_ref`` to every look entity and interact
+target: ``None`` or an unchanged ASCII decimal string of 1..32 characters -- the
+exact catalog-key seam the combat participants and the dialogue host already
+use. The presenter emits a reference only for an identity that is a member of
+the current capped ``art`` panel portrait catalog AND whose own canonical art
+resolution carries a media URL under a ``runtime``/``official`` origin, so a
+descriptor never points at a catalog entry that is absent, cap-dropped, or a
+placeholder. The ``art`` panel itself is unchanged: same membership, cap, and
+face crops. Producer and client bundle cut over together with no compatibility
+adapter or data migration.
+
 The payload shape and the exact shared bounds (design D10) are mirrored by the
 client validator in ``web/static/webclient/js/elosern/protocol.js`` and guarded
 by a dual-direction parity test.
 """
 
-from typing import Any
+from typing import Any, Callable
 
 from web.webclient.presentation import affordances as affordances_module
 from web.webclient.presentation.affordances import (
@@ -72,7 +83,9 @@ from web.webclient.presentation.protocol_validation import (
 )
 from web.webclient.presentation.registry import PanelUnavailableError
 from web.webclient.presentation.options import _validate_affordance_params
+from world.art.presenter import ORIGIN_OFFICIAL, ORIGIN_RUNTIME, resolve_entity
 from world.rules.dialogue import is_dialogue_host, opens_dialogue
+from world.rules.art_view import ArtViewError, build_art_view, portrait_catalog_key
 from world.rules.map_knowledge import (
     KnowledgeError,
     decode_node,
@@ -80,11 +93,14 @@ from world.rules.map_knowledge import (
 from world.rules.npc_identity import npc_display_name
 from world.rules.service_view import build_services_view
 
-EXPLORATION_SCHEMA_VERSION = 3
+EXPLORATION_SCHEMA_VERSION = 4
 
 # Exact shared bounds (design D10) -- must stay equal in the JS validator.
 MAX_LOOK_ENTITIES = 32
 MAX_IDENTITY = MAX_SAFE_INTEGER
+# The opaque decimal portrait-catalog reference bound (shared seam with the
+# combat participant and dialogue host rows): 1..32 ASCII decimal digits.
+MAX_PORTRAIT_REF = 32
 MAX_KIND_CODE_POINTS = 32
 MAX_REASON_MESSAGE_CODE_POINTS = 128
 
@@ -92,7 +108,7 @@ ACTION_KINDS = ("action", "navigate")
 # The target-scoped subset of the shared allowlist: ``explore.move``,
 # ``explore.look``, and ``explore.wait`` are never per-target affordances, and
 # the in-conversation codes are folded into one ``explore.talk_open`` 交談 row,
-# so a v3 target carrying either is a protocol error.
+# so a v4 target carrying either is a protocol error.
 ACTION_IDS = tuple(
     code
     for code in ACTION_CODE_ALLOWLIST
@@ -133,6 +149,26 @@ def _require_exit_ref(value: Any, field: str) -> str:
 
 def _require_identity(payload: dict[str, Any], field: str) -> int:
     return _require_int(payload, field, minimum=1, maximum=MAX_IDENTITY)
+
+
+def _validate_portrait_ref(value: Any) -> str | None:
+    """A nullable opaque portrait-catalog reference (schema version 4).
+
+    Accepts ``None`` or an ASCII decimal string of 1..32 characters -- the exact
+    seam shared with the combat participant and dialogue host rows: the
+    ``isascii()``/``isdecimal()`` pair rejects Unicode-digit and URL-like values
+    and the length bound rejects an overlong key, with no coercion or
+    cross-panel join. Empty, numeric and subject-key shapes reject here.
+    """
+    if value is None:
+        return None
+    if not isinstance(value, str) or not value.isascii() or not value.isdecimal():
+        raise ProtocolValidationError(
+            "portrait_ref must be an opaque decimal catalog key or null"
+        )
+    if len(value) > MAX_PORTRAIT_REF:
+        raise ProtocolValidationError("portrait_ref exceeds its bound")
+    return value
 
 
 def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
@@ -236,13 +272,12 @@ def _validate_look_entity(value: Any) -> dict[str, Any]:
     kind = value["kind"]
     if kind not in ENTITY_KINDS:
         raise ProtocolValidationError("entity kind is not a stable value")
-    if value["portrait_ref"] is not None:
-        raise ProtocolValidationError("portrait_ref must be null in this schema version")
+    portrait_ref = _validate_portrait_ref(value["portrait_ref"])
     return {
         "identity": identity,
         "display_name": display_name,
         "kind": kind,
-        "portrait_ref": None,
+        "portrait_ref": portrait_ref,
     }
 
 
@@ -295,8 +330,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     display_name = _require_str(value, "display_name", maximum=MAX_DISPLAY_NAME_CODE_POINTS)
     if not display_name.strip():
         raise ProtocolValidationError("target display_name must be non-empty")
-    if value["portrait_ref"] is not None:
-        raise ProtocolValidationError("portrait_ref must be null in this schema version")
+    portrait_ref = _validate_portrait_ref(value["portrait_ref"])
     affordances = value["affordances"]
     if not isinstance(affordances, list) or len(affordances) > MAX_AFFORDANCES:
         raise ProtocolValidationError(
@@ -306,7 +340,7 @@ def _validate_interact_target(value: Any) -> dict[str, Any]:
     return {
         "identity": identity,
         "display_name": display_name,
-        "portrait_ref": None,
+        "portrait_ref": portrait_ref,
         "affordances": affordances,
     }
 
@@ -483,11 +517,19 @@ def _move_rows(actor: Any) -> list[dict[str, Any]]:
     return rows
 
 
-def _look_entities(actor: Any) -> list[dict[str, Any]]:
-    """Serialize bounded present character/NPC/monster descriptors (excluding actor)."""
+def _look_entities(
+    actor: Any,
+    portrait_ref_for: "Callable[[Any], str | None] | None" = None,
+) -> list[dict[str, Any]]:
+    """Serialize bounded present character/NPC/monster descriptors (excluding actor).
+
+    ``portrait_ref_for`` is the shared per-presentation art lookup; when it is
+    absent every reference is the truthful null (the art panel is optional).
+    """
     location = getattr(actor, "location", None)
     if location is None:
         return []
+    resolve = portrait_ref_for or (lambda _entity: None)
     present = [
         obj
         for obj in location.contents
@@ -501,7 +543,7 @@ def _look_entities(actor: Any) -> list[dict[str, Any]]:
                 "identity": int(obj.pk),
                 "display_name": _bounded_entity_name(obj),
                 "kind": _entity_kind(obj),
-                "portrait_ref": None,
+                "portrait_ref": resolve(obj),
             }
         )
     return entities
@@ -522,13 +564,55 @@ def _reason_dict(entry: Any) -> dict[str, Any] | None:
     return {"code": code, "message": message}
 
 
-def _interact_targets(actor: Any) -> list[dict[str, Any]]:
+def _portrait_ref_lookup(actor: Any) -> Callable[[Any], "str | None"]:
+    """A per-presentation portrait-ref resolver over the current art view (design D2).
+
+    Builds ``build_art_view(actor)`` once and reuses one ``resolve_entity`` result
+    per identity across the look and interact paths. A reference is emitted only
+    when the identity is a member of the current capped art view AND its own
+    canonical resolution carries a media URL under a ``runtime``/``official``
+    origin -- the same real-image gate the party row uses, delegated to the single
+    chain owner rather than re-derived here. An excluded or cap-dropped identity,
+    or one whose resolution yields a placeholder/silhouette (no own URL), maps to
+    ``None``. When the art view is unavailable every reference degrades to
+    ``None`` through this boundary and exploration stays available; nothing here
+    writes art records, queues, or gameplay state.
+    """
+    try:
+        members = frozenset(
+            int(view.identity) for view in build_art_view(actor).entities
+        )
+    except ArtViewError:
+        return lambda _entity: None
+    resolved: dict[int, "str | None"] = {}
+
+    def lookup(entity: Any) -> "str | None":
+        identity = int(entity.pk)
+        if identity not in members:
+            return None
+        if identity not in resolved:
+            payload = resolve_entity(entity)
+            resolved[identity] = (
+                portrait_catalog_key(identity)
+                if payload.get("url") is not None
+                and payload.get("origin") in (ORIGIN_RUNTIME, ORIGIN_OFFICIAL)
+                else None
+            )
+        return resolved[identity]
+
+    return lookup
+
+
+def _interact_targets(
+    actor: Any,
+    portrait_ref_for: "Callable[[Any], str | None] | None" = None,
+) -> list[dict[str, Any]]:
     """Serialize bounded present NPC/monster targets from the shared vocabulary.
 
     The per-target affordance rules (party bound/full rules, companion rule,
     dead-monster engage, exact-local-host navigation) live in the canonical
     vocabulary; this serializer maps the shared candidates into the exact
-    version-3 descriptor shapes. The single 交談 row is derived from the same
+    version-4 descriptor shapes. The single 交談 row is derived from the same
     ``opens_dialogue`` predicate the ``explore.talk_open`` adapter commits
     through, so the rendered affordance and the action agree.
     """
@@ -545,6 +629,7 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
     location = getattr(actor, "location", None)
     if location is None:
         return []
+    resolve = portrait_ref_for or (lambda _entity: None)
     guild_host = _resolve_single_host(actor, GuildStaff)
     shop_host = _resolve_single_host(actor, Merchant)
     candidates = [
@@ -659,7 +744,7 @@ def _interact_targets(actor: Any) -> list[dict[str, Any]]:
             {
                 "identity": int(obj.pk),
                 "display_name": _bounded_entity_name(obj),
-                "portrait_ref": None,
+                "portrait_ref": resolve(obj),
                 "affordances": affordances[:MAX_AFFORDANCES],
             }
         )
@@ -693,6 +778,7 @@ def exploration_presenter(context: PresentationContext) -> dict[str, Any]:
 
     room_identity = int(location.pk)
     services_available = _services_available(actor)
+    portrait_ref_for = _portrait_ref_lookup(actor)
     payload = {
         "schema_version": EXPLORATION_SCHEMA_VERSION,
         "available": True,
@@ -704,10 +790,10 @@ def exploration_presenter(context: PresentationContext) -> dict[str, Any]:
                 "display_name": _bounded_display_name(location),
                 "room": True,
             },
-            "entities": _look_entities(actor),
+            "entities": _look_entities(actor, portrait_ref_for),
             "objects": _look_objects(actor),
         },
-        "interact": _interact_targets(actor),
+        "interact": _interact_targets(actor, portrait_ref_for),
         "character": {"available": True},
         "quests": {"available": services_available},
         "inventory": {"available": services_available},

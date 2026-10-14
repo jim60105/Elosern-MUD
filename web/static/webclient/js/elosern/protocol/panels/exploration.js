@@ -17,7 +17,7 @@ var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
 
 // ---------------------------------------------------------------------------
-// exploration panel v3 validators (mirror of
+// exploration panel v4 validators (mirror of
 // web.webclient.presentation.exploration, design D10). Shared bounds are
 // guarded by a dual-direction parity test.
 // ---------------------------------------------------------------------------
@@ -34,6 +34,9 @@ var EXPLORATION_MAX_KIND = 32;
 var EXPLORATION_MAX_LABEL = 128;
 var EXPLORATION_MAX_ITEM_KEY = 64;
 var EXPLORATION_MAX_REASON_MESSAGE = 128;
+// The opaque decimal portrait-catalog reference bound (schema version 4):
+// exactly the combat participant and dialogue host seam.
+var EXPLORATION_MAX_PORTRAIT_REF = 32;
 var EXPLORATION_ACTION_KINDS = ["action", "navigate"];
 // The target-scoped subset of the server's twelve-code allowlist: the panel
 // folds a host's talk into one explore.talk_open 交談 row, so the retired
@@ -54,6 +57,23 @@ var EXPLORATION_ENTITY_KINDS = ["character", "npc", "monster"];
 
 function requireIdentity(value, field) {
   return requireInt(value, field, 1, MAX_SAFE_INTEGER);
+}
+
+// A nullable opaque portrait-catalog reference: null, or an ASCII decimal
+// string of 1..32 characters, matching the server's isdecimal() bound and the
+// combat/dialogue host seam. Empty, numeric, Unicode-digit, URL-like and
+// subject-key shapes reject without coercion or a cross-panel join.
+function validateExplorationPortraitRef(value) {
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "string" || !/^[0-9]+$/.test(value)) {
+    throw new Error("portrait_ref must be an opaque decimal catalog key or null");
+  }
+  if (value.length > EXPLORATION_MAX_PORTRAIT_REF) {
+    throw new Error("portrait_ref exceeds its bound");
+  }
+  return value;
 }
 
 function validateExplorationDisabledReason(value) {
@@ -187,9 +207,7 @@ function validateExplorationLookEntity(value) {
   if (EXPLORATION_ENTITY_KINDS.indexOf(value.kind) === -1) {
     throw new Error("entity kind is not a stable value");
   }
-  if (value.portrait_ref !== null) {
-    throw new Error("portrait_ref must be null in this schema version");
-  }
+  validateExplorationPortraitRef(value.portrait_ref);
   return value;
 }
 
@@ -242,9 +260,7 @@ function validateExplorationInteractTarget(value) {
   if (!targetName.trim()) {
     throw new Error("target display_name must be non-empty");
   }
-  if (value.portrait_ref !== null) {
-    throw new Error("portrait_ref must be null in this schema version");
-  }
+  validateExplorationPortraitRef(value.portrait_ref);
   if (
     !Array.isArray(value.affordances) ||
     value.affordances.length > EXPLORATION_MAX_AFFORDANCES
@@ -286,7 +302,7 @@ function validateExplorationMoveRow(value) {
   return value;
 }
 
-// Exact available exploration panel v3 schema (design D10).
+// Exact available exploration panel v4 schema (design D10).
 function validateExplorationPanel(payload) {
   requireExactFields(
     payload,
@@ -305,7 +321,7 @@ function validateExplorationPanel(payload) {
     []
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 3) {
+  if (payload.schema_version !== 4) {
     throw new Error("unsupported exploration schema_version");
   }
   if (payload.available !== true || payload.kind !== "exploration") {
@@ -336,7 +352,7 @@ function validateExplorationPanel(payload) {
   validateExplorationAvailability(payload.inventory, "inventory");
 
   var result = {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "exploration",
     move: payload.move,

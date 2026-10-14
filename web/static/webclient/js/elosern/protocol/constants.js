@@ -435,7 +435,7 @@ var PANEL_ALLOWLIST = {
   objectives: 1,
   services: 6,
   creation: 6,
-  exploration: 3,
+  exploration: 4,
   character: 7,
   lineage: 1,
   dialogue: 2,
