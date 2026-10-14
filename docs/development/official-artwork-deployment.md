@@ -43,7 +43,10 @@ setting. The key is the closed declaration registry and the fingerprint is the
 content digest of the committed bytes, so an operator file cannot replace a
 bundled identity or a terminal scene image, a bundled request can never be
 answered from an operator root, and a missing file is a real 404 rather than a
-substitute image.
+substitute image. The plain static path `/static/art/scenes/<scene-key>.webp`
+serves the identical committed bytes from the collected static root; it is the
+historical asset location, not an authoritative identity, and it carries no
+fingerprint — resolve scene artwork through `/art/bundled-scene/...`.
 
 Delivered so far, each produced through the repository's own sd-webui client
 and prompt library, encoded by `world.art.formats.encode`, and reviewed at
