@@ -11,6 +11,8 @@ object's stale facts never survive reuse.
 
 import importlib
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.search import search_object_by_tag
@@ -166,6 +168,62 @@ class PooledWildernessRoomArtTests(EvenniaTest):
         self.assertNotEqual(room.scene_identity, identity_a)
         self.assertTrue(is_registered_scene_key(room.scene_archetype))
 
+    def test_identity_follows_the_attached_wilderness_name(self):
+        # The delta requires identity from the CURRENT wilderness; an attached
+        # script whose name differs from the configured constant must not
+        # collapse two logical places onto one identity.
+        room = create_object(TerrainRoom, key="t_named_wilderness")
+        stub = SimpleNamespace(key="t_other_wilderness")
+        with patch("world.maps.wilderness_population.ensure_population") as ensure:
+            with patch.object(TerrainRoom, "wilderness", property(lambda self: stub)):
+                self.provider.at_prepare_room((10, 10), None, room)
+            ensure.assert_called_once()
+        self.assertEqual(
+            room.scene_identity,
+            wilderness_scene_identity("t_other_wilderness", 10, 10),
+        )
+
+
+class ReadOnlyResolverBoundaryTests(EvenniaTest):
+    def test_resolving_a_plain_room_persists_no_metadata(self):
+        # A plain Room that was never given metadata must stay untouched by a
+        # read: the descriptors are autocreate=False, so build_art_view can
+        # never mint an Attribute just by rendering the room.
+        from world.rules.art_view import build_art_view
+
+        room = create_object(Room, key="t_bare_room")
+        for key in ("scene_archetype", "room_art_key", "scene_identity"):
+            self.assertFalse(room.attributes.has(key), key)
+        self.assertIsNone(room.scene_archetype)
+        self.char1.location = room
+
+        build_art_view(self.char1)
+
+        for key in ("scene_archetype", "room_art_key", "scene_identity"):
+            self.assertFalse(room.attributes.has(key), key)
+
+    def test_resolving_a_bare_instance_room_persists_no_metadata(self):
+        origin = create_object(Room, key="t_resolver_origin")
+        room = spawn_instance_room(
+            origin,
+            {"prototype_parent": "instance_room", "key": "t_resolver_room"},
+            exit_key="進入",
+            return_key="離開",
+            ttl_seconds=10,
+        )
+        # The construction writes the three facts, so delete them and prove a
+        # read never re-creates them.
+        room.attributes.remove("scene_archetype")
+        room.attributes.remove("room_art_key")
+        room.attributes.remove("scene_identity")
+        self.char1.location = room
+        from world.rules.art_view import build_art_view
+
+        build_art_view(self.char1)
+
+        for key in ("scene_archetype", "room_art_key", "scene_identity"):
+            self.assertFalse(room.attributes.has(key), key)
+
 
 class InstanceRoomArtMetadataTests(EvenniaTest):
     def setUp(self):
@@ -199,6 +257,18 @@ class InstanceRoomArtMetadataTests(EvenniaTest):
         self.assertIsNone(room.room_art_key)
         self.assertIsNone(room.scene_archetype)
         self.assertEqual(room.scene_identity, instance_scene_identity(room.pk))
+
+    def test_invalid_explicit_scene_identity_is_rejected_before_construction(self):
+        for bad in ("", "x" * 129, 7, b"bytes"):
+            with self.subTest(bad=bad):
+                with self.assertRaises(ValueError):
+                    self._spawn(scene_identity=bad)
+                self.assertEqual(InstanceRoom.objects.count(), 0)
+
+    def test_boundary_length_scene_identity_is_accepted(self):
+        identity = "x" * 128
+        room = self._spawn(scene_identity=identity)
+        self.assertEqual(room.scene_identity, identity)
 
     def test_explicit_registered_declaration_survives_a_reload(self):
         room_art_key = _registered_room_art_key()

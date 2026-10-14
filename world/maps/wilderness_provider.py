@@ -146,12 +146,14 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         # previous place would silently persist if these were not re-assigned.
         # The archetype is the authored region->scene mapping (a registered
         # scene key, never the raw terrain region key), the identity is the
-        # wilderness name plus the current coordinates, and the room-art key is
-        # cleared because wilderness declares none -- an earlier place's key
-        # must never leak into another coordinate.
+        # CURRENT wilderness' name plus the current coordinates, and the
+        # room-art key is cleared because wilderness declares none -- an
+        # earlier place's key must never leak into another coordinate.
+        wilderness = room.wilderness
+        wilderness_name = getattr(wilderness, "key", None) or WILDERNESS_NAME
         region = region_for_coordinates(*coordinates)
         room.scene_archetype = REGION_SCENE_ARCHETYPES[region]
-        room.scene_identity = wilderness_scene_identity(WILDERNESS_NAME, *coordinates)
+        room.scene_identity = wilderness_scene_identity(wilderness_name, *coordinates)
         room.room_art_key = None
         room.ndb.active_desc = terrain_description(*coordinates)
         # wilderness-monster-population D-4: ensure the deterministic monster
@@ -159,7 +161,6 @@ class ElosernWildernessMapProvider(WildernessMapProvider):
         # attached. Deferred import breaks the load-time cycle: this module is
         # imported by wilderness_population, which reads region_for_coordinates
         # from here.
-        wilderness = room.wilderness
         if wilderness is not None:
             from world.maps.wilderness_population import ensure_population
 

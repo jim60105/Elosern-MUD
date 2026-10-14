@@ -27,12 +27,15 @@ class SceneArchetypeMixin:
     Assignment stays permissive (an ``AttributeProperty``, never a validating
     descriptor): authored map/instance construction is where a key is checked
     against its registry, and a test or builder may still assign any value.
-    Consumers only READ these facts; the mixin declares no writer.
+    ``autocreate=False`` keeps a READ non-mutating: resolving a room that was
+    never given metadata returns the default without persisting an Attribute,
+    so the art resolver stays read-only. An explicit map/instance assignment
+    still stores the value.
     """
 
-    scene_archetype: str | None = AttributeProperty(default=None)
-    room_art_key: str | None = AttributeProperty(default=None)
-    scene_identity: str | None = AttributeProperty(default=None)
+    scene_archetype: str | None = AttributeProperty(default=None, autocreate=False)
+    room_art_key: str | None = AttributeProperty(default=None, autocreate=False)
+    scene_identity: str | None = AttributeProperty(default=None, autocreate=False)
 
 
 class Room(SceneArchetypeMixin, ObjectParent, DefaultRoom):

@@ -18,7 +18,7 @@ from typeclasses.exits import Exit
 from typeclasses.rooms import InstanceRoom
 from world.art.scene_definitions import is_registered_room_art_key
 from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
-from world.maps.room_art import instance_scene_identity
+from world.maps.room_art import MAX_SCENE_IDENTITY_CODE_POINTS, instance_scene_identity
 from world.observability import log_warn
 from world.rules.clock import (
     ScheduledEvent,
@@ -124,6 +124,15 @@ def spawn_instance_room(
     if room_art_key is not None and not is_registered_room_art_key(room_art_key):
         raise ValueError(
             f"room_art_key {room_art_key!r} is not a registered room-art key"
+        )
+    if scene_identity is not None and (
+        not isinstance(scene_identity, str)
+        or not scene_identity
+        or len(scene_identity) > MAX_SCENE_IDENTITY_CODE_POINTS
+    ):
+        raise ValueError(
+            "scene_identity must be a nonempty string of at most "
+            f"{MAX_SCENE_IDENTITY_CODE_POINTS} code points, got {scene_identity!r}"
         )
     if isinstance(origin_room, InstanceRoom):
         raise ValueError(
