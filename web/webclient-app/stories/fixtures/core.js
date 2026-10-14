@@ -1,3 +1,5 @@
+import { fixtureDigest } from "./art_panels.js";
+
 // Deterministic offline fixtures for the core-family stories (B1). Every
 // value mirrors a shape the C1 store getters will return for the same
 // slice, so the offline showcase and the live views cannot drift. No live
@@ -46,6 +48,8 @@ export const PROMPT_SAMPLE = "<span class=\"color-111\">></span> ";
 export const COMMAND_HISTORY_SAMPLE = ["look", "北", "talk 老周"];
 
 // Roster slice backing CharacterSwitcher (webclient-character-roster, MC5).
+// Each row's `portrait` IS the complete canonical artwork descriptor (change
+// unified-portrait-image-contract): the retired flat field copy is gone.
 export const ROSTER_CHARACTERS_SAMPLE = [
   {
     identity: 1,
@@ -53,15 +57,31 @@ export const ROSTER_CHARACTERS_SAMPLE = [
     current: true,
     pending: false,
     portrait: {
-      subject_key: "char_1",
-      status: "done",
-      url: "/art/portraits/char_1.webp",
-      aspect_ratio: "3/4",
-      alt: "艾莉亞的肖像",
-      placeholder: null,
-      face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
-      stage: { scale: 1, x: 0, y: 0 },
-      origin: "runtime",
+      subject_id: "portrait:character:1",
+      revision: fixtureDigest("roster-1"),
+      generation_subject: "portrait:character:1",
+      generation_state: "done",
+      attempts: [
+        {
+          type: "image",
+          source_id: "portrait.classic:portrait:character:1",
+          rank: 40,
+          resource: {
+            resource_id: "portrait/character/char_1.webp",
+            version: fixtureDigest("char-1"),
+            url: "/art/portraits/char_1.webp",
+            origin: "runtime",
+            geometry: {
+              image_size: null,
+              face_rect: { x: 0.3, y: 0.1, w: 0.4, h: 0.4 },
+              stage: { scale: 1, x: 0, y: 0 },
+              aspect_ratio: "3/4",
+            },
+          },
+        },
+      ],
+      terminal: null,
+      retention_sources: [],
     },
   },
   {
@@ -70,14 +90,13 @@ export const ROSTER_CHARACTERS_SAMPLE = [
     current: false,
     pending: false,
     portrait: {
-      subject_key: "char_2",
-      status: "pending",
-      url: null,
-      aspect_ratio: "3/4",
-      alt: "雷恩的肖像",
-      placeholder: { kind: "generating", label: "肖像生成中" },
-      stage: null,
-      origin: "silhouette",
+      subject_id: "portrait:character:2",
+      revision: fixtureDigest("roster-2"),
+      generation_subject: "portrait:character:2",
+      generation_state: "pending",
+      attempts: [],
+      terminal: null,
+      retention_sources: [],
     },
   },
   {
@@ -86,14 +105,13 @@ export const ROSTER_CHARACTERS_SAMPLE = [
     current: false,
     pending: true,
     portrait: {
-      subject_key: null,
-      status: "missing",
-      url: null,
-      aspect_ratio: "3/4",
-      alt: "新冒險者的肖像",
-      placeholder: { kind: "silhouette", label: "建立中" },
-      stage: null,
-      origin: "placeholder",
+      subject_id: "3",
+      revision: fixtureDigest("roster-3"),
+      generation_subject: null,
+      generation_state: null,
+      attempts: [],
+      terminal: null,
+      retention_sources: [],
     },
   },
 ];

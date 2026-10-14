@@ -1,5 +1,42 @@
 import { h } from "vue";
 import ParticipantFrame from "../../components/ParticipantFrame.vue";
+import {
+  artworkDescriptor,
+  artworkResource,
+  artworkTerminal,
+} from "../fixtures/art_panels.js";
+
+// One catalog value per participant row: exactly `{artwork, context}`.
+function entry(subject, url, faceRect, generation = "done") {
+  return {
+    artwork: artworkDescriptor({
+      subject_id: subject,
+      generation_subject: subject,
+      generation_state: generation,
+      attempts: url
+        ? [
+            {
+              type: "image",
+              source_id: `portrait.default:${subject}`,
+              rank: 30,
+              resource: artworkResource({
+                resource_id: url,
+                url,
+                geometry: {
+                  image_size: null,
+                  face_rect: faceRect,
+                  stage: { scale: 1, x: 0, y: 0 },
+                  aspect_ratio: "3:4",
+                },
+              }),
+            },
+          ]
+        : [],
+      terminal: url ? artworkTerminal() : null,
+    }),
+    context: { name: subject, role: "敵方" },
+  };
+}
 
 // ParticipantFrame (H3 webclient-hud-03-action-dock, task 6.8): the combat
 // participant frame — 我方 / 敵方 groups, the token/name/HP numerals, the
@@ -7,12 +44,12 @@ import ParticipantFrame from "../../components/ParticipantFrame.vue";
 // offline args for the showcase.
 
 const ART_PANEL = {
-  schema_version: 1,
+  schema_version: 3,
   available: true,
   portrait_catalog: {
-    p1: { subject_key: "port_hero", status: "done", url: "/art/defaults/man.webp", alt: "主角的肖像", placeholder: null, face_rect: { x: 0.25, y: 0.06, w: 0.5, h: 0.5 } },
-    e1: { subject_key: "port_goblin", status: "done", url: "/art/defaults/monster_anon.webp", alt: "哥布林的肖像", placeholder: null, face_rect: { x: 0.35, y: 0.12, w: 0.4, h: 0.4 } },
-    e2: { subject_key: "port_ogre", status: "pending", url: null, alt: "巨魔的肖像", placeholder: { kind: "missing", label: "肖像圖像尚未生成" } },
+    p1: entry("port_hero", "/art/defaults/man.webp", { x: 0.25, y: 0.06, w: 0.5, h: 0.5 }),
+    e1: entry("port_goblin", "/art/defaults/monster_anon.webp", { x: 0.35, y: 0.12, w: 0.4, h: 0.4 }),
+    e2: entry("port_ogre", null, null, "pending"),
   },
 };
 

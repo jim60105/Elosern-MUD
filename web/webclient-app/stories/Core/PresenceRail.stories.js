@@ -8,9 +8,24 @@ import { AFFORDANCES, explorationPanelFixture, presenceArgs } from "../fixtures/
 // would 404 in the showcase and the medallion would silently fall back to the
 // initial. The story therefore re-points the entry at a served committed
 // bitmap: it pins the medallion's RENDERING, never the producer's URL.
+// The catalog value is exactly `{artwork, context}`: the story re-points the
+// descriptor's own candidate at a served committed bitmap.
 const STORY_FACE = {
   ...ART_PANEL_SAMPLE.portrait_catalog["101"],
-  url: "/art/defaults/man.webp",
+  artwork: {
+    ...ART_PANEL_SAMPLE.portrait_catalog["101"].artwork,
+    attempts: [
+      {
+        ...ART_PANEL_SAMPLE.portrait_catalog["101"].artwork.attempts[0],
+        resource: {
+          ...ART_PANEL_SAMPLE.portrait_catalog["101"].artwork.attempts[0].resource,
+          resource_id: "defaults/man.webp",
+          version: "m".repeat(64),
+          url: "/art/defaults/man.webp",
+        },
+      },
+    ],
+  },
 };
 
 const STORY_ART = {
