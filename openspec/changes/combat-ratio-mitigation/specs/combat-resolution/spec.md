@@ -94,7 +94,7 @@ where finite positive `K` is loaded from the combat rulebook (initially 40), mat
 - **WHEN** a declared conditional policy resolves defense
 - **THEN** defense is zero only when its configured bypass predicate matches or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which validates at construction (an attack multiplier with an empty predicate stays invalid)
 
-#### Scenario: The maximum-HP component is added after ratio mitigation
+#### Scenario: The maximum-HP component is added after defense subtraction
 
 - **WHEN** a declared conditional policy with a maximum-HP fraction hits
 - **THEN** floor(max_hp * declared_fraction) is added after ratio mitigation on a successful hit
@@ -145,5 +145,4 @@ Physical and magic damage on both sides SHALL use the same ratio retention K/(K+
 #### Scenario: Miss and shared expectation
 - **WHEN** a strike misses or an estimator evaluates the same successful fixed-roll strike
 - **THEN** a miss causes no strike damage and the estimator equals settlement for bypass, conditional multiplier, rider and scale cases
-
 
