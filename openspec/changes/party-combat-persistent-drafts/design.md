@@ -2,29 +2,31 @@
 
 ## Context
 
-See `proposal.md` for motivation and the batch contract in `../combat-ratio-mitigation/batch.md` for complete coverage, order and conflicts. The persistent session record stores identity dbrefs rather than live objects, and startup restores sessions before wilderness reconciliation.
+See proposal.md for motivation and `../combat-ratio-mitigation/batch.md` for complete coverage, order and conflicts. The persistent session record stores identity dbrefs rather than live objects, and startup restores sessions before wilderness reconciliation.
 
-Inspected boundaries are listed in the proposal Impact section. These are observed starting points; all new behavior below is proposed, with no runtime result claimed. The approved 2026-10-15 document explicitly amends the base engine §6.3 where subtraction, allied autonomy and individual allied flee conflict.
+Observed starting points are separate from proposed behavior below; no runtime result is claimed. The approved 2026-10-15 document explicitly amends engine §6.3 subtraction, allied autonomy and individual allied flee.
 
 ## Goals / Non-Goals
 
-This change owns persistent editable party draft and authoritative completeness. It reuses existing deterministic state owners and exact protocol conventions. Required behavior is defined by its complete delta files. There is no new LLM dependency, compatibility path, data migration, shared inventory, companion equipment-management UI or physical proficiency progression. Detailed stage geometry remains owned by the existing UI batch.
+This slice owns persistent editable party draft and authoritative completeness, using existing deterministic state owners and exact protocol conventions. Its delta files define acceptance. No compatibility path, data migration, shared bag, companion equipment-management UI or proficiency-based physical growth is added. Stage geometry stays with the existing active UI batch.
 
 ## Decisions
 
 Extend the JSON-safe session record with `round_revision` (monotonic per completed/consumed round), `draft_version` (monotonic per accepted edit/revalidation), and one draft map keyed by actor ID. Entries store closed kind plus canonical payload data (skill key/scale/target IDs or shorthand; item key/optional target ID; tactical key/optional enemy ID), never entities or live requests. Expose `confirm_actor_command(commander, session_id, round_revision, draft_version, actor_id, command)` and a side-effect-free complete-draft preflight shared with change 5. Save edits transactionally under the deterministic session writer; stale edit versions reject with canonical progress. Every edit reevaluates required membership and removes invalid entries while retaining valid entries. A changed required set returns needs-selection, even if removing a member makes old entries numerically complete; require a fresh confirmation. Equipment changes invalidate affected previews and mark corresponding entries for authoritative revalidation. Persist only confirmed choices, never client hover state. Restart restores progress without an automatic round. Change 5 attaches final-confirm execution to the same facade, so no second submit API is exposed.
 
+If the required actor set is empty, collection stays paused with an explicit no-eligible-actors reason and only party-operation paths. It never treats all([]) as permission for enemy actions/upkeep. Confirmed surrender remains available; confirmed retreat takes its approved no-acting-ally defeat branch. No invented wait/skip action or editing-triggered time advance is added.
+
 ## Risks / Trade-offs
 
-- [Shared boundary changes] -> Implement only after declared prerequisites, integrate earlier deltas and callsites, and use the batch matrix to serialize overlapping files. No obsolete alias or duplicate implementation remains after cutover.
-- [State or capability changes after selection] -> The shared rules boundary repeats authoritative validation; invalid drafts and normal mid-round invalidation follow different documented semantics.
-- [Unproven arithmetic, persistence or UI behavior] -> Tasks include focused independent assertions and actual evidence where owned here. A selected constant alone is not measured balance and a fixture-only UI is not runtime acceptance.
-- [Estimate depends on existing patterns] -> Scope is bounded to the listed owner and 6.5 hours includes its focused tests/docs/integration. Required downstream behavior is owned explicitly in the batch rather than silently deferred.
+- [Shared integration seams] -> Respect direct prerequisites and the complete conflict matrix, preserving earlier delta additions. No obsolete adapter or duplicate formula remains after the coordinated cutover.
+- [State changes after selection] -> Repeat authoritative validation; invalid drafts and normal mid-round invalidation have different explicit semantics.
+- [Unproven results] -> Run the focused independent evidence owned in tasks. A chosen constant alone is not measured balance and a mocked client is not actual runtime acceptance.
+- [Bounded effort] -> 6.5 hours includes implementation, focused evidence, docs and integration. Required adjacent behavior has a named owner in the20-change batch and is required for assembled acceptance.
 
 ## Migration Plan
 
-Pre-release clean cutover only. Implement code, callsites, fixtures, exact schemas and affected canonical requirement annotations together for this slice. No old/new compatibility parser, stored-data migration or deprecated entry path is added. Rollback uses an ordinary revert of the implementation change; proposal authoring performs no rollback, merge, apply or archive. The assembled client/server cutover is accepted only after change 18.
+Pre-release clean cutover. Implement affected code/callers/fixtures/annotations together in this slice; no old/new parser or data migration. An ordinary revert of an implementation commit is the rollback mechanism. Proposal authoring performs no implementation, apply, archive, merge or worktree operations. The assembled feature is accepted only after party-combat-runtime-acceptance.
 
 ## Verification and documentation ownership
 
-Use synthetic fixtures for independent behavior expectations and the existing real-data calibration boundary for authored roster evidence. Register added/moved Evennia tests and browser methods exactly once in the appropriate shard manifest; annotate tests with canonical `<capability>.<requirement-slug>` IDs generated by the project traceability tooling. If the canonical slug changes, migrate every affected annotation. Update existing affected documentation, both player command documents for syntax/context changes, and focused schema/fixture mirrors for transport changes. Run the focused tests and `uv run --locked python -m tools.contract_gate` during implementation; logging changes also require observability lint and focused event tests. Complete managed browser and traceability-evidence execution stay CI-owned.
+Use synthetic fixtures for behavioral expectations and the existing real-data calibration boundary for authored roster evidence. Added/moved Evennia test modules and browser methods must have exactly one shard owner. Use canonical `<capability>.<requirement-slug>` IDs from project traceability tooling, migrating all affected annotations. Update existing affected docs and both player command documents for command syntax/context changes. Focused implementation checks include `uv run --locked python -m tools.contract_gate`; changed logging also requires observability lint and focused event tests. Complete managed browser and traceability-evidence runs stay CI-owned.

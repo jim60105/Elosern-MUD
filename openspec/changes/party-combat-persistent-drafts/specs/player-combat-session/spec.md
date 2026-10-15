@@ -13,7 +13,6 @@ Each session SHALL store one JSON-safe next-round draft bound to session identit
 - **WHEN** a confirmed skill, item or tactical command is committed and loaded afresh
 - **THEN** its actor/action/target/scale data reconstructs from validated identities without persisted live references
 
-
 ### Requirement: Draft completeness is derived again from authoritative membership
 Every confirmation and complete-draft preflight SHALL reevaluate required actor membership and all commands. Invalid entries SHALL produce per-member reselection reasons while retaining valid entries. A changed required set SHALL require a fresh explicit confirmation rather than silently executing an old incomplete draft.
 
@@ -25,7 +24,6 @@ Every confirmation and complete-draft preflight SHALL reevaluate required actor 
 - **WHEN** an earlier selected command is no longer valid when the final member confirms
 - **THEN** no initiative or upkeep starts, invalid entries require replacement and unaffected entries remain
 
-
 ### Requirement: Draft editing has a separate stale-write version
 Draft edits SHALL carry the current session identity, round_revision and draft_version. An admitted edit SHALL increment draft_version. A stale or concurrent edit SHALL reject without overwriting a newer confirmed entry or affecting another session or round.
 
@@ -33,12 +31,18 @@ Draft edits SHALL carry the current session identity, round_revision and draft_v
 - **WHEN** two requests edit the same old draft version
 - **THEN** at most one edit is admitted and the other receives canonical progress without overwrite
 
-
 ### Requirement: Reconnect and restart restore confirmed selection progress without execution
 Confirmed entries SHALL survive disconnect and process restart. Reconnection SHALL restore their session/revision/progress and SHALL NOT invent missing commands, activate tactical choices or advance combat. Session termination SHALL clear its active draft.
 
 #### Scenario: Restart unfinished draft
 - **WHEN** one of several members has a confirmed command when transport or process restarts
 - **THEN** the confirmed entry remains, missing members remain unselected and elapsed rounds/time are unchanged
+
+### Requirement: No eligible actors leaves command collection paused with explicit party exits
+When the required actor set is empty, draft collection SHALL remain paused and report no eligible actors. It SHALL NOT execute an empty draft or trigger enemy actions, upkeep or time while querying/editing. Confirmed surrender SHALL remain available, and confirmed retreat SHALL use the ordinary no-acting-ally defeat path.
+
+#### Scenario: All members action forbidden
+- **WHEN** transient capability rules leave no member eligible to choose a command
+- **THEN** progress shows no-eligible-actors and party exit paths; reconnect or preview does not execute all-empty completeness
 
 
