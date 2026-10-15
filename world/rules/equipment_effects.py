@@ -30,6 +30,7 @@ field now has its owning consumer, so no field may be folded into an
 accessor outside its owner's surface.
 """
 
+import math
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,7 +66,14 @@ MAX_BUDGET_CEILING = 1_000
 _PERCENT_RE = re.compile(r"^[+-][0-9]+%$")
 
 _ENTRY_FIELDS = frozenset(
-    {"adjustments", "gauge_caps", "immune", "attached_buffs", "exposure_bias"}
+    {
+        "adjustments",
+        "gauge_caps",
+        "immune",
+        "attached_buffs",
+        "exposure_bias",
+        "weapon_damage_multiplier",
+    }
 )
 _ADJUSTMENT_FIELDS = frozenset(
     {
@@ -86,7 +94,9 @@ _PERCENT_FIELDS = frozenset({"mp_cost", "sp_cost", "pleasure_gain", "heal_gain"}
 _SOFT_PERCENT_FIELDS = frozenset({"pleasure_gain", "heal_gain"})
 _GAUGE_TARGETS = frozenset({"hp", "mp", "sp"})
 _BUDGET_RARITIES = frozenset(rarity.value for rarity in ItemRarity)
-_BUDGET_COLUMNS = frozenset({"flat", "percent", "soft_percent", "bias", "gauge"})
+_BUDGET_COLUMNS = frozenset(
+    {"flat", "percent", "soft_percent", "bias", "gauge", "weapon_multiplier"}
+)
 
 
 class EquipmentEffectsRulebookError(ValueError):
@@ -107,6 +117,7 @@ class EquipmentEffectRule:
     immune: tuple[str, ...]
     attached_buffs: tuple[str, ...]
     exposure_bias: int
+    weapon_damage_multiplier: float = 1.0
 
 
 def _require_int(
@@ -121,6 +132,21 @@ def _require_int(
             f"{field} must be an integer in [{minimum}, {maximum}], got {value!r}"
         )
     return value
+
+
+def _require_finite_number(
+    value: Any, field: str, *, minimum: float, maximum: float
+) -> float:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise EquipmentEffectsRulebookError(
+            f"{field} must be a number in [{minimum}, {maximum}], got {value!r}"
+        )
+    val_float = float(value)
+    if not math.isfinite(val_float) or not (minimum <= val_float <= maximum):
+        raise EquipmentEffectsRulebookError(
+            f"{field} must be a number in [{minimum}, {maximum}], got {value!r}"
+        )
+    return val_float
 
 
 def _require_percent(value: Any, field: str) -> int:
@@ -146,11 +172,11 @@ def _require_string_list(value: Any, field: str) -> tuple[str, ...]:
 
 
 
-def _validate_budgets(raw: Any) -> dict[str, dict[str, int]]:
-    """Validate the budgets table: five rarities, five non-negative columns.
+def _validate_budgets(raw: Any) -> dict[str, dict[str, int | float]]:
+    """Validate the budgets table: five rarities, six non-negative columns.
 
     The `bias` column may be 0 (common gear grants no exposure at all);
-    every other column is a positive ceiling.
+    every other column is a positive ceiling (weapon_multiplier >= 1.0).
     """
     if not isinstance(raw, dict):
         raise EquipmentEffectsRulebookError(
@@ -166,7 +192,7 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int]]:
         raise EquipmentEffectsRulebookError(
             f"budgets are missing rarities: {sorted(missing)}"
         )
-    budgets: dict[str, dict[str, int]] = {}
+    budgets: dict[str, dict[str, int | float]] = {}
     for rarity in sorted(raw):
         columns = raw[rarity]
         if not isinstance(columns, dict):
@@ -184,11 +210,20 @@ def _validate_budgets(raw: Any) -> dict[str, dict[str, int]]:
                 f"budgets.{rarity} are missing columns: {sorted(missing)}"
             )
         budgets[rarity] = {
-            column: _require_int(
-                columns[column],
-                f"budgets.{rarity}.{column}",
-                minimum=0 if column == "bias" else 1,
-                maximum=MAX_BUDGET_CEILING,
+            column: (
+                _require_finite_number(
+                    columns[column],
+                    f"budgets.{rarity}.{column}",
+                    minimum=1.0,
+                    maximum=float(MAX_BUDGET_CEILING),
+                )
+                if column == "weapon_multiplier"
+                else _require_int(
+                    columns[column],
+                    f"budgets.{rarity}.{column}",
+                    minimum=0 if column == "bias" else 1,
+                    maximum=MAX_BUDGET_CEILING,
+                )
             )
             for column in _BUDGET_COLUMNS
         }
@@ -201,6 +236,7 @@ def _validate_entry(
     budgets: Mapping[str, Mapping[str, int]],
     rarity: str,
     buff_definitions: Mapping[str, BuffDefinition],
+    definition: ItemDefinition | None = None,
 ) -> EquipmentEffectRule:
     """Validate one entry and budget-check every value against its column."""
     if not isinstance(raw, dict):
@@ -336,12 +372,39 @@ def _validate_entry(
             f"bias budget of {ceilings['bias']}"
         )
 
+    weapon_mult = 1.0
+    if "weapon_damage_multiplier" in raw:
+        from world.skills.equipment import EquipmentSlot
+
+        is_weapon = (
+            definition is not None
+            and definition.equipment_slot in (EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF)
+        )
+        if not is_weapon:
+            raise EquipmentEffectsRulebookError(
+                f"effects.{item_key}.weapon_damage_multiplier is only permitted on weapons"
+            )
+        raw_mult = raw["weapon_damage_multiplier"]
+        weapon_mult = _require_finite_number(
+            raw_mult,
+            f"effects.{item_key}.weapon_damage_multiplier",
+            minimum=1.0,
+            maximum=float(MAX_BUDGET_CEILING),
+        )
+        weapon_ceiling = float(ceilings["weapon_multiplier"])
+        if weapon_mult > weapon_ceiling:
+            raise EquipmentEffectsRulebookError(
+                f"effects.{item_key}.weapon_damage_multiplier {weapon_mult!r} exceeds "
+                f"the {rarity} weapon_multiplier budget of {weapon_ceiling}"
+            )
+
     return EquipmentEffectRule(
         adjustments=MappingProxyType(adjustments),
         gauge_caps=MappingProxyType(gauge_caps),
         immune=immune,
         attached_buffs=attached,
         exposure_bias=bias,
+        weapon_damage_multiplier=weapon_mult,
     )
 
 
@@ -515,6 +578,7 @@ def validate_equipment_effect_rules(
             budgets,
             rarity,
             buff_definitions,
+            definition=definition,
         )
     ordered = {key: rules[key] for key in sorted(rules, key=str)}
     # The Church-of-Light doctrine rides the same load: role membership is

@@ -7,11 +7,11 @@
 # load time (rarity is never read at runtime). Percent fields use an explicit
 # signed `+N%` / `-N%` string; flat fields are signed integers.
 budgets:
-  common: {flat: 4, percent: 5, soft_percent: 10, bias: 0, gauge: 5}
-  uncommon: {flat: 6, percent: 8, soft_percent: 15, bias: 1, gauge: 10}
-  rare: {flat: 8, percent: 10, soft_percent: 20, bias: 1, gauge: 15}
-  epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20}
-  legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25}
+  common: {flat: 4, percent: 5, soft_percent: 10, bias: 0, gauge: 5, weapon_multiplier: 1.0}
+  uncommon: {flat: 6, percent: 8, soft_percent: 15, bias: 1, gauge: 10, weapon_multiplier: 1.0}
+  rare: {flat: 8, percent: 10, soft_percent: 20, bias: 1, gauge: 15, weapon_multiplier: 1.0}
+  epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20, weapon_multiplier: 1.0}
+  legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25, weapon_multiplier: 1.0}
 effects:
   guild_limit_e:
     adjustments: {}

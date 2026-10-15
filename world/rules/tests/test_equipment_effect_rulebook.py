@@ -327,6 +327,40 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
     @covers_requirement(
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
     )
+    def test_weapon_multiplier_budget_overflow_is_rejected(self):
+        # plain_sword is common (weapon_multiplier ceiling 1.0).
+        self._expect_rejection(
+            lambda d: d["effects"]["plain_sword"].update(
+                {"weapon_damage_multiplier": 1.1}
+            )
+        )
+
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
+    def test_weapon_multiplier_on_non_weapon_is_rejected(self):
+        # knight_platemail is armor, not a weapon.
+        self._expect_rejection(
+            lambda d: d["effects"]["knight_platemail"].update(
+                {"weapon_damage_multiplier": 1.0}
+            )
+        )
+
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
+    def test_malformed_weapon_multiplier_values_are_rejected(self):
+        for val in (True, False, 0.9, -1.0, float("nan"), float("inf"), "1.5"):
+            with self.subTest(val=val):
+                self._expect_rejection(
+                    lambda d, v=val: d["effects"]["plain_sword"].update(
+                        {"weapon_damage_multiplier": v}
+                    )
+                )
+
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+    )
     def test_non_positive_or_malformed_gauge_cap_is_rejected(self):
         for cap in (-5, 0, True, "10", 25.5):
             with self.subTest(cap=cap):
@@ -371,6 +405,10 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             "zero-cell": lambda d: d["budgets"]["common"].update({"flat": 0}),
             "negative-cell": lambda d: d["budgets"]["common"].update({"flat": -1}),
             "float-cell": lambda d: d["budgets"]["common"].update({"flat": 4.5}),
+            "weapon-multiplier-below-one": lambda d: d["budgets"]["common"].update({"weapon_multiplier": 0.9}),
+            "weapon-multiplier-boolean": lambda d: d["budgets"]["common"].update({"weapon_multiplier": True}),
+            "weapon-multiplier-nan": lambda d: d["budgets"]["common"].update({"weapon_multiplier": float("nan")}),
+            "weapon-multiplier-inf": lambda d: d["budgets"]["common"].update({"weapon_multiplier": float("inf")}),
         }
         for name, mutate in mutations.items():
             with self.subTest(case=name):
