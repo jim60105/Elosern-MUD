@@ -310,6 +310,16 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(updates[0]["revision"], self.sent[-1]["ui_action_result"][0][0]["presentation_revision"])
         return updates[0]["panels"]["gallery"]
 
+    @staticmethod
+    def card_geometry(row):
+        """One card row's placement geometry, read from its descriptor.
+
+        The art-gallery v3 wire moved ``face_rect``/``stage``/``image_size`` off
+        the flat row and onto the canonical descriptor's rank-10 runtime
+        candidate, so placement is read from ``artwork.attempts[0].resource``.
+        """
+        return row["artwork"]["attempts"][0]["resource"]["geometry"]
+
     def generate(self, subject=None, **changes):
         payload = {"subject_key": (subject or self.subject).full(), "fields": [], "custom_prompt": ""}
         payload.update(changes)
@@ -416,7 +426,8 @@ class GalleryActionIntegrationTests(EvenniaTest):
         self.assertEqual(image_path.stat(), before_stat)
         self.assertEqual(image_path.read_bytes(), b"synthetic-image")
         self.assertEqual(len(list(self.root.rglob("*.png"))), 2)
-        self.assertEqual(next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])["face_rect"], rect)
+        row = next(row for row in self.panel()["cards"] if row["image_id"] == first["image_id"])
+        self.assertEqual(self.card_geometry(row)["face_rect"], rect)
 
     @covers_requirement(
         "art-gallery-model::a-face-rect-update-is-checked-against-the-card-s-recorded-image-size"
@@ -451,7 +462,7 @@ class GalleryActionIntegrationTests(EvenniaTest):
         # The committed fact reaches the gallery presentation for the editor's
         # revision-correlated close gate.
         row = next(r for r in self.panel()["cards"] if r["image_id"] == first["image_id"])
-        self.assertEqual(row["stage"], triple)
+        self.assertEqual(self.card_geometry(row)["stage"], triple)
         self.assertIn(
             "gallery_stage_set",
             [call.args[0] for call in service_info.call_args_list if call.args],
