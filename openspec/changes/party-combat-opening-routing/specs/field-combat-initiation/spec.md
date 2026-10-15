@@ -107,7 +107,6 @@ be relied on to undo engagement, because engagement leaves state the rollback ca
 - **WHEN** engagement and the initiating entry commit while companions still need commands
 - **THEN** the session and seed persist together, no action effects or round time have run, and later round failures preserve this committed draft
 
-
 ### Requirement: A committed field initiation emits one boundary event
 `initiate_field_combat()` SHALL emit one `field_combat_initiated` info event through the
 `world.observability` facade, with `char`, `room`, `tick`, `skill`, `enemy_count`, and `opening`

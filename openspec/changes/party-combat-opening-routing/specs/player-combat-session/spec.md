@@ -6,16 +6,13 @@
 **Reason**: The approved party-combat design replaces this conflicting behavior.
 **Migration**: Interactive opening selections seed the party draft; use opening-order metadata and ordinary complete-draft resolution. Independent noninteractive overwhelm mechanics are unchanged. No compatibility route or data migration.
 
-
 ### Requirement: Overwhelm compression is player-direction only
 **Reason**: The approved party-combat design replaces this conflicting behavior.
 **Migration**: Interactive opening selections seed the party draft; use opening-order metadata and ordinary complete-draft resolution. Independent noninteractive overwhelm mechanics are unchanged. No compatibility route or data migration.
 
-
 ### Requirement: submit_opening_action is the sole compression dispatcher and always grants the player first strike
 **Reason**: The approved party-combat design replaces this conflicting behavior.
 **Migration**: Interactive opening selections seed the party draft; use opening-order metadata and ordinary complete-draft resolution. Independent noninteractive overwhelm mechanics are unchanged. No compatibility route or data migration.
-
 
 ## MODIFIED Requirements
 
@@ -62,5 +59,4 @@ An encounter-starting selection SHALL seed the initiating actor entry and wait f
 #### Scenario: Opening first actor
 - **WHEN** an encounter explicitly grants the initiator first action and that actor has low ordinary initiative
 - **THEN** the override applies only to its first complete round; later rounds use normal initiative regardless of command order
-
 
