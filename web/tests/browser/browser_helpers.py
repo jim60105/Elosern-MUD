@@ -1135,12 +1135,98 @@ def valid_local_map_panel(**overrides) -> dict:
     return panel
 
 
+# The scene's own generated source-layer rank, mirroring
+# ``world.art.descriptors.SCENE_RANK_GENERATED`` on the fixture side.
+_SCENE_RANK_GENERATED = 20
+
+
+def _fixture_digest(label: str) -> str:
+    """A deterministic 64-character lowercase digest for one fixture fact."""
+    import hashlib
+
+    return hashlib.sha256(label.encode("utf-8")).hexdigest()
+
+
+def scene_resource(url: str, **overrides) -> dict:
+    """One canonical scene candidate resource for a fixture scene URL.
+
+    Mirrors the scene resolution's own generated resource
+    (``world.art.presenter.describe_scene``): a runtime-origin candidate whose
+    geometry carries no face rectangle and no placement triple — a landscape
+    is not a portrait — pinned to the fixture stage's 16:9 ratio. The resource
+    identity and version follow the URL, so two scene URLs are two resources.
+    """
+    value = {
+        "resource_id": url,
+        "version": _fixture_digest(url),
+        "url": url,
+        "origin": "runtime",
+        "geometry": {
+            "image_size": None,
+            "face_rect": None,
+            "stage": None,
+            "aspect_ratio": "16:9",
+        },
+    }
+    value.update(overrides)
+    return value
+
+
+def scene_block(url: str, subject_id: str, *, label: str, alt: str) -> dict:
+    """One schema-valid v4 ``art`` scene block for a fixture scene URL.
+
+    ``ART_SCHEMA_VERSION = 4``
+    (``web/webclient/presentation/art.py``) cut the scene block to exactly
+    ``{archetype, label, alt, artwork}``: the archetype the room renders from
+    (null for the archetype-less fixture room), the two bounded display
+    strings the stage renders outside the bitmap, and the complete canonical
+    descriptor the scene resolution produced. The descriptor carries the
+    scene's own generated candidate at its stable source-layer rank with the
+    unchanged generation truth (``done``), the retention authorization the
+    backend issues for that known-good generated source (so a same-place
+    replacement keeps the pixels already on screen and crossfades into its
+    successor), and no terminal of its own. Every retired flat scene field
+    (``url``/``subject_key``/``status``/``aspect_ratio``/``placeholder``/
+    ``stage``) fails the exact-key check instead of being adapted, so no v3
+    fixture may carry them.
+    """
+    source_id = f"scene.generated:{subject_id}"
+    return {
+        "archetype": None,
+        "label": label,
+        "alt": alt,
+        "artwork": {
+            "subject_id": subject_id,
+            "revision": _fixture_digest(f"scene:{subject_id}:{url}"),
+            "generation_subject": subject_id,
+            "generation_state": "done",
+            "attempts": [
+                {
+                    "type": "image",
+                    "source_id": source_id,
+                    "rank": _SCENE_RANK_GENERATED,
+                    "resource": scene_resource(url),
+                }
+            ],
+            "terminal": None,
+            "retention_sources": [
+                {
+                    "source_id": source_id,
+                    "token": _fixture_digest(f"scene-retention:{subject_id}"),
+                }
+            ],
+        },
+    }
+
+
 def valid_art_panel() -> dict:
-    """A schema-valid available art panel for injected snapshots.
+    """A schema-valid available art panel (schema version 4) for snapshots.
 
     Mirrors the exact available art form the server presenter emits
-    (``web/webclient/presentation/art.py::art_presenter``): a done scene
-    with a same-origin URL, 16:9 aspect ratio, and no placeholder.
+    (``web/webclient/presentation/art.py::art_presenter``): a done scene whose
+    v4 block carries the scene's own canonical descriptor at the fixture's
+    settled-output URL (`/art/scene/<archetype>.png`), and an empty portrait
+    catalog.
 
     The scene label and settled-output filename follow the boot mode's
     scene-archetype row (kit ``t_`` archetype under the synthetic install,
@@ -1160,23 +1246,15 @@ def valid_art_panel() -> dict:
     else:
         archetype, label = SHIPPED_ART_ARCHETYPE, SHIPPED_ART_SCENE_LABEL
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "scene",
-        "scene": {
-            "archetype": None,
-            "label": label,
-            "subject_key": None,
-            "status": "done",
-            "url": f"/art/scene/{archetype}.png",
-            "aspect_ratio": "16:9",
-            "alt": label,
-            "placeholder": None,
-            # The stage-transform contract: a scene with a url carries the
-            # identity placement triple (webclient-presentation art.py
-            # _validate_stage mirrors this on the wire).
-            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
-        },
+        "scene": scene_block(
+            f"/art/scene/{archetype}.png",
+            f"scene:{archetype}",
+            label=label,
+            alt=label,
+        ),
         "portrait_catalog": {},
     }
 

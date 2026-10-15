@@ -11,10 +11,12 @@ from __future__ import annotations
 
 import base64
 from .browser_helpers import (
+    _fixture_digest,
     focus_action_dock,
     install_outbound_recorder,
     inject_snapshot,
     outbound_messages,
+    scene_block,
     sent_action_count,
     store_state,
     valid_character_panel,
@@ -244,13 +246,6 @@ def _combat_panel() -> dict:
     }
 
 
-def _fixture_digest(label: str) -> str:
-    """A deterministic 64-character lowercase digest for one fixture fact."""
-    import hashlib
-
-    return hashlib.sha256(label.encode("utf-8")).hexdigest()
-
-
 def _artwork_resource(url: str, face_rect: dict | None = None) -> dict:
     """One canonical runtime candidate resource for a fixture URL."""
     return {
@@ -290,10 +285,12 @@ def _artwork_descriptor(subject_id: str, url: str, **overrides) -> dict:
 
 
 def _art_panel(portrait_refs: list) -> dict:
-    """A schema-valid available art panel (v3) with a done scene + catalog.
+    """A schema-valid available art panel (v4) with a done scene + catalog.
 
-    Each catalog value is exactly ``{artwork, context}``: the complete
-    canonical descriptor plus its bounded display context.
+    The scene block is the v4 wrapper ``{archetype, label, alt, artwork}``:
+    the canonical descriptor the scene resolution produced, no retired flat
+    scene field. Each catalog value is exactly ``{artwork, context}``: the
+    complete canonical descriptor plus its bounded display context.
     """
     catalog = {}
     for ref in portrait_refs:
@@ -302,20 +299,15 @@ def _art_panel(portrait_refs: list) -> dict:
             "context": {"name": "角色", "role": "人物"},
         }
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "scene",
-        "scene": {
-            "archetype": None,
-            "label": "南門街道",
-            "subject_key": None,
-            "status": "done",
-            "url": "/art/scene.png",
-            "aspect_ratio": "16:9",
-            "alt": "當前場景",
-            "placeholder": None,
-            "stage": {"scale": 1.0, "x": 0.0, "y": 0.0},
-        },
+        "scene": scene_block(
+            "/art/scene.png",
+            "scene:street",
+            label="南門街道",
+            alt="當前場景",
+        ),
         "portrait_catalog": catalog,
     }
 

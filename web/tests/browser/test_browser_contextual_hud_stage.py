@@ -292,7 +292,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         backdrop = page.locator('[data-testid="scene-backdrop"]')
         self.assertEqual(
-            backdrop.get_attribute("data-scene-status"),
+            backdrop.get_attribute("data-scene-state"),
             "done",
             "the backdrop reports the committed scene status",
         )

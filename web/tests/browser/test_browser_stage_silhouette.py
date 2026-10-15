@@ -23,7 +23,7 @@ from PIL import Image
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import inject_snapshot, valid_local_map_panel
+from .browser_helpers import inject_snapshot, scene_block, valid_local_map_panel
 from ._journey_support import (
     _SCENE_PNG_BYTES,
     _artwork_descriptor,
@@ -129,21 +129,19 @@ def _resolved_entry(url: str, **overrides) -> dict:
 
 
 def _art_panel(entry: dict) -> dict:
+    """A schema-valid available art panel (v4): the scene's canonical
+    descriptor, the retired flat scene fields (``url``/``status``/
+    ``subject_key``/``placeholder``/``stage``) gone from the wire."""
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "scene",
-        "scene": {
-            "archetype": None,
-            "label": "南門街道",
-            "subject_key": None,
-            "status": "done",
-            "url": SCENE_URL,
-            "aspect_ratio": "16:9",
-            "alt": "當前場景",
-            "placeholder": None,
-            "stage": dict(STAGE_TRIPLE),
-        },
+        "scene": scene_block(
+            SCENE_URL,
+            "scene:street",
+            label="南門街道",
+            alt="當前場景",
+        ),
         "portrait_catalog": {"7": entry},
     }
 
