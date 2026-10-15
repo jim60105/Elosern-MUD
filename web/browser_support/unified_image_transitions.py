@@ -30,6 +30,7 @@ TRANSITIONS = frozenset(
         "done_scene",
         "remove_room_binding",
         "move_scene",
+        "reuse_place",
         "repaired_original",
         "revoke_source",
         "unavailable_panel",

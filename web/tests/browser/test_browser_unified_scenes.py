@@ -412,16 +412,25 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
 
         # (7) Re-entering the place the character left commits that EXISTING
         # logical identity again: whatever is on screen belongs to its own
-        # descriptor, and the identity is the one the browser left.
+        # descriptor, and the identity is the one the browser left. A live
+        # engagement forbids movement, so the fight is forfeited first through
+        # the production command.
+        page.evaluate("() => Evennia.msg('text', ['combat forfeit'], {})")
+        self._wait_mode(page, "exploration")
         self._transition(page, "reuse_place")
-        wait_for_store_state(
-            page,
-            lambda state: (
-                (state["panels"]["art"]["scene"]["artwork"] or {}).get("subject_id")
-                == artwork["subject_id"]
-            ),
-            timeout=30000,
-        )
+        deadline = time.monotonic() + 30
+        while time.monotonic() < deadline:
+            if self._art(page).get("subject_id") == artwork["subject_id"]:
+                break
+            page.wait_for_timeout(250)
+        else:
+            raise AssertionError(
+                "re-entering the left place never committed its identity: "
+                f"committed={self._art(page).get('subject_id')!r} "
+                f"expected={artwork['subject_id']!r} "
+                f"mode={store_state(page)['mode']} "
+                f"narrative={self._narrative(page)!r}"
+            )
         page.wait_for_timeout(800)
         reentered = self._displayed(page)
         if reentered is not None:
