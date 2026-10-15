@@ -514,7 +514,7 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 - **THEN** the first beat of each action: the acting stage actor steps 12px × S toward the stage's centre and back within 240ms, staying inside its 16px × S gutter beside the command card; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor fades and drops out of the line-up — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
 
 #### Scenario: Pauses and actorless beats follow the gesture
-- **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the third)
+- **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the line-up's maximum)
 - **THEN** the next beat's pause starts when the gesture has played, and an actorless beat plays no gesture
 
 #### Scenario: Choreography is decorative

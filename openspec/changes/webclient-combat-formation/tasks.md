@@ -28,13 +28,13 @@ Rules:
   - `tests/mode_transitions.test.js`: one shared slot transition rule, and none at reduced/off.
 
   Run
-  `pnpm test -- web/webclient-app/tests/core/companion_lineup.test.js web/webclient-app/tests/core/foe_lineup.test.js web/webclient-app/tests/hud_frame.test.js web/webclient-app/tests/mode_transitions.test.js web/webclient-app/tests/core/combat_formation.test.js`
+  `pnpm exec vitest run web/webclient-app/tests/core/companion_lineup.test.js web/webclient-app/tests/core/foe_lineup.test.js web/webclient-app/tests/hud_frame.test.js web/webclient-app/tests/mode_transitions.test.js web/webclient-app/tests/core/combat_formation.test.js`
   and verify it passes.
 
 ## 2. Glance plates and roster removal (≈2.5 h)
 
 - [ ] 2.1 Create `components/FigurePlate.vue` (design D4: the 52/36px·S line layouts, the repeated-name token) and
-  change the beat step distance to `12px·S` in `components/StageActor.vue`'s lunge keyframes (design D4b) and render one per non-controlled figure in the plates
+  change the beat step distance to `12px·S` (the `--motion-beat-lunge` token in `styles/tokens.css` that `components/StageActor.vue`'s lunge keyframes read; design D4b) and render one per non-controlled figure in the plates
   layer from `formation` slots, `displayHp`/committed HP, and the participant names.
 - [ ] 2.2 Delete `components/ParticipantFrame.vue`, `stories/Data/ParticipantFrame.stories.js`,
   `tests/core/participant_frame.test.js` and `tests/combat/participant_frame.test.js`. Update
@@ -42,7 +42,7 @@ Rules:
   add `Core/FigurePlate`), following the test-id table (design D5).
 - [ ] 2.3 Add `tests/core/figure_plate.test.js`: the full and compact forms, the readout text, the stroke fraction, the
   trailing segment, the accessible name with side and token, and the `displayHp` override. Run
-  `pnpm test -- web/webclient-app/tests/core/figure_plate.test.js web/webclient-app/tests/overlays/deferred_surfaces_absent.test.js`
+  `pnpm exec vitest run web/webclient-app/tests/core/figure_plate.test.js web/webclient-app/tests/overlays/deferred_surfaces_absent.test.js`
   and verify it passes. Run `node --test web/static/webclient/js/tests/ui_contract.test.js` and verify it passes.
 
 ## 3. Live-client browser verification (≈2 h)
