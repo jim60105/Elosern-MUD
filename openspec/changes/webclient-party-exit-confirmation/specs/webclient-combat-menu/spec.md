@@ -13,11 +13,11 @@ one level, and disabled entries SHALL send no packet.
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
 - **THEN** the browser submits `combat.command` with the guarded selected actor and skill payload for `basic_attack` exactly once and the draft facade saves it and resolves only a complete valid round
 
-#### Scenario: Implemented item and tactical choices are live
+#### Scenario: Placeholder mechanics cannot be invoked
 - **WHEN** the selected actor has an eligible item, Defend, Dodge or Taunt choice
 - **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
-#### Scenario: Surrender requires confirmation
+#### Scenario: Forfeit requires confirmation
 - **WHEN** the player opens the Surrender entry but has not confirmed
 - **THEN** no mutation is sent, and Escape returns exactly one menu level without ending combat
 
@@ -161,5 +161,4 @@ Retreat and Surrender SHALL remain reachable independently of commanded member. 
 #### Scenario: Invalidation and replay
 - **WHEN** session/round/epoch changes, disconnect occurs or the token becomes stale
 - **THEN** pending confirmation is canceled without auto-retry and no personal flee or retired action route can mutate
-
 
