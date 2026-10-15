@@ -143,26 +143,21 @@ body {
    right-hand anchor is occupied in the current mode. The selectors carry
    the `.scene-backdrop` class so they outrank SceneBackdrop.vue's
    standalone base rules, which load later at equal specificity.
-   In combat the foe line-up (webclient-combat-foes-on-stage) reaches further
-   left than its anchor: AppClient exposes its reach as `--foe-lineup-span`
-   (in anchor widths, 0 when no row stands) and its front foe's scale as
-   `--foe-front-scale` (which sets the row's inset), and the block's right side
-   clears the row's leftmost foe instead, so the plate stays centred in the
-   open stage between the player and the foes. The span is released only once
-   a leaving row has faded, and the side glides with the row when a foe drops
-   out (instant below `full`). */
+   In combat (webclient-combat-formation) the portrait anchors span the
+   stage, so the sides come from the formation instead: AppClient exposes the
+   party's innermost figure edge as `--caption-left` and the leftmost foe's
+   edge (from the stage's right, held until a leaving foe has faded) as
+   `--caption-right`, each with the 16px gutter, and the plate stays centred
+   in the open stage between them. Outside combat neither is set. The sides
+   glide with the figures (instant below `full`). */
 .elosern-root .scene-backdrop .scene-backdrop__caption {
-  left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale));
-  right: max(
-    calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)),
-    calc(
-      max(var(--actor-right-inset), var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3) +
-        var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px * var(--ui-scale)
-    )
-  );
+  left: var(--caption-left, calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)));
+  right: var(--caption-right, calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)));
   bottom: calc(var(--command-line-h) + 12px * var(--ui-scale));
   align-items: center;
-  transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
+  transition:
+    left calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
 }
 .elosern-root .scene-backdrop .scene-backdrop__plate { justify-content: center; }
 /* Reserve the vitals island's horizontal footprint for the chest label;
@@ -294,18 +289,6 @@ body {
 .elosern-root .skill-detail-pane__desc { font: var(--text-md)/1.8 var(--f-serif); color: var(--paper-300); }
 .elosern-root .skill-detail-pane__cost,
 .elosern-root .skill-detail-pane__target { font-size: var(--text-md); }
-/* The combat participant frame. Its rows are dense enough that a full
-   encounter's frame ends above the stage floor, where the foe line-up's
-   gauges and the scene caption stand (webclient-combat-foes-on-stage), and
-   a long name ends in an ellipsis on its one line instead of wrapping. */
-.elosern-root [data-anchor="map"] > .participant-frame {
-  flex-shrink: 1;
-  max-height: 100%;
-  width: min(100%, clamp(218px * var(--ui-scale), 16vw, 288px * var(--ui-scale)));
-  box-sizing: border-box;
-  align-self: flex-end;
-  border-color: #92816a70;
-}
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) #0003; }

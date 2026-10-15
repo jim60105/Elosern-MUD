@@ -216,19 +216,26 @@ def _connected_active(state: dict) -> bool:
 
 
 
-# H3: in combat mode the ArtPanel is hidden and the portraits render in the
-# ParticipantFrame (the 我方/敵方 token rows). This DOM readiness targets the
-# participant frame's rows.
+# H3, migrated by webclient-combat-formation: in combat mode the ArtPanel is
+# hidden, the portraits stand on the stage, and each drawn figure other than
+# the controlled one carries its glance plate (the participant frame's rows
+# are gone). This DOM readiness targets the first figure plate.
 PORTRAIT_TILE_DOM = {
-    "selector": ".participant-frame__row",
+    "selector": '[data-testid="figure-plate"]',
     "predicate": (
-        "() => { const t = document.querySelector('.participant-frame__row'); "
+        "() => { const t = document.querySelector('[data-testid=\"figure-plate\"]'); "
         "if (!t) { return false; } "
         "const r = t.getBoundingClientRect(); "
         "return r.width > 0 && r.height > 0; }"
     ),
-    "description": "a combat participant row is rendered and visible",
+    "description": "a combat figure plate is rendered and visible",
 }
+
+
+def _plate_reading(label: str) -> tuple[str, str]:
+    """A plate's accessible name split into (name and token, side label)."""
+    who, side, _hp = label.split("，", 2)
+    return who, side
 
 SCENE_PLACEHOLDER_DOM = {
     "selector": '[data-testid="scene-backdrop-placeholder"]',
@@ -901,12 +908,10 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             set(art["portrait_catalog"]),
             {str(p["identity"]) for p in combat["participants"]},
         )
-        # H3: the combat portrait renders in the ParticipantFrame (the 我方/敵方
-        # token rows). Scope to the first (focused) row to avoid a strict-mode
-        # violation.
+        # The combat figures carry their plates (webclient-combat-formation):
+        # each names its participant and its side. Scope to the first plate.
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        name = page.locator(".participant-frame__name").first.inner_text()
-        role = page.locator(".participant-frame__group-label").first.inner_text()
+        name, role = _plate_reading(page.locator('[data-testid="figure-plate"]').first.get_attribute("aria-label"))
         self.assertTrue(name.strip())
         self.assertIn(role, ("我方", "敵方"))
         # No focus packet was ever sent.
@@ -917,11 +922,11 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page = self.logged_in_page((1451, 790))
         self._engage(page)
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        # H3: the combat portrait renders in the ParticipantFrame; scope the
-        # assertions to the first participant row to avoid a strict-mode
-        # violation.
-        self.assertTrue(page.locator(".participant-frame__row").first.is_visible())
-        self.assertTrue(page.locator(".participant-frame__name").first.inner_text().strip())
+        # The figures' plates are visible at the reference viewport; scope to
+        # the first plate to avoid a strict-mode violation.
+        plate = page.locator('[data-testid="figure-plate"]').first
+        self.assertTrue(plate.is_visible())
+        self.assertTrue(_plate_reading(plate.get_attribute("aria-label"))[0].strip())
         self.assertTrue(page.locator('[data-testid="scene-backdrop-image"]').is_visible())
 
     @covers_requirement("webclient-art-panel::contextual-portrait-focus-is-client-local-and-verified")
@@ -931,10 +936,8 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        # H3: the combat participant frame (ParticipantFrame) publishes the
-        # first party participant's portrait/name.
+        # The figures' plates are up (webclient-combat-formation).
         wait_for_store_state(page, _art_portrait_ready, PORTRAIT_TILE_DOM, timeout=15000)
-        first_name = page.locator(".participant-frame__name").first.inner_text()
         combat = store_state(page)["panels"]["context_actions"]
         monster_id = next(
             p["identity"]
@@ -961,32 +964,25 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             page,
             lambda state: state.get("focus", {}).get("key") == "target-" + str(monster_id),
         )
-        # H3: after navigating to the enemy target, the participant frame
-        # (ParticipantFrame) shows the monster's name in the 敵方 group.
+        # After navigating to the enemy target, the monster's own plate
+        # carries the focused-target cue (a non-colour cue, client-local), and
+        # no other plate does; its accessible name names the monster.
         wait_for_store_state(
             page,
             _art_portrait_ready,
             {
-                "selector": "[data-testid=\"participant-frame\"]",
+                "selector": f'[data-testid="figure-plate"][data-identity="{monster_id}"][data-target="true"]',
                 "predicate": (
-                    f"() => {{ const f = document.querySelector('[data-testid=\"participant-frame\"]');"
-                    f" if (!f) {{ return false; }}"
-                    f" const names = Array.from(f.querySelectorAll('.participant-frame__name')).map((n) => n.textContent);"
-                    f" return names.some((n) => n && n.indexOf('{monster_name}') !== -1); }}"
+                    f"() => !!document.querySelector("
+                    f"'[data-testid=\"figure-plate\"][data-identity=\"{monster_id}\"][data-target=\"true\"]')"
                 ),
-                "description": "the participant frame (map anchor island) shows the monster's name",
+                "description": "the focused foe's plate carries the target cue",
             },
             timeout=15000,
         )
-        # The participant frame's 敵方 row shows the monster's name, distinct
-        # from the party's first name.
-        monster_name_shown = page.evaluate(
-            f"() => {{ const f = document.querySelector('[data-testid=\"participant-frame\"]');"
-            f" if (!f) {{ return null; }}"
-            f" const names = Array.from(f.querySelectorAll('.participant-frame__name')).map((n) => n.textContent);"
-            f" return names.find((n) => n && n.indexOf('{monster_name}') !== -1) || null; }}"
-        )
-        self.assertNotEqual(monster_name_shown, first_name)
+        targeted = page.locator('[data-testid="figure-plate"][data-target="true"]')
+        self.assertEqual(targeted.count(), 1)
+        self.assertIn(monster_name, targeted.first.get_attribute("aria-label"))
         # No focus packet was ever sent.
         self.assertEqual(sent_action_count(page, None), 0)
 

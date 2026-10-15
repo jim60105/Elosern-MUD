@@ -497,7 +497,7 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )
     def test_foe_lineup_vitest_evidence_passes(self):
         """The foe line-up component, its geometry, and its wiring in the

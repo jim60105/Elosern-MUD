@@ -43,7 +43,7 @@
       "name": "combat-2",
       "files_a": [
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level",
-        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports",
+        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once",
         "web.tests.browser.test_browser_services_dispatch.ReconnectJourney.test_reconnect_rebuilds_services_and_discards_unsubmitted_quantity"
@@ -285,8 +285,9 @@
         "web.tests.browser.test_vue_transport_mount.VueTransportMountBrowserTest",
         "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_formation_shares_one_scale_and_keeps_the_centre_clear",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_beyond_three_stay_in_the_frame"
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands"
       ]
     },
     {
@@ -346,7 +347,7 @@
         "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_caption_wider_and_no_anchor_overlap",
         "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_host_stands_opposite_the_player",
         "web.tests.browser.test_browser_contextual_hud_anchors.ContextualHudBrowserTest.test_dialogue_choices_sit_centred_between_the_portraits",
-        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_participant_frame_presents_participants_and_portraits",
+        "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_figure_plates_present_the_drawn_participants",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail",
         "web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel",
         "web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_digit_keys_pick_the_rows_of_the_current_frame",

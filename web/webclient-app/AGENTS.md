@@ -11,6 +11,12 @@ prototypes; the real app differs too much for a prototype to be useful).
   narrative column and minimap side by side eating ~60% of the width.
 - The player's own generated portrait stands on stage at all times; NPCs and
   enemies stand opposite in dialogue and combat.
+- In combat both sides stand in one shared-scale formation around a clear
+  dead centre (`components/combat-formation.js`, applied by AppClient): the
+  party may leave its single row, every active foe stands, and each figure
+  but the controlled one carries a glance plate (`FigurePlate.vue`, the
+  stage's `plates` layer). The place card and the participant roster are not
+  shown in combat; the controlled figure's values stay in the vitals dock.
 - Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
   condition; always shown in combat.
 - Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen

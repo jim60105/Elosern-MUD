@@ -405,38 +405,36 @@ class UnifiedFiguresBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator(f"{STANDEE} {ALPHA}").count(), 0)
         page.close()
 
-        # The COMBAT join reads the same descriptor: the participant row's
-        # committed reference names the same catalog entry, and the row's
-        # real-only avatar position presents it.
+        # The COMBAT join reads the same descriptor: a foe participant's
+        # committed reference names the same catalog entry, and its stage
+        # figure in the combat formation presents it (the participant frame's
+        # row, which this once read, left with webclient-combat-formation).
         page = self.logged_in_page((1451, 790), "off")
         self._serve_media(page)
         self._commit(page)
         _wait_mode(page, "exploration")
-        # The combat panel is the family's own schema-valid fixture; its first
-        # participant's committed reference is rebound to the shared descriptor
-        # so the row and the exploration surfaces name ONE catalog entry.
-        combat_art = _art_panel()
-        combat_art["portrait_catalog"]["1"] = _art_panel()["portrait_catalog"]["7"]
+        combat_panel = _combat_panel()
+        foe = next(p for p in combat_panel["participants"] if p["team"] == "foes" and p["state"] == "active")
+        foe["portrait_ref"] = "7"
         inject_snapshot(
             page,
             {
                 "status": valid_status_panel("測試主角", "1"),
                 "local_map": valid_local_map_panel(),
-                "art": combat_art,
-                "context_actions": _combat_panel(),
+                "art": _art_panel(),
+                "context_actions": combat_panel,
             },
             mode="combat",
         )
         _wait_mode(page, "combat")
-        page.wait_for_selector(
-            '[data-testid="participant-frame"] [data-testid="avatar-artwork"]',
-            timeout=15000,
-        )
+        foe_figure = '[data-testid="foe-slot"][data-portrait-ref="7"]'
+        page.wait_for_selector(f'{foe_figure} img[src$="{SHARED_URL}"]', timeout=15000)
         self.assertEqual(
-            self._image_src(page, '[data-testid="participant-frame"]'),
+            self._image_src(page, foe_figure),
             SHARED_URL,
-            "the combat row presents the same admitted descriptor",
+            "the combat figure presents the same admitted descriptor",
         )
+        self.assertEqual(page.locator('[data-testid="participant-frame"]').count(), 0)
         page.close()
 
         # A SOURCE ERROR injected after server resolution: the server already

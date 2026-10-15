@@ -1,27 +1,27 @@
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
+import { combatFormation } from "../../components/combat-formation.js";
 import { FOE_PORTRAIT_CATALOG, foeParticipants } from "../fixtures.js";
 
-// FoeLineup (webclient-combat-foes-on-stage design D1-D5): the combat foes
-// standing opposite the player in `actor-right`. At most three active foes,
-// in presenter order, as a depth-staged row that grows leftward: the first
-// foe stands in front at the anchor's right edge, each later foe stands
-// behind the one before it and smaller. Each foe carries a decorative
-// hit-point gauge with a trailing bar on the stage floor; the numbers stay in
-// the participant frame. Each slot exposes `data-portrait-ref`.
+// FoeLineup (webclient-combat-foes-on-stage design D1-D5;
+// webclient-combat-formation design D1/D3): the combat foes standing
+// opposite the party. Every active foe up to the line-up's maximum, in
+// presenter order. Without a `formation` (the stories above the Formation
+// ones) each foe stands at the anchor's right edge at full height; in the
+// client the anchor spans the stage in combat and each foe stands at the
+// box the combat formation engine gives it. Names and hit points live on the
+// figure plates (Core/FigurePlate). Each slot exposes `data-portrait-ref`.
 //
 // Props: foes (the committed active foes, presenter order), artPanel (the
-// committed `art` panel), motionLevel, max (the cap; stories only), and,
-// while a combat round plays (webclient-combat-beat-choreography D5), stage
-// (`view.beatStage`: the pre-round foes and each step's gestures) and
-// displayHp (`view.displayHp`). Emits
-// nothing (decorative art: no focusable element, no pointer events,
-// hidden from assistive technology).
+// committed `art` panel), motionLevel, max (16 minus the drawn party),
+// stage (`view.beatStage`: the pre-round foes and each step's gestures
+// while a combat round plays), formation (the engine's foe side) and glide.
+// Emits `settled` when a leaving foe has faded (decorative art: no
+// focusable element, no pointer events, hidden from assistive technology).
 //
 // The stage frame below reproduces the shell's geometry from the shared
 // tokens: the combat scene over the stage box, the fixed bottom band, the
-// `actor-right` anchor, and the stage's centre line, so the row's reach reads
-// the way it does in the client.
+// `actor-right` anchor, and the stage's centre line.
 
 export default {
   title: "Core/FoeLineup",
@@ -58,30 +58,79 @@ const renderLineup = (args) => ({
     </div>`,
 });
 
-// One foe stands where the host stands, as tall as the player.
+// One foe at the anchor's right edge, as tall as the player.
 export const OneFoe = {
   render: renderLineup,
   args: { foes: foeParticipants(1), artPanel: ART_PANEL, motionLevel: "full" },
 };
 
-// Two foes: the second steps behind the first, toward the centre.
+// Two foes.
 export const TwoFoes = {
   render: renderLineup,
   args: { foes: foeParticipants(2), artPanel: ART_PANEL, motionLevel: "full" },
 };
 
-// Three foes: the fullest row, still right of the stage's centre line; the
-// third is wounded, so its gauge shows the damage.
+// Three foes.
 export const ThreeFoes = {
   render: renderLineup,
   args: { foes: foeParticipants(3), artPanel: ART_PANEL, motionLevel: "full" },
 };
 
-// Five active foes: only the first three stand on the stage; the participant
-// frame lists all five (no "+N" plate).
-export const FiveFoesCapped = {
-  render: renderLineup,
+// The formation (webclient-combat-formation D1): the anchor spans the stage
+// and the foes stand at the engine's boxes for this window, opposite a solo
+// player, at the shared scale (the dashed lines bound the dead-centre gap).
+const renderFormation = (args) => ({
+  components: { FoeLineup },
+  setup() {
+    const size = ref({ width: window.innerWidth, height: window.innerHeight });
+    const onResize = () => {
+      size.value = { width: window.innerWidth, height: window.innerHeight };
+    };
+    onMounted(() => window.addEventListener("resize", onResize));
+    onBeforeUnmount(() => window.removeEventListener("resize", onResize));
+    const formation = computed(() => {
+      const style = getComputedStyle(document.documentElement);
+      const S = Number(style.getPropertyValue("--ui-scale")) || 1;
+      const { width, height } = size.value;
+      const band = Math.max(190 * S, Math.min(400 * S, height * 0.2785));
+      const header = 48 * S;
+      return combatFormation({
+        stageWidth: width,
+        stageHeight: height,
+        uiScale: S,
+        bandTop: height - band,
+        actorHeight: Math.min(height * 0.62, 680 * S, height - header - band),
+        topBandBottom: header,
+        vitalsDock: null,
+        partyCount: 1,
+        foeCount: args.foes.length,
+      });
+    });
+    return { args, formation };
+  },
+  template: `
+    <div style="position:fixed;inset:0;overflow:clip;background:#0b0d10">
+      <div style="position:absolute;left:0;right:0;top:var(--header-h);bottom:var(--band-h);background:linear-gradient(0deg,#0b0d10 3%,#0b0d1000 60%),url(/art/scenes/forest_path.webp) center top/cover"></div>
+      <div style="position:absolute;inset:0;background:var(--stage-combat-veil)"></div>
+      <div aria-hidden="true" :style="{ position: 'absolute', left: formation.gap.left + 'px', width: (formation.gap.right - formation.gap.left) + 'px', top: 'var(--header-h)', bottom: 'var(--band-h)', borderInline: '1px dashed rgba(228,200,142,.28)' }"></div>
+      <div data-anchor="actor-right" style="position:absolute;inset:0;z-index:2;pointer-events:none">
+        <FoeLineup v-bind="args" :formation="formation.foes" />
+      </div>
+      <div style="position:absolute;left:0;right:0;bottom:0;height:var(--band-h);z-index:5;background:linear-gradient(0deg,#0c0a0e,#141019 70%,var(--panel));border-top:var(--line)"></div>
+    </div>`,
+});
+
+// Five foes in one rank, at the scale a solo player shares.
+export const FormationFiveFoes = {
+  render: renderFormation,
   args: { foes: foeParticipants(5), artPanel: ART_PANEL, motionLevel: "full" },
+};
+
+// Fifteen foes, the participant cap beside a solo player: two ranks, the
+// back rank up-stage and half a step toward the centre.
+export const FormationFifteenFoes = {
+  render: renderFormation,
+  args: { foes: foeParticipants(15), artPanel: ART_PANEL, motionLevel: "full" },
 };
 
 // A pending catalog entry keeps its own placeholder card and label, with the
@@ -123,8 +172,7 @@ export const MissingEntry = {
 // A combat round in progress (webclient-combat-beat-choreography D5): the
 // committed roster already lost the assassin, but the row keeps the
 // round's pre-round foes while the beats play. The front foe steps in, the
-// assassin is hit twice (each hit restarts the shake, the gauge and its
-// trailing bar follow the displayed hit points), then drops out on its own
+// assassin is hit twice (each hit restarts the shake), then drops out on its own
 // defeat beat; the round then ends and the committed foes stand again.
 const ROUND_FOES = foeParticipants(3);
 const COMMITTED_FOES = foeParticipants(3).filter((foe) => foe.identity !== 33);
@@ -164,12 +212,11 @@ const renderRound = (args) => ({
         gestures,
       };
     });
-    const displayHp = computed(() => (entry.value ? entry.value[2] : null));
-    return { args, stage, displayHp, COMMITTED_FOES };
+    return { args, stage, COMMITTED_FOES };
   },
   template: renderLineup(args).template.replace(
     '<FoeLineup v-bind="args" />',
-    '<FoeLineup v-bind="args" :foes="COMMITTED_FOES" :stage="stage" :display-hp="displayHp" />',
+    '<FoeLineup v-bind="args" :foes="COMMITTED_FOES" :stage="stage" />',
   ),
 });
 

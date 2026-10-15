@@ -99,6 +99,9 @@ const props = defineProps({
   // HudFrame.
   cardOpen: { type: Boolean, default: false },
   personFocus: { type: Boolean, default: false },
+  // The combat formation stands (webclient-combat-formation D1), forwarded
+  // to HudFrame.
+  formation: { type: Boolean, default: false },
   // The person in focus, named as the speaker line of the message window
   // while the verb card is open (null otherwise).
   speaker: { type: String, default: null },
@@ -319,7 +322,9 @@ function onWindowKeydown(event) {
 // prop is already the new mode; the DOM still shows the old one).
 const HIDDEN_BY_MODE = {
   creation: "[data-anchor='band-message'], [data-anchor='vitals'], [data-anchor='map'], [data-anchor='command-line']",
-  combat: ".local-map",
+  // The whole `map` anchor (place card, room actions, minimap) leaves in
+  // combat (webclient-combat-formation D2).
+  combat: "[data-anchor='map']",
   exploration: "",
   // webclient-dialogue-stage-actors (design D4): dialogue collapses the
   // command region together with the dock inside it. (The objective line is
@@ -474,6 +479,7 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       :beat-hold="beatHold"
       :card-open="cardOpen"
       :person-focus="personFocus"
+      :formation="formation"
       :open-surfaces="frameOpenSurfaces"
       :lowhp="lowHp"
       :command-line-expanded="commandLineExpanded"
@@ -502,6 +508,9 @@ defineExpose({ focusCommandField, releaseCommandField, restoreFocusHome, focusMe
       </template>
       <template #actor-right>
         <slot name="actor-right" />
+      </template>
+      <template #plates>
+        <slot name="plates" />
       </template>
       <template #choices>
         <slot name="choices" />

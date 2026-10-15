@@ -9,6 +9,7 @@ import { computed, h, ref } from "vue";
 import CompanionLineup from "../../components/CompanionLineup.vue";
 import HudFrame from "../../components/HudFrame.vue";
 import { companionFigures } from "../../components/companion-lineup.js";
+import { combatFormation } from "../../components/combat-formation.js";
 import { portraitFor } from "../../components/party-helpers.js";
 import { COMPANION_PORTRAIT_CATALOG, PARTY_PANEL_FULL_SAMPLE } from "../fixtures/party_panels.js";
 
@@ -28,6 +29,20 @@ const player = {
 // The art-panel slice the lineup renderer consumes: only `portrait_catalog`
 // is read, but the panel is the registered v4 form, not the retired v3.
 const ART_PANEL = { schema_version: 4, available: true, portrait_catalog: COMPANION_PORTRAIT_CATALOG };
+// The combat formation's party side (webclient-combat-formation D1) for this
+// window, against `foes` foes, from the shared token geometry.
+function formationFor(partyCount, foes) {
+  const S = Number(getComputedStyle(document.documentElement).getPropertyValue("--ui-scale")) || 1;
+  const width = window.innerWidth;
+  const height = window.innerHeight;
+  const band = Math.max(190 * S, Math.min(400 * S, height * 0.2785));
+  const header = 48 * S;
+  return combatFormation({
+    stageWidth: width, stageHeight: height, uiScale: S, bandTop: height - band,
+    actorHeight: Math.min(height * 0.62, 680 * S, height - header - band), topBandBottom: header,
+    vitalsDock: null, partyCount, foeCount: foes,
+  });
+}
 const renderLineup = (args) => ({
   setup() {
     const possessing = ref(!!args.possession);
@@ -41,8 +56,12 @@ const renderLineup = (args) => ({
       artPanel: ART_PANEL, portraitFor,
     }));
     return () => h("div", { style: "height:100vh;position:relative;background:var(--ink-900)" }, [
-      h(HudFrame, { mode: "exploration", motionLevel: args.motionLevel || "full" }, {
-        "actor-left": () => h(CompanionLineup, { slots: slots.value, dimmed: speaking.value, speakingIdentity: speaking.value ? 102 : null, motionLevel: args.motionLevel || "full" }),
+      h(HudFrame, { mode: args.formation ? "combat" : "exploration", formation: !!args.formation, motionLevel: args.motionLevel || "full" }, {
+        "actor-left": () => h(CompanionLineup, {
+          slots: slots.value, dimmed: speaking.value, speakingIdentity: speaking.value ? 102 : null,
+          motionLevel: args.motionLevel || "full",
+          formation: args.formation ? formationFor(slots.value.length, args.formation).party : null,
+        }),
       }),
       ...(args.possession ? [h("button", {
         type: "button", style: "position:absolute;top:var(--header-h);left:50%;z-index:5",
@@ -63,3 +82,7 @@ export const PossessionSwap = { render: renderLineup, args: { companions: 4, pos
 export const PlaceholderOnly = { render: renderLineup, args: { companions: 4, placeholders: true } };
 export const MotionOff = { render: renderLineup, args: { companions: 4, possession: true, motionLevel: "off" } };
 export const CompanionSpeaks = { render: renderLineup, args: { companions: 4, speaking: true } };
+// In combat the party stands in the shared-scale formation (here against one
+// foe, and against eleven: the participant cap with a full party).
+export const FormationFullPartyOneFoe = { render: renderLineup, args: { companions: 4, formation: 1 } };
+export const FormationFullPartyElevenFoes = { render: renderLineup, args: { companions: 4, formation: 11 } };

@@ -198,7 +198,9 @@ describe("B5 full-overlays contract: deferred surfaces absent, manifest frozen",
      "Core/CommandLine",
      "Action/DockBreadcrumb",
      "Action/SkillDetailPane",
-      "Data/ParticipantFrame",
+      // The combat figures' glance plates replaced the participant frame
+      // (webclient-combat-formation).
+      "Core/FigurePlate",
       "Core/HudDrawer",
       // The shared reference-surface header (webclient-drawer-frame-unification).
       "Core/DrawerHeader",

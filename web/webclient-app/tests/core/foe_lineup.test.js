@@ -1,9 +1,10 @@
-// webclient-combat-foes-on-stage (design D1-D5): the foe line-up stands at
-// most three foes in `actor-right`, in presenter order, as never-dimmed
-// StageActors resolved from the committed art catalog; each slot exposes
-// its portrait reference and a decorative hit-point gauge; the row is a
-// depth-staged, leftward-growing line whose geometry comes from one pure
-// helper; a foe that leaves is inert while it fades.
+// webclient-combat-foes-on-stage (design D1-D5) and webclient-combat-formation
+// (design D1/D3/D4): the foe line-up stands every active foe up to its
+// maximum (15, or 16 minus the drawn party), in presenter order, as
+// never-dimmed StageActors resolved from the committed art catalog; each slot
+// exposes its portrait reference and stands at the formation engine's box;
+// names and hit points live on the figure plates, never on a floor plate; a
+// foe that leaves is inert while it fades.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { mount } from "@vue/test-utils";
@@ -11,15 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
 import { fixtureDigest, artworkDescriptor, artworkResource } from "../../stories/fixtures/art_panels.js";
-import {
-  FOE_EXPOSED,
-  FOE_LINEUP_MAX,
-  FOE_SCALES,
-  activeFoes,
-  foeHpPercent,
-  foeLineupSpan,
-  foeSlots,
-} from "../../components/foe-lineup.js";
+import { FOE_STAGE_MAX, activeFoes, foeStageLimit } from "../../components/foe-lineup.js";
 
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
@@ -81,8 +74,23 @@ const ART = {
   available: true,
   kind: "scene",
   scene: null,
-  portrait_catalog: { 1: entry(1), 2: entry(2), 3: entry(3), 4: entry(4), 5: entry(5) },
+  portrait_catalog: Object.fromEntries(Array.from({ length: 16 }, (_, i) => [i + 1, entry(i + 1)])),
 };
+
+// A formation side for `count` foes: distinct stage-pixel boxes, the first
+// foe frontmost (as combat-formation.js returns them).
+function formationSide(count) {
+  return {
+    ranks: 1,
+    form: "full",
+    figures: Array.from({ length: count }, (_, index) => ({
+      index,
+      rank: 0,
+      box: { left: 1200 - index * 90, top: 240, width: 160, height: 240 },
+      z: count - index,
+    })),
+  };
+}
 
 describe("FoeLineup", () => {
   let wrapper;
@@ -95,19 +103,20 @@ describe("FoeLineup", () => {
   const slots = () => wrapper.findAll('[data-testid="foe-slot"]');
 
   it.each([
-    [1, 1],
-    [3, 3],
-    [5, 3],
-  ])("stands %i active foes as %i slots in presenter order", (given, shown) => {
-    const foes = [1, 2, 3, 4, 5].slice(0, given).map((id) => foe(id));
-    wrapper = mount(FoeLineup, { props: { foes, artPanel: ART } });
+    [1, FOE_STAGE_MAX, 1],
+    [5, FOE_STAGE_MAX, 5],
+    [15, FOE_STAGE_MAX, 15],
+    [16, FOE_STAGE_MAX, 15],
+    [15, 11, 11],
+  ])("stands %i active foes under a maximum of %i as %i slots in presenter order", (given, max, shown) => {
+    const ids = Array.from({ length: given }, (_, i) => i + 1);
+    wrapper = mount(FoeLineup, { props: { foes: ids.map((id) => foe(id)), artPanel: ART, max } });
     const root = wrapper.get('[data-testid="foe-lineup"]');
     expect(root.attributes("data-count")).toBe(String(shown));
-    expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(
-      ["1", "2", "3"].slice(0, shown),
-    );
+    const expected = ids.slice(0, shown).map(String);
+    expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(expected);
     expect(slots().map((s) => s.get("img").attributes("src"))).toEqual(
-      ["1", "2", "3"].slice(0, shown).map((ref) => `/art/portraits/npc_${ref}.webp`),
+      expected.map((ref) => `/art/portraits/npc_${ref}.webp`),
     );
   });
 
@@ -159,41 +168,21 @@ describe("FoeLineup", () => {
     }
   });
 
-  it("moves non-colour acting and target cues by identity without activating the stage", async () => {
-    const foes = [foe(1), foe(2)];
-    wrapper = mount(FoeLineup, { props: {
-      foes, artPanel: ART, focusedTarget: "2",
-      stage: { key: "round:1", foes, gestures: { 1: { gesture: "lunge" } } },
-    } });
-    expect(slots()[0].attributes("data-acting")).toBe("true");
-    expect(slots()[1].attributes("data-target")).toBe("true");
-    expect(slots()[1].get(".foe-lineup__name").text()).toBe(foes[1].display_name);
-    expect(wrapper.attributes("aria-hidden")).toBe("true");
-    expect(wrapper.findAll("button, a, input, [tabindex]")).toHaveLength(0);
-    await slots()[1].get(".foe-lineup__name").trigger("click");
+  it("carries no floor name plate, gauge or numerals, and nothing to activate", async () => {
+    // The floor name and gauge moved to the figure plates
+    // (webclient-combat-formation D4): the line-up states no name, token or
+    // number of its own, and clicking or keying a slot activates nothing.
+    const foes = [foe(1, { hp_current: 15, display_name: "哥布林" }), foe(2, { display_name: "狼" })];
+    wrapper = mount(FoeLineup, { props: { foes, artPanel: ART, formation: formationSide(2) } });
+    expect(wrapper.find(".foe-lineup__name").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="foe-gauge"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="figure-plate"]').exists()).toBe(false);
+    expect(wrapper.text()).not.toMatch(/\d/);
+    expect(wrapper.text()).not.toContain("e1");
+    await slots()[1].trigger("click");
     await slots()[1].trigger("keydown", { key: "Enter" });
-    await slots()[1].trigger("keydown", { key: " " });
     expect(wrapper.emitted("action")).toBeUndefined();
     expect(wrapper.emitted("select")).toBeUndefined();
-    await wrapper.setProps({ focusedTarget: 1, stage: null });
-    expect(slots()[0].attributes("data-target")).toBe("true");
-    expect(slots()[1].attributes("data-target")).toBeUndefined();
-    expect(slots()[0].attributes("data-acting")).toBeUndefined();
-  });
-
-  it("carries a gauge per foe from the committed hit points, with no numerals", async () => {
-    wrapper = mount(FoeLineup, {
-      props: { foes: [foe(1, { hp_current: 15, hp_maximum: 60 }), foe(2, { hp_current: 0, hp_maximum: 0 })], artPanel: ART },
-    });
-    const gauges = wrapper.findAll('[data-testid="foe-gauge"]');
-    expect(gauges).toHaveLength(2);
-    expect(gauges[0].get(".foe-lineup__fill").element.style.width).toBe("25%");
-    expect(gauges[0].get(".foe-lineup__ghost").element.style.width).toBe("25%");
-    expect(gauges[1].get(".foe-lineup__fill").element.style.width).toBe("0%");
-    expect(gauges.map((gauge) => gauge.text()).join("")).not.toMatch(/\d/);
-    expect(wrapper.text()).not.toContain("e1");
-    await wrapper.setProps({ foes: [foe(1, { hp_current: 45, hp_maximum: 60 }), foe(2)] });
-    expect(wrapper.findAll(".foe-lineup__fill")[0].element.style.width).toBe("75%");
   });
 
   // webclient-combat-beat-choreography (design D5): while a round plays, the
@@ -220,10 +209,10 @@ describe("FoeLineup", () => {
       expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2"]);
     });
 
-    it("steps a fourth pre-round foe onto the stage once a front foe's defeat has played", async () => {
+    it("stands every pre-round foe, and drops a front foe once its defeat has played", async () => {
       const round = [foe(1), foe(2), foe(3), foe(4)];
       wrapper = mount(FoeLineup, { props: { foes: [foe(2), foe(3), foe(4)], stage: stage(round), artPanel: ART } });
-      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["1", "2", "3"]);
+      expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["1", "2", "3", "4"]);
       await wrapper.setProps({ stage: stage(round.slice(1)) });
       expect(slots().map((s) => s.attributes("data-portrait-ref"))).toEqual(["2", "3", "4"]);
     });
@@ -281,23 +270,6 @@ describe("FoeLineup", () => {
       expect(slot.find('[data-testid="artwork-failure"]').exists()).toBe(false);
     });
 
-    it("follows the displayed hit points on each gauge, with no numerals", async () => {
-      wrapper = mount(FoeLineup, {
-        props: {
-          foes: [foe(1, { hp_current: 0 })],
-          stage: stage([foe(1, { hp_current: 60, hp_maximum: 60 })]),
-          displayHp: { 1: 30 },
-          artPanel: ART,
-        },
-      });
-      expect(wrapper.get(".foe-lineup__fill").element.style.width).toBe("50%");
-      expect(wrapper.get(".foe-lineup__ghost").element.style.width).toBe("50%");
-      // A foe with no displayed value reads its pre-round row.
-      await wrapper.setProps({ displayHp: {} });
-      expect(wrapper.get(".foe-lineup__fill").element.style.width).toBe("100%");
-      expect(wrapper.get('[data-testid="foe-gauge"]').text()).not.toMatch(/\d/);
-    });
-
     it("hands each foe its gesture, key, and damage number", () => {
       wrapper = mount(FoeLineup, {
         props: {
@@ -321,32 +293,40 @@ describe("FoeLineup", () => {
     });
   });
 
-  it("places each slot from the geometry helper, the front foe above the ones behind", () => {
-    wrapper = mount(FoeLineup, { props: { foes: [foe(1), foe(2), foe(3)], artPanel: ART } });
-    const geometry = foeSlots(3);
+  it("stands each slot at its formation box in stage pixels, the first foe frontmost", async () => {
+    const formation = formationSide(3);
+    wrapper = mount(FoeLineup, { props: { foes: [foe(1), foe(2), foe(3)], artPanel: ART, formation } });
+    expect(wrapper.get('[data-testid="foe-lineup"]').attributes("data-formation")).toBe("true");
     slots().forEach((slot, index) => {
+      const { box, z } = formation.figures[index];
       const style = slot.element.style;
-      expect(style.height).toBe(`${geometry[index].scale * 100}%`);
-      expect(style.right).toBe(`${geometry[index].right * 100}%`);
-      expect(style.bottom).toBe(`${geometry[index].lift * 100}%`);
-      expect(Number(style.zIndex)).toBe(3 - index);
+      expect([style.left, style.top, style.width, style.height]).toEqual(
+        [box.left, box.top, box.width, box.height].map((value) => `${value}px`),
+      );
+      expect(Number(style.zIndex)).toBe(z);
       expect(style.getPropertyValue("--foe-index")).toBe(String(index));
-      // Every foe but the rearmost casts the depth shadow on the one behind.
-      expect(slot.classes("foe-lineup__slot--before")).toBe(index < 2);
+      // The glide wrapper the shell's shared-scale glide drives.
+      expect(slot.get(".formation-figure").attributes("data-glide-key")).toBe(`foe:${index + 1}`);
     });
-    expect(wrapper.get('[data-testid="foe-lineup"]').element.style.getPropertyValue("--foe-front-scale")).toBe(
-      String(geometry[0].scale),
-    );
+    // Without a measured formation the slots carry no stage position.
+    await wrapper.setProps({ formation: null });
+    expect(wrapper.get('[data-testid="foe-lineup"]').attributes("data-formation")).toBeUndefined();
+    expect(slots()[0].element.style.left).toBe("");
+    // A resize, a reconnect and the lower motion levels re-form in place.
+    expect(wrapper.get('[data-testid="foe-lineup"]').attributes("data-glide")).toBe("true");
+    await wrapper.setProps({ glide: false });
+    expect(wrapper.get('[data-testid="foe-lineup"]').attributes("data-glide")).toBe("false");
   });
 
   it("makes a leaving foe inert while it fades", async () => {
     wrapper = mount(FoeLineup, {
-      props: { foes: [foe(1), foe(2)], artPanel: ART, motionLevel: "full" },
+      props: { foes: [foe(1), foe(2)], artPanel: ART, motionLevel: "full", formation: formationSide(2) },
       global: { stubs: { transition: false, "transition-group": false } },
       attachTo: document.body,
     });
     const leaving = slots()[0].element;
-    await wrapper.setProps({ foes: [foe(2)] });
+    const leavingLeft = leaving.style.left;
+    await wrapper.setProps({ foes: [foe(2)], formation: formationSide(1) });
     await nextTick();
     expect(leaving.isConnected).toBe(true);
     expect(leaving.inert).toBe(true);
@@ -356,7 +336,9 @@ describe("FoeLineup", () => {
     const remaining = wrapper.findAll('[data-testid="foe-slot"]').filter((s) => !s.element.inert);
     expect(remaining).toHaveLength(1);
     expect(remaining[0].attributes("data-portrait-ref")).toBe("2");
-    expect(remaining[0].element.style.right).toBe("0%");
+    expect(remaining[0].element.style.left).toBe(`${formationSide(1).figures[0].box.left}px`);
+    // The leaving foe fades where it stood.
+    expect(leaving.style.left).toBe(leavingLeft);
   });
 
   it("removes a leaving foe at once at the off level", async () => {
@@ -370,61 +352,32 @@ describe("FoeLineup", () => {
     expect(slots()).toHaveLength(1);
     // The leave has settled, and the row says so.
     expect(wrapper.emitted("settled")).toHaveLength(1);
-    expect(slots()[0].classes("foe-lineup__slot--before")).toBe(false);
   });
 
   it("names every duration through the motion tokens and never FLIPs the re-slotting", () => {
     const source = readFileSync(join(APP_ROOT, "components/FoeLineup.vue"), "utf8");
     expect(source).not.toMatch(/(transition|animation)[a-z-]*:[^;]*[0-9]m?s/);
     const slotRule = /\.foe-lineup__slot \{[\s\S]*?\}/.exec(source)[0];
-    expect(slotRule).toContain("right calc(var(--motion-actor) * var(--motion-travel))");
-    expect(slotRule).toContain("height calc(var(--motion-actor) * var(--motion-travel))");
+    // One shared re-forming rule: every box edge on the travel duration.
+    for (const property of ["left", "top", "width", "height"]) {
+      expect(slotRule).toContain(`${property} calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard)`);
+    }
     expect(slotRule).not.toMatch(/transition:[^;]*transform/);
-    // The trailing bar lags the fill on the vitals' own trail tokens (the
-    // bar shares its box rule with the fill, so every rule the selector opens
-    // is read, not just the first, and only a rule it opens counts).
-    const rulesFor = (pattern) => [...source.matchAll(pattern)].map((match) => match[0]).join("\n");
-    expect(rulesFor(/(?:^|\})\s*\.foe-lineup__ghost \{[^}]*\}/g)).toContain(
-      "transition: width var(--motion-trail) ease var(--motion-trail-delay);",
-    );
-    expect(rulesFor(/(?:^|\})\s*\.foe-lineup__fill \{[^}]*\}/g)).toContain(
-      "transition: width var(--motion-slow) var(--ease-standard);",
-    );
+    expect(source).toMatch(/\.foe-lineup\[data-glide="false"\] > \.foe-lineup__slot \{\s*transition: none;/);
   });
 });
 
-describe("the line-up geometry", () => {
-  it("caps the row at three and keeps every scale falling front to back", () => {
-    expect(FOE_LINEUP_MAX).toBe(3);
-    expect(foeSlots(5)).toHaveLength(3);
-    expect(foeSlots(0)).toEqual([]);
-    for (const count of [1, 2, 3]) {
-      const scales = FOE_SCALES[count];
-      expect(scales).toHaveLength(count);
-      scales.slice(1).forEach((scale, i) => expect(scale).toBeLessThan(scales[i]));
-      // The front foe gives up height as the group grows.
-      if (count > 1) expect(scales[0]).toBeLessThan(FOE_SCALES[count - 1][0]);
-    }
-    expect(FOE_SCALES[1]).toEqual([1]);
+describe("the line-up selection", () => {
+  it("stands at most fifteen foes, and sixteen participants with the drawn party", () => {
+    expect(FOE_STAGE_MAX).toBe(15);
+    expect(foeStageLimit(1)).toBe(15);
+    expect(foeStageLimit(3)).toBe(13);
+    expect(foeStageLimit(5)).toBe(11);
+    // The controlled figure always stands, so a party of none counts as one.
+    expect(foeStageLimit(0)).toBe(15);
   });
 
-  it("steps each foe left so exactly the exposed share of it shows past the one in front", () => {
-    const slots = foeSlots(3);
-    expect(slots[0].right).toBe(0);
-    for (let i = 1; i < slots.length; i += 1) {
-      const frontLeft = slots[i - 1].right + slots[i - 1].scale;
-      const backLeft = slots[i].right + slots[i].scale;
-      expect(backLeft - frontLeft).toBeCloseTo(FOE_EXPOSED * slots[i].scale, 10);
-      expect(slots[i].lift).toBeGreaterThan(slots[i - 1].lift);
-      expect(slots[i].z).toBeLessThan(slots[i - 1].z);
-    }
-    expect(foeLineupSpan(0)).toBe(0);
-    expect(foeLineupSpan(1)).toBe(1);
-    expect(foeLineupSpan(3)).toBeCloseTo(slots[2].right + slots[2].scale, 10);
-    expect(foeLineupSpan(2)).toBeLessThan(foeLineupSpan(3));
-  });
-
-  it("selects the active foes in presenter order and computes the gauge", () => {
+  it("selects the active foes in presenter order", () => {
     const participants = [
       foe(1),
       { ...foe(2), team: "party" },
@@ -435,9 +388,5 @@ describe("the line-up geometry", () => {
     ];
     expect(activeFoes(participants).map((p) => p.identity)).toEqual([1, 6]);
     expect(activeFoes(null)).toEqual([]);
-    expect(foeHpPercent({ hp_current: 30, hp_maximum: 60 })).toBe(50);
-    expect(foeHpPercent({ hp_current: 90, hp_maximum: 60 })).toBe(100);
-    expect(foeHpPercent({ hp_current: 1, hp_maximum: 0 })).toBe(0);
-    expect(foeHpPercent({ hp_current: null, hp_maximum: 60 })).toBeNull();
   });
 });

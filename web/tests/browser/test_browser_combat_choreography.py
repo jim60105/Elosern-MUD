@@ -301,7 +301,7 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
         "webclient-contextual-hud::vitals-read-as-one-numeral-readout-over-three-thin-trailing-bar-lines",
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )
     def test_beat_gestures_full_motion(self):
         """At `full` the player steps in, the foe shakes and flashes with a
@@ -355,7 +355,7 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
     )
     def test_beat_gestures_reduced(self):
         """At `reduced` nothing steps, shakes, or brightens, no number shows,

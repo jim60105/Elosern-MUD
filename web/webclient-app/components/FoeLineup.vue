@@ -1,19 +1,19 @@
 <script setup>
-// FoeLineup (OpenSpec change webclient-combat-foes-on-stage, design D1-D5;
-// the AVG stage design §4 and §10.2): the combat foes standing opposite the
-// player in the `actor-right` anchor.
-// - At most three foes, in presenter order, as one `StageActor` each
-//   (`side="right"`, never dimmed); further foes stand only in the
-//   participant frame, which stays the complete numbers panel.
-// - A depth-staged row (foe-lineup.js): the first foe stands in front at the
-//   anchor's right edge, and each later foe stands behind the one before it,
-//   further toward the stage centre and smaller. The whole row steps in from
-//   the anchor until the front foe's face clears the participant frame
-//   (`--foe-face-clear`).
-// - Each foe carries a decorative hit-point gauge on the stage floor (the
-//   same baseline as the scene caption) with a trailing bar that makes damage
-//   visible; names and non-colour cues sit above it, while HP numerals,
-//   tokens and participant states remain in the frame.
+// FoeLineup (OpenSpec changes webclient-combat-foes-on-stage and
+// webclient-combat-formation, design D1/D3/D4): the combat foes standing
+// opposite the party.
+// - Every active foe up to the line-up's maximum (`max`, 16 minus the drawn
+//   party, never above FOE_STAGE_MAX), in presenter order, as one
+//   `StageActor` each (`side="right"`, never dimmed).
+// - In combat the `actor-right` anchor spans the stage, so each slot stands
+//   at the box the combat formation engine gives it (`formation.figures`,
+//   stage pixels) at the scale the party shares; a re-formed line glides
+//   every slot's box together (`glide`), and the shell's formation glide
+//   (composables/use-formation-glide.js) drives the inner `.formation-figure`
+//   wrapper when a foe appears, so its height matches every other figure's
+//   in every frame.
+// - Names, hit points and cues live on the figure plates (FigurePlate.vue in
+//   the stage's `plates` layer), not on the stage floor.
 // - Each foe's figure is the canonical artwork descriptor its combat
 //   participant row's catalog reference names, resolved against the committed
 //   `art` panel — or, while a held round stands the pre-round roster after
@@ -23,17 +23,17 @@
 // - Each slot exposes `data-portrait-ref`, the art-catalog key the combat
 //   beats name, so the beat presentation can address a foe.
 // - A foe joining or leaving the active set inside combat enters or fades
-//   (`TransitionGroup name="foe"`); the others glide to their new places.
-//   The leaving slot is inert from the commit on.
+//   (`TransitionGroup name="foe"`); the leaving slot is inert from the commit
+//   on and fades where it stands.
 // - While a combat round plays (webclient-combat-beat-choreography D5), the
 //   row stands the round's pre-round foes (`stage.foes`), so a foe the round
 //   defeats stays until its own defeat beat; each foe plays its beat gesture
-//   (`stage.gestures`), and each gauge follows the displayed hit points.
+//   (`stage.gestures`).
 // Decorative art: no focusable element, no pointer events, hidden from
-// assistive technology (the frame is the accessible list of participants).
+// assistive technology (the plates carry each foe's accessible reading).
 import { computed } from "vue";
 import StageActor from "./StageActor.vue";
-import { FOE_LINEUP_MAX, foeHpPercent, foeSlots } from "./foe-lineup.js";
+import { FOE_STAGE_MAX } from "./foe-lineup.js";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
@@ -44,15 +44,19 @@ const props = defineProps({
   artPanel: { type: Object, default: null },
   // The EFFECTIVE motion level: at `off` the transitions have no CSS phase.
   motionLevel: { type: String, default: "full" },
-  // The cap (three); stories and tests pass it only to show the cap.
-  max: { type: Number, default: FOE_LINEUP_MAX },
+  // The line-up's maximum: 16 minus the drawn party (AppClient), never above
+  // FOE_STAGE_MAX.
+  max: { type: Number, default: FOE_STAGE_MAX },
   // The playing round's stage (`view.beatStage`), or null: its `foes` stand
   // instead of `foes`, and its `gestures` animate them.
   stage: { type: Object, default: null },
-  // The hit points the playing round displays (`view.displayHp`), keyed by
-  // portrait reference, or null.
-  displayHp: { type: Object, default: null },
-  focusedTarget: { type: [Number, String], default: null },
+  // The engine's foe side (`formation.foes`: `{ figures: [{ box, z }] }`),
+  // or null outside a measured formation (stories, layout-free tests): the
+  // slots then fall back to an unpositioned default.
+  formation: { type: Object, default: null },
+  // Whether a re-formed line glides (false on a resize, a reconnect, and
+  // below `full`).
+  glide: { type: Boolean, default: true },
 });
 
 // `settled` fires when a foe that left the row has finished fading (at `off`,
@@ -60,9 +64,8 @@ const props = defineProps({
 const emit = defineEmits(["settled"]);
 
 const shown = computed(() =>
-  (props.stage ? props.stage.foes : props.foes).slice(0, Math.min(props.max, FOE_LINEUP_MAX)),
+  (props.stage ? props.stage.foes : props.foes).slice(0, Math.min(props.max, FOE_STAGE_MAX)),
 );
-const slots = computed(() => foeSlots(shown.value.length));
 
 // The raw catalog entry the participant's `portrait_ref` names: a pending
 // entry keeps its own placeholder card, and a null or unknown reference
@@ -95,26 +98,25 @@ function panelFor() {
   return props.stage?.foeCatalog ? { available: true, portrait_catalog: props.stage.foeCatalog } : null;
 }
 
+// The slot's box: the engine's stage-pixel box and paint order, or nothing
+// (the CSS default) without a formation.
 function slotStyle(index) {
-  const slot = slots.value[index];
+  const figure = props.formation?.figures?.[index];
+  if (!figure) {
+    return { "--foe-index": index, zIndex: shown.value.length - index };
+  }
+  const { left, top, width, height } = figure.box;
   return {
     "--foe-index": index,
-    "--foe-scale": slot.scale,
-    "--foe-lift": slot.lift,
-    bottom: `${slot.lift * 100}%`,
-    height: `${slot.scale * 100}%`,
-    right: `${slot.right * 100}%`,
-    zIndex: slot.z,
+    left: `${left}px`,
+    top: `${top}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+    zIndex: figure.z,
+    // The beat step, cut to the space before the next head (the engine's
+    // `lunge`), so a foe acting in a round never leans over a neighbour's head.
+    "--motion-beat-lunge": `${figure.lunge ?? 0}px`,
   };
-}
-
-// The gauge reads the displayed value while a round plays, else the
-// committed one.
-function gaugeWidth(participant) {
-  const ref = participant.portrait_ref;
-  const displayed = ref == null ? undefined : props.displayHp?.[ref];
-  const row = typeof displayed === "number" ? { ...participant, hp_current: displayed } : participant;
-  return `${foeHpPercent(row) ?? 0}%`;
 }
 
 // The foe's beat gesture for the current step, or null.
@@ -129,7 +131,8 @@ function gestureFor(participant) {
     class="foe-lineup"
     data-testid="foe-lineup"
     :data-count="shown.length"
-    :style="{ '--foe-front-scale': slots[0]?.scale ?? 1 }"
+    :data-formation="formation ? 'true' : null"
+    :data-glide="glide ? 'true' : 'false'"
     aria-hidden="true"
   >
     <TransitionGroup
@@ -142,30 +145,26 @@ function gestureFor(participant) {
         v-for="(p, i) in shown"
         :key="p.identity"
         class="foe-lineup__slot"
-        :class="{ 'foe-lineup__slot--before': i < shown.length - 1 }"
         data-testid="foe-slot"
+        :data-identity="p.identity"
+        :data-rank="formation?.figures?.[i]?.rank ?? null"
         :data-portrait-ref="p.portrait_ref ?? ''"
         :data-beat="gestureFor(p)?.gesture ?? null"
-        :data-acting="gestureFor(p)?.gesture === 'lunge' ? 'true' : null"
-        :data-target="focusedTarget != null && String(focusedTarget) === String(p.identity) ? 'true' : null"
         :style="slotStyle(i)"
       >
-        <StageActor
-          :artwork="entryFor(p)"
-          :panel="panelFor()"
-          :has-reference="p.portrait_ref !== null && p.portrait_ref !== undefined"
-          :name="p.display_name"
-          side="right"
-          :dimmed="false"
-          :motion-level="motionLevel"
-          :gesture="gestureFor(p)?.gesture ?? null"
-          :gesture-key="stage?.key ?? null"
-          :float-amount="gestureFor(p)?.amount ?? null"
-        />
-        <div class="foe-lineup__name" :title="p.display_name">{{ p.display_name }}</div>
-        <div class="foe-lineup__gauge" data-testid="foe-gauge">
-          <span class="foe-lineup__ghost" :style="{ width: gaugeWidth(p) }"></span>
-          <span class="foe-lineup__fill" :style="{ width: gaugeWidth(p) }"></span>
+        <div class="formation-figure" :data-glide-key="`foe:${p.identity}`">
+          <StageActor
+            :artwork="entryFor(p)"
+            :panel="panelFor()"
+            :has-reference="p.portrait_ref !== null && p.portrait_ref !== undefined"
+            :name="p.display_name"
+            side="right"
+            :dimmed="false"
+            :motion-level="motionLevel"
+            :gesture="gestureFor(p)?.gesture ?? null"
+            :gesture-key="stage?.key ?? null"
+            :float-amount="gestureFor(p)?.amount ?? null"
+          />
         </div>
       </div>
     </TransitionGroup>
@@ -173,145 +172,81 @@ function gestureFor(participant) {
 </template>
 
 <style>
-/* The row (design D2): the anchor's box, stepped in from the anchor's right
-   edge until the front foe's face clears the participant frame
-   (`--foe-face-clear`, tokens.css). Slots are absolutely placed inside it; their
-   percentages are of the anchor (height for heights, width for offsets). */
+/* The row spans its anchor; in combat the anchor spans the stage (HudFrame,
+   `data-formation`), so slot boxes are stage coordinates. */
 .foe-lineup {
   position: absolute;
-  bottom: 0;
-  right: calc(
-    max(var(--actor-right-inset), var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3) -
-      var(--actor-right-inset)
-  );
-  width: 100%;
-  height: 100%;
+  inset: 0;
   pointer-events: none;
-  /* The front foe's scale sets the inset, so a new front foe (the old one
-     fell) glides the row in step with its slots. */
-  transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
 }
 
-/* One foe. Re-slotting (a foe joining or leaving) glides the others to their
-   new place and size through `right` and `height`; the base transition never
-   names `transform`, so TransitionGroup's FLIP move stays off (a FLIP would
-   move the box but jump its size). Below `full` the glide is instant. */
+/* One foe at its formation box. A re-formed line glides every box on the
+   shared travel duration and easing (the party's slots use the same rule),
+   so both sides change size together; the base transition never names
+   `transform`, so TransitionGroup's FLIP move stays off (a FLIP would move
+   the box but jump its size). Below `full`, on a resize and on a reconnect
+   the change is instant. Without a formation (a standalone story) the foes
+   stand at full height leftward from the anchor's right edge. */
 .foe-lineup__slot {
   position: absolute;
+  right: 0;
   bottom: 0;
+  height: 100%;
   aspect-ratio: 2 / 3;
   transition:
-    right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
-    bottom calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    left calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    top calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    width calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
     height calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
 }
-.foe-lineup__slot > .stage-actor {
+.foe-lineup:not([data-formation="true"]) > .foe-lineup__slot {
+  right: calc(var(--foe-index, 0) * 55%);
+}
+.foe-lineup[data-formation="true"] > .foe-lineup__slot {
+  right: auto;
+  bottom: auto;
+  aspect-ratio: auto;
+}
+.foe-lineup[data-glide="false"] > .foe-lineup__slot {
+  transition: none;
+}
+.foe-lineup__slot > .formation-figure,
+.foe-lineup__slot > .formation-figure > .stage-actor {
   height: 100%;
+}
+.foe-lineup__slot > .formation-figure {
+  position: relative;
 }
 /* Depth: a foe that stands in front of another casts a soft shadow onto it,
    so overlapping figures separate even when their art shares a backdrop. */
-.foe-lineup__slot--before .reference-artwork {
-  filter: drop-shadow(calc(-14px * var(--ui-scale)) 0 calc(18px * var(--ui-scale)) rgba(4, 3, 6, 0.55));
+.foe-lineup__slot:not(:last-child) .reference-artwork {
+  filter: drop-shadow(calc(-10px * var(--ui-scale)) 0 calc(14px * var(--ui-scale)) rgba(4, 3, 6, 0.5));
 }
 
-
-/* The placeholder at the slot's scale: the ring and the initial shrink with
-   the figure, so a back foe's placeholder never looks larger than its body. */
-.foe-lineup .stage-actor .reference-artwork__placeholder-glyph {
-  width: calc(clamp(88px * var(--ui-scale), 11vh, 132px * var(--ui-scale)) * var(--foe-scale, 1));
-  font-size: calc(clamp(44px * var(--ui-scale), 5.6vh, 66px * var(--ui-scale)) * var(--foe-scale, 1));
+/* The placeholder at the formation's scale: the ring and the initial shrink
+   with the figure, so a small figure's placeholder never looks larger than
+   its body; the label never drops below the 16px chrome floor
+   (webclient-vue-application "Chrome type is legible and numerals are
+   stable"). Where foes overlap, the label leaves: each foe's plate names it. */
+.foe-lineup[data-formation="true"] .stage-actor .reference-artwork__placeholder-glyph {
+  width: calc(clamp(88px * var(--ui-scale), 11vh, 132px * var(--ui-scale)) * var(--formation-scale, 1));
+  font-size: calc(clamp(44px * var(--ui-scale), 5.6vh, 66px * var(--ui-scale)) * var(--formation-scale, 1));
 }
-.foe-lineup .stage-actor .reference-artwork__placeholder-label {
-  /* The label shrinks with the figure, but never below the shipped floor:
-     0.86 × --text-md is 15.48px at the reference scale, and
-     webclient-vue-application "Chrome type is legible and numerals are stable"
-     forbids any surface carrying a reference-scale step below 16 CSS px. */
-  font-size: max(var(--text-xs), calc(var(--text-md) * var(--foe-scale, 1)));
+.foe-lineup[data-formation="true"] .stage-actor .reference-artwork__placeholder-label {
+  font-size: max(var(--text-xs), calc(var(--text-md) * var(--formation-scale, 1)));
 }
-
-/* The decorative hit-point gauge (design D5; AVG stage design §10.2): a slim
-   track on the stage floor, on the scene caption's baseline above the
-   expanded command-line row, centred under the figure. A dark trough with the
-   caption plate's gold hairline keeps it legible over light and dark art; the
-   fill is the vitals' hit-point red, and the pale trailing bar lags behind a
-   drop so the damage shows as a gap (the vitals' own trail tokens). */
-.foe-lineup__name,
-.foe-lineup__gauge {
-  position: absolute;
-  left: 50%;
-  bottom: calc(var(--command-line-h, calc(44px * var(--ui-scale))) + 12px * var(--ui-scale) + (var(--scene-caption-h, calc(34px * var(--ui-scale))) - calc(8px * var(--ui-scale))) / 2 - var(--actor-h) * var(--foe-lift, 0));
-  width: clamp(72px * var(--ui-scale), 44%, 168px * var(--ui-scale));
-}
-.foe-lineup__name {
-  transform: translateX(-50%);
-  margin-bottom: calc(13px * var(--ui-scale));
-  padding: 2px calc(4px * var(--ui-scale));
-  box-sizing: border-box;
-  background: rgba(8, 7, 10, 0.88);
-  color: var(--paper-50);
-  font: var(--text-sm)/1.3 var(--f-serif);
-  text-align: center;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  border-bottom: 2px solid transparent;
-}
-.foe-lineup__slot[data-target="true"] .foe-lineup__name {
-  border-inline: calc(3px * var(--ui-scale)) solid var(--paper-50);
-}
-.foe-lineup__slot[data-acting="true"] .foe-lineup__name {
-  border-bottom: calc(3px * var(--ui-scale)) double var(--paper-50);
-}
-.foe-lineup__gauge {
-  height: calc(8px * var(--ui-scale));
-  box-sizing: border-box;
-  transform: translateX(-50%);
-  padding: 1px;
-  border: 1px solid rgba(202, 183, 138, 0.42);
-  border-radius: var(--radius-pill);
-  background: rgba(8, 7, 10, 0.82);
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 calc(3px * var(--ui-scale)) calc(10px * var(--ui-scale)) rgba(0, 0, 0, 0.65);
-  overflow: hidden;
-}
-.foe-lineup__ghost,
-.foe-lineup__fill {
-  position: absolute;
-  top: 1px;
-  bottom: 1px;
-  left: 1px;
-  max-width: calc(100% - 2px);
-  border-radius: var(--radius-pill);
-}
-.foe-lineup__ghost {
-  background: rgba(244, 226, 200, 0.55);
-  transition: width var(--motion-trail) ease var(--motion-trail-delay);
-}
-.foe-lineup__fill {
-  background: linear-gradient(90deg, #7c2026, #b8342e 45%, var(--vit-hp));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.22);
-  transition: width var(--motion-slow) var(--ease-standard);
-}
-
-/* A defeated foe's gauge thins away with its figure
-   (webclient-combat-beat-choreography D5), so the slot that leaves after
-   the defeat beat is already empty. */
-.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__gauge,
-.foe-lineup__slot[data-beat="defeat"] > .foe-lineup__name {
-  opacity: 0;
-  transition: opacity var(--motion-beat-defeat) var(--ease-exit);
+.foe-lineup[data-formation="true"]:not([data-count="1"]) .reference-artwork__identity,
+.foe-lineup[data-formation="true"]:not([data-count="1"]) .reference-artwork__placeholder-label {
+  display: none;
 }
 
 /* Membership inside combat (design D3): a joining foe slides in from the
    right as it fades in; a leaving foe (defeated, fled) fades where it stands
-   while the others glide into its place. */
+   while the others glide into their new places. */
 .foe-lineup > .foe-enter-active {
   transition:
     opacity var(--motion-actor) var(--ease-standard),
-    transform var(--motion-actor) var(--ease-enter),
-    right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
-    height calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
+    transform var(--motion-actor) var(--ease-enter);
 }
 .foe-lineup > .foe-leave-active {
   transition: opacity var(--motion-actor) var(--ease-exit);

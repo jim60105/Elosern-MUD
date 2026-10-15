@@ -187,10 +187,11 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         "avatar-artwork-presentation::compact-avatar-failures-remain-accessible"
     )
     def test_roster_presence_party_participant_fallback_is_accessible(self) -> None:
-        """Switcher, presence, party and combat avatars share one renderer: a
+        """Switcher, presence and party avatars share one renderer: a
         real-only attempt whose browser decode failure keeps the grapheme
         initial, a persistent keyboard-reachable explanation, and no alpha
-        terminal resource."""
+        terminal resource. Combat renders no avatar since the participant
+        frame left (webclient-combat-formation)."""
         page = self.new_page((1451, 790), "off")
         # Installed BEFORE the client opens: the avatar surfaces' first real
         # attempts are already the intercepted ones.
@@ -282,54 +283,24 @@ class AvatarArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             page.evaluate("() => document.activeElement.tagName === 'BUTTON'")
         )
 
-        # --- a deterministic combat participant row (standalone marker) -------
+        # --- combat: no participant avatar remains --------------------------
+        # webclient-combat-formation removed the participant frame, whose rows
+        # were the combat avatar surface this journey once checked. The
+        # participants are now the stage's figures, each non-controlled one
+        # with a glance plate that names it in text; no combat avatar renders
+        # at all, so none can lose its initial or its explanation.
         page.keyboard.press("Escape")
         target = combat_journey_values()["engage_target"]
         page.evaluate("([t]) => Evennia.msg('text', [`engage ${t}`], {})", [target])
         wait_for_store_state(page, lambda s: s.get("mode") == "combat", timeout=30000)
-        page.wait_for_selector(f"{PARTICIPANT_FRAME} {AVATAR}", timeout=30000)
+        page.wait_for_selector('[data-anchor="plates"] [data-testid="figure-plate"]', timeout=30000)
+        self.assertEqual(page.locator(PARTICIPANT_FRAME).count(), 0)
+        self.assertEqual(page.locator(f'[data-anchor="plates"] {AVATAR}').count(), 0)
         participants = store_state(page)["panels"]["context_actions"]["participants"]
-        row = next(
-            (
-                p
-                for p in participants
-                if p.get("team") == "party"
-                and p.get("portrait_ref") in admitted
-                and p.get("display_name")
-            ),
-            None,
-        )
-        self.assertIsNotNone(
-            row, "the engaged battle must carry a party participant with a reference"
-        )
-        states = page.evaluate(
-            """() => Array.from(
-                 document.querySelectorAll('[data-testid="participant-frame"] [data-testid="avatar-artwork"]')
-               ).map((root) => {
-                 const initial = root.querySelector('[data-testid="avatar-artwork__initial"]');
-                 const marker = root.querySelector('[data-testid="artwork-failure"]');
-                 const img = root.querySelector('img');
-                 return {
-                   initial: initial ? initial.textContent : null,
-                   markerTag: marker ? marker.tagName : null,
-                   imgSrc: img ? img.getAttribute('src') : null,
-                 };
-               })"""
-        )
-        self.assertTrue(states)
-        # The row itself carries no test id (the frozen hook is the frame), so
-        # the participant is identified by its own displayed initial beside the
-        # marker the reached fault keeps.
-        expected_initial = self._initial_of(row["display_name"])
-        matched = [
-            s for s in states if s["initial"] == expected_initial and s["markerTag"] == "BUTTON"
-        ]
-        self.assertTrue(
-            matched, f"no participant avatar for {row['display_name']!r}: {states}"
-        )
-        combat = matched[0]
-        if combat["imgSrc"] is not None:
-            self.assertFalse(combat["imgSrc"].startswith(_ALPHA_PREFIX))
+        for row in participants:
+            plate = page.locator(f'[data-testid="figure-plate"][data-identity="{row["identity"]}"]')
+            if plate.count():
+                self.assertIn(row["display_name"], plate.first.get_attribute("aria-label"))
 
         # The real attempts were observed: the interception really exercised the
         # seeded gallery cards, so the fallbacks above are a decode failure and

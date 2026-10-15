@@ -231,7 +231,9 @@
   --motion-shift-lg: 32px;
   /* The combat beat distances: each is multiplied by `--motion-travel` where
      it is used, so `reduced` and `off` move nothing. */
-  --motion-beat-lunge: 24px;
+  /* The step stays inside the 16px·S gutter beside the command card's
+     columns (webclient-combat-formation D4b). */
+  --motion-beat-lunge: calc(12px * var(--ui-scale));
   --motion-beat-shake: 6px;
   --motion-beat-rise: 48px;
   --ease-standard: cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -281,16 +283,6 @@
   --actor-h: min(62vh, 680px * var(--ui-scale), calc(100vh - var(--header-h) - var(--band-h)));
   --actor-left-inset: max(6vw, calc(var(--left-column) + 8px * var(--ui-scale) - var(--actor-h) / 3));
   --actor-right-inset: max(6vw, calc(312px * var(--ui-scale) - var(--actor-h) / 3));
-  /* In combat the right-hand island is the compact participant frame, within
-     the `map` anchor's `--right-column - 28px` column (the column's left edge
-     `--right-column - 12px` from the stage's right edge) — much wider than
-     the minimap card. The foe line-up (webclient-combat-foes-on-stage) steps
-     in until its front foe's face clears that column; at short viewports the
-     token also keeps the floor name/gauge clear of the frame. Its inset is
-     `max(var(--actor-right-inset), var(--foe-face-clear) - <front slot width> / 2)`,
-     written where the front foe's scale is known (FoeLineup.vue and the
-     scene caption's rule in app-shell.css). */
-  --foe-face-clear: calc(var(--right-column) + 24px * var(--ui-scale));
 
   /* ---- shape & chrome ---- */
   /* The radius ladder (webclient-proportional-ui-scale): every ordinary
@@ -368,15 +360,6 @@
    --z-offline: 9000;
 }
 
-/* Short viewports (the stage box is 471px tall at 1280x720): a full
-   encounter's participant frame reaches down to the stage floor, so the foe
-   line-up steps in further, until the front foe's floor gauge — not only its
-   face — clears the frame (webclient-combat-foes-on-stage). */
-@media (max-height: 820px) {
-  :root {
-    --foe-face-clear: calc(var(--right-column) + 48px * var(--ui-scale));
-  }
-}
 
 /* H5: colorblind-safe status palette. The settings surface's colorblind
    override sets `data-colorblind="on"` on `<html>`; this block swaps the

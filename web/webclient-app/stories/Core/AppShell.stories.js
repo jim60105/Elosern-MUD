@@ -223,12 +223,32 @@ const MODE_JOURNEY_DIALOGUE_CLOSED = {
 };
 
 // The combat panel with `foes` active foes (webclient-combat-foes-on-stage):
-// the player's side, then the foes in presenter order, each with a catalog
-// portrait; `overrides` edits a foe by identity (a defeat, a missing ref).
-const combatPanelWith = (foes, overrides = {}) =>
-  protocolFixtures.combatActions({ ...combatRoster([...PARTY_PARTICIPANTS, ...foeParticipants(foes, overrides)]) });
+// the player's side — the player and the first `companions` slots of the
+// full party sample, so every drawn companion has its participant row and
+// its plate its numbers (webclient-combat-formation) — then the foes in
+// presenter order, each with a catalog portrait; `overrides` edits a foe by
+// identity (a defeat, a missing ref).
+const partyParticipants = (companions) => [
+  PARTY_PARTICIPANTS[0],
+  ...PARTY_PANEL_FULL_SAMPLE.slots.slice(0, companions).map((slot, index) => ({
+    identity: slot.identity,
+    token: `a${index + 2}`,
+    display_name: slot.display_name,
+    team: "party",
+    state: "active",
+    hp_current: slot.hp_current,
+    hp_maximum: slot.hp_maximum,
+    portrait_ref: slot.portrait_ref,
+    conditions: [],
+  })),
+];
+const combatPanelWith = (foes, overrides = {}, companions = 2) =>
+  protocolFixtures.combatActions({ ...combatRoster([...partyParticipants(companions), ...foeParticipants(foes, overrides)]) });
 const combatRoster = (participants) => ({ participants, skills: combatSkills(participants) });
-const combatArt = (art) => ({ ...art, portrait_catalog: { ...(art.portrait_catalog || {}), ...FOE_PORTRAIT_CATALOG } });
+const combatArt = (art) => ({
+  ...art,
+  portrait_catalog: { ...(art.portrait_catalog || {}), ...COMPANION_PORTRAIT_CATALOG, ...FOE_PORTRAIT_CATALOG },
+});
 
 const renderPlayer = (args) => ({
   setup() {
@@ -238,6 +258,7 @@ const renderPlayer = (args) => ({
     let app;
     let bridge;
     let journeyTimer = null;
+    let savedStorage = null;
     onMounted(async () => {
       app = createApp(AppClient);
       app.use(pinia);
@@ -246,6 +267,12 @@ const renderPlayer = (args) => ({
       store.beginTransport(1);
       store.setConnected(true);
       store.setLoggedIn(true);
+      // A story's motion level must not outlive it: the store persists the
+      // choice, so the page's storage is restored on unmount.
+      if (args.motionLevel) {
+        savedStorage = Object.keys(window.localStorage).map((key) => [key, window.localStorage.getItem(key)]);
+        store.setMotionLevel(args.motionLevel);
+      }
       const snapshot = protocolFixtures.snapshot({
         mode: args.dialogue ? "dialogue" : args.combat ? "combat" : "exploration",
         panels: {
@@ -305,7 +332,7 @@ const renderPlayer = (args) => ({
               }] : []),
             ],
           }),
-          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat) : protocolFixtures.explorationActions({
+          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat, {}, args.companions ?? 2) : protocolFixtures.explorationActions({
             suggestions: { status: "ready", cards: [
               { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
               { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
@@ -553,8 +580,13 @@ const renderPlayer = (args) => ({
       // `autoplay` walks on its own.
       if (args.modeJourney) {
         let revision = 1;
-        const art = { ...ART_PANEL_SAMPLE, scene: stageJourneyScene(STAGE_JOURNEY_STOPS[2]), portrait_catalog: { ...MODE_JOURNEY_CATALOG, ...FOE_PORTRAIT_CATALOG } };
+        const art = {
+          ...ART_PANEL_SAMPLE,
+          scene: stageJourneyScene(STAGE_JOURNEY_STOPS[2]),
+          portrait_catalog: { ...MODE_JOURNEY_CATALOG, ...COMPANION_PORTRAIT_CATALOG, ...FOE_PORTRAIT_CATALOG },
+        };
         const foes = args.modeJourneyFoes || 3;
+        const companions = args.populated ? args.companions ?? 2 : 0;
         const commit = (mode, panels, line) => {
           revision += 1;
           store.receive(1, "ui_update", [protocolFixtures.update({ revision, mode, panels })], {});
@@ -571,20 +603,20 @@ const renderPlayer = (args) => ({
           },
           fight: () => {
             store.appendText("in", "攻擊灰袍盜賊");
-            commit("combat", { context_actions: combatPanelWith(foes) }, "灰袍盜賊猛然掀翻木桌，短刀在火光中一閃！");
+            commit("combat", { context_actions: combatPanelWith(foes, {}, companions) }, "灰袍盜賊猛然掀翻木桌，短刀在火光中一閃！");
           },
           // Inside combat (webclient-combat-foes-on-stage): the front foe is
           // defeated, fades where it stands, and the others step forward.
           defeat: () => {
             store.appendText("in", "攻擊灰袍盜賊");
-            commit("combat", { context_actions: combatPanelWith(foes, { 31: { state: "defeated", hp_current: 0 } }) }, "灰袍盜賊踉蹌倒地，再也沒有起來。");
+            commit("combat", { context_actions: combatPanelWith(foes, { 31: { state: "defeated", hp_current: 0 } }, companions) }, "灰袍盜賊踉蹌倒地，再也沒有起來。");
           },
           flee: () => {
             store.appendText("in", "逃跑");
             commit("exploration", { context_actions: protocolFixtures.explorationActions() }, "你撞開後門衝進夜色，身後的叫罵聲漸漸遠去。");
           },
         };
-        const order = ["talk", "leave", "fight", "defeat", "flee"];
+        const order = args.modeJourneyOrder || ["talk", "leave", "fight", "defeat", "flee"];
         let next = 0;
         const go = (name) => {
           const key = name || order[next];
@@ -609,6 +641,10 @@ const renderPlayer = (args) => ({
     });
     onBeforeUnmount(() => {
       if (journeyTimer !== null) clearInterval(journeyTimer);
+      if (savedStorage) {
+        window.localStorage.clear();
+        savedStorage.forEach(([key, value]) => window.localStorage.setItem(key, value));
+      }
       if (window.__stageJourney && host.value?.__stageJourney === window.__stageJourney) delete window.__stageJourney;
       if (window.__modeJourney && host.value?.__modeJourney === window.__modeJourney) delete window.__modeJourney;
       if (window.__participantPolish && host.value?.__participantPolish === window.__participantPolish) delete window.__participantPolish;
@@ -673,19 +709,43 @@ export const ExplorationCompanionFocusRestored = {
 };
 export const DialogueFullParty = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true } };
 export const DialogueCompanionSpeaks = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true, companionSpeaks: true } };
-// Combat: the minimap and the objective line are hidden, and the participant
-// frame takes the `map` anchor.
+// Combat: the `map` anchor (place card, minimap, objective line) is hidden,
+// and both sides stand in one shared-scale formation with glance plates.
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
-// Six rows, three standing foes, long identity and pending thumbnail. The
+// Four foes (one defeated), a long foe name ellipsized on its plate. The
 // offline journey exposes round()/round(true) for normal/terminal playback.
 export const CombatParticipantPolish = { render: renderPlayer, args: { combat: 4, participantPolish: true } };
 // The foe line-up (webclient-combat-foes-on-stage) with one foe, and with
-// five, of whom three stand on the stage while the frame lists all five.
+// five, every one of whom stands in the formation.
 export const CombatOneFoe = { render: renderPlayer, args: { combat: 1 } };
 export const GroundedOneFoe = { render: renderPlayer, args: { combat: 1, grounding: "missing" } };
 export const GroundedTwoFoes = { render: renderPlayer, args: { combat: 2, grounding: "pending" } };
 export const GroundedThreeFoes = { render: renderPlayer, args: { combat: 3, grounding: "failed" } };
 export const CombatFiveFoes = { render: renderPlayer, args: { combat: 5 } };
+// The combat formation (webclient-combat-formation design D6): the corners
+// of the party × foe matrix, each at the shared scale the engine picks for
+// the viewport — review them at 1451x790 and at 1600x900. The party is the
+// player plus `companions`; foes run up to the participant cap (16).
+export const CombatSoloOneFoe = { render: renderPlayer, args: { combat: 1, companions: 0 } };
+export const CombatSoloFifteenFoes = { render: renderPlayer, args: { combat: 15, companions: 0 } };
+export const CombatThreeFiguresFiveFoes = { render: renderPlayer, args: { combat: 5, companions: 2 } };
+export const CombatFullPartyOneFoe = { render: renderPlayer, args: { combat: 1, companions: 4 } };
+export const CombatFullPartyEightFoes = { render: renderPlayer, args: { combat: 8, companions: 4 } };
+export const CombatFullPartyElevenFoes = { render: renderPlayer, args: { combat: 11, companions: 4 } };
+// Exploration → combat → exploration at `full`: the party glides and scales
+// from its exploration row into the formation while the foes enter at the
+// same height as the flash releases, then the plates rise; leaving combat
+// glides the party back. `__modeJourney.go('fight' | 'defeat' | 'flee')`.
+export const CombatEnterJourney = {
+  render: renderPlayer,
+  args: { modeJourney: true, autoplay: true, populated: true, companions: 2, modeJourneyFoes: 5, modeJourneyOrder: ["fight", "defeat", "flee"] },
+};
+// The same journey at `reduced`: every figure takes its final box in the
+// commit's frame; only entering and leaving figures and plates fade.
+export const CombatReducedMotion = {
+  render: renderPlayer,
+  args: { modeJourney: true, autoplay: true, populated: true, companions: 2, modeJourneyFoes: 5, modeJourneyOrder: ["fight", "defeat", "flee"], motionLevel: "reduced" },
+};
 // The stage transitions (webclient-scene-transitions): a walk down a short
 // street. Each step crossfades the scene once the next painting is decoded,
 // slides the place card's new heading in, pans the minimap from the node the

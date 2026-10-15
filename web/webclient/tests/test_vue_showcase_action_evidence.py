@@ -152,7 +152,7 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Action/SkillUseDock",
                 "Data/StatusPanel",
                 "Data/VitalsTrack", "Data/SkillBook",
-                "Data/ConditionChips", "Data/ParticipantFrame",
+                "Data/ConditionChips",
                 "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ShopPanel",
                 "World/QuestDrawer", "World/LoreCodexDrawer", "World/InventoryPanel",
@@ -222,6 +222,9 @@ class VueShowcaseActionEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The foe line-up (webclient-combat-foes-on-stage), the combat foes
                 # standing opposite the player on the stage.
                 "Core/FoeLineup",
+                # The combat figures' glance plates (webclient-combat-formation), which
+                # replaced the participant frame.
+                "Core/FigurePlate",
                 # The dialogue choice list (webclient-dialogue-choices-overlay), centred
                 # over the stage once the session line is read.
                 "Core/DialogueChoices",

@@ -69,6 +69,18 @@ const FOE_ROSTER = [
   [33, "e3", "蒙面刺客", "/art/defaults/woman.webp", 18, 50],
   [34, "e4", "見習盜賊", "/art/defaults/boy.webp", 30, 30],
   [35, "e5", "銷贓商人", "/art/defaults/elder.webp", 40, 40],
+  // The formation stories stand up to fifteen foes (webclient-combat-
+  // formation); three share a name, so their plates carry session tokens.
+  [36, "e6", "哥布林", "/art/defaults/monster_anon.webp", 24, 24],
+  [37, "e7", "哥布林", "/art/defaults/monster_anon.webp", 9, 24],
+  [38, "e8", "哥布林", "/art/defaults/monster_anon.webp", 24, 24],
+  [39, "e9", "狼", "/art/defaults/girl.webp", 32, 40],
+  [40, "e10", "盜賊斥候", "/art/defaults/boy.webp", 28, 28],
+  [41, "e11", "盜賊弓手", "/art/defaults/woman.webp", 20, 35],
+  [42, "e12", "盜賊術士", "/art/defaults/man.webp", 35, 35],
+  [43, "e13", "雇傭劍士", "/art/defaults/elder.webp", 50, 50],
+  [44, "e14", "雇傭槍兵", "/art/defaults/man.webp", 48, 50],
+  [45, "e15", "看門惡犬", "/art/defaults/monster_anon.webp", 30, 30],
 ];
 
 export const FOE_PORTRAIT_CATALOG = Object.freeze(

@@ -203,7 +203,9 @@ describe("motion tokens (webclient-motion-level)", () => {
       "--motion-beat-hit: 180ms;",
       "--motion-beat-float: 600ms;",
       "--motion-beat-defeat: 350ms;",
-      "--motion-beat-lunge: 24px;",
+      // The step stays inside the 16px·S gutter beside the command card's
+      // columns (webclient-combat-formation D4b): 24px would reach into them.
+      "--motion-beat-lunge: calc(12px * var(--ui-scale));",
       "--motion-beat-shake: 6px;",
       "--motion-beat-rise: 48px;",
       "--motion-trail-delay: 300ms;",

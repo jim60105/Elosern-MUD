@@ -354,15 +354,17 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
     @covers_requirement(
-        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits"
+        "webclient-contextual-hud::combat-figures-carry-glance-plates"
     )
-    def test_dock_and_participant_frame_geometry_at_both_desktop_viewports(self):
-        # H3 task 8.8: at both 1451x790 and 2560x1440, the dock panel must
-        # stay inside its anchor, the deepest combat frame's cast/confirm
-        # control must be reachable without clipping, and the participant
-        # frame must sit in the `map` anchor (never a portrait anchor) and
-        # intersect neither the dock, the narrative caption, nor the command
-        # line (webclient-avg-stage-hud-anchors design D4).
+    def test_dock_and_figure_plate_geometry_at_both_desktop_viewports(self):
+        # H3 task 8.8, migrated by webclient-combat-formation: at both
+        # 1451x790 and 2560x1440, the dock panel must stay inside its anchor
+        # and the deepest combat frame's cast/confirm control must be
+        # reachable without clipping. The participant frame these assertions
+        # once placed in the `map` anchor is gone: its replacement, each
+        # drawn figure's plate, sits in the `plates` layer (never a portrait
+        # anchor) and intersects neither the dock, the message window, the
+        # command line, the vitals dock nor the top band.
         for viewport in ((1451, 790), (2560, 1440)):
             with self.subTest(viewport=viewport):
                 page = self.logged_in_page(viewport)
@@ -382,24 +384,12 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
                 geo = page.evaluate(
                     """() => {
-                      const rectOf = (sel) => {
-                        const el = document.querySelector(sel);
+                      const box = (el) => {
                         if (!el) { return null; }
                         const r = el.getBoundingClientRect();
                         return { x: r.left, y: r.top, w: r.width, h: r.height };
                       };
-                      // The participant frame sits in the bounded `map` anchor
-                      // (`max-height` + `overflow-y:auto`), so only the portion
-                      // of the frame inside the anchor is visible.
-                      const clampTo = (inner, outer) => {
-                        if (!inner || !outer) { return inner; }
-                        const x = Math.max(inner.x, outer.x);
-                        const y = Math.max(inner.y, outer.y);
-                        const x2 = Math.min(inner.x + inner.w, outer.x + outer.w);
-                        const y2 = Math.min(inner.y + inner.h, outer.y + outer.h);
-                        if (x2 <= x || y2 <= y) { return null; }
-                        return { x, y, w: x2 - x, h: y2 - y };
-                      };
+                      const rectOf = (sel) => box(document.querySelector(sel));
                       const noIntersect = (a, b) => !(a && b)
                         || a.x >= b.x + b.w || b.x >= a.x + a.w
                         || a.y >= b.y + b.h || b.y >= a.y + a.h;
@@ -412,49 +402,52 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         && (r.y + r.h) <= window.innerHeight);
                       const dock = rectOf('#action-dock');
                       const anchor = rectOf('[data-testid="anchor-band-command"]');
-                      const mapAnchor = rectOf('[data-anchor="map"]');
-                      const participantRaw = rectOf('[data-testid="participant-frame"]');
-                      const participant = clampTo(participantRaw, mapAnchor);
                       const caption = rectOf('[data-testid="message-window"]');
                       const commandLine = rectOf('[data-anchor="command-line"]');
-                      const frameEl = document.querySelector('[data-testid="participant-frame"]');
-                      // The focused row of the committed frame: the pane-kind
-                      // variants mark focus with per-kind classes (the token
-                      // rows of the target frame carry only aria-selected).
+                      const vitals = rectOf('[data-anchor="vitals"]');
+                      // The top band is the stage's top strip, `--header-h`
+                      // tall (read from the stage's metrics probe).
+                      const stageBox = rectOf('[data-testid="elosern-stage"]');
+                      const header = rectOf('.stage-metrics > [data-metric="--header-h"]');
+                      const topBand = { x: stageBox.x, y: stageBox.y, w: stageBox.w, h: header.h };
+                      const plateEls = [...document.querySelectorAll('[data-testid="figure-plate"]')];
+                      const plates = plateEls.map(box);
                       const confirmEl = document.querySelector(
                         '.dock-menu [aria-selected="true"], ' +
                         '.dock-menu .dock-menu-item--focused');
-                      const confirmRect = confirmEl && confirmEl.getBoundingClientRect();
-                      const confirm = confirmRect
-                        ? { x: confirmRect.left, y: confirmRect.top,
-                            w: confirmRect.width, h: confirmRect.height }
-                        : null;
+                      const confirm = box(confirmEl);
                       return {
                         dockInsideAnchor: inside(dock, anchor),
                         confirmReachable: withinViewport(confirm),
-                        participantNoDock: noIntersect(participant, dock),
-                        participantNoCaption: noIntersect(participant, caption),
-                        participantNoCommandLine: noIntersect(participant, commandLine),
-                        participantVisible: !!participant,
-                        inMapAnchor: !!(frameEl && frameEl.closest('[data-anchor="map"]')),
-                        onActorRight: !!(frameEl && frameEl.closest('[data-anchor="actor-right"]')),
-                        hasParticipant: !!participantRaw,
+                        plateCount: plates.length,
+                        platesNoDock: plates.every((p) => noIntersect(p, dock)),
+                        platesNoCaption: plates.every((p) => noIntersect(p, caption)),
+                        platesNoCommandLine: plates.every((p) => noIntersect(p, commandLine)),
+                        platesNoVitals: plates.every((p) => noIntersect(p, vitals)),
+                        platesBelowTopBand: plates.every((p) => p.y >= topBand.y + topBand.h),
+                        platesVisible: plates.every(withinViewport),
+                        inPlatesLayer: plateEls.every((el) => !!el.closest('[data-anchor="plates"]')),
+                        onPortraitAnchor: plateEls.some((el) => !!el.closest('[data-anchor="actor-left"], [data-anchor="actor-right"]')),
+                        roster: !!document.querySelector('[data-testid="participant-frame"]'),
                         hasConfirm: !!confirm,
                         hasAnchor: !!anchor,
                       };
                     }"""
                 )
                 self.assertTrue(geo["hasAnchor"], f"missing dock anchor at {viewport}")
-                self.assertTrue(geo["hasParticipant"], f"missing participant frame at {viewport}")
                 self.assertTrue(geo["hasConfirm"], f"missing confirm control at {viewport}")
                 self.assertTrue(geo["dockInsideAnchor"], f"dock not inside anchor at {viewport}")
                 self.assertTrue(geo["confirmReachable"], f"confirm control clipped at {viewport}")
-                self.assertTrue(geo["participantNoDock"], f"participant frame intersects dock at {viewport}")
-                self.assertTrue(geo["participantNoCaption"], f"participant frame intersects caption at {viewport}")
-                self.assertTrue(geo["participantVisible"], f"participant frame has no visible box in its anchor at {viewport}")
-                self.assertTrue(geo["participantNoCommandLine"], f"participant frame intersects the command line at {viewport}")
-                self.assertTrue(geo["inMapAnchor"], f"participant frame is not in the map anchor at {viewport}")
-                self.assertFalse(geo["onActorRight"], f"participant frame sits on the actor-right anchor at {viewport}")
+                self.assertGreater(geo["plateCount"], 0, f"no figure plate at {viewport}")
+                self.assertFalse(geo["roster"], f"a participant roster renders at {viewport}")
+                self.assertTrue(geo["platesNoDock"], f"a plate intersects the dock at {viewport}")
+                self.assertTrue(geo["platesNoCaption"], f"a plate intersects the message window at {viewport}")
+                self.assertTrue(geo["platesNoCommandLine"], f"a plate intersects the command line at {viewport}")
+                self.assertTrue(geo["platesNoVitals"], f"a plate intersects the vitals dock at {viewport}")
+                self.assertTrue(geo["platesBelowTopBand"], f"a plate enters the top band at {viewport}")
+                self.assertTrue(geo["platesVisible"], f"a plate leaves the viewport at {viewport}")
+                self.assertTrue(geo["inPlatesLayer"], f"a plate is not in the plates layer at {viewport}")
+                self.assertFalse(geo["onPortraitAnchor"], f"a plate sits on a portrait anchor at {viewport}")
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_attack_flow_submits_basic_attack_once(self):

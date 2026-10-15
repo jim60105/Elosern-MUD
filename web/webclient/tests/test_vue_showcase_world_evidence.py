@@ -116,7 +116,8 @@ WORLD_FAMILY_STORY_IDS = {
 # set, so this baseline must extend — not restructure. The H1/H2/H3 HUD
 # waves added keys (HudFrame, SceneBackdrop, FullLogOverlay,
 # RestForm, DockBreadcrumb, SkillDetailPane,
-# VitalsTrack, ConditionChips, ParticipantFrame), which this baseline now
+# VitalsTrack, ConditionChips; the ParticipantFrame key left with
+# webclient-combat-formation), which this baseline now
 # carries as well. The Feedback/ToastQueue key from the
 # add-action-feedback-toasts change joins it at the manifest's refreeze
 # at 42.
@@ -145,7 +146,6 @@ PREVIOUS_MANIFEST_KEYS = {
     "Data/VitalsTrack",
     "Data/SkillBook",
     "Data/ConditionChips",
-    "Data/ParticipantFrame",
     "Data/EquipmentDoll",
     "Data/CharacterStatusDrawer",
     "Overlays/CreationOverlay",
@@ -211,6 +211,9 @@ PREVIOUS_MANIFEST_KEYS = {
     # The foe line-up (webclient-combat-foes-on-stage), the combat foes
     # standing opposite the player on the stage.
     "Core/FoeLineup",
+    # The combat figures' glance plates (webclient-combat-formation), which
+    # replaced the participant frame.
+    "Core/FigurePlate",
     # The dialogue choice list (webclient-dialogue-choices-overlay), centred
     # over the stage once the session line is read.
     "Core/DialogueChoices",

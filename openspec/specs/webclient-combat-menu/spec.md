@@ -276,7 +276,7 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: The participant frame renders the committed session
 - **WHEN** a combat session commits participants on both teams, one of them fled or knocked out
-- **THEN** the participant frame renders both sides in presenter order with each participant's token, display name, current and maximum hit points, and an explicit text marker for the non-active state, and it is not reachable by sequential keyboard navigation
+- **THEN** every drawn figure other than the controlled one carries its plate with display name, hit-point stroke and current and maximum hit points (the controlled figure's values stay in the vitals dock), the session token is part of the plate's accessible name only, and no plate is reachable by sequential keyboard navigation in this requirement
 
 #### Scenario: A participant portrait comes only from the catalog
 - **WHEN** a participant carries a `portrait_ref` present in the committed portrait catalog, and another carries `null`
@@ -340,9 +340,9 @@ one level, and disabled entries SHALL send no packet.
   steps are unchanged in behaviour and in payload
 
 #### Scenario: The participant frame is display-only in the HUD island
-- **WHEN** combat presents the participant frame in the HUD island area
-- **THEN** it is not a row container, not a tab stop, and not part of the dock's
-  composite widget; target selection remains the dock's target frame
+- **WHEN** combat presents the figure plates
+- **THEN** they are not a row container and not part of the dock's composite widget;
+  target selection remains the dock's target frame
 
 #### Scenario: Category frames carry per-row descriptor counts
 - **WHEN** the category or group frame renders its entries
@@ -365,12 +365,12 @@ one level, and disabled entries SHALL send no packet.
   skill frame directly, so no level ever offers a single choice
 
 #### Scenario: Participant hit points are numerals and missing art means no portrait
-- **WHEN** the participant frame renders committed participants, or the art panel is
+- **WHEN** the figure plates render committed participants, or the art panel is
   unavailable
-- **THEN** each participant shows its session token, display name, current and maximum
-  hit points as numerals, and its state with an explicit text marker for any non-active
-  state, and a null reference or an unavailable art panel yields no portrait at all with
-  no client-constructed subject key or URL
+- **THEN** each plate shows its participant's display name and current and maximum hit
+  points as numerals (its session token only in the accessible name), and a null reference
+  or an unavailable art panel yields the figure's truthful placeholder with no
+  client-constructed subject key or URL
 
 ### Requirement: Combat target selection sends one shape per TargetSpec
 The browser SHALL derive target controls only from the validated skill descriptor.
@@ -508,7 +508,7 @@ presented as steps, and no round SHALL be presented twice.
 
 #### Scenario: Displayed hit points follow the beats and snap at the end
 - **WHEN** a foe at 30 hit points takes damage beats with `hp_after` 18 and then 0 in a playing round
-- **THEN** the participant frame shows 30, then 18 after the first damage beat, then 0 after the
+- **THEN** the foe's plate shows 30, then 18 after the first damage beat, then 0 after the
   second, and once the round ends it shows the committed value
 
 #### Scenario: The command panel unlocks after playback and the revision
@@ -591,8 +591,8 @@ presented as steps, and no round SHALL be presented twice.
 - **WHEN** a playing round damages a participant whose previous committed hit points are
   known
 - **THEN** that participant displays its previous committed value until its first damage
-  beat, and after each of its damage beats that beat's `hp_after`, in the vitals and in
-  the participant frame
+  beat, and after each of its damage beats that beat's `hp_after`, in the vitals and on
+  its figure plate
 
 #### Scenario: Playback end snaps every value and nothing else follows the beats
 - **WHEN** a round's presentation ends

@@ -5,7 +5,7 @@
 // The store — not a composable — owns the playback, because the lock it holds
 // must gate `dispatchAction` and the keyboard router (both live here), while
 // three components read the projected slice (MessageWindow, VitalsTrack,
-// ParticipantFrame). The window reports only "this beat is fully shown":
+// FigurePlate). The window reports only "this beat is fully shown":
 // typing speed and the fit test are its own.
 //
 // One round binds per (epoch, round id), and only to the dispatch that
