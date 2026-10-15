@@ -115,6 +115,7 @@ def _continue_or_settle(
     )
 
 
+@serialized_combat_write
 def settle_session(
     actor: Any,
     record: CombatSessionRecord,
@@ -416,6 +417,7 @@ def forfeit(actor: Any) -> dict[str, Any]:
     return _settle_with_restore(actor, record, battlefield, outcome)
 
 
+@serialized_combat_write
 def restore_active_session(actor: Any) -> None:
     """Reconstruct a valid persisted session or terminate it diagnostically.
 

@@ -1,10 +1,10 @@
 """Round mechanics: submissions, round bookkeeping, and the round transaction.
 
-Every preflight-valid player action drives exactly one ordinary round --
-compression is reachable only through ``submit_opening_action``, the sole
-sanctioned requester -- inside one shared outer transaction that commits (or
-rolls back) the round effects, the post-round scans, session metadata, and the
-terminal settlement as one unit (fix-combat-settlement-recovery D1).
+Active-session submissions edit one persistent party draft. Its final valid
+confirmation commits admission before resolving one ordinary round. Effects,
+metadata, draft consumption and terminal settlement share the round transaction.
+The exploration opening remains the sole compression entry until its owning
+opening-routing change replaces that separate boundary.
 """
 
 from dataclasses import replace
@@ -240,6 +240,7 @@ def _preflight_skill_submission(
     return record, battlefield, request, None
 
 
+@serialized_combat_write
 def submit_opening_action(
     actor: Any,
     skill_key: str,

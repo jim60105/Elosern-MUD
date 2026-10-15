@@ -146,6 +146,7 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
     return engage_group(actor, [target])
 
 
+@serialized_combat_write
 def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
     """Create one persistent hostile session against several present monsters.
 
