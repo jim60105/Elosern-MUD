@@ -13,7 +13,6 @@ A deterministic localhost runtime journey SHALL use the actual UI to command mul
 - **WHEN** the journey runs at both accepted desktop viewports
 - **THEN** the centered card/stage target/warning contracts remain intact and companion SELF uses the commanded figure
 
-
 ### Requirement: Actual party exit acceptance covers cancellation committed outcomes and text parity
 Isolated real-runtime encounters SHALL exercise retreat and surrender cancellation and committed outcomes, stale/repeated confirmation, carried downed companions, failed-retreat enemy/upkeep behavior and hostile/exam consequences. An exercised text-client path SHALL demonstrate explicit actor command and exit confirmation parity.
 
@@ -24,5 +23,4 @@ Isolated real-runtime encounters SHALL exercise retreat and surrender cancellati
 #### Scenario: Complete batch acceptance
 - **WHEN** all implementation changes request assembled feature acceptance
 - **THEN** missing companion items/tactics, missing text/browser paths or absent selected real weapon/encounter evidence blocks acceptance; full managed browser and complete trace evidence remain CI-owned
-
 
