@@ -277,28 +277,28 @@ describe("skill frame server order + single-sub-group skip (task 6.9)", () => {
   // Skill descriptor + panel fixtures (hoisted to dodge the V8 parser quirk).
   const skillSlash = {
     key: "slash", label: "斬撃", description: "近戰斬擊。", cost: { mp: 0 },
-    target_spec: "single", enabled: true, disabled_reason: null, targets: [2], shorthands: [],
+    target_spec: "single", enabled: true, disabled_reason: null, targets: [2], shorthands: [], hostile: true, beneficial: false,
   };
   const skillCombo = {
     key: "combo", label: "連撃", description: "連續斬擊。", cost: { mp: 8 },
-    target_spec: "single", enabled: true, disabled_reason: null, targets: [2], shorthands: [],
+    target_spec: "single", enabled: true, disabled_reason: null, targets: [2], shorthands: [], hostile: true, beneficial: false,
   };
   const skillHeal = {
     key: "heal", label: "治癒", description: "恢復生命值。", cost: { mp: 12 },
-    target_spec: "single", enabled: true, disabled_reason: null, targets: [1], shorthands: [],
+    target_spec: "single", enabled: true, disabled_reason: null, targets: [1], shorthands: [], hostile: false, beneficial: true,
   };
    const participant = {
      identity: 1, token: "p1", display_name: "阿強", team: "party",
-    state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null,
+    state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [],
   };
   const foe = {
     identity: 2, token: "e1", display_name: "哥布林", team: "foes",
-    state: "active", hp_current: 45, hp_maximum: 45, portrait_ref: null,
+    state: "active", hp_current: 45, hp_maximum: 45, portrait_ref: null, conditions: [],
   };
 
   function makePanel(skills) {
     return {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "combat",
       session: { session_id: "hostile:1:0", mode: "hostile", round: 1, state: "ready", reason: null },

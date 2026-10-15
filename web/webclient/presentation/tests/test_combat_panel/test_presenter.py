@@ -223,7 +223,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         self.assertTrue(payload["available"])
         self.assertEqual(payload["kind"], "exploration")
-        self.assertEqual(payload["schema_version"], 5)
+        self.assertEqual(payload["schema_version"], 6)
         self.assertNotIn("session", payload)
         self.assertNotIn("participants", payload)
         self.assertNotIn("root_actions", payload)
@@ -639,8 +639,8 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.player.attributes.get("map_knowledge"), before["map_knowledge"]
         )
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
-    def test_creation_pending_renders_the_version_five_unavailable_form(self):
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
+    def test_creation_pending_renders_the_version_six_unavailable_form(self):
         payload = self.registry.render(
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
@@ -653,7 +653,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             PresentationContext(actor=self.player, protocol_version=1),
         )
         self.assertFalse(payload["available"])
-        self.assertEqual(payload["schema_version"], 5)
+        self.assertEqual(payload["schema_version"], 6)
         self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
         self.assertNotIn("affordances", payload)
         self.assertNotIn("suggestions", payload)

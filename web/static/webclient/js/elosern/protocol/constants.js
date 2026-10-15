@@ -67,6 +67,8 @@ var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical
 // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
 var MAX_SESSION_ID_CODE_POINTS = 128;
 var MAX_PARTICIPANTS = 16;
+// Per-participant condition rows (v6; mirror of world.rules.combat_view).
+var MAX_PARTICIPANT_CONDITIONS = 8;
 // Flattened active-skill descriptor bound. Raised from 32 to clear the
 // current theoretical maximum of 157 obtainable active skills (91 base
 // active skills including innate, plus the 66 registered sexual acts of
@@ -435,7 +437,7 @@ var PANEL_ALLOWLIST = {
   gallery: 3,
   art: ART_SCHEMA_VERSION,
   status: 3,
-  context_actions: 5,
+  context_actions: 6,
   local_map: 1,
   party: 2,
   objectives: 1,
@@ -497,6 +499,7 @@ module.exports = {
   SEVERITIES: SEVERITIES,
   MAX_SESSION_ID_CODE_POINTS: MAX_SESSION_ID_CODE_POINTS,
   MAX_PARTICIPANTS: MAX_PARTICIPANTS,
+  MAX_PARTICIPANT_CONDITIONS: MAX_PARTICIPANT_CONDITIONS,
   MAX_SKILLS: MAX_SKILLS,
   MAX_DISPLAY_NAME: MAX_DISPLAY_NAME,
   MAX_LABEL: MAX_LABEL,

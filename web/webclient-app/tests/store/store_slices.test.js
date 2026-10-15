@@ -688,6 +688,7 @@ describe("store view slices", () => {
           hp_current: 180,
           hp_maximum: 220,
           portrait_ref: null,
+          conditions: [],
         },
         {
           identity: 201,
@@ -698,6 +699,7 @@ describe("store view slices", () => {
           hp_current: 50,
           hp_maximum: 50,
           portrait_ref: null,
+          conditions: [],
         },
       ],
     });

@@ -92,7 +92,7 @@ def _suggestions_ready(card_labels: list) -> dict:
 def _exploration_context_actions_panel(suggestions: dict) -> dict:
     """A schema-valid ``context_actions`` exploration form with a suggestions envelope."""
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "exploration",
         "affordances": [],
@@ -111,6 +111,7 @@ def _participant(identity, token, name, team, state, hp_current, hp_maximum, por
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
         "portrait_ref": portrait_ref,
+        "conditions": [],
     }
 
 
@@ -127,6 +128,8 @@ def _skill(key, label, description, cost, target_spec, element=None, enabled=Tru
         "disabled_reason": None if enabled else {"code": "unavailable", "message": "技能尚未解鎖。"},
         "targets": targets or [],
         "shorthands": shorthands or [],
+        "hostile": False,
+        "beneficial": False,
     }
 
 
@@ -228,7 +231,7 @@ def _combat_panel() -> dict:
         ),
     ]
     return {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "combat",
         "session": {

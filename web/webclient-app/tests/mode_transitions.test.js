@@ -153,9 +153,9 @@ describe("AppClient live mode changes", () => {
   const twoFoes = (defeatFirst = false) => ({
     context_actions: fx.combatActions({
       participants: [
-        { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: defeatFirst ? "defeated" : "active", hp_current: defeatFirst ? 0 : 40, hp_maximum: 60, portrait_ref: null },
-        { identity: 9, token: "e2", display_name: "盜賊頭目", team: "foes", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null },
-        { identity: 8, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
+        { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: defeatFirst ? "defeated" : "active", hp_current: defeatFirst ? 0 : 40, hp_maximum: 60, portrait_ref: null, conditions: [] },
+        { identity: 9, token: "e2", display_name: "盜賊頭目", team: "foes", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null, conditions: [] },
+        { identity: 8, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
       ],
     }),
   });

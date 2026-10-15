@@ -5,7 +5,7 @@ Exact combat context actions panel, keyboard menu, allowlisted combat adapters, 
 ## Requirements
 
 ### Requirement: Combat context actions are an exact read-only panel
-The production presentation registry SHALL register `context_actions` schema version 5.
+The production presentation registry SHALL register `context_actions` schema version 6.
 For a valid active combat session, its available payload SHALL contain exactly
 `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`,
 `secondary_actions`, `skills`, and `suggestions`; `available` SHALL be true, `kind`
@@ -30,8 +30,8 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
   the shared unavailable form is emitted instead
 
 #### Scenario: Combat fields stay byte-identical across the version bump
-- **WHEN** a v4-compatible combat fixture is validated by the version-5 validator and the client mirror
-- **THEN** every combat field serializes exactly as it did at schema version 4, with only `schema_version` equal to 5 and the `suggestions` object added
+- **WHEN** a v4-compatible combat fixture, extended with the version-6 participant `conditions` and skill `hostile`/`beneficial`, is validated by the version-6 validator and the client mirror
+- **THEN** every combat field serializes exactly as it did at schema version 4, with `schema_version` equal to 6, the `suggestions` object (version 5) and the version-6 participant and skill facts added
 
 #### Scenario: Absent location emits the shared unavailable form
 - **WHEN** the puppet has an absent location
@@ -64,6 +64,10 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 #### Scenario: Exploration actions are never fabricated in a combat session
 - **WHEN** a valid active combat session renders `context_actions`
 - **THEN** the panel never fabricates exploration actions alongside the combat form
+
+#### Scenario: Version 6 adds read-only facts only
+- **WHEN** the combat available form is serialized at version 6
+- **THEN** its top-level field set is unchanged from version 5, every participant additionally carries `conditions`, every skill descriptor additionally carries `hostile` and `beneficial`, the presenter stays read-only, and the exploration and unavailable forms differ from version 5 only in `schema_version`
 
 ### Requirement: Combat presentation enumerates complete deterministic choices
 The combat panel's `skills` field SHALL be an ordered array of category groups, each
@@ -174,15 +178,19 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 - **WHEN** a skill descriptor is serialized
 - **THEN** it contains its stable key, registry label and description, exact resource
   cost, target specification, nullable element key, enabled state, nullable stable
-  disabled reason, ordered valid participant IDs, and applicable approved AREA
-  shorthands — byte-identical in shape to schema version 2's flat descriptor
+  disabled reason, ordered valid participant IDs, applicable approved AREA
+  shorthands, the optional freeform scales, and the two required booleans `hostile` and
+  `beneficial` — otherwise byte-identical in shape to schema version 2's flat descriptor
 
 #### Scenario: Participant ordering and field set are exact
 - **WHEN** the participants array is serialized
 - **THEN** participants are ordered from `player_ids` then `enemy_ids` and each contains
   a positive opaque identity, stable session token, bounded display name, team,
-  living/fled/knocked-out state, current/maximum HP, and a nullable server-authored
-  portrait reference
+  living/fled/knocked-out state, current/maximum HP, a nullable server-authored
+  portrait reference, and `conditions`: at most 8 rows of `code`, `label` and
+  `severity`, the same condition codes, labels and severity vocabulary the status
+  panel derives for an entity, in the status panel's order, empty when the entity
+  carries none
 
 #### Scenario: The portrait reference comes from the catalog the server actually builds
 - **WHEN** the server derives a participant's `portrait_ref`
@@ -194,6 +202,18 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 - **WHEN** a combat `context_actions` payload is serialized
 - **THEN** every list and string is within its explicit bound and the serialized
   envelope remains within the OOB protocol limit
+
+#### Scenario: Each skill declares whether it is hostile or beneficial to its chosen targets
+- **WHEN** the combat panel serializes `basic_attack`, `heal`, the cleanse skill, a skill applying a debuff-polarity buff to its targets, a gauge-transfer (drain) skill, a sexual-stimulus skill, a skill applying a buff-polarity buff to its targets, a damage skill whose damage is routed only to the `enemies` audience, a movement-only skill, and a skill that both damages and heals its chosen targets
+- **THEN** `hostile` is true exactly when at least one effect routed to the chosen targets (the `selected` audience, recipient not actor-bound) is classified hostile, and `beneficial` exactly when one is classified beneficial, by the registry's static per-effect-kind classification (a buff application takes its buff definition's polarity: `debuff` hostile, `buff` beneficial; a gauge transfer takes its declared direction: `drain` hostile, `restore` beneficial); so the ten skills read `hostile`/`beneficial` as true/false, false/true, false/true, true/false, true/false, true/false, false/true, false/false, false/false and true/true; no amount, formula or current participant takes part, and the server and client validators reject a descriptor missing either field or carrying a non-boolean value
+
+#### Scenario: Every effect kind is classified
+- **WHEN** the classification table is checked against every effect dataclass the effect parser can produce
+- **THEN** each kind is classified exactly once as `hostile`, `beneficial`, `neutral`, `buff-definition` (buff applications), or `gauge-direction` (gauge transfers), and an unclassified kind fails the test
+
+#### Scenario: Participants carry their conditions
+- **WHEN** a foe is poisoned and a companion is blessed in an active session, and a participant carries more than eight conditions
+- **THEN** the foe's row carries the poisoned condition's `code`, `label` and `severity` as the status panel would derive them, the companion's the blessed one, the long list is cut to its first eight in the status panel's order, and an entity without condition state carries `[]` instead of failing the panel
 
 ### Requirement: Availability uses shared side-effect-free rules preview
 The combat presenter, Telnet action listing, and combat adapters SHALL consume the same deterministic preview boundary. Availability SHALL include ownership and active kind, resources, exact target shape, presence/alive/range/faction candidate checks, action capability including `actions_per_turn == 0`, effect-handler availability, and time metadata. Preview state is advisory; every submitted action SHALL repeat authoritative validation against current canonical state before initiative.

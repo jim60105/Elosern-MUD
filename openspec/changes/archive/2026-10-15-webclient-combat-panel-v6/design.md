@@ -7,7 +7,8 @@
   actor through `build_status_read_model(entity)` (`web/webclient/presentation/status.py`).
 - Skill effects are typed (`SkillDef.parsed_effects`), with parallel `effect_policies` carrying an `audience`
   (`SELECTED` default, `SELF`, `ALLIES`, `ENEMIES`; `world/skills/effects/policies.py`). Buff definitions declare
-  `polarity` `buff`/`debuff` (`world/rules/buffs/definitions.py`). No other effect kind declares a direction.
+  `polarity` `buff`/`debuff` (`world/rules/buffs/definitions.py`), and a gauge transfer declares a `direction`
+  `drain`/`restore` (`world/skills/effects/combat.py`). No other effect kind declares a direction.
 - Schema convention:
   - Required additions to `context_actions` bumped the version: v1→v2 added `portrait_ref` (`0d25c3ea`), v2→v3
     grouped skills (`ffacd0ec`), and v4→v5 added `suggestions`.
@@ -28,7 +29,8 @@ introduced the envelope, so they stay as written.
 
 `ParticipantView.conditions: tuple[ConditionRow, ...]` holds `code`, `label` and `severity` from the status read
 model of the participant entity: the first 8, in its order. If the read model raises `StatusQueryError` for an entity
-(an object type it does not model), that participant's list is `[]` and the panel stays available. A missing
+(an object type it does not model) or `MissingDisplayMetadataError` (a condition without display metadata), that
+participant's list is `[]` and the panel stays available. A missing
 condition list is not worth making the whole panel unavailable. Severity vocabulary and code bounds reuse the status
 panel's validators.
 
@@ -49,12 +51,13 @@ that finding in the module docstring.
 Anchors the spec pins:
 
 - **Hostile:** damage, gauge transfer (drain), debuff-polarity buff application, and the sexual stimulus/pleasure kinds.
-- **Beneficial:** heal, cleanse, buff-polarity buff application, and restore-purity.
+- **Beneficial:** heal, cleanse, gauge transfer (restore), buff-polarity buff application, and restore-purity.
 - **Neutral:** movement, flavor, and session stamps.
 
 For a SELF skill, the `SELECTED` effects whose recipient is the target land on the actor, so they count (a hostile SELF
-skill is possible and is pinned by a synthetic fixture). This change classifies the remaining kinds by their
-docstrings. The exhaustiveness test lists the
+skill is possible and is pinned by a synthetic fixture). A gauge transfer is classified `gauge-direction`: it takes its declared `direction` (`drain` hostile, `restore`
+beneficial), because the shipped MP-restore spell aimed at one ally would otherwise read hostile. This change
+classifies the remaining kinds by their docstrings. The exhaustiveness test lists the
 `world.skills.effects.__all__` dataclasses and fails on any kind missing from the table.
 
 ### D4. Mirrors

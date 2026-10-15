@@ -198,6 +198,8 @@ describe("declarative service/combat/creation surfaces (store)", () => {
                 disabled_reason: null,
                 targets,
                 shorthands: [],
+                hostile: false,
+                beneficial: false,
               },
             ],
           },
@@ -231,6 +233,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
             hp_current: 100,
             hp_maximum: 100,
             portrait_ref: null,
+            conditions: [],
           },
           {
             identity: 9,
@@ -241,6 +244,7 @@ describe("declarative service/combat/creation surfaces (store)", () => {
             hp_current: 100,
             hp_maximum: 100,
             portrait_ref: null,
+            conditions: [],
           },
         ],
       });

@@ -150,7 +150,7 @@ class OptionsSnapshotFactoryTests(unittest.TestCase):
 class ActionPayloadValidatorsLockstepTests(unittest.TestCase):
     """Totality and lockstep tests for affordance payload validation (possession-validator-lockstep)."""
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_action_payload_validators_covers_allowlist(self):
         from web.webclient.presentation.affordances import ACTION_CODE_ALLOWLIST
         from web.webclient.presentation.options import (
@@ -172,7 +172,7 @@ class ActionPayloadValidatorsLockstepTests(unittest.TestCase):
             except Exception as exc:
                 self.assertNotIn("unregistered action code", str(exc))
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_unregistered_action_code_payload_validation_rejects_cleanly(self):
         from web.webclient.presentation.options import _validate_affordance_params
         from web.webclient.presentation.protocol import ProtocolValidationError
@@ -181,7 +181,7 @@ class ActionPayloadValidatorsLockstepTests(unittest.TestCase):
             _validate_affordance_params("explore.unregistered_bogus", {"npc_id": 1})
         self.assertIn("explore.unregistered_bogus", str(ctx.exception))
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_suggestion_params_validation_for_possession_codes(self):
         from web.webclient.presentation.options import _validate_suggestion_params
         from web.webclient.presentation.protocol import MAX_SAFE_INTEGER, ProtocolValidationError
@@ -213,7 +213,7 @@ class ActionPayloadValidatorsLockstepTests(unittest.TestCase):
                 ):
                     _validate_suggestion_params(action_code, "known_action", bad_payload)
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_possession_validators_boundary_enforcement(self):
         from web.webclient.actions.exploration_actions import (
             ExplorationActionError,

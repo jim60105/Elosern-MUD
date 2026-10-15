@@ -18,8 +18,9 @@ Two client changes in the combat batch need facts the combat panel does not send
 - Each combat **skill descriptor** gains two required booleans, `hostile` and `beneficial`: whether an effect routed to
   the chosen targets (`EffectAudience.SELECTED`, recipient not actor-bound) is classified hostile or beneficial.
 - A static **effect-kind classification** (`world/skills/effects/polarity.py`): every effect dataclass the parser can
-  produce is classified `hostile`, `beneficial`, `neutral`, or `buff-definition` (a buff application takes its buff
-  definition's declared `polarity`: `debuff` hostile, `buff` beneficial). An exhaustiveness test fails on an
+  produce is classified `hostile`, `beneficial`, `neutral`, `buff-definition`, or `gauge-direction` (a buff
+  application takes its buff definition's declared `polarity`: `debuff` hostile, `buff` beneficial; a gauge transfer
+  takes its declared `direction`: `drain` hostile, `restore` beneficial). An exhaustiveness test fails on an
   unclassified kind. No amounts or formulas.
 - `context_actions` moves to **schema version 6**. This touches the server registry and validator, the client
   `PANEL_ALLOWLIST` and its mirror, and the version-parity contract. The mirror rejects version-5 payloads.

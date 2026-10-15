@@ -3,8 +3,8 @@
 // ---------------------------------------------------------------------------
 // B2 action-dock family fixtures (webclient-vue-03-showcase-action).
 //
-// Every value mirrors a validated `context_actions` v5 slice — the exact
-// server-authored shapes (the v5 exploration form's action/navigation
+// Every value mirrors a validated `context_actions` v6 slice — the exact
+// server-authored shapes (the v6 exploration form's action/navigation
 // affordances and the suggestions envelope) — so the offline showcase and
 // the live (C1 store) views cannot drift. Fixed literals only.
 // ---------------------------------------------------------------------------

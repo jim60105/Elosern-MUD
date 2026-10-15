@@ -8,7 +8,7 @@
 // Slice map:
 //   core.js               — B1 core-family (narrative, status slice, prompt,
 //                           command history, roster)
-//   action_dock.js        — B2 action-dock family (context_actions v5)
+//   action_dock.js        — B2 action-dock family (context_actions v6)
 //   status_panels.js      — B3 `status` panel family
 //   character_panels.js   — B3 `character` v7 panel family
 //   skills.js             — B3 skills slice

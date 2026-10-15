@@ -508,7 +508,7 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                     server_time: s.serverTime,
                     panels: {
                         context_actions: {
-                            schema_version: 5,
+                            schema_version: 6,
                             available: true,
                             kind: 'exploration',
                             affordances: [],

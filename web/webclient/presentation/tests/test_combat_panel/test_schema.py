@@ -148,6 +148,56 @@ class ContextActionsSchemaTests(unittest.TestCase):
             with self.assertRaises(Exception):
                 validate_context_actions(panel)
 
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_participant_conditions_are_exact_bounded_rows(self):
+        row = {"code": "t_ash_burn", "label": "合成灼燒", "severity": "harmful"}
+        panel = _valid_panel(participants=[_valid_participant(conditions=[row] * 8)])
+        normalized = validate_context_actions(panel)
+        self.assertEqual(normalized["participants"][0]["conditions"], [row] * 8)
+        bad_values = (
+            [row] * 9,
+            [{**row, "severity": "hidden"}],
+            [{**row, "label": " "}],
+            [{**row, "code": "Bad Code"}],
+            [{**row, "remaining_seconds": 30}],
+            [{"code": "t_ash_burn", "label": "合成灼燒"}],
+            None,
+        )
+        for value in bad_values:
+            with self.subTest(value=value):
+                with self.assertRaises(Exception):
+                    validate_context_actions(
+                        _valid_panel(participants=[_valid_participant(conditions=value)])
+                    )
+        missing = _valid_participant()
+        del missing["conditions"]
+        with self.assertRaises(Exception):
+            validate_context_actions(_valid_panel(participants=[missing]))
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_skill_polarity_flags_are_required_booleans(self):
+        for field in ("hostile", "beneficial"):
+            for value in (None, 1, "true"):
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(Exception):
+                        validate_context_actions(
+                            _valid_panel(
+                                skills=self._nested_skills(_valid_skill(**{field: value}))
+                            )
+                        )
+            missing = _valid_skill()
+            del missing[field]
+            with self.subTest(field=field, value="missing"):
+                with self.assertRaises(Exception):
+                    validate_context_actions(
+                        _valid_panel(skills=self._nested_skills(missing))
+                    )
+        normalized = validate_context_actions(
+            _valid_panel(skills=self._nested_skills(_valid_skill(hostile=True, beneficial=True)))
+        )
+        skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        self.assertEqual((skill["hostile"], skill["beneficial"]), (True, True))
+
     def test_rejects_skill_shorthand_on_single(self):
         panel = _valid_panel(
             skills=self._nested_skills(_valid_skill(shorthands=["all-enemies"]))

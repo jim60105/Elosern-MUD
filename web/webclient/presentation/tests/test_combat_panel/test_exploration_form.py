@@ -12,7 +12,7 @@ from ._support import _exploration_panel, _valid_category_group, _valid_panel, _
 
 
 class ContextActionsExplorationFormTests(unittest.TestCase):
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_valid_exploration_form_passes(self):
         normalized = validate_context_actions(_exploration_panel())
         self.assertEqual(normalized["schema_version"], CONTEXT_ACTIONS_SCHEMA_VERSION)
@@ -130,6 +130,33 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
                 validate_context_actions(_exploration_panel(affordances=[bad]))
 
     def test_combat_form_is_byte_identical_to_version_4_plus_suggestions(self):
+        version6 = _valid_panel()
+        # The version-4 combat fields: the same fixture without the version-6
+        # participant ``conditions`` and skill ``hostile``/``beneficial``.
+        v4_participants = [
+            {key: value for key, value in participant.items() if key != "conditions"}
+            for participant in version6["participants"]
+        ]
+        v4_skills = [
+            {
+                **category,
+                "groups": [
+                    {
+                        **group,
+                        "skills": [
+                            {
+                                key: value
+                                for key, value in skill.items()
+                                if key not in ("hostile", "beneficial")
+                            }
+                            for skill in group["skills"]
+                        ],
+                    }
+                    for group in category["groups"]
+                ],
+            }
+            for category in version6["skills"]
+        ]
         version4 = {
             "schema_version": 4,
             "available": True,
@@ -141,40 +168,54 @@ class ContextActionsExplorationFormTests(unittest.TestCase):
                 "state": "ready",
                 "reason": None,
             },
-            "participants": [_valid_participant()],
+            "participants": v4_participants,
             "root_actions": ["attack", "skills", "items", "defend", "flee"],
             "secondary_actions": ["forfeit"],
-            "skills": [_valid_category_group()],
+            "skills": v4_skills,
         }
-        version5 = _valid_panel()
-        self.assertEqual(version4["schema_version"], 4)
-        self.assertEqual(version5["schema_version"], 5)
-        # Every combat field serializes exactly as at version 4; only the
-        # version field and the suggestions envelope are added.
+        self.assertEqual(version6["schema_version"], 6)
+        # Every other combat field serializes exactly as at version 4; the
+        # version field, the suggestions envelope (v5) and the v6 facts are
+        # the only additions.
         self.assertEqual(
             {
                 key: value
-                for key, value in version5.items()
-                if key not in ("schema_version", "suggestions")
+                for key, value in version6.items()
+                if key not in ("schema_version", "suggestions", "participants", "skills")
             },
             {
                 key: value
                 for key, value in version4.items()
-                if key != "schema_version"
+                if key not in ("schema_version", "participants", "skills")
             },
         )
-        self.assertEqual(version5["suggestions"], {"status": "unavailable"})
-        normalized = validate_context_actions(version5)
-        self.assertEqual(normalized["schema_version"], 5)
+        normalized = validate_context_actions(version6)
+        self.assertEqual(normalized["schema_version"], 6)
         self.assertEqual(normalized["session"], version4["session"])
-        self.assertEqual(normalized["participants"], version4["participants"])
+        self.assertEqual(
+            [
+                {key: value for key, value in row.items() if key != "conditions"}
+                for row in normalized["participants"]
+            ],
+            version4["participants"],
+        )
+        self.assertEqual(
+            [row["conditions"] for row in normalized["participants"]], [[]]
+        )
+        skill = normalized["skills"][0]["groups"][0]["skills"][0]
+        self.assertEqual((skill["hostile"], skill["beneficial"]), (True, False))
+        self.assertEqual(
+            {key: value for key, value in skill.items() if key not in ("hostile", "beneficial")},
+            version4["skills"][0]["groups"][0]["skills"][0],
+        )
         self.assertEqual(normalized["root_actions"], version4["root_actions"])
         self.assertEqual(normalized["secondary_actions"], version4["secondary_actions"])
-        self.assertEqual(normalized["skills"], version4["skills"])
         self.assertEqual(normalized["suggestions"], {"status": "unavailable"})
-        # A version-4 payload is rejected by the version-5 validator.
+        # Version-4 and version-5 payloads are rejected by the v6 validator.
         with self.assertRaises(ProtocolValidationError):
             validate_context_actions(version4)
+        with self.assertRaises((ProtocolValidationError, ContextActionsError)):
+            validate_context_actions({**version6, "schema_version": 5})
 
     def test_over_envelope_exploration_form_fails_closed(self):
         wide = "寬" * 128

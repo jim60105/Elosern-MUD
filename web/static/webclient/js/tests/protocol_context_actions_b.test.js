@@ -15,39 +15,90 @@ const { T_ACT_ARENA, T_ACT_SOLO, T_FIRE_LABEL, snapshot, validStatusPanel } = re
 const { nestedSkills, validCategoryGroup, validCombatPanel, validCombatParticipant, validCombatSkill, validRecoveryPanel, validSkillGroup } = require("./protocol_fixtures.js");
 
 test("the combat form is byte-identical to version 4 plus suggestions", () => {
-  const version4 = {
-    schema_version: 4,
-    available: true,
-    kind: "combat",
-    session: {
-      session_id: "hostile:1:0",
-      mode: "hostile",
-      round: 0,
-      state: "ready",
-      reason: null,
-    },
-    participants: [validCombatParticipant()],
-    root_actions: ["attack", "skills", "items", "defend", "flee"],
-    secondary_actions: ["forfeit"],
-    skills: [validCategoryGroup()],
-  };
-  const version5 = validCombatPanel();
-  assert.equal(version4.schema_version, 4);
-  assert.equal(version5.schema_version, 5);
-  const withoutVersion = (panel) => {
-    const copy = Object.assign({}, panel);
+  const version6 = validCombatPanel();
+  const stripV6 = (panel) => {
+    const copy = JSON.parse(JSON.stringify(panel));
+    copy.participants.forEach((participant) => delete participant.conditions);
+    copy.skills.forEach((category) =>
+      category.groups.forEach((group) =>
+        group.skills.forEach((skill) => {
+          delete skill.hostile;
+          delete skill.beneficial;
+        })
+      )
+    );
     delete copy.schema_version;
+    delete copy.suggestions;
     return copy;
   };
+  const version4 = Object.assign({ schema_version: 4 }, stripV6(version6));
+  assert.equal(version6.schema_version, 6);
   // Every combat field serializes exactly as at version 4; only the version
-  // field and the suggestions envelope are added.
-  const version4Copy = Object.assign({}, version4, {
-    suggestions: { status: "unavailable" },
-  });
-  assert.deepEqual(withoutVersion(version5), withoutVersion(version4Copy));
-  assert.deepEqual(version5.suggestions, { status: "unavailable" });
-  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(version5));
+  // field, the suggestions envelope (v5) and the v6 participant conditions
+  // and skill hostile/beneficial facts are added.
+  const version4Copy = Object.assign({}, version4);
+  delete version4Copy.schema_version;
+  assert.deepEqual(stripV6(version6), version4Copy);
+  assert.deepEqual(version6.suggestions, { status: "unavailable" });
+  assert.deepEqual(version6.participants[0].conditions, []);
+  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(version6));
   assert.throws(() => Protocol.validateContextActionsPanel(version4));
+  // A version-5 payload is rejected by the v6 mirror.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(Object.assign({}, version6, { schema_version: 5 }))
+  );
+  assert.throws(() =>
+    Protocol.validatePanel(
+      "context_actions",
+      Protocol.PANEL_ALLOWLIST.context_actions,
+      Object.assign({}, version6, { schema_version: 5 })
+    )
+  );
+});
+
+test("participant conditions are exact bounded status rows", () => {
+  const row = { code: "t_ash_burn", label: "合成灼燒", severity: "harmful" };
+  const withConditions = (conditions) =>
+    validCombatPanel({ participants: [validCombatParticipant({ conditions: conditions })] });
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(withConditions(Array(8).fill(row)))
+  );
+  [
+    Array(9).fill(row),
+    [Object.assign({}, row, { severity: "hidden" })],
+    [Object.assign({}, row, { label: " " })],
+    [Object.assign({}, row, { code: "Bad Code" })],
+    [Object.assign({}, row, { remaining_seconds: 30 })],
+    [{ code: "t_ash_burn", label: "合成灼燒" }],
+    null,
+  ].forEach((conditions) => {
+    assert.throws(() => Protocol.validateContextActionsPanel(withConditions(conditions)));
+  });
+  const missing = validCombatParticipant();
+  delete missing.conditions;
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(validCombatPanel({ participants: [missing] }))
+  );
+});
+
+test("skill hostile and beneficial are required booleans", () => {
+  ["hostile", "beneficial"].forEach((field) => {
+    [null, 1, "true"].forEach((value) => {
+      const skill = validCombatSkill({ [field]: value });
+      assert.throws(() =>
+        Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(skill) }))
+      );
+    });
+    const missing = validCombatSkill();
+    delete missing[field];
+    assert.throws(() =>
+      Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(missing) }))
+    );
+  });
+  const both = validCombatSkill({ hostile: true, beneficial: true });
+  assert.doesNotThrow(() =>
+    Protocol.validateContextActionsPanel(validCombatPanel({ skills: nestedSkills(both) }))
+  );
 });
 
 test("the unavailable forms differ only in schema_version", () => {
@@ -56,8 +107,8 @@ test("the unavailable forms differ only in schema_version", () => {
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
-  const version5 = {
-    schema_version: 5,
+  const version6 = {
+    schema_version: 6,
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
@@ -66,18 +117,21 @@ test("the unavailable forms differ only in schema_version", () => {
     delete copy.schema_version;
     return copy;
   };
-  assert.deepEqual(withoutVersion(version5), withoutVersion(version4));
+  assert.deepEqual(withoutVersion(version6), withoutVersion(version4));
   assert.doesNotThrow(() =>
-    Protocol.validatePanel("context_actions", 5, version5)
+    Protocol.validatePanel("context_actions", 6, version6)
   );
-  assert.throws(() => Protocol.validatePanel("context_actions", 5, version4));
+  assert.throws(() => Protocol.validatePanel("context_actions", 6, version4));
+  assert.throws(() =>
+    Protocol.validatePanel("context_actions", 6, Object.assign({}, version6, { schema_version: 5 }))
+  );
   // The unavailable form rejects a suggestions field: the field set stays
   // exactly schema_version/available/reason.
   assert.throws(() =>
     Protocol.validatePanel(
       "context_actions",
-      5,
-      Object.assign({}, version5, { suggestions: { status: "unavailable" } })
+      6,
+      Object.assign({}, version6, { suggestions: { status: "unavailable" } })
     )
   );
 });
@@ -136,7 +190,7 @@ test("freeform_scales is optional and validated when present", () => {
 test("rejects malformed context_actions panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("context_actions", Protocol.PANEL_ALLOWLIST.context_actions, {
-      schema_version: 5,
+      schema_version: 6,
       available: false,
     })
   );

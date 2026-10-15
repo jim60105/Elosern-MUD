@@ -41,7 +41,7 @@ _OPTIONS_FRAGMENTS = (
 
 
 class ContextActionsOptionsParityContract(unittest.TestCase):
-    @covers_requirement("webclient-context-actions-suggestions::the-v5-client-mirror-and-parity-contract-enforce-the-suggestions-shape")
+    @covers_requirement("webclient-context-actions-suggestions::the-v6-client-mirror-and-parity-contract-enforce-the-suggestions-shape")
     def test_python_and_js_option_bounds_are_identical(self):
         py_source = _PY_OPTIONS.read_text(encoding="utf-8")
         js_source = protocol_client_source()
@@ -57,6 +57,16 @@ class ContextActionsOptionsParityContract(unittest.TestCase):
                     f"{py_name}={py_match.group(1)} vs {js_name}={js_match.group(1)}"
                 )
         self.assertEqual(mismatches, [], "Python/JS option bounds diverged")
+
+    @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
+    def test_participant_condition_bound_is_identical(self):
+        py_source = (REPO_ROOT / "world/rules/combat_view.py").read_text(encoding="utf-8")
+        py_match = re.search(r"^MAX_PARTICIPANT_CONDITIONS\s*=\s*([0-9]+)", py_source, re.MULTILINE)
+        js_match = re.search(r"var MAX_PARTICIPANT_CONDITIONS\s*=\s*([0-9]+)", protocol_client_source())
+        self.assertIsNotNone(py_match)
+        self.assertIsNotNone(js_match)
+        self.assertEqual(py_match.group(1), js_match.group(1))
+        self.assertEqual(py_match.group(1), "8")
 
     def test_python_and_js_share_option_fragments(self):
         py_source = _PY_OPTIONS.read_text(encoding="utf-8")

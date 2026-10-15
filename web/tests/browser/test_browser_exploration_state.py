@@ -612,7 +612,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         ``(action_code, label, params)``), on an affordance-free panel."""
         return {
             "context_actions": {
-                "schema_version": 5,
+                "schema_version": 6,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -726,7 +726,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         pinned_context = {
             "context_actions": {
-                "schema_version": 5,
+                "schema_version": 6,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -807,7 +807,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         def context_actions(suggestions: dict) -> dict:
             return {
                 "context_actions": {
-                    "schema_version": 5,
+                    "schema_version": 6,
                     "available": True,
                     "kind": "exploration",
                     "affordances": [],

@@ -508,7 +508,7 @@ describe("frame resolver — the degradation marker", () => {
   it("an unavailable context_actions envelope offers no suggestions card", () => {
     const state = committedState();
     state.panels.context_actions = {
-      schema_version: 5,
+      schema_version: 6,
       available: false,
       kind: "exploration",
       reason: { code: "ai_offline", message: "建議服務目前離線。" },
@@ -601,6 +601,8 @@ function combatFixturePanel(overrides = {}) {
         disabled_reason: null,
         targets: [7],
         shorthands: [],
+        hostile: false,
+        beneficial: false,
           // A freeform-scale skill: the scale step exists so the resolver's
           // selection-preservation path (rebuildForPanel) is exercised.
           freeform_scales: [
@@ -611,12 +613,12 @@ function combatFixturePanel(overrides = {}) {
       extra
     );
   return {
-    schema_version: 5,
+    schema_version: 6,
     available: true,
     kind: "combat",
     session: { session_id: "hostile:1:0", mode: "hostile", round: 1, state: "ready", reason: null },
     participants: [
-      { identity: 7, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
+      { identity: 7, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
     ],
     root_actions: ["attack", "skills", "items", "defend", "flee"],
     secondary_actions: ["forfeit"],

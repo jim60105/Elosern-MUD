@@ -247,7 +247,7 @@ def _validate_passive_row(value: Any) -> dict[str, Any]:
 def _validate_active_skill_row(value: Any) -> dict[str, Any]:
     """Validate one active skill row of the ``character`` payload.
 
-    The row is the display subset of the ``context_actions`` v5 skill
+    The row is the display subset of the ``context_actions`` v6 skill
     descriptor: the required ``key``/``label`` plus the optional, omittable
     ``cost`` (a bounded resource-key mapping, validated with the same
     bounded-identifier-key and non-negative-int checks the combat panel uses),

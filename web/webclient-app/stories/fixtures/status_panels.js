@@ -8,7 +8,7 @@
 // at schema version 5 (web/webclient/presentation/character.py) — and the
 // character's skill data keeps the character payload's category/group/
 // {key,label} grouping with the optional OOB skill-descriptor detail fields
-// (the context_actions v5 descriptor shape: cost, target_spec,
+// (the context_actions v6 descriptor shape: cost, target_spec,
 // freeform_scales, shorthands) attached to some rows only. Fixed literals
 // only, so the offline showcase and the live (C1 store) views cannot drift.
 // ---------------------------------------------------------------------------
