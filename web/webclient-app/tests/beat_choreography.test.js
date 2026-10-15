@@ -72,8 +72,8 @@ function beat(seq, action, kind, actor, target, extra = {}) {
 
 // Action 0: the player rolls, hits foe 3 twice (a multi-hit), and defeats
 // it. Action 1: foe 4 hits the player. Action 2: the ally hits foe 8 (the
-// fourth foe still standing, not on the stage). Action 3: foe 4 hits the
-// ally.
+// fourth foe still standing — every active foe stands since
+// webclient-combat-formation). Action 3: foe 4 hits the ally.
 const BEATS = [
   beat(0, 0, "roll", PLAYER, "3"),
   beat(1, 0, "damage", PLAYER, "3", { amount: 12, hp_after: 18 }),
@@ -87,7 +87,7 @@ const BEATS = [
 function plan(options = {}) {
   return planRound({
     panel: { schema_version: 1, available: true, round: ROUND, beats: options.beats || BEATS },
-    roster: ROSTER,
+    roster: options.roster || ROSTER,
     statusHp: 80,
     playerKey: PLAYER,
     level: options.level || "full",
@@ -176,12 +176,25 @@ describe("stageFor (design D3)", () => {
     expect(stageFor(at(1, "pause", { beats })).defeated).toEqual([]);
   });
 
-  it("animates nobody who has no stage actor: an ally, or a foe beyond the third", () => {
-    // The ally's first beat hits the fourth foe still standing: neither
-    // stands on the stage.
-    expect(stageFor(at(5, "act")).gestures).toEqual({});
+  it("animates every standing foe, but nobody without a stage actor: an ally, or a foe beyond the maximum", () => {
+    // The ally's first beat hits the fourth foe still standing: the foe
+    // stands on the stage and shakes; the ally has no stage actor, so no step.
+    expect(stageFor(at(5, "act")).gestures).toEqual({ "8": { gesture: "hit", amount: 5 } });
     // Foe 4 steps; the ally it hits has no stage actor.
     expect(stageFor(at(6, "act")).gestures).toEqual({ "4": { gesture: "lunge", amount: null } });
+    // Sixteen active foes: the line-up stands fifteen, so the sixteenth in
+    // presenter order plays nothing while the fifteenth still shakes.
+    const many = Array.from({ length: 16 }, (_, i) => foe(101 + i));
+    const party = ROSTER.filter((row) => row.team === "party");
+    const beats = [
+      beat(0, 0, "damage", PLAYER, "115", { amount: 3, hp_after: 27 }),
+      beat(1, 0, "damage", PLAYER, "116", { amount: 3, hp_after: 27 }),
+    ];
+    expect(stageFor(at(0, "act", { beats, roster: [...many, ...party] })).gestures).toEqual({
+      [PLAYER]: { gesture: "lunge", amount: null },
+      "115": { gesture: "hit", amount: 3 },
+    });
+    expect(stageFor(at(1, "act", { beats, roster: [...many, ...party] })).gestures).toEqual({});
   });
 
   it("gives a key the plan does not know no gesture", () => {
@@ -221,7 +234,7 @@ describe("actMs (design D2)", () => {
   });
 
   it("is 0 for a step that plays no gesture, and for the reduced level's 0ms tokens", () => {
-    expect(actMs(at(5, "act"), read)).toBe(0);
+    expect(actMs(at(0, "act", { beats: [beat(0, 0, "other", "99", "98")] }), read)).toBe(0);
     const reduced = (name) => (name === "--motion-beat-defeat" ? 150 : 0);
     expect(actMs(at(4, "act"), reduced)).toBe(0);
     expect(actMs(at(3, "act"), reduced)).toBe(150);

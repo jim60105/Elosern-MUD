@@ -8,11 +8,13 @@
 //   leaves a leaving copy behind;
 // - the dialogue choice rows carry their stagger index, keep the one-tab-stop
 //   menu contract, and take a digit before any animation ends.
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { mount } from "@vue/test-utils";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
-import { foeLineupSpan } from "../components/foe-lineup.js";
+import { combatFormation } from "../components/combat-formation.js";
 import AppClient from "../AppClient.vue";
 import HudFrame from "../components/HudFrame.vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
@@ -103,10 +105,38 @@ describe("HudFrame mode layers", () => {
   });
 });
 
+// jsdom lays nothing out, so the stage the formation measures is stubbed at
+// the 1451x790 reference: the stage box, the metrics probe's three lengths,
+// and no vitals dock. Every other element keeps jsdom's empty box.
+const STAGE = { width: 1451, height: 790 };
+const PROBE = { "--actor-h": 489.8, "--header-h": 48, "--band-h": 220 };
+function stubStageLayout() {
+  const original = Element.prototype.getBoundingClientRect;
+  vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
+    const box = (width, height) => ({ left: 0, top: 0, x: 0, y: 0, width, height, right: width, bottom: height, toJSON() {} });
+    if (this.getAttribute("data-testid") === "elosern-stage") return box(STAGE.width, STAGE.height);
+    const metric = this.getAttribute("data-metric");
+    if (metric && metric in PROBE) return box(1, PROBE[metric]);
+    return original.call(this);
+  });
+}
+// The engine's own answer for those measurements, to compare against.
+const expectedFormation = (party, foes) =>
+  combatFormation({
+    stageWidth: STAGE.width, stageHeight: STAGE.height, uiScale: 1, bandTop: STAGE.height - PROBE["--band-h"],
+    actorHeight: PROBE["--actor-h"], topBandBottom: PROBE["--header-h"], cardWidth: 264, vitalsDock: null,
+    partyCount: party, foeCount: foes,
+  });
+
 describe("AppClient live mode changes", () => {
   let store, wrapper, revision, generation, epoch;
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   beforeEach(async () => {
+    stubStageLayout();
     setActivePinia(createPinia());
     store = useElosernStore();
     store.setSender(fx.createFakeSender());
@@ -280,9 +310,13 @@ describe("AppClient live mode changes", () => {
     const row = lineups()[0];
     expect(row.classes()).toContain("foes-enter-enter-active");
     expect(row.findAll('[data-testid="foe-slot"]').map((s) => s.attributes("data-portrait-ref"))).toEqual(["", ""]);
-    // Party members never stand on the stage; the frame still lists them.
+    // A party row in the combat panel that no drawn figure stands for is
+    // not a foe: it never stands in the foe line-up.
     expect(row.text()).not.toContain("同行劍士");
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).not.toBe("0");
+    // The caption clears the leftmost foe of the formation (stage px + 16).
+    const shape = expectedFormation(1, 2);
+    const leftmost = Math.min(...shape.foes.figures.map((f) => f.box.left));
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(`${STAGE.width - leftmost + 16}px`);
 
     commit("exploration");
     await nextTick();
@@ -290,8 +324,10 @@ describe("AppClient live mode changes", () => {
     expect(leaving).toHaveLength(1);
     expect(leaving[0].element.inert).toBe(true);
     expect(leaving[0].classes()).toContain("foes-enter-leave-active");
-    // The caption keeps clearing the row until the fade has ended.
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).not.toBe("0");
+    // The caption keeps clearing the row until the fade has ended; the party
+    // side returns to the exploration rule at once.
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(`${STAGE.width - leftmost + 16}px`);
+    expect(clientRoot().style.getPropertyValue("--caption-left")).toBe("");
   });
 
   it("a foe defeated inside combat leaves the row inert while the other steps forward", async () => {
@@ -300,20 +336,24 @@ describe("AppClient live mode changes", () => {
     commit("combat", twoFoes());
     await nextTick();
     await nextTick();
-    const heldSpan = clientRoot().style.getPropertyValue("--foe-lineup-span");
+    const heldEdge = clientRoot().style.getPropertyValue("--caption-right");
+    expect(heldEdge).not.toBe("");
     commit("combat", twoFoes(true));
     await nextTick();
     // The caption keeps the two-foe room until the fallen foe has faded.
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(heldSpan);
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(heldEdge);
     const slots = lineups()[0].findAll('[data-testid="foe-slot"]');
     const leaving = slots.filter((s) => s.element.inert);
     expect(leaving).toHaveLength(1);
     expect(leaving[0].classes()).toContain("foe-leave-active");
     const staying = slots.filter((s) => !s.element.inert);
     expect(staying).toHaveLength(1);
-    expect(staying[0].element.style.right).toBe("0%");
+    // The other foe steps to the one-foe formation's box.
+    expect(staying[0].element.style.left).toBe(`${expectedFormation(1, 1).foes.figures[0].box.left}px`);
     expect(lineups()[0].attributes("data-count")).toBe("1");
-    expect(wrapper.get('[data-testid="participant-frame"]').text()).toContain("已敗退");
+    // The fallen foe's plate leaves with it; the standing foe keeps its own.
+    const plates = wrapper.findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert);
+    expect(plates.map((p) => p.attributes("data-identity"))).toEqual(["9"]);
   });
 
   it("a reconnect mid-combat mounts the line-up at rest", async () => {
@@ -340,11 +380,12 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     commit("combat", twoFoes());
     await nextTick();
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe(String(foeLineupSpan(2)));
+    const edge = (foes) => `${STAGE.width - Math.min(...expectedFormation(1, foes).foes.figures.map((f) => f.box.left)) + 16}px`;
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(edge(2));
     // A fallen foe leaves at once, and so does the room it held.
     commit("combat", twoFoes(true));
     await nextTick();
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe("1");
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(edge(1));
     commit("combat", twoFoes());
     await nextTick();
     expect(lineups()).toHaveLength(1);
@@ -352,7 +393,7 @@ describe("AppClient live mode changes", () => {
     commit("exploration");
     await nextTick();
     expect(lineups()).toHaveLength(0);
-    expect(clientRoot().style.getPropertyValue("--foe-lineup-span")).toBe("0");
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe("");
   });
 
   it("at the off level the host has no CSS phase and goes in the commit's frame", async () => {
@@ -465,5 +506,77 @@ describe("DialogueChoices stagger", () => {
     expect(root().classes()).not.toContain("dialogue-choices--rows-still");
     // The card itself never refades.
     expect(root().classes()).toContain("dialogue-choices--still");
+  });
+});
+
+// webclient-combat-formation (design D3): both line-ups re-form on one
+// shared rule — the same four box edges, duration and easing — so their
+// heights stay equal through every change, and nothing glides below `full`.
+describe("the shared formation glide", () => {
+  const APP_ROOT = join(process.cwd(), "web/webclient-app");
+  const source = (file) => readFileSync(join(APP_ROOT, file), "utf8");
+  const transitionOf = (css, selector) => {
+    const start = css.indexOf(selector);
+    expect(start).toBeGreaterThanOrEqual(0);
+    const block = css.slice(start, css.indexOf("}", start));
+    return /transition:([^;]*);/.exec(block)[1].replace(/\s+/g, " ").trim();
+  };
+  const SHARED = ["left", "top", "width", "height"]
+    .map((edge) => `${edge} calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard)`)
+    .join(", ");
+
+  it("uses one slot transition rule on both sides and on the plates", () => {
+    expect(transitionOf(source("components/FoeLineup.vue"), ".foe-lineup__slot {")).toBe(SHARED);
+    expect(
+      transitionOf(source("components/CompanionLineup.vue"), '.companion-lineup[data-formation="true"] > .companion-lineup__slot {'),
+    ).toBe(SHARED);
+    expect(transitionOf(source("AppClient.vue"), '.figure-plates[data-glide="true"] > .figure-plate {')).toBe(SHARED);
+  });
+
+  describe("in the client", () => {
+    let store, wrapper;
+    beforeEach(() => {
+      stubStageLayout();
+      setActivePinia(createPinia());
+      store = useElosernStore();
+      store.setSender(fx.createFakeSender());
+      wrapper = mount(AppClient, { attachTo: document.body });
+      store.beginTransport(1);
+      store.setConnected(true);
+      store.setLoggedIn(true);
+    });
+    afterEach(() => {
+      wrapper.unmount();
+      document.body.replaceChildren();
+      vi.restoreAllMocks();
+    });
+    const snapshot = (revision, mode) =>
+      store.receive(1, "ui_snapshot", [fx.snapshot({
+        presentation_epoch: fx.EPOCH_A, revision, mode,
+        panels: {
+          status: fx.statusPanel(),
+          exploration: fx.explorationPanel(),
+          context_actions: mode === "combat" ? fx.combatActions() : fx.explorationActions(),
+          art: ART_PANEL_SAMPLE,
+        },
+      })], {});
+
+    it.each([
+      ["full", "true"],
+      ["reduced", "false"],
+      ["off", "false"],
+    ])("glides at %s: %s", async (level, glide) => {
+      store.setMotionLevel(level);
+      snapshot(1, "exploration");
+      await nextTick();
+      snapshot(2, "combat");
+      await nextTick();
+      expect(wrapper.get('[data-testid="elosern-stage"]').attributes("data-formation")).toBe("true");
+      expect(wrapper.get('[data-testid="companion-lineup"]').attributes("data-glide")).toBe(glide);
+      expect(wrapper.get('[data-testid="foe-lineup"]').attributes("data-glide")).toBe(glide);
+      // The party stands at the engine's box for the measured stage.
+      const party = expectedFormation(1, wrapper.findAll('[data-testid="foe-slot"]').length).party.figures[0].box;
+      expect(wrapper.get('[data-testid="companion-figure"]').element.style.height).toBe(`${party.height}px`);
+    });
   });
 });

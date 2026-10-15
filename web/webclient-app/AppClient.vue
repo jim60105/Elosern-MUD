@@ -12,7 +12,6 @@ import AppShell from "./components/AppShell.vue";
 import ActionDock from "./components/ActionDock.vue";
 import CreationOverlay from "./components/CreationOverlay.vue";
 import DockMenu from "./components/DockMenu.vue";
-import ParticipantFrame from "./components/ParticipantFrame.vue";
 import SkillDetailPane from "./components/SkillDetailPane.vue";
 import ExitCompass from "./components/ExitCompass.vue";
 import ExplorationReadout from "./components/ExplorationReadout.vue";
@@ -50,7 +49,11 @@ import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
 import FoeLineup from "./components/FoeLineup.vue";
-import { FOE_LINEUP_MAX, activeFoes, foeLineupSpan, foeSlots } from "./components/foe-lineup.js";
+import { activeFoes, foeStageLimit } from "./components/foe-lineup.js";
+import FigurePlate from "./components/FigurePlate.vue";
+import { plateHpCurrent, repeatedNames } from "./components/figure-plate.js";
+import { useCombatFormation } from "./composables/use-combat-formation.js";
+import { useFormationGlide } from "./composables/use-formation-glide.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
 import ChoiceCard from "./components/ChoiceCard.vue";
 import QuestionCard from "./components/QuestionCard.vue";
@@ -303,43 +306,149 @@ const playerGesture = computed(() => {
   const entry = identity == null ? null : beatStage.value?.gestures?.[identity];
   return entry || null;
 });
-// How far the row reaches left of the anchor, in anchor widths, and its
-// front foe's scale (which sets the row's inset), exposed on the client root
-// as `--foe-lineup-span` and `--foe-front-scale` so the scene caption stays
-// clear of it (styles/app-shell.css). A row that grows takes its room at
-// once; a row that shrinks (a foe fell or fled) keeps its room until the
-// leaving foe has faded; and a row that leaves the stage keeps it until the
-// whole row has faded, so the caption never slides under a fading figure.
-const foeLineupCount = computed(() => (foesOnStage.value ? Math.min(lineupFoes.value.length, FOE_LINEUP_MAX) : 0));
-const foeLineupReach = ref({ span: 0, front: 1 });
-function reachFor(count) {
-  return count > 0 ? { span: foeLineupSpan(count), front: foeSlots(count)[0].scale } : { span: 0, front: 1 };
+// The combat formation (webclient-combat-formation D1): while the stage is in
+// combat (the committed mode, or a held round that ended the fight), the
+// controlled figure, every drawn companion and every active foe up to
+// `16 - party` stand at the engine's boxes for the measured stage. The
+// counts, the mode and the measurements are all inputs of one computed, so a
+// roster change re-forms both sides in the same tick.
+const rootRef = ref(null);
+const formationActive = computed(() => stageMode.value === "combat");
+const partyFigureCount = computed(() => Math.max(1, renderedLineup.value.length));
+const foeLimit = computed(() => foeStageLimit(partyFigureCount.value));
+const formationCounts = computed(() => ({
+  party: partyFigureCount.value,
+  foes: foesOnStage.value ? Math.min(lineupFoes.value.length, foeLimit.value) : 0,
+}));
+const { formation, metrics: stageMetrics, instant: formationInstant } = useCombatFormation({
+  rootRef,
+  active: formationActive,
+  counts: formationCounts,
+});
+// A re-formed line glides at `full`, never across a reconnect or a resize.
+const formationGlide = computed(
+  () => store.view.motionLevel === "full" && !modeHydrating.value && !formationInstant.value,
+);
+useFormationGlide({ rootRef, formation, enabled: () => formationGlide.value });
+
+// The glance plates (design D4): one per drawn figure other than the
+// controlled one, in its formation plate slot. Numbers come from the combat
+// panel's participant row joined by identity (the displayed playback value
+// while a round plays); the session token is shown only while two drawn
+// figures share a name.
+const combatParticipants = computed(() =>
+  contextActionsPanel.value?.kind === "combat" && Array.isArray(contextActionsPanel.value.participants)
+    ? contextActionsPanel.value.participants
+    : [],
+);
+function participantFor(identity) {
+  if (identity === null || identity === undefined) return null;
+  const key = String(identity);
+  return combatParticipants.value.find((p) => String(p.identity) === key) ?? null;
 }
+const actingIdentity = computed(() => {
+  const gestures = beatStage.value?.gestures;
+  if (!gestures) return null;
+  const ref = Object.keys(gestures).find((key) => gestures[key]?.gesture === "lunge");
+  return ref ?? null;
+});
+const plateEntries = computed(() => {
+  const shape = formation.value;
+  if (!shape) return [];
+  const party = renderedLineup.value.slice(0, shape.party.figures.length);
+  const foes = lineupFoes.value.slice(0, shape.foes.figures.length);
+  const repeated = repeatedNames([...party.map((slot) => slot.displayName), ...foes.map((p) => p.display_name)]);
+  const displayHp = store.view.displayHp;
+  const entries = [];
+  party.forEach((slot, index) => {
+    if (slot.isControlled) return;
+    const row = participantFor(slot.identity);
+    entries.push({
+      key: `party:${slot.identity}`,
+      identity: slot.identity,
+      side: "party",
+      name: slot.displayName || row?.display_name || "",
+      token: row?.token ?? "",
+      showToken: repeated.has(slot.displayName),
+      hpCurrent: row ? plateHpCurrent(row, displayHp) : null,
+      hpMaximum: row?.hp_maximum ?? null,
+      plate: shape.party.figures[index].plate,
+      target: false,
+      acting: false,
+    });
+  });
+  foes.forEach((p, index) => {
+    // The committed row carries the current numbers; while a round plays a
+    // pre-round foe the committed roster has lost keeps its pre-round row.
+    const row = participantFor(p.identity) ?? p;
+    entries.push({
+      key: `foe:${p.identity}`,
+      identity: p.identity,
+      side: "foes",
+      name: p.display_name,
+      token: p.token ?? "",
+      showToken: repeated.has(p.display_name),
+      hpCurrent: plateHpCurrent(row, displayHp),
+      hpMaximum: row.hp_maximum ?? null,
+      plate: shape.foes.figures[index].plate,
+      target: focusedCombatTarget.value != null && String(focusedCombatTarget.value) === String(p.identity),
+      acting: actingIdentity.value != null && p.portrait_ref != null && String(p.portrait_ref) === actingIdentity.value,
+    });
+  });
+  return entries;
+});
+
+// The scene caption stays centred in the open stage between the party's
+// innermost figure and the leftmost foe (app-shell.css reads
+// `--caption-left`/`--caption-right`). The foe edge keeps the room of a line
+// that shrinks until its leaving foe has faded, and of a line that leaves the
+// stage until it has faded, so the caption never slides under a fading
+// figure; a line that grows takes its room at once.
+const captionGap = computed(() => 16 * (stageMetrics.value?.uiScale ?? 1));
+const partyEdge = computed(() => {
+  const figures = formation.value?.party.figures ?? [];
+  return figures.length ? Math.max(...figures.map((f) => f.box.left + f.box.width)) : null;
+});
+const foeEdgeNow = computed(() => {
+  const shape = formation.value;
+  const figures = shape?.foes.figures ?? [];
+  // The stage's width is twice its centre (the engine's frame).
+  return figures.length ? shape.centre * 2 - Math.min(...figures.map((f) => f.box.left)) : null;
+});
+const foeEdge = ref(null);
 watch(
-  foeLineupCount,
-  (count) => {
-    const next = reachFor(count);
-    if (count > 0 && next.span >= foeLineupReach.value.span) {
-      foeLineupReach.value = next;
+  foeEdgeNow,
+  (edge) => {
+    if (edge !== null && (foeEdge.value === null || edge >= foeEdge.value)) {
+      foeEdge.value = edge;
     }
   },
   { immediate: true },
 );
 function onFoeLineupSettled() {
-  foeLineupReach.value = reachFor(foeLineupCount.value);
+  foeEdge.value = foeEdgeNow.value;
 }
 function onFoeLineupGone() {
   if (!foesOnStage.value) {
-    foeLineupReach.value = reachFor(0);
+    foeEdge.value = null;
   }
 }
+const rootStyle = computed(() => {
+  const style = {};
+  // The shared figure scale, for the figures' placeholder glyphs and labels.
+  if (formation.value) style["--formation-scale"] = formation.value.scale;
+  if (partyEdge.value !== null) style["--caption-left"] = `${partyEdge.value + captionGap.value}px`;
+  if (foeEdge.value !== null) style["--caption-right"] = `${foeEdge.value + captionGap.value}px`;
+  return style;
+});
 </script>
 
 <template>
   <div
+    ref="rootRef"
     class="elosern-root"
     data-testid="elosern-client-root"
-    :style="{ '--foe-lineup-span': foeLineupReach.span, '--foe-front-scale': foeLineupReach.front }"
+    :style="rootStyle"
   >
       <AppShell
         ref="shellRef"
@@ -359,6 +468,7 @@ function onFoeLineupGone() {
         :beat-hold="beatHold"
         :card-open="presenceCardOpen || roomCardOpen"
         :person-focus="personFocus"
+        :formation="!!formation"
         :speaker="speaker"
         :mode-hydrating="modeHydrating"
         :connection-status="store.view.connectionStatus"
@@ -433,6 +543,8 @@ function onFoeLineupGone() {
             :gesture="playerGesture?.gesture ?? null"
             :gesture-key="beatStage?.key ?? null"
             :float-amount="playerGesture?.amount ?? null"
+            :formation="formation?.party ?? null"
+            :glide="formationGlide"
           />
         </template>
         <!-- The opposite side of the stage (webclient-dialogue-stage-actors
@@ -482,14 +594,45 @@ function onFoeLineupGone() {
               v-if="foesOnStage"
               :foes="combatFoes"
               :stage="beatStage"
-              :display-hp="store.view.displayHp"
-              :focused-target="focusedCombatTarget"
+              :max="foeLimit"
+              :formation="formation?.foes ?? null"
+              :glide="formationGlide"
               :inert="beatHold || null"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
               @settled="onFoeLineupSettled"
             />
           </Transition>
+        </template>
+        <!-- The glance plates (webclient-combat-formation D4): one per drawn
+             figure other than the controlled one, at its formation plate
+             slot. They rise in once their figures have landed, glide with
+             them on a re-formed line, and fade where they stand on leaving. -->
+        <template #plates>
+          <TransitionGroup
+            tag="div"
+            class="figure-plates"
+            name="figure-plate"
+            :data-glide="formationGlide ? 'true' : 'false'"
+            :css="hostTransitionCss"
+            v-bind="inertWhileLeaving"
+          >
+            <FigurePlate
+              v-for="entry in plateEntries"
+              :key="entry.key"
+              :identity="entry.identity"
+              :name="entry.name"
+              :token="entry.token"
+              :show-token="entry.showToken"
+              :side="entry.side"
+              :hp-current="entry.hpCurrent"
+              :hp-maximum="entry.hpMaximum"
+              :form="entry.plate.form"
+              :box="entry.plate"
+              :target="entry.target"
+              :acting="entry.acting"
+            />
+          </TransitionGroup>
         </template>
         <!-- The dialogue choice list (webclient-dialogue-choices-overlay
              D4/D5), centred over the stage: only in dialogue with the panel
@@ -611,9 +754,10 @@ function onFoeLineupGone() {
       </template>
       <!-- The `map` anchor (webclient-avg-stage-hud-anchors design D1/D4),
            at the stage's top-right, in this order: the minimap island, the
-           one-line objective (exploration only), the combat participant
-           frame, and the title ballot. No reference panel lives here; they
-           are drawers. -->
+           one-line objective (exploration only), and the title ballot. It is
+           not rendered in combat, where the formation stands in the right
+           column (webclient-combat-formation D2). No reference panel lives
+           here; they are drawers. -->
       <template #map>
         <!-- The minimap island (H2, design D9); hidden in combat. The
              `@move` wiring and `explore.move` submission are untouched. -->
@@ -630,15 +774,6 @@ function onFoeLineupGone() {
         <ObjectiveTracker
           v-if="showObjectiveTracker"
           :rows="store.objectivesRows"
-        />
-        <!-- The combat participant frame (H3, design D4): the minimap is
-             hidden in combat, so the frame takes the top-right; it never
-             stands on a portrait anchor. -->
-        <ParticipantFrame
-          v-if="contextActionsPanel && contextActionsPanel.kind === 'combat' && Array.isArray(contextActionsPanel.participants)"
-          :participants="contextActionsPanel.participants"
-          :art-panel="panel('art')"
-          :display-hp="store.view.displayHp"
         />
         <!-- The epithet nomination ballot menu (title-epithet-nomination):
              mounted only while the committed `title_ballot` panel carries
@@ -1050,6 +1185,41 @@ function onFoeLineupGone() {
 }
 [data-anchor="actor-right"] > .foes-enter-enter-from,
 [data-anchor="actor-right"] > .foes-enter-leave-to {
+  opacity: 0;
+}
+
+/* The glance plates (webclient-combat-formation D4). The group spans the
+   plates layer, so each plate's slot is in stage pixels. A re-formed line
+   glides each plate with its figure (the slots' own duration and easing);
+   on a resize, a reconnect and below `full` it moves in place. A plate rises
+   out of its anchored foot and fades in once its figure has landed (after
+   the travel duration), and fades where it stands when its figure leaves;
+   `reduced` keeps only the fade and `off` has no CSS phase at all. */
+.figure-plates {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.figure-plates[data-glide="true"] > .figure-plate {
+  transition:
+    left calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    top calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    width calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard),
+    height calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);
+}
+.figure-plates > .figure-plate-enter-active {
+  transition:
+    opacity var(--motion-actor) var(--ease-standard) calc(var(--motion-actor) * var(--motion-travel)),
+    transform var(--motion-actor) var(--ease-enter) calc(var(--motion-actor) * var(--motion-travel));
+}
+.figure-plates > .figure-plate-leave-active {
+  transition: opacity var(--motion-actor) var(--ease-exit);
+}
+.figure-plates > .figure-plate-enter-from {
+  opacity: 0;
+  transform: translateY(calc(var(--motion-shift-sm) * 0.5 * var(--motion-travel)));
+}
+.figure-plates > .figure-plate-leave-to {
   opacity: 0;
 }
 

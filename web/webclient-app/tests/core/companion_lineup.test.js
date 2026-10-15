@@ -149,4 +149,46 @@ describe("companion standing lineup", () => {
     expect(slot().get('[data-testid="stage-actor"]').attributes("data-speaking")).toBe("false");
     wrapper.unmount();
   });
+  // webclient-combat-formation (design D1/D3): in combat each figure stands
+  // at its formation box in stage pixels; outside combat the exploration
+  // row's geometry is exactly what it was.
+  it("stands at the formation's boxes only while a formation is given, and restores the exploration row", async () => {
+    const wrapper = mount(CompanionLineup, { props: { slots: figures(), motionLevel: "off" } });
+    const exploration = () => wrapper.findAll('[data-testid="companion-figure"]').map((slot) => {
+      const style = slot.element.style;
+      return [style.right, style.bottom, style.height, style.width, style.left, style.top, style.zIndex];
+    });
+    const before = exploration();
+    expect(before.every(([, , , , left, top]) => left === "" && top === "")).toBe(true);
+    expect(wrapper.attributes("data-formation")).toBeUndefined();
+    const formation = {
+      ranks: 1,
+      form: "full",
+      figures: Array.from({ length: 5 }, (_, index) => ({
+        index, rank: 0, box: { left: 80 + index * 60, top: 300, width: 160, height: 240 }, z: 5 - index,
+      })),
+    };
+    await wrapper.setProps({ formation });
+    expect(wrapper.attributes("data-formation")).toBe("true");
+    wrapper.findAll('[data-testid="companion-figure"]').forEach((slot, index) => {
+      const { box, z } = formation.figures[index];
+      const style = slot.element.style;
+      expect([style.left, style.top, style.width, style.height]).toEqual(
+        [box.left, box.top, box.width, box.height].map((value) => `${value}px`),
+      );
+      expect(style.right).toBe("");
+      expect(Number(style.zIndex)).toBe(z);
+      expect(slot.get(".formation-figure").attributes("data-glide-key")).toBe(`party:${slot.attributes("data-identity")}`);
+    });
+    // The controlled figure is the formation's first (outer-edge) figure.
+    expect(wrapper.get('[data-slot="0"]').attributes("data-controlled")).toBe("true");
+    await wrapper.setProps({ formation: null });
+    expect(wrapper.attributes("data-formation")).toBeUndefined();
+    expect(exploration()).toEqual(before);
+    // The glide flag follows the shell: a resize or a reconnect re-forms in place.
+    expect(wrapper.attributes("data-glide")).toBe("true");
+    await wrapper.setProps({ glide: false });
+    expect(wrapper.attributes("data-glide")).toBe("false");
+    wrapper.unmount();
+  });
 });

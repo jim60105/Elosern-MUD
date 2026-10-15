@@ -149,7 +149,11 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
     expect(w.find('[data-anchor="vitals"] [data-testid="objective-tracker"]').exists()).toBe(false);
   });
 
-  it("puts the combat participant frame in the map anchor, never on a portrait anchor", async () => {
+  it("renders no participant roster in combat: the map anchor holds no combat surface", async () => {
+    // webclient-combat-formation D2: the roster is gone; each figure carries
+    // its own plate in the `plates` layer, and the `map` anchor is hidden in
+    // combat. The guarded defect: a roster (or any numbers panel) standing in
+    // the map column or on a portrait anchor.
     const w = await mountClient(
       {
         status: fx.statusPanel(),
@@ -157,8 +161,9 @@ describe("the map anchor's island order (webclient-avg-stage-hud-anchors design 
       },
       "combat",
     );
-    expect(w.find('[data-anchor="map"] [data-testid="participant-frame"]').exists()).toBe(true);
-    expect(w.find('[data-anchor="actor-right"] [data-testid="participant-frame"]').exists()).toBe(false);
+    expect(w.find('[data-testid="participant-frame"]').exists()).toBe(false);
+    expect(w.get('[data-anchor="map"]').text()).not.toMatch(/\d+\s*\/\s*\d+/);
+    expect(w.find('[data-anchor="actor-right"] [data-testid="figure-plate"]').exists()).toBe(false);
     // actor-right holds only the foe line-up's decorative actors
     // (webclient-combat-foes-on-stage): one per active foe, no frame content.
     const actorRight = w.get('[data-anchor="actor-right"]');

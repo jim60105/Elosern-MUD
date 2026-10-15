@@ -520,13 +520,25 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
     const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
     const rule = extractRule(shellCss, ".elosern-root .scene-backdrop .scene-backdrop__caption");
     expect(rule).toContain("bottom: calc(var(--command-line-h) + 12px * var(--ui-scale));");
-    expect(rule).toContain("left: calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale));");
-    // The right side clears the right anchor box, or, while the foe line-up
-    // stands (webclient-combat-foes-on-stage), its leftmost foe.
-    expect(rule).toContain("calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)),");
-    expect(rule).toContain("var(--actor-h) * 2 / 3 * var(--foe-lineup-span, 0) + 16px * var(--ui-scale)");
-    expect(rule).toContain("var(--foe-face-clear) - var(--actor-h) * var(--foe-front-scale, 1) / 3");
-    expect(rule).toContain("transition: right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard);");
+    // Outside combat each side clears its portrait anchor's box; in combat
+    // (webclient-combat-formation) the anchors span the stage, so the sides
+    // are the party's innermost figure and the leftmost foe, which AppClient
+    // publishes as `--caption-left` / `--caption-right`. The guarded defect:
+    // a caption painted under a figure on either side.
+    expect(rule).toContain(
+      "left: var(--caption-left, calc(var(--actor-left-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)));",
+    );
+    expect(rule).toContain(
+      "right: var(--caption-right, calc(var(--actor-right-inset) + var(--actor-h) * 2 / 3 + 16px * var(--ui-scale)));",
+    );
+    expect(rule).toContain("left calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard)");
+    expect(rule).toContain("right calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard)");
+    // The retired foe-row reach tokens are gone everywhere.
+    const tokensCss = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
+    for (const retired of ["--foe-lineup-span", "--foe-front-scale", "--foe-face-clear"]) {
+      expect(shellCss).not.toContain(retired);
+      expect(tokensCss).not.toContain(retired);
+    }
     expect(shellCss).not.toMatch(/scene-backdrop[^{]*\{[^}]*\d+vh/);
     const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf8");
     expect(tokens).toContain(
@@ -580,5 +592,109 @@ describe("bottom band ownership (webclient-avg-stage-shell design D1/D2)", () =>
       "band-message",
       "band-command",
     ]);
+  });
+});
+
+// webclient-combat-formation (design D1/D2/D4): while the formation stands
+// the portrait anchors span the stage, the `map` anchor leaves in combat, and
+// the `plates` layer holds the figure plates between the portrait anchors and
+// the islands.
+describe("the combat formation stage (webclient-combat-formation)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("spans both portrait anchors over the stage only while the formation stands", async () => {
+    const wrapper = mount(HudFrame, { props: { mode: "combat", formation: true } });
+    const stage = wrapper.get('[data-testid="elosern-stage"]');
+    expect(stage.attributes("data-formation")).toBe("true");
+    await wrapper.setProps({ mode: "exploration", formation: false });
+    expect(stage.attributes("data-formation")).toBeUndefined();
+    // Keyed on the formation, not on the mode: a held round that ended the
+    // fight keeps it while the mode is already exploration.
+    const css = styleBlock("components/HudFrame.vue");
+    const start = css.indexOf('.elosern-stage[data-formation="true"] [data-anchor="actor-left"],');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const rule = css.slice(start, css.indexOf("}", start) + 1);
+    expect(rule).toContain('.elosern-stage[data-formation="true"] [data-anchor="actor-right"]');
+    expect(rule).toContain("inset: 0;");
+    expect(rule).toContain("height: auto;");
+    expect(rule).toContain("aspect-ratio: auto;");
+    // A line-up still fading out after the formation ended keeps the right
+    // anchor spanning the stage, so its foes fade where they stood.
+    expect(rule).toContain('[data-anchor="actor-right"]:has(> [data-testid="foe-lineup"][data-formation="true"])');
+    // Styling pitfall: no `.elosern-root` duplicate re-places the portrait
+    // anchors over the formation's stage coordinates.
+    const shellCss = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    for (const anchor of ["actor-left", "actor-right"]) {
+      const duplicate = extractRule(shellCss, `.elosern-root [data-anchor="${anchor}"]`);
+      expect(duplicate).not.toMatch(/(?<![-\w])(left|right|top|bottom|inset|height|width)\s*:/);
+    }
+    wrapper.unmount();
+  });
+
+  it("hides the whole map anchor in combat and rescues focus out of it", async () => {
+    const css = styleBlock("components/HudFrame.vue");
+    expect(extractRule(css, '.elosern-stage[data-elosern-mode="combat"] [data-anchor="map"]')).toContain("display: none");
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const wrapper = mount(AppShell, {
+      attachTo: host,
+      props: { mode: "exploration" },
+      slots: {
+        "action-dock": () => h(ActionDock, { mode: "exploration" }),
+        map: () => h("button", { type: "button", "data-testid": "map-island-control" }, "島"),
+      },
+    });
+    await nextTick();
+    const inMap = wrapper.get('[data-anchor="map"] [data-testid="map-island-control"]').element;
+    inMap.focus();
+    expect(document.activeElement).toBe(inMap);
+    await wrapper.setProps({ mode: "combat" });
+    expect(document.activeElement).toBe(document.getElementById("action-dock"));
+    wrapper.unmount();
+  });
+
+  it("stands the plates layer above the portraits and the flash, below the islands, inert while held", async () => {
+    const wrapper = mount(HudFrame, {
+      props: { mode: "combat", formation: true },
+      slots: { plates: () => h("div", { "data-testid": "a-plate" }) },
+    });
+    const stage = wrapper.get('[data-testid="elosern-stage"]').element;
+    const order = [...stage.children].map((el) => el.getAttribute("data-testid") || el.className);
+    expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("stage-flash"));
+    expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("anchor-actor-right"));
+    expect(order.indexOf("anchor-plates")).toBeLessThan(order.indexOf("anchor-vitals"));
+    const layer = wrapper.get('[data-testid="anchor-plates"]');
+    expect(layer.attributes("data-anchor")).toBe("plates");
+    expect(layer.find('[data-testid="a-plate"]').exists()).toBe(true);
+    expect(layer.findAll("button, a, input, [tabindex]")).toHaveLength(0);
+    expect(layer.attributes("inert")).toBeUndefined();
+    await wrapper.setProps({ beatHold: true, mode: "exploration" });
+    expect(layer.attributes("inert")).toBeDefined();
+    expect(layer.attributes("aria-hidden")).toBe("true");
+    const css = styleBlock("components/HudFrame.vue");
+    const rule = extractRule(css, '.elosern-stage [data-anchor="plates"]');
+    expect(rule).toContain("inset: 0;");
+    expect(rule).toContain("z-index: 3;");
+    expect(rule).toContain("pointer-events: none;");
+    // The islands stand above it (z-index 4) and the band above them.
+    expect(extractRule(css, '.elosern-stage [data-anchor="map"]')).toContain("z-index: 4;");
+    wrapper.unmount();
+  });
+
+  it("carries a hidden metrics probe that resolves the engine's length tokens", () => {
+    const wrapper = mount(HudFrame, { props: { mode: "exploration" } });
+    const probe = wrapper.get('[data-testid="stage-metrics"]');
+    expect(probe.attributes("aria-hidden")).toBe("true");
+    expect(probe.findAll("[data-metric]").map((el) => el.attributes("data-metric"))).toEqual([
+      "--actor-h",
+      "--header-h",
+      "--band-h",
+    ]);
+    const css = styleBlock("components/HudFrame.vue");
+    expect(css).toContain('.elosern-stage .stage-metrics > [data-metric="--actor-h"] { height: var(--actor-h); }');
+    expect(extractRule(css, ".elosern-stage .stage-metrics")).toContain("visibility: hidden;");
+    wrapper.unmount();
   });
 });

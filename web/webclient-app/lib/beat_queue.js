@@ -227,9 +227,10 @@ export function displayHpFor(state) {
 
 // webclient-combat-beat-choreography D3: the stage while a round plays.
 //
-// The foe line-up shows at most this many foes (components/foe-lineup.js
-// FOE_LINEUP_MAX); a foe beyond it has no stage actor, so it plays no gesture.
-const STAGE_FOES = 3;
+// The foe line-up stands every active foe up to this many
+// (components/foe-lineup.js FOE_STAGE_MAX; webclient-combat-formation); a foe
+// beyond it has no stage actor, so it plays no gesture.
+const STAGE_FOES = 15;
 
 // The motion token each gesture lasts (design D1/D2).
 export const GESTURE_TOKENS = Object.freeze({
@@ -256,8 +257,8 @@ function foeKey(row) {
 //   leaves already faded.
 // - `gestures`: key -> `{gesture, amount}` for the current step, in its act
 //   and pause phases (the rising number runs on into the pause), for the
-//   stage actors that stand on the stage only: the player and the first
-//   three foes. The player never plays `defeat`.
+//   stage actors that stand on the stage only: the player and the foes the
+//   line-up stands. The player never plays `defeat`.
 // - `key`: `<round>:<step>`, so a new step restarts a gesture on the same
 //   figure.
 export function stageFor(state) {

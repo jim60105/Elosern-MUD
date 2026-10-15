@@ -9,14 +9,19 @@
 //   it may cover the player portrait's lowest
 //   strip, never its face) and
 //   `map` at the top-right (the place card first — place-card-relocation
-//   design D2 — then the minimap, the one-line objective, the combat
-//   participant frame, and the title ballot);
+//   design D2 — then the minimap, the one-line objective, and the title
+//   ballot). In combat the `map` anchor is not rendered: the combat
+//   formation uses the stage's right column (webclient-combat-formation D2);
 // - the portrait anchors `actor-left` (the controlled figure and companions) and
 //   `actor-right` (the dialogue host's stage actor while the mode is
 //   dialogue, the foe line-up while it is combat —
 //   webclient-combat-foes-on-stage), standing on the bottom band's top edge.
-//   In combat `actor-right` keeps its box and lets the line-up's row reach
-//   left beyond it;
+//   While the combat formation stands (`formation`, webclient-combat-formation
+//   D1) both anchors span the stage, so the line-ups' formation boxes are
+//   stage coordinates;
+// - the `plates` layer (webclient-combat-formation D4): a stage-sized,
+//   pointer-transparent layer above the portrait anchors and below the
+//   islands, holding only the combat figures' glance plates;
 // - the `choices` anchor (webclient-dialogue-choices-overlay D6): the
 //   centred card — the dialogue choice list, or in exploration the
 //   person-focus verb card and the presence overflow card
@@ -41,7 +46,8 @@
 //
 // Layers: backdrop 0, vignette 1, combat veil 2, portrait anchors 2 (after
 // the veil in DOM order, so the player stays bright in combat), the combat
-// flash 3, the presence anchor, the island anchors, and the choices anchor
+// flash 3, the plates layer 3 (after the flash), the presence anchor, the
+// island anchors, and the choices anchor
 // 4 (the choices anchor last in DOM order, so a card paints over the rail),
 // band 5, command line 6. Drawers and overlays live outside the stage, above
 // all of it.
@@ -97,6 +103,10 @@ const props = defineProps({
   cardOpen: { type: Boolean, default: false },
   // A person's verb card is open: the cockpit steps away around it.
   personFocus: { type: Boolean, default: false },
+  // The combat formation stands (webclient-combat-formation D1): in combat
+  // and while a round that ended the fight still plays. The portrait anchors
+  // then span the stage and the `plates` layer shows.
+  formation: { type: Boolean, default: false },
 });
 
 // The open-surface registry drives the `menu-open` mark (design D9): the
@@ -136,7 +146,16 @@ defineExpose({ menuOpen });
     :data-beat-hold="beatHold ? 'combat' : null"
     :data-card-open="cardOpen ? 'true' : null"
     :data-person-focus="personFocus ? 'true' : null"
+    :data-formation="formation ? 'true' : null"
   >
+    <!-- The stage metrics probe (webclient-combat-formation D1): boxes whose
+         heights resolve the shell's length tokens, which their computed
+         custom properties do not, so the formation input reads real px. -->
+    <div class="stage-metrics" data-testid="stage-metrics" aria-hidden="true">
+      <span data-metric="--actor-h"></span>
+      <span data-metric="--header-h"></span>
+      <span data-metric="--band-h"></span>
+    </div>
     <div class="stage-vignette" data-testid="stage-vignette"></div>
     <!-- Decorative: always rendered, faded by opacity (design D2). -->
     <div
@@ -165,6 +184,19 @@ defineExpose({ menuOpen });
     <!-- The combat entry flash (design D2): decorative, above the backdrop
          and the portraits, under every island and the band. -->
     <div class="stage-flash" data-testid="stage-flash" aria-hidden="true"></div>
+    <!-- The figure plates (webclient-combat-formation D4): filled only
+         while the formation stands (a leaving plate fades out inert); inert
+         and hidden from assistive technology while a round that ended the
+         fight is held. -->
+    <div
+      class="stage-anchor"
+      data-anchor="plates"
+      data-testid="anchor-plates"
+      :inert="beatHold || null"
+      :aria-hidden="beatHold ? 'true' : null"
+    >
+      <slot name="plates" />
+    </div>
     <div
       class="stage-anchor"
       data-anchor="presence"
@@ -367,12 +399,52 @@ defineExpose({ menuOpen });
    acts only as the floor). */
 .elosern-stage [data-anchor="actor-left"] { left: var(--actor-left-inset); overflow: visible; }
 .elosern-stage [data-anchor="actor-right"] { right: var(--actor-right-inset); }
-/* The foe line-up (webclient-combat-foes-on-stage D2) grows leftward from
-   this box's right edge and steps in to the combat inset; the anchor keeps
-   its box and shows what reaches past it. */
-.elosern-stage[data-elosern-mode="combat"] [data-anchor="actor-right"] {
+/* The combat formation (webclient-combat-formation D1): both portrait
+   anchors span the stage, so the line-ups' formation boxes are stage
+   coordinates. Keyed on `data-formation`, not on the mode: a held round that
+   ended the fight keeps the formation while the mode is already another. The
+   anchors stay pointer-transparent; the figures' chest labels need no
+   dock-clearing offset here (the formation keeps the dock off every face).
+   A foe line-up still fading out after the formation ended keeps the
+   right anchor spanning the stage, so its foes fade where they stood. */
+.elosern-stage[data-formation="true"] [data-anchor="actor-left"],
+.elosern-stage[data-formation="true"] [data-anchor="actor-right"],
+.elosern-stage [data-anchor="actor-right"]:has(> [data-testid="foe-lineup"][data-formation="true"]) {
+  inset: 0;
+  height: auto;
+  aspect-ratio: auto;
   overflow: visible;
+  --actor-label-left: 18%;
 }
+
+/* The plates layer (design D4): stage-sized and non-scrolling, above the
+   portrait anchors (and the flash, after it in DOM order) and below the
+   islands, the band, the choices anchor and the command line. */
+.elosern-stage [data-anchor="plates"] {
+  inset: 0;
+  z-index: 3;
+  overflow: visible;
+  pointer-events: none;
+}
+
+/* The metrics probe: laid out, never painted, never hit. */
+.elosern-stage .stage-metrics {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.elosern-stage .stage-metrics > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 1px;
+}
+.elosern-stage .stage-metrics > [data-metric="--actor-h"] { height: var(--actor-h); }
+.elosern-stage .stage-metrics > [data-metric="--header-h"] { height: var(--header-h); }
+.elosern-stage .stage-metrics > [data-metric="--band-h"] { height: var(--band-h); }
 
 /* choices (webclient-dialogue-choices-overlay D6): the dialogue choice
    list, horizontally centred on the stage at `min(560px, 40%)` wide and
@@ -592,6 +664,14 @@ defineExpose({ menuOpen });
 }
 .elosern-stage[data-elosern-mode="combat"] .local-map {
   display: none !important;
+}
+/* The `map` anchor in combat (webclient-combat-formation D2): the place
+   card and everything else in the right column leave while the mode is
+   combat, because the formation stands there. A held round that ended the
+   fight follows the committed mode at the commit, so the column returns at
+   once (the held foes are inert decoration over it until the round ends). */
+.elosern-stage[data-elosern-mode="combat"] [data-anchor="map"] {
+  display: none;
 }
 /* The objective line (webclient-avg-stage-hud-anchors design D2) is an
    exploration-only surface; it carries no tab stop, so no focus rescue. */
