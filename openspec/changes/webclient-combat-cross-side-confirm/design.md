@@ -46,7 +46,11 @@ client table keyed by skill key (drifts from the registry), parsing the descript
 The two fields are additive and required. The server presenter, the client validator and the bundle ship from one
 commit in this pre-release repository, so no peer ever pairs an old validator with a new presenter; bumping
 `context_actions` to 6 would rename requirement headers in three capabilities and rewrite every fixture's version for
-no compatibility benefit. If the user prefers a bump, it is a
+no compatibility benefit. Accepted risk: a long-open tab running the old bundle rejects the new payload (its exact
+validator sees unknown fields) until it reloads — a version bump would not help that tab either. Making the fields
+optional like `freeform_scales` would degrade gracefully but reintroduce "no fact" as a silent no-confirm path, so
+they stay required. Note that `world/rules/tests/test_combat_view.py` constructs `SkillDescriptorView` with keyword
+arguments and must pass the new fields. If the user prefers a bump, it is a
 mechanical follow-up.
 
 ### D3. The predicate: `stores/elosern/cross_side.js`
@@ -74,8 +78,16 @@ descriptor for `combat.focusSkillKey`, and calls `crossSide`. On `null` it dispa
   (the same in-flight lock and echo), then clear.
 - **否 / ✕ / Escape** → `cancelCrossSide()`: clear, `router.focusItemByKey(focusKey)`, and request DOM focus on
   `#action-dock` (`dockFocusRequest`). The AREA selection lives in the model and is untouched.
-- **Invalidation**: a committed `context_actions` replacement, `beatLocked()` turning true, or a mode change clears
-  `crossSideConfirm` without sending.
+- **Invalidation**: a committed `context_actions` replacement that removes or disables the pending skill or drops a
+  pending target (or the shorthand) from its candidates, `beatLocked()` turning true, or a mode change clears
+  `crossSideConfirm` without sending; an unrelated replacement (e.g. a resync with the same candidates) keeps it.
+- **Unresolvable target**: an identity with no committed participant row counts as both sides (fail closed), so a
+  harmful or restorative skill asks with the 友方與敵方 wording.
+- **Pointer**: while `crossSideConfirm` is set, `stageTargetPointer` is a no-op and the line-ups' hit areas and the
+  prompt chips get `pointer-events: none` (AppClient passes the flag), so no click or hover behind the modal moves the
+  router focus or sends a cast.
+- **Focus on close**: `confirmCrossSide` and every invalidation request DOM focus on the mode's focus home
+  (`#action-dock` in combat) through `dockFocusRequest` / `restoreFocusHome`, so closing never leaves focus on body.
 - **Keys**: while `crossSideConfirm` is set, `focusPress` claims nothing for the dock (returns `false` for arrows,
   digits, Enter, Space, Escape), so the router cannot re-submit; the QuestionCard handles its own keys.
 
@@ -108,6 +120,9 @@ Fixtures gain a healing SINGLE skill, a harmful SELF skill, a harmful AREA skill
 Pre-release; no data migration. Rollback is reverting the change's commits.
 
 ## Open Questions
+
+- The user specified two wordings (友方, 敵方); this change adds 自己 (only the actor is hit) and 友方與敵方 (a
+  skill with both facts hitting both sides, or an unresolvable target). Confirm or reduce to the two.
 
 - Should debuff-polarity buffs, gauge transfers or sexual effects aimed across sides also ask? This change counts only
   damage (harm) and heal/cleanse (restore).

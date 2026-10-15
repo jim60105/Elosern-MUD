@@ -41,15 +41,23 @@ Aiming a harmful skill at the player's own side, or a restorative skill at the o
 
 #### Scenario: The question keeps the stage and the keys consistent
 - **WHEN** the question card is open
-- **THEN** the stage keeps the target step's dim, lit set and markers unchanged, the collapsed command card is inert beneath the question card, no dock key (arrows, digits, Enter, Space) moves or activates the target step, and the question card traps focus among its controls as the room cards' question does
+- **THEN** the stage keeps the target step's dim, lit set and markers unchanged, the collapsed command card is inert beneath the question card, no dock key (arrows, digits, Enter, Space) moves or activates the target step, no pointer on a figure's hit area or a prompt chip focuses, moves or sends anything (the hit areas and chips take no pointer while the question is open), and the question card traps focus among its controls as the room cards' question does
 
 #### Scenario: The question is accessible
 - **WHEN** the question card opens
 - **THEN** it is a modal dialog labelled by its question text, so assistive technology announces `確定要對友方使用〈基本攻擊〉？`, and its first focused control is 否
 
 #### Scenario: A change under the question cancels it
-- **WHEN** the question card is open and a committed `context_actions` replacement arrives, a combat round starts playing, or the committed mode leaves combat
-- **THEN** the question card closes without sending; on a replacement the target step returns with the existing selection repair, and the server's validation still decides every sent cast
+- **WHEN** the question card is open and a committed `context_actions` replacement removes or disables the pending skill or drops one of its chosen targets (or the chosen shorthand) from the candidates, a combat round starts playing, or the committed mode leaves combat
+- **THEN** the question card closes without sending and DOM focus goes to the mode's focus home (`#action-dock` in combat), never the document body; on a replacement the target step returns with the existing selection repair; a replacement that leaves the pending skill, its targets and its shorthand valid keeps the question open; the server's validation still decides every sent cast
+
+#### Scenario: Confirming returns focus to the dock
+- **WHEN** the player activates 是
+- **THEN** exactly one cast is sent, the question card closes, and DOM focus is on `#action-dock`, never the document body
+
+#### Scenario: An unresolvable target fails closed
+- **WHEN** a harmful or restorative submission names a target identity that no committed participant row carries
+- **THEN** the client asks with the question naming 友方與敵方 instead of sending at once
 
 #### Scenario: A locked submission waits
 - **WHEN** a mutation is in flight while the question card is open

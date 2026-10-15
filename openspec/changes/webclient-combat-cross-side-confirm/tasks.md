@@ -14,7 +14,8 @@ scratch file; no loops over browser files; Evennia commands use a `MUD_TEST_SETT
 - [ ] 1.2 `web/webclient/presentation/combat_panel.py`: emit both in `_serialize_skill` and require both as booleans in
   the skill validator's exact field set. `web/static/webclient/js/elosern/protocol/panels/combat.js`: require both in
   `validateSkill` (booleans). Update the hand-written combat skill descriptors these validators see: find them with
-  `grep -rln "\"shorthands\"\|shorthands:" web/webclient/presentation/tests web/static/webclient/js/tests web/webclient-app/tests web/webclient-app/stories web/tests/browser/_journey_support.py world/rules/tests/test_combat_view.py`
+  `grep -rln "\"shorthands\"\|shorthands:\|shorthands=" web/webclient/presentation/tests web/static/webclient/js/tests web/webclient-app/tests web/webclient-app/stories web/tests/browser/_journey_support.py world/rules/tests`
+  (the grep is a starting point; the focused runs in 1.3 and 2.4 are the authority)
   and add `harms`/`restores` (prefer the shared builders: `web/webclient/presentation/tests/test_combat_panel/_support.py`,
   `web/static/webclient/js/tests/protocol_fixtures.js`, `web/webclient-app/stories/fixtures/combat_stage.js`).
 - [ ] 1.3 Tests: in `world/rules/tests/test_combat_view.py` assert the six cases of the delta scenario "Each skill
@@ -44,7 +45,9 @@ scratch file; no loops over browser files; Evennia commands use a `MUD_TEST_SETT
   `stageTargetPointer` activation on an ally with Attack send nothing and set `crossSideConfirm`; `confirmCrossSide`
   sends exactly one payload equal to the no-question payload; `cancelCrossSide` restores the focus key and leaves the
   AREA selection; Enter/arrows/digits with the question open dispatch nothing and move nothing; a panel replacement,
-  `beatLocked` and a mode change clear it; Attack on a foe and heal on an ally dispatch at once). Add
+  `beatLocked` and a mode change clear it while an unrelated replacement keeps it; `stageTargetPointer` hover and
+  activate are no-ops while it is open; `confirmCrossSide` and each invalidation request focus on `#action-dock`; an
+  unresolvable target identity asks with the 友方與敵方 wording; Attack on a foe and heal on an ally dispatch at once). Add
   `web/webclient-app/tests/core/question_card.test.js`: `initialFocus="no"` focuses 否 on mount and after a lock
   releases; the default still focuses 是. Run
   `pnpm test -- web/webclient-app/tests/store/cross_side_confirm.test.js web/webclient-app/tests/core/question_card.test.js web/webclient-app/tests/store/stage_target_step.test.js web/webclient-app/tests/app_client_room_actions.test.js`
@@ -58,8 +61,9 @@ Build once: `pnpm run build`.
   `CombatStageBrowserTest`: Attack → a companion → Enter opens `[data-testid="cross-side-question"]` with role
   `dialog`, the text `確定要對友方使用〈基本攻擊〉？` and focus on 否, no `combat.cast` sent, every figure's
   `data-speaking` unchanged from the step; Escape returns to the step with focus on `#action-dock` and the same
-  marker focused; Enter again then 是 sends exactly one `combat.cast` with that companion's `target_ids`; Attack on a
-  foe sends at once with no dialog. Annotate it with the IDs it establishes (confirm spellings with `list`) and
+  marker focused; Enter again then 是 sends exactly one `combat.cast` with that companion's `target_ids`; with the question open a click on a foe's
+  `stage-target-hit` sends nothing; after 是 the active element is `#action-dock`; Attack on a foe sends at once with no
+  dialog. Annotate it with the IDs it establishes (confirm spellings with `list`) and
   register it in `.github/browser-shards.json` beside the other `CombatStageBrowserTest` methods. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_cross_side_cast_asks_first web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage`
   and verify both pass.

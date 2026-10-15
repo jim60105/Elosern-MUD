@@ -48,7 +48,8 @@ None.
   (submission interception for `target-*`, `self-confirm`, `area-confirm`); `stores/elosern/view.js`
   (`view.crossSideConfirm`); `stores/elosern/interaction.js` (no dock key while the question is open);
   `AppClient.vue` (`choices` slot); `components/QuestionCard.vue` (`initialFocus`); `components/ActionDock.vue`
-  (inert while the question is open).
+  (inert while the question is open; chips take no pointer); `components/FoeLineup.vue` and
+  `components/CompanionLineup.vue` (hit areas take no pointer while the question is open).
 - Fixtures: every hand-written combat skill descriptor that passes a wire validator gains the two fields (server
   `_support.py` helpers, `web/static/webclient/js/tests/protocol_fixtures.js`, Storybook fixtures).
 - Tests: Python presenter/view tests, the Node wire test, a new Vitest file, one new browser method registered in
