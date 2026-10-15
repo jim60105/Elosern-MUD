@@ -99,6 +99,40 @@ never enters the card's columns, even for its 240ms gesture (the beats requireme
   (the participant cap), plus `CombatEnterJourney` (exploration → combat at full) and `CombatReducedMotion`.
 - `Core/FoeLineup` and `Core/CompanionLineup` gain `Formation` stories.
 
+### D7. Heads are never covered; plates are never covered (user decision at apply time)
+
+The user ruled: no standing figure's head — front rank or back rank — may ever be covered, by a plate, a target
+marker or another figure; lower bodies may be covered; nothing may cover a plate. The engine
+(`components/combat-formation.js`, archived with `webclient-combat-formation-engine`) is amended in this change:
+
+- **Head proxy.** A head is the central 30% of a figure box's width and its top 22% (`HEAD_WIDTH`, `HEAD_HEIGHT`).
+  Measured on the shipped standing art, a head with its hair spans about 15–18% of the box's width and the top
+  16–17% of its height, so the proxy is conservative. A per-figure head from the committed face rectangle would
+  need the art in the engine's input; the proxy keeps the engine pure.
+- **New fit conditions.** No plate or marker slot overlaps any head; a front-rank box never overlaps a back-rank
+  head; no two heads of one rank overlap (the step is at least 30% of the figure width).
+- **Plate placement.** In the front rank of a two-rank side, a plate above the head would lie across the back
+  rank's faces (no half-step offset can clear them: the 112px·S plate is wider than the back figures' offset
+  allows). Those plates stand on the side's floor line instead, over their own figures' lower bodies: the lowest
+  line's bottom 8px·S above the command-line row (a new optional input, `--command-line-h`, 44px·S by default) and,
+  for the party, 8px·S above the vitals dock. A second plate line stands above the first. Back-rank plates stay above
+  their heads.
+- **Plates are never covered.** The plates layer paints above every figure (z 3 over the portrait anchors' z 2), and
+  plate slots avoid the vitals dock, the command-line row, the band and the top band.
+
+Normative anchors that move (before → after, scale + foe slot form + foe ranks; party sizes 1–5):
+
+- 1451x790: six foes 0.72F1 → 0.66F1 for every party size; fifteen foes beside a solo player 0.55C2 → 0.50C2.
+- 1600x900 and 1920x1080: five foes 0.78F1 → 0.72F1 (parties 1–5); six foes 0.78F1 → 0.66F1; seven foes 0.60F1 →
+  0.55F1; a five-figure party against one to four foes 0.78F1 → 0.72F1; fifteen foes 0.55C2 → 0.50C2.
+- 2560x1440: five foes 0.84F1 → 0.78F1; six 0.84F1 → 0.66F1; seven 0.84F1 → 0.66F2; eight 0.78F1 → 0.66F2; nine
+  0.66F1 → 0.55F2 (parties 1–5); a five-figure party against one to four foes 0.84F1 → 0.78F1; fifteen foes
+  0.55F2 → 0.50F2.
+
+The spec's anchor scenario changes accordingly: five party figures against one to five foes stay 0.72 and against
+six become 0.66; fifteen foes beside a solo player become 0.50 compact (was 0.55 compact, user-approved in the
+engine change). The pinned table in `tests/core/combat_formation.test.js` is re-pinned in the same commit.
+
 ## Risks / Trade-offs
 
 - [The place card disappears in combat] → it is a deliberate decision-first trade, the only one that fits the
@@ -110,6 +144,11 @@ never enters the card's columns, even for its 240ms gesture (the beats requireme
   without its replacement assertion.
 - [Interim between this change and `webclient-combat-figure-plates`] → plates show no conditions; archive the two
   back to back.
+- [A second floor-plate line reaches a front figure's torso] → only in two-rank sides whose step is too narrow for
+  one line; the head stays clear by the fit rule, but that second line may cross the front figure's torso (at
+  1451x790 and the 0.50 floor it starts about 35% below the figure's top).
+- [Same-rank neighbours overlap at the shoulders] → heads stay apart by the 30% step floor; bodies may overlap
+  side by side, as in the exploration row.
 
 ## Migration Plan
 

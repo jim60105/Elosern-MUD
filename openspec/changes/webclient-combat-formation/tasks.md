@@ -89,6 +89,20 @@ Build once: `pnpm run build`.
   the Evennia focused labels `tests.test_evennia_test_optimization_contract` and `tests.test_webclient_frozen_contract`
   (env file with `MUD_TEST_SETTINGS=1`), and `openspec validate webclient-combat-formation --strict`. Verify all pass.
 
+## 6. Heads never covered (user decision at apply time, design D7)
+
+- [ ] 6.1 `components/combat-formation.js`: the head proxy, the head fit conditions, the two-rank front plates on
+  the floor line, the optional command-line input (HudFrame probe + `use-combat-formation.js`); re-derive the
+  invariants and re-pin the table and the anchors in `tests/core/combat_formation.test.js`. Run
+  `pnpm exec vitest run web/webclient-app/tests/core/combat_formation.test.js` and verify it passes.
+- [ ] 6.2 Amend the contextual-hud delta (the engine requirement, the plates requirement, "Combat identity and status
+  remain legible") and add the `avatar-artwork-presentation` delta (no participant avatars). Run
+  `openspec validate webclient-combat-formation --strict`.
+- [ ] 6.3 Extend `test_combat_formation_shares_one_scale_and_keeps_the_centre_clear`: no plate covers any head (front
+  or back rank), no front figure covers a back head, heads of one rank stay apart, the plates layer paints above the
+  figures. Run the class with `web.tests.browser.unittest_driver` and verify it passes. Re-screenshot the two-rank
+  stories at 1451x790 and 1600x900.
+
 Archive-time only (not an apply task):
 
 - After the delta sync, retarget the `covers_requirement` IDs that still name the two removed requirements ("Foes stand

@@ -60,6 +60,11 @@ None.
 - `webclient-combat-menu`: amends the keyboard-hierarchy scenarios and the beat-playback scenarios that named the
   participant frame.
 - `webclient-art-panel`: drops the participant frame from the framed-portrait surface lists.
+- `avatar-artwork-presentation`: combat renders no participant avatar; the compact-failure requirement names the
+  roster, presence and party avatars only.
+- `webclient-contextual-hud` also amends "Combat formation geometry is one pure shared-scale function" (user
+  decision at apply time): no head, front or back rank, is ever covered; a two-rank side's front plates stand on the
+  floor line; nothing covers a plate. Several anchors move (design D7).
 
 ## Impact
 
