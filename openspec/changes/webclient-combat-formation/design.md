@@ -117,6 +117,15 @@ marker or another figure; lower bodies may be covered; nothing may cover a plate
   line's bottom 8px·S above the command-line row (a new optional input, `--command-line-h`, 44px·S by default) and,
   for the party, 8px·S above the vitals dock. A second plate line stands above the first. Back-rank plates stay above
   their heads.
+- **Beat steps.** A figure acting in a round leans up to 12px·S toward the centre; the engine returns each figure's
+  `lunge`, cut to the clear space before the next head of its rank, and the line-ups set it on the slot as
+  `--motion-beat-lunge`, so no head reaches another at the step's peak. (Widening the head spacing by the full
+  12px·S instead would leave 13–15 foes with no fitting layout at 1451x790–1920x1080.)
+- **Scope of "ever".** The rule holds for every resting layout and at the beat step's peak. A glide between two
+  layouts (entering or leaving combat, a re-formed line) and a foe fading where it stood are transitions between two
+  compliant layouts and are not separately constrained.
+- **The plate's ground** stays inside its slot's height (it only feathers out sideways), so the drawn plate is no
+  taller than the slot the engine checks.
 - **Plates are never covered.** The plates layer paints above every figure (z 3 over the portrait anchors' z 2), and
   plate slots avoid the vitals dock, the command-line row, the band and the top band.
 
