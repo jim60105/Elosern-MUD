@@ -75,7 +75,8 @@
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
 // recessed; the mark clears only when no open surface remains.
-import { computed, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { bindPlateGroup } from "./plate-group.js";
 
 const props = defineProps({
   // The committed mode value rendered on the shell root. The store's reducer
@@ -132,6 +133,28 @@ function onFlipEnd(event) {
   }
 }
 
+// The plates' keyboard group (webclient-combat-figure-plates D4): one tab
+// stop while the formation stands and no ended round is held; the anchor
+// leaves the tab order while focus is inside it, so Tab and Shift+Tab leave
+// the group. plate-group.js moves focus and rescues it when its element
+// goes away or inert.
+const plateGroup = computed(() => props.formation && !props.beatHold);
+const plateFocusInside = ref(false);
+const platesRef = ref(null);
+let unbindPlateGroup = null;
+onMounted(() => {
+  if (platesRef.value) {
+    unbindPlateGroup = bindPlateGroup(platesRef.value, {
+      onInside: (inside) => {
+        plateFocusInside.value = inside;
+      },
+    });
+  }
+});
+onBeforeUnmount(() => {
+  unbindPlateGroup?.();
+});
+
 defineExpose({ menuOpen });
 </script>
 
@@ -185,19 +208,6 @@ defineExpose({ menuOpen });
     <!-- The combat entry flash (design D2): decorative, above the backdrop
          and the portraits, under every island and the band. -->
     <div class="stage-flash" data-testid="stage-flash" aria-hidden="true"></div>
-    <!-- The figure plates (webclient-combat-formation D4): filled only
-         while the formation stands (a leaving plate fades out inert); inert
-         and hidden from assistive technology while a round that ended the
-         fight is held. -->
-    <div
-      class="stage-anchor"
-      data-anchor="plates"
-      data-testid="anchor-plates"
-      :inert="beatHold || null"
-      :aria-hidden="beatHold ? 'true' : null"
-    >
-      <slot name="plates" />
-    </div>
     <div
       class="stage-anchor"
       data-anchor="presence"
@@ -248,6 +258,27 @@ defineExpose({ menuOpen });
       >
         <slot name="band-command" />
       </div>
+    </div>
+    <!-- The figure plates (webclient-combat-formation D4): filled only
+         while the formation stands (a leaving plate fades out inert); inert
+         and hidden from assistive technology while a round that ended the
+         fight is held. The anchor is the plates' keyboard group
+         (webclient-combat-figure-plates D4): after the band in DOM order, so
+         Tab from the action dock reaches it next; its paint order is its
+         explicit z-index (3), above the portraits and the flash and below
+         the islands and the band. -->
+    <div
+      ref="platesRef"
+      class="stage-anchor"
+      data-anchor="plates"
+      data-testid="anchor-plates"
+      :role="plateGroup ? 'group' : null"
+      :aria-label="plateGroup ? '戰場' : null"
+      :tabindex="plateGroup ? (plateFocusInside ? -1 : 0) : null"
+      :inert="beatHold || null"
+      :aria-hidden="beatHold ? 'true' : null"
+    >
+      <slot name="plates" />
     </div>
     <div
       class="stage-anchor"
