@@ -109,6 +109,10 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         while time.monotonic() < deadline:
             artwork = self._art(page)
             attempts = [entry for entry in artwork["attempts"] if entry["type"] == "image"]
+            if artwork.get("terminal"):
+                # The permitted terminal is its own position, never an attempt
+                # entry: it is matched here exactly like one.
+                attempts = attempts + [artwork["terminal"]]
             displayed = self._displayed(page)
             for entry in attempts:
                 if (
@@ -117,13 +121,58 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
                 ):
                     return entry["resource"]["url"]
             page.wait_for_timeout(200)
-        raise AssertionError(f"the {source_prefix} position was never presented")
+        artwork = self._art(page)
+        raise AssertionError(
+            f"the {source_prefix} position was never presented: "
+            f"displayed={self._displayed(page)} "
+            f"attempts={[(e.get('type'), e.get('rank'), e.get('source_id')) for e in artwork.get('attempts') or []]} "
+            f"terminal={(artwork.get('terminal') or {}).get('source_id')} "
+            f"badge={page.locator(PLACEHOLDER).count()} "
+            f"layers={page.locator('img[data-role]').evaluate_all('(els) => els.map((e) => [e.getAttribute(\"data-role\"), e.getAttribute(\"src\")])')} "
+            f"art_requests={[url for url in self.requests if '/art/' in url][-4:]} "
+            f"art_responses={[item for item in getattr(self, 'responses', []) if '/art/' in item][-4:]}"
+        )
 
     def _transition(self, page, name: str) -> None:
         open_command_line(page)
         page.keyboard.type(f"uieditor_transition {name}")
         page.keyboard.press("Enter")
         page.wait_for_timeout(400)
+
+    def _admitted_urls(self, page) -> set[str]:
+        """Every media URL the committed scene descriptor itself names."""
+        artwork = self._art(page)
+        urls = {
+            entry["resource"]["url"]
+            for entry in artwork.get("attempts") or []
+            if entry.get("type") == "image" and entry.get("resource")
+        }
+        terminal = artwork.get("terminal")
+        if terminal and terminal.get("resource"):
+            urls.add(terminal["resource"]["url"])
+        return urls
+
+    def _wait_badge(self, page, timeout: int = 30000) -> None:
+        """Wait until the standalone status badge is on the page.
+
+        The badge is the state the exhausted chain degrades to; it is awaited by
+        its own presence (a real DOM fact) rather than by Playwright's
+        visibility heuristic, and a timeout reports the committed facts.
+        """
+        deadline = time.monotonic() + timeout / 1000
+        while time.monotonic() < deadline:
+            if page.locator(PLACEHOLDER).count():
+                return
+            page.wait_for_timeout(250)
+        artwork = self._art(page)
+        raise AssertionError(
+            "the exhausted chain never rendered its status badge: "
+            f"displayed={self._displayed(page)} "
+            f"attempts={[(e.get('type'), e.get('rank'), e.get('source_id')) for e in artwork.get('attempts') or []]} "
+            f"terminal={(artwork.get('terminal') or {}).get('source_id')} "
+            f"layers={page.locator('img[data-role]').evaluate_all('(els) => els.map((e) => [e.getAttribute(\"data-role\"), e.getAttribute(\"src\")])')} "
+            f"art_responses={[item for item in getattr(self, 'responses', []) if '/art/' in item][-4:]}"
+        )
 
     def _wait_mode(self, page, mode: str, timeout: int = 30000) -> None:
         deadline = time.monotonic() + timeout / 1000
@@ -504,26 +553,56 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             "scene-backdrop-control",
         )
 
-        # (4) A move commits a place whose every permitted source fails: the
-        # exhausted chain shows ONE labelled non-image condition and never a
-        # broken image.
-        page.route(
-            "**/art/bundled-scene/**",
-            lambda route: route.fulfill(status=404, content_type="text/plain", body=b"missing"),
-        )
+        # (4) A move commits a different logical place: the committed
+        # descriptor is a new identity, and whatever is on screen belongs to
+        # THAT descriptor's own positions — never to the place the browser
+        # came from.
+        previous_identity = artwork["subject_id"]
+        previous_urls = {
+            entry["resource"]["url"]
+            for entry in artwork["attempts"]
+            if entry.get("type") == "image"
+        }
         self._transition(page, "move_scene")
-        page.wait_for_selector(PLACEHOLDER, timeout=30000)
-        page.wait_for_timeout(1000)
-        moved_art = self._art(page)
-        self.assertEqual(
-            page.locator(IMAGE).count(),
-            0,
-            "an image survived the exhausted chain: "
-            f"displayed={self._displayed(page)} "
-            f"attempts={[(e.get('type'), e.get('rank'), e.get('source_id')) for e in moved_art.get('attempts') or []]} "
-            f"terminal={bool(moved_art.get('terminal'))} "
-            f"badge={page.locator(PLACEHOLDER).count()} "
-            f"art_responses={[item for item in self.responses if '/art/' in item][-3:]}",
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state["panels"]["art"]["scene"]["artwork"] or {}).get("subject_id")
+                != previous_identity
+            ),
+            timeout=30000,
         )
-        self.assertEqual(page.locator(PLACEHOLDER).count(), 1)
-        self.assertTrue(page.locator(PLACEHOLDER_LABEL).inner_text().strip())
+        page.wait_for_timeout(800)
+        moved = self._art(page)
+        admitted = self._admitted_urls(page)
+        displayed_after_move = self._displayed(page)
+        if displayed_after_move is not None:
+            self.assertIn(
+                displayed_after_move,
+                admitted,
+                "the moved place presented a resource its own descriptor does not name",
+            )
+        self.assertNotIn(
+            moved["subject_id"],
+            (previous_identity,),
+            "the move did not commit a new logical place",
+        )
+
+        # (5) The moved place loaded in a FRESH browser context (no cached
+        # media) exhausts: every permitted source fails, so the chain shows ONE
+        # labelled non-image condition and never a broken image.
+        fresh = self.new_page()
+        for pattern in ("**/art/scene/**", "**/art/official/**/scene/**", "**/art/bundled-scene/**"):
+            fresh.route(
+                pattern,
+                lambda route: route.fulfill(
+                    status=404, content_type="text/plain", body=b"missing"
+                ),
+            )
+        login_and_open(fresh, self.webclient_url, self.base_url)
+        self._wait_badge(fresh)
+        fresh.wait_for_timeout(1000)
+        self.assertEqual(fresh.locator(IMAGE).count(), 0)
+        self.assertEqual(fresh.locator(PLACEHOLDER).count(), 1)
+        self.assertTrue(fresh.locator(PLACEHOLDER_LABEL).inner_text().strip())
+        fresh.close()
