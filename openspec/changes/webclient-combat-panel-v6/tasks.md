@@ -6,10 +6,10 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
 
 ## 1. Classification and view (≈2.5 h)
 
-- [ ] 1.1 Create `world/skills/effects/polarity.py` (design D3) with the table, reasons and `skill_target_polarity`.
-- [ ] 1.2 `world/rules/combat_view.py`: add `conditions` to `ParticipantView` (design D2) and `hostile`/`beneficial` to
+- [x] 1.1 Create `world/skills/effects/polarity.py` (design D3) with the table, reasons and `skill_target_polarity`.
+- [x] 1.2 `world/rules/combat_view.py`: add `conditions` to `ParticipantView` (design D2) and `hostile`/`beneficial` to
   `SkillDescriptorView`; derive both while building participants and skills.
-- [ ] 1.3 Add tests in `world/rules/tests/test_combat_view.py`:
+- [x] 1.3 Add tests in `world/rules/tests/test_combat_view.py`:
   - the ten skill cases of the delta scenario, using synthetic registry rows (in the module's existing style) where no
     shipped skill exists;
   - the exhaustiveness check;

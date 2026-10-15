@@ -1,8 +1,11 @@
 """Frozen combat-session view model tests (tasks 1.4)."""
 
 import importlib
-from dataclasses import replace
+from dataclasses import fields, replace
+import inspect
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
@@ -29,7 +32,16 @@ from world.rules.progression import (
     scaled_mp_cost,
 )
 from world.lore.elements import Element
-from world.skills.registry import SkillKind
+from world.skills.effects import EffectAudience, EffectPolicy
+from world.skills.effects import combat as effects_combat
+from world.skills.effects import passives as effects_passives
+from world.skills.effects import sexual as effects_sexual
+from world.skills.effects.polarity import (
+    EFFECT_TARGET_POLARITY,
+    POLARITY_CLASSES,
+    skill_target_polarity,
+)
+from world.skills.registry import SkillKind, TargetSpec
 from world.tests.synthetic_data import SYNTH_SKILLS, make_skill
 
 from ._combat_session_helpers import (
@@ -154,6 +166,8 @@ def _descriptor(skill) -> SkillDescriptorView:
         valid_target_ids=(),
         shorthands=(),
         freeform_scales=(),
+        hostile=False,
+        beneficial=False,
     )
 
 
@@ -386,6 +400,158 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(row.display_name, "塞提斯")
         self.assertNotIn("\u3000", row.display_name)
         self.assertNotIn("南門守衛", row.display_name)
+
+    def _condition_scope(self, codes):
+        """Synthetic buff definitions plus literal display metadata.
+
+        Every code but ``t_unlisted`` gets a display row, so a buff on that
+        definition exercises the missing-metadata path.
+        """
+        from world.rules.buffs.definitions import BuffDefinition
+
+        displays = {
+            "t_ash_burn": ("合成灼燒", "harmful"),
+            "t_moss_veil": ("合成苔幕", "beneficial"),
+            **{f"t_mark_{index}": (f"合成印記{index}", "warning") for index in range(10)},
+        }
+        definitions = {
+            code: BuffDefinition(
+                key=code, duration=30, tick_interval=None, stacking="refresh",
+                modifiers={}, polarity="buff",
+            )
+            for code in codes
+        }
+
+        def display(code):
+            label, severity = displays[code]
+            return SimpleNamespace(label=label, severity=severity)
+
+        from world.rules.status_display import MissingDisplayMetadataError
+
+        def strict_display(code):
+            if code not in displays:
+                raise MissingDisplayMetadataError(code)
+            return display(code)
+
+        patcher = patch.dict("world.rules.buffs.BUFF_DEFINITIONS", definitions)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        display_patch = patch(
+            "world.rules.status_query.status.display_for", side_effect=strict_display
+        )
+        display_patch.start()
+        self.addCleanup(display_patch.stop)
+
+    @staticmethod
+    def _apply(entity, *codes):
+        from world.rules.buffs import apply_buff
+
+        for code in codes:
+            apply_buff(entity, code)
+
+    def _row(self, view, entity):
+        return next(p for p in view.participants if p.identity == entity.pk)
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_participants_carry_their_status_conditions(self):
+        from typeclasses.npcs import NPC
+        from world.rules.combat_view import ConditionRow
+        from world.rules.party import join_party
+
+        self._condition_scope(["t_ash_burn", "t_moss_veil"])
+        companion = create_object(NPC, key="view companion", location=self.room)
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        engage(self.player, self.monster)
+        self._apply(self.monster, "t_ash_burn")
+        self._apply(companion, "t_moss_veil")
+        stored = dict(self.monster.attributes.get("buffs"))
+        view = build_combat_view(self.player)
+        self.assertEqual(
+            self._row(view, self.monster).conditions,
+            (ConditionRow("t_ash_burn", "合成灼燒", "harmful"),),
+        )
+        self.assertEqual(
+            self._row(view, companion).conditions,
+            (ConditionRow("t_moss_veil", "合成苔幕", "beneficial"),),
+        )
+        self.assertEqual(self._row(view, self.player).conditions, ())
+        # Reading conditions leaves the stored buff state untouched.
+        self.assertEqual(dict(self.monster.attributes.get("buffs")), stored)
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_more_than_eight_conditions_keep_the_first_eight_in_order(self):
+        codes = [f"t_mark_{index}" for index in range(10)]
+        self._condition_scope(codes)
+        engage(self.player, self.monster)
+        self._apply(self.monster, *codes)
+        view = build_combat_view(self.player)
+        self.assertEqual(
+            [row.code for row in self._row(view, self.monster).conditions],
+            codes[:8],
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_unmodelled_or_unlabelled_conditions_give_an_empty_list(self):
+        self._condition_scope(["t_ash_burn", "t_unlisted"])
+        from world.rules import combat_view
+        from world.rules.status_query import StatusQueryError
+
+        engage(self.player, self.monster)
+        self._apply(self.monster, "t_ash_burn", "t_unlisted")
+        self._apply(self.player, "t_ash_burn")
+        # A condition without display metadata (MissingDisplayMetadataError)
+        # empties that participant's list; the other participant keeps its row.
+        view = build_combat_view(self.player)
+        self.assertFalse(view.recovery)
+        self.assertEqual(self._row(view, self.monster).conditions, ())
+        self.assertEqual(
+            [row.code for row in self._row(view, self.player).conditions],
+            ["t_ash_burn"],
+        )
+        # An entity the read model does not model (StatusQueryError).
+        real = combat_view.build_status_read_model
+
+        def unmodelled(entity):
+            if entity.pk == self.monster.pk:
+                raise StatusQueryError("unmodelled")
+            return real(entity)
+
+        with patch.object(combat_view, "build_status_read_model", side_effect=unmodelled):
+            view = build_combat_view(self.player)
+        self.assertFalse(view.recovery)
+        self.assertEqual(self._row(view, self.monster).conditions, ())
+
+    def test_condition_rows_have_no_owner_only_visibility_to_filter(self):
+        """Design D2 tripwire: the status rows carry no visibility facet.
+
+        Participant conditions reach the opposing player unfiltered because
+        the status read model has no hidden or owner-only flag. A new field
+        on either record fails here so the disclosure decision is revisited.
+        """
+        from world.rules.status_display import ConditionDisplay
+        from world.rules.status_query.models import ConditionValue
+
+        self.assertEqual(
+            {field.name for field in fields(ConditionDisplay)},
+            {"code", "label", "severity"},
+        )
+        self.assertEqual(
+            {field.name for field in fields(ConditionValue)},
+            {"code", "label", "severity", "remaining_seconds", "modifiers", "provenance"},
+        )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_descriptors_carry_target_polarity(self):
+        engage(self.player, self.monster)
+        view = build_combat_view(self.player)
+        cast = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        # The kit cast is a single elemental damage spell.
+        self.assertEqual((cast.hostile, cast.beneficial), (True, False))
+        flee_key, _ = _innate_keys()
+        flee = next(skill for skill in view.skills if skill.key == flee_key)
+        self.assertEqual((flee.hostile, flee.beneficial), (False, False))
 
     def test_no_session_raises_view_error(self):
         with self.assertRaises(CombatViewError):
@@ -664,6 +830,8 @@ class GroupSkillViewsTests(unittest.TestCase):
             valid_target_ids=(),
             shorthands=(),
             freeform_scales=(),
+            hostile=False,
+            beneficial=False,
         )
         groups = group_skill_views((descriptor,))
         sexual = next(
@@ -679,6 +847,100 @@ class GroupSkillViewsTests(unittest.TestCase):
 
     def test_empty_skills_yield_no_categories(self):
         self.assertEqual(group_skill_views(()), ())
+
+
+# Synthetic buff polarities for the pure classification cases: the lookup the
+# polarity function receives instead of the live buff registry.
+_T_BUFF_POLARITY = {"t_ward": "buff", "t_hex": "debuff"}.__getitem__
+
+
+def _polar(key, effects, *, audiences=None, target_spec=TargetSpec.SINGLE):
+    """One synthetic active row with the given effects and audiences."""
+    policies = (
+        ()
+        if audiences is None
+        else tuple(EffectPolicy(audience=audience) for audience in audiences)
+    )
+    return make_skill(
+        key, effects=list(effects), effect_policies=policies, target_spec=target_spec
+    )
+
+
+class SkillTargetPolarityTests(unittest.TestCase):
+    """Pure target-side polarity of skill descriptors (context_actions v6)."""
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_ten_skill_cases_read_their_declared_polarity(self):
+        cases = (
+            ("t_strike", ["damage:none:physical"], None, (True, False)),
+            ("t_mend", ["heal:single"], None, (False, True)),
+            ("t_purge", ["cleanse:status"], None, (False, True)),
+            ("t_curse", ["buff_apply:t_hex"], None, (True, False)),
+            ("t_sap", ["gauge_transfer:mp:drain:fixed:5"], None, (True, False)),
+            ("t_tease", ["stimulus:target"], None, (True, False)),
+            ("t_bless", ["buff_apply:t_ward"], None, (False, True)),
+            (
+                "t_scatter",
+                ["damage:none:magic"],
+                (EffectAudience.ENEMIES,),
+                (False, False),
+            ),
+            ("t_glide", ["movement:flight"], None, (False, False)),
+            ("t_mixed", ["damage:none:physical", "heal:single"], None, (True, True)),
+        )
+        for key, effects, audiences, expected in cases:
+            with self.subTest(key=key):
+                skill = _polar(key, effects, audiences=audiences)
+                self.assertEqual(
+                    skill_target_polarity(skill, _T_BUFF_POLARITY), expected
+                )
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_gauge_restore_and_actor_bound_effects(self):
+        restore = _polar("t_refill", ["gauge_transfer:mp:restore:fixed:5"])
+        self.assertEqual(skill_target_polarity(restore), (False, True))
+        # An actor-only stimulus and the actor's own self-heal never reach
+        # the chosen targets.
+        actor_only = _polar("t_self_tease", ["stimulus:actor", "self_heal"])
+        self.assertEqual(skill_target_polarity(actor_only), (False, False))
+        # A self-routed damage component does not count either.
+        self_routed = _polar(
+            "t_recoil", ["damage:none:physical"], audiences=(EffectAudience.SELF,)
+        )
+        self.assertEqual(skill_target_polarity(self_routed), (False, False))
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_self_skill_with_selected_hostile_effect_reads_hostile(self):
+        skill = _polar(
+            "t_penance", ["damage:none:physical"], target_spec=TargetSpec.SELF
+        )
+        self.assertEqual(skill_target_polarity(skill), (True, False))
+
+    @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
+    def test_every_effect_kind_is_classified_exactly_once(self):
+        produced = {
+            obj
+            for module in (effects_combat, effects_passives, effects_sexual)
+            for _, obj in inspect.getmembers(module, inspect.isclass)
+            if obj.__module__ == module.__name__
+            and hasattr(obj, "__dataclass_fields__")
+        }
+        parser = importlib.import_module("world.skills.effects.parser")
+        parsed_kinds = {
+            obj
+            for obj in vars(parser).values()
+            if inspect.isclass(obj) and obj.__name__.endswith("Effect")
+        }
+        self.assertEqual(parsed_kinds, produced)
+        self.assertEqual(set(EFFECT_TARGET_POLARITY), produced)
+        self.assertTrue(set(EFFECT_TARGET_POLARITY.values()) <= POLARITY_CLASSES)
+
+    def test_unclassified_kind_fails_closed(self):
+        skill = SimpleNamespace(
+            parsed_effects=(object(),), effect_policies=(EffectPolicy(),)
+        )
+        with self.assertRaises(KeyError):
+            skill_target_polarity(skill)
 
 
 if __name__ == "__main__":

@@ -13,6 +13,20 @@ A validly parsed session whose participants cannot be reconstructed yields a
 bounded recovery view carrying only the session summary and a confirmed Forfeit
 entry; a malformed record is surfaced as an unavailable presentation by the
 caller rather than being repaired here.
+
+Participant conditions (context_actions v6) reuse the status panel's read model
+for each participant entity: the same codes, labels and severities in the same
+order, cut to the first ``MAX_PARTICIPANT_CONDITIONS``. Disclosure finding
+(design D2): the status read model carries no hidden or owner-only condition --
+neither ``ConditionValue`` nor ``ConditionDisplay`` has a visibility flag, the
+severity vocabulary (beneficial, informational, warning, harmful, critical) has
+no private member, and no code family is reserved for the owner -- so no row is
+filtered before it reaches the opposing player. Only ``code``, ``label`` and
+``severity`` are exposed; durations, modifiers and provenance stay owner-side.
+
+Skill descriptors carry ``hostile``/``beneficial``: the static target-side
+classification of ``world.skills.effects.polarity`` over the effects routed to
+the chosen targets.
 """
 
 from dataclasses import dataclass
@@ -28,6 +42,9 @@ from world.rules.combat_session import (
 )
 from world.rules.player_messages import rejection_message
 from world.rules.progression import freeform_scale_entries_for
+from world.rules.status_display import MissingDisplayMetadataError
+from world.rules.status_query import StatusQueryError, build_status_read_model
+from world.skills.effects.polarity import skill_target_polarity
 from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 
 # Presentation bounds owned by the combat view (equal or below protocol limits).
@@ -41,6 +58,8 @@ MAX_SKILLS = 192
 MAX_SESSION_ID_CODE_POINTS = 128
 MAX_DISPLAY_NAME_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 512
+# Per-participant condition rows presented on the combat panel (v6).
+MAX_PARTICIPANT_CONDITIONS = 8
 
 # Stable root action keys in approved keyboard order.
 ROOT_ACTIONS = ("attack", "skills", "items", "defend", "flee")
@@ -67,6 +86,21 @@ class CombatViewError(ValueError):
 
 
 @dataclass(frozen=True)
+class ConditionRow:
+    """One participant condition as the status read model derives it.
+
+    Attributes:
+        code: The stable condition code (buff definition key or rule ID).
+        label: The Traditional Chinese display label.
+        severity: The status severity vocabulary value.
+    """
+
+    code: str
+    label: str
+    severity: str
+
+
+@dataclass(frozen=True)
 class ParticipantView:
     """One ordered combat participant with a stable session token.
 
@@ -81,6 +115,9 @@ class ParticipantView:
         portrait_ref: The opaque art-catalog key for this participant while
             the participant is present in the ``webclient-art-panel`` portrait
             catalog, else ``None``.
+        conditions: The participant's first ``MAX_PARTICIPANT_CONDITIONS``
+            status conditions in the status read model's order; empty when
+            the entity carries none or is not modelled by the read model.
     """
 
     identity: int
@@ -91,6 +128,7 @@ class ParticipantView:
     hp_current: int
     hp_maximum: int
     portrait_ref: str | None
+    conditions: tuple[ConditionRow, ...]
 
 
 @dataclass(frozen=True)
@@ -112,6 +150,10 @@ class SkillDescriptorView:
         reason_message: Safe Traditional Chinese disabled explanation.
         valid_target_ids: Ordered participant IDs that pass the target checks.
         shorthands: Applicable approved AREA shorthands.
+        freeform_scales: The freeform cast scales offered to a master.
+        hostile: Whether an effect routed to the chosen targets is hostile.
+        beneficial: Whether an effect routed to the chosen targets is
+            beneficial.
     """
 
     key: str
@@ -128,6 +170,8 @@ class SkillDescriptorView:
     valid_target_ids: tuple[int, ...]
     shorthands: tuple[str, ...]
     freeform_scales: tuple[tuple[float, str, int], ...]
+    hostile: bool
+    beneficial: bool
 
 
 @dataclass(frozen=True)
@@ -212,6 +256,23 @@ def _participant_state(entity: Any, identity: int, record: Any) -> str:
     if _stored_trait_value(entity.traits.hp) <= 0:
         return "defeated"
     return "active"
+
+
+def participant_conditions(entity: Any) -> tuple[ConditionRow, ...]:
+    """Return the entity's first status conditions as presented rows.
+
+    An entity the status read model does not model (``StatusQueryError``) or
+    one carrying a condition without display metadata yields ``()`` so one
+    participant never makes the whole panel unavailable.
+    """
+    try:
+        model = build_status_read_model(entity)
+    except (StatusQueryError, MissingDisplayMetadataError):
+        return ()
+    return tuple(
+        ConditionRow(code=row.code, label=row.label, severity=row.severity)
+        for row in model.conditions[:MAX_PARTICIPANT_CONDITIONS]
+    )
 
 
 def _bound(value: str, maximum: int, field: str) -> str:
@@ -323,6 +384,7 @@ def _build_participants(
                     hp_current=current,
                     hp_maximum=maximum,
                     portrait_ref=portrait_catalog_key(int(dbref)),
+                    conditions=participant_conditions(entity),
                 )
             )
     if not participants or len(participants) > MAX_PARTICIPANTS:
@@ -382,6 +444,7 @@ def _build_skills(
         else:
             reason_code = preview.reason.value if preview.reason is not None else "unavailable"
             reason_message = rejection_message(preview.reason) if preview.reason is not None else "目前無法使用。"
+        hostile, beneficial = skill_target_polarity(skill)
         descriptors.append(
             SkillDescriptorView(
                 key=key,
@@ -398,6 +461,8 @@ def _build_skills(
                 valid_target_ids=valid_ids,
                 shorthands=preview.shorthands,
                 freeform_scales=freeform_scale_entries_for(actor, skill),
+                hostile=hostile,
+                beneficial=beneficial,
             )
         )
     return tuple(descriptors)
@@ -520,7 +585,9 @@ __all__ = [
     "CategoryGroupView",
     "CombatView",
     "CombatViewError",
+    "ConditionRow",
     "MAX_DISPLAY_NAME_CODE_POINTS",
+    "MAX_PARTICIPANT_CONDITIONS",
     "MAX_PARTICIPANTS",
     "MAX_REASON_MESSAGE_CODE_POINTS",
     "MAX_SESSION_ID_CODE_POINTS",
@@ -535,5 +602,6 @@ __all__ = [
     "build_combat_view",
     "combat_participants",
     "group_skill_views",
+    "participant_conditions",
     "rejection_message_from_session",
 ]
