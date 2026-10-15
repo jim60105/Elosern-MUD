@@ -182,6 +182,8 @@ _INSTALL_READER = """() => {
           token: el.querySelector('[data-testid="figure-plate-token"]')?.textContent ?? null,
         })),
       platesLayerFocusable: q('[data-anchor="plates"]').querySelectorAll('button, a, input, textarea, select, [tabindex]').length,
+      platesZ: Number(getComputedStyle(q('[data-anchor="plates"]')).zIndex),
+      actorsZ: Math.max(...['actor-left', 'actor-right'].map((a) => Number(getComputedStyle(q(`[data-anchor="${a}"]`)).zIndex))),
       captionLeft: root.getPropertyValue('--caption-left').trim(),
       captionRight: root.getPropertyValue('--caption-right').trim(),
       commandLine: box(q('[data-anchor="command-line"]')),
@@ -408,7 +410,9 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         and the top band, the place card and the map anchor are not rendered,
         leaving combat restores the exploration boxes, entering at `full`
         keeps one height in every sampled frame, and three same-named foes
-        show their tokens."""
+        show their tokens; no head (front rank or back) is ever covered by a
+        plate or by a figure in front of it, and no figure paints over a
+        plate."""
         for viewport in FORMATION_VIEWPORTS:
             for companions in (0, 2, 4):
                 party = 1 + companions
@@ -443,17 +447,35 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                                 self.assertFalse(_intersects(a["box"], s["vitals"]), f"a plate meets the vitals dock at {size}")
                             for b in s["plates"][a_index + 1:]:
                                 self.assertFalse(_intersects(a["box"], b["box"]), f"two plates meet at {size}")
-                        # No plate covers a front-rank figure's head (the top
-                        # quarter of its box). A two-rank side's back faces
-                        # may sit behind the front plates' feathered ground
-                        # (the engine's accepted geometry, see the report).
-                        front = [x["box"] for x in s["party"] if x["rank"] in ("0", None)] + [
-                            x["box"] for row in s["rows"] for x in row["slots"]
-                            if not x["leaving"] and x["rank"] in ("0", None)
+                        # No head is ever covered (webclient-combat-formation):
+                        # a head is the central 30% of a figure's width and the
+                        # top 22% of its height. No plate covers any head, front
+                        # rank or back; no front-rank figure reaches a back-rank
+                        # head; the heads of one rank stay apart. Lower bodies
+                        # may be covered. The plates layer paints above every
+                        # figure, so no figure covers a plate.
+                        standing = [(x["rank"], x["box"]) for x in s["party"]] + [
+                            (x["rank"], x["box"]) for row in s["rows"] for x in row["slots"] if not x["leaving"]
                         ]
-                        for head in ({**b, "bottom": b["top"] + b["height"] / 4} for b in front):
+
+                        def head(b):
+                            return {
+                                "left": b["left"] + 0.35 * b["width"], "right": b["left"] + 0.65 * b["width"],
+                                "top": b["top"], "bottom": b["top"] + 0.22 * b["height"],
+                            }
+
+                        for rank, b in standing:
+                            h = head(b)
                             for p in s["plates"]:
-                                self.assertFalse(_intersects(p["box"], head), f"a plate covers a front-rank head at {size}")
+                                self.assertFalse(_intersects(p["box"], h), f"a plate covers a rank-{rank} head at {size}")
+                            for other_rank, o in standing:
+                                if o is b:
+                                    continue
+                                if (other_rank or "0") < (rank or "0"):
+                                    self.assertFalse(_intersects(o, h), f"a front figure covers a back head at {size}")
+                                elif other_rank == rank:
+                                    self.assertFalse(_intersects(head(o), h), f"two heads of one rank overlap at {size}")
+                        self.assertGreater(s["platesZ"], s["actorsZ"], "the plates layer must paint above the figures")
                         self.assertEqual(s["mapDisplay"], "none", size)
                         self.assertFalse(s["placeCardShown"], size)
                         self.assertEqual(s["platesLayerFocusable"], 0)
