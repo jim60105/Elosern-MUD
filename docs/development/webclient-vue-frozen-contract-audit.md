@@ -377,6 +377,7 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 
 | `artwork-failure`, `artwork-alpha`, `artwork-alpha-fill`（共用的在地失敗指示與 alpha 遮罩原語：face-rect 原始編輯器在讀到的失敗位置渲染前者、以觀測成功後的同一 URL 填色渲染後者；由 unified-image-loading-core 變更加入，受管旅程 `test_browser_image_loading_core.py` 首次鎖定前者。unified-portrait-image-contract 讓舞台與角色卡改由此原語繪製描述子自帶的 alpha 終端，並補登填色元素本身的掛鉤，其行內 --artwork-alpha-mask 自訂屬性載明所綁的終端資源 URL；受管旅程 `test_browser_stage_silhouette.py` 與 `test_browser_unified_figures.py` 鎖定它） | unified-image-loading-core（填色掛鉤由 unified-portrait-image-contract 補登） | REMAP-TO-TESTID |
 | `avatar-artwork` + `avatar-artwork__<suffix>`（`avatar-artwork__face`、`avatar-artwork__initial`）（共用的微型頭像渲染器：根節點、其真實影像與字素首字備援；由 unified-avatar-rendering 變更加入，受管旅程 `test_browser_avatar_artwork.py` 首次鎖定。presence medallion 仍以自己的 face／initial 掛鉤轉發此渲染器的影像與首字，故該 family 不變） | unified-avatar-rendering | REMAP-TO-TESTID |
+| `dream-panel`、`dream-reply`、`dream-scene-art`、`dream-art-control`、`dream-art-failure`、`dream-art-view`、`dream-art-view-image`、`dream-art-view-failure`、`data-row`（夢境舞台：對話 modal 的根節點與其回覆列、舞台上唯一的畫面層、該畫面的全圖控制與在地狀態標記、全圖對話方塊與其中的影像／狀態，以及念頭列的列屬性識別——覺醒步驟以該屬性選擇器鎖定。前兩者與列屬性為既有掛鉤，受管旅程 `test_browser_dream_artwork.py` 首次鎖定；其餘由 unified-dream-rendering 隨共用場景載入整合一併加入） | unified-dream-rendering | REMAP-TO-TESTID |
 
 **CSS class hooks the managed browser suite targets**（重新對應至穩定掛鉤，無主要需求文字命名這些項目，故無規格增量）：
 
@@ -559,6 +560,13 @@ H1 至 H5 重設計波次重新對應了以瀏覽器為目標的識別碼集合�
 ---
 
 ## 6. 修訂記錄
+
+### unified-dream-rendering — 2026-10-15（unified-dream-rendering）
+
+- **§2.3 補登 hook：** 夢境舞台的 `dream-panel`、`dream-reply`（既有對話 modal 根與回覆列，本變更首次由受管套件鎖定）、`dream-scene-art`（舞台上唯一被呈現的畫面層——現由共用的有序嘗試載入流程供給）、`dream-art-control`、`dream-art-failure`（畫面的全圖控制與在地狀態標記）、`dream-art-view`、`dream-art-view-image`、`dream-art-view-failure`（以同一份已顯示資源與同一組已達失敗開啟的全圖對話方塊），以及念頭列的 `data-row` 屬性（覺醒步驟以 `[data-row='awaken']` 鎖定）登記為 REMAP-TO-TESTID 列。受管旅程 `test_browser_dream_artwork.py` 的 `DreamArtworkBrowserTest.test_offline_dream_and_official_failure_use_shared_scene` 於兩次獨立開機的真實客戶端鎖定它們；`tests/test_webclient_frozen_contract.py` 的受管瀏覽器目標掃描自此轉綠。
+- **§2.3 沿用 hook：** `wait-card`、`dream-question`、`place-card-wait` family 與 `scene-backdrop` family 皆維持既有登記——夢境以同一張等待卡與同一個 進入夢境協作？ 問題進入，舞台畫面則沿用共用的場景載入語意而非新增第二套解析器。
+- **manifest：** `World/DreamPanel` 沿用既有條目（本變更未新增或移除任何 story 元件列）。
+- **§5 完整性聲明維持成立：** 新的受管目標全數登記於上方 REMAP-TO-TESTID 列；凍結 façade（§1）與分類（§2）皆未改變，§3 增量清單亦不變（本變更未觸及 OOB 信封或 façade 表面）。
 
 ### unified-avatar-rendering — 2026-10-15（unified-avatar-rendering）
 

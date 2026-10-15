@@ -18,10 +18,12 @@ wait card's 放棄／睡眠 row and the 進入夢境協作？ question):
 
 from __future__ import annotations
 
+from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
+
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import activate_wait_row, store_state
+from .browser_helpers import activate_wait_row, narrative_log_text, store_state
 from .fixtures import create_runtime
 from .harness import ManagedServer, ManagedServerTearDownMixin
 
@@ -83,7 +85,18 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
     def enter_dream(self, page) -> None:
         """Enter the committed dream through the wait card's sleep question."""
         activate_wait_row(page, "wait-sleep", dream=True, timeout=60000)
-        page.wait_for_selector(PANEL, state="visible", timeout=60000)
+        try:
+            page.wait_for_selector(PANEL, state="visible", timeout=60000)
+        except PlaywrightTimeoutError as error:
+            state = store_state(page)
+            raise AssertionError(
+                "the dream panel never opened: mode={mode} dream={dream} "
+                "narrative={narrative}".format(
+                    mode=state.get("mode"),
+                    dream=(state.get("panels") or {}).get("dream"),
+                    narrative=narrative_log_text(page)[-400:],
+                )
+            ) from error
 
     def dream(self, page) -> dict:
         return store_state(page)["panels"]["dream"]["state"]
@@ -108,7 +121,7 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
     )
     def test_offline_dream_and_official_failure_use_shared_scene(self):
         # ---- phase 1: the operator root holds no preferred image --------
-        self.boot()
+        self.boot(ELOSERN_BROWSER_DREAM="1")
         page = self.logged_in_page()
         art_before = self.art_scene(page)
         self.enter_dream(page)
@@ -138,7 +151,7 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         self.assertEqual(self.art_scene(page), art_before)
 
         # ---- phase 2: a configured preferred image the browser cannot load ----
-        self.boot(ELOSERN_BROWSER_DREAM_ART="1")
+        self.boot(ELOSERN_BROWSER_DREAM="1", ELOSERN_BROWSER_DREAM_ART="1")
         page2 = self.logged_in_page()
         art_before2 = self.art_scene(page2)
         # The interception is registered on the exact admitted path, so it can

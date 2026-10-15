@@ -23,11 +23,9 @@ from web.webclient.presentation.dream import dream_presenter
 from world.ai import dream, guardrail
 from world.art import descriptors, formats, official as official_art, subjects
 from world.art.scene_definitions import (
-    ROOM_ART_KEY_SET,
     load_bundled_scene_catalog,
     reset_bundled_scenes,
 )
-from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
@@ -680,10 +678,6 @@ class DreamSurfaceTests(EvenniaTest):
         from world.art.store import ArtAssetRecord
 
         self.enter()
-        location = self.actor.location
-        location.scene_archetype = sorted(SCENE_ARCHETYPE_REGISTRY)[0]
-        location.room_art_key = sorted(ROOM_ART_KEY_SET)[0]
-        location.scene_identity = "grid:t_synth_map:0,0"
         session = surface.associated_session(self.actor)
         def art_records():
             # Any enqueue (the one thing that could inherit the sleeper's room)

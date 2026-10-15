@@ -24,6 +24,10 @@ function requirement(kind, text) {
   return { kind: kind, text: text };
 }
 
+// The terminal position's scene key: this fixture is a wire-shape fixture, so
+// it uses the reserved synthetic vocabulary rather than a shipped scene key.
+const TERMINAL_KEY = "t_terminal_scene";
+
 function digest(label) {
   let out = "";
   for (let i = 0; i < 64; i += 1) {
@@ -77,9 +81,9 @@ function dreamDescriptor(overrides) {
       ],
       terminal: {
         kind: "scene_image",
-        source_id: "scene.terminal:city_street",
+        source_id: "scene.terminal:" + TERMINAL_KEY,
         rank: 100,
-        resource: bundledResource("city_street"),
+        resource: bundledResource(TERMINAL_KEY),
       },
       retention_sources: [],
     },
@@ -228,7 +232,7 @@ test("dream carries the canonical scene descriptor and refuses the retired raw U
     ]
   );
   assert.equal(descriptor.terminal.kind, "scene_image");
-  assert.equal(descriptor.terminal.source_id, "scene.terminal:city_street");
+  assert.equal(descriptor.terminal.source_id, "scene.terminal:" + TERMINAL_KEY);
 
   // A reached fault names its source and reason, never a URL.
   const refused = dreamDescriptor({

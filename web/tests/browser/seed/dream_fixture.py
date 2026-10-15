@@ -1,17 +1,23 @@
 """Dream-stage journey fixture (change ``unified-dream-rendering``).
 
-Installed only when ``ELOSERN_BROWSER_DREAM_ART=1``. It gives one real dream
-journey the OPTIONAL operator-preferred image the stage's first source position
-resolves: the exact identity ``npc/dream_goddess/dream-throne.webp`` (the
-dream chain's own constant) is written under the runtime official root BEFORE
-server startup, so the startup catalog admits it exactly like a deployed
-catalog and the committed descriptor carries it at ``scene.operator``.
+Two independent, test-only opt-ins, both unset by default:
+
+* ``ELOSERN_BROWSER_DREAM=1`` moves the character into a fresh room holding no
+  living monster, because the committed sleep preflight refuses a time skip
+  beside one (``world.rules.skip_safety``) and the shared seed room hosts the
+  combat fixtures' monsters. The room carries no authored scene metadata, so
+  the journey's "the dream inherits no physical-room background" assertion is a
+  real claim about the room the player is actually in.
+* ``ELOSERN_BROWSER_DREAM_ART=1`` additionally writes the OPTIONAL
+  operator-preferred image the stage's first source position resolves: the exact
+  identity ``npc/dream_goddess/dream-throne.webp`` (the dream chain's own
+  constant) under the runtime official root BEFORE server startup, so the
+  startup catalog admits it exactly like a deployed catalog and the committed
+  descriptor carries it at ``scene.operator``.
 
 Nothing else is seeded: the required bundled ``dream_throne`` illustration and
-the distinct town terminal are the committed collection, and the sleeper's
-physical room is deliberately left alone, so a journey can assert that the
-dream inherits no room background. Unset, this module is a no-op and never
-affects the unrelated browser suites.
+the distinct town terminal are the committed collection. Unset, this module is
+a no-op and never affects the unrelated browser suites.
 """
 
 from __future__ import annotations
@@ -40,8 +46,20 @@ def _fixture_webp() -> bytes:
 
 
 def _dream_art_fixture(character) -> None:
-    """Write the operator-preferred dream image under the runtime official root."""
-    if os.environ.get("ELOSERN_BROWSER_DREAM_ART") != "1":
+    """Seed the safe dream room and, when flagged, the preferred official image."""
+    safe_room = os.environ.get("ELOSERN_BROWSER_DREAM") == "1"
+    preferred_art = os.environ.get("ELOSERN_BROWSER_DREAM_ART") == "1"
+    if not safe_room and not preferred_art:
+        return
+    if safe_room:
+        from evennia.utils.create import create_object
+        from typeclasses.rooms import Room
+
+        room = create_object(Room, key="夢境測試起點")
+        character.location = room
+        character.save()
+        print(f"seeded dream room {room.key} ({room.pk})")
+    if not preferred_art:
         return
     from django.conf import settings
 
