@@ -36,7 +36,6 @@ agility values are read through `SkillHandler.effective_value("agility")` (chang
 - **WHEN** a defender declared Dodge for the active round
 - **THEN** the shared hit margin subtracts the configured defender threshold bonus, initially 25; critical still requires a landed raw-100 hit
 
-
 ## ADDED Requirements
 
 ### Requirement: Defend and Dodge consume one zero-resource round-start action
@@ -50,7 +49,6 @@ Eligible allied Defend and Dodge declarations SHALL cost zero MP/SP, consume the
 - **WHEN** a round ends, reconnect occurs after completion or a round technically fails
 - **THEN** no activated tactical effect leaks as a durable buff; failed-round state restores while the selected draft remains recoverable
 
-
 ### Requirement: Defend reduces eligible final scaled direct damage
 Defend SHALL reduce eligible direct damage by the rulebook reduction, initially 35%, after normal mitigation, riders and authored magnitude. The reduced result SHALL be floored and the final hit floor reapplied. Damaging upkeep and explicitly defense-bypassing damage SHALL be exempt; zero or low defense alone SHALL NOT be exempt.
 
@@ -62,7 +60,6 @@ Defend SHALL reduce eligible direct damage by the rulebook reduction, initially 
 - **WHEN** a defended actor receives explicit defense bypass or a damaging upkeep tick
 - **THEN** no Defend reduction is applied; an ordinary hit against zero defense still receives Defend
 
-
 ### Requirement: Dodge affects only shared hit checks and their margins
 Dodge SHALL add the rulebook threshold bonus, initially 25, to the defender-side hit threshold and resulting margin calculation. It SHALL NOT reduce landed damage, create new miss rolls, change initiative or improve retreat. Raw-roll critical requires landing. Per-target AREA hit checks SHALL apply Dodge separately.
 
@@ -73,5 +70,4 @@ Dodge SHALL add the rulebook threshold bonus, initially 25, to the defender-side
 #### Scenario: Estimator agreement
 - **WHEN** a monster estimates a hit against a Defend or Dodge declaration
 - **THEN** its shared arithmetic matches settlement and does not grant extra enemy basic tactics
-
 
