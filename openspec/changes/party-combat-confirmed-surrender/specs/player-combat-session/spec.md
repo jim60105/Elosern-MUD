@@ -29,7 +29,6 @@ cleanup, with exam recovery settling FAIL.
 - **WHEN** the player invokes forfeit, surrender or an allied flee route without a current explicit confirmation
 - **THEN** only a party-scoped consequence prompt is returned, with no settlement, discarded draft or elapsed time
 
-
 ## ADDED Requirements
 
 ### Requirement: Party exit requires a commander session round and operation bound confirmation
@@ -42,7 +41,6 @@ Retreat and surrender SHALL be session-level operations available independently 
 #### Scenario: Public bypass forbidden
 - **WHEN** an allied personal flee skill or text alias requests exit
 - **THEN** it reaches the same party confirmation boundary and cannot perform individual allied escape
-
 
 ### Requirement: Confirmed surrender enters existing defeat or exam FAIL without an extra round
 Confirmed surrender SHALL atomically discard draft selections and enter ordinary hostile-defeat or guild-exam FAIL settlement. It SHALL roll no success check, run no extra enemy attack and add no artificial round. Already accumulated time SHALL settle once. Existing defeat aftermath and exam policy SHALL remain unchanged.
@@ -58,5 +56,4 @@ Confirmed surrender SHALL atomically discard draft selections and enter ordinary
 #### Scenario: Technical failure
 - **WHEN** surrender settlement fails after durable/cache writes
 - **THEN** the draft and all touched durable/cache state restore and a later valid retry may complete
-
 
