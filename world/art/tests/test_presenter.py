@@ -49,18 +49,16 @@ from world.art.presenter import (
     ORIGIN_PLACEHOLDER,
     ORIGIN_RUNTIME,
     ORIGIN_SILHOUETTE,
-    PAYLOAD_OFFICIAL,
-    PLACEHOLDER_MISSING,
-    PLACEHOLDER_UNAVAILABLE,
     describe_entity,
     describe_portrait,
+    describe_scene,
     media_url_for,
-    resolve_scene,
-    resolve_scene_subject,
 )
+from world.art import descriptors, subjects
 from world.art.queue import claim, ensure, record_key, settle
 from world.art.store import ArtAssetRecord, ArtAssetStatus
 from world.art.subjects import ArtSubject, ArtSubjectKind
+from world.rules.art_view import SceneTarget
 from world.tests.synthetic_data import (
     SYNTH_ARCHETYPES,
     SYNTH_MONSTER_TIERS,
@@ -109,6 +107,38 @@ def _scene(key="t_synth_forest"):
     return ArtSubject(ArtSubjectKind.SCENE, key)
 
 
+def _scene_target(archetype: str | None, *, room_art_key: str | None = None,
+                  room_binding_invalid: bool = False) -> SceneTarget:
+    """The read-only logical scene input one scene resolution reads.
+
+    The logical identity is an authored one (supported map construction always
+    writes it), which is what authorizes retained display content.
+    """
+    return SceneTarget(
+        identity="place:t_synth_scene_room",
+        trusted_identity=True,
+        archetype=archetype,
+        room_art_key=room_art_key,
+        room_binding_invalid=room_binding_invalid,
+    )
+
+
+def _scene_descriptor(key: str):
+    """``describe_scene`` for one synthetic archetype key.
+
+    The resolution resolves its own subject through ``world.art.subjects``''
+    module-level registry binding, so the synthetic key is patched into THAT
+    binding for the call.
+    """
+    with patch.object(subjects, "SCENE_ARCHETYPE_REGISTRY", {key: None}):
+        return describe_scene(_scene_target(key))
+
+
+def _scene_attempt(descriptor: dict, rank: int) -> list[dict]:
+    """Every attempt one scene position produced, in declaration order."""
+    return [entry for entry in descriptor["attempts"] if entry["rank"] == rank]
+
+
 class ArtPresenterTests(EvenniaTestCase):
     character_typeclass = PlayerCharacter
 
@@ -137,7 +167,7 @@ class ArtPresenterTests(EvenniaTestCase):
         target.write_bytes(b"asset")
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_done_record_resolves_to_a_same_origin_url(self):
+    def test_done_record_resolves_to_a_versioned_same_origin_url(self):
         subject = _scene()
         ensure(subject, "desc")
         self._write_asset("scene/t_synth_forest.png")
@@ -149,15 +179,25 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity="scene/t_synth_forest.png",
             error=None,
         )
-        payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["status"], ArtAssetStatus.DONE)
-        self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
-        self.assertEqual(payload["aspect_ratio"], "16:9")
-        self.assertNotIn("out_path", payload)
+        descriptor = _scene_descriptor(subject.key)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
+        generated = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)
+        self.assertEqual(len(generated), 1)
+        resource = generated[0]["resource"]
+        self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
+        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_forest.png"))
+        # A republishable generated path carries its bounded cache version, so
+        # a regeneration is a new request rather than the same cached bytes.
+        version = resource["url"].partition("?v=")[2]
+        self.assertEqual(version, descriptors.generated_version(
+            "scene/t_synth_forest.png",
+            str(ArtAssetRecord.objects.get(db_key=record_key(subject)).db.generation_token),
+        ))
+        self.assertNotIn("out_path", repr(descriptor))
+        self.assertNotIn(self.root.as_posix(), repr(descriptor))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_done_record_with_a_missing_file_resolves_to_unavailable(self):
+    def test_done_record_with_a_missing_file_resolves_to_the_output_missing_fact(self):
         subject = _scene()
         ensure(subject, "desc")
         claimed = claim(10)
@@ -168,21 +208,37 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity="scene/t_synth_forest.png",
             error=None,
         )
-        payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
-        self.assertEqual(payload["kind"], PLACEHOLDER_UNAVAILABLE)
+        descriptor = _scene_descriptor(subject.key)
+        generated = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)
+        self.assertEqual(len(generated), 1)
+        self.assertEqual(generated[0]["type"], "fault")
+        self.assertEqual(
+            generated[0]["reason"], descriptors.REASON_GENERATED_OUTPUT_MISSING
+        )
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_DONE)
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
-    def test_missing_pending_failed_and_disabled_states_resolve_to_placeholders(self):
+    def test_missing_pending_and_failed_states_stay_truthful(self):
         pending = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
         ensure(pending, "desc")
-        for subject in (
-            _scene("not_ensured"),
-            pending,
-        ):
-            payload = resolve_scene_subject(subject)
-            self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-            self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        claimed = claim(10)
+        tokens = {record.db_key: str(record.db.generation_token) for record in claimed}
+
+        # No record at all is factually missing: nothing is claimed, and the
+        # generated position carries no attempt.
+        absent = _scene_descriptor(_SYNTH_SCENE)
+        self.assertEqual(absent["generation_state"], descriptors.GENERATION_MISSING)
+        self.assertEqual(_scene_attempt(absent, descriptors.SCENE_RANK_GENERATED), [])
+
+        # A claimed (in-progress) record is the same player-visible fact as a
+        # queued one: pending, with no synthesized candidate.
+        pending_descriptor = _scene_descriptor("t_synth_tavern")
+        self.assertEqual(
+            pending_descriptor["generation_state"], descriptors.GENERATION_PENDING
+        )
+        self.assertEqual(
+            _scene_attempt(pending_descriptor, descriptors.SCENE_RANK_GENERATED), []
+        )
 
         failed = ArtSubject(ArtSubjectKind.SCENE, "t_synth_dungeon")
         ensure(failed, "desc")
@@ -195,10 +251,13 @@ class ArtPresenterTests(EvenniaTestCase):
             output_identity=None,
             error="boom",
         )
-        payload = resolve_scene_subject(failed)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertEqual(payload["status"], ArtAssetStatus.FAILED)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        failed_descriptor = _scene_descriptor("t_synth_dungeon")
+        self.assertEqual(
+            failed_descriptor["generation_state"], descriptors.GENERATION_FAILED
+        )
+        fault = _scene_attempt(failed_descriptor, descriptors.SCENE_RANK_GENERATED)
+        self.assertEqual(len(fault), 1)
+        self.assertEqual(fault[0]["reason"], descriptors.REASON_GENERATION_FAILED)
 
     @covers_requirement("art-asset-lifecycle::rejected-prompt-content-never-reaches-the-presenter-or-browser")
     def test_malformed_subject_ages_resolve_only_to_the_unavailable_placeholder(self):
@@ -233,48 +292,52 @@ class ArtPresenterTests(EvenniaTestCase):
         self.assertIsNotNone(candidate(descriptor))
         self.assertEqual(candidate(descriptor)["url"], "/art/portrait/character/42.png")
 
-    def test_the_flat_projection_refuses_every_non_scene_subject(self):
-        """The surviving flat payload is SCENE-only, by construction."""
-        with self.assertRaises(Exception):
-            resolve_scene_subject(ArtSubject(ArtSubjectKind.CHARACTER, "42"))
-        with self.assertRaises(Exception):
-            resolve_scene_subject(ArtSubject(ArtSubjectKind.MONSTER, "goblin"))
-
-    def test_resolve_scene_handles_valid_and_unresolvable_archetypes(self):
-        self.assertEqual(resolve_scene("not_a_scene")["kind"], PLACEHOLDER_UNAVAILABLE)
-        payload = resolve_scene(_SYNTH_SCENE)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+    def test_unresolvable_archetype_is_the_malformed_metadata_case(self):
+        """A room whose authored archetype cannot be honored says so."""
+        malformed = _scene_descriptor(None)
+        self.assertIsNone(malformed["generation_subject"])
+        self.assertIsNone(malformed["generation_state"])
+        self.assertEqual(malformed["retention_sources"], [])
+        self.assertEqual(len(malformed["attempts"]), 1)
+        self.assertEqual(
+            malformed["attempts"][0]["reason"], descriptors.REASON_CONFIGURATION_INVALID
+        )
+        registered = _scene_descriptor(_SYNTH_SCENE)
+        self.assertEqual(
+            registered["generation_subject"], _scene(_SYNTH_SCENE).full()
+        )
 
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_claimed_record_is_presented_as_pending_while_the_worker_holds_it(self):
         subject = _scene()
         ensure(subject, "desc")
         claim(10)
-        payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
-        self.assertEqual(payload["status"], ArtAssetStatus.PENDING)
-        self.assertEqual(payload["kind"], PLACEHOLDER_MISSING)
+        descriptor = _scene_descriptor(subject.key)
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_PENDING)
+        self.assertEqual(_scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED), [])
         record = ArtAssetRecord.objects.filter(db_key=record_key(subject)).first()
         self.assertEqual(record.db.status, ArtAssetStatus.IN_PROGRESS)
 
     @covers_requirement("art-queue-worker::in-flight-generation-exposes-a-wire-stable-status")
     def test_settled_statuses_pass_through_unchanged(self):
-        for subject, expected in (
-            (_scene("not_ensured"), ArtAssetStatus.MISSING),
-            (_scene("t_synth_dungeon"), ArtAssetStatus.FAILED),
-        ):
-            if expected == ArtAssetStatus.FAILED:
-                ensure(subject, "desc")
-                claimed = claim(10)
-                settle(
-                    subject,
-                    generation_token=str(claimed[0].db.generation_token),
-                    status=ArtAssetStatus.FAILED,
-                    output_identity=None,
-                    error="boom",
-                )
-            payload = resolve_scene_subject(subject)
-            self.assertEqual(payload["status"], expected)
+        failed = _scene("t_synth_dungeon")
+        ensure(failed, "desc")
+        claimed = claim(10)
+        settle(
+            failed,
+            generation_token=str(claimed[0].db.generation_token),
+            status=ArtAssetStatus.FAILED,
+            output_identity=None,
+            error="boom",
+        )
+        self.assertEqual(
+            _scene_descriptor("t_synth_dungeon")["generation_state"],
+            descriptors.GENERATION_FAILED,
+        )
+        self.assertEqual(
+            _scene_descriptor(_SYNTH_SCENE)["generation_state"],
+            descriptors.GENERATION_MISSING,
+        )
 
     @covers_requirement("art-subject-model::subject-producer-validation-rejects-unrepresentable-keys")
     def test_slash_portrait_key_resolves_to_unavailable_without_a_queue_record(self):
@@ -312,9 +375,11 @@ class ArtPresenterTests(EvenniaTestCase):
         with override_settings(
             ART_SD_OUTPUT_FORMAT="webp", ART_SD_OUTPUT_EXTENSION=".webp"
         ):
-            payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], "asset")
-        self.assertEqual(payload["url"], "/art/scene/t_synth_forest.png")
+            descriptor = _scene_descriptor(subject.key)
+        resource = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)[0][
+            "resource"
+        ]
+        self.assertTrue(resource["url"].startswith("/art/scene/t_synth_forest.png"))
 
     @covers_requirement("art-queue-worker::media-serving-maps-validated-stored-identities-to-same-origin-urls-without-exposing-the-store-root")
     def test_foreign_directory_identity_resolves_to_unavailable(self):
@@ -359,10 +424,13 @@ class ArtPresenterTests(EvenniaTestCase):
                 output_identity=identity,
                 error=None,
             )
-            payload = resolve_scene_subject(subject)
+            descriptor = _scene_descriptor(f"mixed_store_{extension[1:]}")
+            resource = _scene_attempt(descriptor, descriptors.SCENE_RANK_GENERATED)[0][
+                "resource"
+            ]
             with self.subTest(extension=extension):
-                self.assertEqual(payload["kind"], "asset")
-                self.assertEqual(payload["url"], f"/art/{identity}")
+                self.assertEqual(resource["origin"], descriptors.ORIGIN_RUNTIME)
+                self.assertTrue(resource["url"].startswith(f"/art/{identity}"))
 
 
 class ResolveEntityTests(EvenniaTestCase):
@@ -662,12 +730,16 @@ class FaceRectPayloadTests(_CardPayloadCase):
         "art-gallery-resolution::every-resolution-payload-carries-a-face-rectangle-or-null"
     )
     def test_every_placeholder_payload_carries_a_null_rectangle(self):
-        # missing record -> PLACEHOLDER_MISSING
-        subject = ArtSubject(ArtSubjectKind.SCENE, "rect_not_ensured")
-        payload = resolve_scene_subject(subject)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNone(payload["stage"])
+        # A scene with no recorded generation resolves no image candidate, and
+        # every scene resource that DOES resolve carries the scene's own
+        # geometry: no face rectangle and no placement triple belong to a
+        # landscape.
+        scene_descriptor = _scene_descriptor(_SYNTH_SCENE)
+        self.assertIsNone(candidate(scene_descriptor))
+        for attempt in scene_descriptor["attempts"]:
+            if attempt["type"] == "image":
+                self.assertIsNone(attempt["resource"]["geometry"]["face_rect"])
+                self.assertIsNone(attempt["resource"]["geometry"]["stage"])
         # no policy -> unavailable
         plain = create_object(PlayerCharacter, key="rect-plain")
         plain.age = 30
@@ -675,23 +747,6 @@ class FaceRectPayloadTests(_CardPayloadCase):
         descriptor = describe_entity(plain)
         self.assertIsNone(candidate(descriptor))
         self.assertIsNone(candidate(descriptor))
-        self.assertIsNone(candidate(descriptor))
-        # done record with a missing file -> unavailable
-        done = ArtSubject(ArtSubjectKind.SCENE, "t_synth_tavern")
-        from world.art.queue import claim as claim2, ensure as ensure2, settle as settle2
-
-        ensure2(done, "desc")
-        claimed = claim2(10)
-        settle2(
-            done,
-            generation_token=str(claimed[0].db.generation_token),
-            status=ArtAssetStatus.DONE,
-            output_identity="scene/t_synth_tavern.png",
-            error=None,
-        )
-        payload = resolve_scene_subject(done)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
         self.assertIsNone(candidate(descriptor))
 
     @covers_requirement(
@@ -712,13 +767,15 @@ class FaceRectPayloadTests(_CardPayloadCase):
         self.assertEqual(
             terminal(descriptor)["geometry"]["face_rect"], dict(DEFAULT_FACE_RECT)
         )
-        # The unpatched seam fills persons but still returns None for scenes:
-        # a scene subject keeps the byte-identical truthful placeholder.
-        scene = ArtSubject(ArtSubjectKind.SCENE, "seam-no-record-scene")
-        payload = resolve_scene_subject(scene)
-        self.assertIsNone(payload["url"])
-        self.assertIsNone(payload["face_rect"])
-        self.assertIsNone(payload["fallback"])
+        # Scenes never consult the portrait fallback seam: a scene's terminal
+        # is its own declared scene image, so no silhouette is ever carried
+        # beside a landscape, and no scene attempt claims a silhouette origin.
+        scene_descriptor = _scene_descriptor(_SYNTH_SCENE)
+        self.assertIsNone(scene_descriptor["terminal"])
+        self.assertNotIn(
+            descriptors.ORIGIN_SILHOUETTE,
+            [attempt.get("resource", {}).get("origin") for attempt in scene_descriptor["attempts"]],
+        )
 
 
 class SilhouettePayloadTests(EvenniaTestCase):

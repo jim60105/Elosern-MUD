@@ -109,6 +109,59 @@ closed at import; the authored tables are validated against the registered
 scene-archetype and room-art vocabularies, so a bad edit names the offending
 key instead of silently degrading a room to no scene art.
 
+## How a scene resolves
+
+One logical scene resolves through ONE read-only walk
+(`world.art.presenter.describe_scene`) whose input is the room's authored
+metadata: its bounded logical **scene identity** (the descriptor's
+`subject_id`), the registered archetype, and the optional registered
+`room_art_key`. The walk emits the canonical artwork descriptor — ordered
+candidates and reached faults, the recorded generation truth, the permitted
+terminal and the retention authorizations — and the client renders it through
+the shared loading core. Sources are tried in this exact order, by the stable
+rank the descriptor carries, never by array position:
+
+| Rank | Source | Where it comes from |
+| ---: | --- | --- |
+| 10 | Room official override | `<root>/room/<room-art-key>/` for a room whose authored metadata declares that key |
+| 20 | Generated archetype art | the scene record's own `done` output, served as `/art/scene/<scene-key>.<ext>?v=<generation digest>` |
+| 30 | Operator scene default | `<root>/scene/<scene-key>/` |
+| 40 | Required bundled type art | the committed `web/static/art/scenes/<scene-key>.webp` illustration |
+| 100 | Declared terminal image | the scene's own declared terminal (`city_street` for town scenes, `forest_path` for forest ones) |
+
+- A source that cannot be honored contributes a **reached fact** at its own
+  position instead of a silent absence: a refused declared default or an
+  unreadable directory (`explicit_reference_missing`, `source_unavailable`,
+  `source_rejected`), a refused manifest (`metadata_invalid`), a recorded
+  generation failure (`generation_failed`), a vanished generated output
+  (`generated_output_missing`), a missing required bundled illustration
+  (`required_resource_missing`), or an unusable authored room binding
+  (`configuration_invalid`). A healthy earlier candidate is presented and the
+  client never reaches the later facts, so a working override leaves no unused
+  failure on screen.
+- A scene whose authored archetype cannot be honored (absent or unregistered)
+  states exactly one `configuration_invalid` fact at the terminal position and
+  still shows the permitted town terminal image. It claims no generation: an
+  unusable archetype names no subject, so no pending generation is synthesized.
+- A scene whose declared terminal IS its own bundled type illustration is
+  attempted once: the required position already covers that exact resource and
+  the terminal position stays empty.
+- The generated output's URL carries the bounded `?v=<digest>` cache version,
+  because a regeneration republishes the same stored path; a path whose
+  versioned form would exceed the runtime route's own URL ceiling keeps its
+  unversioned URL rather than failing the panel.
+- **Retention**: the descriptor authorizes the sources whose prior known-good
+  output is still applicable and readable, as `{source_id, token}` pairs — the
+  generated source for as long as its preserved output identity can be
+  presented (deliberately including a pending or failed regeneration, whose
+  requeue preserves the prior output), and the room override for as long as the
+  binding applies and the default it resolves is still admitted. Only a room
+  whose identity came from the map owner authorizes anything: a fallback
+  identity cannot establish that two resolutions are the same logical place, so
+  it authorizes no retained content at all. A replaced room default, a removed
+  binding, a revoked source or a vanished output stops authorizing the pixels
+  it no longer describes.
+
 ## The directory contract
 
 One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
@@ -132,9 +185,9 @@ One directory root, `ART_OFFICIAL_ROOT`, holds the current artwork only:
   are the authored room vocabulary of the same module. A directory keyed to a
   name no registry declares is skipped with one bounded diagnostic while
   unrelated artwork still indexes.
-- Operator scene/room artwork overrides the archetype chain of a room that
-  references it; the required bundled scene illustration above always remains
-  available for the built-in collection.
+- Operator scene/room artwork participates in the scene resolution chain
+  documented under "How a scene resolves" below; the required bundled scene
+  illustration above always remains available for the built-in collection.
 - The collaborative dream stage's illustration is an official `npc` asset
   addressed by its **exact** identity
   `<root>/npc/dream_goddess/dream-throne.webp`, so that exact filename is what

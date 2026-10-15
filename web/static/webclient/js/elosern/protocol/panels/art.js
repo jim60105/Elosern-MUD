@@ -4,7 +4,7 @@
 // panel's wire validator moved to ./gallery.js in the gallery v2 -> v3 cutover
 // (change unified-gallery-image-contract) and consumes the canonical artwork
 // descriptor through ../artwork.js — the same shared validator this panel's
-// catalog entries now use.
+// catalog entries and its scene block now use.
 
 var C = require("../constants.js");
 var core = require("../core.js");
@@ -19,7 +19,6 @@ var validateArtwork = artwork.validateArtwork;
 
 var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_CANONICAL_JSON_BYTES = C.MAX_CANONICAL_JSON_BYTES;
-var MAX_MEDIA_URL = C.MAX_MEDIA_URL;
 var ART_SCHEMA_VERSION = C.ART_SCHEMA_VERSION;
 
 // Panel discriminator dispatch: the unavailable form is common to every
@@ -27,31 +26,21 @@ var ART_SCHEMA_VERSION = C.ART_SCHEMA_VERSION;
 
 // Exact available art panel schema (mirror of
 // web.webclient.presentation.art, webclient-art-panel).
-var ART_PLACEHOLDER_KINDS = ["missing", "unavailable"];
 var ART_ROLES = ["隊友", "敵方", "對話對象", "人物"];
 var ART_MAX_CONTEXT_NAME = 64;
 var ART_MAX_CONTEXT_ROLE = 16;
 
-function validateArtPlaceholder(value) {
-  if (value === null) {
-    return null;
-  }
-  requireExactFields(value, "art placeholder", ["kind", "label"], []);
-  if (ART_PLACEHOLDER_KINDS.indexOf(value.kind) === -1) {
-    throw new Error("placeholder kind is not a stable value");
-  }
-  var label = requireString(value.label, "placeholder label", 128);
-  if (!label.trim()) {
-    throw new Error("placeholder label must be non-empty");
-  }
-  return { kind: value.kind, label: label };
-}
-
+// One scene wrapper: exactly the archetype the room renders from (null for a
+// room whose authored metadata cannot be honored), the two bounded display
+// strings the stage renders outside the bitmap, and the complete canonical
+// descriptor the scene resolution produced (mirror of
+// web.webclient.presentation.art._validate_scene). Every retired flat scene
+// field fails the exact-key check instead of being adapted.
 function validateArtScene(value) {
   requireExactFields(
     value,
     "art scene",
-    ["archetype", "label", "subject_key", "status", "url", "aspect_ratio", "alt", "placeholder", "stage"],
+    ["archetype", "label", "alt", "artwork"],
     []
   );
   if (value.archetype !== null) {
@@ -64,66 +53,16 @@ function validateArtScene(value) {
   if (!label.trim()) {
     throw new Error("scene label must be non-empty");
   }
-  if (value.subject_key !== null) {
-    requireString(value.subject_key, "scene subject_key", 128);
-  }
-  var status = value.status;
-  if (status !== null) {
-    requireString(status, "scene status", 16);
-    if (["missing", "pending", "failed", "done"].indexOf(status) === -1) {
-      throw new Error("scene status is not a stable value");
-    }
-  }
-  var url = value.url;
-  if (url !== null) {
-    requireString(url, "scene url", MAX_MEDIA_URL);
-    if (url.indexOf("/art/") !== 0) {
-      throw new Error("scene url must be a same-origin media URL");
-    }
-  }
-  if (value.aspect_ratio !== null && value.aspect_ratio !== "16:9") {
-    throw new Error("scene aspect_ratio must be 16:9");
-  }
   var alt = requireString(value.alt, "scene alt", 512);
   if (!alt.trim()) {
     throw new Error("scene alt must be non-empty");
   }
-  var placeholder = validateArtPlaceholder(value.placeholder);
-  var stage = validateArtStage(value.stage, url);
-  if (placeholder === null && status !== "done") {
-    throw new Error("scene placeholder must be present unless done");
-  }
-  if (placeholder !== null && status === "done") {
-    throw new Error("a done scene must not carry a placeholder");
-  }
   return {
     archetype: value.archetype,
-    stage: stage,
     label: label,
-    subject_key: value.subject_key,
-    status: status,
-    url: url,
-    aspect_ratio: value.aspect_ratio,
     alt: alt,
-    placeholder: placeholder,
+    artwork: validateArtwork(value.artwork),
   };
-}
-
-function validateArtStage(value, url) {
-  if (url === null) {
-    if (value !== null) throw new Error("a placeholder carries no stage");
-    return null;
-  }
-  requireExactFields(value, "stage", ["scale", "x", "y"], []);
-  ["scale", "x", "y"].forEach(function (name) {
-    var coordinate = value[name];
-    var lower = name === "scale" ? 0.2 : -0.5;
-    var upper = name === "scale" ? 2 : 0.5;
-    if (typeof coordinate !== "number" || !Number.isFinite(coordinate) || coordinate < lower || coordinate > upper) {
-      throw new Error("invalid stage." + name);
-    }
-  });
-  return { scale: value.scale, x: value.x, y: value.y };
 }
 
 function validateArtContext(value) {
@@ -197,7 +136,5 @@ function validateArtPanel(payload) {
 }
 
 module.exports = {
-  validateArtPlaceholder: validateArtPlaceholder,
   validateArtPanel: validateArtPanel,
-  validateArtStage: validateArtStage,
 };

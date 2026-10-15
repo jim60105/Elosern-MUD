@@ -1,57 +1,60 @@
 <script setup>
-// SceneBackdrop (H1, webclient-hud-01-shell-and-scene, design D3/D8): the
-// full-bleed cinematic stage backdrop. Renders the committed `art` panel's
-// scene truthfully:
-// - `done` with a same-origin URL → cover-cropped `<img>` as the lowest
-//   stage layer.
-// - `pending` with a prior image already rendered → the prior image,
-//   visibly dimmed, with the explicit `目前場景圖片生成中` label (never
-//   presented as the current scene).
-// - `missing` / `failed` / invalid / `pending` without a prior image /
-//   panel unavailable → the current mode's gradient stage with the
-//   truthful placeholder label rendered as text outside the bitmap.
-// A failed image URL is remembered (client-local) so it is not re-fetched
-// without a new URL or a user reload (art degradation never blocks
-// gameplay). The scene label and alternative text always render as DOM
-// text nodes, so no required information exists only inside the bitmap.
+// SceneBackdrop (H1, webclient-hud-01-shell-and-scene; scene rendering owned by
+// change unified-scene-rendering): the full-bleed cinematic stage backdrop.
 //
-// The scene full view (MODIFIED webclient-art-panel): the backdrop's scene
-// control opens a full-screen view on click or Enter, Escape closes it and
-// restores focus to the control.
+// It is a RENDERER of the committed `art` panel's scene descriptor and of the
+// shared loading core's own result — nothing more. The scene resolution walks
+// the ordered source chain (room override, generated archetype, operator
+// default, required bundled type, declared terminal) behind the descriptor, and
+// the loading core (`useArtwork`) owns the ordered attempt walk, the reached
+// faults and the exhausted state; this component only decides WHAT IS ON
+// SCREEN:
 //
-// The scene crossfade (webclient-scene-transitions, design D2): the image
-// the committed state asks for (`targetImage`) is kept apart from the image
-// on screen (`shownImage`). A new URL is decoded first; until its pixels are
-// ready the previous image stays up, dimmed like a pending scene's prior
-// image (never presented as the current scene), and only then does the new
-// image fade in over it while the previous one fades out, so the fade never
-// passes through an empty frame. The label, alternative text, and
-// placeholder follow the committed state at once. Mount shows its image
-// without a fade, and at the `off` motion level the swap is instant.
-import { computed, nextTick, onBeforeUnmount, ref, shallowRef, watch } from "vue";
+//   * the current successful candidate, as soon as it is at least as high a
+//     priority as the retained content;
+//   * otherwise the retained content — the good image the player is already
+//     looking at, which the backend still authorizes for this exact logical
+//     place and generation subject (`lib/scene-artwork.js`);
+//   * otherwise this scene's own provisional bundled/terminal background while
+//     a higher-priority source is still loading;
+//   * otherwise the mode's gradient stage with a truthful status badge.
+//
+// A scene the backend no longer authorizes discards its pixels on the commit
+// that changed it (a new logical place, a removed room binding, a revoked
+// source), so previous-place art can never be shown as the current scene and a
+// move never crossfades across places. A reached failure stays visible beside
+// the healthy fallback that follows it, expected absence carries no error
+// styling at all, and an unavailable panel is its own local indication —
+// never a synthesized "not generated yet".
+//
+// The scene full view shares this same displayed resource and failure state:
+// there is no second resolution, and it never opens a broken-image-only view.
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { artworkAvailability } from "../lib/artwork.js";
+import { artworkFailureCategory } from "../lib/artwork-failure.js";
+import { applicableRetained, displayedScene, retainedEntry } from "../lib/scene-artwork.js";
+import { useArtwork } from "../composables/useArtwork.js";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
-  // The committed `art` v1 panel payload: `available: true` carries
-  // `scene` + `portrait_catalog`; the registry-unavailable form carries
-  // `available: false` + `reason`.
+  // The committed `art` v4 panel payload: `available: true` carries the
+  // canonical `scene` descriptor block plus `portrait_catalog`; the
+  // registry-unavailable form carries `available: false` + `reason`.
   art: { type: Object, required: true },
   // The committed mode (the store's reducer mode). Selects the gradient
-  // stage for degraded scenes: exploration → explore gradient, combat →
-  // combat gradient, creation → dialogue gradient (design D7: the gradient
-  // stage differs per mode and carries the inset vignette, applied by the
-  // shell's stage, not the backdrop itself).
+  // stage for degraded scenes (design D7: the gradient stage differs per mode)
+  // and decides whether the art surface is REQUIRED at all: a creation-pending
+  // shell has no committed scene surface, so its absence is expected rather
+  // than a failure.
   mode: { type: String, default: "exploration" },
-  // The EFFECTIVE motion level (`store.view.motionLevel`,
-  // webclient-scene-transitions D1): at `off` the transition has no CSS
-  // phase, so the final state is on screen in the commit's frame (a CSS
-  // phase would outlive the commit by a double frame even at 0s).
+  // The EFFECTIVE motion level (`store.view.motionLevel`): at `off` the
+  // transition has no CSS phase, so the final state is on screen in the
+  // commit's frame.
   motionLevel: { type: String, default: "full" },
 });
 
 // The current mode's gradient stage token (design D7/D10): the always-correct
-// base layer — a degraded OOB channel is visually indistinguishable from an
-// ungenerated scene.
+// base layer beneath every image.
 const stageGradient = computed(() => {
   if (props.mode === "combat") {
     return "var(--stage-gradient-combat)";
@@ -63,234 +66,348 @@ const stageGradient = computed(() => {
 });
 
 const unavailable = computed(() => props.art?.available === false);
-const scene = computed(() => (unavailable.value ? null : (props.art.scene ?? null)));
+const sceneView = computed(() => (unavailable.value ? null : (props.art?.scene ?? null)));
+const artwork = computed(() => sceneView.value?.artwork ?? null);
 
-// The client-local memory of the last successfully rendered scene image
-// (design D3): a pending scene retains that prior image dimmed.
-const priorImage = ref(null);
-// The set of scene URLs that failed to load in the browser (task 4.7):
-// a failed URL is not re-fetched before a user reload.
-const failedUrls = new Set();
-const imageLoadFailed = ref(false);
-// The full-view open state (task 4.6) + the opener element for focus
-// restore.
+// The shared availability input: a required scene surface whose committed
+// panel is missing/unavailable, or whose committed scene carries no descriptor
+// at all, is a FAILURE (the panel-level availability indication), never a
+// synthesized generation progress. A mode that does not require the surface is
+// expected absence.
+const availability = computed(() =>
+  artworkAvailability({
+    panel: props.art,
+    required: props.mode !== "creation",
+    hasReference: true,
+    artwork: artwork.value,
+    viewSubjectId: artwork.value?.subject_id ?? null,
+  }),
+);
+
+// The ONE provisional source of this scene: its own required bundled type
+// illustration, or — for a scene whose bundled image is unavailable — its
+// declared terminal image. Nothing else is ever fetched outside the ordered
+// walk, so a provisional request can never displace a higher-priority source
+// or issue a duplicate attempt for one.
+const provisionalSource = computed(() => {
+  const descriptor = artwork.value;
+  if (!descriptor) {
+    return null;
+  }
+  const attempts = Array.isArray(descriptor.attempts) ? descriptor.attempts : [];
+  const bundled = attempts.find(
+    (entry) => entry?.type === "image" &&
+      entry.resource?.url &&
+      String(entry.source_id ?? "").startsWith("scene.bundled:"),
+  );
+  if (bundled) {
+    return bundled.resource;
+  }
+  const terminal = descriptor.terminal;
+  if (terminal?.kind === "scene_image" && terminal.resource?.url) {
+    return terminal.resource;
+  }
+  return null;
+});
+
+const load = useArtwork(artwork, availability, { provisionalSource });
+onBeforeUnmount(() => load.dispose());
+
+// The retained display content: the last successful image this backdrop is
+// authorized to keep. It is re-validated against EVERY committed descriptor,
+// so authorization loss (a move, a removed binding, a revoked source) drops it
+// synchronously, and a lower-priority successful fallback never displaces it.
+const retained = ref(null);
+watch(
+  [artwork, () => load.selected.value],
+  () => {
+    retained.value = retainedEntry(retained.value, artwork.value, load.selected.value);
+  },
+  { immediate: true },
+);
+
+const display = computed(() =>
+  displayedScene({
+    // The retained entry is re-validated against the COMMITTED descriptor at
+    // read time, so a commit that revokes its authorization (a move, a removed
+    // binding, a changed token) can never paint the previous place's pixels —
+    // not even for the one frame a watcher might lag behind.
+    retained: applicableRetained(retained.value, artwork.value),
+    selected: load.selected.value,
+    provisional: load.provisionalSelected.value,
+    available: availability.value.state,
+  }),
+);
+
+// The crossfade is a SAME-PLACE replacement only.
+//
+// A committed bitmap may fade into its replacement while the logical place and
+// the displayed pixels are the same scene's — a successful candidate replacing
+// this scene's own provisional background, or a same-scene replacement. Every
+// other swap renders instantly: a move, an authorization loss or a dropped
+// image must never leave the previous place's painting fading across the
+// stage, so those swaps have no CSS phase at all and their outgoing layer is
+// gone in the commit's frame.
+const crossfade = ref(false);
+let shownPlace = null;
+watch(
+  () => [display.value?.url ?? null, artwork.value?.subject_id ?? null],
+  () => {
+    const place = artwork.value?.subject_id ?? null;
+    crossfade.value = !!display.value && shownPlace !== null && place === shownPlace;
+    shownPlace = display.value ? place : null;
+  },
+  { immediate: true },
+);
+
+// The crossfade phase's own hooks.
+//
+// The swap's enter/leave is driven from here rather than from transition
+// classes, so a swap that must NOT animate completes in the commit's frame
+// (the hooks call `done` immediately) while a same-place replacement fades
+// over the one motion-token duration the client's motion level publishes —
+// with no case that can leave an outdated layer on the stage because a CSS
+// phase never ended.
+const transitionCss = computed(() => props.motionLevel !== "off");
+
+function motionDurationMs() {
+  if (typeof getComputedStyle !== "function" || typeof document === "undefined") {
+    return 0;
+  }
+  const raw = getComputedStyle(document.documentElement).getPropertyValue("--motion-scene").trim();
+  const value = Number.parseFloat(raw);
+  if (!Number.isFinite(value) || value <= 0) {
+    return 0;
+  }
+  return raw.endsWith("ms") ? value : value * 1000;
+}
+
+const layerHooks = {
+  onBeforeEnter(el) {
+    el.inert = false;
+  },
+  onEnter(el, done) {
+    if (!transitionCss.value || !crossfade.value) {
+      done();
+      return;
+    }
+    const duration = motionDurationMs();
+    el.style.opacity = "0";
+    void el.offsetWidth;
+    el.style.transition = `opacity ${duration}ms var(--ease-standard)`;
+    el.style.opacity = "1";
+    setTimeout(done, duration);
+  },
+  onBeforeLeave(el) {
+    el.inert = true;
+  },
+  onLeave(el, done) {
+    if (!transitionCss.value || !crossfade.value) {
+      done();
+      return;
+    }
+    const duration = motionDurationMs();
+    el.style.transition = `opacity ${duration}ms var(--ease-exit)`;
+    el.style.opacity = "0";
+    setTimeout(done, duration);
+  },
+  onAfterLeave(el) {
+    el.inert = false;
+  },
+  onLeaveCancelled(el) {
+    el.inert = false;
+  },
+};
+
+// The layer that presents the scene: the displayed bitmap, rendered on its
+// own so the same-place crossfade is one CSS phase of one element. A layer
+// whose URL is the live ordered attempt (or the live provisional one) carries
+// that element's token, so the shared driver observes the real load/decode of
+// the element it issued; a retained or reused bitmap carries no token and
+// settles nothing twice.
+function layerFor(url, role, token) {
+  return { url, role, token };
+}
+
+// The root element, so the already-loaded check below can read the real
+// elements this component rendered.
+const rootEl = ref(null);
+
+const presented = computed(() => {
+  const shown = display.value;
+  if (!shown) {
+    return null;
+  }
+  const ordered = load.attempt.value;
+  const provisional = load.provisionalAttempt.value;
+  if (ordered?.url === shown.url) {
+    return layerFor(shown.url, "attempt", ordered.token);
+  }
+  if (provisional?.url === shown.url) {
+    return layerFor(shown.url, "provisional", provisional.token);
+  }
+  return layerFor(shown.url, "content", null);
+});
+
+// The hidden probes: one per resource currently being fetched that is not
+// already on screen. They report the real natural dimensions the driver needs
+// and never paint anything.
+const probes = computed(() => {
+  const shown = display.value;
+  const out = [];
+  for (const [candidate, role] of [
+    [load.attempt.value, "attempt"],
+    [load.provisionalAttempt.value, "provisional"],
+  ]) {
+    if (!candidate?.url || candidate.url === shown?.url) {
+      continue;
+    }
+    out.push(layerFor(candidate.url, role, candidate.token));
+  }
+  return out;
+});
+
+// The scene label, the alternative text and the status facts always render as
+// DOM text outside the bitmap.
+const sceneLabel = computed(() => sceneView.value?.label ?? (unavailable.value ? "場景" : ""));
+const sceneAlt = computed(() => sceneView.value?.alt ?? "");
+const generationState = computed(() => artwork.value?.generation_state ?? "none");
+const reachedFailure = computed(() => load.reachedFaults.value[0] ?? null);
+const panelUnavailable = computed(
+  () => load.panelUnavailable.value || availability.value.state === "failed",
+);
+const displayPresented = computed(() => !!display.value);
+
+// One local indication for the state the backdrop is actually in:
+//   * an unavailable panel is its own availability fact;
+//   * a reached failure keeps its error marker even when a healthy fallback
+//     follows it (the corrupt-override and failed-regeneration cases);
+//   * expected absence says so plainly, with no error styling and no
+//     "sample" label.
+const failureText = computed(() =>
+  panelUnavailable.value
+    ? artworkFailureCategory("panel_unavailable")
+    : reachedFailure.value
+      ? artworkFailureCategory(reachedFailure.value.reason)
+      : null,
+);
+// A resolution that is still walking its chain has NOT concluded anything, so
+// it shows the stage's own gradient rather than a badge claiming absence: the
+// status badge is for a reached failure, for the panel's own availability
+// failure, and for a chain that genuinely ran out — never for the moment
+// between a commit and its pixels.
+const resolving = computed(
+  () => load.phase.value === "loading" && !reachedFailure.value && !panelUnavailable.value,
+);
+// ONE local indication, never two: while a bitmap is on screen the reached
+// failure is stated by the caption row's own leading fact, and the standalone
+// status badge belongs to the states with nothing to show (the panel's
+// availability failure, a chain that ran out, or a reached failure that left no
+// image at all). A resolution that is still walking shows neither.
+const showPlaceholder = computed(
+  () =>
+    panelUnavailable.value ||
+    (!displayPresented.value && (!resolving.value || !!reachedFailure.value)),
+);
+const placeholderKind = computed(() =>
+  panelUnavailable.value
+    ? "panel_unavailable"
+    : reachedFailure.value
+      ? reachedFailure.value.reason
+      : "missing",
+);
+const placeholderLabel = computed(() => failureText.value ?? "尚未生成");
+
+// The caption row stands only for a real scene image. While one is on screen,
+// the failure marker (if any) leads the row, and a pending regeneration states
+// its factual progress there; the failure fact outranks the progress notice
+// because it is the one the player must not miss.
+const captionFailure = computed(() => (displayPresented.value ? failureText.value : null));
+// The progress notice is an INDEPENDENT fact, never a fallback for the failure
+// text: a pending regeneration whose retained image is on screen states both
+// what is wrong (once) and what is still happening.
+const generating = computed(
+  () => displayPresented.value && generationState.value === "pending",
+);
+// Nothing on screen: the badge carries the same two facts in its own column.
+const badgeProgress = computed(
+  () => !displayPresented.value && generationState.value === "pending",
+);
+
+// The full-view open state + the opener element for focus restore.
 const fullViewOpen = ref(false);
 const controlEl = ref(null);
 const fullViewEl = ref(null);
 
-// When the full view opens, focus moves into it (focus trap: while open,
-// Tab stays within the view; Escape closes and returns focus to the
-// control that opened it).
 watch(fullViewOpen, (open) => {
   if (open) {
     fullViewEl.value?.focus();
   }
 });
 
-watch(
-  () => props.art,
-  () => {
-    // A new scene (a fresh URL) resets the load-failure flag; a failed URL
-    // stays remembered until a new URL arrives or the page reloads.
-    if (scene.value?.url) {
-      imageLoadFailed.value = false;
-    }
-  },
-  { deep: true },
-);
-
-const sceneUrl = computed(() => {
-  const url = scene.value?.url;
-  if (url && failedUrls.has(url)) {
-    return null;
+// A display that is no longer a real image (a move to a scene with nothing to
+// show, a revoked source, an unavailable panel) can never leave a full view
+// open on a broken bitmap.
+watch(display, (value) => {
+  if (!value?.url && fullViewOpen.value) {
+    closeFullView(false);
   }
-  return url ?? null;
 });
 
-// Which image the committed state asks for:
-// - done + a live URL → the current image
-// - pending + a prior image → the dimmed prior image
-const targetImage = computed(() => {
-  if (scene.value?.status === "done" && sceneUrl.value && !imageLoadFailed.value) {
-    return { url: sceneUrl.value, dimmed: false };
-  }
-  if (scene.value?.status === "pending" && priorImage.value) {
-    return { url: priorImage.value, dimmed: true };
-  }
-  return null;
-});
-
-// The image on screen (design D2). Mount takes the target at once: there is
-// nothing to fade from, and mounting plays no transition.
-const shownImage = shallowRef(targetImage.value);
-// The URL whose decode is in flight, or null.
-const decodingUrl = ref(null);
-// The decoder keeps a reference to its `Image` until it settles.
-let decoder = null;
-
-const transitionCss = computed(() => props.motionLevel !== "off");
-
-// A new URL's pixels are ready: `decode()` where the engine has it. Returns
-// null where there is no decode API (jsdom), so the caller swaps at once.
-function decodeImage(url) {
-  if (typeof Image === "undefined") {
-    return null;
-  }
-  const img = new Image();
-  if (typeof img.decode !== "function") {
-    return null;
-  }
-  img.src = url;
-  decoder = img;
-  return img.decode();
-}
-
-watch(
-  () => [targetImage.value?.url ?? null, targetImage.value?.dimmed ?? false],
-  ([url]) => {
-    const target = targetImage.value;
-    if (!target) {
-      decodingUrl.value = null;
-      decoder = null;
-      shownImage.value = null;
-      return;
-    }
-    if (shownImage.value?.url === url) {
-      // The same bitmap: only the dimmed treatment changes (it eases).
-      decodingUrl.value = null;
-      decoder = null;
-      shownImage.value = target;
-      return;
-    }
-    if (decodingUrl.value === url) {
-      return;
-    }
-    const pending = decodeImage(url);
-    if (!pending) {
-      decodingUrl.value = null;
-      shownImage.value = target;
-      return;
-    }
-    decodingUrl.value = url;
-    const settle = (ok) => {
-      // A newer target replaced this one while it decoded: drop it.
-      if (decodingUrl.value !== url) {
-        return;
-      }
-      decodingUrl.value = null;
-      decoder = null;
-      if (!ok) {
-        // The URL failed to load or decode: the same failure the rendered
-        // image's error path records, so the URL is never fetched again, the
-        // previous image fades out, and the placeholder takes over.
-        recordFailure(url);
-        return;
-      }
-      if (targetImage.value?.url === url) {
-        shownImage.value = targetImage.value;
-      }
-    };
-    pending.then(
-      () => settle(true),
-      () => settle(false),
-    );
-  },
-);
-
-onBeforeUnmount(() => {
-  decodingUrl.value = null;
-  decoder = null;
-});
-
-// What renders: the shown image, dimmed while the next one decodes — the
-// label already names the new scene, so the old bitmap must look stale.
-const activeImage = computed(() => {
-  const shown = shownImage.value;
-  if (!shown) {
-    return null;
-  }
-  return { url: shown.url, dimmed: shown.dimmed || decodingUrl.value !== null };
-});
-
-const showPlaceholder = computed(() => {
-  if (unavailable.value) {
-    return true;
-  }
-  const s = scene.value;
-  if (!s) {
-    return true;
-  }
-  if (s.status === "pending" && priorImage.value) {
-    return false;
-  }
-  if (s.status === "done") {
-    return imageLoadFailed.value || !sceneUrl.value;
-  }
-  return true;
-});
-
-const placeholderLabel = computed(() => {
-  if (unavailable.value) {
-    return props.art?.reason?.message || "無法提供";
-  }
-  return scene.value?.placeholder?.label || "場景圖片尚未生成";
-});
-
-const placeholderKind = computed(() => {
-  if (unavailable.value) {
-    return props.art?.reason?.code || "unavailable";
-  }
-  return (imageLoadFailed.value ? "load_failed" : (scene.value?.placeholder?.kind ?? "unavailable"));
-});
-
-const statusBadgeText = computed(() => {
-  const isSample = showPlaceholder.value && props.mode !== "creation";
-  return isSample ? `範例場景 ‧ ${placeholderLabel.value}` : placeholderLabel.value;
-});
-
-// The scene label + alt always render as text outside the bitmap.
-const sceneLabel = computed(() => scene.value?.label ?? (unavailable.value ? "場景" : ""));
-const sceneAlt = computed(() => scene.value?.alt ?? "");
-const generating = computed(() => scene.value?.status === "pending" && !!priorImage.value);
-const hasControl = computed(() => !unavailable.value && !!scene.value);
-
-// The rendered image's own URL: during a crossfade two images are in the
-// DOM, and a late event from the leaving one must not speak for the scene on
-// screen.
-function eventUrl(event) {
-  return event?.currentTarget?.getAttribute?.("src") || null;
-}
-
-function onImageLoad(event) {
-  const url = eventUrl(event);
-  if (!url || url !== shownImage.value?.url) {
+// An element that ALREADY holds the bytes never fires another load.
+//
+// A commit can re-issue a load for a resource whose element is on screen and
+// complete (the browser served it from its cache, or a re-resolution followed
+// the first paint). Waiting for an event that will never come would leave the
+// resolution parked on a resource it has, so every rendered layer whose
+// element reports `complete` is reported to its owning driver once. The
+// driver's own token and cursor checks make a repeated report a no-op.
+function reportCompleteLayers() {
+  const root = rootEl.value;
+  if (!root || typeof root.querySelectorAll !== "function") {
     return;
   }
-  priorImage.value = url;
-  imageLoadFailed.value = false;
-}
-
-// A scene URL that failed to load: remembered, so it is not fetched again
-// before a new URL or a reload, and — when it is the scene the committed
-// state asks for — the placeholder takes over.
-function recordFailure(url) {
-  failedUrls.add(url);
-  if (url !== targetImage.value?.url && url !== shownImage.value?.url) {
-    return;
+  for (const element of root.querySelectorAll("img[data-role]")) {
+    if (!element.complete || !element.naturalWidth) {
+      continue;
+    }
+    const url = element.getAttribute("src");
+    const layer = [...probes.value, presented.value].find((item) => item?.url === url);
+    if (layer) {
+      onLayerLoad(layer, { target: element });
+    }
   }
-  priorImage.value = null;
-  imageLoadFailed.value = true;
 }
 
-function onImageError(event) {
-  const url = eventUrl(event);
-  if (url) {
-    recordFailure(url);
+watch([probes, presented], () => {
+  void nextTick().then(reportCompleteLayers);
+}, { flush: "post" });
+onMounted(reportCompleteLayers);
+
+// Which shared driver owns one rendered layer's load/error observations.
+function onLayerLoad(layer, event) {
+  if (layer.role === "attempt") {
+    load.onImageLoad(event);
+  } else if (layer.role === "provisional") {
+    load.onProvisionalLoad(event);
+  }
+}
+
+function onLayerError(layer, event) {
+  if (layer.role === "attempt") {
+    load.onImageError(event);
+  } else if (layer.role === "provisional") {
+    load.onProvisionalError(event);
+  } else if (layer.url === retained.value?.url) {
+    // A retained source the browser can no longer load is a known failed
+    // source: it stops authorizing itself and the next applicable source (or
+    // the truthful status badge) takes its place.
+    retained.value = null;
   }
 }
 
 function openFullView() {
-  if (fullViewOpen.value) {
+  if (fullViewOpen.value || !displayPresented.value) {
     return;
   }
   fullViewOpen.value = true;
@@ -317,8 +434,8 @@ function onFullViewKeydown(event) {
     event.preventDefault();
     closeFullView(true);
   } else if (event.key === "Tab") {
-    // Focus trap: Tab cycles between the close button and the dialog root,
-    // so keyboard users stay within the full view and cannot tab into the
+    // Focus trap: Tab cycles between the close button and the dialog root, so
+    // keyboard users stay within the full view and cannot tab into the
     // recessed background HUD.
     const root = fullViewEl.value;
     const closeBtn = root?.querySelector(".scene-backdrop__fullview-close");
@@ -335,10 +452,28 @@ function onFullViewKeydown(event) {
   }
 }
 
-// Seed the prior-image memory (stories and tests): a pending scene keeps
-// its prior image visibly dimmed — never presented as the current scene.
+// Seed the retained display content for the CURRENT committed scene (stories
+// and acceptance journeys): the seeded pixels carry the descriptor's own
+// retention authorization, so they behave exactly like content this browser
+// really had on screen — they survive only while the backend still authorizes
+// that source for this logical place.
 function setPriorImage(url) {
-  priorImage.value = url;
+  const descriptor = artwork.value;
+  const source = Array.isArray(descriptor?.retention_sources)
+    ? descriptor.retention_sources[0]
+    : null;
+  retained.value = {
+    subjectId: descriptor?.subject_id ?? null,
+    generationSubject: descriptor?.generation_subject ?? null,
+    sourceId: source?.source_id ?? null,
+    token: source?.token ?? null,
+    rank: typeof source?.rank === "number" ? source.rank : 100,
+    resourceId: null,
+    version: null,
+    url,
+    geometry: null,
+    dimensions: null,
+  };
 }
 
 defineExpose({ openFullView, closeFullView, setPriorImage });
@@ -346,30 +481,48 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 
 <template>
   <div
+    ref="rootEl"
     class="scene-backdrop"
     data-testid="scene-backdrop"
     :data-available="unavailable ? 'false' : 'true'"
-    :data-scene-status="scene?.status ?? 'none'"
+    :data-scene-state="generationState"
     :style="{ background: stageGradient }"
   >
-    <div v-if="showPlaceholder && mode !== 'creation'" class="scene-backdrop__sample" aria-hidden="true"></div>
-    <!-- The crossfade (design D2): keyed by URL with no mode, so the
-         entering image fades in above the leaving one, which is inert from
-         the commit on. -->
-    <Transition name="scene-xfade" :css="transitionCss" v-bind="inertWhileLeaving">
+    <!-- The presented bitmap: one element, one CSS phase per swap. A swap the
+         spec does not allow to animate (a move, a revocation, the off motion
+         level) has no CSS phase at all and is gone in the commit's frame. -->
+    <Transition name="scene-xfade" :css="false" v-bind="layerHooks">
       <img
-        v-if="activeImage"
-        :key="activeImage.url"
+        v-if="presented"
+        :key="presented.url"
         class="scene-backdrop__image"
         data-testid="scene-backdrop-image"
-        :src="activeImage.url"
-        :class="{ 'scene-backdrop__image--dimmed': activeImage.dimmed }"
-        :alt="''"
+        :data-role="presented.role"
+        :data-attempt-token="presented.role === 'attempt' ? String(presented.token) : null"
+        :data-provisional-token="presented.role === 'provisional' ? String(presented.token) : null"
+        :src="presented.url"
+        alt=""
         aria-hidden="true"
-        @load="onImageLoad($event)"
-        @error="onImageError($event)"
+        @load="onLayerLoad(presented, $event)"
+        @error="onLayerError(presented, $event)"
       />
     </Transition>
+
+    <!-- The probes: the resources the shared driver is fetching right now.
+         Invisible, never presented, and never carrying the image test hook. -->
+    <img
+      v-for="probe in probes"
+      :key="probe.url"
+      class="scene-backdrop__image scene-backdrop__image--probe"
+      :data-role="probe.role"
+      :data-attempt-token="probe.role === 'attempt' ? String(probe.token) : null"
+      :data-provisional-token="probe.role === 'provisional' ? String(probe.token) : null"
+      :src="probe.url"
+      alt=""
+      aria-hidden="true"
+      @load="onLayerLoad(probe, $event)"
+      @error="onLayerError(probe, $event)"
+    />
 
     <div
       v-if="showPlaceholder"
@@ -378,24 +531,36 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
       :data-kind="placeholderKind"
     >
       <p class="scene-backdrop__placeholder-label" data-testid="scene-backdrop-placeholder-label">
-        {{ statusBadgeText }}
+        {{ placeholderLabel }}
+      </p>
+      <p
+        v-if="badgeProgress"
+        class="scene-backdrop__placeholder-progress"
+        data-testid="scene-backdrop-placeholder-progress"
+      >
+        目前場景圖片生成中
       </p>
     </div>
 
-    <!-- The scene caption: one single-line plate holding the pending
-         notice, the scene label, the alternative text, and the full-view
-         control. A label or alt text longer than the row truncates with an
-         ellipsis (the full text stays in the DOM and in `title`), so the row
-         keeps the fixed `--scene-caption-h` the dialogue choice list stops
-         above. The label and alt render as text outside the
-         bitmap (MODIFIED webclient-art-panel): no required information
-         exists only inside the image. -->
+    <!-- The scene caption: one single-line plate holding the status facts, the
+         scene label, the alternative text, and the full-view control. A label
+         or alt text longer than the row truncates with an ellipsis (the full
+         text stays in the DOM and in `title`), so the row keeps the fixed
+         `--scene-caption-h` the dialogue choice list stops above. -->
     <div
-      v-if="activeImage"
+      v-if="displayPresented"
       class="scene-backdrop__caption"
       data-testid="scene-backdrop-caption"
     >
       <div class="scene-backdrop__plate">
+        <p
+          v-if="captionFailure"
+          class="scene-backdrop__generating scene-backdrop__generating--failure"
+          data-testid="scene-backdrop-failure"
+          role="status"
+        >
+          {{ captionFailure }}
+        </p>
         <p
           v-if="generating"
           class="scene-backdrop__generating"
@@ -409,10 +574,11 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
         <p v-if="sceneAlt && sceneAlt !== sceneLabel" class="scene-backdrop__scene-alt" data-testid="scene-backdrop-alt" :title="sceneAlt">
           {{ sceneAlt }}
         </p>
-        <!-- The scene control opens the full view (MODIFIED art-panel: click
-             or Enter on the control; Escape closes and restores focus). -->
+        <!-- The scene control opens the full view (click or Enter on the
+             control; Escape closes and restores focus). It exists exactly when
+             a real scene image is on screen, so no broken-only view can open. -->
         <button
-          v-if="hasControl && activeImage"
+          v-if="displayPresented"
           ref="controlEl"
           type="button"
           class="scene-backdrop__fullview-control"
@@ -446,13 +612,16 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
         關閉
       </button>
       <img
-        v-if="activeImage"
+        v-if="display"
         class="scene-backdrop__fullview-image"
         data-testid="scene-backdrop-fullview-image"
-        :src="activeImage.url"
+        :src="display.url"
         :alt="sceneAlt"
       />
       <p v-if="sceneLabel" class="scene-backdrop__fullview-label">{{ sceneLabel }}</p>
+      <p v-if="captionFailure" class="scene-backdrop__fullview-failure" role="status">
+        {{ captionFailure }}
+      </p>
     </div>
   </div>
 </template>
@@ -467,7 +636,8 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 
 /* The mode's gradient stage is the always-correct base layer (design D3):
    the backdrop element's background carries the current mode's gradient. */
-/* The dimmed treatment eases in and out on the scene duration. */
+/* Every image layer (displayed or probing) covers the stage box; a probe is
+   invisible but still loads, so the driver observes real dimensions. */
 .scene-backdrop .scene-backdrop__image {
   position: absolute;
   inset: 0;
@@ -477,34 +647,18 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   transition: opacity var(--motion-scene) var(--ease-standard);
 }
 
-/* A pending scene keeps its prior image visibly dimmed (never presented
-   as current), and so does the previous image while the next one decodes. */
-.scene-backdrop .scene-backdrop__image--dimmed {
-  opacity: 0.45;
+.scene-backdrop .scene-backdrop__image--probe {
+  opacity: 0;
+  pointer-events: none;
 }
 
-/* The scene crossfade (webclient-scene-transitions, design D2). The new
-   painting fades in ABOVE the old one on a fast-rising curve while the old
-   one thins on a slow-starting curve, so the pair never drops through the
-   dark gradient beneath them (no dip in brightness mid-fade). The entering
-   layer also settles from a hair larger than cover — a slight arrival, not a
-   zoom — and only where travel is allowed. */
-.scene-backdrop .scene-xfade-enter-active {
+/* The scene crossfade (webclient-scene-transitions, design D2): the entering
+   painting fades in OVER the leaving one (it is the later sibling, so it
+   paints above), and the leaving one thins on the slower exit curve, so the
+   pair never drops through the dark gradient beneath them. Both phases take
+   their duration from the one motion token the client publishes. */
+.scene-backdrop .scene-backdrop__image:first-of-type {
   z-index: 1;
-  transition:
-    opacity var(--motion-scene) var(--ease-standard),
-    transform var(--motion-scene) var(--ease-standard);
-}
-.scene-backdrop .scene-xfade-leave-active {
-  z-index: 0;
-  transition: opacity var(--motion-scene) var(--ease-exit);
-}
-.scene-backdrop .scene-xfade-enter-from {
-  opacity: 0;
-  transform: scale(calc(1 + 0.025 * var(--motion-travel)));
-}
-.scene-backdrop .scene-xfade-leave-to {
-  opacity: 0;
 }
 
 .scene-backdrop .scene-backdrop__placeholder {
@@ -531,9 +685,15 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   color: var(--paper-300);
 }
 
-/* The scene caption block: one plate (the pending notice, the label, the
-   alt text, and the full-view control). Standalone, it sits at the stage's
-   lower left clear of the band and the command-line row; the shell
+.scene-backdrop .scene-backdrop__placeholder-progress {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-xs);
+}
+
+/* The scene caption block: one plate (the status facts, the label, the alt
+   text, and the full-view control). Standalone, it sits at the stage's lower
+   left clear of the band and the command-line row; the shell
    (app-shell.css) centres it in the open stage between the portraits. The
    block itself is pointer-transparent; only its children take pointer
    events, so it never blocks the stage beside them. */
@@ -553,8 +713,9 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   pointer-events: auto;
 }
 
-/* The pending notice leads the plate in the warning tone, split from the
-   label by the same gold hairline the alt text uses. */
+/* The leading status fact of the plate: the pending notice in the warning
+   tone, or a reached failure in the error tone. Both are split from the label
+   by the same gold hairline the alt text uses. */
 .scene-backdrop .scene-backdrop__generating {
   flex: none;
   margin: 0;
@@ -567,12 +728,16 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   letter-spacing: 0.04em;
 }
 
+.scene-backdrop .scene-backdrop__generating--failure {
+  color: #f3b9bc;
+}
+
 /* The plate reads as a museum caption for the painting: the label in the
    serif display face, the alt text as its quieter description after a gold
    hairline, and the full-view control as a small trailing chip. It is one
    line at the fixed `--scene-caption-h`: within the caption block's width
    the label takes at most 55% and the alt text the rest, each ending in an
-   ellipsis; the notice and the control never shrink. */
+   ellipsis; the status facts and the control never shrink. */
 .scene-backdrop .scene-backdrop__plate {
   display: flex;
   flex-wrap: nowrap;
@@ -645,9 +810,9 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   color: var(--paper-50);
 }
 
-/* The full-screen scene view (MODIFIED art-panel keyboard-first): the same
-   image (or the mode gradient) at full screen, focus-trapped, Escape closes
-   and restores focus to the opener. */
+/* The full-screen scene view (keyboard-first): the same image the backdrop
+   shows at full screen, focus-trapped; Escape closes and restores focus to
+   the opener. */
 .scene-backdrop .scene-backdrop__fullview {
   position: fixed;
   inset: 0;
@@ -666,17 +831,16 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
   object-fit: contain;
 }
 
-.scene-backdrop .scene-backdrop__fullview-gradient {
-  width: min(960px * var(--ui-scale), 92vw);
-  aspect-ratio: 16 / 9;
-  background: inherit;
-  border-radius: var(--radius);
-}
-
 .scene-backdrop .scene-backdrop__fullview-label {
   margin: var(--sp-3) 0 0;
   color: var(--paper-300);
   font-size: var(--text-sm);
+}
+
+.scene-backdrop .scene-backdrop__fullview-failure {
+  margin: var(--sp-2) 0 0;
+  color: #f3b9bc;
+  font-size: var(--text-xs);
 }
 
 /* The full-view close control: a keyboard-reachable close button pinned to

@@ -38,33 +38,45 @@
   // Scene reduction.
   // -------------------------------------------------------------------------
 
-  // Reduce the validated scene payload into a render view. The scene is
-  // either an asset (done), a truthful placeholder, or -- when the current
-  // scene is pending and a prior image was already rendered -- a dimmed
-  // retained image explicitly labelled `目前場景圖片生成中`. `previous` is the
-  // prior reduced scene view (or null); without a prior image a pending scene
-  // degrades to the placeholder.
+  // Reduce the validated scene payload into a render view.
+  //
+  // The scene block is exactly `{archetype, label, alt, artwork}`: the view's
+  // image is the descriptor's own highest-ranked image attempt (rank decides
+  // priority), its status is the descriptor's recorded generation truth, and
+  // the archetype/label/alt are the committed display strings. `previous` is
+  // the prior reduced scene view (or null); a pending regeneration of the SAME
+  // logical place and generation subject keeps the prior image, which is
+  // exactly the retention the descriptor's own authorization expresses.
   function reduceScene(scene, previous) {
     scene = scene || {};
-    var status = scene.status || null;
-    var placeholder = scene.placeholder || null;
+    var artwork = scene.artwork || null;
+    var candidate = originalOf(artwork);
+    var status = artwork && artwork.generation_state ? artwork.generation_state : null;
     var view = {
       archetype: scene.archetype || null,
       label: scene.label || "",
       status: status,
-      url: scene.url || null,
-      aspectRatio: scene.aspect_ratio || null,
+      url: candidate ? candidate.resource.url : null,
+      aspectRatio:
+        candidate && candidate.resource.geometry ? candidate.resource.geometry.aspect_ratio : null,
       alt: scene.alt || "",
-      placeholderKind: placeholder ? placeholder.kind : null,
-      placeholderLabel: placeholder ? placeholder.label : null,
-      state: "placeholder",
+      artwork: artwork,
+      placeholderKind: candidate ? null : status === "failed" ? "failed" : "missing",
+      placeholderLabel: candidate ? null : status === "failed" ? "場景圖像生成失敗" : "場景圖像尚未生成",
+      state: candidate ? "asset" : "placeholder",
     };
-    if (status === "done" && scene.url) {
-      view.state = "asset";
-    } else if (status === "pending" && previous && previous.url && previous.state === "asset") {
-      // Pending with a prior rendered image: retain it visibly dimmed.
+    var sameScene =
+      previous &&
+      previous.artwork &&
+      artwork &&
+      previous.artwork.subject_id === artwork.subject_id &&
+      previous.artwork.generation_subject === artwork.generation_subject;
+    if (!candidate && status === "pending" && previous && previous.url && previous.state === "asset" && sameScene) {
+      // Pending with a prior rendered image of this same scene: retain it.
       view.state = "pending";
       view.url = previous.url;
+      view.placeholderKind = null;
+      view.placeholderLabel = null;
     }
     return view;
   }

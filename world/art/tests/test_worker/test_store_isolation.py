@@ -179,12 +179,37 @@ class WorkerStoreIsolationTests(WorkerStoreIsolation):
         record = self._record_for(subject)
         self.assertEqual(record.db.status, ArtAssetStatus.FAILED)
         self.assertEqual(record.db.last_error_code, "sd_connection_error")
-        from world.art.presenter import resolve_scene_subject
+        from world.art import descriptors
+        from world.art.presenter import describe_scene
+        from world.art import subjects as art_subjects
+        from world.rules.art_view import SceneTarget
 
-        # A scene position: the scene block keeps its own flat projection.
-        payload = resolve_scene_subject(subject)
-        self.assertEqual(payload["kind"], "missing")
-        self.assertIsNone(payload["url"])
+        # A scene position: the recorded failure is a reached fact of the
+        # canonical descriptor and no candidate is invented around it.
+        with patch.object(
+            art_subjects,
+            "SCENE_ARCHETYPE_REGISTRY",
+            {subject.key: None},
+        ):
+            descriptor = describe_scene(
+                SceneTarget(
+                    identity="place:t_synth_store_isolation",
+                    trusted_identity=True,
+                    archetype=subject.key,
+                    room_art_key=None,
+                    room_binding_invalid=False,
+                )
+            )
+        self.assertEqual(descriptor["generation_state"], descriptors.GENERATION_FAILED)
+        generated = [
+            attempt
+            for attempt in descriptor["attempts"]
+            if attempt["rank"] == descriptors.SCENE_RANK_GENERATED
+        ]
+        self.assertEqual(
+            [attempt["reason"] for attempt in generated],
+            [descriptors.REASON_GENERATION_FAILED],
+        )
 
     @covers_requirement(
         "internal-art-worker::art-generation-failures-degrade-to-bounded-named-error-codes",

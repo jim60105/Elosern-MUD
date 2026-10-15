@@ -33,23 +33,48 @@ const {
 } = require("./protocol_fixtures.js");
 
 
+// One canonical scene descriptor: the wire this file's art panels carry beside
+// the portrait descriptor under test. The scene is exactly
+// {archetype, label, alt, artwork}, so a portrait fact that leaked into the
+// scene block could not be mistaken for a scene fact.
+function validSceneArtwork() {
+  const fingerprint = fixtureDigest("scene-bundled");
+  return {
+    subject_id: "grid:t_south_gate:0,0",
+    revision: fixtureDigest("scene-revision"),
+    generation_subject: "scene:t_south_gate",
+    generation_state: "done",
+    attempts: [
+      {
+        type: "image",
+        source_id: "scene.bundled:t_south_gate",
+        rank: 40,
+        resource: {
+          resource_id: `bundled-scene/t_south_gate/${fingerprint}.webp`,
+          version: fingerprint,
+          url: `/art/bundled-scene/t_south_gate/${fingerprint}.webp`,
+          origin: "bundled_official",
+          geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: null },
+        },
+      },
+    ],
+    terminal: null,
+    retention_sources: [],
+  };
+}
+
 // The same descriptor, placed on both wires: an art catalog value wraps it with
 // its display context, a roster row carries it bare.
 function bothWires(artwork) {
   const artPanel = {
-    schema_version: 3,
+    schema_version: 4,
     available: true,
     kind: "scene",
     scene: {
       archetype: null,
-      stage: { scale: 1, x: 0, y: 0 },
       label: "南門街道",
-      subject_key: null,
-      status: "done",
-      url: "/art/scene.png",
-      aspect_ratio: "16:9",
       alt: "當前場景",
-      placeholder: null,
+      artwork: validSceneArtwork(),
     },
     portrait_catalog: { "1": validArtCatalogEntry({ artwork }) },
   };
@@ -90,14 +115,16 @@ test("both portrait wires refuse the retired flat shape", () => {
   // its exact-key check.
   assert.throws(() =>
     Protocol.validateArtPanel({
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "scene",
       scene: {
-        archetype: null, stage: { scale: 1, x: 0, y: 0 }, label: "南門街道", subject_key: null,
-        status: "done", url: "/art/scene.png", aspect_ratio: "16:9",
-        alt: "當前場景", placeholder: null,
+        archetype: null,
+        label: "南門街道",
+        alt: "當前場景",
+        artwork: validSceneArtwork(),
       },
+      
       portrait_catalog: { "1": flat },
     })
   );

@@ -104,15 +104,28 @@ class ArtPushPureGateTests(unittest.TestCase):
     def test_art_subject_keys_extraction(self):
         self.assertEqual(_art_subject_keys({}), set())
         self.assertEqual(_art_subject_keys({"scene": None}), set())
-        self.assertEqual(_art_subject_keys({"scene": {"subject_key": ""}}), set())
-        self.assertEqual(_art_subject_keys({"scene": {"subject_key": "scene:arena"}}), {"scene:arena"})
+        self.assertEqual(_art_subject_keys({"scene": {"artwork": None}}), set())
+        self.assertEqual(
+            _art_subject_keys({"scene": {"artwork": {"generation_subject": ""}}}), set()
+        )
+        self.assertEqual(
+            _art_subject_keys(
+                {"scene": {"artwork": {"generation_subject": "scene:arena"}}}
+            ),
+            {"scene:arena"},
+        )
         catalog = {
             "char_1": {"artwork": {"generation_subject": "portrait:character:alice"}},
             "char_2": {"subject_key": ""},
             "char_3": None,
         }
         self.assertEqual(
-            _art_subject_keys({"scene": {"subject_key": "scene:arena"}, "portrait_catalog": catalog}),
+            _art_subject_keys(
+                {
+                    "scene": {"artwork": {"generation_subject": "scene:arena"}},
+                    "portrait_catalog": catalog,
+                }
+            ),
             {"scene:arena", "portrait:character:alice"},
         )
 
@@ -136,7 +149,7 @@ class ArtPushPureGateTests(unittest.TestCase):
         """
         payload = {
             "available": True,
-            "scene": {"subject_key": "scene:t_synth_bazaar"},
+            "scene": {"artwork": {"generation_subject": "scene:t_synth_bazaar"}},
             "portrait_catalog": {
                 "11": {"artwork": {"generation_subject": "portrait:character:alice"}},
                 "12": {"artwork": {"generation_subject": ""}},
@@ -187,7 +200,7 @@ class ArtPushPureGateTests(unittest.TestCase):
         def fake_render1(name, ctx):
             contexts_sess1.append(ctx)
             if name == "art":
-                return {"available": True, "scene": {"subject_key": "target"}}
+                return {"available": True, "scene": {"artwork": {"generation_subject": "target"}}}
             return {"available": False}
 
         def fake_render2(name, ctx):
@@ -629,8 +642,18 @@ class ArtPushPresenterTests(EvenniaTestCase):
         ]
         self.assertEqual(len(updates), 1)
         envelope = updates[0]["ui_update"][0][0]
-        self.assertEqual(envelope["panels"]["art"]["scene"]["status"], ArtAssetStatus.DONE)
-        self.assertEqual(envelope["panels"]["art"]["scene"]["url"], "/art/scene/t_synth_bazaar.png")
+        scene = envelope["panels"]["art"]["scene"]
+        self.assertEqual(scene["artwork"]["generation_state"], "done")
+        generated = [
+            attempt
+            for attempt in scene["artwork"]["attempts"]
+            if attempt["type"] == "image"
+            and attempt["source_id"].startswith("scene.generated:")
+        ]
+        self.assertEqual(len(generated), 1)
+        self.assertTrue(
+            generated[0]["resource"]["url"].startswith("/art/scene/t_synth_bazaar.png")
+        )
         self.assertEqual(envelope["revision"], 1)
         self.assertNotIn("context_actions", envelope["panels"])
         # Scene-only exclusion (design D3): the completed subject names the
@@ -947,7 +970,7 @@ class ArtPushPresenterTests(EvenniaTestCase):
         ]
         self.assertEqual(len(snapshots), 1)
         art = snapshots[0]["panels"]["art"]
-        self.assertEqual(art["scene"]["status"], ArtAssetStatus.DONE)
+        self.assertEqual(art["scene"]["artwork"]["generation_state"], "done")
 
 
 if __name__ == "__main__":

@@ -22,6 +22,7 @@ import LocalMap from "../components/LocalMap.vue";
 import SceneBackdrop from "../components/SceneBackdrop.vue";
 import DialogueChoices from "../components/DialogueChoices.vue";
 import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
+import { observeLoad } from "./support/scene_layers.js";
 import * as fx from "./store/protocol_fixtures.js";
 
 import { h, nextTick } from "vue";
@@ -131,7 +132,7 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(document.activeElement).toBe(winEl);
   });
 
-  it("keeps the backdrop's committed art unmodified across the dialogue mode flip", () => {
+  it("keeps the backdrop's committed art unmodified across the dialogue mode flip", async () => {
     // webclient-align-08: "Dialogue backdrop keeps its committed art" — the
     // mode change must not touch the scene surface: same committed bitmap and
     // label before and after the flip.
@@ -146,15 +147,18 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
         backdrop: () => h(SceneBackdrop, { art: ART_PANEL_SAMPLE }),
       },
     });
+    // The backdrop presents a resource only once its own element reported the
+    // pixels, so the journey reaches the state exactly like the browser does.
+    const sceneUrl = ART_PANEL_SAMPLE.scene.artwork.attempts[0].resource.url;
+    await observeLoad(wrapper, sceneUrl);
     const before = wrapper.get('[data-testid="scene-backdrop-image"]').attributes("src");
-    expect(before).toBe("/art/scenes/scene_river_dawn.png");
+    expect(before).toBe(sceneUrl);
 
-    wrapper.setProps({ mode: "dialogue" });
-    return wrapper.vm.$nextTick().then(() => {
-      expect(wrapper.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
-      expect(wrapper.get('[data-testid="scene-backdrop-image"]').attributes("src")).toBe(before);
-      expect(wrapper.get('[data-testid="scene-backdrop-label"]').text()).toBe("河畔清晨");
-    });
+    await wrapper.setProps({ mode: "dialogue" });
+    await wrapper.vm.$nextTick();
+    expect(wrapper.find('[data-elosern-mode="dialogue"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="scene-backdrop-image"]').attributes("src")).toBe(before);
+    expect(wrapper.get('[data-testid="scene-backdrop-label"]').text()).toBe("河畔清晨");
   });
 
   it("collapses the command region and hides cockpit anchors in dialogue", () => {

@@ -23,18 +23,77 @@ const {
   validArtworkResource,
 } = require("./protocol_fixtures.js");
 
+// One canonical scene descriptor: the generated archetype artwork at rank 20
+// ahead of the required bundled illustration at rank 40. The scene wrapper is
+// exactly {archetype, label, alt, artwork}.
+function validSceneResource(overrides) {
+  var version = fixtureDigest("scene-output");
+  return Object.assign(
+    {
+      resource_id: "scene/t_hearth_hollow.png",
+      version: version,
+      url: "/art/scene/t_hearth_hollow.png?v=" + version,
+      origin: "runtime",
+      geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: "16:9" },
+    },
+    overrides
+  );
+}
+
+function validBundledResource(overrides) {
+  var fingerprint = fixtureDigest("bundled-hearth");
+  return Object.assign(
+    {
+      resource_id: "bundled-scene/t_hearth_hollow/" + fingerprint + ".webp",
+      version: fingerprint,
+      url: "/art/bundled-scene/t_hearth_hollow/" + fingerprint + ".webp",
+      origin: "bundled_official",
+      geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: null },
+    },
+    overrides
+  );
+}
+
+function validSceneArtwork(overrides) {
+  return Object.assign(
+    {
+      subject_id: "grid:t_hearth:0,0",
+      revision: fixtureDigest("scene-revision"),
+      generation_subject: "scene:t_hearth_hollow",
+      generation_state: "done",
+      attempts: [
+        {
+          type: "image",
+          source_id: "scene.generated:scene:t_hearth_hollow",
+          rank: 20,
+          resource: validSceneResource(),
+        },
+        {
+          type: "image",
+          source_id: "scene.bundled:t_hearth_hollow",
+          rank: 40,
+          resource: validBundledResource(),
+        },
+      ],
+      terminal: null,
+      retention_sources: [
+        {
+          source_id: "scene.generated:scene:t_hearth_hollow",
+          token: fixtureDigest("scene-retention"),
+        },
+      ],
+    },
+    overrides
+  );
+}
+
 function validScene(overrides) {
   return Object.assign(
     {
       archetype: "t_hearth_hollow",
-      stage: { scale: 1, x: 0, y: 0 },
       label: "爐火合成廳",
-      subject_key: "scene:t_hearth_hollow",
-      status: "done",
-      url: "/art/scene/t_hearth_hollow.png",
-      aspect_ratio: "16:9",
       alt: "爐火合成廳場景",
-      placeholder: null,
+      artwork: validSceneArtwork(),
     },
     overrides
   );
@@ -71,7 +130,7 @@ function validEntry(overrides) {
 function validPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 3,
+      schema_version: 4,
       available: true,
       kind: "scene",
       scene: validScene(),
@@ -102,13 +161,52 @@ test("malformed art payloads are rejected by the protocol validator", () => {
   assert.throws(() => Protocol.validateArtPanel(validPanel({ kind: "combat" })));
   assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 1 })));
   assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 2 })));
-  assert.throws(() =>
-    Protocol.validateArtPanel(validPanel({ scene: validScene({ url: "https://x.test/a.png" }) }))
-  );
-  assert.throws(() => Protocol.validateArtPanel(catalogPanel({ x: validEntry() })));
+  assert.throws(() => Protocol.validateArtPanel(validPanel({ schema_version: 3 })));
   assert.throws(() =>
     Protocol.validateArtPanel(
-      validPanel({ scene: validScene({ status: "pending", url: null, placeholder: null }) })
+      validPanel({
+        scene: validScene({
+          artwork: validSceneArtwork({
+            attempts: [
+              {
+                type: "image",
+                source_id: "scene.generated:scene:t_hearth_hollow",
+                rank: 20,
+                resource: validSceneResource({ url: "https://x.test/a.png" }),
+              },
+            ],
+          }),
+        }),
+      })
+    )
+  );
+  // The retired flat scene fields are refused outright.
+  assert.throws(() => Protocol.validateArtPanel(validPanel({ scene: validScene({ status: "done" }) })));
+  assert.throws(() =>
+    Protocol.validateArtPanel(validPanel({ scene: validScene({ url: "/art/scene/x.png" }) }))
+  );
+  assert.throws(() => Protocol.validateArtPanel(catalogPanel({ x: validEntry() })));
+  // A reached fault never carries a URL: the fact names the source, and the
+  // retired flat field on a fault entry is refused by the shared validator.
+  assert.throws(() =>
+    Protocol.validateArtPanel(
+      validPanel({
+        scene: validScene({
+          artwork: validSceneArtwork({
+            generation_state: "failed",
+            attempts: [
+              {
+                type: "fault",
+                source_id: "scene.generated:scene:t_hearth_hollow",
+                rank: 20,
+                reason: "generation_failed",
+                resource: validSceneResource(),
+              },
+            ],
+            terminal: null,
+          }),
+        }),
+      })
     )
   );
   // v3: the entry is exactly {artwork, context}, and the descriptor's own
@@ -159,34 +257,54 @@ test("malformed art payloads are rejected by the protocol validator", () => {
 });
 
 test("a done scene reduces to the asset state", () => {
-  const model = ArtPanel.reducePanel(validPanel(), "exploration", {});
+  const panel = validPanel();
+  const model = ArtPanel.reducePanel(panel, "exploration", {});
   assert.equal(model.available, true);
   assert.equal(model.scene.state, "asset");
-  assert.equal(model.scene.url, "/art/scene/t_hearth_hollow.png");
+  // The image is the descriptor's own highest-ranked candidate; the display
+  // strings are the committed ones.
+  assert.equal(
+    model.scene.url,
+    panel.scene.artwork.attempts[0].resource.url
+  );
   assert.equal(model.scene.label, "爐火合成廳");
   assert.equal(model.scene.alt, "爐火合成廳場景");
+  assert.equal(model.scene.status, "done");
 });
 
-test("a missing or failed scene reduces to the placeholder state", () => {
+test("a failed scene reduces to the placeholder state", () => {
   const panel = validPanel({
     scene: validScene({
-      status: "failed",
-      url: null,
-      placeholder: { kind: "missing", label: "未生成" },
+      artwork: validSceneArtwork({
+        generation_state: "failed",
+        attempts: [
+          {
+            type: "fault",
+            source_id: "scene.generated:scene:t_hearth_hollow",
+            rank: 20,
+            reason: "generation_failed",
+          },
+        ],
+        terminal: null,
+        retention_sources: [],
+      }),
     }),
   });
   const model = ArtPanel.reducePanel(panel, "exploration", {});
   assert.equal(model.scene.state, "placeholder");
-  assert.equal(model.scene.placeholderKind, "missing");
+  assert.equal(model.scene.placeholderKind, "failed");
+  assert.equal(model.scene.status, "failed");
   assert.equal(model.scene.url, null);
 });
 
 test("a pending scene with no prior image reduces to the placeholder state", () => {
   const panel = validPanel({
     scene: validScene({
-      status: "pending",
-      url: null,
-      placeholder: { kind: "missing", label: "未生成" },
+      artwork: validSceneArtwork({
+        generation_state: "pending",
+        attempts: [],
+        terminal: null,
+      }),
     }),
   });
   const model = ArtPanel.reducePanel(panel, "exploration", {});
@@ -200,14 +318,17 @@ test("a pending scene with a prior image retains it dimmed", () => {
   assert.equal(prior.scene.state, "asset");
   const pending = validPanel({
     scene: validScene({
-      status: "pending",
-      url: null,
-      placeholder: { kind: "missing", label: "未生成" },
+      artwork: validSceneArtwork({
+        generation_state: "pending",
+        attempts: [],
+        terminal: null,
+      }),
     }),
   });
   const model = ArtPanel.reducePanel(pending, "exploration", prior);
   assert.equal(model.scene.state, "pending");
-  assert.equal(model.scene.url, "/art/scene/t_hearth_hollow.png");
+  // The retained image is the one this browser is already showing.
+  assert.equal(model.scene.url, prior.scene.url);
 });
 
 test("catalog reduction keys entries by opaque catalog IDs", () => {

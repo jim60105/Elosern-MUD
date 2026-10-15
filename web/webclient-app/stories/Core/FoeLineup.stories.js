@@ -45,7 +45,7 @@ const renderLineup = (args) => ({
   setup: () => ({ args }),
   template: `
     <div style="position:fixed;inset:0;overflow:clip;background:#0b0d10">
-      <div style="position:absolute;left:0;right:0;top:var(--header-h);bottom:var(--band-h);background:linear-gradient(0deg,#0b0d10 3%,#0b0d1000 60%),url(/art/showcase/sample-forest.webp) center top/cover"></div>
+      <div style="position:absolute;left:0;right:0;top:var(--header-h);bottom:var(--band-h);background:linear-gradient(0deg,#0b0d10 3%,#0b0d1000 60%),url(/art/scenes/forest_path.webp) center top/cover"></div>
       <div style="position:absolute;inset:0;background:var(--stage-combat-veil)"></div>
       <div aria-hidden="true" style="position:absolute;left:50%;top:var(--header-h);bottom:var(--band-h);border-left:1px dashed rgba(228,200,142,.28)"></div>
       <div

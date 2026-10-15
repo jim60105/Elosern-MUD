@@ -22,6 +22,9 @@ from web.browser_support.browser_fixtures_data.shipped_seed import (
 #: Authored NPC/monster object keys the synth fixtures place (free-form
 #: object names; no registry resolves them).
 SYNTH_DIALOGUE_HOST_KEY = "合成櫃檯員"
+# The art/scene fixtures' dialogue host in shipped mode (the one the
+# exploration and scene journeys converse with).
+SHIPPED_DIALOGUE_HOST_KEY = "酒館老闆"
 SYNTH_BARD_KEY = "合成吟遊詩人"
 SYNTH_HOSTILE_MONSTER_KEY = "燼殼爬行者"
 SYNTH_DEFEATED_MONSTER_KEY = "倒地的燼殼蟲"
@@ -85,6 +88,34 @@ def art_scene_values() -> "tuple[str, str]":
 #: combat fixture's start-room monsters).
 SHIPPED_ART_ROOM_MONSTER_KEY = "酒館灰狼"
 SYNTH_ART_ROOM_MONSTER_KEY = "合成燼殼蟲"
+
+#: Object key of the engageable monster the SCENE fixture places in the scene
+#: room (change unified-scene-rendering). It is deliberately distinct from the
+#: art fixture's own monster: two co-located objects sharing one key make the
+#: engage command's target search ambiguous.
+SHIPPED_SCENE_MONSTER_KEY = "爐階影犬"
+SYNTH_SCENE_MONSTER_KEY = "合成影犬"
+
+
+def scene_fixture_monster_key() -> str:
+    """The scene fixture's engageable monster key for the current boot mode."""
+    if synth_mode_enabled():
+        return SYNTH_SCENE_MONSTER_KEY
+    return SHIPPED_SCENE_MONSTER_KEY
+
+
+def art_dialogue_host_key() -> str:
+    """The art fixture's dialogue host key for the current boot mode.
+
+    The host the scene/art journeys converse with (``art_fixture`` creates it
+    with exactly this key), so a journey can address it through the ordinary
+    ``talk`` command without restating a shipped display name.
+    """
+    if synth_mode_enabled():
+        from web.browser_support.browser_fixtures_data import SYNTH_DIALOGUE_HOST_KEY
+
+        return SYNTH_DIALOGUE_HOST_KEY
+    return SHIPPED_DIALOGUE_HOST_KEY
 
 
 def art_room_monster_key() -> str:

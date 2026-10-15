@@ -169,6 +169,55 @@ PORTRAIT_RANK_DEFAULT = 30
 PORTRAIT_RANK_CLASSIC = 40
 PORTRAIT_RANK_OFFICIAL = 50
 PORTRAIT_RANK_ALPHA = GALLERY_RANK_ALPHA
+# The exact scene-layer ranks (design §"Stable ranks and authorized
+# retention", change unified-scene-rendering): the authored room-art override,
+# the scene's own generated archetype artwork, the optional operator scene
+# default, the required bundled type illustration and the distinct declared
+# town/forest terminal image, in that precedence. Like the portrait ranks these
+# are positions, never attempt-array indexes, and a fault keeps the rank of the
+# source it belongs to.
+SCENE_RANK_ROOM = 10
+SCENE_RANK_GENERATED = 20
+SCENE_RANK_OPERATOR = 30
+SCENE_RANK_BUNDLED = 40
+SCENE_RANK_TERMINAL = 100
+
+# The scene source-layer prefixes. A position's canonical source id is
+# ``<prefix>:<identity>`` — the authored room-art key, the scene subject's own
+# generation key, the scene key, or the terminal key. A FACT of a position
+# names the exact thing it belongs to after the colon (the content directory
+# identity, or one admitted image's identity), exactly like the portrait
+# chain's own official faults, so two facts of one position never collide.
+SCENE_ROOM_SOURCE_PREFIX = "scene.room"
+SCENE_GENERATED_SOURCE_PREFIX = "scene.generated"
+SCENE_OPERATOR_SOURCE_PREFIX = "scene.operator"
+SCENE_BUNDLED_SOURCE_PREFIX = "scene.bundled"
+SCENE_TERMINAL_SOURCE_PREFIX = "scene.terminal"
+
+
+def scene_room_source_id(room_art_key: str) -> str:
+    """The canonical source id of one authored per-room operator override."""
+    return f"{SCENE_ROOM_SOURCE_PREFIX}:{room_art_key}"
+
+
+def scene_generated_source_id(generation_subject: str) -> str:
+    """The canonical source id of one scene archetype's generated artwork."""
+    return f"{SCENE_GENERATED_SOURCE_PREFIX}:{generation_subject}"
+
+
+def scene_operator_source_id(scene_key: str) -> str:
+    """The canonical source id of one optional operator scene default."""
+    return f"{SCENE_OPERATOR_SOURCE_PREFIX}:{scene_key}"
+
+
+def scene_bundled_source_id(scene_key: str) -> str:
+    """The canonical source id of one required bundled scene illustration."""
+    return f"{SCENE_BUNDLED_SOURCE_PREFIX}:{scene_key}"
+
+
+def scene_terminal_source_id(terminal_key: str) -> str:
+    """The canonical source id of one scene's declared terminal image."""
+    return f"{SCENE_TERMINAL_SOURCE_PREFIX}:{terminal_key}"
 
 
 def gallery_original_source_id(image_id: str) -> str:

@@ -30,6 +30,17 @@
 // consumed when the cursor reaches it; a provisional failure stays latent until
 // that source is reached; a provisional `loading` parks resolution on a `wait`
 // until the map changes.
+//
+// `options.provisionalSource` optionally names ONE resource — a scene's own
+// bundled/terminal background — this driver fetches OUTSIDE the ordered walk,
+// so a higher-priority source that is still loading never leaves the surface
+// blank. It is the same element-driven mechanism, never a second loader: the
+// resource's `loading` ownership is registered before its element is exposed,
+// so the ordered walk parks on that source instead of issuing a duplicate
+// request, and its settled outcome is handed over at the source's own
+// precedence position with no duplicate attempt. The element is exposed as
+// `provisionalAttempt` (bind `token`/`url` exactly like `attempt`) and its
+// successful resource as `provisionalSelected`.
 
 import { computed, ref, toValue, watch } from "vue";
 import {
@@ -40,6 +51,7 @@ import {
   createLoadState,
   observeFailure,
   observeSuccess,
+  resourceKey,
   resolutionFacts,
   resolve,
   withKnown,
@@ -72,12 +84,22 @@ export function useImageAttempts(request, availability, options = {}) {
   const reachedFaults = ref([]);
   const exhausted = ref(true);
   const panelUnavailable = ref(false);
+  // The out-of-band provisional element this driver owns (the surface's own
+  // bundled/terminal background) and the resource it successfully decoded.
+  const provisionalAttempt = ref(null);
+  const provisionalSelected = ref(null);
+  // The driver's OWN provisional outcomes, merged with the caller's map. They
+  // are epoch-scoped and keyed by resource identity/version exactly like the
+  // shared reducer's own store, so the ordered walk reuses the outcome at the
+  // source's precedence position.
+  const provisionalOutcomes = ref(new Map());
 
   let machine = null;
   // One immutable token per concrete attempt. The caller keys its `<img>` on
   // `attempt.token`, so every attempt owns its own element and any late
   // load/error from a retired element is rejected by the attribute it carries.
   let attemptToken = 0;
+  let provisionalToken = 0;
   let disposed = false;
   let knownEpoch;
   const knownOutcomes = new Map();
@@ -87,7 +109,17 @@ export function useImageAttempts(request, availability, options = {}) {
     const value = toValue(availability);
     return value && typeof value === "object" ? value : { state: "ready" };
   };
-  const provisionalValue = () => (options.provisional === undefined ? new Map() : provisionalMap(toValue(options.provisional)));
+  const provisionalSourceValue = () =>
+    options.provisionalSource === undefined ? null : toValue(options.provisionalSource) ?? null;
+  const provisionalValue = () => {
+    const merged = provisionalMap(
+      options.provisional === undefined ? undefined : toValue(options.provisional),
+    );
+    for (const [key, outcome] of provisionalOutcomes.value.entries()) {
+      merged.set(key, outcome);
+    }
+    return merged;
+  };
 
   const dimensions = computed(() => selected.value?.dimensions ?? null);
   const saveEligible = computed(
@@ -114,6 +146,170 @@ export function useImageAttempts(request, availability, options = {}) {
     ]);
   });
   const provisionalKey = computed(() => provisionalSignature(provisionalValue()));
+  const provisionalSourceKey = computed(() => {
+    const source = provisionalSourceValue();
+    return JSON.stringify([resourceKey(source), source?.url ?? null]);
+  });
+
+  function clearProvisional() {
+    provisionalAttempt.value = null;
+    provisionalSelected.value = null;
+    provisionalOutcomes.value = new Map();
+  }
+
+  // Retire the live element WITHOUT discarding a settled observation.
+  //
+  // A `loading` marker only means something while its element exists, so it
+  // goes with the element; a settled outcome stays (it is an observation of a
+  // resource the ordered walk may still reach).
+  function retireProvisional() {
+    const current = provisionalAttempt.value;
+    provisionalAttempt.value = null;
+    if (!current) {
+      return;
+    }
+    const outcome = provisionalOutcomes.value.get(current.key);
+    if (outcome?.phase !== LOAD_PHASE.loading) {
+      return;
+    }
+    const next = new Map(provisionalOutcomes.value);
+    next.delete(current.key);
+    provisionalOutcomes.value = next;
+  }
+
+  // Start or retire the out-of-band provisional element.
+  //
+  // It is started ONLY for a resource the ordered walk does not currently own:
+  // once the walk's own in-flight attempt IS that resource, or its outcome is
+  // already durable, or it is already provisional-loaded, there is nothing
+  // left to fetch outside the walk — which is what keeps the resource
+  // requested exactly once. The `loading` ownership is recorded before the
+  // element exists, so a walk that reaches the resource meanwhile parks on it
+  // instead of issuing a second request.
+  function syncProvisional() {
+    if (disposed) {
+      return;
+    }
+    const req = requestValue();
+    const source = provisionalSourceValue();
+    const key = resourceKey(source);
+    if (!req || !source || !key || availabilityValue().state !== "ready") {
+      retireProvisional();
+      return;
+    }
+    if (phase.value !== LOAD_PHASE.loading) {
+      // Resolution already settled (or exhausted): an out-of-band background
+      // has nothing left to stand in for, so its element is retired rather
+      // than left fetching a resource that will not be displayed.
+      retireProvisional();
+      return;
+    }
+    const epoch = machine?.epoch ?? req?.epoch ?? null;
+    const settledProvisional = provisionalOutcomes.value.get(key);
+    if (settledProvisional && settledProvisional.epoch === epoch) {
+      if (settledProvisional.phase === LOAD_PHASE.success) {
+        // A same-epoch re-resolution of a resource this driver already decoded
+        // keeps showing it: the observation is not repeated, and its temporary
+        // display is reconstructed from the CURRENT resource rather than lost.
+        provisionalAttempt.value = null;
+        const entry = machine?.order.find(
+          (item) => item.kind === "image" && item.key === key,
+        );
+        provisionalSelected.value = {
+          key,
+          sourceId: entry?.sourceId ?? null,
+          rank: entry?.rank ?? null,
+          resourceId: source.resource_id ?? null,
+          version: source.version ?? null,
+          url: source.url,
+          geometry: source.geometry ?? null,
+          dimensions: settledProvisional.dimensions ?? null,
+        };
+        return;
+      }
+      if (settledProvisional.phase !== LOAD_PHASE.loading) {
+        retireProvisional();
+        return;
+      }
+    }
+    if (knownOutcomes.has(key) || attempt.value?.key === key) {
+      // The ordered walk already owns (or already observed) this exact
+      // resource: a second fetching element would be a duplicate attempt.
+      retireProvisional();
+      return;
+    }
+    if (provisionalAttempt.value?.key === key) {
+      return;
+    }
+    provisionalToken += 1;
+    const entry = machine?.order.find((item) => item.kind === "image" && item.key === key);
+    provisionalOutcomes.value = new Map(provisionalOutcomes.value).set(key, {
+      epoch: machine?.epoch ?? req?.epoch ?? null,
+      phase: LOAD_PHASE.loading,
+    });
+    provisionalAttempt.value = {
+      key,
+      sourceId: entry?.sourceId ?? null,
+      rank: entry?.rank ?? null,
+      resource: source,
+      url: source.url,
+      token: provisionalToken,
+    };
+  }
+
+  function settleProvisional(outcome) {
+    const current = provisionalAttempt.value;
+    if (disposed || !current) {
+      return;
+    }
+    provisionalOutcomes.value = new Map(provisionalOutcomes.value).set(current.key, {
+      epoch: machine?.epoch ?? null,
+      ...outcome,
+    });
+    if (outcome.phase === LOAD_PHASE.success) {
+      provisionalSelected.value = {
+        key: current.key,
+        sourceId: current.sourceId,
+        rank: current.rank,
+        resourceId: current.resource?.resource_id ?? null,
+        version: current.resource?.version ?? null,
+        url: current.url,
+        geometry: current.resource?.geometry ?? null,
+        dimensions: outcome.dimensions ?? null,
+      };
+    }
+    provisionalAttempt.value = null;
+  }
+
+  function onProvisionalLoad(event) {
+    const target = event?.target;
+    const current = provisionalAttempt.value;
+    if (!current?.url || !target || typeof target.getAttribute !== "function") {
+      return;
+    }
+    if (target.getAttribute("data-provisional-token") !== String(current.token)) {
+      return;
+    }
+    const width = Number(target.naturalWidth) || 0;
+    const height = Number(target.naturalHeight) || 0;
+    if (width > 0 && height > 0) {
+      settleProvisional({ phase: LOAD_PHASE.success, dimensions: { width, height } });
+    } else {
+      settleProvisional({ phase: "failed", reason: IMAGE_DECODE_FAILED });
+    }
+  }
+
+  function onProvisionalError(event) {
+    const target = event?.target;
+    const current = provisionalAttempt.value;
+    if (!current?.url || !target || typeof target.getAttribute !== "function") {
+      return;
+    }
+    if (target.getAttribute("data-provisional-token") !== String(current.token)) {
+      return;
+    }
+    settleProvisional({ phase: "failed", reason: IMAGE_LOAD_FAILED });
+  }
 
   function clearResult() {
     attempt.value = null;
@@ -191,9 +387,24 @@ export function useImageAttempts(request, availability, options = {}) {
     const req = requestValue();
     const avail = availabilityValue();
     const epoch = req?.epoch ?? null;
-    if (knownEpoch !== epoch) {
+    // The comparison is captured BEFORE the assignment: every superseded epoch
+    // retires its observations, both the durable outcomes and the provisional
+    // ones, so a scene change can never inherit what another scene observed.
+    const epochChanged = knownEpoch !== epoch;
+    if (epochChanged) {
       knownOutcomes.clear();
       knownEpoch = epoch;
+    }
+    // A settled provisional OUTCOME is an observation of one resource, so it
+    // survives a re-resolution of the SAME epoch: a chain that reaches that
+    // resource later reuses the observed result instead of requesting it
+    // again. Only the live element and the provisional display retire here,
+    // and a genuinely different epoch discards the observations with the rest
+    // of the retired resolution.
+    retireProvisional();
+    provisionalSelected.value = null;
+    if (epochChanged) {
+      provisionalOutcomes.value = new Map();
     }
     clearResult();
     if (avail.state === "failed") {
@@ -205,6 +416,10 @@ export function useImageAttempts(request, availability, options = {}) {
       return;
     }
     step(createLoadState(req, { known: knownOutcomes, provisional: provisionalValue() }));
+    // The out-of-band provisional element is started AFTER the walk's own
+    // first step, so it can never claim a resource the walk is already
+    // fetching.
+    syncProvisional();
   }
 
   function refreshGeometry() {
@@ -295,13 +510,22 @@ export function useImageAttempts(request, availability, options = {}) {
     disposed = true;
     knownOutcomes.clear();
     machine = null;
+    clearProvisional();
     clearResult();
     panelUnavailable.value = false;
   }
 
-  watch(factsKey, restart, { immediate: true });
+  // The resolution facts are the commit boundary of this surface, so the
+  // restart runs SYNCHRONOUSLY with them: any other watcher of the same commit
+  // (a consumer keeping its own display content) then reads a cleared
+  // selection rather than a stale one, and no surface can pair this commit's
+  // facts with the previous commit's result.
+  watch(factsKey, restart, { immediate: true, flush: "sync" });
   watch(geometryKey, refreshGeometry);
   watch(provisionalKey, resume);
+  // A settled resolution retires the out-of-band element too: the provisional
+  // background exists to stand in WHILE a higher-priority source loads.
+  watch([provisionalSourceKey, () => phase.value], syncProvisional);
 
   return {
     attempt,
@@ -314,6 +538,10 @@ export function useImageAttempts(request, availability, options = {}) {
     saveEligible,
     onImageLoad,
     onImageError,
+    provisionalAttempt,
+    provisionalSelected,
+    onProvisionalLoad,
+    onProvisionalError,
     dispose,
   };
 }

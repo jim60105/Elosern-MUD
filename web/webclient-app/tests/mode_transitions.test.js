@@ -19,8 +19,15 @@ import DialogueChoices from "../components/DialogueChoices.vue";
 import { nextModeChange } from "../composables/use-mode-change.js";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
 import { useElosernStore } from "../stores/elosern.js";
-import { ART_PANEL_SAMPLE } from "../stories/fixtures.js";
+import {
+  ART_PANEL_SAMPLE,
+  fixtureDigest,
+  sceneBlock,
+  sceneDescriptor,
+  sceneResource,
+} from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
+import { observeLoad } from "./support/scene_layers.js";
 
 const DIALOGUE = {
   schema_version: 2,
@@ -386,12 +393,23 @@ describe("AppClient live mode changes", () => {
       context_actions: fx.explorationActions(),
       art: {
         ...ART_PANEL_SAMPLE,
-        scene: {
-          ...ART_PANEL_SAMPLE.scene,
-          url: "/art/scenes/new_town.png",
-          label: "新城鎮",
-          alt: "新城鎮的景象",
-        },
+        scene: sceneBlock(
+          { label: "新城鎮", alt: "新城鎮的景象" },
+          sceneDescriptor({
+            attempts: [
+              {
+                type: "image",
+                source_id: "scene.generated:scene:river_dawn",
+                rank: 20,
+                resource: sceneResource({
+                  version: fixtureDigest("new-town"),
+                  url: "/art/scenes/new_town.png",
+                }),
+              },
+            ],
+            terminal: null,
+          }),
+        ),
       },
     });
     store.receive(generation, "ui_action_result", [fx.actionResult({ request_id: requestId, presentation_revision: revision - 1 })], {});
@@ -401,6 +419,9 @@ describe("AppClient live mode changes", () => {
     // Backdrop receives combat stage mode while art panel carries newly committed scene identity
     const backdrop = wrapper.getComponent({ name: "SceneBackdrop" });
     expect(backdrop.props("mode")).toBe("combat");
+    // The committed scene's own element reports its pixels, exactly like the
+    // browser's: only then does the caption row stand for a real bitmap.
+    await observeLoad(wrapper, "/art/scenes/new_town.png");
     expect(wrapper.get('[data-testid="scene-backdrop-label"]').text()).toBe("新城鎮");
   });
 });

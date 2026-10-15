@@ -48,6 +48,12 @@ class ArtAssetRecord(DefaultScript):
     source_hash: str = AttributeProperty(default="")
     prompt_digest: str = AttributeProperty(default="")
     generation_token: str = AttributeProperty(default="")
+    # The token that PUBLISHED the current output, kept after publication (the
+    # claim token above is cleared then). It is the one durable fact that
+    # distinguishes two successive successful publications of the same stored
+    # path, so a consumer deriving a resource version from it always sees a new
+    # version for a new output -- a requeue clears only the transient claim.
+    published_generation_token: str = AttributeProperty(default="")
     status: str = AttributeProperty(default=ArtAssetStatus.MISSING)
     output_identity: str | None = AttributeProperty(default=None)
     prior_output_identity: str | None = AttributeProperty(default=None)

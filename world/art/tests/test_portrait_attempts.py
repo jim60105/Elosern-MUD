@@ -46,7 +46,6 @@ from world.art.official import current_catalog, load_catalog, reset_catalog
 from world.art.official_refs import PRESET_PROVENANCE_ATTRIBUTE
 from world.art.presenter import (
     GALLERY_ASPECT_RATIO,
-    PLACEHOLDER_UNAVAILABLE,
     describe_entity,
     describe_portrait,
 )

@@ -177,6 +177,8 @@ def login_and_open(
     base_url: str,
     account: str = BROWSER_ACCOUNT,
     password: str = BROWSER_PASSWORD,
+    *,
+    wait_until: str = "load",
 ) -> None:
     """Log in through Django auth and open the WebClient, waiting for the shell.
 
@@ -202,7 +204,11 @@ def login_and_open(
     page.fill("#id_password", password)
     page.click('input[type="submit"]')
     page.wait_for_load_state("networkidle")
-    page.goto(webclient_url)
+    # A journey that holds one of the client's own media requests cannot wait
+    # for the document's `load` event (the held image would never complete), so
+    # the final navigation's wait condition is the caller's to choose; the shell
+    # readiness check below is what actually gates the journey either way.
+    page.goto(webclient_url, wait_until=wait_until)
     wait_for_shell_active(page)
 
 

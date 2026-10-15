@@ -175,21 +175,28 @@ test("the creation form reads both age minimums from the custom.age descriptor",
   assert.strictEqual(/custom(\.value)?\??\.adult/.test(source), false);
 });
 
-test("the scene backdrop reuses an in-flight scene image instead of refetching", () => {
-  // The browser image-load-failure requirement forbids repeatedly fetching
-  // the same scene URL. H1 moved the scene frame out of ArtPanel into
-  // SceneBackdrop (the stage backdrop), so the no-refetch contract lives
-  // there: a failed URL is remembered in `failedUrls` and not re-fetched;
-  // a new scene URL resets the load-failure flag.
+test("the scene backdrop delegates its image loading and never caches URLs itself", () => {
+  // The browser image-load-failure requirement forbids repeatedly fetching the
+  // same scene URL. Change unified-scene-rendering moved every load/decode
+  // observation into the shared loading core, so no surface owns a private
+  // failure cache any more: SceneBackdrop renders the descriptor's own
+  // resources through `useArtwork`, and the driver's remembered outcomes
+  // (`knownOutcomes`) are the ONE place a failed resource stops being
+  // recommended.
   const source = read("web/webclient-app/components/SceneBackdrop.vue");
-  assert.match(source, /imageLoadFailed = ref\(false\)/);
-  assert.match(source, /const failedUrls = new Set\(\)/);
-  assert.match(source, /failedUrls\.add\(url\)/);
-  // A failed URL resolves to null so the image element is not re-requested.
-  assert.match(source, /if \(url && failedUrls\.has\(url\)/);
-  // A new scene resets the load-failure flag (the generating prior image).
-  assert.match(source, /imageLoadFailed\.value = false/);
+  assert.match(source, /useArtwork\(artwork, availability/);
+  assert.match(source, /scene\.bundled:/);
+  // No client-local URL failure cache and no private decoder: the driver owns
+  // both, so a failed URL is never re-requested by this component either.
+  assert.strictEqual(/failedUrls/.test(source), false);
+  assert.strictEqual(/imageLoadFailed/.test(source), false);
+  assert.strictEqual(/new Image\(/.test(source), false);
+  // The scene's status facts still render as DOM text outside the bitmap.
   assert.match(source, /目前場景圖片生成中/);
+  // The driver remembers each observed outcome by resource identity.
+  const driver = read("web/webclient-app/composables/useImageAttempts.js");
+  assert.match(driver, /knownOutcomes\.set\(/);
+  assert.match(driver, /data-provisional-token/);
 });
 
 test("every custom property consumed without a fallback is defined in the shipped sources", () => {

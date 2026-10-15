@@ -254,35 +254,35 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 - **THEN** dialogue mode hides the cockpit and navigation surfaces: the place card, the minimap island, and the vitals dock are hidden while the committed mode is `dialogue`
 
 ### Requirement: The scene backdrop renders the art payload truthfully behind the stage
-The stage backdrop SHALL render the committed `art` panel's scene: the same-origin image with cover-style cropping when the scene status is `done`; the previously rendered image visibly dimmed and labelled `目前場景圖片生成中` when the scene is pending and a prior image exists; and the mode's gradient stage otherwise — for a missing, failed, or invalid asset, a pending scene with no prior image, or an unavailable `art` panel.
+The backdrop SHALL consume canonical scene load state and same-scene retention, displaying the successful source or that new scene's own provisional bundled/terminal art. Reached failures SHALL remain locally accessible after fallback. Mode changes SHALL not select art. Existing caption placement, focus and non-overlap invariants SHALL remain; CSS sample backgrounds SHALL be removed.
 
 #### Scenario: The backdrop never lies about the scene
 - **WHEN** any scene renders on the backdrop
 - **THEN** the backdrop presents no invented image as authoritative and no stale image as current
 
 #### Scenario: A bundled sample is captioned inside one status badge
-- **WHEN** a bundled decorative sample accompanies a missing, pending, or unavailable fallback
-- **THEN** it appears only with a visible caption distinguishing it from an actual scene image, while retaining the authoritative missing/pending/unavailable label; the sample caption and that label share one status badge, so the stage shows at most one status badge at a time, and the badge shows no raw placeholder kind code and no error-styled (dashed seal-red) frame; samples never enter the art catalog or change its status, and disappear when an actual or labelled prior scene renders
+- **WHEN** expected missing/pending generation reaches bundled scene art
+- **THEN** it is official type artwork with factual generation explanation if needed, no sample-only label or error styling; no CSS sample wash remains
 
 #### Scenario: Portrait samples stay labelled and subordinate
-- **WHEN** a decorative portrait sample renders, an available committed player-roster portrait exists, or a portrait image fails to load
-- **THEN** the sample is labelled separately from the current subject, the available committed player-roster portrait takes precedence, and a load failure returns to an explicitly labelled sample instead of attributing that sample to the player
+- **WHEN** a figure lacks real art
+- **THEN** its canonical alpha terminal and truthful identity appear; no decorative sample is attributed to the subject
 
 #### Scenario: The combat hold never holds scene identity
-- **WHEN** the combat hold of "Surface visibility is gated by the committed game mode" is playing
-- **THEN** the backdrop MAY keep presenting the combat gradient stage (and the combat sample wash where a degraded scene carries one), yet it does not hold the pre-terminal scene's identity: a newer committed scene image, pending state, or truthful degradation follows the rules above beneath the held decoration at its commit, and the scene caption row names the newly committed scene, never the held combat one
+- **WHEN** held combat decoration spans a new logical scene commit
+- **THEN** the previous-place background is invalidated immediately; current scene type determines its own provisional/resolved image while combat decoration remains presentation-only
 
 #### Scenario: All required labels exist as text outside the bitmap
-- **WHEN** any scene renders
-- **THEN** the scene label, its alternative text, and any truthful placeholder label are rendered as text outside the bitmap, so no required information exists only inside an image; the gradient stage differs per mode (exploration, dialogue, combat) and carries an inset vignette
+- **WHEN** scene art displays
+- **THEN** label, nonduplicate alternative text, factual progress and accessible failure explanation remain DOM text outside the bitmap; exhausted non-image styling may retain existing mode tokens without using mode to select any image
 
 #### Scenario: Backdrop captions never meet the band or dock
 - **WHEN** the backdrop's own floating caption elements — the status badge, the `目前場景圖片生成中` pending notice, the scene label and alternative-text captions, and the full-view control — render at 1451x790 and at every larger viewport up to the chrome cap
 - **THEN** none of them overlaps the bottom band's, the action dock's, or the command line's rendered content, extending the sibling stage requirement's general anchor non-overlap invariant to these backdrop-internal captions, which sit outside the named stage anchors but are absolutely positioned within the same full-bleed stage
 
 #### Scenario: The caption row stands only for a real scene image
-- **WHEN** a `done` scene image or the dimmed prior image of a pending scene is on the stage, and when the scene is missing, failed, invalid, or unavailable
-- **THEN** the scene caption row renders only in the first case and not in the second, whose truthful label the status badge already states; within the row the alternative text is omitted when it is identical to the scene label, and the full-view control is an icon button whose accessible name is `開啟場景全圖`
+- **WHEN** generated, operator or bundled official scene art is on screen
+- **THEN** its caption/fullview control use the successful resource even when generation is missing/pending/failed, without duplicate alternative text
 
 #### Scenario: The caption row sits centred on the stage's lower edge
 - **WHEN** the scene label, the alternative text, the pending notice, and the full-view control render, with or without the foe line-up standing in combat
@@ -297,30 +297,28 @@ The stage backdrop SHALL render the committed `art` panel's scene: the same-orig
 - **THEN** the backdrop renders that image cover-cropped to the stage box behind every HUD surface, and the scene label and alternative text render as text outside the bitmap
 
 #### Scenario: A missing scene degrades to the mode gradient
-- **WHEN** the committed art panel carries a missing, failed, or invalid scene
-- **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as text, and no image element carries a URL
+- **WHEN** generation has no image
+- **THEN** required type art is attempted with no error for expected absence; only exhausted permitted image sources use non-image background
 
 #### Scenario: A degraded scene shows one status badge and no caption row
-- **WHEN** the `art` panel is unavailable, or the scene is missing, and the bundled sample wash renders
-- **THEN** exactly one status badge renders, stating both the sample caption and the truthful
-  placeholder label, without a raw kind code, and no scene caption row, scene label, alternative text,
-  or full-view control renders
+- **WHEN** all permitted scene resources fail
+- **THEN** one local failure explanation appears without a broken image or broken-only fullview; healthy official fallback keeps its normal caption/fullview affordance
 
 #### Scenario: An alternative text equal to the label is not repeated
 - **WHEN** a `done` scene's alternative text is identical to its label
 - **THEN** the caption row renders the label once and no alternative-text element
 
 #### Scenario: An unavailable art panel is indistinguishable from an ungenerated scene
-- **WHEN** the `art` panel commits its unavailable form
-- **THEN** the backdrop renders the mode gradient stage exactly as for a missing asset, with no broken image frame and no gameplay surface blocked
+- **WHEN** the art panel cannot provide image data
+- **THEN** safe same-identity last-known content or permitted fallback remains with a local availability indication distinct from expected missing generation
 
 #### Scenario: A pending scene keeps its prior image labelled
-- **WHEN** the scene is pending and a prior scene image is already rendered
-- **THEN** the backdrop keeps that image visibly dimmed with the explicit `目前場景圖片生成中` label, and never presents it as the current scene
+- **WHEN** the same scene/generation subject is pending and has applicable retained success
+- **THEN** its good image is retained with factual progress, never across a different place
 
 #### Scenario: The combat stage is visually distinct
-- **WHEN** the committed mode is combat and no scene image is available
-- **THEN** the backdrop renders the combat gradient stage, visually distinct from the exploration stage
+- **WHEN** combat begins in the same logical scene
+- **THEN** the artwork source is unchanged; existing non-image styling and gameplay decoration may differ without selecting different sample images
 
 #### Scenario: The truthful-placeholder caption never intrudes on the action dock
 - **WHEN** the `art` panel is unavailable or the scene is missing/failed, so the status badge
@@ -2706,8 +2704,8 @@ The client SHALL apply every committed change to its state and to the document i
 The stage SHALL animate the committed changes below, taking every duration and distance from the client's motion tokens, so they follow the effective motion level of "The motion level is a client-local preference that governs every client animation". No transition SHALL delay a committed value or the player's input beyond its own duration, as "Presentation timing never gates committed state or input" requires.
 
 #### Scenario: A new scene image crossfades above the previous one
-- **WHEN** a new scene image commits
-- **THEN** it crossfades from the previous image to the new one over the scene duration (500ms at `full`); the new image starts its fade only once it is decoded; until then the previous image stays visible with the dimmed treatment the backdrop already uses for a prior image, so the fade never passes through an empty frame and a previous scene is never presented undimmed as the current one; the new image fades in above the previous one and the pair does not dip through the stage behind them mid-fade; and the scene label, the alternative text, and the placeholder update at commit
+- **WHEN** a same-scene replacement successfully decodes at eligible priority
+- **THEN** the renderer crossfades within existing motion tokens; a different scene never retains the old place while waiting and starts with its own background at commit
 
 #### Scenario: A new location label slides in
 - **WHEN** a new location label commits, and when the world time alone changes
@@ -2734,11 +2732,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
 - **THEN** at `reduced` it plays as an opacity fade of at most 150ms with no slide, no pan, and no marker travel, and the dim changes instantly; at `off` it renders its final state in the commit's frame
 
 #### Scenario: A new scene crossfades once decoded
-- **WHEN** the effective level is `full`, the backdrop shows a done scene, and a committed revision names
-  a different done scene URL
-- **THEN** the scene label and alternative text read the new values in the commit's frame, the previous
-  image stays visible and dimmed until the new image is decoded, and then both images are present while
-  the previous one fades out over 500ms, after which only the new image remains
+- **WHEN** a different logical scene commits while its preferred image is delayed
+- **THEN** prior-place image is immediately invalidated, the new scene own provisional background appears, and its decoded preferred image may fade in over that background
 
 #### Scenario: The place card slides in the new location
 - **WHEN** the effective level is `full` and a move commits a new location label, and later only the
@@ -2775,11 +2770,8 @@ The stage SHALL animate the committed changes below, taking every duration and d
   placement at once, and the message window's clear fades within 150ms
 
 #### Scenario: Off renders every final state at once
-- **WHEN** the effective level is `off` and a move commits a new scene, location, current node, portrait,
-  and vitals state
-- **THEN** in the commit's frame the backdrop holds only the new image once decoded, and the place card,
-  the minimap, the message window, the stage actor, and the vitals dock each hold only their final
-  state
+- **WHEN** motion is off and scene/location/portrait/vitals commit
+- **THEN** each canonical value updates in the commit frame; the new scene displays its own available background while preferred pixels decode and never holds the old place
 
 ### Requirement: A leaving element is out of reach while it animates out
 Every stage element that animates out — a crossfading image or portrait, a previous place-card heading, the message window's clearing layer, the vitals island, and every later leaving element the client animates — SHALL leave the accessibility tree, the tab order, and pointer hit-testing at the moment the change that removes it commits, and SHALL stay out of reach until it is removed or re-enters.

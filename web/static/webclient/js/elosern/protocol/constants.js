@@ -412,10 +412,13 @@ var DIALOGUE_MAX_KEYWORD_LABEL = 128;
 var DIALOGUE_MAX_LINE = 2000;
 
 // The art panel's schema version (mirror of
-// web.webclient.presentation.art.ART_SCHEMA_VERSION): v3 replaces the flat
+// web.webclient.presentation.art.ART_SCHEMA_VERSION): v3 replaced the flat
 // portrait-catalog entry with exactly `{artwork, context}` — the canonical
-// artwork descriptor plus its bounded display context.
-var ART_SCHEMA_VERSION = 3;
+// artwork descriptor plus its bounded display context; v4 replaces the flat
+// scene block with exactly `{archetype, label, alt, artwork}`, so both
+// artwork vocabularies are canonical and every retired flat scene field is
+// rejected instead of adapted.
+var ART_SCHEMA_VERSION = 4;
 
 // Roster panel bounds (mirror of web.webclient.presentation.roster,
 // webclient-character-roster): at most ten character rows in ascending

@@ -375,6 +375,7 @@ def _settle_by_key(db_key: str, *, status: str, output_identity: str | None,
             record.db.completed_at = time.time()
             record.db.last_error_code = None
             record.db.claimed_at = None
+            record.db.published_generation_token = generation_token
         else:
             record.db.status = ArtAssetStatus.FAILED
             record.db.last_error_code = error or "settle_error"
@@ -464,6 +465,9 @@ def _settle_generated_by_key(
         record.db.completed_at = time.time()
         record.db.last_error_code = None
         record.db.claimed_at = None
+        # The publishing token survives publication: it is the durable
+        # publication identity a resource version is derived from.
+        record.db.published_generation_token = generation_token
         record.db.generation_token = ""
         record.db.seed = seed
         return record, prior_cleanup
