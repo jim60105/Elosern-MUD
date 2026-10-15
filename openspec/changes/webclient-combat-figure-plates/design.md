@@ -62,8 +62,13 @@ is in danger, and whether it carries a condition worth acting on (cleanse, finis
 - A tooltip lists one or more conditions: one for a glyph, the hidden ones for `+N`, the glyph's own plus the hidden
   ones for a folded glyph.
 - AppClient bumps a `plateTooltipClose` counter when a round starts playing (`dispatch.beatLocked` turns true) and
-  when the committed mode changes; plates pass it to `ConditionChips` as `closeSignal`. A window resize already
-  closes an open tooltip; a replaced condition list (every commit) closes it too.
+  when the committed mode changes, and provides it; each plate reads it (so a plate already fading out, whose props
+  are no longer patched, still sees it) and passes it to `ConditionChips` as `closeSignal`. A window resize closes an
+  open tooltip, and so does a scroll of the document or of a container of the icon (not the message log following a
+  new line). A commit closes it only when the conditions under it change, so a same-content revision keeps a reader's
+  tooltip open.
+- Plate variant: while a tooltip is open it claims the next Escape wherever focus is (window capture), so the group
+  never moves focus away from a tooltip left open by the pointer.
 - Head rule: at rest no tooltip is open, so the formation's guarantees (no head and no plate covered) hold; a tooltip
   shows only while the pointer rests on, or focus holds, its glyph.
 - `webclient-combat-stage-target-picking` adds the target-step trigger.
@@ -85,8 +90,8 @@ is in danger, and whether it carries a condition worth acting on (cleanse, finis
   - Escape: an open tooltip consumes the first press (`ConditionChips`); with none open, focus returns to
     `#action-dock`;
   - every key the group handles (arrows, Home, End, Escape, and Enter/Space on a plate) calls `preventDefault` and
-    `stopPropagation`, so `bridge.js`'s document listener never routes it. Digits and other keys keep their global
-    meaning.
+    `stopPropagation`, so `bridge.js`'s document listener never routes it; Enter/Space on a glyph only stop
+    propagation (the button keeps its native activation). Digits and other keys keep their global meaning.
 - Each plate's `aria-label` appends 危險 when low and its conditions (`狀態：…`, the shared labels joined by `、`).
 
 ### D5. Low-HP alarm

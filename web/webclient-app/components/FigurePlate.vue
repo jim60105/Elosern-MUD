@@ -33,7 +33,7 @@
 // one brass hairline crown along the bottom edge. `role="group"` with the whole
 // reading (and its conditions) as its accessible name; only the glyphs take
 // pointer events.
-import { computed } from "vue";
+import { computed, inject } from "vue";
 import ConditionChips from "./ConditionChips.vue";
 import { bySeverity, isLowPlateHp, plateHpPercent, plateLabel } from "./figure-plate.js";
 
@@ -63,6 +63,11 @@ const props = defineProps({
 });
 
 const compact = computed(() => props.form === "compact");
+// The client's close counter (AppClient provides it): read reactively here,
+// so a plate fading out after leaving combat — whose props are no longer
+// patched — still closes its tooltip.
+const providedClose = inject("plateTooltipClose", null);
+const closeAll = computed(() => props.closeSignal + (providedClose?.value ?? 0));
 const percent = computed(() => plateHpPercent(props.hpCurrent, props.hpMaximum));
 const strokeWidth = computed(() => `${percent.value ?? 0}%`);
 const low = computed(() => isLowPlateHp(props.hpCurrent, props.hpMaximum));
@@ -143,7 +148,7 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
         :cap="glyphCap"
         :tabbable="false"
         :fold="glyphFold"
-        :close-signal="closeSignal"
+        :close-signal="closeAll"
       />
     </div>
   </div>

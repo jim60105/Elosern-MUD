@@ -352,4 +352,44 @@ describe("ConditionChips (chromeless condition icon row)", () => {
       spy.mockRestore();
     }
   });
+
+  it("closes on a window resize, and on a scroll only of the document or a container of the icon", async () => {
+    const host = document.body.appendChild(document.createElement("div"));
+    const log = document.body.appendChild(document.createElement("div"));
+    const w = mount(ConditionChips, { attachTo: host, props: { conditions: manyConditions(2), variant: "plate" } });
+    const icon = w.get('[data-testid="figure-plate__condition--cond_0"]');
+    const tip = () => document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+    await icon.trigger("mouseenter");
+    log.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(tip()).not.toBeNull();
+    host.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(tip()).toBeNull();
+    await icon.trigger("mouseenter");
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(tip()).toBeNull();
+    w.unmount();
+  });
+
+  it("lets a plate tooltip claim Escape wherever focus is, and only while open", async () => {
+    const outside = document.body.appendChild(document.createElement("button"));
+    const w = mountChips({ conditions: manyConditions(2), variant: "plate" }, true);
+    const reached = [];
+    const outer = (event) => reached.push(event.key);
+    document.addEventListener("keydown", outer);
+    try {
+      outside.focus();
+      await w.get('[data-testid="figure-plate__condition--cond_0"]').trigger("mouseenter");
+      outside.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
+      expect(reached).toEqual([]);
+      outside.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(reached).toEqual(["Escape"]);
+    } finally {
+      document.removeEventListener("keydown", outer);
+    }
+  });
 });

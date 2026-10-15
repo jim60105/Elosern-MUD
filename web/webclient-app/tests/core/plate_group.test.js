@@ -162,6 +162,11 @@ describe("the plates keyboard group", () => {
     await press(" ");
     await press("Escape");
     expect(routed).toEqual([]);
+    // A glyph keeps its native activation, but Enter and Space stop at the group.
+    plateEl(201).querySelector(".figure-plate__glyphs button").focus();
+    await press(" ");
+    await press("Enter");
+    expect(routed).toEqual([]);
     plateEl(201).focus();
     await press("1");
     expect(routed).toEqual(["1"]);

@@ -5,7 +5,7 @@
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model). The behavior
 // groups live in ./composables/ (each watch stays with the state it mutates).
-import { computed, ref, watch } from "vue";
+import { computed, provide, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { useAppClient } from "./composables/use-app-client.js";
 import AppShell from "./components/AppShell.vue";
@@ -402,8 +402,11 @@ const plateEntries = computed(() => {
 
 // The plates' condition tooltips (webclient-combat-figure-plates, design
 // D3) close when a round starts playing and when the committed mode
-// changes; a resize and a scroll close them inside ConditionChips.
+// changes; a resize and a scroll close them inside ConditionChips. The
+// counter is provided, not passed, so a plate already fading out of the
+// stage (no longer patched) still sees it.
 const plateTooltipClose = ref(0);
+provide("plateTooltipClose", plateTooltipClose);
 watch(
   () => !!store.view.dispatch.beatLocked,
   (locked) => {
@@ -653,7 +656,6 @@ const rootStyle = computed(() => {
               :target="entry.target"
               :acting="entry.acting"
               :conditions="entry.conditions"
-              :close-signal="plateTooltipClose"
               :stage-x="entry.plate.left + entry.plate.width / 2"
             />
           </TransitionGroup>

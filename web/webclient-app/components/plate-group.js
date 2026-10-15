@@ -119,9 +119,11 @@ export function bindPlateGroup(
       }
       return;
     }
+    setInside(true);
+    // Only a plate or a glyph is remembered as the group's re-entry point.
+    if (!event.target.matches?.(`${PLATE}, ${GLYPH}`)) return;
     remembered = event.target;
     rememberedIdentity = event.target.closest(PLATE)?.getAttribute("data-identity") ?? null;
-    setInside(true);
   }
 
   function onFocusOut(event) {
@@ -190,7 +192,9 @@ export function bindPlateGroup(
       case "Enter":
       case " ":
         // A plate is no control: its Enter and Space never reach the dock.
+        // A glyph keeps its native activation, but the key stops here.
         if (active === plate) consume(event);
+        else if (onGlyph) event.stopPropagation();
         return;
       default:
     }

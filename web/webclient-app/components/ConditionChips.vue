@@ -127,6 +127,7 @@ let anchorRect = null;
 const TIP_GAP = 6;
 const VIEWPORT_INSET = 4;
 function place(event) {
+  anchorEl = event.currentTarget;
   const rect = event.currentTarget.getBoundingClientRect();
   anchorRect = { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width };
   const centre = rect.left + rect.width / 2;
@@ -201,19 +202,40 @@ watch(
   },
 );
 const tipOpen = computed(() => tipCondition.value !== null);
+// A scroll moves the icon only when it scrolls the document or a container
+// of the icon; any other scroll (the message log following a new line)
+// leaves the tooltip open.
+let anchorEl = null;
+function onScroll(event) {
+  const target = event.target;
+  if (!anchorEl || target === document || target === document.documentElement || target === window || (target?.contains && target.contains(anchorEl))) {
+    closeTip();
+  }
+}
+// Plate variant: an open tooltip claims the next Escape wherever focus is
+// (a focused plate, or the dock while the pointer rests on a glyph), so the
+// plates group never moves focus away from a tooltip left open.
+function onWindowEscape(event) {
+  if (event.key !== "Escape" || !tipOpen.value) return;
+  event.stopPropagation();
+  event.preventDefault();
+  closeTip();
+}
+function unlisten() {
+  window.removeEventListener("scroll", onScroll, true);
+  window.removeEventListener("resize", closeTip);
+  window.removeEventListener("keydown", onWindowEscape, true);
+}
 watch(tipOpen, (open) => {
   if (open) {
-    window.addEventListener("scroll", closeTip, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", closeTip);
+    if (plate.value) window.addEventListener("keydown", onWindowEscape, true);
   } else {
-    window.removeEventListener("scroll", closeTip, true);
-    window.removeEventListener("resize", closeTip);
+    unlisten();
   }
 });
-onBeforeUnmount(() => {
-  window.removeEventListener("scroll", closeTip, true);
-  window.removeEventListener("resize", closeTip);
-});
+onBeforeUnmount(unlisten);
 
 // Escape closes an open tooltip (then the disclosure) and is consumed only
 // while one of them is open, mirroring DesktopNavigation.onToolKeydown: with

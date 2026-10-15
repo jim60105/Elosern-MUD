@@ -389,6 +389,22 @@ describe("the plates layer in the client", () => {
     expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
   });
 
+  it("closes a plate tooltip when combat ends, even while the plate fades out", async () => {
+    const participants = [{ ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] }];
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.combatActions({ participants }), art: ART_PANEL_SAMPLE },
+    })], {});
+    await nextTick();
+    await nextTick();
+    await wrapper.get('[data-testid="figure-plate__condition--poison"]').trigger("mouseenter");
+    expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).not.toBeNull();
+    store.receive(1, "ui_update", [fx.update({ revision: 2, mode: "exploration", panels: { context_actions: fx.explorationActions() } })], {});
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
+  });
+
   it("gives the player's own figure a plate while a companion is possessed, and none to the possessed one", async () => {
     // Possession (the controlled figure is the possessed companion): the
     // player's own figure stands as a non-controlled figure and carries its
