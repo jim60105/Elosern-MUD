@@ -119,6 +119,47 @@ class DamageBandTests(unittest.TestCase):
         )
         self.assertEqual(estimated, int(phys_pending.description.split("|")[-1]))
 
+    def test_weapon_damage_multiplier_physical_consumer_and_controls(self):
+        from world.lore.items import EquipmentSlot, EquipmentModifierKey
+        from world.rules.equipment_effects import EquipmentEffectRule
+        from world.tests.synthetic_data import make_item
+
+        # Synthetic weapons
+        synth_main = make_item(
+            key="t_synth_main_sword",
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+        )
+        rule_1_5 = EquipmentEffectRule(
+            adjustments={},
+            gauge_caps={},
+            immune=(),
+            attached_buffs=(),
+            exposure_bias=0,
+            weapon_damage_multiplier=1.5,
+        )
+        phys_actor = FakeEntity("phys_actor", atk_phys=60, magic_power=60, agility=10)
+        phys_actor.db.equipment = {
+            "weapon_main": synth_main.key,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        target = FakeEntity("target", hp=100, defense=20, agility=10)
+        with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_main.key: synth_main}):
+            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
+                with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
+                    with patch("world.rules.combat.damage.roll_d100", return_value=60):
+                        # Physical strike: attack=60 * 1.5 = 90. K=40, def=20 => 90 * 40 / 60 = 60.
+                        phys_pending = _handle_damage(phys_actor, [target], "damage:fire:physical", {}, 1.0)[0]
+                        # Magic strike: weapon factor is NOT applied => attack=60. 60 * 40 / 60 = 40.
+                        mag_pending = _handle_damage(phys_actor, [target], "damage:fire:magic", {}, 1.0)[0]
+
+        # Scenario from spec: K=40, defense=20, attack before weapon factor=60, declared factor is 1.5
+        # THEN physical damage before Defend is 60; matching magic control remains 40
+        self.assertEqual(int(phys_pending.description.split("|")[-1]), 60)
+        self.assertEqual(int(mag_pending.description.split("|")[-1]), 40)
+
     @covers_requirement("combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a")
     def test_floor_shape_does_not_apply_to_a_miss(self):
         actor = FakeEntity("actor", atk_phys=1, agility=10)

@@ -1192,6 +1192,56 @@ class EstimationIntegrationTests(EvenniaTestCase):
         self.assertAlmostEqual(settled / 100, projection.damage, places=4)
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    def test_the_estimate_and_settlement_match_with_equipped_weapon_multiplier(self):
+        from world.lore.items import EquipmentSlot, EquipmentModifierKey
+        from world.rules.equipment_effects import EquipmentEffectRule
+        from world.tests.synthetic_data import make_item
+
+        synth_weapon = make_item(
+            key="t_est_sword",
+            equipment_slot=EquipmentSlot.WEAPON_MAIN,
+            modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+        )
+        rule_1_5 = EquipmentEffectRule(
+            adjustments={},
+            gauge_caps={},
+            immune=(),
+            attached_buffs=(),
+            exposure_bias=0,
+            weapon_damage_multiplier=1.5,
+        )
+        self.monster.db.skills = {"active": [STRIKE.key], "passive": []}
+        self.monster.traits.atk_phys.base = 40
+        self.monster.traits.agility.base = 10
+        self.monster.db.equipment = {
+            "weapon_main": synth_weapon.key,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        target = self._participant("t_est_target_wpn", hp=500)
+        target.traits.defense.base = 10
+        target.traits.agility.base = 20
+        with patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {synth_weapon.key: synth_weapon}):
+            with patch.dict("world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES", {EquipmentModifierKey.PLAIN_SWORD: rule_1_5}):
+                context, estimate = self._estimate(target, STRIKE.key)
+                self.assertNotIsInstance(estimate, InvalidEstimate)
+                projection = _recipient(estimate, target)
+                settled = 0.0
+                for face in range(1, 101):
+                    target.traits.hp.current = 500
+                    self.monster.traits.mp.current = 20
+                    with patch("world.rules.combat.damage.roll_d100", return_value=face):
+                        result = ActionResolver.resolve(
+                            ActionRequest(self.monster, STRIKE.key, [target], context, scale=1.0)
+                        )
+                    self.assertEqual(result.outcome, "success", result.detail)
+                    settled += 500 - self._committed(target, "hp")
+                # Agreement across every face between estimation and settlement
+                self.assertAlmostEqual(settled / 100, projection.damage, places=4)
+                self.assertGreater(projection.damage, 0.0)
+
+    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_drain_projection_matches_the_committed_pools(self):
         self.monster.db.skills = {"active": [DRAIN.key], "passive": []}
         self.monster.traits.magic_power.base = 20

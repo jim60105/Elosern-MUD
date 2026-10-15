@@ -824,6 +824,38 @@ def equipment_exposure_bias(entity: Any) -> int:
     return sum(rule.exposure_bias for rule in _worn_rules(entity))
 
 
+def equipment_weapon_multiplier(entity: Any) -> float:
+    """Return the actor's declared weapon damage factor, or 1.0.
+
+    Reads fail-closed normalized equipment mapping.
+    Main-hand weapon takes precedence.
+    If main-hand is empty, falls back to off-hand weapon.
+    If main-hand is occupied by non-weapon, fallback is blocked -> 1.0.
+    Malformed storage or no declared multiplier returns 1.0.
+    Factors never combine.
+    """
+    from world.rules.equipment import normalized_equipment
+    from world.skills.equipment import EquipmentSlot
+
+    equipment = normalized_equipment(entity)
+    if equipment is None:
+        return 1.0
+    main_key = equipment.get("weapon_main")
+    if main_key is not None:
+        defn = ITEM_REGISTRY.get(main_key)
+        if defn is None or defn.equipment_slot not in (EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF):
+            return 1.0
+        rule = EQUIPMENT_EFFECT_RULES.get(defn.modifier_key)
+        return float(rule.weapon_damage_multiplier) if rule is not None else 1.0
+    off_key = equipment.get("weapon_off")
+    if off_key is not None:
+        defn = ITEM_REGISTRY.get(off_key)
+        if defn is not None and defn.equipment_slot in (EquipmentSlot.WEAPON_MAIN, EquipmentSlot.WEAPON_OFF):
+            rule = EQUIPMENT_EFFECT_RULES.get(defn.modifier_key)
+            return float(rule.weapon_damage_multiplier) if rule is not None else 1.0
+    return 1.0
+
+
 def equipment_pleasure_gain(entity: Any) -> int:
     """Sum the signed ``pleasure_gain`` percents of the worn equipment.
 
@@ -1012,6 +1044,9 @@ def equipment_adjustment_text(item_key: str) -> str:
         cap = rule.gauge_caps.get(target)
         if cap is not None and cap > 0:
             segments.append(f"{label} +{cap}")
+    if rule.weapon_damage_multiplier > 1.0:
+        mult_str = f"{rule.weapon_damage_multiplier:g}"
+        segments.append(f"武器傷害 x{mult_str}")
     if rule.immune:
         # Function-local: status_display reaches this module's consumers
         # through combat_modifiers, so a module-level import would close a

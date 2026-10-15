@@ -189,6 +189,13 @@ def _handle_damage(
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
     now = event_context.get("now") if event_context is not None else None
+    if school == "physical":
+        from world.rules.equipment_effects import equipment_weapon_multiplier
+
+        weapon_multiplier = equipment_weapon_multiplier(actor)
+    else:
+        weapon_multiplier = 1.0
+
     source_tier = "學徒"
     resolved = event_context.get("resolved_effect") if event_context is not None else None
     source_skill = getattr(resolved, "source_skill", None)
@@ -250,6 +257,7 @@ def _handle_damage(
                     rider=damage_rider(_max_hp(target), max_hp_frac),
                     matched_multiplier=matched_mult,
                     scale=scale,
+                    weapon_multiplier=weapon_multiplier,
                 )
 
             residual = amount

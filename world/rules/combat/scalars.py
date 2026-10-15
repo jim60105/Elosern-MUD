@@ -87,10 +87,11 @@ def strike_amount(
     rider: int = 0,
     matched_multiplier: float = 1.0,
     scale: float = 1.0,
+    weapon_multiplier: float = 1.0,
 ) -> int:
     """Return one landing strike's staged damage amount.
 
-    ``round(attack x multiplier x coefficient x matched_multiplier)`` is the
+    ``round(attack x multiplier x coefficient x matched_multiplier x weapon_multiplier)`` is the
     pre-mitigation hit; ratio retention ``K / (K + max(0, defense))`` scales
     that hit (where ``K`` is ``damage.mitigation_k`` from the combat rulebook),
     the rider is added, and the result never falls below the rulebook damage
@@ -101,7 +102,9 @@ def strike_amount(
     """
     floor = int(COMBAT_YAML["damage"]["floor"])
     k = float(COMBAT_YAML["damage"]["mitigation_k"])
-    attack_part = round(attack * multiplier * coefficient * matched_multiplier)
+    attack_part = round(
+        attack * multiplier * coefficient * matched_multiplier * weapon_multiplier
+    )
     defense_used = max(0.0, float(defense))
     base_amount = int(max(attack_part * k / (k + defense_used) + rider, floor))
     return int(max(scaled_magnitude(base_amount, scale), floor))
