@@ -57,6 +57,7 @@ SESSION_REASON_MESSAGES: dict[str, str] = {
     "malformed_session": "戰鬥紀錄異常。",
     "invalid_recovery": "你已經無法行動，戰鬥結束了。",
     "unknown_session_id": "無法確認當前戰鬥。",
+    "forbidden_actor": "指定的角色目前無法接受指令。",
 }
 
 # Stable terminal outcome announcements shared by command and adapter paths.

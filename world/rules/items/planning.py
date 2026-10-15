@@ -22,6 +22,7 @@ from world.rules.item_effects import (
 )
 from world.rules.items.contracts import (
     ItemEffectStep,
+    ItemChoice,
     ItemUsePlan,
     ItemUsePreflight,
     ItemUseReason,
@@ -233,3 +234,102 @@ def preflight_item_use(
         mirror_pk=mirror.id if mirror is not None else None,
     )
     return ItemUsePreflight(allowed=True, reason=None, plan=plan)
+
+
+def enumerate_actor_item_choices(
+    actor: Any,
+    context: Any,
+    candidate_entities: list[Any] | None = None,
+    *,
+    in_combat: bool = True,
+) -> tuple[ItemChoice, ...]:
+    """Enumerate the immutable actor-local usable item choices for ``actor``.
+
+    Inspects ``actor``'s own inventory (never a shared party bag), filters
+    usable items permitted in the context, and derives eligibility, polarity,
+    valid targets, and reasons via ``preflight_item_use``.
+    """
+    inventory = _inventory_list(actor)
+    if not inventory:
+        return ()
+    counts: dict[str, int] = {}
+    for key in inventory:
+        counts[key] = counts.get(key, 0) + 1
+
+    choices: list[ItemChoice] = []
+    candidates = candidate_entities or []
+
+    for item_key in sorted(counts.keys()):
+        definition = ITEM_REGISTRY.get(item_key)
+        if definition is None or definition.use_mechanics is None:
+            continue
+        mechanics = definition.use_mechanics
+        if in_combat and not mechanics.combat_allowed:
+            continue
+        profile = item_effects.ITEM_EFFECT_PROFILES.get(item_key)
+        if not isinstance(profile, ItemEffectProfile):
+            continue
+
+        # Determine target_spec from profile effects:
+        # If any effect has scope SINGLE, player must specify a single target.
+        # If all effects are SELF, target_spec is SELF.
+        # Otherwise (group scopes like ALL_ALLIES/ALL_ENEMIES/ALL), player specifies no target (NONE).
+        has_single = any(eff.scope is ItemTargetScope.SINGLE for eff in profile.effects)
+        all_self = all(eff.scope is ItemTargetScope.SELF for eff in profile.effects)
+        if has_single:
+            target_spec = "single"
+        elif all_self:
+            target_spec = "self"
+        else:
+            target_spec = "none"
+
+        # Polarity derivation
+        hostile = any(
+            eff.scope is ItemTargetScope.ALL_ENEMIES
+            or (isinstance(eff, GaugeAdjustEffect) and eff.amount < 0)
+            for eff in profile.effects
+        )
+        beneficial = any(
+            eff.scope in (ItemTargetScope.SELF, ItemTargetScope.ALL_ALLIES)
+            or (isinstance(eff, GaugeAdjustEffect) and eff.amount > 0)
+            or (isinstance(eff, StatusRemoveEffect) and eff.selector in ("all", "negative"))
+            for eff in profile.effects
+        )
+
+        # Determine valid targets and enabled state
+        if target_spec == "single":
+            valid_targets_list: list[Any] = []
+            first_reason: ItemUseReason | None = None
+            for candidate in candidates:
+                req = ItemUseRequest(actor=actor, item_key=item_key, target=candidate)
+                preflight = preflight_item_use(req, in_combat=in_combat, context=context)
+                if preflight.allowed:
+                    valid_targets_list.append(candidate)
+                elif first_reason is None:
+                    first_reason = preflight.reason
+            enabled = len(valid_targets_list) > 0
+            reason = None if enabled else (first_reason or ItemUseReason.TARGET_INVALID)
+            valid_targets = tuple(valid_targets_list)
+        else:
+            # For self or group effects, no explicit candidate target
+            req = ItemUseRequest(actor=actor, item_key=item_key, target=None)
+            preflight = preflight_item_use(req, in_combat=in_combat, context=context)
+            enabled = preflight.allowed
+            reason = None if enabled else preflight.reason
+            valid_targets = (actor,) if target_spec == "self" and enabled else ()
+
+        choices.append(
+            ItemChoice(
+                item_key=item_key,
+                label=definition.display_name_zh,
+                quantity=counts[item_key],
+                enabled=enabled,
+                reason=reason,
+                target_spec=target_spec,
+                valid_targets=valid_targets,
+                hostile=hostile,
+                beneficial=beneficial,
+            )
+        )
+
+    return tuple(choices)

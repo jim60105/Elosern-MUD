@@ -38,6 +38,8 @@ from world.rules.combat import (  # noqa: F401  (compat: the historical module n
 from world.rules.combat_session.battlefield import (
     _context_for,
     _session_policy,
+    authorize_combat_actor,
+    is_actor_eligible_to_act,
     reconstruct_battlefield,
 )
 from world.rules.combat_session.errors import (  # noqa: F401
@@ -151,6 +153,7 @@ __all__ = [
     "_submit_request",
     "_team_living",
     "_terminal_outcome",
+    "authorize_combat_actor",
     "classify_overwhelm",
     "clear_session",
     "combat",
@@ -159,6 +162,7 @@ __all__ = [
     "forfeit",
     "from_storage",
     "get_world_clock",
+    "is_actor_eligible_to_act",
     "is_in_active_session",
     "monster_behaviour_policy",
     "overwhelm",

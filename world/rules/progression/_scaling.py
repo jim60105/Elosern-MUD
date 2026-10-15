@@ -15,6 +15,7 @@ from typing import Any
 from world.lore.elements import ELEMENT_REGISTRY
 from world.skills.cost_tiers import is_freeform_eligible
 from world.skills.registry import SkillDef
+from world.rules.combat_modifiers import apply_cost_modifier, evaluate_combat_modifiers_no_create
 
 from ._constants import (
     AFFINITY_ELEMENT_MULTIPLIER,
@@ -203,8 +204,16 @@ def freeform_scale_entries_for(actor: Any, skill: Any) -> tuple[tuple[float, str
     if not allowed:
         return ()
     base_mp = int(skill.cost["mp"])
+    bundle = evaluate_combat_modifiers_no_create(actor)
+    adjusted_base_mp = apply_cost_modifier(base_mp, bundle.get("mp_cost"))
+    if adjusted_base_mp <= 0:
+        return tuple(
+            (scale, label, 0)
+            for scale, label in FREEFORM_CAST_SCALES
+            if scale in allowed
+        )
     return tuple(
-        (scale, label, scaled_mp_cost(base_mp, scale))
+        (scale, label, scaled_mp_cost(adjusted_base_mp, scale))
         for scale, label in FREEFORM_CAST_SCALES
         if scale in allowed
     )

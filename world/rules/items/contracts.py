@@ -107,6 +107,33 @@ class ItemUsePreflight:
 
 
 @dataclass(frozen=True)
+class ItemChoice:
+    """One immutable actor-scoped usable item choice with preflighted availability.
+
+    Attributes:
+        item_key: The canonical item registry key.
+        label: Display name of the item.
+        quantity: Available quantity in the actor's inventory.
+        enabled: Whether the item is currently usable by the actor.
+        reason: Stable rejection reason when disabled, else None.
+        target_spec: Targeting specification required for player input ('none', 'self', 'single').
+        valid_targets: Tuple of participant entities eligible as the chosen target.
+        hostile: Whether any effect is hostile toward the target.
+        beneficial: Whether any effect is beneficial toward the target.
+    """
+
+    item_key: str
+    label: str
+    quantity: int
+    enabled: bool
+    reason: ItemUseReason | None
+    target_spec: str
+    valid_targets: tuple[Any, ...]
+    hostile: bool
+    beneficial: bool
+
+
+@dataclass(frozen=True)
 class ItemUseResult:
     """The result of one item-use resolution, shaped for round settlement."""
 

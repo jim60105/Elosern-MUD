@@ -46,6 +46,7 @@ here.
 """
 
 from world.rules.items.contracts import (  # noqa: F401
+    ItemChoice,
     ItemEffectStep,
     ItemUseError,
     ItemUsePlan,
@@ -66,6 +67,7 @@ from world.rules.items.planning import (  # noqa: F401
     _plan_gauge_step,
     _plan_status_step,
     _status_matches,
+    enumerate_actor_item_choices,
     preflight_item_use,
 )
 from world.rules.item_effects import (  # noqa: F401

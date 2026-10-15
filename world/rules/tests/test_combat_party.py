@@ -38,11 +38,16 @@ from world.rules.combat import Battlefield, _handle_damage, run_round
 from world.rules.combat_session import (
     _context_for,
     _round_provider,
+    BASIC_ATTACK_KEY,
+    authorize_combat_actor,
+    CombatSessionError,
+    SessionReason,
     engage,
     forfeit,
     read_session,
     reconstruct_battlefield,
     submit_player_action,
+    submit_player_item_use,
 )
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_behaviour import monster_behaviour_policy
@@ -761,6 +766,237 @@ class BattlefieldCommitSurfaceTests(EvenniaTestCase):
         self.assertNotIn("from world.rules.combat import Battlefield", source)
         self.assertNotIn("isinstance(context, Battlefield", source)
         self.assertIn('"knocked_out"', source)
+
+
+class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
+    """Actor commands, commander authorization, and actor-scoped skill and item use."""
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, "items", "item_effect_profiles", extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room = create_object(Room, key="combat party actor arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.monster = _monster("party actor goblin", hp=500)
+        self.monster.location = self.room
+
+    @covers_requirement(
+        "player-combat-session::commander-may-select-only-currently-controllable-allied-actors"
+    )
+    def test_commander_authorization_rejects_enemy_and_other_party(self):
+        companion = _companion(self.player, "同行夥伴", hp=100)
+        other_player = create_object(PlayerCharacter, key="路人玩家")
+        other_player.location = self.room
+        other_companion = _companion(other_player, "別人的夥伴", hp=100)
+        engage(self.player, self.monster)
+
+        # 1. Commander choosing enemy
+        with self.assertRaises(CombatSessionError) as caught:
+            submit_player_action(
+                self.player,
+                BASIC_ATTACK_KEY,
+                [self.monster],
+                commanded_actor=self.monster,
+            )
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+
+        # 2. Commander choosing another player's companion
+        with self.assertRaises(CombatSessionError) as caught:
+            submit_player_action(
+                self.player,
+                BASIC_ATTACK_KEY,
+                [self.monster],
+                commanded_actor=other_companion,
+            )
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+
+        # 3. Commander account puppet stays unchanged
+        self.assertIsNone(self.player.account)
+
+    @covers_requirement(
+        "player-combat-session::commander-may-select-only-currently-controllable-allied-actors"
+    )
+    def test_commander_authorization_rejects_stale_moved_down_or_forbidden_actor(self):
+        companion = _companion(self.player, "狀態同伴", hp=100)
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+
+        # Moved companion
+        companion.location = None
+        with self.assertRaises(CombatSessionError) as caught:
+            authorize_combat_actor(self.player, companion, record, field)
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+        companion.location = self.player.location
+
+        # Fled companion
+        field.fled.add(str(companion.key))
+        with self.assertRaises(CombatSessionError) as caught:
+            authorize_combat_actor(self.player, companion, record, field)
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+        field.fled.clear()
+
+        # Knocked out companion
+        field.knocked_out.add(str(companion.key))
+        with self.assertRaises(CombatSessionError) as caught:
+            authorize_combat_actor(self.player, companion, record, field)
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+        field.knocked_out.clear()
+
+        # Defeated companion (HP 0)
+        companion.traits.hp.current = 0
+        with self.assertRaises(CombatSessionError) as caught:
+            authorize_combat_actor(self.player, companion, record, field)
+        self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+        companion.traits.hp.current = 100
+
+        # Action-forbidden companion (actions_per_turn == 0)
+        with patch("world.rules.combat_session.battlefield.evaluate_combat_modifiers_no_create", return_value={"actions_per_turn": 0}):
+            with self.assertRaises(CombatSessionError) as caught:
+                authorize_combat_actor(self.player, companion, record, field)
+            self.assertEqual(caught.exception.args[0], SessionReason.FORBIDDEN_ACTOR)
+
+    @covers_requirement(
+        "player-combat-session::all-personal-skill-choices-and-costs-are-actor-scoped"
+    )
+    def test_companion_skill_choices_self_binding_and_resource_deduction(self):
+        companion = _companion(self.player, "魔法同伴", hp=100)
+        companion.traits.mp.base = 50
+        companion.traits.mp.current = 50
+        grant_lineage(companion, [_T_CAST])
+        self.player.traits.mp.base = 50
+        self.player.traits.mp.current = 50
+        # Player does not know _T_CAST
+        self.player.db.skills = ()
+
+        engage(self.player, self.monster)
+        from world.rules.combat_view import build_combat_view
+
+        # 1. View choices for companion
+        view = build_combat_view(self.player, for_actor=companion)
+        skill_keys = [s.key for s in view.skills]
+        self.assertIn(_T_CAST, skill_keys)
+
+        # 2. View choices for commander lacks companion skill
+        commander_view = build_combat_view(self.player)
+        self.assertNotIn(_T_CAST, [s.key for s in commander_view.skills])
+
+        # 3. Companion executes _T_CAST
+        result = submit_player_action(
+            self.player,
+            _T_CAST,
+            [self.monster],
+            commanded_actor=companion,
+        )
+        self.assertEqual(result["outcome"], "round")
+        # Companion MP deducted, player MP untouched
+        self.assertLess(companion.traits.mp.current, 50)
+        self.assertEqual(self.player.traits.mp.current, 50)
+
+    @covers_requirement(
+        "player-combat-session::all-personal-skill-choices-and-costs-are-actor-scoped"
+    )
+    def test_companion_freeform_magnitude_eligibility_without_leakage(self):
+        companion = _companion(self.player, "風靈同伴", hp=100)
+        companion.traits.mp.base = 100
+        companion.traits.mp.current = 100
+        grant_lineage(companion, [_T_CAST])
+        # Companion does not have wind mastery
+        engage(self.player, self.monster)
+
+        from world.rules.action import RejectReason
+        # Forged scale by companion without mastery rejects
+        result = submit_player_action(
+            self.player,
+            _T_CAST,
+            [self.monster],
+            scale=2.0,
+            commanded_actor=companion,
+        )
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["reason"], RejectReason.SCALED_CAST_FORBIDDEN)
+
+    @covers_requirement(
+        "player-combat-session::free-inspection-and-equipment-operations-do-not-select-round-commands"
+    )
+    def test_free_inspection_causes_no_round_advancement(self):
+        companion = _companion(self.player, "巡察同伴", hp=100)
+        engage(self.player, self.monster)
+        before_rounds = read_session(self.player).rounds_elapsed
+
+        from world.rules.combat_view import build_combat_view
+        from world.rules.items import enumerate_actor_item_choices
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+        context = _context_for(field, record)
+
+        # Inspect choices
+        _ = build_combat_view(self.player, for_actor=companion)
+        _ = enumerate_actor_item_choices(companion, context)
+
+        # No round advance, dice roll, or resource cost
+        after_rounds = read_session(self.player).rounds_elapsed
+        self.assertEqual(before_rounds, after_rounds)
+
+    @covers_requirement(
+        "item-use-resolution::controllable-companion-item-requests-use-that-actors-complete-item-rules"
+    )
+    def test_companion_item_requests_use_companion_inventory_and_mirrors(self):
+        companion = _companion(self.player, "背包同伴", hp=50)
+        companion.traits.hp.base = 100
+        companion.traits.hp.current = 50
+        # Use t_ember_spray which is already in synthetic scope and is combat-allowed self-heal
+        companion.db.inventory = ["t_ember_spray"]
+        self.player.db.inventory = []
+
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+        context = _context_for(field, record)
+
+        from world.rules.items import enumerate_actor_item_choices, ItemUseReason
+        # Companion item choices exist
+        choices = enumerate_actor_item_choices(companion, context)
+        self.assertTrue(any(c.item_key == "t_ember_spray" and c.enabled for c in choices))
+
+        # Commander lacks item
+        cmd_choices = enumerate_actor_item_choices(self.player, context)
+        self.assertFalse(any(c.item_key == "t_ember_spray" for c in cmd_choices))
+
+        # Forged item request for commander who lacks t_ember_spray
+        rej = submit_player_item_use(
+            self.player,
+            "t_ember_spray",
+            commanded_actor=self.player,
+        )
+        self.assertEqual(rej["outcome"], "rejected")
+        self.assertEqual(rej["reason"], ItemUseReason.ITEM_NOT_HELD)
+
+        # Forged item request for companion naming item companion lacks
+        companion.db.inventory = []
+        rej2 = submit_player_item_use(
+            self.player,
+            "t_ember_spray",
+            commanded_actor=companion,
+        )
+        self.assertEqual(rej2["outcome"], "rejected")
+        self.assertEqual(rej2["reason"], ItemUseReason.ITEM_NOT_HELD)
+        companion.db.inventory = ["t_ember_spray"]
+
+        # Valid item use by companion heals companion and consumes companion mirror
+        result = submit_player_item_use(
+            self.player,
+            "t_ember_spray",
+            commanded_actor=companion,
+        )
+        self.assertEqual(result["outcome"], "round")
+        self.assertGreater(companion.traits.hp.current, 50)
+        self.assertEqual(companion.db.inventory.count("t_ember_spray"), 0)
 
 
 if __name__ == "__main__":

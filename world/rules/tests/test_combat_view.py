@@ -379,6 +379,30 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertEqual(before, after)
 
+    @covers_requirement(
+        "player-combat-session::all-personal-skill-choices-and-costs-are-actor-scoped"
+    )
+    def test_view_parameterized_for_actor_and_unauthorized_rejection(self):
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="view companion 2", location=self.room)
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        companion.traits.hp.base = 100
+        companion.traits.hp.current = 100
+        join_party(companion, self.player)
+        grant_lineage(companion, [_T_CAST.key])
+        engage(self.player, self.monster)
+
+        # Authorized companion view
+        comp_view = build_combat_view(self.player, for_actor=companion)
+        self.assertIn(_T_CAST.key, [s.key for s in comp_view.skills])
+
+        # Unauthorized view: enemy as for_actor
+        with self.assertRaises(CombatViewError):
+            build_combat_view(self.player, for_actor=self.monster)
+
     @covers_requirement('npc-identity-titles::compact-presentation-rows-keep-the-plain-npc-name')
     def test_titled_npc_participant_row_stays_plain_name(self):
         # npc-title-identity-core compact-row pin: the combat panel renders
