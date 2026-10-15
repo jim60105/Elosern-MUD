@@ -99,9 +99,16 @@ function intersectsOrTouches(a, b) {
   return a.left <= right(b) && b.left <= right(a) && a.top <= bottom(b) && b.top <= bottom(a);
 }
 
-function count(value) {
-  const n = Math.floor(Number(value));
-  return Number.isFinite(n) && n > 0 ? n : 0;
+// A figure count: a whole number of at least 0, else a TypeError. Counts
+// outside the supported range (party 1-5, foes 1-(16 - party)) are laid out by
+// the same rules; `fits` speaks only to the geometry, and keeping the counts in
+// range is the caller's contract.
+function count(name, value) {
+  const n = Number(value);
+  if (value === null || value === "" || typeof value === "boolean" || !Number.isInteger(n) || n < 0) {
+    throw new TypeError(`combat formation: input.${name} is not a whole number of at least 0`);
+  }
+  return n;
 }
 
 // The horizontal zones and the gap, from the input.
@@ -224,15 +231,17 @@ function fitSide(input, zone, side, n, scale, allowCompact) {
 
 // The required numeric inputs; a missing or non-finite one throws instead of
 // yielding a silent NaN formation.
-const REQUIRED = ["stageWidth", "stageHeight", "bandTop", "actorHeight", "topBandBottom"];
+const REQUIRED = ["stageWidth", "stageHeight", "uiScale", "bandTop", "actorHeight", "topBandBottom"];
 
 function normalise(input) {
   for (const name of REQUIRED) {
-    if (!Number.isFinite(Number(input?.[name])) || input?.[name] === null || input?.[name] === "") {
+    const value = input?.[name];
+    if (value === null || value === "" || typeof value === "boolean" || !Number.isFinite(Number(value))) {
       throw new TypeError(`combat formation: input.${name} is not a finite number`);
     }
   }
-  const uiScale = Number(input.uiScale) > 0 ? Number(input.uiScale) : 1;
+  const uiScale = Number(input.uiScale);
+  if (uiScale <= 0) throw new TypeError("combat formation: input.uiScale must be greater than 0");
   const cardWidth = Number.isFinite(Number(input.cardWidth)) && Number(input.cardWidth) > 0
     ? Number(input.cardWidth)
     : CARD_WIDTH * uiScale;
@@ -246,8 +255,8 @@ function normalise(input) {
     topBandBottom: Number(input.topBandBottom),
     cardWidth,
     vitalsDock: dock ? rect(Number(dock.left), Number(dock.top), Number(dock.width), Number(dock.height)) : null,
-    partyCount: count(input.partyCount),
-    foeCount: count(input.foeCount),
+    partyCount: count("partyCount", input.partyCount),
+    foeCount: count("foeCount", input.foeCount),
   };
 }
 
@@ -302,7 +311,8 @@ export function combatFormation(rawInput) {
 // out: the top band (`--header-h`) is the stage's top strip and the bottom
 // band (`--band-h`) its bottom strip; the vitals rectangle is converted into
 // stage coordinates. `counts` is `{ party, foes }`.
-export function formationInputFromStage(stageRect, styles, vitalsRect, counts = {}) {
+export function formationInputFromStage(stageRect, styles, vitalsRect, counts) {
+  if (!stageRect || !counts) throw new TypeError("combat formation: the stage rectangle and the counts are required");
   const read = (name, unit) => {
     const value = typeof styles?.getPropertyValue === "function" ? styles.getPropertyValue(name) : styles?.[name];
     const raw = String(value ?? "").trim();

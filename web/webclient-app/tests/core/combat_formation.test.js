@@ -30,7 +30,8 @@ const VIEWPORTS = Object.freeze({
 // The reference input for one viewport (tokens.css): the top band is the 48px·S
 // header; the bottom band is clamp(190px·S, 27.85vh, 400px·S); the portrait
 // height is min(62vh, 680px·S, the stage between the bands); the reference
-// vitals dock is 25vw × 92px·S standing on the band, 16px·S from the left.
+// vitals dock is 25vw × 92px·S standing on the band's top edge (its top is
+// bandTop − 92px·S), 16px·S from the left.
 function reference(name, partyCount, foeCount) {
   const { width, height, S } = VIEWPORTS[name];
   const header = 48 * S;
@@ -294,7 +295,8 @@ const TABLE = Object.freeze({
 });
 
 describe("combat formation: the pinned table", () => {
-  for (const [name, rows] of Object.entries(TABLE)) {
+  // 1920x1080 shares the 1600x900 table (design D4).
+  for (const [name, rows] of [...Object.entries(TABLE), ["1920x1080", TABLE["1600x900"]]]) {
     it(`matches the reference table at ${name}`, () => {
       const actual = rows.map((_, index) => {
         const party = index + 1;
@@ -433,6 +435,14 @@ describe("combat formation: edge rules", () => {
       expect(() => combatFormation({ ...base, [name]: undefined }), name).toThrow(TypeError);
       expect(() => combatFormation({ ...base, [name]: Number.NaN }), name).toThrow(TypeError);
     }
+    // A missing or unusable chrome factor would size every slot for S = 1.
+    for (const uiScale of [undefined, 0, -1, "abc"]) {
+      expect(() => combatFormation({ ...base, uiScale }), String(uiScale)).toThrow(TypeError);
+    }
+    for (const bad of [undefined, -1, 1.5, "two", null]) {
+      expect(() => combatFormation({ ...base, partyCount: bad }), `party ${bad}`).toThrow(TypeError);
+      expect(() => combatFormation({ ...base, foeCount: bad }), `foes ${bad}`).toThrow(TypeError);
+    }
   });
 });
 
@@ -500,6 +510,12 @@ describe("combat formation: the stage input adapter", () => {
     expect(
       formationInputFromStage(stageRect, css, { left: 0, top: 0, width: 0, height: 0 }, { party: 1, foes: 1 }).vitalsDock,
     ).toBeNull();
+  });
+
+  it("requires the stage rectangle and the counts", () => {
+    const css = styles({ "--ui-scale": "1", "--actor-h": "489.8px", "--band-h": "220px", "--header-h": "48px" });
+    expect(() => formationInputFromStage({ left: 0, top: 0, width: 1451, height: 790 }, css, null)).toThrow(TypeError);
+    expect(() => formationInputFromStage(null, css, null, { party: 1, foes: 1 })).toThrow(TypeError);
   });
 
   it("accepts a plain record of measured values", () => {
