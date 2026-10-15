@@ -63,7 +63,7 @@ where finite positive `K` is loaded from the combat rulebook (initially 40), mat
   have qualified only for `base_multiplier`
 
 #### Scenario: Damage never drops below the floor
-- **WHEN** `effective_attack_stat * roll_multiplier - effective_defense` computes to a value at or
+- **WHEN** `the mitigated attack component plus rider` computes to a value at or
   below zero
 - **THEN** the applied damage equals `damage.floor`, never zero or negative
 
