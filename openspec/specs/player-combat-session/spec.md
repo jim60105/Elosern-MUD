@@ -526,6 +526,7 @@ member of the opposing team; in every other case it SHALL select `opening="round
 #### Scenario: Off-roster targets reject like the ordinary facade
 - **WHEN** `submit_opening_action()` is called with a target that is not a member of the
   reconstructed battlefield's roster
+- **THEN** it rejects, matching `submit_player_action()`'s existing not-present rejection
 
 ### Requirement: Commander may select only currently controllable allied actors
 The authenticated player SHALL remain commander while a chosen eligible party member is the action actor. Authorization SHALL derive from current session and bound party membership and existing ability-to-act rules. Enemy, absent, fled, defeated, knocked-out and action-forbidden members SHALL require no command and SHALL receive no automatic attack.

@@ -421,6 +421,7 @@ scopes. Preflight SHALL remain side-effect-free.
 
 #### Scenario: Self and group scopes bind without a caller target
 - **WHEN** preflight resolves effect scopes
+- **THEN** self scopes bind the actor and group scopes expand through the context
 
 ### Requirement: Controllable companion item requests use that actors complete item rules
 A commanded companion SHALL use its own usable inventory, equipment context and shared item-effect preflight. SELF SHALL bind that actor; successful consumption SHALL remove one item and matching mirror from that actor. Every existing scope, effectiveness rule and disabled reason SHALL apply without a shared party bag.
