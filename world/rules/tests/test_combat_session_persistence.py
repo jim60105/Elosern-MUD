@@ -224,6 +224,63 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(duplicate["reason"], "already_committed")
         self.assertEqual(get_world_clock().tick, tick + 6)
 
+    def test_earlier_defeat_invalidates_selected_spell_without_retarget_or_cost(self):
+        from world.rules.combat_session import engage_group, submit_player_action
+        from world.rules.tests.combat_fixtures import grant_lineage
+        from world.tests.synthetic_data import SYNTH_SKILLS
+        from world.rules.combat.rounds import _end_of_round_upkeep
+
+        companion = self._waiting_companion()
+        spell = SYNTH_SKILLS["t_ember_burst"].key
+        grant_lineage(companion, [spell])
+        companion.traits.mp.current = 50
+        self.monster.traits.hp.current = 1
+        survivor = _monster("untouched foe", hp=1000)
+        survivor.location = self.room
+        engage_group(self.player, [self.monster, survivor])
+        partial = submit_player_action(self.player, spell, [self.monster], commanded_actor=companion)
+        self.assertEqual(partial["outcome"], "draft")
+        mp = companion.traits.mp.current
+        survivor_hp = survivor.traits.hp.current
+        with (
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[
+                self.player.key, companion.key, self.monster.key, survivor.key,
+            ]),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=100),
+            patch("world.rules.combat_session.policies._enemy_policy", return_value=None),
+            patch("world.rules.combat.rounds._end_of_round_upkeep", wraps=_end_of_round_upkeep) as upkeep,
+        ):
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(self.monster.traits.hp.current, 0)
+        self.assertEqual(survivor.traits.hp.current, survivor_hp)
+        self.assertEqual(companion.traits.mp.current, mp)
+        self.assertEqual(upkeep.call_count, 1)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
+    def test_valid_spell_miss_pays_cost_and_consumes_one_round(self):
+        from world.rules.combat_session import submit_player_action
+        from world.rules.tests.combat_fixtures import grant_lineage
+        from world.tests.synthetic_data import SYNTH_SKILLS
+
+        spell = SYNTH_SKILLS["t_ember_burst"].key
+        grant_lineage(self.player, [spell])
+        self.player.traits.mp.current = 50
+        engage(self.player, self.monster)
+        hp = self.monster.traits.hp.current
+        mp = self.player.traits.mp.current
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+            patch("world.rules.combat_session.policies._enemy_policy", return_value=None),
+        ):
+            result = submit_player_action(self.player, spell, [self.monster])
+        self.assertEqual(result["outcome"], "round")
+        self.assertEqual(self.monster.traits.hp.current, hp)
+        self.assertLess(self.player.traits.mp.current, mp)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
     def test_nested_caller_transaction_rejects_before_admission(self):
         from django.db import transaction
         from world.rules.combat_session import confirm_actor_command
@@ -595,3 +652,47 @@ class DurableRoundAdmissionTests(BattlefieldIsolation, TransactionTestCase):
         self.assertEqual((current.draft_version, current.rounds_elapsed), (1, 0))
         self.assertEqual(self.player.traits.hp.current, hp)
         self.assertIsNone(self.player.db.last_combat_receipt)
+
+    def test_terminal_receipt_is_readable_by_fresh_process_and_retry_is_safe(self):
+        import json
+        import subprocess
+        from django.db import connection
+        from world.rules.combat_session import confirm_actor_command
+        from world.rules.clock import get_world_clock
+
+        tick = get_world_clock().tick
+
+        def defeat(*args, **kwargs):
+            self.monster.traits.hp.current = 0
+            return []
+
+        with patch("world.rules.combat_session.rounds.run_round", side_effect=defeat):
+            result = confirm_actor_command(
+                self.player, self.record.session_id, 0, 0, self.player.pk, self.command
+            )
+        self.assertEqual(result["outcome"], "victory")
+        # A separate interpreter has no Evennia/idmapper or provider used-set.
+        code = (
+            "import base64,json,pickle,sqlite3,sys;"
+            "db=sqlite3.connect(sys.argv[1]);"
+            "row=db.execute("
+            "\"SELECT a.db_value FROM objects_objectdb_db_attributes oa "
+            "JOIN typeclasses_attribute a ON a.id=oa.attribute_id "
+            "WHERE oa.objectdb_id=? AND a.db_key='last_combat_receipt' "
+            "AND a.db_category IS NULL\",(int(sys.argv[2]),)).fetchone();"
+            "print(json.dumps(pickle.loads(base64.b64decode(row[0]))))"
+        )
+        child = subprocess.run(
+            ["uv", "run", "--locked", "python", "-c", code,
+             str(connection.settings_dict["NAME"]), str(self.player.pk)],
+            check=True, capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(json.loads(child.stdout), result["receipt"])
+        self.player.attributes.reset_cache()
+        with patch("world.rules.combat_session.rounds.run_round") as run:
+            retry = confirm_actor_command(
+                self.player, self.record.session_id, 0, 0, self.player.pk, self.command
+            )
+        run.assert_not_called()
+        self.assertEqual(retry["reason"], "already_committed")
+        self.assertEqual(get_world_clock().tick, tick + 6)

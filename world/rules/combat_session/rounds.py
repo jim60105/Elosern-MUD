@@ -397,7 +397,7 @@ def preflight_draft_entries(
             continue
         try:
             authorize_combat_actor(commander, actor_obj, record, battlefield)
-        except CombatSessionError as auth_err:
+        except CombatSessionError as auth_err:  # observability: ignore R2: expected authorization rejection is returned as a member-specific reselection reason
             reselection_reasons[actor_id] = {
                 "reason": "forbidden_actor",
                 "detail": str(auth_err.args[0]),
@@ -503,6 +503,7 @@ def confirm_actor_command(
         commander, session_id, round_revision, draft_version, actor_id, command
     )
     if not result.get("ok") or not result.get("is_complete"):
+        result["outcome"] = "draft" if result.get("ok") else "rejected"
         return result
     record = read_session_uncached(commander)
     battlefield = reconstruct_battlefield(commander, record)

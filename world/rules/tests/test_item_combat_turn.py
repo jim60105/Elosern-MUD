@@ -579,9 +579,9 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
             if registry_key_for_object(obj) == _MANA_KEY
         )
         engage(self.player, self.monster)
+        from world.rules.combat_session import BASIC_ATTACK_KEY, submit_player_action
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         # Touch the companion's handler pre-use so its in-process cache is
-        from world.rules.combat_session import submit_player_action
-        submit_player_action(self.player, "basic_attack", [self.monster], commanded_actor=self.companion)
         # live across the settlement: a restore that skipped the per-target
         # cache drop would roll back stored sexual state while a stale
         # companion.sexual handler still reported the rolled-back gain.
@@ -646,8 +646,8 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         second.traits.hp.current = 60
         self.player.db.inventory = [_MANA_KEY, _MANA_KEY]
         engage_group(self.player, [self.monster, second])
-        from world.rules.combat_session import submit_player_action
-        submit_player_action(self.player, "basic_attack", [self.monster], commanded_actor=self.companion)
+        from world.rules.combat_session import BASIC_ATTACK_KEY, submit_player_action
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         clock = WorldClock()
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),

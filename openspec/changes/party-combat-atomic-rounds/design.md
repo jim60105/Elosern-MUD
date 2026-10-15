@@ -30,3 +30,26 @@ Pre-release clean cutover. Implement affected code/callers/fixtures/annotations 
 ## Verification and documentation ownership
 
 Use synthetic fixtures for behavioral expectations and the existing real-data calibration boundary for authored roster evidence. Added/moved Evennia test modules and browser methods must have exactly one shard owner. Use canonical `<capability>.<requirement-slug>` IDs from project traceability tooling, migrating all affected annotations. Update existing affected docs and both player command documents for command syntax/context changes. Focused implementation checks include `uv run --locked python -m tools.contract_gate`; changed logging also requires observability lint and focused event tests. Complete managed browser and traceability-evidence runs stay CI-owned.
+
+## Implementation boundary and focused evidence
+
+`confirm_actor_command` holds the shared reentrant combat writer across a
+durable edit transaction and a separate durable round transaction. Caller-owned
+transactions are rejected before admission, since savepoint completion cannot
+establish durable admission. Technical failure retains the admitted draft and
+its incremented `draft_version`; retry uses that current version.
+
+The complete-draft provider supplies selected skills and own-inventory items.
+The existing opening provider remains a separate boundary owned by
+`party-combat-opening-routing`. Tactical resolution belongs to the later
+defend/dodge and taunt changes; draft storage alone does not implement tactics.
+Session exit implementations must acquire the shared writer before reading
+revision state and retain it through restoration.
+
+Focused verification on 2026-10-16 passed 140 tests across session persistence,
+session flow, item combat turns, initiative/action counts, party combat and
+combat commands. Real outer-commit fault injection retains the accepted draft
+and restores HP caches. Competing connections commit one revision. A fresh
+interpreter reads the terminal receipt directly from the committed SQLite file;
+a subsequent retry runs no round and advances no additional time. These
+results do not replace the remaining task checklist or final review.

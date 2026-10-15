@@ -237,6 +237,8 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
             result = submit_player_action(
                 self.player, _T_CAST, [companion]
             )
+            self.assertEqual(result["outcome"], "draft")
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         self.assertEqual(result["outcome"], "round")
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(companion.relations.affinity_for(self.player), 9)
@@ -333,7 +335,13 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         )
         provider = _round_provider(self.player, request, battlefield, record)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            return battlefield, run_round(battlefield, provider)
+            logs = run_round(battlefield, provider)
+        from dataclasses import replace
+        from world.rules.combat_session import _persist
+        from world.rules.combat_session.rounds import _knocked_out_ids
+
+        _persist(self.player, replace(record, knocked_out_ids=_knocked_out_ids(logs, battlefield)))
+        return battlefield, logs
 
     @covers_requirement("action-resolution-pipeline::nonlethal-policy-transforms-lethal-projection-before-eventlog-planners")
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
@@ -446,6 +454,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("party-system::knocked-out-companions-are-persistent-battlefield-state-and-can-never-die")
     def test_knockout_state_survives_a_battlefield_rebuild(self):
         engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             submit_player_action(self.player, _T_CAST, [self.monster])
         record = read_session(self.player)
@@ -475,6 +484,7 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         # round's combat seconds and lifts the companion above the nonlethal
         # floor, and a later engagement includes it again.
         engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
@@ -528,6 +538,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 1
         companion = _companion(self.player, "仍站著", hp=100)
         engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
@@ -559,6 +570,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.hp.current = 100
         self.monster.traits.agility.base = 5
         engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
@@ -573,6 +585,7 @@ class TerminalAndCleanupTests(BattlefieldIsolation, EvenniaTestCase):
     def test_knocked_out_companion_does_not_end_the_session(self):
         companion = _companion(self.player, "先倒下", hp=50)
         engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             result = submit_player_action(
                 self.player, _T_CAST, [self.monster]
@@ -887,6 +900,7 @@ class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertNotIn(_T_CAST, [s.key for s in commander_view.skills])
 
         # 3. Companion executes _T_CAST
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         result = submit_player_action(
             self.player,
             _T_CAST,
@@ -989,6 +1003,7 @@ class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
         companion.db.inventory = ["t_ember_spray"]
 
         # Valid item use by companion heals companion and consumes companion mirror
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         result = submit_player_item_use(
             self.player,
             "t_ember_spray",
