@@ -138,7 +138,7 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         js_source = protocol_client_source()
         block_match = re.search(r"var PANEL_ALLOWLIST\s*=\s*\{(.*?)\};", js_source, re.DOTALL)
         self.assertIsNotNone(block_match, "UMD PANEL_ALLOWLIST block vanished")
-        umd = set(re.findall(r"(\w+):\s*\d+", block_match.group(1)))
+        umd = set(self._js_allowlist_entries(js_source))
         vue_source = _VUE_STORE.read_text(encoding="utf-8")
         vue_match = re.search(r"const PANEL_ALLOWLIST\s*=\s*\[(.*?)\];", vue_source, re.DOTALL)
         self.assertIsNotNone(vue_match, "Vue PANEL_ALLOWLIST list vanished")
@@ -328,14 +328,35 @@ class PanelSchemaVersionParityContract(unittest.TestCase):
         return int(match.group(1))
 
     @staticmethod
-    def _js_allowlist_value(js_source, panel_name):
+    def _js_allowlist_entries(js_source):
+        """Every ``PANEL_ALLOWLIST`` entry as ``{name: version-or-None}``.
+
+        An entry may spell its version as a numeric literal or as a
+        module-scope identifier reference (``art: ART_SCHEMA_VERSION``), because
+        the allowlist mirrors the per-panel constants declared beside it. An
+        identifier is resolved to its own ``var IDENT = <n>;`` declaration; an
+        unresolvable identifier yields ``None`` so the caller fails loudly
+        rather than treating the spelling as a missing panel version.
+        """
         block_match = re.search(r"var PANEL_ALLOWLIST\s*=\s*\{(.*?)\};", js_source, re.DOTALL)
         if block_match is None:
-            return None
-        for name, version in re.findall(r"(\w+): (\d+)", block_match.group(1)):
-            if name == panel_name:
-                return int(version)
-        return None
+            return {}
+        entries = {}
+        for name, token in re.findall(
+            r"(\w+):\s*([0-9]+|[A-Z][A-Z0-9_]*)", block_match.group(1)
+        ):
+            if token.isdigit():
+                entries[name] = int(token)
+                continue
+            var_match = re.search(
+                rf"^ {{0,2}}var {token}\s*=\s*([0-9]+)\s*;", js_source, re.MULTILINE
+            )
+            entries[name] = int(var_match.group(1)) if var_match is not None else None
+        return entries
+
+    @classmethod
+    def _js_allowlist_value(cls, js_source, panel_name):
+        return cls._js_allowlist_entries(js_source).get(panel_name)
 
     @staticmethod
     def _js_recheck_value(js_source, panel_name):
