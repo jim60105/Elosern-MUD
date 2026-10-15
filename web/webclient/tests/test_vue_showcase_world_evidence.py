@@ -176,6 +176,10 @@ PREVIOUS_MANIFEST_KEYS = {
     # The gallery image contract added the shared descriptor preview position
     # (unified-gallery-image-contract).
     "Core/ArtworkPreview",
+    # The ordered-attempt image loading core added the shared alpha mask fill
+    # and the bounded reached-failure indicator (unified-image-loading-core).
+    "Core/ArtworkAlpha",
+    "Core/ArtworkFailure",
     "World/TitleBallotMenu",
     "Overlays/LineagePanel",
     "Overlays/TitleCodexPanel",
