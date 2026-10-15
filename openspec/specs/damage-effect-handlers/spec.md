@@ -2,7 +2,9 @@
 
 ## Purpose
 Registers the damage:* prefix into change 8's effect-handler registry declaring the traits surface, fixes the damage:<element>:<school> naming convention, and requires the to-hit roll and damage number to be computed during effect resolution — never inside handlers — reading every stat through effective_value() with combat modifiers applied uniformly regardless of origin.
+
 ## Requirements
+
 ### Requirement: damage:* is registered into change 8's effect-handler registry, declaring the traits
 surface
 `world/rules/combat.py` SHALL call change 8's `register_effect_handler("damage", _handle_damage,
@@ -40,7 +42,7 @@ an element rather than a registry lookup. The reserved token SHALL change nothin
 - **WHEN** a synthetic actor strikes a target with an elementless physical damage effect, and a twin
   actor strikes an identical target with an element-bearing physical damage effect of the same
   coefficient and policy under the same fixed roll
-- **THEN** both attacks read `atk_phys`, subtract the same defense, apply the same policy terms and
+- **THEN** both attacks read `atk_phys`, apply the same ratio mitigation, apply the same policy terms and
   commit the same hp delta, and neither the attacker's nor the target's elemental affinity changes
   either result
 
@@ -93,4 +95,3 @@ SHALL distinguish a poison-sourced adjustment from an arousal-sourced or fear-so
 - **WHEN** `_handle_damage`'s source is inspected
 - **THEN** it contains no conditional keyed on which `combat_modifiers.yaml` rule produced an
   `agility`/`accuracy` adjustment — only the bundle's output keys are read
-

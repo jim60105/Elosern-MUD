@@ -87,12 +87,12 @@ followed by the authored scale and final floor, where `K` is the rulebook's fini
 #### Scenario: Unconditional execution bypass ignores any target's defense
 - **WHEN** a synthetic policy with `bypass_defense=True` and an empty predicate damages a high-defense
   and a low-defense target, and separately authoring attaches an attack multiplier to an empty predicate
-- **THEN** both hits subtract no defense while the identical coefficient without bypass differs by the
+- **THEN** both hits use zero defense for ratio mitigation while the identical coefficient without bypass differs by the
   targets' defense, and the multiplier-with-empty-predicate authoring still raises at construction
 
 #### Scenario: Divert runs after the full formula and pays from the named gauge
 - **WHEN** a synthetic divert profile (fraction, cap) is active on a target whose authored hit amount
-  (post-defense, post-rider, post-scale) exceeds the fraction's product with the target's budget
+  (post-ratio, post-rider, post-scale) exceeds the fraction's product with the target's budget
 - **THEN** exactly `round(amount × fraction)` capped by remaining budget and current gauge is paid
   from the gauge through the canonical writer, HP drops only by the residual, and the same roll
   without the profile delivers the full authored HP amount
