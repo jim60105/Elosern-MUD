@@ -224,6 +224,10 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat_session.rounds.run_round", side_effect=record_round),
         ):
             submit_player_action(self.player, _T_CAST, [build()])
+            from world.rules.combat_session import reconstruct_battlefield
+            field = reconstruct_battlefield(self.player, read_session(self.player))
+            foe = next(entity for entity in field.roster.values() if entity.pk not in read_session(self.player).player_ids)
+            submit_player_action(self.player, "basic_attack", [foe], commanded_actor=companion)
         self.player.db.active_combat = None
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=44),

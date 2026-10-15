@@ -68,6 +68,7 @@ def _terminal_session_id(actor: Any, record: CombatSessionRecord | None) -> str 
     return None
 
 
+@serialized_combat_write
 def clear_session(
     actor: Any,
     battlefield: Battlefield | None = None,

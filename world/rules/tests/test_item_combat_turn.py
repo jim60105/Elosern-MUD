@@ -280,9 +280,10 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             replace(read_session(self.player), knocked_out_ids=(self.player.pk,)),
         )
         result = submit_player_item_use(self.player, _TONIC_KEY)
-        # A player already knocked out settles as defeat; the skipped turn
-        # must still leave the potion untouched and emit no item-use event.
-        self.assertEqual(result["outcome"], "defeat")
+        # An empty eligible set pauses collection without acting or upkeep.
+        self.assertTrue(result["empty_required"])
+        self.assertFalse(result["is_complete"])
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
         self.assertEqual(
             self.player.db.inventory.count(_TONIC_KEY), 1
         )
@@ -579,6 +580,8 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         )
         engage(self.player, self.monster)
         # Touch the companion's handler pre-use so its in-process cache is
+        from world.rules.combat_session import submit_player_action
+        submit_player_action(self.player, "basic_attack", [self.monster], commanded_actor=self.companion)
         # live across the settlement: a restore that skipped the per-target
         # cache drop would roll back stored sexual state while a stale
         # companion.sexual handler still reported the rolled-back gain.
@@ -643,6 +646,8 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         second.traits.hp.current = 60
         self.player.db.inventory = [_MANA_KEY, _MANA_KEY]
         engage_group(self.player, [self.monster, second])
+        from world.rules.combat_session import submit_player_action
+        submit_player_action(self.player, "basic_attack", [self.monster], commanded_actor=self.companion)
         clock = WorldClock()
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),

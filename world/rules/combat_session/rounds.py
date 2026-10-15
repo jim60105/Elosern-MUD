@@ -25,6 +25,7 @@ from world.rules.combat_session.battlefield import (
     reconstruct_battlefield,
 )
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
+from world.rules.combat_session.writer import serialized_combat_write
 from world.rules.combat_session.policies import (
     _overwhelm_provider,
     _round_provider,
@@ -112,6 +113,7 @@ def _current_tick() -> int | None:
     return clock.tick if clock is not None else None
 
 
+@serialized_combat_write
 def submit_player_action(
     actor: Any,
     skill_key: str,
@@ -146,13 +148,16 @@ def submit_player_action(
     )
     if rejection is not None:
         return rejection
-    return _submit_request(
-        actor,
-        record,
-        battlefield,
-        request,
-        commanded_kind="skill",
-        commanded_key=skill_key,
+    effective_actor = actor if commanded_actor is None else commanded_actor
+    targets = targets_or_shorthand if isinstance(targets_or_shorthand, str) else [
+        int(target.pk) for target in targets_or_shorthand
+    ]
+    return confirm_actor_command(
+        actor, record.session_id, record.round_revision, record.draft_version,
+        int(effective_actor.pk),
+        {"kind": "skill", "payload": {
+            "skill_key": skill_key, "targets_or_shorthand": targets, "scale": scale,
+        }},
     )
 
 
@@ -299,6 +304,7 @@ def submit_opening_action(
     )
 
 
+@serialized_combat_write
 def submit_player_item_use(
     actor: Any, item_key: str, *, target: Any | None = None, commanded_actor: Any | None = None
 ) -> dict[str, Any]:
@@ -343,13 +349,12 @@ def submit_player_item_use(
             "reason": preflight.reason.value if preflight.reason else None,
             "detail": preflight.detail,
         }
-    return _submit_request(
-        actor,
-        record,
-        battlefield,
-        ItemUseRequest(actor=effective_actor, item_key=item_key, target=target),
-        commanded_kind="item",
-        commanded_key=item_key,
+    return confirm_actor_command(
+        actor, record.session_id, record.round_revision, record.draft_version,
+        int(effective_actor.pk),
+        {"kind": "item", "payload": {
+            "item_key": item_key, "target_id": int(target.pk) if target is not None else None,
+        }},
     )
 
 
@@ -482,9 +487,6 @@ def preflight_draft_entries(
         "missing_actors": missing_actors,
         "membership_changed": membership_changed,
     }
-
-
-from world.rules.combat_session.writer import serialized_combat_write
 
 
 @serialized_combat_write

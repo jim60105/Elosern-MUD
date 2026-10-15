@@ -131,6 +131,16 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster = _monster("persist goblin")
         self.monster.location = self.room
 
+    def _waiting_companion(self):
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        companion = create_object(NPC, key="draft companion", location=self.room)
+        companion.race = self.player.race
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        return companion
+
     def test_final_confirmation_commits_once_and_clears_draft(self):
         from world.rules.combat_session import confirm_actor_command
         engage(self.player, self.monster)
@@ -191,6 +201,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("player-combat-session::confirmed-round-selections-persist-as-one-editable-session-draft")
     def test_confirmed_round_selections_persist_and_replace_earlier_selection(self):
         from world.rules.combat_session import confirm_actor_command
+        self._waiting_companion()
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
         cmd1 = {
@@ -271,7 +282,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         # Fresh confirmation acknowledges new required set
         res_ack = confirm_actor_command(self.player, session_id, 0, 1, self.player.pk, cmd_player)
         self.assertTrue(res_ack["ok"])
-        self.assertTrue(res_ack["is_complete"])
+        self.assertEqual(res_ack["receipt"]["round_revision"], 0)
 
     @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
     def test_resource_or_capability_change_produces_reselection_reasons(self):
@@ -328,6 +339,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
     @covers_requirement("player-combat-session::draft-editing-has-a-separate-stale-write-version")
     def test_concurrent_cas_draft_version_rejection(self):
         from world.rules.combat_session import confirm_actor_command
+        self._waiting_companion()
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
 
@@ -413,6 +425,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.equipment import toggle_equipment
         from world.tests.synthetic_data import SYNTH_ITEMS
         self.player.db.equipment = None
+        self._waiting_companion()
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
         cmd = {

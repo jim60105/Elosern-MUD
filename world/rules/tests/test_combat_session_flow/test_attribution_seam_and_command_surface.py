@@ -211,6 +211,9 @@ class RoundSettlementSeamTests(BattlefieldIsolation, EvenniaTestCase):
             #    companion, so the friendly-fire penalty applies (-1 per hit)
             #    inside the seam.
             with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+                submit_player_action(
+                    self.player, "basic_attack", [self.monster], commanded_actor=self.companion
+                )
                 result = submit_player_action(
                     self.player,
                     _T_SEAM_CASCADE.key,

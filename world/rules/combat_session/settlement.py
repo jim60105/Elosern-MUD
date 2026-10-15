@@ -20,6 +20,7 @@ from world.rules.clock import get_world_clock, settle_combat_result
 from world.rules.combat import COMBAT_YAML, Battlefield
 from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
+from world.rules.combat_session.writer import serialized_combat_write
 from world.rules.overwhelm import classify_overwhelm
 from world.rules.combat_session.lifecycle import _persist, clear_session
 from world.rules.combat_session.records import CombatSessionRecord, read_session
@@ -400,6 +401,7 @@ def _settle_with_restore(
         raise
 
 
+@serialized_combat_write
 def forfeit(actor: Any) -> dict[str, Any]:
     """Settle accumulated time, record defeat/exam FAIL, and clean up."""
     record = read_session(actor)
