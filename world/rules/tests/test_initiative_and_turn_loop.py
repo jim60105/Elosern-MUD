@@ -100,6 +100,40 @@ class InitiativeAndTurnLoopTests(unittest.TestCase):
             run_round(battlefield, provider)
         self.assertEqual(calls, ["fast", "fast", "slow"])
 
+    @covers_requirement("combat-resolution::the-turn-loop-consumes-actions-per-turn-as-the-round-s-action-count-with-zero-skipping-before-actionresolver-is-called")
+    def test_interactive_allies_cap_skill_and_item_without_enemy_cap_or_fallback(self):
+        from types import SimpleNamespace
+        from world.rules.action import ActionRequest
+        from world.rules.items import ItemUseRequest
+        from world.rules.combat_session.policies import _party_round_provider
+
+        for kind in ("skill", "item", "missing"):
+            with self.subTest(kind=kind):
+                field = self.battlefield()
+                ally, enemy = field.roster["fast"], field.roster["slow"]
+                ally.pk, enemy.pk = 1, 2
+                request = (
+                    ItemUseRequest(actor=ally, item_key="selected-item")
+                    if kind == "item" else ActionRequest(ally, BASIC_ATTACK_KEY, [enemy], None)
+                )
+                selected = {} if kind == "missing" else {1: request}
+                provider = _party_round_provider(selected, field, SimpleNamespace(player_ids=(1,)))
+                success = SimpleNamespace(outcome="success", event_log=None, journal=None)
+                with (
+                    patch("world.rules.combat.rounds.roll_initiative", return_value=["fast", "slow"]),
+                    patch("world.rules.combat.rounds.evaluate_combat_modifiers", return_value={"actions_per_turn": 2}),
+                    patch("world.rules.combat.rounds.ActionResolver.resolve", return_value=success) as resolve,
+                    patch("world.rules.combat.rounds.resolve_item_use", return_value=success) as use,
+                    patch("world.rules.combat_session.policies._enemy_policy", return_value=None) as policy,
+                    patch("world.rules.combat.rounds._end_of_round_upkeep", return_value={}),
+                    patch("world.rules.combat.rounds.settle_upkeep", return_value=[]),
+                ):
+                    run_round(field, provider)
+                self.assertEqual(resolve.call_count, int(kind == "skill"))
+                self.assertEqual(use.call_count, int(kind == "item"))
+                self.assertEqual(policy.call_count, 2)
+                self.assertTrue(all(call.args[0] is enemy for call in policy.call_args_list))
+
     def test_mid_round_defeat_cuts_remaining_slots_with_no_event(self):
         battlefield = self.battlefield()
         calls = []

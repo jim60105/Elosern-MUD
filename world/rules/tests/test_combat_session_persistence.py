@@ -178,6 +178,63 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_receipt_failure_after_terminal_clock_and_clear_restores_round(self):
+        from world.rules.combat_session import confirm_actor_command
+        from world.rules.combat_session.records import read_session_uncached, write_last_combat_receipt
+        from world.rules.clock import get_world_clock
+
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        clock = get_world_clock()
+        tick = clock.tick
+        hp = self.monster.traits.hp.current
+        command = {"kind": "skill", "payload": {
+            "skill_key": BASIC_ATTACK_KEY, "targets_or_shorthand": [self.monster.pk], "scale": 1.0,
+        }}
+
+        def defeat(*args, **kwargs):
+            self.monster.traits.hp.current = 0
+            return []
+
+        def fail_receipt(actor, receipt):
+            write_last_combat_receipt(actor, receipt)
+            raise RuntimeError("receipt fault")
+
+        with (
+            patch("world.rules.combat_session.rounds.run_round", side_effect=defeat),
+            patch("world.rules.combat_session.rounds.write_last_combat_receipt", side_effect=fail_receipt),
+            patch("world.rules.combat_session.rounds.log_info") as info,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "receipt fault"):
+                confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, command)
+        current = read_session_uncached(self.player)
+        self.assertEqual(current.rounds_elapsed, 0)
+        self.assertEqual(current.draft_entries[self.player.pk], command)
+        self.assertEqual(self.monster.traits.hp.current, hp)
+        self.assertEqual(get_world_clock().tick, tick)
+        self.assertIsNone(self.player.db.last_combat_receipt)
+        self.assertFalse(any(call.args[0] == "combat_round_settled" for call in info.call_args_list))
+        with patch("world.rules.combat_session.rounds.run_round", side_effect=defeat):
+            result = confirm_actor_command(self.player, record.session_id, 0, current.draft_version, self.player.pk, command)
+        self.assertEqual(result["outcome"], "victory")
+        self.assertIsNone(read_session_uncached(self.player))
+        self.assertEqual(get_world_clock().tick, tick + 6)
+        duplicate = confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, command)
+        self.assertEqual(duplicate["reason"], "already_committed")
+        self.assertEqual(get_world_clock().tick, tick + 6)
+
+    def test_nested_caller_transaction_rejects_before_admission(self):
+        from django.db import transaction
+        from world.rules.combat_session import confirm_actor_command
+
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        with transaction.atomic():
+            with self.assertRaisesRegex(RuntimeError, "durable"):
+                confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, {})
+        self.assertEqual(read_session(self.player).draft_version, 0)
+
     def test_disconnect_reconnect_resumes_same_session(self):
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
@@ -459,3 +516,82 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "defeat")
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_in_active_session(self.player))
+
+
+from django.test import TransactionTestCase
+
+
+class DurableRoundAdmissionTests(BattlefieldIsolation, TransactionTestCase):
+    """Exercise real outer commits and competing connections, without TestCase savepoints."""
+
+    def setUp(self):
+        super().setUp()
+        open_synthetic_scope(self, "skills", "elements", "items", "item_effect_profiles", extra=synth_innate_overlay())
+        self.room = create_object(Room, key="durable arena")
+        self.player = _player()
+        self.player.location = self.room
+        self.monster = _monster("durable foe")
+        self.monster.location = self.room
+        engage(self.player, self.monster)
+        self.record = read_session(self.player)
+        self.command = {"kind": "skill", "payload": {
+            "skill_key": BASIC_ATTACK_KEY, "targets_or_shorthand": [self.monster.pk], "scale": 1.0,
+        }}
+
+    def test_concurrent_final_confirmations_consume_one_revision(self):
+        from concurrent.futures import ThreadPoolExecutor
+        from threading import Barrier
+        from django.db import connections
+        from world.rules.combat_session import confirm_actor_command
+        from world.rules.combat_session.records import read_session_uncached
+
+        barrier = Barrier(2)
+
+        def confirm():
+            barrier.wait(timeout=10)
+            try:
+                return confirm_actor_command(
+                    self.player, self.record.session_id, 0, 0, self.player.pk, self.command
+                )
+            finally:
+                connections.close_all()
+
+        with patch("world.rules.combat_session.rounds.run_round", return_value=[]) as run:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                results = list(executor.map(lambda _: confirm(), range(2)))
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(sum(result["ok"] for result in results), 1)
+        self.assertEqual(read_session_uncached(self.player).rounds_elapsed, 1)
+        self.assertEqual(read_session_uncached(self.player).round_revision, 1)
+
+    def test_outer_commit_failure_keeps_admission_and_restores_caches(self):
+        from django.db import connection
+        from world.rules.combat_session import confirm_actor_command
+        from world.rules.combat_session.records import read_session_uncached
+
+        commit = connection.commit
+        commits = 0
+        hp = self.player.traits.hp.current
+
+        def fail_second_commit():
+            nonlocal commits
+            commits += 1
+            if commits == 2:
+                raise RuntimeError("outer commit fault")
+            return commit()
+
+        def effects(*args, **kwargs):
+            self.player.traits.hp.current = hp - 1
+            return []
+
+        with (
+            patch.object(connection, "commit", side_effect=fail_second_commit),
+            patch("world.rules.combat_session.rounds.run_round", side_effect=effects),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "outer commit fault"):
+                confirm_actor_command(self.player, self.record.session_id, 0, 0, self.player.pk, self.command)
+        current = read_session_uncached(self.player)
+        self.assertEqual(current.draft_entries[self.player.pk], self.command)
+        self.assertEqual((current.draft_version, current.rounds_elapsed), (1, 0))
+        self.assertEqual(self.player.traits.hp.current, hp)
+        self.assertIsNone(self.player.db.last_combat_receipt)
