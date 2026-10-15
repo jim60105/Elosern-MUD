@@ -13,8 +13,9 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
   - the ten skill cases of the delta scenario, using synthetic registry rows (in the module's existing style) where no
     shipped skill exists;
   - the exhaustiveness check;
-  - participant conditions: a poisoned foe, a blessed companion, more than eight conditions cut to eight, and an
-    unmodelled entity giving `[]`.
+  - participant conditions: a poisoned foe, a blessed companion, more than eight conditions cut to eight, an
+    unmodelled entity giving `[]`, and the hidden-condition check of design D2;
+  - a synthetic SELF skill with a `SELECTED` hostile effect reads `hostile: true`.
 
   Update the module's existing keyword constructions of `SkillDescriptorView`/`ParticipantView`. Run the Evennia
   focused labels `world.rules.tests.test_combat_view` and `world.skills.tests` and verify they pass.
@@ -32,7 +33,8 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
   The grep is a starting point; the runs in 2.3 are the authority.
 - [ ] 2.3 Run each of the following and verify it passes:
   - the Evennia focused labels `web.webclient.presentation.tests.test_combat_panel`,
-    `web.webclient.presentation.tests.test_registry` and `tests.test_panel_schema_version_parity_contract`;
+    `web.webclient.presentation.tests.test_registry`, `tests.test_panel_schema_version_parity_contract` and
+    `tests.test_context_actions_parity_contract`;
   - `node --test web/static/webclient/js/tests/protocol_context_actions_b.test.js web/static/webclient/js/tests/combat_menu.test.js web/static/webclient/js/tests/hud_dock_menus.test.js`;
   - `pnpm test -- web/webclient-app/tests/preserved_contract.test.js web/webclient-app/tests/store/combat_command_window.test.js web/webclient-app/tests/combat/participant_frame.test.js`;
   - the browser method that boots a real combat panel,

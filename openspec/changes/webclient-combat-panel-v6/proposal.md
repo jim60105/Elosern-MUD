@@ -38,6 +38,7 @@ None.
   enumerates complete deterministic choices" (participant `conditions`, skill `hostile`/`beneficial`, classification).
 - `webclient-context-actions`: renames and amends "context_actions is an exact read-only version-6 panel".
 - `webclient-context-actions-suggestions`: renames and amends the version-6 envelope and v6 mirror requirements.
+- `webclient-component-showcase`: the action-dock family and skill-surface requirements name v6.
 
 ## Impact
 

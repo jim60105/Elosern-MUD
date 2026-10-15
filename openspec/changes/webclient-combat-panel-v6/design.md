@@ -32,6 +32,11 @@ model of the participant entity: the first 8, in its order. If the read model ra
 condition list is not worth making the whole panel unavailable. Severity vocabulary and code bounds reuse the status
 panel's validators.
 
+Disclosure: these rows reach the opposing player. The implementation checks whether the status read model carries
+any hidden or owner-only condition (a flag, a severity or a code family meant only for the owner); if it does, such
+rows are filtered out of participant `conditions` and a test pins the filter. If it does not, the design records
+that finding in the module docstring.
+
 ### D3. Effect-kind classification
 
 `world/skills/effects/polarity.py` holds two things:
@@ -47,7 +52,9 @@ Anchors the spec pins:
 - **Beneficial:** heal, cleanse, buff-polarity buff application, and restore-purity.
 - **Neutral:** movement, flavor, and session stamps.
 
-This change classifies the remaining kinds by their docstrings. The exhaustiveness test lists the
+For a SELF skill, the `SELECTED` effects whose recipient is the target land on the actor, so they count (a hostile SELF
+skill is possible and is pinned by a synthetic fixture). This change classifies the remaining kinds by their
+docstrings. The exhaustiveness test lists the
 `world.skills.effects.__all__` dataclasses and fails on any kind missing from the table.
 
 ### D4. Mirrors
