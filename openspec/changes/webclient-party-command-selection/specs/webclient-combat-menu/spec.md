@@ -21,7 +21,6 @@ The existing centered command card SHALL provide a keyboard/pointer actor select
 - **WHEN** transport resets or final preflight returns some invalid members
 - **THEN** confirmed entries restore from the server, missing/invalid members remain identifiable and no intent is supplied or replayed automatically
 
-
 ## MODIFIED Requirements
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
