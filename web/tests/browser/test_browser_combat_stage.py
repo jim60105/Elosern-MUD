@@ -401,10 +401,10 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="participant-frame"]').count(), 0)
         page.close()
 
-    @covers_requirement(
-        "webclient-contextual-hud::figure-plates-show-conditions-at-a-glance-and-their-details-on-demand",
-        "webclient-contextual-hud::combat-figures-carry-glance-plates",
-    )
+    # The ADDED requirement "Figure plates show conditions at a glance and
+    # their details on demand" joins this decorator when the change's delta
+    # is synced at archive (an unsynced ID fails the traceability gate).
+    @covers_requirement("webclient-contextual-hud::combat-figures-carry-glance-plates")
     def test_figure_plates_show_conditions_and_alarm(self):
         """A poisoned foe's plate shows its glyph, whose tooltip opens on demand
         only and closes on every exit tried here; a companion at 20% carries
@@ -426,7 +426,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         tooltip = page.locator('[data-testid="figure-plate__condition-tooltip"]')
 
         # The glyph stands inside its plate's slot, and nothing is open at rest.
-        self.assertEqual(glyph.locator(".glyph").inner_text(), "▼")
+        self.assertEqual(glyph.inner_text().strip(), "▼")
         self.assertEqual(glyph.get_attribute("aria-label"), "中毒")
         plate_box, glyph_box = foe.bounding_box(), glyph.bounding_box()
         self.assertGreaterEqual(glyph_box["x"], plate_box["x"] - 0.5)
