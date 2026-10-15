@@ -88,9 +88,6 @@ ORIGINAL_IMAGE_SIZE = {"width": 4, "height": 4}
 # under the loading-core journeys.
 GALLERY_PENDING_IMAGE_ID = "10000000-0000-4000-8000-0000000ed173"
 GALLERY_FAILED_ERROR_CODE = "sd_connection_error"
-# The manifest-declared filename of the seeded operator content directory.
-GALLERY_OFFICIAL_FILENAME = "a.png"
-GALLERY_MANIFEST_FILENAME = "manifest.json"
 
 # The portrait descriptor mode (``unified-portrait-image-contract``). The
 # player's own activated character carries the committed card every roster
@@ -253,49 +250,6 @@ _APPLIERS = {
     "repaired_original": _repaired_original,
     "revoke_source": _revoke_source,
 }
-
-
-def seed_official_content(character) -> str | None:
-    """Write one real operator content directory for the character's own preset key.
-
-    The bytes and their manifest land under the journey's configured
-    ``ART_OFFICIAL_ROOT`` BEFORE server startup, so the startup index admits
-    them exactly like a deployed catalog and the gallery's official rows come
-    from the real snapshot. ``None`` when the character declares no preset
-    provenance or the journey configured no official root.
-
-    A character whose activation path wrote no (or an unregistered) preset
-    provenance is given the first registered shipped preset key: a
-    preset-born character's reference is exactly that provenance, so the
-    journey exercises the real resolver rather than a synthetic shortcut.
-    """
-    import json
-    import os
-
-    from django.conf import settings
-
-    from world.art.official_refs import PLAYER_PRESET_REGISTRY, PRESET_PROVENANCE_ATTRIBUTE
-    from web.tests.browser.seed.identity import FIXTURE_VALID_PNG
-
-    root = os.environ.get("ART_OFFICIAL_ROOT") or str(
-        getattr(settings, "ART_OFFICIAL_ROOT", "") or ""
-    )
-    if not root:
-        return None
-    key = character.attributes.get(PRESET_PROVENANCE_ATTRIBUTE)
-    if not isinstance(key, str) or not key or key not in PLAYER_PRESET_REGISTRY:
-        registered = sorted(PLAYER_PRESET_REGISTRY)
-        if not registered:
-            return None
-        key = registered[0]
-        character.attributes.add(PRESET_PROVENANCE_ATTRIBUTE, key)
-    folder = Path(root) / "preset" / key
-    folder.mkdir(parents=True, exist_ok=True)
-    (folder / GALLERY_OFFICIAL_FILENAME).write_bytes(FIXTURE_VALID_PNG)
-    (folder / GALLERY_MANIFEST_FILENAME).write_text(
-        json.dumps({"default": GALLERY_OFFICIAL_FILENAME}), encoding="utf-8"
-    )
-    return f"preset/{key}/{GALLERY_OFFICIAL_FILENAME}"
 
 
 def seed_pending_and_failed_rows() -> str | None:

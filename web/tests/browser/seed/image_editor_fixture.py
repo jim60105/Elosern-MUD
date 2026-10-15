@@ -118,8 +118,10 @@ def _gallery_rows(character) -> None:
     from web.browser_support.unified_image_transitions import (
         GALLERY_FAILED_ERROR_CODE,
         GALLERY_PENDING_IMAGE_ID,
-        seed_official_content,
         seed_pending_and_failed_rows,
+    )
+    from web.tests.browser.seed.official_content_fixture import (
+        seed_official_content,
     )
 
     seeded = seed_official_content(character)
