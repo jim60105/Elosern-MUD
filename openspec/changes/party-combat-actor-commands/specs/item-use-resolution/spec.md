@@ -17,4 +17,3 @@ A commanded companion SHALL use its own usable inventory, equipment context and 
 - **WHEN** a companion chooses an item with mixed effects or nonself recipients
 - **THEN** ordinary effect target resolution and per-effect ineffective skipping apply with the selected actor as owner
 
-

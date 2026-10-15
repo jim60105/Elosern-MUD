@@ -13,7 +13,6 @@ The authenticated player SHALL remain commander while a chosen eligible party me
 - **WHEN** the commander chooses a companion
 - **THEN** the account puppet and possession lifecycle remain unchanged
 
-
 ### Requirement: All personal skill choices and costs are actor scoped
 Each authorized actor SHALL receive its own complete skill/scale/target/cost choices and disabled reasons through the shared authoritative preview. The server SHALL independently repeat ownership and capability validation. SELF SHALL bind the selected actor, and skill MP/SP SHALL be charged to that actor.
 
@@ -25,7 +24,6 @@ Each authorized actor SHALL receive its own complete skill/scale/target/cost cho
 - **WHEN** only one party actor has the required freeform mastery
 - **THEN** only that actor receives the eligible scale ladder and forged scale use by another actor rejects
 
-
 ### Requirement: Free inspection and equipment operations do not select round commands
 Opening a bag, inspecting choices and existing equipment operations SHALL retain their free cost semantics. Relevant equipment changes SHALL invalidate affected previews and cause draft revalidation. Companion out-of-combat inventory management, item transfer and companion equipment-management UI SHALL remain excluded.
 
@@ -36,5 +34,4 @@ Opening a bag, inspecting choices and existing equipment operations SHALL retain
 #### Scenario: Equipment invalidation
 - **WHEN** equipment changes a selected actor relevant capability
 - **THEN** affected previews and draft entries require authoritative revalidation before any complete round executes
-
 
