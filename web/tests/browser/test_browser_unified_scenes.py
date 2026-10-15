@@ -287,6 +287,12 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
     @covers_requirement(
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage"
     )
+    @covers_requirement(
+        "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
+    )
+    @covers_requirement(
+        "scene-artwork-presentation::full-view-shares-resolved-scene-truth"
+    )
     def test_room_precedence_retention_movement_and_fullview(self) -> None:
         page = self.logged_in_page()
         page.on("request", lambda request: self.requests.append(request.url))
@@ -461,6 +467,12 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
 
     @covers_requirement(
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage"
+    )
+    @covers_requirement(
+        "scene-artwork-presentation::provisional-backgrounds-never-change-precedence"
+    )
+    @covers_requirement(
+        "scene-artwork-presentation::full-view-shares-resolved-scene-truth"
     )
     def test_provisional_and_terminal_failures_are_reached_once(self) -> None:
         # The routes are installed BEFORE the page loads, on the path families

@@ -41,6 +41,8 @@ from world.art.subjects import ArtSubject, ArtSubjectKind
 from world.rules import art_view
 from world.rules.art_view import SceneTarget, scene_target_for
 
+from tools.spec_traceability import covers_requirement
+
 PLACE_IDENTITY = "grid:t_synth_map:0,0"
 SCENE_KEY = "t_synth_scene"
 OTHER_SCENE_KEY = "t_synth_other"
@@ -195,6 +197,9 @@ class SourceChainTests(_SceneFixture):
         settings_override.enable()
         self.addCleanup(settings_override.disable)
 
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_healthy_room_override_is_the_first_ranked_attempt(self):
         descriptor = describe_scene(self.target(room_key=ROOM_KEY))
         entries = self.entries(descriptor)
@@ -215,6 +220,9 @@ class SourceChainTests(_SceneFixture):
             sorted(entry["rank"] for entry in entries),
         )
 
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_generated_artwork_precedes_the_operator_and_bundled_positions(self):
         identity = self.publish()
         descriptor = describe_scene(self.target())
@@ -239,6 +247,9 @@ class SourceChainTests(_SceneFixture):
         )
         self.assertNotIn("terminal", [entry.get("source_id") for entry in entries])
 
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_recalled_failure_stays_visible_before_the_healthy_substitute(self):
         subject = self.subject()
         ensure(subject, SCENE_DESCRIPTION)
@@ -282,6 +293,9 @@ class SourceChainTests(_SceneFixture):
         self.assertEqual(bundled[0]["type"], "fault")
         self.assertEqual(bundled[0]["reason"], descriptors.REASON_REQUIRED_RESOURCE_MISSING)
 
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_identical_terminal_is_never_attempted_twice(self):
         descriptor = describe_scene(self.target(archetype=OTHER_SCENE_KEY))
         self.assertIsNone(descriptor["terminal"])
@@ -425,6 +439,9 @@ class MalformedMetadataTests(_SceneFixture):
         settings_override.enable()
         self.addCleanup(settings_override.disable)
 
+    @covers_requirement(
+        "scene-artwork-presentation::normal-scenes-use-the-complete-authored-source-chain"
+    )
     def test_malformed_metadata_falls_back_to_the_town_terminal(self):
         descriptor = describe_scene(self.target(archetype="t_synth_absent"))
         entries = self.entries(descriptor)
@@ -572,6 +589,9 @@ class RetentionAuthorizationTests(_SceneFixture):
             for entry in descriptor["retention_sources"]
         }
 
+    @covers_requirement(
+        "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
+    )
     def test_generated_authorization_survives_a_requeue_and_a_failed_regeneration(self):
         self.publish()
         published = self.sources(describe_scene(self.target()))
@@ -593,11 +613,17 @@ class RetentionAuthorizationTests(_SceneFixture):
         failed = self.sources(describe_scene(self.target()))
         self.assertEqual(failed.get(generated), published[generated])
 
+    @covers_requirement(
+        "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
+    )
     def test_generated_authorization_disappears_with_its_output(self):
         identity = self.publish()
         (self.store_root / identity).unlink()
         self.assertEqual(self.sources(describe_scene(self.target())), {})
 
+    @covers_requirement(
+        "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
+    )
     def test_room_authorization_requires_the_binding_and_its_admitted_default(self):
         bound = self.sources(describe_scene(self.target(room_key=ROOM_KEY)))
         room_source = descriptors.scene_room_source_id(ROOM_KEY)
@@ -624,6 +650,9 @@ class RetentionAuthorizationTests(_SceneFixture):
         self.assertIn(room_source, replaced)
         self.assertNotEqual(replaced[room_source], bound[room_source])
 
+    @covers_requirement(
+        "scene-artwork-presentation::retention-is-scoped-to-unchanged-scene-and-generation-subject"
+    )
     def test_an_untrusted_identity_authorizes_nothing(self):
         self.publish()
         untrusted = SceneTarget(

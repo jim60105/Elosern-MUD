@@ -9,7 +9,7 @@ offline degradation, and keyboard-first desktop-bounded browser acceptance.
 ## Requirements
 
 ### Requirement: The art panel is an exact read-only panel available in exploration and combat modes
-The production presentation registry SHALL register `art` schema version 3. Its available payload
+The production presentation registry SHALL register `art` schema version 4. Its available payload
 SHALL contain exactly `schema_version`, `available`, `kind`, `scene`, and `portrait_catalog`;
 `available` SHALL be true and `kind` SHALL be `scene`. The panel SHALL be available in `exploration`
 and `combat` modes and SHALL use the registered common unavailable form in `creation` mode.
@@ -51,27 +51,24 @@ and `combat` modes and SHALL use the registered common unavailable form in `crea
 - **WHEN** art schema 3 and roster schema 3 ship
 - **THEN** portrait_catalog values and roster portraits carry the complete canonical artwork descriptor plus authorized display context; active validators and every portrait consumer reject the old flat image fields while scene retains its prior shape until its separately versioned cutover
 
+#### Scenario: Both artwork vocabularies are canonical
+- **WHEN** art schema 4 is shipped
+- **THEN** scene is exactly {archetype, label, alt, artwork} with the canonical scene descriptor; portrait_catalog retains the complete canonical portrait values from schema 3; server/client validators and all scene consumers switch atomically and old scene image fields are rejected
+
 ### Requirement: The scene payload resolves only validated archetypes with truthful placeholders
-The art panel scene SHALL resolve through `world.art.presenter.resolve_scene` from the current room's
-validated `scene_archetype` and SHALL contain the subject key, asset status, same-origin media URL,
-aspect ratio, and alternative text for a `done` record, or a truthful placeholder kind and
-explanatory label otherwise. The panel SHALL NOT silently present old art as current, SHALL NOT
-expose `out_path` or the store root, and SHALL derive its URL only from a validated stored identity.
+The scene payload SHALL carry the current logical scene identity and room-aware canonical descriptor through the shared art resolver. Source order SHALL be authored room official, generated archetype, optional operator type official, required bundled type official and distinct terminal. Missing/pending generation SHALL use normal bundled art; reached failures SHALL persist without writes or roots exposure.
 
 #### Scenario: Done scene serves the same-origin media URL
-- **WHEN** a room's scene archetype has a `done` asset record with an existing validated output
-- **THEN** the scene payload carries the asset status, the same-origin `/art/...` URL, 16:9 aspect,
-  and meaningful alternative text, and never an absolute filesystem path
+- **WHEN** the generated archetype source is done and no higher room source succeeds
+- **THEN** the generated candidate has its validated same-origin URL and independent done state; the renderer follows canonical precedence
 
 #### Scenario: Pending scene retains a labelled prior image
-- **WHEN** the current scene is pending and a prior scene image is already rendered
-- **THEN** the backdrop keeps that prior image dimmed with the explicit `目前場景圖片生成中` label and the
-  pending status rather than presenting it as current art
+- **WHEN** generation is pending for the same scene and generation subject with an applicable prior success
+- **THEN** the prior good image is retained until same/higher-priority replacement; a different scene discards it immediately
 
 #### Scenario: Failed, missing, or invalid scene uses the gradient stage and placeholder label
-- **WHEN** the scene asset is failed, missing, scheduler-disabled, or its output file is absent
-- **THEN** the backdrop renders the current mode's gradient stage with the truthful placeholder label as
-  text and no URL, and no stale image is substituted
+- **WHEN** generation is failed, missing, disabled or its selected file disappeared
+- **THEN** shared resolution tries type/terminal art; expected absence has no error and reached failure remains visible, with non-image background only at exhaustion
 
 #### Scenario: The scene renders as the full-bleed stage backdrop
 - **WHEN** the client renders a resolved scene
@@ -79,13 +76,12 @@ expose `out_path` or the store root, and SHALL derive its URL only from a valida
   scene label and alternative text as text outside the bitmap
 
 #### Scenario: A pending scene with a prior image dims and labels it
-- **WHEN** the current scene is pending and a prior scene is already rendered
-- **THEN** the client retains that prior image visibly dimmed and labelled `目前場景圖片生成中`
+- **WHEN** the same scene and generation subject is pending with retained good art
+- **THEN** the image remains with factual pending explanation and no error styling; no prior-place art can be retained
 
 #### Scenario: No prior image degrades to the gradient stage
-- **WHEN** there is no prior image, or the asset is failed or invalid
-- **THEN** the client renders the current mode's gradient stage together with the scene placeholder
-  label
+- **WHEN** a fresh scene has no retained success
+- **THEN** its own required type/terminal art is provisionally available while higher sources resolve, without mode-based sample selection
 
 ### Requirement: The portrait catalog is server-authored, age-checked, and bounded
 The portrait catalog SHALL be bounded, deterministic and keyed by opaque identities admitted to the current visible/focusable art view; owned roster portraits remain independently scoped and do not expand this catalog. Each value SHALL carry the complete canonical descriptor and bounded display context. Existing named-policy/canonical-age checks and monster visual-species provenance SHALL remain. Ineligible subjects SHALL expose no real candidate or generated subject key.
@@ -343,19 +339,15 @@ all qualifying freshly rendered panels together in one affected-panel
 - **THEN** no stale exploration descriptor is published and no revision is advanced for that completion
 
 ### Requirement: Art degradation never blocks gameplay or leaks rejected content
-With the worker command fixed to fail and every LLM profile unavailable, movement, dialogue, combat,
-quests, and services SHALL proceed through their deterministic paths while every art state degrades
-to the approved placeholders. OOB errors SHALL contain no traceback, local path, unescaped player
-content, or rejected prompt content.
+Image generation/service or source failures SHALL degrade presentation without blocking deterministic gameplay. Expected absence SHALL use approved normal artwork fallback; unexpected reached failures SHALL remain local after fallback. Player/OOB explanations SHALL contain no traceback, filesystem root, credential or rejected prompt. Browser-only failures SHALL not imply backend telemetry.
 
 #### Scenario: Offline art never blocks play
-- **WHEN** the worker command is fixed to fail and the scheduler is disabled
-- **THEN** the player can move, talk, fight, trade, and turn in quests while the stage shows only the
-  gradient and its placeholder label, and no gameplay action waits on a job
+- **WHEN** image generation and LLM services are unavailable and scheduler is disabled
+- **THEN** movement, dialogue, combat, trades and quests proceed; correct alpha figures/name initials/bundled scene art remain, with expected absence free of error styling
 
 #### Scenario: Image load failure degrades to fallback
-- **WHEN** a rendered scene URL fails to load in the browser
-- **THEN** the backdrop shows its fallback gradient and placeholder label and does not repeatedly refetch the same URL
+- **WHEN** a rendered scene source fails load/decode
+- **THEN** ordered resolution tries the next source and preserves a local failure indication without unchanged-descriptor retries
 
 #### Scenario: Rejected content stays out of every error surface
 - **WHEN** an art or presentation error occurs
@@ -363,35 +355,24 @@ content, or rejected prompt content.
   rejected-subject data
 
 #### Scenario: The missing-scene placeholder gate observes a single node
-- **WHEN** the art panel is available with a missing scene and a snapshot refresh or Vue re-render
-  opens a transient double-node window under a loaded runner
-- **THEN** the acceptance test's bounded gate keeps polling the scene backdrop's placeholder
-  `data-testid` hook until it observes exactly one visible placeholder node, so the assertion is
-  deterministic rather than a single raw `.count()` sample
+- **WHEN** a missing-generation scene rerenders
+- **THEN** bounded shared waits observe its committed descriptor and single successful bundled image, rather than enforcing an obsolete placeholder
 
 #### Scenario: Every enumerated failure degrades presentation only
-- **WHEN** the scheduler is disabled, the worker is unavailable or times out, a done record's file
-  is missing, the output identity is invalid, an OOB disconnect occurs during completion, or the
-  browser's image load fails
-- **THEN** each degrades presentation only and logs bounded diagnostics
+- **WHEN** generation is disabled or failed, a completed output is missing/invalid, data becomes unavailable, or browser loading fails
+- **THEN** each leaves gameplay usable; independent failure facts stay distinct from expected absence and backend boundary diagnostics use the facade
 
 #### Scenario: A browser image load failure stops refetching
-- **WHEN** a browser image load fails
-- **THEN** the browser shows fallback text/placeholder and does not repeatedly fetch without a new
-  URL or user reload
+- **WHEN** a browser source load fails
+- **THEN** its version is not requested again on unchanged rerender; a new applicable revision or fresh page may retry, with persistent reached error meanwhile
 
 #### Scenario: A degraded scene shows one labelled placeholder
-- **WHEN** the scene is missing, pending, or failed
-- **THEN** it degrades to a single truthful placeholder label on the stage backdrop, identified by
-  a stable `data-testid` hook, with the mode gradient as the rendered stage
+- **WHEN** an image chain exhausts
+- **THEN** one safe non-image state and persistent accessible failure explanation appears without a broken image
 
 #### Scenario: The placeholder gate uses the shared bounded wait helper
-- **WHEN** the browser acceptance test asserts the placeholder count and a snapshot refresh or Vue
-  re-render can open a transient double-node window under a loaded runner
-- **THEN** the test gates its assertion on the shared bounded wait helper (the committed art-panel
-  store state plus a DOM-readiness descriptor, within one bounded deadline) rather than a single
-  raw `.count()` sample, so the assertion observes the single visible placeholder node
-  deterministically
+- **WHEN** a scene acceptance test spans Vue replacement
+- **THEN** it uses the committed canonical panel and a single visible current-scene/failure DOM readiness descriptor within one bounded deadline
 
 ### Requirement: Art panel browser acceptance is keyboard-first, accessible, and desktop-bounded
 The scene full view SHALL open by click on the backdrop's scene control or Enter on that focused
