@@ -105,7 +105,7 @@ The jump from one rank at 0.60 to two ranks at 0.50 is forced by headroom: a bac
 
 ## Risks / Trade-offs
 
-- [Smaller figures than today in big fights] → the floor keeps figures ≥ 269px tall at the reference viewport, and
+- [Smaller figures than today in big fights] → the floor keeps figures ≥ 245px tall at the reference viewport, and
   two ranks are used before any further shrink.
 - [The prototype's numbers drift in the real module] → the invariants are normative; the pinned table is updated
   deliberately in the same commit.
