@@ -104,15 +104,22 @@ The foe line-up's rearmost foe stands within 31px (1451) / 49px (1600) of the ce
 dead-centre card clears every foe box. The foe-side gap therefore cannot set the width. The card instead:
 
 1. takes its **width from the party side only**, which is guaranteed for a given party size:
-   `--combat-card-w: clamp(224px·S, 2 × (50% − var(--stage-party-edge) − 16px·S), 280px·S)`;
+   `--combat-card-w: clamp(240px·S, 2 × (50% − var(--stage-party-edge) − 16px·S), 280px·S)`;
 2. keeps the **foe plates, gauges and the focused-target cue clear vertically**: its bottom edge stands
    8px·S above the foe name-plate line, which every foe shares, so whatever the foe count it never meets a plate,
    gauge or cue (the current cue is the plate's border; the arrow markers of the stage target step only show while
    the card is collapsed, see `webclient-combat-stage-target-picking`);
-3. **may stand over foe art**: with one foe it clears the foe's box at both viewports; with two foes it covers the
-   left 45.8px (1451) / 33.7px (1600) of the rear foe's box; with three or more foes it covers 109px (1451) /
-   105.8px (1600) of the rear foe's box — at 1451 this reaches the rear foe's centre line, so the rear foe's face is
-   partly hidden while the player chooses a command. This is the open question below.
+3. **may stand over foe art** — this deviates from the user's "only empty floor" wording and needs the user's
+   sign-off before apply (see Open Questions): with one foe it clears the foe's box at both viewports; with two foes
+   (rear box 819.7–1074.4, centre 947.1 / 920.7–1210.8, centre 1065.8) a 280/308.8 card covers the left 45.8px /
+   33.7px of the rear box, well short of its centre; with three or more foes (rear box 756.5–955.6, centre 856.1 /
+   848.6–1075.5, centre 962.1) it covers 109px / 105.8px, passing the rear box's centre by 9.4px at 1451 and stopping
+   7.7px short of it at 1600. Only slot boxes were measured; the art's alpha bounds were not, so how much of the rear
+   foe's body or face is hidden depends on the artwork. With three foes the foe-side dead-centre gap is 30px / 62px,
+   so no usable card avoids the rear foe's box; the overlap is forced, not a tuning choice.
+
+Fallback when even the minimum cannot fit (five-figure party): the card keeps the minimum width and dead
+centre and stands over the right part of the controlled figure's box (below).
 
 `--stage-party-edge` = `var(--actor-left-inset) + fw + max(0px, fw × var(--party-reach, 0) − var(--actor-left-inset)
 + 16px·S)`, the CSS form of CompanionLineup's own translate; AppClient writes `--party-reach` =
@@ -123,19 +130,20 @@ Resulting widths (±1px):
 
 | Party figures | 1 | 2 | 3 | 4 | 5 |
 |---|---|---|---|---|---|
-| 1451x790 (min 224, max 280) | 280 | 280 | 280 | 263.6 | 224 (overlaps the controlled box by 16.4) |
-| 1600x900 (min 247.0, max 308.8) | 308.8 | 308.8 | 308.8 | 249.8 | 247.0 (overlaps the controlled box by 40.5) |
+| 1451x790 (min 240, max 280) | 280 | 280 | 280 | 263.6 | 240 (overlaps the controlled box by 24.4) |
+| 1600x900 (min 264.6, max 308.8) | 308.8 | 308.8 | 308.8 | 264.6 (clamped up; left edge 667.7, 10.2px clear of the box) | 264.6 (overlaps the controlled box by 49.3) |
 
 With five figures the controlled figure stands right of where even the minimum card can clear; the overlap is the
-right margin of its 2:3 box (the art is centred in the box, 163px/186px from that edge), so the card covers floor or
-the figure's edge, never its face.
+right 24.4px / 49.3px of its 2:3 box, whose centre (466.6 / 531.0) stays 138.9px / 136.7px left of the card. The art's
+alpha bounds were not measured, so the overlap is stated against the box only.
 
-**Minimum width 224px·S — why.** The narrow layout (D5) needs: a skill row = selection glyph 20 + icon 22 + a
-six-character label (the longest current combat skill labels, e.g. 基本攻擊, 微光治癒, 疾風突進, are 2–4
-characters) at `--text-md` 18px = 108 + a cost `MP 12` ≈ 52, plus 2 × 12 padding = 226 at S = 1 before wrapping;
-the 威力 scale step's five chips (1/4, 1/2, 1, 2, 4) at 38px + 4px gaps = 206; the AREA token grid's two columns at
-≥ 96px each = 200. 224px·S keeps all of them on one line per row with labels up to six characters, and longer ones
-wrap inside the row. Below ~200px the scale chips and the two-column token grid would have to wrap their columns.
+**Minimum width 240px·S — why.** Inner width = card width − 2 × 12px·S card padding − 2 × 1px frame border =
+214px at S = 1. Budgets at S = 1: a skill row = selection glyph 18 + icon 20 + two 6px gaps + a label of four
+characters at `--text-md` 18px (72; the longest current combat skill labels — 基本攻擊, 微光治癒, 疾風突進 — are four)
++ a cost `MP 12` at `--text-sm` ≈ 48 + 2 × 8 row padding = 186, leaving room for a fifth character (204); longer
+labels wrap inside the row. The 威力 scale step's five chips (1/4, 1/2, 1, 2, 4) at a 38px minimum with 4px gaps =
+206. The AREA token grid's two columns at 102px with an 8px gap = 212. 224px·S (inner 198) would overflow the scale
+row and the token grid, so 240px·S is the smallest width at which every frame keeps its columns on one line.
 **Maximum 280px·S** keeps the card's right edge left of the single foe's box at both viewports (865.5 < 920.5 −
 16; 954.4 < 1035.5 − 17.6).
 
@@ -218,16 +226,16 @@ overlay is not lost and is left alone.
   `CombatSkillDetail`, `CombatDisabledCommand`, `CombatMasterScale` (a skill with `freeform_scales`, as in
   `stories/fixtures/skills.js`), `CombatFourFigureParty` (three companions, three foes) and `CombatFullParty`
   (four companions, three foes); `CombatOneFoe` and `CombatFiveFoes` already exist.
-- `Action/ActionDock`: combat stories render `card: true` in a host of 224×394 and 280×394; add `CombatTargets`,
+- `Action/ActionDock`: combat stories render `card: true` in a host of 240×394 and 280×394; add `CombatTargets`,
   `CombatMasterScale` and `CombatDisabledDetail` (strip with a reason).
-- `Action/SkillDetailPane`: a `Strip` story. `Action/DockMenu`: `TargetFrame`/`FixedGridFrame` in a 224px host.
+- `Action/SkillDetailPane`: a `Strip` story. `Action/DockMenu`: `TargetFrame`/`FixedGridFrame` in a 240px host.
 - No component is added; `component-manifest.json` stays frozen.
 
 ## Risks / Trade-offs
 
 - [Card over rear foe art with 2–3 foes] → plates, gauges and the target cue stay clear by construction; the stage
   target step (next change) collapses the card while the player picks a target. Recorded as the open question.
-- [Five-figure party] → the card overlaps the controlled figure's box margin (16.4 / 40.5px), never its face.
+- [Five-figure party] → the card overlaps the right 24.4 / 49.3px of the controlled figure's box; the box centre stays ≥ 136px clear.
 - [`--party-reach` duplicates `companion-lineup.js`'s table in CSS] → AppClient computes it from the JS table
   (no second table); only the translate formula is mirrored, with comments; a Vitest case pins both.
 - [Teleport + focus in jsdom/Chromium differ] → Vitest asserts the node move and the re-home call; one live browser
@@ -243,8 +251,10 @@ Pre-release client; no data or protocol migration. Rollback is reverting the cha
 
 ## Open Questions
 
-- With two or more foes the dead-centre card covers part of the rear foe's art while the player chooses a command
-  (at 1451x790 with three foes, up to the rear foe's centre line). Plates, gauges and cues stay clear, and the card
-  collapses during target choice once `webclient-combat-stage-target-picking` lands. If that is not acceptable, the
-  options are a smaller maximum width (it cannot clear three foes at any usable width) or re-staging the foe
-  line-up (a separate change).
+- **Needs the user's sign-off before apply (blocking for task 1.1):** with two or more foes the dead-centre card
+  stands over part of the rear foe's box while the player chooses a command (three foes: 109px at 1451x790, past the
+  box's centre by 9.4px; 105.8px at 1600x900), and with a five-figure party over the right 24.4 / 49.3px of the
+  controlled figure's box. This deviates from "overlay only empty floor between figures"; physically no usable
+  dead-centre width avoids it (the foe-side gap is 30px / 62px with three foes). Plates, gauges and cues stay clear,
+  and the card collapses during target choice once `webclient-combat-stage-target-picking` lands. Alternatives: accept;
+  re-stage the foe line-up (a separate change); or relax dead centre for three foes.

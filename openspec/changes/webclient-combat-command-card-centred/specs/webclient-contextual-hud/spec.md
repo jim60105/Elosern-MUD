@@ -5,7 +5,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 
 #### Scenario: The width and height follow the stated formulas
 - **WHEN** combat renders at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
+- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
 
 #### Scenario: The card is at dead centre for every party size and foe count
 - **WHEN** combat renders at 1451x790 and at 1600x900 with one, two, three and five active foes, each with a solo player, a four-figure party (the player and three companions) and a five-figure party
@@ -13,7 +13,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 
 #### Scenario: The width follows the guaranteed gap on the party side
 - **WHEN** combat renders with a solo player, a three-figure party, a four-figure party and a five-figure party at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 224 at 1451x790 and 308.8, 308.8, 249.8 and 247.0 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 16.5px at 1451x790 and 40.5px at 1600x900
+- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 240 at 1451x790 and 308.8, 308.8, 264.6 and 264.6 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 24.5px at 1451x790 and 49.5px at 1600x900
 
 #### Scenario: The card never covers a foe plate, gauge or cue
 - **WHEN** combat renders at 1451x790 and at 1600x900 with one, two and three active foes, including while the attack target frame focuses the rearmost foe
@@ -28,7 +28,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 - **THEN** the card's rendered box is identical (±1px) in every frame, the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
 
 #### Scenario: Every frame lays out in one narrow column
-- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 224px × S wide card
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 240px × S wide card
 - **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
 
 #### Scenario: The detail folds into a strip below the rows

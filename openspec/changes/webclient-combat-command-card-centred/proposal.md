@@ -18,12 +18,13 @@ the combat menu to the centre of the stage, in the same place as the other optio
   **combat command card** inside the stage's `choices` anchor, framed with the shared ChoiceCard shell (gold
   frame, crest, corner brackets, focused-frame brightening).
 - **Geometry.** The card's horizontal centre is the stage centre in every case. Its width is
-  `clamp(224px·S, 2 × (stage centre − party edge − 16px·S), 280px·S)`, where the party edge is the controlled
+  `clamp(240px·S, 2 × (stage centre − party edge − 16px·S), 280px·S)`, where the party edge is the controlled
   figure's right edge as the (uncompressed) companion line-up places it for the committed party size. Its top is
   the `choices` anchor's top; its bottom stands 8px·S above the foe name-plate line; its height is
   `min(400px·S, that span)` and never changes between frames. It never covers a foe name plate, gauge or
-  focused-target cue; with two or more foes it may stand over part of the rear foes' art (see design D3 and the
-  open question).
+  focused-target cue; with two or more foes it stands over part of the rear foe's box — a deviation from the
+  user's "only empty floor" rule that is physically forced at dead centre and **needs the user's sign-off before
+  apply** (design D3 and Open Questions).
 - **Narrow layout.** Every list frame is one column; the detail folds into a fixed three-line strip under the
   rows (cost and target requirement, then the description or the disabled reason, full text kept as the focused
   row's accessible description); the breadcrumb is one line that keeps the back control and the current frame
@@ -42,7 +43,7 @@ the combat menu to the centre of the stage, in the same place as the other optio
   frame in this change; `webclient-combat-stage-target-picking` moves it onto the stage.
 - Storybook: `Core/AppShell` combat stories show the centred card; new stories cover the party/foe matrix, the
   target step, a disabled command, playback and the master scale step; `Action/ActionDock` combat stories render
-  the card variant at 224px and 280px. No component is added, so `component-manifest.json` is unchanged.
+  the card variant at 240px and 280px. No component is added, so `component-manifest.json` is unchanged.
 - `web/webclient-app/AGENTS.md` and the AVG stage redesign doc stop describing the command panel as bottom-right
   in combat.
 

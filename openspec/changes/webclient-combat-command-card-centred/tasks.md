@@ -12,6 +12,11 @@ assertion that detects the same class of defect, never delete it outright. Obtai
 `uv run --locked python -m tools.spec_traceability list --json-output <scratch>/ids.json`; MODIFIED requirements
 keep their IDs.
 
+## 0. Gate
+
+- [ ] 0.1 Confirm the user has signed off design D3's forced overlap of the rear foe's box (two or more foes) and of
+  the controlled figure's box (five-figure party); if not, stop and return the change for re-planning.
+
 ## 1. Stage: the card anchor, the Teleport, geometry and focus (≈2.5 h)
 
 - [ ] 1.1 In `styles/tokens.css` add `--foe-plate-h` and `--foe-plate-rise` (design D3); rewrite the
@@ -35,7 +40,7 @@ keep their IDs.
   in combat the slot's root element is inside `[data-anchor="choices"]`, not inside `band-command`, and it is the
   same DOM node across exploration → combat → exploration and combat → dialogue; a mount directly in combat places
   it in the anchor; the combat anchor rule uses `calc(50% - var(--combat-card-w) / 2)` and
-  `clamp(calc(224px * var(--ui-scale)), …, calc(280px * var(--ui-scale)))` over `--stage-party-edge`; the band rule
+  `clamp(calc(240px * var(--ui-scale)), …, calc(280px * var(--ui-scale)))` over `--stage-party-edge`; the band rule
   collapses `band-command` with `display: none` in combat; focus on a dock descendant before entering combat ends
   on `#action-dock` after `nextTick`. Add to `web/webclient-app/tests/core/companion_lineup.test.js` a case pinning
   `companionReach(n)` to `(n − 1) × EXPOSURE[n]` for n = 1…5 and to `tests/core/foe_lineup.test.js` a case that
@@ -85,7 +90,8 @@ file.
   bottom is ≥ 8px·S above every plate's top; it intersects no plate, gauge, `vitals`, `map` or command-line anchor;
   with ≤ 4 figures it intersects no party figure box; with 1 foe it intersects no foe box; `band-command` is
   `display:none` and the message region spans the band; with the attack target frame open the focused foe's plate
-  cue is not covered; the card box is identical (±1px) across root → Skills → category → skill frame. Annotate it
+  cue is not covered; with a five-figure party (240px·S card) the 威力 scale step and an AREA target frame show every
+  chip and token inside the card with no horizontal overflow; the card box is identical (±1px) across root → Skills → category → skill frame. Annotate it
   with the existing IDs it establishes
   (`webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode`,
   `webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size`; confirm spellings
@@ -128,9 +134,9 @@ file.
   after the snapshot commits; add `CombatTargetStep`, `CombatSkillDetail`, `CombatDisabledCommand`,
   `CombatMasterScale`, `CombatFourFigureParty` (three companions, three foes) and `CombatFullParty` (four
   companions, three foes); keep the existing combat stories. Update the file's combat comments (card, not band).
-- [ ] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in 224×394 and
+- [ ] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in 240×394 and
   280×394 hosts; add `CombatTargets`, `CombatMasterScale` and `CombatDisabledDetail`. `stories/Action/SkillDetailPane.stories.js`:
-  add `Strip`. `stories/Action/DockMenu.stories.js`: render `TargetFrame` and `FixedGridFrame` in a 224px host.
+  add `Strip`. `stories/Action/DockMenu.stories.js`: render `TargetFrame` and `FixedGridFrame` in a 240px host.
 - [ ] 4.3 Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify both succeed with
   `component-manifest.json` unchanged; then run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_resize_keeps_pointer_targets_live`
