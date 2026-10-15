@@ -525,6 +525,32 @@ class NodeSuiteEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
     @covers_requirement(
+        "webclient-contextual-hud::combat-formation-geometry-is-one-pure-shared-scale-function",
+    )
+    def test_combat_formation_geometry_vitest_evidence_passes(self):
+        """The pure combat formation function: shared-scale ladder, dead-centre
+        gap, fit rules, out-of-range fallback, full matrix and anchor values."""
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/core/combat_formation.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "combat formation Vitest evidence failed:\n" + result.stdout + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+    @covers_requirement(
         "webclient-contextual-hud::the-objective-tracker-island-presents-the-committed-objectives-only",
     )
     def test_objective_tracker_node_suite_passes(self):
