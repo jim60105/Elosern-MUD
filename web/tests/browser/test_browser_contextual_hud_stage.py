@@ -101,7 +101,7 @@ def _wait_appended_page_measured(page, scale, timeout=30000) -> None:
 
 
 _GALLERY_PANEL = {
-    "schema_version": 2,
+    "schema_version": 3,
     "available": True,
     "kind": "gallery",
     "subjects": [
