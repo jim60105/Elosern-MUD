@@ -33,7 +33,11 @@ During the stage target step that "Combat targets are picked on the stage figure
 
 #### Scenario: Tooltips and the step coexist
 - **WHEN** a plate's condition tooltip is open and the step starts, and during the step the pointer rests on a plate's glyph
-- **THEN** starting the step closes the tooltip, and during the step hovering a glyph opens its tooltip without moving the target focus or taking a target's pointer action
+- **THEN** starting the step closes the tooltip and moves keyboard focus that was inside the plates group to `#action-dock`, and during the step hovering a glyph opens its tooltip without moving the target focus or taking a target's pointer action
+
+#### Scenario: Fallen looks never read as a target-step dim
+- **WHEN** a step dims a standing foe while a defeated foe and a downed companion stand beside it
+- **THEN** the dimmed foe keeps its colour, pose and opacity and carries no mark or fallen text, while the defeated foe keeps its collapse, seal and 已擊破 and the companion its kneel and 倒地, so every pair differs by shape and text, not by brightness alone
 
 #### Scenario: Pointer hit areas exist only during the step
 - **WHEN** the step is open, and after it ends
@@ -154,7 +158,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The portrait anchors are non-interactive art
 - **WHEN** any stage actor renders
-- **THEN** the portrait anchors carry no focusable element and intercept no pointer events, except the hit areas and arrow markers over selectable figures during the stage target step, and they MAY sit behind the HUD islands, the `choices` anchor, and the command-line row
+- **THEN** the portrait anchors carry no focusable element and intercept no pointer events, except the hit areas over selectable figures during the stage target step, and they MAY sit behind the HUD islands, the `choices` anchor, and the command-line row
 
 #### Scenario: The choices anchor is bounded by the stage box
 - **WHEN** dialogue mode renders the choice content, taller than the available span allows
@@ -170,18 +174,18 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The plates layer is a named stage layer
 - **WHEN** combat renders its formation
-- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates and the markers other requirements place there
+- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates
 
 ### Requirement: The combat command card stands at the stage's dead centre
 While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one 264px × S wide card in the stage's `choices` anchor, framed like the other choice cards, centred on the stage's horizontal centre in every combat state, inside the dead-centre gap the combat formation keeps clear; the band's command region SHALL collapse.
 
 #### Scenario: The card is at dead centre with a fixed width
-- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes (eleven with five figures)
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes
 - **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 264px × S (±1px: 264 and 291.1), and it is the same in every case
 
 #### Scenario: The card never covers the formation
 - **WHEN** combat renders any of those cases, including during the entry into combat and while a foe joins or leaves
-- **THEN** the card intersects no figure box at rest, no figure plate and no target-marker slot, because every one of them stands at least 16px × S outside the card's edges
+- **THEN** the card intersects no figure box (at rest or at the farthest point of a beat gesture), no figure plate and no marker slot, because every one of them stands outside the card's columns
 
 #### Scenario: The width and height follow the stated rules
 - **WHEN** combat renders at 1451x790 and at 1600x900
@@ -236,19 +240,19 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 - **THEN** the waiting cue with its skip control covers the card's body inside the card while the card keeps its box, and the skip ends the round through the existing skip path
 
 ### Requirement: Combat figures stand in a shared-scale formation
-While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 15, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 16 minus the party count, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
 
 #### Scenario: Every active foe stands
 - **WHEN** a combat snapshot commits one, three, five, eight and fifteen foes that have not fled, some of them knocked out or defeated, with a solo player at 1451x790
 - **THEN** exactly that many foe stage actors render, in presenter order, at the formation's boxes (±1px), and no foe is left to another surface
 
 #### Scenario: Both sides are drawn at one scale
-- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes, and again while a foe joins, while one leaves, and during the entry into combat
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes, and again while a foe joins, while one leaves, and during the entry into combat
 - **THEN** every rendered figure box on both sides has the same height (±1px) as every other in the same frame, sampled at the start, the middle and the end of each transition
 
 #### Scenario: The dead-centre gap stays clear
-- **WHEN** combat renders any of those cases, including while a beat gesture plays at rest positions
-- **THEN** no figure box at rest intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S`
+- **WHEN** combat renders any of those cases, including at the farthest point of every beat gesture
+- **THEN** no figure box intersects the band from `stage centre − 132px × S` to `stage centre + 132px × S` (the card's columns) at any moment, and none intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S` at rest
 
 #### Scenario: The party forms up only in combat
 - **WHEN** the committed mode changes exploration → combat → exploration with a five-figure party, and exploration → dialogue

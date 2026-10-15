@@ -80,7 +80,7 @@ all in `--text-sm` (16px, 22px·S lines): line 1 the action label (with the scal
 skill has a chosen 威力), ` ‧ 選擇目標` and a right-aligned `Esc 返回`; line 2 the focused position summary; both
 single lines with an ellipsis; then (AREA) one chip per group position and the confirm chip, 28px·S tall with 4px·S
 gaps, wrapping onto at most two rows (全體敵人, 全體我方, 全體 and 施展（n） need ≈ 290px at S = 1, more than the
-214px inner width). The chips are `<button tabindex="-1">` whose `mousedown` is prevented and whose click handler
+238px inner width of the 264px·S card). The chips are `<button tabindex="-1">` whose `mousedown` is prevented and whose click handler
 returns DOM focus to `#action-dock`, because `bridge.js` leaves Enter on a focused button to the button. The DockMenu row region stays mounted with the `hidden` attribute
 (so router state and focus bookkeeping are unchanged) and DOM focus moves to `#action-dock` when it was inside the
 row region. The card's anchor rule from the previous change keeps `left`/`width`/`top`; in the step the dock's
@@ -103,14 +103,17 @@ only with the focus or the selection.
   the live region are the accessible path);
 - the arrow markers render in the `plates` layer at each figure's formation marker slot, directly above its plate:
   `<span class="stage-target__marker" data-testid="stage-target-marker" :data-state="focus|selectable"
-  :data-selected>`, ▼ filled with the digit when focused, ▽ outlined with the digit otherwise, ✓ when selected;
+  :data-selected>`, ▼ filled with the digit when focused, ▽ outlined with the digit otherwise, ✓ when selected, each a 24px·S pointer
+  target;
   markers take a pointer like the hit area;
 - a lit focused figure gets `data-target-focus="true"`: at `full` a `filter: drop-shadow(...)` ring animated by
   `elosern-target-pulse` (1.2s, `infinite alternate`); under reduced, off and `prefers-reduced-motion` the ring is
   static and brighter and the marker gains an underline bar;
 - plates are never dimmed: they carry the hit points the choice depends on. No figure's box, z or position changes.
 
-AppClient bumps the plates' `plateTooltipClose` counter (`webclient-combat-figure-plates` D3) when a step starts.
+AppClient bumps the plates' `plateTooltipClose` counter (`webclient-combat-figure-plates` D3) when a step starts, and
+if DOM focus is inside the plates keyboard group it moves to `#action-dock` first, so the step's arrow claim and the
+group's arrows never compete.
 Hovering a glyph during the step opens its tooltip only; the glyph is not a hit area.
 
 ### D5. Pointer

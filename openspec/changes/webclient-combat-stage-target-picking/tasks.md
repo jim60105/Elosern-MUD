@@ -65,7 +65,8 @@ Build once: `pnpm run build`.
   `test_area_targets_light_groups_on_the_stage` (an AREA skill: Space selects two foes with ✓ markers; the
   `all-allies` position lights every party candidate; confirm sends `target_shorthand`; under `reduced` motion the
   focused figure's computed `animation-name` is `none` and the underline is present; a knocked-out foe candidate shows its
-  fallen look plus the arrow; starting a step closes an open plate tooltip). Annotate both with existing IDs they establish (confirm spellings with
+  fallen look plus the arrow; starting a step closes an open plate tooltip and moves focus out of the plates group; a step-dimmed foe beside a
+  defeated foe differs by pose and text). Annotate both with existing IDs they establish (confirm spellings with
   `uv run --locked python -m tools.spec_traceability list`). Register both in `.github/browser-shards.json` beside
   `CombatStageBrowserTest.test_foes_stand_opposite_the_player`. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage`
