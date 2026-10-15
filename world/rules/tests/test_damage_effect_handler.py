@@ -215,7 +215,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
                 "damage:dark:physical",
                 lambda entity: {"atk_phys": 5} if entity is actor else {},
             ),
-            round((20 + 5) * 2.0) - 5,
+            int(round((20 + 5) * 2.0) * 40 / (40 + 5)),
         )
 
     def test_physical_attack_without_the_bonus_is_unchanged(self):
@@ -228,7 +228,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
                 "damage:dark:physical",
                 lambda entity: {},
             ),
-            round(20 * 2.0) - 5,
+            int(round(20 * 2.0) * 40 / (40 + 5)),
         )
 
     @covers_requirement(
@@ -244,7 +244,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
                 "damage:fire:magic",
                 lambda entity: {"atk_phys": 5} if entity is actor else {},
             ),
-            round(20 * 2.0) - 5,
+            int(round(20 * 2.0) * 40 / (40 + 5)),
         )
 
     @covers_requirement(
@@ -262,7 +262,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
                         effect_id,
                         lambda entity: {"defense": 5} if entity is target else {},
                     ),
-                    round(20 * 2.0) - 10,
+                    int(round(20 * 2.0) * 40 / (40 + 10)),
                 )
 
     def test_damage_floor_still_clamps_after_adjustments(self):
@@ -288,7 +288,7 @@ class AdjustedStatDamageTests(unittest.TestCase):
                 "damage:dark:physical",
                 lambda entity: {"defense": 2.5} if entity is target else {},
             ),
-            int(round(20 * 2.0) - (5 + 2.5)),
+            int(round(20 * 2.0) * 40 / (40 + 7.5)),
         )
 
 

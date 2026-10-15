@@ -30,6 +30,94 @@ class DamageBandTests(unittest.TestCase):
         self.assertEqual(
             _roll_multiplier(100, 0), damage["crit_multiplier"]
         )
+        # Non-default K consumption proof: K=80, attack=60, defense=20 => 60 * 80 / 100 = 48
+        with patch.dict(COMBAT_YAML["damage"], {"mitigation_k": 80}):
+            self.assertEqual(
+                strike_amount(
+                    attack=60.0,
+                    multiplier=1.0,
+                    coefficient=1.0,
+                    defense=20.0,
+                ),
+                48,
+            )
+
+    @covers_requirement(
+        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+    )
+    def test_ratio_mitigation_integration_properties(self):
+        # 1. Physical and magic symmetry through _handle_damage
+        phys_actor = FakeEntity("phys_a", atk_phys=50, agility=10)
+        magic_actor = FakeEntity("mag_a", magic_power=50, agility=10)
+        target = FakeEntity("target", hp=100, defense=30, agility=10)
+        with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
+            with patch("world.rules.combat.damage.roll_d100", return_value=60):
+                phys_pending = _handle_damage(phys_actor, [target], "damage:dark:physical", {}, 1.0)[0]
+                mag_pending = _handle_damage(magic_actor, [target], "damage:fire:magic", {}, 1.0)[0]
+        self.assertEqual(phys_pending.description.split("|")[-1], mag_pending.description.split("|")[-1])
+        # 50 * 1.0 * 1.0 = 50. 50 * 40 / (40 + 30) = 28.57... => 28
+        self.assertEqual(phys_pending.description.split("|")[-1], "28")
+
+        # 2. Explicit defense bypass sets defense to zero
+        from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
+        bypass_policy = DamagePolicy(
+            unconditional_defense_bypass=True,
+        )
+        with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
+            with patch("world.rules.combat.damage.roll_d100", return_value=60):
+                res_eff = ResolvedEffect(source_skill="test", policy=EffectPolicy(damage=bypass_policy))
+                bypassed = _handle_damage(
+                    phys_actor, [target], "damage:dark:physical", {"resolved_effect": res_eff}, 1.0
+                )[0]
+        # With defense=0: 50 * 40 / 40 = 50
+        self.assertEqual(bypassed.description.split("|")[-1], "50")
+
+        # 3. Miss deals no damage and applies no floor
+        with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
+            with patch("world.rules.combat.damage.roll_d100", return_value=1):
+                missed = _handle_damage(phys_actor, [target], "damage:dark:physical", {}, 1.0)[0]
+        self.assertEqual(missed.description.split("|")[-1], "0")
+        missed.apply()
+        self.assertEqual(target.traits.hp.value, 100)
+
+        # 4. Devastation rider, scales, and conditional coefficients ordering
+        # attack=30, mult=1.5, coeff=2.0, matched_multiplier=1.5 => attack_part=round(30*1.5*2.0*1.5)=135
+        # defense=20 => retention=40/(40+20)=2/3 => 135 * 40 / 60 = 90
+        # rider=10 => base_amount = 90 + 10 = 100
+        # scale=0.5 => scaled_magnitude(100, 0.5) = 50
+        self.assertEqual(
+            strike_amount(
+                attack=30.0,
+                multiplier=1.5,
+                coefficient=2.0,
+                defense=20.0,
+                rider=10,
+                matched_multiplier=1.5,
+                scale=0.5,
+            ),
+            50,
+        )
+
+        # 5. Nonlethal protection preservation with ratio mitigation
+        protected_target = FakeEntity("prot_target", hp=10, defense=0, agility=10)
+        with patch("world.rules.combat.damage.evaluate_combat_modifiers", return_value={}):
+            with patch("world.rules.combat.damage.roll_d100", return_value=60):
+                lethal_pending = _handle_damage(
+                    phys_actor, [protected_target], "damage:dark:physical", {"nonlethal": True}, 1.0
+                )[0]
+        # Target has 10 HP, damage is 50 => floored at 1 HP
+        lethal_pending.apply()
+        self.assertEqual(protected_target.traits.hp.value, 1)
+
+        # 6. Estimator parity with settlement on shared strike_amount
+        # Evaluated at face roll 60 (margin > 0):
+        estimated = strike_amount(
+            attack=50.0,
+            multiplier=1.0,
+            coefficient=1.0,
+            defense=30.0,
+        )
+        self.assertEqual(estimated, int(phys_pending.description.split("|")[-1]))
 
     @covers_requirement("combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a")
     def test_floor_shape_does_not_apply_to_a_miss(self):

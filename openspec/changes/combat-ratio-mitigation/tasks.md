@@ -8,7 +8,7 @@ Total estimate: **5.5 hours**, including implementation, focused verification, d
 
 ## 2. Bounded implementation and evidence (1.5h)
 
-- [ ] 2.1 Thread explicit bypass and shared estimator reads; test physical/magic symmetry, negative-defense clamp, miss, riders, scales, conditional coefficients, and divert/nonlethal preservation.
+- [x] 2.1 Thread explicit bypass and shared estimator reads; test physical/magic symmetry, negative-defense clamp, miss, riders, scales, conditional coefficients, and divert/nonlethal preservation.
 
 ## 3. Bounded implementation and evidence (1h)
 
