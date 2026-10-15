@@ -316,7 +316,7 @@ class InstanceRoomArtMetadataTests(EvenniaTest):
 
         view = build_art_view(self.char1)
 
-        self.assertEqual(view.scene_archetype, room.scene_archetype)
+        self.assertEqual(view.scene.archetype, room.scene_archetype)
         self.assertEqual(
             (room.scene_archetype, room.room_art_key, room.scene_identity), before
         )

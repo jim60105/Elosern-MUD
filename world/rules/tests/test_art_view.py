@@ -122,7 +122,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         }
         actor = _actor(self.room, active_combat=record)
         view = build_art_view(actor, resolver=_resolver(entities))
-        self.assertEqual(view.scene_archetype, A_BAZAAR)
+        self.assertEqual(view.scene.archetype, A_BAZAAR)
         self.assertEqual(
             [(entity.identity, entity.role) for entity in view.entities],
             [(1, ROLE_ALLY), (2, ROLE_FOE), (3, ROLE_FOE)],
@@ -149,7 +149,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         )
         self.assertEqual(view.entities[0].subject_kind, SUBJECT_NONE)
         self.assertEqual(view.entities[1].subject_kind, SUBJECT_CHARACTER)
-        self.assertEqual(view.scene_archetype, A_LODGE)
+        self.assertEqual(view.scene.archetype, A_LODGE)
 
     def test_actor_is_not_their_own_exploration_focusable_subject(self):
         # Even when the actor carries an explicit named portrait policy, they
@@ -247,14 +247,14 @@ class ArtViewSelectionTests(unittest.TestCase):
 
     def test_scene_archetype_none_and_invalid_resolve_to_none(self):
         room = _room([], scene_archetype=None)
-        self.assertIsNone(build_art_view(_actor(room)).scene_archetype)
+        self.assertIsNone(build_art_view(_actor(room)).scene.archetype)
         room = _room([], scene_archetype="not_a_scene")
-        self.assertIsNone(build_art_view(_actor(room)).scene_archetype)
-        self.assertIsNone(build_art_view(_actor(location=None)).scene_archetype)
+        self.assertIsNone(build_art_view(_actor(room)).scene.archetype)
+        self.assertIsNone(build_art_view(_actor(location=None)).scene.archetype)
 
     def test_no_location_yields_empty_view(self):
         view = build_art_view(_actor(location=None))
-        self.assertIsNone(view.scene_archetype)
+        self.assertIsNone(view.scene.archetype)
         self.assertEqual(view.entities, ())
 
     def test_malformed_portrait_policy_is_treated_as_no_subject(self):
@@ -262,7 +262,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         room = _room([bad], scene_archetype=A_LODGE)
         view = build_art_view(_actor(room))
         self.assertEqual(view.entities, ())
-        self.assertEqual(view.scene_archetype, A_LODGE)
+        self.assertEqual(view.scene.archetype, A_LODGE)
 
     def test_overlong_display_name_raises_view_error(self):
         long_name = _entity(50, name="長" * 200, dialogue=True)
