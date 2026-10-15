@@ -13,7 +13,7 @@ Human-only calibration SHALL keep approved section 8 tables/conditions as condit
 - **WHEN** probe resolves skills/rounds
 - **THEN** no growth/unlock drift or ordinary kill reward occurs
 
-#### Scenario: Evidence-driven approved tuning and no new species
+#### Scenario: No tuning or new species
 - **WHEN** calibration probes are built
 - **THEN** no combat math duplication, elf/beastfolk target or new species is introduced; the approved ratio/weapon/tactical calibration records initial and selected values, and permits only observed-outcome-supported authored tuning through its owning balance slice
 
@@ -29,5 +29,4 @@ Equipment-growth smoke SHALL use real entity construction, registered gear, ordi
 #### Scenario: Durable provenance
 - **WHEN** a factor is observed after equipping real registered gear
 - **THEN** evidence distinguishes committed fresh reload from in-memory changes and records every neutral weapon exception
-
 

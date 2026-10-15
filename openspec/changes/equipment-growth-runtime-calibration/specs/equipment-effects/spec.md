@@ -13,4 +13,3 @@ Every shipped weapon SHALL have a recorded initial and selected multiplier or a 
 - **WHEN** committed real equipment changes defense or a weapon is tested against magic/healing controls
 - **THEN** positive defense reduces successful damage monotonically, no armor multiplier is added, magic/healing receive no weapon factor and base traits/proficiency/affinity rules remain unchanged
 
-
