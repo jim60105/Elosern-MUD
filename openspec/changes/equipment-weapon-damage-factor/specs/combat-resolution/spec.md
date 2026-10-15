@@ -17,4 +17,3 @@ Physical-school attack_part SHALL be round(attack * roll_multiplier * coefficien
 - **WHEN** proficiency, guild rank or elemental practice affinity changes without equipment change
 - **THEN** no weapon factor or stored base trait changes
 
-

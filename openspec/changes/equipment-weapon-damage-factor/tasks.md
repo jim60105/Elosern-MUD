@@ -1,10 +1,10 @@
 # Tasks
 
-Total estimate: **6.5 hours**, including implementation, focused verification, documentation and integration. Prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Every group lands its own relevant tests/docs; the final group checks integration.
+Total estimate: **6.5 hours**, including implementation, focused verification, documentation and integration. Direct prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Each group lands its own tests/docs; the final group checks integration.
 
 ## 1. Bounded implementation and evidence (1.5h)
 
-- [ ] 1.1 Extend the closed equipment loader, entry model and rarity-budget validation, with malformed/bool/nonfinite/below-one/nonweapon/over-budget tests.
+- [ ] 1.1 Extend the closed equipment loader, entry model and rarity-budget validation and author valid initial ceiling1.0 cells for every shipped rarity; test startup load plus malformed/bool/nonfinite/below-one/nonweapon/over-budget cases.
 
 ## 2. Bounded implementation and evidence (1.5h)
 

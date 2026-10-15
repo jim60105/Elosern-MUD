@@ -80,4 +80,3 @@ The weapon damage factor SHALL be a validated finite numeric declaration at leas
 - **WHEN** a dual-wielder has existing off-hand flats and passives
 - **THEN** those adjustments retain their existing behavior and the selected factor is applied once
 
-
