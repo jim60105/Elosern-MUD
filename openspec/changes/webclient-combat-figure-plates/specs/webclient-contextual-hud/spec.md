@@ -5,15 +5,15 @@ Each combat figure plate SHALL show the participant's committed conditions (`con
 
 #### Scenario: Conditions are glyphs with accessible names
 - **WHEN** a foe is poisoned (`harmful`) and blessed (`beneficial`) and a companion carries five conditions, in `full` plates
-- **THEN** the foe's plate shows the two severity glyphs (the vitals dock's distinct shapes, never colour alone) on its third line, the companion's plate shows its first three glyphs and a `+2` glyph there, each glyph standing in a 24px × S hit box that stays inside the plate slot, the name and the stroke keep their own lines at their full widths, every glyph's accessible name is the shared condition label, and no condition word is permanently visible
+- **THEN** the foe's plate shows the two severity glyphs (the vitals dock's distinct shapes, never colour alone) on its third line, the companion's plate shows its three most severe glyphs (critical, then harmful, warning, informational, beneficial; committed order within a severity) and a `+2` glyph there, each glyph standing in a 24px × S hit box that stays inside the plate slot, the name and the stroke keep their own lines at their full widths, every glyph's accessible name is the shared condition label, and no condition word is permanently visible
 
 #### Scenario: A full plate's glyph line fits its slot
-- **WHEN** a `full` plate carries eight conditions
-- **THEN** its third line holds three glyphs and `+5`, four 24px × S hit boxes inside the plate's content width, bottom-aligned on the slot's lower edge, and the `+5` glyph's tooltip lists the five hidden conditions
+- **WHEN** a `full` plate carries four conditions, and then eight
+- **THEN** its third line holds four 24px × S hit boxes inside the plate's width, bottom-aligned on the slot's lower edge: the four glyphs, then three glyphs and `+5`, whose tooltip lists the five hidden conditions
 
 #### Scenario: A compact plate keeps one glyph
 - **WHEN** a plate takes the `compact` form with three conditions
-- **THEN** it shows on its second line the most severe condition's glyph (critical, then harmful, warning, informational, beneficial) and `+2`, the first line keeping its stroke at least 30px × S long, and its accessible name lists all three conditions
+- **THEN** it shows on its second line the most severe condition's glyph and `+2` (two conditions would show both glyphs), the first line keeping its stroke at least 30px × S long, and its accessible name lists all three conditions
 
 #### Scenario: A compact plate in danger folds its overflow into its glyph
 - **WHEN** a `compact` plate with three conditions falls to low hit points
@@ -33,7 +33,7 @@ Each combat figure plate SHALL show the participant's committed conditions (`con
 
 #### Scenario: Low hit points add text and colour together
 - **WHEN** a companion falls to 25% of its maximum hit points or below, and later recovers above it
-- **THEN** its readout's current value turns the critical hue and a small `危險` tag joins the plate (after the name on a `full` plate, which ellipsizes to make room; on the glyph line of a `compact` plate), and both clear on recovery; the threshold is the vitals dock's `LOW_HP_THRESHOLD` applied to the displayed value, and the accessible name states 危險
+- **THEN** its readout's current value turns the critical hue and a small `危險` tag opens the plate's glyph line in both forms, so the name keeps its line (a `full` plate's line then keeps two boxes: two glyphs, or the most severe glyph and `+N`), and both clear on recovery; the threshold is the vitals dock's `LOW_HP_THRESHOLD` applied to the displayed value, and the accessible name states 危險
 
 #### Scenario: The plates are one keyboard group
 - **WHEN** keyboard focus leaves the action dock (`#action-dock`) with Tab while combat is shown

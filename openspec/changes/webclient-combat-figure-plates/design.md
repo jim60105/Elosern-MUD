@@ -40,8 +40,10 @@ is in danger, and whether it carries a condition worth acting on (cleanse, finis
   - `fold` (plate variant only): no `+N` icon; the last visible glyph carries the hidden conditions in its tooltip
     and accessible name and shows a small drawn `+` mark (D5);
   - `closeSignal` (a counter; every change closes the open tooltip, D3).
-- The plate renders the row with `cap = 3` in committed order (full) or `cap = 1` (compact). The compact plate first
-  orders the conditions by severity: critical > harmful > warning > informational > beneficial (stable).
+- The glyph line has a box budget: four boxes on a full plate, two on a compact one; when the 危險 tag opens the line
+  (D5) it keeps two (full) or one (compact). The conditions show most severe first (critical > harmful > warning >
+  informational > beneficial, committed order within a severity). When they outnumber the boxes, the last box is
+  `+N`; with a single box the `+N` folds into the glyph instead (`fold`).
 - Geometry: each icon is a 24×24px·S hit box, bottom-aligned on the slot's lower edge, so it rises over the lower
   part of the readout line (which is not interactive) and never leaves the slot. Full: 3 glyphs + `+N` = 4 × 24 +
   3 × 2 gap = 102px·S inside the 106px·S content width. The glyph draws at `--text-xs`, line-height 1.
@@ -92,11 +94,12 @@ is in danger, and whether it carries a condition worth acting on (cleanse, finis
 `isLowPlateHp(current, maximum)` uses `LOW_HP_THRESHOLD` and the displayed value. When true:
 
 - the readout's current value takes `--crit`;
-- a `危險` tag (the vitals marker's style: seal border, crit text, `--text-xs` bold) joins the plate — on a full plate
-  after the name on line 1 (the name ellipsizes; its title and accessible name keep it whole), because line 2 has no
-  room beside a 40px·S stroke and a three-digit readout; on a compact plate at the start of the glyph line;
-- a compact plate with more conditions than its glyph shows folds the `+N` into its glyph (D2 `fold`), because the
-  tag, the glyph and `+N` (≈ 88px·S) exceed the 66px·S content width;
+- a `危險` tag (the vitals marker's style: seal border, crit text, `--text-xs` bold, ≈ 40px·S) opens the glyph line in
+  both forms. Line 2 has no room beside a 40px·S stroke and a three-digit readout, and on line 1 it would crush the
+  name to one character (reviewed in Storybook), so the name keeps its line;
+- the line then keeps two boxes on a full plate (tag + 2 × 24 + gaps ≈ 94px·S of 112) and one on a compact plate,
+  where more than one condition folds the `+N` into the glyph (D2 `fold`), because the tag, a glyph and `+N`
+  (≈ 92px·S) exceed the 72px·S slot;
 - the plate gains `data-low-hp="true"` for tests.
 
 There is no pulse, unlike the vitals hp line: many plates pulsing would compete for attention.

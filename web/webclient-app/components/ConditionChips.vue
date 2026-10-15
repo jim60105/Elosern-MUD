@@ -579,7 +579,7 @@ function onRowKeydown(event) {
   width: calc(24px * var(--ui-scale));
   height: calc(24px * var(--ui-scale));
   align-items: flex-end;
-  padding-bottom: calc(3px * var(--ui-scale));
+  padding-bottom: calc(2px * var(--ui-scale));
   box-sizing: border-box;
   pointer-events: auto;
   opacity: 0.92;
@@ -592,7 +592,7 @@ function onRowKeydown(event) {
 }
 .conditions--plate .chip.more {
   min-width: calc(24px * var(--ui-scale));
-  padding: 0 calc(2px * var(--ui-scale)) calc(3px * var(--ui-scale));
+  padding: 0 calc(2px * var(--ui-scale)) calc(2px * var(--ui-scale));
   line-height: 1;
 }
 /* A folded icon carries hidden conditions: a small drawn plus at its

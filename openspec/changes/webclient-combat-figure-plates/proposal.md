@@ -13,14 +13,14 @@ icons with details on demand, a text-plus-colour low-HP alarm, and full keyboard
 - **Condition glyphs on each plate:**
   - Glyphs reuse the vitals dock's severity shapes (`ConditionChips` gains `cap`, `tabbable`, a `plate` variant, a
     `fold` and a close signal).
-  - `full` plates show up to 3 glyphs plus `+N`; `compact` plates show the most severe glyph plus `+N` (folded into the
-    glyph when the 危險 tag needs the room).
+  - Most severe first: `full` plates show up to 3 glyphs plus `+N` (4 boxes); `compact` plates the most severe glyph
+    plus `+N` (2 boxes, the `+N` folded into the glyph when the 危險 tag needs the room).
   - The accessible names use the shared condition label.
 - **Tooltip on demand**, with the notes' mechanics, kept inside the viewport (shift left, flip below). It closes on
   leave, blur, Escape, resize/scroll, the data disappearing, playback starting and leaving combat, so none shows at
   rest and the formation's head and plate rules hold.
 - **Low-HP alarm:** at 25% HP or below (the vitals `LOW_HP_THRESHOLD`), the current value turns the critical hue and a
-  `危險` tag joins the plate (after the name on a full plate, on the glyph line of a compact one).
+  `危險` tag opens the plate's glyph line.
 - **One keyboard group:** the plates layer is a single tab stop after the action dock (戰場; the anchor moves after the
   band in DOM order). Left/Right move between plates, Up/Down between a plate and its glyphs, Escape/Tab leave, and
   the handled keys are consumed before the router.

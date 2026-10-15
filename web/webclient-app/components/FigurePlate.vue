@@ -16,12 +16,12 @@
 // Conditions, alarm and keyboard (webclient-combat-figure-plates, design
 // D2/D4/D5): the glyph line shows the participant's committed conditions as
 // the vitals dock's severity glyphs (ConditionChips' plate variant) — three
-// and `+N` on a full plate, the most severe and `+N` on a compact one — each
-// in a 24px·S hit box bottom-aligned on the slot's edge, with the detail
-// only in an on-demand tooltip. At or below LOW_HP_THRESHOLD the current
-// value turns the critical hue and a 危險 tag joins the plate: after the
-// name on a full plate, at the start of the glyph line on a compact one,
-// where the `+N` then folds into the glyph for room. The plate is a
+// and `+N` on a full plate, the most severe and `+N` on a compact one, most
+// severe first — each in a 24px·S hit box bottom-aligned on the slot's
+// edge, with the detail only in an on-demand tooltip. At or below
+// LOW_HP_THRESHOLD the current value turns the critical hue and a 危險 tag
+// opens the glyph line, which then keeps one box fewer on a full plate
+// (two) and folds the `+N` into the glyph on a compact one. The plate is a
 // `tabindex="-1"` stop of the plates group (plate-group.js); `data-stage-x`
 // gives the group its left-to-right order.
 //
@@ -66,8 +66,16 @@ const compact = computed(() => props.form === "compact");
 const percent = computed(() => plateHpPercent(props.hpCurrent, props.hpMaximum));
 const strokeWidth = computed(() => `${percent.value ?? 0}%`);
 const low = computed(() => isLowPlateHp(props.hpCurrent, props.hpMaximum));
-const shownConditions = computed(() => (compact.value ? bySeverity(props.conditions) : props.conditions));
-const glyphCap = computed(() => (compact.value ? 1 : 3));
+// The glyph line's boxes (design D2): four on a full plate, two on a compact
+// one, one fewer when the 危險 tag takes the line's start (two and one). The
+// conditions show most severe first; when more than the boxes, the last box
+// is the `+N` — or, with a single box, the `+N` folds into the glyph.
+const shownConditions = computed(() => bySeverity(props.conditions));
+const glyphBoxes = computed(() => (compact.value ? 2 : 4) - (low.value ? (compact.value ? 1 : 2) : 0));
+const glyphFold = computed(() => glyphBoxes.value === 1 && shownConditions.value.length > 1);
+const glyphCap = computed(() =>
+  shownConditions.value.length <= glyphBoxes.value || glyphFold.value ? glyphBoxes.value : glyphBoxes.value - 1,
+);
 const label = computed(() =>
   plateLabel({
     name: props.name,
@@ -111,7 +119,6 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
     <div class="figure-plate__name" :aria-hidden="compact ? 'true' : null" :title="name">
       <span class="figure-plate__name-text">{{ name }}</span>
       <span v-if="showToken && token" class="figure-plate__token" data-testid="figure-plate-token">{{ token }}</span>
-      <span v-if="low && !compact" class="figure-plate__danger" data-testid="figure-plate-danger" aria-hidden="true">危險</span>
     </div>
     <div class="figure-plate__line">
       <span
@@ -129,13 +136,13 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
       >
     </div>
     <div class="figure-plate__glyphs" data-testid="figure-plate-glyphs">
-      <span v-if="low && compact" class="figure-plate__danger" data-testid="figure-plate-danger" aria-hidden="true">危險</span>
+      <span v-if="low" class="figure-plate__danger" data-testid="figure-plate-danger" aria-hidden="true">危險</span>
       <ConditionChips
         :conditions="shownConditions"
         variant="plate"
         :cap="glyphCap"
         :tabbable="false"
-        :fold="compact && low"
+        :fold="glyphFold"
         :close-signal="closeSignal"
       />
     </div>
@@ -307,13 +314,13 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
   flex: none;
   align-self: center;
   box-sizing: border-box;
-  padding: 1px calc(3px * var(--ui-scale)) 0;
+  padding: 0 calc(3px * var(--ui-scale));
   border: 1px solid var(--seal-600);
   border-radius: 2px;
   background: rgba(20, 8, 8, 0.55);
   color: var(--crit);
   font: 700 var(--text-xs)/1 var(--f-sans);
-  letter-spacing: 0.06em;
+  letter-spacing: 0.02em;
   text-shadow: none;
 }
 
@@ -338,9 +345,12 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
 .figure-plate[data-form="compact"] .figure-plate__glyphs {
   grid-row: 2;
 }
-.figure-plate[data-form="compact"] .figure-plate__glyphs > .figure-plate__danger {
+.figure-plate__glyphs > .figure-plate__danger {
   align-self: flex-end;
-  margin: 0 0 calc(3px * var(--ui-scale)) calc(3px * var(--ui-scale));
+  margin: 0 0 calc(1px * var(--ui-scale)) calc(3px * var(--ui-scale));
+}
+.figure-plate[data-form="compact"] .figure-plate__glyphs > .figure-plate__danger {
+  margin-bottom: 0;
 }
 
 /* Keyboard focus (the plates group): the global gold double ring; a

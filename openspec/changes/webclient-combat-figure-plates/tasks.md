@@ -14,12 +14,12 @@ Rules:
 - [ ] 1.1 `components/ConditionChips.vue`: add the `cap`, `tabbable`, `variant`, `fold` and `closeSignal` props and
   the measured tooltip placement (design D2, D3); `lib/condition_label.js`: a missing `provenance` is no source. Keep
   every existing vitals dock behaviour (its tests guard it).
-- [ ] 1.2 `components/FigurePlate.vue` / `figure-plate.js`: the glyph row per form, the compact severity order, the
-  low-HP alarm and its placement (design D5), the fold, and the conditions and 危險 in the accessible name.
+- [ ] 1.2 `components/FigurePlate.vue` / `figure-plate.js`: the glyph row and its box budget per form, the severity order, the
+  low-HP alarm on the glyph line (design D5), the fold, and the conditions and 危險 in the accessible name.
   `AppClient.vue`: pass the participant `conditions`, the `plateTooltipClose` counter (design D3) and each plate's
   stage x.
 - [ ] 1.3 Tests (run with `pnpm exec vitest run` on exactly these files):
-  - `tests/core/figure_plate.test.js`: glyph counts per form, `+N` and its tooltip list, the compact severity order,
+  - `tests/core/figure_plate.test.js`: glyph counts per form, `+N` and its tooltip list, the severity order,
     the fold, the 危險 tag at exactly 25% and its absence at 26% (both forms), the accessible name with conditions,
     and the close signal;
   - `tests/data/condition_chips.test.js`: the default cap unchanged, `tabbable=false` puts no icon in the tab order,

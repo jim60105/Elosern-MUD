@@ -135,6 +135,7 @@ describe("FigurePlate conditions and alarm", () => {
     wrapper = mount(FigurePlate, { props: { name: "哥布林", token: "e1", side: "foes", hpCurrent: 20, hpMaximum: 24, form: "full", conditions: [POISON, BLESS] } });
     const line = wrapper.get('[data-testid="figure-plate-glyphs"]');
     expect(glyphs(wrapper).map((g) => g.get(".glyph").text())).toEqual(["▼", "▲"]);
+    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["poison", "bless"]);
     expect(line.findAll("button").every((b) => b.attributes("tabindex") === "-1")).toBe(true);
     expect(glyphs(wrapper)[0].attributes("aria-label")).toBe("中毒");
     // No condition word is permanently visible.
@@ -145,18 +146,32 @@ describe("FigurePlate conditions and alarm", () => {
     expect(wrapper.get(".figure-plate__line").find("button").exists()).toBe(false);
   });
 
-  it("caps a full plate at three glyphs and a +N whose tooltip lists the hidden ones", async () => {
+  it("caps a full plate at three glyphs, most severe first, and a +N whose tooltip lists the hidden ones", async () => {
     wrapper = mount(FigurePlate, { attachTo: document.body, props: { name: "蕾娜", side: "party", hpCurrent: 90, hpMaximum: 120, form: "full", conditions: EIGHT } });
-    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["c1", "c2", "c3"]);
+    // critical, then harmful (committed order), …
+    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["c4", "c1", "c7"]);
     expect(overflow(wrapper).text()).toBe("+5");
     await overflow(wrapper).trigger("mouseenter");
-    expect([...tip().querySelectorAll(".tip-item .detail-label")].map((n) => n.textContent)).toEqual(["暈眩", "遲緩", "護盾", "流血", "恐懼"]);
+    expect([...tip().querySelectorAll(".tip-item .detail-label")].map((n) => n.textContent)).toEqual(["遲緩", "恐懼", "迷霧", "疾風", "護盾"]);
     await overflow(wrapper).trigger("mouseleave");
     expect(tip()).toBeNull();
     // A five-condition companion: three glyphs and +2.
     await wrapper.setProps({ conditions: FIVE });
     expect(glyphs(wrapper)).toHaveLength(3);
     expect(overflow(wrapper).text()).toBe("+2");
+    // Four fit the line's four boxes: no +N.
+    await wrapper.setProps({ conditions: FIVE.slice(0, 4) });
+    expect(glyphs(wrapper)).toHaveLength(4);
+    expect(overflow(wrapper).exists()).toBe(false);
+    // Low, the 危險 tag opens the line and two boxes remain: a glyph and +N.
+    await wrapper.setProps({ hpCurrent: 20 });
+    const line = wrapper.get('[data-testid="figure-plate-glyphs"]');
+    expect(line.element.firstElementChild.getAttribute("data-testid")).toBe("figure-plate-danger");
+    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["c4"]);
+    expect(overflow(wrapper).text()).toBe("+3");
+    await wrapper.setProps({ conditions: [POISON, BLESS] });
+    expect(glyphs(wrapper)).toHaveLength(2);
+    expect(overflow(wrapper).exists()).toBe(false);
   });
 
   it("shows a compact plate's most severe glyph and +N, in severity order", () => {
@@ -186,9 +201,9 @@ describe("FigurePlate conditions and alarm", () => {
     expect(wrapper.attributes("data-low-hp")).toBe("true");
     expect(wrapper.get('[data-testid="figure-plate-danger"]').text()).toBe("危險");
     expect(wrapper.get(".figure-plate__current").classes()).toContain("figure-plate__current--low");
-    // The tag stands after the name on a full plate, on the glyph line of a compact one.
-    const home = form === "full" ? ".figure-plate__name" : '[data-testid="figure-plate-glyphs"]';
-    expect(wrapper.get(home).find('[data-testid="figure-plate-danger"]').exists()).toBe(true);
+    // The tag opens the glyph line in both forms; the name keeps its line.
+    expect(wrapper.get('[data-testid="figure-plate-glyphs"]').find('[data-testid="figure-plate-danger"]').exists()).toBe(true);
+    expect(wrapper.get(".figure-plate__name").find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
     await wrapper.setProps({ hpCurrent: 26 });
     expect(wrapper.attributes("data-low-hp")).toBeUndefined();
     expect(wrapper.find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
