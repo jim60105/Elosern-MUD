@@ -56,7 +56,7 @@ the dock that has just moved back. HudFrame's flip watcher stops setting `data-f
 
 - **Width:** `264px·S`, fixed (264 at 1451x790, 291.1 at 1600x900); `left: calc(50% - 132px·S)`.
 - **Gap:** the formation engine reserves `[C − 132px·S − 16px·S, C + 132px·S + 16px·S]` for every party size (1–5
-  figures) and foe count (1–15) at every viewport. Nothing in the formation (figure boxes, plates, target markers) can
+  figures) and foe count (up to 16 − party) at every viewport. Nothing in the formation (figure boxes, plates, target markers) can
   meet the card, so the card needs no clamp, no shift and no dependency on the line-ups.
 - **Height:** top-anchored at the `choices` anchor's top; `height: min(400px·S, 100%)` of the anchor's span (400 at
   1451x790, 441.1 at 1600x900). No frame resizes it.
@@ -148,8 +148,8 @@ overlay is not lost and is left alone.
 - [Truncated detail] → the strip clips description lines; the full text stays the row's accessible description and
   the strip's `title`.
 - [A reload straight into combat must find the Teleport target] → `defer` + an id on the same component's anchor.
-- [Beat lunges step 24px·S toward the centre] → a lunge moves a figure for 240ms into its 16px·S gutter and at most
-  8px·S under the card's edge; it is decorative, and the card paints above the figures.
+- [Beat lunges] → `webclient-combat-formation` shrinks the step toward the centre to 12px·S, inside the 16px·S
+  gutter, so no figure ever enters the card's columns.
 
 ## Migration Plan
 

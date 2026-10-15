@@ -91,8 +91,8 @@ file.
   and verify both pass.
 - [ ] 3.2 Update `web/tests/browser/test_browser_combat_menu.py`
   `CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports`: the dock lies inside
-  `[data-anchor="choices"]` (not `anchor-band-command`) and inside the viewport; keep the participant-frame and
-  confirm-control assertions. Run
+  `[data-anchor="choices"]` (not `anchor-band-command`) and inside the viewport; keep the plate/formation assertions
+  `webclient-combat-formation` migrated there and the confirm-control assertions. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once`
   and verify all pass.
 - [ ] 3.3 Update `web/tests/browser/test_browser_mode_transitions.py`: the reader takes the dock animations from

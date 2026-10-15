@@ -4,12 +4,12 @@
 While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one 264px × S wide card in the stage's `choices` anchor, framed like the other choice cards, centred on the stage's horizontal centre in every combat state, inside the dead-centre gap the combat formation keeps clear; the band's command region SHALL collapse.
 
 #### Scenario: The card is at dead centre with a fixed width
-- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes (eleven with five figures)
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes
 - **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 264px × S (±1px: 264 and 291.1), and it is the same in every case
 
 #### Scenario: The card never covers the formation
 - **WHEN** combat renders any of those cases, including during the entry into combat and while a foe joins or leaves
-- **THEN** the card intersects no figure box at rest, no figure plate and no target-marker slot, because every one of them stands at least 16px × S outside the card's edges
+- **THEN** the card intersects no figure box (at rest or at the farthest point of a beat gesture), no figure plate and no marker slot, because every one of them stands outside the card's columns
 
 #### Scenario: The width and height follow the stated rules
 - **WHEN** combat renders at 1451x790 and at 1600x900
@@ -190,7 +190,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The plates layer is a named stage layer
 - **WHEN** combat renders its formation
-- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates and the markers other requirements place there
+- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves the accessibility tree and the tab order, excepting only the two hold states defined in the scenarios below. The matrix SHALL be:
@@ -304,7 +304,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 
 #### Scenario: Per-surface requirements stay consistent with the matrix
 - **WHEN** a per-surface requirement names its own visible-mode set
-- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration and combat, hidden in dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
+- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration, hidden in combat, dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
 
 #### Scenario: The mode gate outranks the dock's data rule
 - **WHEN** the committed mode is `dialogue` and a committed revision drops a vital below its maximum or adds a new condition
