@@ -111,6 +111,7 @@ class DecisionReads:
         self._proficiency: dict[Any, Mapping[str, float]] = {}
         self._costs: dict[tuple[Any, str, float], dict[str, int]] = {}
         self._diverts: dict[Any, tuple[DivertLimit, ...]] = {}
+        self._weapon_multipliers: dict[Any, float] = {}
 
     def skill(self, skill_key: str) -> SkillDef | None:
         """Return the registered skill definition behind one key."""
@@ -131,6 +132,16 @@ class DecisionReads:
         if key not in self._modifiers:
             self._modifiers[key] = evaluate_combat_modifiers_no_create(entity)
         return self._modifiers[key]
+
+    def weapon_multiplier(self, entity: Any) -> float:
+        """Return the entity's declared weapon damage factor, memoized."""
+        key = _memo_key(entity)
+        if key not in self._weapon_multipliers:
+            from world.rules.equipment_effects import equipment_weapon_multiplier
+
+            self._weapon_multipliers[key] = equipment_weapon_multiplier(entity)
+        return self._weapon_multipliers[key]
+
 
     def costs(self, entity: Any, skill: SkillDef, scale: float) -> dict[str, int]:
         """Return one skill's adjusted costs at ``scale`` for the entity."""

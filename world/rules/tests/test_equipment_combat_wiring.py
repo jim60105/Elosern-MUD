@@ -41,6 +41,7 @@ from world.rules.equipment import toggle_equipment
 from world.rules.equipment_effects import (
     equipment_adjustments,
     equipment_gauge_caps,
+    equipment_weapon_multiplier,
 )
 from world.rules.items import (
     ItemUseRequest,
@@ -401,6 +402,48 @@ class AccessorFoldTests(_WearerCase):
                 evaluate_combat_modifiers_no_create(entity), {"atk_phys": 2}
             )
 
+    @covers_requirement(
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration"
+    )
+    def test_equipment_weapon_multiplier_precedence_and_controls(self):
+        from dataclasses import replace
+        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
+
+        # _SABER is weapon_main, _ECHO is weapon_off, _PLATE is armor
+        # Patch _SABER rule with factor 1.5, _ECHO rule with factor 2.0
+        saber_rule = replace(EQUIPMENT_EFFECT_RULES[_ATK_KEY], weapon_damage_multiplier=1.5)
+        echo_rule = replace(EQUIPMENT_EFFECT_RULES[_ECHO_KEY], weapon_damage_multiplier=2.0)
+        with patch.dict(EQUIPMENT_EFFECT_RULES, {_ATK_KEY: saber_rule, _ECHO_KEY: echo_rule}):
+            # Dual-wield: main hand has 1.5, off hand has 2.0 => factor is 1.5 (main hand wins)
+            dual_entity = self.wear(_player("dual wielder"), _SABER.key, _ECHO.key)
+            self.assertEqual(equipment_weapon_multiplier(dual_entity), 1.5)
+
+            # Empty main hand, occupied off hand => fallback to off hand (2.0)
+            off_only = _player("off only")
+            off_only.db.inventory = [_ECHO.key]
+            off_only.db.equipment = {
+                "weapon_main": None,
+                "weapon_off": _ECHO.key,
+                "armor": None,
+                "accessories": [],
+            }
+            self.assertEqual(equipment_weapon_multiplier(off_only), 2.0)
+
+            # Non-weapon in main hand: blocks fallback => 1.0
+            # Put _PLATE (armor) in weapon_main slot
+            blocked = _player("blocked fallback")
+            blocked.db.inventory = [_PLATE.key, _ECHO.key]
+            blocked.db.equipment = {
+                "weapon_main": _PLATE.key,
+                "weapon_off": _ECHO.key,
+                "armor": None,
+                "accessories": [],
+            }
+            self.assertEqual(equipment_weapon_multiplier(blocked), 1.0)
+
+            # Empty hands => 1.0
+            bare = _player("bare hands")
+            self.assertEqual(equipment_weapon_multiplier(bare), 1.0)
 
 class SingleSourceStructureTests(unittest.TestCase):
     @covers_requirement(
@@ -541,7 +584,11 @@ class DamageWiringTests(_FixtureFieldCase):
         _worn(attacker, weapon=_SABER.key)
         worn = self._staged_damage(attacker, defender)
         # Crit roll 100 doubles the weapon's flat attack before defense.
-        self.assertEqual(worn - baseline, 2 * _ATK)
+        # With ratio mitigation (K=40, def=5):
+        # baseline: round(20 * 2.0) * 40 / 45 = 40 * 40 / 45 = 35.55... -> 35
+        # worn: round((20 + 5) * 2.0) * 40 / 45 = 50 * 40 / 45 = 44.44... -> 44
+        # 44 - 35 = 9
+        self.assertEqual(worn - baseline, 9)
 
     @covers_requirement(
         "combat-modifier-table::worn-equipment-merges-into-the-merged-bundle-of-both-evaluation-paths"

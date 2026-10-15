@@ -1336,6 +1336,11 @@ class _Decision:
         """
         actor = self.participant(self.actor)
         attack_key = "atk_phys" if effect.school == "physical" else "magic_power"
+        weapon_multiplier = (
+            _finite(self.reads.weapon_multiplier(self.actor), "actor.weapon_multiplier")
+            if effect.school == "physical"
+            else 1.0
+        )
         attack = _finite(
             attack_with_bundle(
                 self._real(actor, attack_key),
@@ -1396,6 +1401,7 @@ class _Decision:
                 rider=rider,
                 matched_multiplier=matched_multiplier,
                 scale=scale,
+                weapon_multiplier=weapon_multiplier,
             )
             outcomes[amount] = outcomes.get(amount, 0.0) + _FACE_PROBABILITY
         return outcomes

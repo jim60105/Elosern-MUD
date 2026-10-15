@@ -453,6 +453,21 @@ class DecisionSnapshotReadTests(unittest.TestCase):
         self.assertEqual(self.actor.trait_reads, 0, "storage first, handler never")
 
     @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
+    def test_weapon_multiplier_read_is_memoized_within_decision(self):
+        reads = DecisionReads()
+        with patch("world.rules.equipment_effects.equipment_weapon_multiplier", return_value=1.5) as mock_read:
+            val1 = reads.weapon_multiplier(self.actor)
+            val2 = reads.weapon_multiplier(self.actor)
+            self.assertEqual(val1, 1.5)
+            self.assertEqual(val2, 1.5)
+            self.assertEqual(mock_read.call_count, 1)
+        # A new decision read set takes a fresh read
+        reads2 = DecisionReads()
+        with patch("world.rules.equipment_effects.equipment_weapon_multiplier", return_value=2.0) as mock_read2:
+            self.assertEqual(reads2.weapon_multiplier(self.actor), 2.0)
+            self.assertEqual(mock_read2.call_count, 1)
+
+    @covers_requirement("monster-ai-decision-inputs::snapshot-reads-are-reused-within-one-decision")
     def test_validation_reuses_one_read_set_across_every_plan(self):
         participants = tuple(
             _ProbeParticipant(f"t_snap_rival_{index}") for index in range(4)

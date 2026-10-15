@@ -148,6 +148,22 @@ class EquipmentAdjustmentTextTests(unittest.TestCase):
         with _patch_rule(rule):
             self.assertEqual(equipment_adjustment_text(_PROSE_ITEM.key), "防禦 +3")
 
+    def test_weapon_damage_multiplier_renders_when_greater_than_one(self):
+        rule = replace(
+            _EMPTY_RULE,
+            adjustments={"atk_phys": 4},
+            weapon_damage_multiplier=1.5,
+        )
+        with _patch_rule(rule):
+            self.assertEqual(
+                equipment_adjustment_text(_PROSE_ITEM.key), "攻擊 +4｜武器傷害 x1.5"
+            )
+
+    def test_neutral_weapon_damage_multiplier_is_omitted(self):
+        rule = replace(_EMPTY_RULE, weapon_damage_multiplier=1.0)
+        with _patch_rule(rule):
+            self.assertEqual(equipment_adjustment_text(_PROSE_ITEM.key), "")
+
     def test_empty_entry_renders_empty(self):
         with _patch_rule(_EMPTY_RULE):
             self.assertEqual(equipment_adjustment_text(_PROSE_ITEM.key), "")

@@ -40,7 +40,7 @@ The equipment-effect rulebook SHALL be loaded through one validated loader that 
 
 #### Scenario: The closed entry vocabulary
 - **WHEN** a rulebook entry is validated
-- **THEN** it may contain only `adjustments` restricted to `atk_phys`, `defense`, `magic_power`, `agility`, `mp_cost`, `sp_cost`, `pleasure_gain`, and `heal_gain`; plus `gauge_caps`, `immune`, `attached_buffs`, and `exposure_bias`
+- **THEN** it may contain only `adjustments` restricted to `atk_phys`, `defense`, `magic_power`, `agility`, `mp_cost`, `sp_cost`, `pleasure_gain`, and `heal_gain`; plus `gauge_caps`, `immune`, `attached_buffs`, `exposure_bias`, and optional weapon-only `weapon_damage_multiplier`
 
 #### Scenario: Percent-shaped fields reject flat values
 - **WHEN** an `mp_cost` adjustment is authored as a flat integer or an `atk_phys` adjustment as a percent string
@@ -63,7 +63,7 @@ The equipment-effect rulebook SHALL be loaded through one validated loader that 
 - **THEN** the load fails with the named rulebook error
 
 ### Requirement: Per-rarity budgets mechanically bound every authored value
-The rulebook SHALL carry a budgets table keyed by the item's registered rarity with separate ceilings for flat values, combat percents (`agility`, `mp_cost`, `sp_cost`), soft percents (`pleasure_gain`, `heal_gain`), `exposure_bias`, and positive-only `gauge_caps`. The loader SHALL reject any entry whose value exceeds the ceiling of its rarity's corresponding column (in absolute value).
+The rulebook SHALL carry a budgets table keyed by the item's registered rarity with separate ceilings for flat values, combat percents (`agility`, `mp_cost`, `sp_cost`), soft percents (`pleasure_gain`, `heal_gain`), `exposure_bias`, positive-only `gauge_caps`, and a finite `weapon_multiplier` ceiling of at least 1.0. The loader SHALL reject any entry exceeding its rarity's column ceiling (absolute value for signed adjustments; directly for weapon multipliers).
 
 #### Scenario: Over-budget equipment fails startup
 - **WHEN** a common-rarity item's entry grants `+10 defense`
@@ -111,7 +111,7 @@ The equipment-effect capability SHALL expose one predicate returning the union o
 - **THEN** it returns an empty set
 
 ### Requirement: Equipment adjustments render as deterministic prose
-The capability SHALL provide one server-side formatter converting a registered item's rulebook entry into one deterministic 正體中文 summary: segments joined by 「｜」 in field-vocabulary declaration order, signed integers, percent fields as `±N%`, gauge fields as `<gauge>上限 ±N`, immunity keys rendered by their registered display names, and zero-valued fields omitted. Every number SHALL come from the rulebook; the formatter SHALL NOT recompute effective values.
+One server-side formatter SHALL render a registered item's rulebook entry as one deterministic 正體中文 summary: segments joined by 「｜」 in field-vocabulary declaration order, signed integers, percent fields as `±N%`, gauge fields as `<gauge>上限 ±N`, immunity keys by registered display names, the authored weapon multiplier as a multiplier segment, and zero-valued adjustments or neutral 1.0 multipliers omitted. Every number SHALL come from the rulebook, never recomputed by the formatter.
 
 #### Scenario: Heavy armor describes its trade-off verbatim
 - **WHEN** the formatter renders a synthetic armor entry (atk −2, defense +8, agility −10%, hp cap +15)
@@ -254,3 +254,18 @@ Every registered equipment item SHALL bind one-to-one to a complete budget-check
 #### Scenario: Military exception
 - **WHEN** military E-S equipment is checked
 - **THEN** the six named sword/armor pairs remain protected by military-equipment because guild examiner content depends on them; examiner-facing statements remain named
+
+### Requirement: Weapon multiplier uses exactly one equipped weapon declaration
+The weapon damage factor SHALL be a validated finite numeric declaration at least 1.0 and within its rarity ceiling. Runtime SHALL use the main-hand weapon, falling back to off-hand only when main-hand is empty, otherwise 1.0. Two factors SHALL NOT combine. Rarity SHALL be load-time validation only.
+
+#### Scenario: Main and off hand precedence
+- **WHEN** main hand has factor 1.5 and off hand factor 2.0
+- **THEN** factor is 1.5; emptying main hand makes it 2.0; an occupied nonweapon main hand makes it 1.0
+
+#### Scenario: Malformed declarations and no gear
+- **WHEN** a factor is bool, nonfinite, below one, on nonweapon gear or over budget, or the actor has empty hands
+- **THEN** invalid declarations reject load; empty hands and gear with no declared bonus use 1.0
+
+#### Scenario: Existing gear semantics
+- **WHEN** a dual-wielder has existing off-hand flats and passives
+- **THEN** those adjustments retain their existing behavior and the selected factor is applied once
