@@ -118,6 +118,10 @@ The jump from one rank at 0.60 to two ranks at 0.50 is forced by headroom: a bac
   half the slot width plus 12px·S (every 8–14 foe case at 1451x790). The invariants do not forbid it, since forbidding it
   would leave no full-slot formation for eight or more foes; `webclient-combat-stage-target-picking` must draw the
   marker above the plates or within this slot so it stays visible.
+- [Front-rank plates over back-rank faces] → in a two-rank formation the front rank's plate lines lie across the
+  back rank's upper bodies (at 1451x790 and 0.50 the front plates span y≈213–321 while the back figures start at
+  y≈193). The invariants allow it; `webclient-combat-formation` should give the plates' ground enough feathering that
+  the back-rank faces still read.
 - [The prototype's numbers drift in the real module] → the invariants are normative; the pinned table is updated
   deliberately in the same commit.
 
