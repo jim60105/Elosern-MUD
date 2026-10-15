@@ -73,7 +73,7 @@ While the formation is shown, each drawn combat figure other than the controlled
 ## MODIFIED Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
 #### Scenario: The requirement carries its amendments
 - **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
@@ -321,7 +321,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 - **THEN** dialogue mode hides the cockpit and navigation surfaces: the place card, the minimap island, and the vitals dock are hidden while the committed mode is `dialogue`
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat the same figures stand at the boxes "Combat figures stand in a shared-scale formation" sets. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
+The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat they stand at the formation's boxes. Each figure SHALL reuse StageActor rendering and stay non-interactive decorative art: no focusable element, no pointer events.
 
 #### Scenario: Portraits resolve through the catalog
 - **WHEN** a companion portrait renders
@@ -330,6 +330,7 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 #### Scenario: Every figure shares one size and ground line
 - **WHEN** the lineup renders any number of figures
 - **THEN** every figure, including the controlled character, has the same full anchor size and ground line; no progressively smaller scale, lift ramp or depth dimming
+- **AND** in combat the figures stand at the boxes "Combat figures stand in a shared-scale formation" sets
 
 #### Scenario: The row compresses to stay in the left half
 - **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in exploration and dialogue
@@ -423,11 +424,15 @@ The surfaces placed in the stage's island anchors SHALL render as floating HUD i
 - **THEN** the party quickbar is removed with this change
 
 ### Requirement: Combat identity and status remain legible without changing authority
-The combat presentation SHALL show each standing participant's name, hit-point stroke and numeric HP on its figure plate (the controlled figure's in the vitals dock), and distinguish the acting or focused-target foe by a non-colour cue without making it interactive. No standing figure's head, in the front rank or the back rank, SHALL ever be covered — not by a plate, a target marker or another figure; a figure's lower body MAY be covered; and nothing SHALL cover a plate. A zero canonical round SHALL be described as preparation rather than incremented.
+The combat presentation SHALL show each standing participant's name, hit-point stroke and numeric HP on its figure plate (the controlled figure's in the vitals dock), and distinguish the acting or focused-target foe by a non-colour cue without making it interactive. No standing figure's head, in either rank, SHALL ever be covered by a plate, a target marker or another figure; a lower body MAY be covered; nothing SHALL cover a plate.
 
 #### Scenario: Playback HP agrees
 - **WHEN** a beat changes display HP for a participant whose portrait reference names a displayed value
 - **THEN** its plate's readout and stroke use that value and settle to committed HP together; a null or unmapped reference keeps committed HP on its plate
+
+#### Scenario: A zero canonical round is preparation
+- **WHEN** the canonical round is zero
+- **THEN** the presentation SHALL describe it as preparation rather than incrementing it
 
 #### Scenario: First round is not fabricated
 - **WHEN** session round is zero and then one
@@ -438,7 +443,7 @@ The combat presentation SHALL show each standing participant's name, hit-point s
 - **THEN** the figure shows its truthful placeholder with one initial and accessible state, and its plate keeps the participant's name; the session token stays in the plate's accessible name only
 
 ### Requirement: The place card names the current location and the world time
-The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's top-right corner directly below the top band and directly above the minimap island, while the committed mode is exploration, and SHALL NOT render it in combat mode (where the combat formation uses the stage's right column), creation mode or settled dialogue mode. The card SHALL state the current location as its heading and the world date/time beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
+The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's top-right corner directly below the top band and directly above the minimap island, while the committed mode is exploration, and SHALL NOT render it in combat, creation or settled dialogue mode. The card SHALL state the current location as its heading and the world date/time beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
 
 #### Scenario: Dialogue entry leaves only inert exit paint
 - **WHEN** the mode live-enters dialogue
@@ -575,11 +580,19 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
   round's beats are read as text pages
 
 ### Requirement: Combat formation geometry is one pure shared-scale function
-The client SHALL compute every combat figure box, plate slot and marker slot from one pure function of the stage geometry, the party figure count (1 to 5: the controlled figure plus at most four companions) and the drawn foe count (1 to 16 minus the party count), with one shared figure scale for both sides. The function SHALL keep a dead-centre gap of the combat command card's width plus a gutter on each side free of every figure box and slot, and SHALL never cover a figure's head: a head is the central 30% of its box's width and the top 22% of its height, and no plate slot, marker slot or other figure in front of it may overlap it, while a lower body may be covered.
+The client SHALL compute every combat figure box, plate slot and marker slot from one pure function of the stage geometry, the party figure count (1 to 5) and the drawn foe count (1 to 16 minus the party count), with one shared figure scale for both sides. The function SHALL keep a dead-centre gap of the combat command card's width plus a gutter on each side free of every figure box and slot, and SHALL never cover a figure's head, as the scenario "A head is never covered" defines it.
 
 #### Scenario: Inputs and outputs are explicit
 - **WHEN** the function is called with the stage width and height, the desktop chrome factor S, the band's top edge, the portrait height `actor-h`, the top band's bottom edge, the vitals dock box, the card width `264px × S`, the command-line row's height (`44px × S` when not measured), a party count and a foe count
 - **THEN** it returns the shared scale, one figure box per party figure (controlled figure first) and per foe (presenter order), each figure's rank, one plate slot per figure with its form (`full` or `compact`), and one target-marker slot per figure, all in stage pixels, and it reads no DOM
+
+#### Scenario: A head is never covered
+- **WHEN** the function returns any formation
+- **THEN** a head is the central 30% of a figure's box width and the top 22% of its height, and no plate slot, marker slot or other figure in front of it overlaps it, while a lower body may be covered
+
+#### Scenario: The party count is bounded
+- **WHEN** the function is called with a party count
+- **THEN** it accepts 1 to 5, the controlled figure plus at most four companions
 
 #### Scenario: Both sides share one scale
 - **WHEN** the function returns any formation

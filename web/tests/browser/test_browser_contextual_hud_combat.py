@@ -31,7 +31,7 @@ from ._journey_support import (
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
     """Contextual HUD action-dock behavior on the shared managed server."""
     @covers_requirement(
-        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits",
+        "webclient-contextual-hud::combat-figures-carry-glance-plates",
         "webclient-contextual-hud::combat-identity-and-status-remain-legible-without-changing-authority",
     )
     def test_combat_figure_plates_present_the_drawn_participants(self):

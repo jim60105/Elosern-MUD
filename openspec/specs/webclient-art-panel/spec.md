@@ -394,9 +394,9 @@ exist only inside an image.
 
 #### Scenario: Catalog entries render only inside consuming surfaces
 - **WHEN** the browser renders portrait catalog entries
-- **THEN** they render only inside the framed-portrait surfaces that consume them — the combat
-  participant frame, the party strip and party drawer, the stage actors that stand the dialogue
-  host and the combat foes in the `actor-right` anchor, the interact target avatars and dock
+- **THEN** they render only inside the framed-portrait surfaces that consume them — the party strip and
+  party drawer, the stage actors that stand the dialogue host, the combat party and the combat
+  foes, the interact target avatars and dock
   target rows
 - **AND** the client renders no standalone portrait catalog strip and no per-portrait full-view
   control
@@ -437,7 +437,7 @@ the image's p% point with the frame's p% point, which centers the rectangle's ce
 - **THEN** it returns centered `50% 50%`, a URL-bearing surface renders that centered cover crop and a null-URL placeholder renders its label without an image
 
 #### Scenario: Every framed portrait honors the carried rectangle
-- **WHEN** the same entry is rendered by the combat participant frame, party strip, party drawer avatar thumbnails, dialogue host avatar, interact target avatar, dock target row and character switcher
+- **WHEN** the same entry is rendered by the party strip, party drawer avatar thumbnails, dialogue host avatar, interact target avatar, dock target row and character switcher
 - **THEN** each cover-cropped image applies the shared mapping to its face rectangle, even when the entry carries a nonidentity stage triple
 
 #### Scenario: The surfaces outside the recenters-only list are unchanged by this split
@@ -466,7 +466,7 @@ the image's p% point with the frame's p% point, which centers the rectangle's ce
 - **AND** every other surface named here keeps the recenters-only treatment verbatim
 
 #### Scenario: Avatar surfaces apply the mapping and ignore stage
-- **WHEN** each avatar surface — the combat participant frame, the party strip and the party
+- **WHEN** each avatar surface — the party strip and the party
   drawer's avatar thumbnails, the dialogue host avatar in the narrative feed, the interact target
   avatars and the dock's target rows, and the top-bar character switcher — renders an entry
 - **THEN** it applies the mapping to that entry's rectangle and ignores stage

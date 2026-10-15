@@ -310,9 +310,9 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         return [x["box"] for x in s["party"]] + foes
 
     @covers_requirement(
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
-        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits",
+        "webclient-contextual-hud::combat-figures-carry-glance-plates",
         "webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage",
     )
     def test_foes_stand_opposite_the_player(self):
@@ -380,7 +380,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         )
         page.close()
 
-    @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")
+    @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_every_active_foe_stands(self):
         """Five active foes all stand, each with its plate; no roster lists them.
 
@@ -399,7 +399,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
         "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode",
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
@@ -538,7 +538,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
-        "webclient-contextual-hud::foes-stand-opposite-the-player-during-combat",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
     )
     def test_foes_enter_and_leave_full(self):
@@ -587,7 +587,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertLessEqual(worst["overflow"], 0, worst)
         page.close()
 
-    @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")
+    @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_reload_in_combat_plays_no_entrance(self):
         """A reconnect into combat mounts the row at rest."""
         page = self._page(REFERENCE, motion_level=None)
@@ -600,7 +600,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(all(_identity(x["transform"]) for x in s["rows"][0]["slots"]))
         page.close()
 
-    @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")
+    @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_foes_reduced_only_fade(self):
         """At reduced the row fades within 150ms and nothing moves."""
         page = self._page(REFERENCE, motion_level="reduced")
@@ -622,7 +622,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self._wait(page, "s.rows.length === 0 && s.captionRight === ''")
         page.close()
 
-    @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")
+    @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_foes_off_is_instant(self):
         """At off the row and its foes are present or absent in the commit's frame."""
         page = self._page(REFERENCE)

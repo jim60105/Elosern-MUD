@@ -354,7 +354,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
     @covers_requirement(
-        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits"
+        "webclient-contextual-hud::combat-figures-carry-glance-plates"
     )
     def test_dock_and_figure_plate_geometry_at_both_desktop_viewports(self):
         # H3 task 8.8, migrated by webclient-combat-formation: at both
