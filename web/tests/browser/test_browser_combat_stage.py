@@ -168,6 +168,7 @@ _INSTALL_READER = """() => {
       party: [...document.querySelectorAll('[data-anchor="actor-left"] [data-testid="companion-figure"]')].map((slot) => ({
         identity: slot.getAttribute('data-identity'),
         controlled: slot.getAttribute('data-controlled') === 'true',
+        rank: slot.getAttribute('data-rank'),
         box: box(slot.querySelector('[data-testid="stage-actor"]')),
       })),
       plates: [...document.querySelectorAll('[data-anchor="plates"] [data-testid="figure-plate"]')]
@@ -197,6 +198,7 @@ _INSTALL_READER = """() => {
         focusable: row.querySelectorAll('button, a, input, textarea, select, [tabindex]').length,
         slots: [...row.querySelectorAll('[data-testid="foe-slot"]')].map((slot) => ({
           ref: slot.getAttribute('data-portrait-ref'),
+          rank: slot.getAttribute('data-rank'),
           inert: slot.inert,
           leaving: slot.classList.contains('foe-leave-active'),
           box: box(slot.querySelector('[data-testid="stage-actor"]')),
@@ -362,6 +364,14 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                     self.assertAlmostEqual(
                         (plate["left"] + plate["right"]) / 2, (player["right"] + leftmost) / 2, delta=1.5, msg=size
                     )
+        # Shrinking the window in combat re-seats the caption's foe edge at
+        # once (no held room from the wider stage).
+        self._resize(page, REFERENCE)
+        s = self._read(page)
+        leftmost = min(x["box"]["left"] for x in s["rows"][0]["slots"])
+        self.assertAlmostEqual(
+            float(s["captionRight"].rstrip("px")), s["stage"]["width"] - leftmost + 16 * s["scale"], delta=1.0
+        )
         page.close()
 
     @covers_requirement("webclient-contextual-hud::foes-stand-opposite-the-player-during-combat")
@@ -433,6 +443,17 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                                 self.assertFalse(_intersects(a["box"], s["vitals"]), f"a plate meets the vitals dock at {size}")
                             for b in s["plates"][a_index + 1:]:
                                 self.assertFalse(_intersects(a["box"], b["box"]), f"two plates meet at {size}")
+                        # No plate covers a front-rank figure's head (the top
+                        # quarter of its box). A two-rank side's back faces
+                        # may sit behind the front plates' feathered ground
+                        # (the engine's accepted geometry, see the report).
+                        front = [x["box"] for x in s["party"] if x["rank"] in ("0", None)] + [
+                            x["box"] for row in s["rows"] for x in row["slots"]
+                            if not x["leaving"] and x["rank"] in ("0", None)
+                        ]
+                        for head in ({**b, "bottom": b["top"] + b["height"] / 4} for b in front):
+                            for p in s["plates"]:
+                                self.assertFalse(_intersects(p["box"], head), f"a plate covers a front-rank head at {size}")
                         self.assertEqual(s["mapDisplay"], "none", size)
                         self.assertFalse(s["placeCardShown"], size)
                         self.assertEqual(s["platesLayerFocusable"], 0)

@@ -20,6 +20,12 @@
 // watcher. Leaving figures are left alone: they fade where they stand.
 // Below `full`, on a reconnect and on a resize nothing is inverted, and any
 // glide still in flight is cleared, so the figures stand at their final boxes.
+// Known limits: a figure that appears while a crossing glide is still in
+// flight starts from the persisting figures' mid-glide height, so the two
+// decompositions (slot × wrapper) may differ for the rest of that glide; and
+// the party's slots are keyed by position (possession swaps portraits in
+// place), so a companion joining mid-combat reuses a slot whose glide key
+// changes — it is then treated as appearing, which is the intended motion.
 import { watch } from "vue";
 
 export const GLIDE_TRANSITION = "transform calc(var(--motion-actor) * var(--motion-travel)) var(--ease-standard)";
@@ -102,6 +108,7 @@ export function useFormationGlide({ rootRef, formation, enabled }) {
         const inverse = invertBox(rectOf(el), crossing ? known : null, referenceHeight);
         if (!inverse) {
           if (crossing && slot) plays.push({ el, slot, inverse: null });
+          else clearGlide(el);
           continue;
         }
         el.style.transformOrigin = inverse.origin;

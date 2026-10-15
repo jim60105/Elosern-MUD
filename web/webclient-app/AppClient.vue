@@ -419,7 +419,9 @@ const foeEdge = ref(null);
 watch(
   foeEdgeNow,
   (edge) => {
-    if (edge !== null && (foeEdge.value === null || edge >= foeEdge.value)) {
+    // A resize re-forms in place (`formationInstant`), so the edge follows the
+    // new stage at once even when it shrinks; only a roster change holds it.
+    if (edge !== null && (foeEdge.value === null || edge >= foeEdge.value || formationInstant.value)) {
       foeEdge.value = edge;
     }
   },

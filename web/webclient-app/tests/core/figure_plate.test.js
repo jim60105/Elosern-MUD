@@ -222,4 +222,50 @@ describe("the plates layer in the client", () => {
     await nextTick();
     expect(wrapper.get('[data-anchor="plates"]').findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert)).toHaveLength(0);
   });
+
+  it("gives the player's own figure a plate while a companion is possessed, and none to the possessed one", async () => {
+    // Possession (the controlled figure is the possessed companion): the
+    // player's own figure stands as a non-controlled figure and carries its
+    // plate, joined to its participant row by identity; the controlled
+    // companion's values stay in the vitals dock.
+    const roster = {
+      schema_version: 3, available: true,
+      characters: [{ identity: 1, name: "測試主角", current: true, pending: false, portrait: {
+        subject_id: "portrait:character:1",
+        revision: "1".repeat(64),
+        generation_subject: "portrait:character:1",
+        generation_state: "missing",
+        attempts: [],
+        terminal: null,
+        retention_sources: [],
+      } }],
+      max_characters: 5, can_create: true, switch_locked: false, lock_reason: null,
+    };
+    const participants = [
+      foeRow(201, "e1", "狼", 20),
+      { identity: 1, token: "a1", display_name: "測試主角", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [] },
+      { identity: 102, token: "a2", display_name: "幽", team: "party", state: "active", hp_current: 144, hp_maximum: 160, portrait_ref: null, conditions: [] },
+    ];
+    const response = store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: {
+        status: fx.statusPanel({ actor: { identity: "102" } }),
+        roster,
+        possession_banner: { schema_version: 1, available: true, host_name: "幽", since_tick: 1 },
+        party: { ...PARTY_PANEL_FULL_SAMPLE, slots: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 2) },
+        context_actions: fx.combatActions({ participants }),
+        art: ART_PANEL_SAMPLE,
+      },
+    })], {});
+    expect(response.accepted).toBe(true);
+    await nextTick();
+    await nextTick();
+    const figures = wrapper.findAll('[data-testid="companion-figure"]').map((f) => [f.attributes("data-identity"), f.attributes("data-controlled")]);
+    expect(figures).toEqual([["102", "true"], ["101", "false"], ["1", "false"]]);
+    const plates = wrapper.findAll('[data-anchor="plates"] [data-testid="figure-plate"]');
+    expect(plates.map((p) => `${p.attributes("data-side")}:${p.attributes("data-identity")}`)).toEqual([
+      "party:101", "party:1", "foes:201",
+    ]);
+    expect(plates[1].attributes("aria-label")).toBe("測試主角 a1，我方，生命 80/100");
+  });
 });
