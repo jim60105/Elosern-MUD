@@ -287,7 +287,8 @@
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_formation_shares_one_scale_and_keeps_the_centre_clear",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
-        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands"
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_figure_plates_show_conditions_and_alarm"
       ]
     },
     {

@@ -76,9 +76,18 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         self.assertEqual("".join(first.locator('[data-testid="figure-plate-readout"]').text_content().split()), "60/60")
         # No token shows while the names differ.
         self.assertEqual(page.locator('[data-testid="figure-plate-token"]').count(), 0)
-        # Display-only: nothing focusable, no pointer events.
+        # The layer is one tab stop (the group 戰場, webclient-combat-figure-plates):
+        # nothing inside it is in the tab order, and it takes no pointer events.
         layer = page.locator('[data-anchor="plates"]')
-        self.assertEqual(layer.locator("button, a, input, textarea, select, [tabindex]").count(), 0)
+        self.assertEqual(layer.get_attribute("role"), "group")
+        self.assertEqual(layer.get_attribute("tabindex"), "0")
+        self.assertEqual(
+            layer.evaluate(
+                "(el) => [...el.querySelectorAll('button, a, input, textarea, select, [tabindex]')]"
+                ".filter((n) => n.tabIndex >= 0).length"
+            ),
+            0,
+        )
         self.assertEqual(layer.evaluate("(el) => getComputedStyle(el).pointerEvents"), "none")
 
         # actor-right holds only the foe line-up's decorative actors.
