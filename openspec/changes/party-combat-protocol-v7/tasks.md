@@ -1,27 +1,23 @@
 # Tasks
 
-Total estimate: **7.5 hours**, including implementation, focused verification, documentation and integration. Prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Every group lands its own relevant tests/docs; the final group checks integration.
+Total estimate: **6.5 hours**, including implementation, focused verification, documentation and integration. Direct prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Each group lands its own tests/docs; the final group checks integration.
 
 ## 1. Bounded implementation and evidence (1.5h)
 
-- [ ] 1.1 Extend shared actor/draft read models and v7 server presenter; test bounds, recovery, local item targets, conditions/polarity and read-only before/after state.
+- [ ] 1.1 Build one requested-actor read model and durable progress projection; test local skills/items/tactics, quantities/summaries/reselection reasons and read-only state.
 
 ## 2. Bounded implementation and evidence (1.5h)
 
-- [ ] 2.1 Implement exact command/exit adapter schemas and canonical result forms, retire old combat registrations and guard active inventory.use; prove forged actor/revision/payload rejection.
+- [ ] 2.1 Implement exact v7 server panel schemas and every numeric/list/reference invariant; test recovery, maximal catalog byte bound, missing/extra fields and no truncation.
 
 ## 3. Bounded implementation and evidence (1.5h)
 
-- [ ] 3.1 Mirror v7 and all field/reference invariants in UMD validators/constants, version parity contracts and valid/invalid shared fixtures; test missing/extra fields and unsupported versions.
+- [ ] 3.1 Mirror v7 schemas/constants in UMD validators and update shared valid/invalid fixture builders and version parity tests; test v6 rejection and exact Python/JS parity.
 
 ## 4. Bounded implementation and evidence (1h)
 
-- [ ] 4.1 Update publication invalidation, prompt result data, pending versus committed beats and terminal panels; test reconnect restores confirmed draft without intent replay.
+- [ ] 4.1 Update all affected panel version/capability docs, fixture callsites, canonical annotations and test shard ownership; preserve incoming v6 conditions/polarity and unchanged exploration/unavailable semantics.
 
-## 5. Bounded implementation and evidence (1h)
+## 5. Integration gate (1h)
 
-- [ ] 5.1 Document the complete wire contract and breaking reload cutover; update canonical IDs, all protocol fixture builders and shard manifests.
-
-## 6. Integration gate (1h)
-
-- [ ] 6.1 Run focused Python schema/adapter tests and Node protocol gates plus tools.contract_gate; record exact-field parity and no old/new compatibility evidence.
+- [ ] 5.1 Run focused combat-view/schema/version parity tests, Node protocol gate and tools.contract_gate; report exact field and catalog-envelope evidence.

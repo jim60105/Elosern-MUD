@@ -5,7 +5,6 @@
 - FROM: `### Requirement: context_actions is an exact read-only version-6 panel`
 - TO: `### Requirement: context_actions is an exact read-only version-7 panel`
 
-
 ## MODIFIED Requirements
 
 ### Requirement: context_actions is an exact read-only version-7 panel

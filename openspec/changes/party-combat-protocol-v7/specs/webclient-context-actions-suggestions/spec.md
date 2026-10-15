@@ -9,7 +9,6 @@
 - FROM: `### Requirement: The v6 client mirror and parity contract enforce the suggestions shape`
 - TO: `### Requirement: The v7 client mirror and parity contract enforce the suggestions shape`
 
-
 ## MODIFIED Requirements
 
 ### Requirement: The context_actions panel carries a suggestions envelope at version 7
@@ -43,7 +42,7 @@ validation SHALL reject unknown statuses, missing or extra fields, and cards und
 
 #### Scenario: The common unavailable form keeps its version-4 semantics
 - **WHEN** the registered common unavailable form is built at version 7
-- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 6
+- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 7
 
 #### Scenario: Combat never consults suggestion state
 - **WHEN** the combat form is rendered
