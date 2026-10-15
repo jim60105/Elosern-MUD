@@ -6,6 +6,7 @@ round count -- never live objects. This module owns strict parsing,
 serialization, session identity, and the active-session read predicates.
 """
 
+import dataclasses
 from dataclasses import dataclass
 from typing import Any
 
@@ -22,6 +23,10 @@ _RECORD_FIELDS = frozenset(
         "knocked_out_ids",
         "rounds_elapsed",
         "exam_id",
+        "round_revision",
+        "draft_version",
+        "draft_entries",
+        "confirmed_actors",
     }
 )
 # Optional fields: ``settled_tick`` is written only when the terminal
@@ -44,6 +49,10 @@ class CombatSessionRecord:
     knocked_out_ids: tuple[int, ...]
     rounds_elapsed: int
     exam_id: str | None
+    round_revision: int = 0
+    draft_version: int = 0
+    draft_entries: dict[int, dict[str, Any]] = dataclasses.field(default_factory=dict)
+    confirmed_actors: tuple[int, ...] = ()
     settled_tick: int | None = None
     martyr_key: tuple[str, ...] | None = None
 
@@ -67,6 +76,95 @@ def _require_int(value: Any, field: str) -> int:
             SessionReason.MALFORMED_SESSION, f"record field {field!r} must be an integer"
         )
     return value
+
+
+def _validate_draft_entry(actor_id: int, entry: Any) -> dict[str, Any]:
+    """Strictly validate one draft entry dictionary; reject malformed kinds/IDs/live objects."""
+    if not hasattr(entry, "items") or isinstance(entry, (str, bytes)):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"draft entry for actor {actor_id} must be a dict",
+        )
+    allowed_keys = {"kind", "payload"}
+    unknown = set(entry) - allowed_keys
+    if unknown:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"draft entry has unknown keys {sorted(unknown)}",
+        )
+    if "kind" not in entry or "payload" not in entry:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "draft entry requires 'kind' and 'payload'",
+        )
+    kind = entry["kind"]
+    payload = entry["payload"]
+    if not hasattr(payload, "items") or isinstance(payload, (str, bytes)):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "draft entry payload must be a dict",
+        )
+    if kind == "skill":
+        skill_keys = {"skill_key", "targets_or_shorthand", "scale"}
+        if set(payload) != skill_keys:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                f"skill draft payload fields mismatch: {sorted(payload)}",
+            )
+        if not isinstance(payload["skill_key"], str) or not payload["skill_key"]:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "invalid skill_key in draft")
+        t = payload["targets_or_shorthand"]
+        if isinstance(t, str):
+            if t not in {"all-enemies", "all-allies", "all"}:
+                raise CombatSessionError(SessionReason.MALFORMED_SESSION, "invalid target shorthand")
+        elif isinstance(t, (list, tuple)):
+            if any(isinstance(x, bool) or not isinstance(x, int) for x in t):
+                raise CombatSessionError(SessionReason.MALFORMED_SESSION, "skill draft target IDs must be ints")
+        elif not hasattr(t, "__iter__"):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "skill draft targets must be list or shorthand str")
+        scale = payload["scale"]
+        if isinstance(scale, bool) or not isinstance(scale, (int, float)):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "skill draft scale must be float")
+        import math
+        if not math.isfinite(float(scale)):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "skill draft scale must be finite")
+    elif kind == "item":
+        item_keys = {"item_key", "target_id"}
+        if set(payload) != item_keys:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, f"item draft payload fields mismatch: {sorted(payload)}")
+        if not isinstance(payload["item_key"], str) or not payload["item_key"]:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "invalid item_key in draft")
+        target_id = payload["target_id"]
+        if target_id is not None and (isinstance(target_id, bool) or not isinstance(target_id, int)):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "item target_id must be int or None")
+    elif kind == "tactical":
+        tactical_keys = {"tactical_key", "target_id"}
+        if set(payload) != tactical_keys:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, f"tactical draft payload fields mismatch: {sorted(payload)}")
+        if payload["tactical_key"] not in {"defend", "dodge", "taunt"}:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, f"unknown tactical key: {payload['tactical_key']!r}")
+        target_id = payload["target_id"]
+        if target_id is not None and (isinstance(target_id, bool) or not isinstance(target_id, int)):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "tactical target_id must be int or None")
+    else:
+        raise CombatSessionError(SessionReason.MALFORMED_SESSION, f"unknown draft command kind {kind!r}")
+    return {"kind": str(kind), "payload": dict(payload)}
+
+
+def _parse_draft_entries(raw: Any) -> dict[int, dict[str, Any]]:
+    """Parse and validate draft_entries mapping (actor_id -> draft entry)."""
+    if not hasattr(raw, "items") or isinstance(raw, (str, bytes)):
+        raise CombatSessionError(SessionReason.MALFORMED_SESSION, "draft_entries must be a dict")
+    result: dict[int, dict[str, Any]] = {}
+    for k, v in raw.items():
+        try:
+            actor_id = int(k)
+        except (TypeError, ValueError) as err:
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, f"invalid actor_id key in draft_entries: {k!r}") from err
+        if isinstance(k, bool):
+            raise CombatSessionError(SessionReason.MALFORMED_SESSION, "draft_entries actor_id cannot be bool")
+        result[actor_id] = _validate_draft_entry(actor_id, v)
+    return result
 
 
 def _parse_stamp_list(values: Any, field: str) -> tuple[str, ...] | None:
@@ -137,6 +235,14 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
             raise CombatSessionError(
                 SessionReason.MALFORMED_SESSION, "settled_tick must be non-negative"
             )
+    round_revision = _require_int(data.get("round_revision", 0), "round_revision")
+    if round_revision < 0:
+        raise CombatSessionError(SessionReason.MALFORMED_SESSION, "round_revision must be non-negative")
+    draft_version = _require_int(data.get("draft_version", 0), "draft_version")
+    if draft_version < 0:
+        raise CombatSessionError(SessionReason.MALFORMED_SESSION, "draft_version must be non-negative")
+    draft_entries = _parse_draft_entries(data.get("draft_entries", {}))
+    confirmed_actors = _parse_id_list(data.get("confirmed_actors", []), "confirmed_actors")
     martyr_key = _parse_stamp_list(data.get("martyr_key"), "martyr_key")
     record = CombatSessionRecord(
         session_id=session_id,
@@ -148,6 +254,10 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         knocked_out_ids=_parse_id_list(data["knocked_out_ids"], "knocked_out_ids"),
         rounds_elapsed=rounds_elapsed,
         exam_id=exam_id,
+        round_revision=round_revision,
+        draft_version=draft_version,
+        draft_entries=draft_entries,
+        confirmed_actors=confirmed_actors,
         settled_tick=settled_tick,
         martyr_key=martyr_key,
     )
@@ -182,6 +292,19 @@ def _validate_participant_shape(record: CombatSessionRecord) -> None:
                 SessionReason.MALFORMED_SESSION,
                 f"{field} references unknown dbrefs {sorted(stray)}",
             )
+    if record.draft_entries:
+        stray_draft = set(record.draft_entries) - set(record.player_ids)
+        if stray_draft:
+            raise CombatSessionError(
+                SessionReason.MALFORMED_SESSION,
+                f"draft_entries reference unknown player dbrefs {sorted(stray_draft)}",
+            )
+    stray_confirmed = set(record.confirmed_actors) - set(record.player_ids)
+    if stray_confirmed:
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            f"confirmed_actors reference unknown player dbrefs {sorted(stray_confirmed)}",
+        )
 
 
 def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
@@ -196,6 +319,13 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         "knocked_out_ids": list(record.knocked_out_ids),
         "rounds_elapsed": record.rounds_elapsed,
         "exam_id": record.exam_id,
+        "round_revision": record.round_revision,
+        "draft_version": record.draft_version,
+        "draft_entries": {
+            str(k): {"kind": v["kind"], "payload": dict(v["payload"])}
+            for k, v in (record.draft_entries or {}).items()
+        },
+        "confirmed_actors": list(record.confirmed_actors),
         "settled_tick": record.settled_tick,
         "martyr_key": (
             None if record.martyr_key is None else list(record.martyr_key)
@@ -217,7 +347,15 @@ def session_id_for(actor: Any, mode: str) -> str:
 
 def read_session(actor: Any) -> CombatSessionRecord | None:
     """Strictly parse ``actor.db.active_combat`` or return ``None``."""
-    raw = actor.db.active_combat
+    return _parse_raw_active_combat(actor.db.active_combat)
+
+
+def read_session_uncached(actor: Any) -> CombatSessionRecord | None:
+    """Read and parse the raw persistent active_combat record directly from the database bypassing idmapper."""
+    return _parse_raw_active_combat(_raw_active_combat(actor))
+
+
+def _parse_raw_active_combat(raw: Any) -> CombatSessionRecord | None:
     if raw is None:
         return None
     try:
@@ -233,6 +371,20 @@ def read_session(actor: Any) -> CombatSessionRecord | None:
             SessionReason.MALFORMED_SESSION,
             "active_combat could not be converted to a session record",
         ) from error
+
+
+def _raw_active_combat(actor: Any) -> Any:
+    """Query the database directly for actor's active_combat attribute value bypassing in-process cache."""
+    if not hasattr(actor, "db_attributes") or not hasattr(actor, "pk") or actor.pk is None:
+        return getattr(getattr(actor, "db", None), "active_combat", None)
+    row = (
+        actor.db_attributes.through.objects.filter(
+            objectdb_id=actor.pk, attribute__db_key="active_combat"
+        )
+        .values_list("attribute__db_value", flat=True)
+        .first()
+    )
+    return row
 
 
 def is_in_active_session(actor: Any) -> bool:
