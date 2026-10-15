@@ -60,6 +60,20 @@ def _alpha(card_id: str) -> str:
     return f'{_card(card_id)} {_ALPHA}'
 
 
+def _marker(card_id: str) -> str:
+    """The exact card's own persistent failure indicator.
+
+    The page carries other figure positions with their own markers (the
+    companion lineup's stage standee reports its own panel-level
+    availability), so the image-fault assertion names the position under test
+    rather than the first marker in the document. An unexpected browser
+    load/decode failure at THIS image position keeps its own image-scoped
+    indication (image-attempt-lifecycle); the panel-level message belongs to a
+    panel that cannot supply its data.
+    """
+    return f'{_card(card_id)} {_MARKER}'
+
+
 class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     """Gallery preview journeys on a per-test isolated server."""
 
@@ -154,8 +168,9 @@ class GalleryImageContractBrowserTest(ManagedServerTearDownMixin, BrowserAccepta
 
         # The reached failure keeps a persistent, keyboard-accessible marker
         # with bounded text (never a raw URL, path or exception).
-        marker = page.locator(_MARKER).first
+        marker = page.locator(_marker(SEEDED_ORIGINAL_IMAGE_ID))
         marker.wait_for(state="visible", timeout=30000)
+        self.assertEqual(page.locator(_marker(SEEDED_ORIGINAL_IMAGE_ID)).count(), 1)
         self.assertEqual(marker.get_attribute("role"), "status")
         self.assertIn("圖片載入失敗", marker.inner_text())
         self.assertNotIn(candidate["url"], marker.inner_text())
