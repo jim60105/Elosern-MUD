@@ -19,6 +19,7 @@ from world.rules.combat_session.battlefield import reconstruct_battlefield
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.records import (
     CombatSessionRecord,
+    read_session_uncached,
     read_session,
     session_id_for,
     to_storage,
@@ -32,6 +33,17 @@ from world.rules.skip_safety import (
 
 def _persist(actor: Any, record: CombatSessionRecord) -> None:
     actor.db.active_combat = to_storage(record)
+
+
+def _persist_draft_increment(commander: Any) -> None:
+    """Reload the uncached durable record and increment draft_version without dropping latest commands."""
+    from dataclasses import replace
+    current = read_session_uncached(commander)
+    if current is None:
+        current = read_session(commander)
+    if current is not None:
+        updated = replace(current, draft_version=current.draft_version + 1)
+        _persist(commander, updated)
 
 
 def _terminal_session_id(actor: Any, record: CombatSessionRecord | None) -> str | None:

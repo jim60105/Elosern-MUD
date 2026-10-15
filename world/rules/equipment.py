@@ -602,7 +602,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
                 )
             # Invalidate affected draft previews if in combat
             from world.rules.combat_session.records import read_session, read_session_uncached
-            from world.rules.combat_session.lifecycle import _persist
+            from world.rules.combat_session.lifecycle import _persist, _persist_draft_increment
             from world.rules.party import bound_owner_of
             commander = None
             if read_session(entity) is not None:
@@ -610,12 +610,7 @@ def toggle_equipment(entity: Any, item_key: str) -> EquipmentToggleResult:
             elif hasattr(entity, "db"):
                 commander = bound_owner_of(entity)
             if commander is not None:
-                rec = read_session(commander)
-                if rec is not None:
-                    from dataclasses import replace
-                    # Increment draft_version to invalidate in-flight draft edits
-                    updated_rec = replace(rec, draft_version=rec.draft_version + 1)
-                    _persist(commander, updated_rec)
+                _persist_draft_increment(commander)
     except Exception:
         restore_attribute_best_effort(entity, "buffs", buffs_snapshot)
         restore_attribute_best_effort(entity, "equipment", snapshot)

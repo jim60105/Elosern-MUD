@@ -361,6 +361,7 @@ def preflight_draft_entries(
     """
     required_actors = get_required_combat_actors(record, battlefield)
     if not required_actors:
+        membership_changed = bool(record.confirmed_actors) and (record.confirmed_actors != ())
         return {
             "is_complete": False,
             "empty_required": True,
@@ -370,6 +371,7 @@ def preflight_draft_entries(
             "reselection_reasons": {},
             "missing_actors": (),
             "needs_reselection": False,
+            "membership_changed": membership_changed,
         }
 
     valid_entries: dict[int, dict[str, Any]] = {}
@@ -437,6 +439,9 @@ def preflight_draft_entries(
                 valid_entries[actor_id] = entry
         elif kind == "tactical":
             tactical_key = payload.get("tactical_key")
+            if tactical_key not in {"defend", "dodge", "taunt"}:
+                reselection_reasons[actor_id] = {"reason": "invalid_tactical_key", "detail": f"unsupported tactical action: {tactical_key}"}
+                continue
             target_id = payload.get("target_id")
             if tactical_key == "taunt":
                 if target_id is None:
