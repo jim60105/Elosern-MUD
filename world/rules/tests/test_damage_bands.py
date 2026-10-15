@@ -43,7 +43,7 @@ class DamageBandTests(unittest.TestCase):
             )
 
     @covers_requirement(
-        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+        "combat-resolution::ratio-mitigation-clamps-negative-defense-and-shares-settlement-and-estimation"
     )
     def test_ratio_mitigation_integration_properties(self):
         # 1. Physical and magic symmetry through _handle_damage
@@ -141,7 +141,7 @@ class DamageBandTests(unittest.TestCase):
         self.assertEqual(target.traits.hp.value, 100)
 
     @covers_requirement(
-        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+        "combat-resolution::ratio-mitigation-clamps-negative-defense-and-shares-settlement-and-estimation"
     )
     def test_ratio_scalar_independent_arithmetic_evidence(self):
         # Task 1.1 / Spec: K=40, rounded pre-mitigation attack=60, defense=20 => 40
@@ -185,11 +185,10 @@ class DamageBandTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
+        "combat-resolution::ratio-mitigation-clamps-negative-defense-and-shares-settlement-and-estimation"
     )
     def test_rulebook_validation_rejects_invalid_mitigation_k(self):
         valid_base = {
-            "to_hit": {"defender_constant": 51},
             "damage": {
                 "crit_multiplier": 2.0,
                 "solid_hit_margin": 40,
@@ -210,7 +209,7 @@ class DamageBandTests(unittest.TestCase):
             validate_combat_rulebook("not a dict")
         # Missing damage section rejects
         with self.assertRaises(CombatRulebookError):
-            validate_combat_rulebook({"to_hit": {}})
+            validate_combat_rulebook({"other_section": {}})
         # Missing mitigation_k rejects
         missing_k = dict(valid_base, damage=dict(valid_base["damage"]))
         del missing_k["damage"]["mitigation_k"]

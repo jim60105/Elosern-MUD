@@ -46,7 +46,7 @@ an element rather than a registry lookup. The reserved token SHALL change nothin
 
 #### Scenario: The school segment alone selects the attacking stat
 - **WHEN** an elementless (`none`) damage effect settles
-- **THEN** the school segment alone selects the attacking stat, and the effect resolves through the same to-hit roll, defense subtraction, policy application and projection as an element-bearing one
+- **THEN** the school segment alone selects the attacking stat, and the effect resolves through the same to-hit roll, ratio defense mitigation, policy application and projection as an element-bearing one
 
 ### Requirement: The to-hit roll and damage number are computed during effect resolution, never inside
 apply()

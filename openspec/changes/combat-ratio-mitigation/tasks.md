@@ -16,8 +16,8 @@ Total estimate: **5.5 hours**, including implementation, focused verification, d
 
 ## 4. Bounded implementation and evidence (0.75h)
 
-- [ ] 4.1 Update canonical traceability annotations, affected design/API documentation and shard ownership; check changed contracts map to the delta requirements.
+- [x] 4.1 Update canonical traceability annotations, affected design/API documentation and shard ownership; check changed contracts map to the delta requirements.
 
 ## 5. Integration gate (0.75h)
 
-- [ ] 5.1 Run focused scalar, damage and estimator tests and tools.contract_gate; record commands and outcomes with no full suite.
+- [x] 5.1 Run focused scalar, damage and estimator tests and tools.contract_gate; record commands and outcomes with no full suite.
