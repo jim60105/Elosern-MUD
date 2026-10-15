@@ -551,6 +551,11 @@ to-hit   d100 + attacker agility   vs   60 + defender agility
 damage   (atk_phys × roll multiplier) − defender defense, floor 1
 ```
 
+> **Amended 2026-10-15 (change `combat-ratio-mitigation`).** Flat defense subtraction in the
+> damage formula is replaced by shared ratio mitigation:
+> `damage = int(max(attack_part * K / (K + max(0, defense)) + rider, floor))`
+> where finite positive `K` is configured in `rulebook/combat.yaml` (`mitigation_k`, initially 40).
+>
 > **Amended 2026-08-09 (change `dice-combat`).** The to-hit defender constant is **51**, not 60, in
 > `rulebook/combat.yaml` (`defender_constant: 51`): dice-combat's D-2 recalibrated it against the
 > real stat bands so the inclusive 1..100 roll reaches exact 50% parity. The formula shape is

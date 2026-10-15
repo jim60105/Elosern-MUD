@@ -14,7 +14,7 @@ are the ones an estimator most easily gets wrong:
 
 - the d100 multiplier ladder and the hit margin (:func:`damage_multiplier`,
   :func:`hit_margin`, :func:`strike_lands`);
-- the staged strike amount, including the defense subtraction, the
+- the staged strike amount, including ratio defense mitigation, the
   ``max_hp_fraction`` rider, the rulebook floor and the authored scale
   (:func:`strike_amount`, :func:`damage_rider`);
 - the staged heal amount and the capacity caps that decide how much of a staged
@@ -71,7 +71,7 @@ def strike_lands(margin: float) -> bool:
 def damage_rider(maximum_hp: float, max_hp_fraction: float) -> int:
     """Return the ``max_hp_fraction`` devastation rider of one strike.
 
-    The rider is added after defense subtraction on any successful hit,
+    The rider is added after ratio defense mitigation on any successful hit,
     regardless of whether a damage predicate is configured or matched, and it
     is zero for the ordinary ``max_hp_fraction=0.0`` policy.
     """
@@ -91,15 +91,19 @@ def strike_amount(
     """Return one landing strike's staged damage amount.
 
     ``round(attack x multiplier x coefficient x matched_multiplier)`` is the
-    pre-mitigation hit; the defense term is subtracted from it, the rider is
-    added, and the result never falls below the rulebook damage floor. That
+    pre-mitigation hit; ratio retention ``K / (K + max(0, defense))`` scales
+    that hit (where ``K`` is ``damage.mitigation_k`` from the combat rulebook),
+    the rider is added, and the result never falls below the rulebook damage
+    floor. That
     unscaled amount is then scaled by the authored cast magnitude, and the
     rulebook floor is re-applied so even a fractional cast lands its minimum
     hit -- the floor itself is never scaled.
     """
     floor = int(COMBAT_YAML["damage"]["floor"])
+    k = float(COMBAT_YAML["damage"]["mitigation_k"])
     attack_part = round(attack * multiplier * coefficient * matched_multiplier)
-    base_amount = int(max(attack_part - defense + rider, floor))
+    defense_used = max(0.0, float(defense))
+    base_amount = int(max(attack_part * k / (k + defense_used) + rider, floor))
     return int(max(scaled_magnitude(base_amount, scale), floor))
 
 

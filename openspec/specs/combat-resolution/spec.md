@@ -37,11 +37,16 @@ agility values are read through `SkillHandler.effective_value("agility")` (chang
 
 ### Requirement: Damage multiplier is banded by margin of success, with a magnitude-only critical on a
 natural 100
-`world/rules/rulebook/combat.yaml`'s `damage` section SHALL declare `crit_multiplier`,
-`solid_hit_margin`, `solid_hit_multiplier`, `base_multiplier`, and `floor`. Damage SHALL be
-`max(round(effective_attack_stat * roll_multiplier * effect_potency) - effective_defense, floor)`,
-`roll_multiplier` being `crit_multiplier` on a raw unmodified `roll_d100()` of 100, else
+Damage SHALL be
+`int(max(round(effective_attack_stat * roll_multiplier * effect_potency * matched_multiplier) * K / (K + max(0, effective_defense)) + rider, floor))`
+followed by the authored scale and final floor, where `K` is the rulebook's finite positive
+`damage.mitigation_k`. `roll_multiplier` is `crit_multiplier` on a raw `roll_d100()` of 100, else
 `solid_hit_multiplier` at margin >= `solid_hit_margin`, else `base_multiplier`.
+
+#### Scenario: The damage rulebook declares every band constant
+- **WHEN** the combat rulebook is loaded
+- **THEN** its `damage` section declares `crit_multiplier`, `solid_hit_margin`,
+  `solid_hit_multiplier`, `base_multiplier`, and `floor`
 
 #### Scenario: A bare hit uses the base multiplier
 - **WHEN** an attack hits with a margin of success below `solid_hit_margin` and the raw roll is not 100
@@ -62,7 +67,7 @@ natural 100
   have qualified only for `base_multiplier`
 
 #### Scenario: Damage never drops below the floor
-- **WHEN** `effective_attack_stat * roll_multiplier - effective_defense` computes to a value at or
+- **WHEN** `the mitigated attack component plus rider` computes to a value at or
   below zero
 - **THEN** the applied damage equals `damage.floor`, never zero or negative
 
@@ -82,12 +87,12 @@ natural 100
 #### Scenario: Unconditional execution bypass ignores any target's defense
 - **WHEN** a synthetic policy with `bypass_defense=True` and an empty predicate damages a high-defense
   and a low-defense target, and separately authoring attaches an attack multiplier to an empty predicate
-- **THEN** both hits subtract no defense while the identical coefficient without bypass differs by the
+- **THEN** both hits use zero defense for ratio mitigation while the identical coefficient without bypass differs by the
   targets' defense, and the multiplier-with-empty-predicate authoring still raises at construction
 
 #### Scenario: Divert runs after the full formula and pays from the named gauge
 - **WHEN** a synthetic divert profile (fraction, cap) is active on a target whose authored hit amount
-  (post-defense, post-rider, post-scale) exceeds the fraction's product with the target's budget
+  (post-ratio, post-rider, post-scale) exceeds the fraction's product with the target's budget
 - **THEN** exactly `round(amount × fraction)` capped by remaining budget and current gauge is paid
   from the gauge through the canonical writer, HP drops only by the residual, and the same roll
   without the profile delivers the full authored HP amount
@@ -127,10 +132,10 @@ natural 100
 - **WHEN** a declared conditional policy resolves defense
 - **THEN** defense is zero only when its configured bypass predicate matches or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which validates at construction (an attack multiplier with an empty predicate stays invalid)
 
-#### Scenario: The maximum-HP component is added after defense subtraction
+#### Scenario: The maximum-HP component is added after defense mitigation
 
 - **WHEN** a declared conditional policy with a maximum-HP fraction hits
-- **THEN** floor(max_hp * declared_fraction) is added after defense subtraction on a successful hit
+- **THEN** floor(max_hp * declared_fraction) is added after ratio mitigation on a successful hit
 
 #### Scenario: Existing ordering rules follow the new components
 
@@ -548,3 +553,18 @@ chances, and otherwise the maximum declared chance among matched zero-action rul
 
 - **WHEN** the side-effect-free action preview runs against a chance-bearing lock holder
 - **THEN** it keeps reporting the deterministic bundle state without ever consuming the roll
+
+### Requirement: Ratio mitigation clamps negative defense and shares settlement and estimation
+Physical and magic damage on both sides SHALL use the same ratio retention K/(K+max(0, adjusted_defense)). Explicit defense bypass SHALL use zero defense. K SHALL be finite and positive; invalid rulebook values SHALL fail load. Attack rounding, post-mitigation rider, pre-scale floor, half-up scale and final hit floor SHALL retain their defined order.
+
+#### Scenario: Independent ratio example
+- **WHEN** K is 40, rounded pre-mitigation attack is 60 and defense is 20
+- **THEN** both damage schools resolve 40 before riders, scale or tactical reduction, independently of registry magnitudes
+
+#### Scenario: Negative defense and load failures
+- **WHEN** defense is negative, or K is zero, negative, bool or nonfinite
+- **THEN** negative defense behaves as zero, and every invalid K declaration rejects at load
+
+#### Scenario: Miss and shared expectation
+- **WHEN** a strike misses or an estimator evaluates the same successful fixed-roll strike
+- **THEN** a miss causes no strike damage and the estimator equals settlement for bypass, conditional multiplier, rider and scale cases

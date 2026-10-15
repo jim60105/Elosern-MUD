@@ -4,11 +4,16 @@
 
 ### Requirement: Damage multiplier is banded by margin of success, with a magnitude-only critical on a
 natural 100
-`world/rules/rulebook/combat.yaml`'s `damage` section SHALL declare `crit_multiplier`,
-`solid_hit_margin`, `solid_hit_multiplier`, `base_multiplier`, and `floor`. Damage SHALL be
-`int(max(round(effective_attack_stat * roll_multiplier * effect_potency * matched_multiplier) * K / (K + max(0, effective_defense)) + rider, floor))` followed by the existing authored scale and final floor,
-where finite positive `K` is loaded from the combat rulebook (initially 40), matched_multiplier defaults to 1, rider defaults to 0, and `roll_multiplier` is `crit_multiplier` on a raw unmodified `roll_d100()` of 100, else
+Damage SHALL be
+`int(max(round(effective_attack_stat * roll_multiplier * effect_potency * matched_multiplier) * K / (K + max(0, effective_defense)) + rider, floor))`
+followed by the authored scale and final floor, where `K` is the rulebook's finite positive
+`damage.mitigation_k`. `roll_multiplier` is `crit_multiplier` on a raw `roll_d100()` of 100, else
 `solid_hit_multiplier` at margin >= `solid_hit_margin`, else `base_multiplier`.
+
+#### Scenario: The damage rulebook declares every band constant
+- **WHEN** the combat rulebook is loaded
+- **THEN** its `damage` section declares `crit_multiplier`, `solid_hit_margin`,
+  `solid_hit_multiplier`, `base_multiplier`, and `floor`
 
 #### Scenario: A bare hit uses the base multiplier
 - **WHEN** an attack hits with a margin of success below `solid_hit_margin` and the raw roll is not 100
@@ -94,7 +99,7 @@ where finite positive `K` is loaded from the combat rulebook (initially 40), mat
 - **WHEN** a declared conditional policy resolves defense
 - **THEN** defense is zero only when its configured bypass predicate matches or the policy declares the unconditional execution-tier bypass — `bypass_defense=True` with an empty predicate, which validates at construction (an attack multiplier with an empty predicate stays invalid)
 
-#### Scenario: The maximum-HP component is added after defense subtraction
+#### Scenario: The maximum-HP component is added after defense mitigation
 
 - **WHEN** a declared conditional policy with a maximum-HP fraction hits
 - **THEN** floor(max_hp * declared_fraction) is added after ratio mitigation on a successful hit
