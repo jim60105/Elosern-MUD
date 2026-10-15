@@ -1,27 +1,27 @@
 # Tasks
 
-Total estimate: **7 hours**, including implementation, focused verification, documentation and integration. Prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Every group lands its own relevant tests/docs; the final group checks integration.
+Total estimate: **6.5 hours**, including implementation, focused verification, documentation and integration. Direct prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Each group lands its own tests/docs; the final group checks integration.
 
-## 1. Bounded implementation and evidence (1.5h)
+## 1. Bounded implementation and evidence (1.25h)
 
-- [ ] 1.1 Add bounded real-party calibration scenarios with explicit draft commands and existing simulation discipline; test no growth/reward drift, real kit/restrictions and command completeness.
+- [ ] 1.1 Implement exactly the eight named human encounter cells in design using real kit, explicit complete draft choices, seeds0-3 and the existing 200-round/simulation discipline; test no reward/growth drift.
 
-## 2. Bounded implementation and evidence (1.5h)
+## 2. Bounded implementation and evidence (1.25h)
 
-- [ ] 2.1 Measure the complete arithmetic/skill budget matrix in both damage directions including estimator agreement and magic/bypass/rider/scale/multi-strike controls.
+- [ ] 2.1 Execute the 32 baseline encounter trials and record rejects, defeats/retreats/losses/all-standing/unfinished/medians and actual restrictions; use previously completed factor-budget evidence.
 
-## 3. Bounded implementation and evidence (1h)
+## 3. Bounded implementation and evidence (1.25h)
 
-- [ ] 3.1 Run fixed-seed representative encounter probes and record outcomes/medians/rejections; include tactical and constrained-enemy alternatives.
+- [ ] 3.1 Evaluate the fixed tuning surface and select retained/changed K/tactics/weapon values from measured outcomes; if implicated skills need magnitude changes, tune only the two named physical probe skill definitions.
 
 ## 4. Bounded implementation and evidence (1h)
 
-- [ ] 4.1 Select balance values from observed outcomes and make only evidence-supported authored adjustments; repeat affected bounded probes and record baseline versus selected results.
+- [ ] 4.1 Rerun the same 32 selected-value trials once and record initial versus selected outcomes; diagnose any real-kit mismatch before acceptance without dropping a cell.
 
-## 5. Bounded implementation and evidence (1h)
+## 5. Bounded implementation and evidence (0.75h)
 
-- [ ] 5.1 Update existing evidence documentation, data-contract expectations, canonical IDs and shard ownership with exact seeds/backend/revision and limitations.
+- [ ] 5.1 Update actual evidence, narrow authored-data expectations, canonical IDs and shard ownership; preserve historical and upper-tier limitations.
 
 ## 6. Integration gate (1h)
 
-- [ ] 6.1 Run focused calibration and changed-rule tests plus tools.contract_gate; run observability lint if logs change, with no broad suite or full CI-owned trace evidence.
+- [ ] 6.1 Run focused calibration/changed-data tests and tools.contract_gate; no broad suite or CI-owned full trace verification.
