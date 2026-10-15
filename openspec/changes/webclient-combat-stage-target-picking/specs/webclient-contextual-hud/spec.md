@@ -5,11 +5,11 @@ During the stage target step that "Combat targets are picked on the stage figure
 
 #### Scenario: The card collapses to a target prompt
 - **WHEN** the stage target step opens at 1451x790 and at 1600x900 with one, two and three standing foes and parties of one, four and five figures
-- **THEN** the card keeps its horizontal centre, width and top, its height is at most 72px × S, it shows the action's label (with the chosen 威力 label when the skill carries one), 選擇目標, the focused position's name and side or group label and size, and `Esc 返回`; an AREA step also shows one chip per group position and the confirm chip; the row region is hidden, DOM focus is on `#action-dock`, and the prompt intersects no arrow marker, foe name plate or gauge
+- **THEN** the card keeps its horizontal centre, width and top and its height is at most 136px × S; in `--text-sm` it shows one line with the action's label (with the chosen 威力 label when the skill carries one), 選擇目標 and `Esc 返回`, and one line with the focused position's summary, each ending in an ellipsis when too long; an AREA step adds one chip per group position and the confirm chip, wrapping onto at most two chip rows; the row region is hidden, DOM focus is on `#action-dock`, and the prompt intersects no arrow marker, foe name plate or gauge (the only marker inside the card's columns is the rearmost of three foes, whose marker top stands at y 209 at 1451x790 and y 239 at 1600x900)
 
 #### Scenario: Every figure dims except the lit set
 - **WHEN** the step focuses one foe among three standing foes with a four-figure party
-- **THEN** that foe's stage actor is lit (`data-speaking="true"`) and every other stage actor — the controlled figure, each companion and the other foes — carries the dialogue listener dim (`data-speaking="false"`, the shared `--actor-dim` brightness); no figure moves, resizes, lifts or changes z; when the step ends every figure returns to its combat state in the same frame
+- **THEN** that foe's stage actor is lit (`data-speaking="true"`) and every other stage actor — the controlled figure, each companion and the other foes — carries the dialogue listener dim (`data-speaking="false"`, the shared `--actor-dim` brightness); no figure moves, resizes, lifts or changes z; when the step ends every figure returns in the same frame to its state before the step — in combat the controlled figure and the foes are undimmed and the companions keep their existing listener dim
 
 #### Scenario: Selectable figures carry arrow markers
 - **WHEN** the step renders with three candidates among five standing figures
@@ -25,7 +25,7 @@ During the stage target step that "Combat targets are picked on the stage figure
 
 #### Scenario: The focused target is announced
 - **WHEN** the step opens on a foe, the focus moves to an ally, to an off-stage foe, to the `all-allies` group position, and to the AREA confirm position with two members selected
-- **THEN** a polite live region inside the card announces, in order, the foe's name and 敵方, the ally's name and 我方, the off-stage foe's name with 敵方 and 場外, 全體我方 with its size, and 施展 with 已選 2 名; it announces only focus and selection changes, never a dim or pulse change
+- **THEN** a polite live region inside the card announces, in order, exactly `目標：<foe name>，敵方`, `目標：<ally name>，我方`, `目標：<foe name>，敵方，場外`, `目標：全體我方，共 <n> 名` and `施展：已選 2 名`; a selected member appends `，已選`, the confirm position with a chosen shorthand reads `施展：<group label>，共 <n> 名` and with nothing chosen `施展：尚未選擇目標`, a SELF step reads `目標：自己`, and when two candidates share a display name each member announcement appends the participant's session token in full-width parentheses (`（e2）`); it announces only focus and selection changes, never a dim or pulse change
 
 #### Scenario: An off-stage position cues the participant frame
 - **WHEN** the step focuses a candidate that no stage figure draws
@@ -169,7 +169,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 
 #### Scenario: The width and height follow the stated formulas
 - **WHEN** combat renders at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
+- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
 
 #### Scenario: The card is at dead centre for every party size and foe count
 - **WHEN** combat renders at 1451x790 and at 1600x900 with one, two, three and five active foes, each with a solo player, a four-figure party (the player and three companions) and a five-figure party
@@ -177,7 +177,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 
 #### Scenario: The width follows the guaranteed gap on the party side
 - **WHEN** combat renders with a solo player, a three-figure party, a four-figure party and a five-figure party at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 224 at 1451x790 and 308.8, 308.8, 249.8 and 247.0 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 16.5px at 1451x790 and 40.5px at 1600x900
+- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 240 at 1451x790 and 308.8, 308.8, 264.6 and 264.6 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 24.5px at 1451x790 and 49.5px at 1600x900
 
 #### Scenario: The card never covers a foe plate, gauge or cue
 - **WHEN** combat renders at 1451x790 and at 1600x900 with one, two and three active foes, including while the attack target frame focuses the rearmost foe
@@ -192,7 +192,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 - **THEN** the card's rendered box is identical (±1px) in every frame except the stage target step, where it collapses to the target prompt that "The stage target step presents the targets on the stage figures" defines at the same centre, width and top; the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
 
 #### Scenario: Every frame lays out in one narrow column
-- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 224px × S wide card
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 240px × S wide card
 - **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
 
 #### Scenario: The detail folds into a strip below the rows
@@ -230,6 +230,8 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 #### Scenario: Playback veils the card's body
 - **WHEN** a combat round plays by itself and locks the commands, and later the player activates 跳過演出
 - **THEN** the waiting cue with its skip control covers the card's body inside the card while the card keeps its box, and the skip ends the round through the existing skip path
+
+## MODIFIED Requirements
 
 ### Requirement: Foes stand opposite the player during combat
 While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor for each committed combat participant whose team is the opposing side and whose state is active, in the presenter's order, at most three. When no foe is active the line-up SHALL render nothing.

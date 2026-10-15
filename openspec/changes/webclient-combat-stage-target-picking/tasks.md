@@ -27,7 +27,8 @@ same class of defect.
   `all`; confirm lit = selection, then = chosen shorthand; payloads unchanged); NONE and a disabled skill (no step,
   arrows reach the router); a fifth foe and a knocked-out foe as off-stage positions; a knocked-out companion
   candidate on stage; a panel replacement removing the focused candidate (focus repaired, lit set follows);
-  `beatLocked` (null model, arrows unclaimed); digits still address server order; announcement strings for member,
+  `beatLocked` (null model, arrows unclaimed); digits still address server order; an arrow from a back-row focus goes to the first/last position; the exact
+  announcement templates (and the token suffix for duplicate names) for member,
   ally, off-stage, group and confirm. Run `pnpm test -- web/webclient-app/tests/store/stage_target_step.test.js
   web/webclient-app/tests/store/combat_command_window.test.js web/webclient-app/tests/store/digit_row_picks.test.js`
   and verify it passes.
@@ -41,7 +42,7 @@ same class of defect.
 - [ ] 2.2 `components/ParticipantFrame.vue`: `targetCues` → `data-target-cue` and the arrow glyph on off-stage rows.
 - [ ] 2.3 `components/ActionDock.vue`: the target prompt, the hidden row region, the focus move to `#action-dock`,
   the AREA chips and the polite live region (design D3); `components/HudFrame.vue`: the step's `height: auto;
-  max-height: 72px·S` card rule. `AppClient.vue`: pass `targeting`/`targetCues`/`stageTarget` from
+  max-height: 136px·S` card rule; chips are `tabindex="-1"` buttons that return DOM focus to `#action-dock`. `AppClient.vue`: pass `targeting`/`targetCues`/`stageTarget` from
   `store.view.stageTarget` and wire the hit areas and chips to `stageTargetPointer`.
 - [ ] 2.4 Extend `tests/core/foe_lineup.test.js` and `tests/core/companion_lineup.test.js` (lit vs dimmed
   `data-speaking`, markers only on selectable slots with the right `data-state`, digit and ✓, hit areas only while
@@ -57,10 +58,11 @@ Build once: `pnpm run build`.
 
 - [ ] 3.1 Add to `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest`:
   `test_targets_are_picked_on_the_stage` (1451x790 and 1600x900; four-figure party, three foes; Attack: the card
-  collapses to ≤ 72px·S at the same centre/width/top and intersects no marker; every non-focused figure has
+  collapses to ≤ 136px·S at the same centre/width/top and intersects no marker (also with an AREA skill's chips); every non-focused figure has
   `data-speaking="false"`, the focused foe `"true"`; markers only on candidates; the member order by marker `left`
   equals the stage order; ArrowLeft/Right move along it; a pointer click on a foe hit area sends exactly one
-  `combat.cast` equal to the keyboard payload; Escape restores every figure and removes every marker) and
+  `combat.cast` equal to the keyboard payload; Escape restores every figure's `data-speaking` to a snapshot taken before the step and removes every marker;
+  an AREA chip click followed by ArrowRight and Enter activates the focused position, not the chip) and
   `test_area_targets_light_groups_on_the_stage` (an AREA skill: Space selects two foes with ✓ markers; the
   `all-allies` position lights every party candidate; confirm sends `target_shorthand`; under `reduced` motion the
   focused figure's computed `animation-name` is `none` and the underline is present; a fifth foe focused cues its

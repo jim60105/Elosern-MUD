@@ -13,7 +13,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 
 #### Scenario: Arrow keys move along the stage
 - **WHEN** the player presses ArrowRight, ArrowDown, ArrowLeft and ArrowUp in a stage target step with four positions
-- **THEN** ArrowRight and ArrowDown move the frame's focus to the next position in stage order and ArrowLeft and ArrowUp to the previous one, each wrapping at the ends, through the router's existing focus-by-key operation; in a SELF step every arrow keeps the focus where it is; outside the stage target step the arrow keys reach the router unchanged
+- **THEN** ArrowRight and ArrowDown move the frame's focus to the next position in stage order and ArrowLeft and ArrowUp to the previous one, each wrapping at the ends, through the router's existing focus-by-key operation; in a SELF step every arrow keeps the focus where it is; when the frame's focus is on an item that is no position (such as a back row), ArrowRight and ArrowDown move to the first position and ArrowLeft and ArrowUp to the last; outside the stage target step the arrow keys reach the router unchanged
 
 #### Scenario: Enter, Space, digits and Escape keep their meaning
 - **WHEN** the player presses Enter on a SINGLE position, Space and then Enter on an AREA member, Enter on an AREA group position, Enter on the AREA confirm position, a digit, and Escape
@@ -25,7 +25,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 
 #### Scenario: Pointer picks a figure
 - **WHEN** the player moves the pointer over a selectable foe's figure, then clicks it, and in an AREA step clicks a group chip and the confirm chip in the target prompt
-- **THEN** hovering focuses that foe's position, the click focuses it and activates it through the router's confirm with a pointer source, sending exactly one `combat.cast` for a SINGLE step and toggling the member for an AREA step, and the chips choose their shorthand and submit the AREA payload; a figure that is not a candidate takes no pointer
+- **THEN** hovering focuses that foe's position, the click focuses it and activates it through the router's confirm with a pointer source, sending exactly one `combat.cast` for a SINGLE step and toggling the member for an AREA step, and the chips choose their shorthand and submit the AREA payload; after a chip click DOM focus is back on `#action-dock`, so a following Enter activates the focused position rather than the chip; a figure that is not a candidate takes no pointer
 
 #### Scenario: Whole-group positions light the group
 - **WHEN** an AREA skill carries the shorthands `all-enemies` and `all-allies` and the player moves onto the `all-enemies` position, then to `all-allies`, then presses Enter and moves to the confirm position

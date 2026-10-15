@@ -10,8 +10,8 @@ an arrow marks every figure the action may target, and the focused one is lit an
 ## What Changes
 
 - **Stage target step.** While the current frame is the target frame of an enabled SINGLE, SELF or AREA skill
-  (Attack included), the card collapses to a one- or two-line **target prompt** (action, 選擇目標, the focused
-  target and side or group and size, `Esc 返回`; AREA adds group/confirm chips) and the targets are chosen on the
+  (Attack included), the card collapses to a **target prompt** of at most 136px·S (action, 選擇目標, `Esc 返回`, the
+  focused target and side or group and size; AREA adds up to two rows of group/confirm chips) and the targets are chosen on the
   stage. NONE and disabled-skill frames keep their card rows.
 - **Presentation.** Every stage figure (controlled figure, companions, foes) takes the existing dialogue listener dim
   (`StageActor`'s `dimmed` → `data-speaking="false"`, `--actor-dim`), except the focused position's lit set. An arrow

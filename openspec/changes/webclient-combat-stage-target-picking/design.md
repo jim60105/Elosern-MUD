@@ -60,14 +60,16 @@ locked.
   `all-allies` → `team === "party"`, `all` → every candidate); confirm → the explicit selection, else the chosen
   shorthand's set, else empty; self → the controlled figure's identity.
 - **Labels**: side 敵方/我方 from `team`; groups 全體敵人/全體我方/全體 (client display labels for the three approved
-  keys; the payload keeps the key); 場外 for an off-stage member; the announcement strings are built here so Vitest
+  keys; the payload keeps the key); 場外 for an off-stage member; the exact announcement templates of the spec
+  (with the session token appended when display names repeat) are built here so Vitest
   pins them.
 - Identity joins use `String(identity)` exactly as `lineupSlotByIdentity` does.
 
 ### D2. Arrow keys: a claim in `focusPress`, nothing else
 
 When `view.stageTarget` is non-null and the key is an arrow, `focusPress` moves to the next/previous position key
-(wrapping; no-op for a single position) with `router.focusItemByKey(key)` and returns `true`. Enter, Space, digits,
+(wrapping; no-op for a single position; from a focused item that is no position, such as a back row, Right/Down
+go to the first position and Left/Up to the last) with `router.focusItemByKey(key)` and returns `true`. Enter, Space, digits,
 Escape and `/` continue to the existing paths, so the router's own geometry, item order and confirm path are
 untouched and the digits still address items in server order (each marker shows its digit, D4). Rejected: reordering
 the frame's items to stage order in the frame resolver — it would change digit mapping, the "server candidate order"
@@ -76,14 +78,20 @@ contract and the AREA grid geometry.
 ### D3. The card collapses to a target prompt
 
 `ActionDock` (card mode) takes `stageTarget`; when non-null it renders the prompt instead of the visible row region:
-line 1 the action label (with the scale label from `scaleLabelFor` when the skill has a chosen 威力), ` ‧ 選擇目標`,
-and the focused position summary; line 2 (AREA) one chip per group position and the confirm chip (buttons that call
-the store's pointer entry, D5), plus `Esc 返回`. The DockMenu row region stays mounted with the `hidden` attribute
+all in `--text-sm` (16px, 22px·S lines): line 1 the action label (with the scale label from `scaleLabelFor` when the
+skill has a chosen 威力), ` ‧ 選擇目標` and a right-aligned `Esc 返回`; line 2 the focused position summary; both
+single lines with an ellipsis; then (AREA) one chip per group position and the confirm chip, 28px·S tall with 4px·S
+gaps, wrapping onto at most two rows (全體敵人, 全體我方, 全體 and 施展（n） need ≈ 290px at S = 1, more than the
+214px inner width). The chips are `<button tabindex="-1">` whose `mousedown` is prevented and whose click handler
+returns DOM focus to `#action-dock`, because `bridge.js` leaves Enter on a focused button to the button. The DockMenu row region stays mounted with the `hidden` attribute
 (so router state and focus bookkeeping are unchanged) and DOM focus moves to `#action-dock` when it was inside the
 row region. The card's anchor rule from the previous change keeps `left`/`width`/`top`; in the step the dock's
-height is `auto` with `max-height: 72px·S`. With the card top at 58 / 70.6 the prompt ends by y 130 / 150, above
-every arrow marker (the rearmost foe's box top is 170.8 / 194.6 with two foes and 237 / 269.9 with three; the single
-foe and the party stand outside the card's columns).
+height is `auto` with `max-height: 136px·S` (12 + 22 + 22 + 28 + 4 + 28 + 12 = 128 at S = 1). Clearance: markers are
+24px·S tall with their bottom 4px·S above the figure box. The only marker inside the card's columns at the measured
+configurations is the rearmost of three foes (box centre 856.1 vs card right edge ≤ 865.5 at 1451; marker 948.8–975.2
+vs card right edge ≤ 954.4 at 1600), whose marker top is 237 − 4 − 24 = 209 / 269.9 − 4.4 − 26.5 = 239; the prompt
+ends by 58 + 136 = 194 / 70.6 + 150 = 220.6, at least 8px·S above it. With two foes the rear marker centre (947.1 /
+1065.8) and every party marker (controlled box centre ≤ 466.6 / 531.0) lie outside the card's columns.
 
 A `<p role="status" aria-live="polite" class="sr-only">` inside the card carries `stageTarget.announce`; it changes
 only with the focus or the selection.
