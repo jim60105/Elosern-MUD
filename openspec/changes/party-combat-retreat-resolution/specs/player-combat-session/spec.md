@@ -47,7 +47,6 @@ Confirmed retreat SHALL replace all personal commands and attempt before ordinar
 - **WHEN** no pursuers remain or no allied member can act
 - **THEN** no pursuers gives automatic escape without a roll; no acting ally uses ordinary defeat
 
-
 ### Requirement: Successful retreat carries the entire present party and counts one round
 A successful retreat SHALL remove the whole present party from combat, carrying knocked-out companions without including them in the agility minimum. Enemies SHALL take no action and exactly one elapsed combat round SHALL be added and settled. The operation SHALL add no healing, revival or invented relocation.
 
@@ -59,7 +58,6 @@ A successful retreat SHALL remove the whole present party from combat, carrying 
 - **WHEN** a successful retreat confirmation is duplicated across reconnect or restart
 - **THEN** the party outcome and added round/time settle once, never leaving a subset in combat
 
-
 ### Requirement: Failed retreat consumes all allied actions and runs one ordinary enemy upkeep round
 A failed retreat SHALL keep the entire party in combat, consume every allied action opportunity, allow eligible enemies their normal initiative actions and run ordinary upkeep once. It SHALL cost no MP/SP, activate no Defend/Dodge/Taunt and execute no old draft command. A nonterminal failure SHALL create a fresh next-round draft.
 
@@ -70,5 +68,4 @@ A failed retreat SHALL keep the entire party in combat, consume every allied act
 #### Scenario: Failure rollback
 - **WHEN** a technical failure occurs after enemy, upkeep or retreat metadata writes
 - **THEN** all round state and caches restore together and the accepted operation remains safe to retry without double time
-
 

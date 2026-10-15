@@ -68,7 +68,6 @@ FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`, and `effe
 - **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
-
 ### Requirement: The disengage effect handler computes flee success from the same agility-difference
 The individual contest below SHALL remain the enemy and noninteractive mechanism. Allied interactive retreat SHALL use the party contest rather than invoking this individual effect.
 
@@ -138,7 +137,6 @@ player-chosen target
 - **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
-
 ### Requirement: A successful flee adds the fleeing entity's key to Battlefield.fled; a failed attempt
 The individual mutation below SHALL remain the enemy and noninteractive mechanism. Allied interactive exit SHALL mutate the whole party only through confirmed retreat.
 
@@ -164,5 +162,4 @@ outcome SHALL write to any entity's `traits`, `sexual`, `buffs`, or `skill_grant
 #### Scenario: Allied interactive escape uses party confirmation
 - **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
 - **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
-
 
