@@ -131,6 +131,43 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster = _monster("persist goblin")
         self.monster.location = self.room
 
+    def test_final_confirmation_commits_once_and_clears_draft(self):
+        from world.rules.combat_session import confirm_actor_command
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        command = {"kind": "skill", "payload": {
+            "skill_key": BASIC_ATTACK_KEY, "targets_or_shorthand": [self.monster.pk], "scale": 1.0,
+        }}
+        with patch("world.rules.combat_session.rounds.run_round", return_value=[] ) as run:
+            result = confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, command)
+            duplicate = confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, command)
+        self.assertTrue(result["ok"])
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(duplicate["reason"], "stale_round_revision")
+        current = read_session(self.player)
+        self.assertEqual((current.round_revision, current.rounds_elapsed), (1, 1))
+        self.assertEqual(current.draft_entries, {})
+        self.assertEqual(result["receipt"]["round_revision"], 0)
+
+    def test_technical_failure_preserves_accepted_final_draft(self):
+        from world.rules.combat_session import confirm_actor_command
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        command = {"kind": "skill", "payload": {
+            "skill_key": BASIC_ATTACK_KEY, "targets_or_shorthand": [self.monster.pk], "scale": 1.0,
+        }}
+        with patch("world.rules.combat_session.rounds.run_round", side_effect=RuntimeError("fault")):
+            with self.assertRaisesRegex(RuntimeError, "fault"):
+                confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, command)
+        current = read_session(self.player)
+        self.assertEqual((current.round_revision, current.rounds_elapsed, current.draft_version), (0, 0, 1))
+        self.assertEqual(current.draft_entries[self.player.pk], command)
+        self.assertIsNone(self.player.db.last_combat_receipt)
+        with patch("world.rules.combat_session.rounds.run_round", return_value=[]):
+            result = confirm_actor_command(self.player, record.session_id, 0, 1, self.player.pk, command)
+        self.assertTrue(result["ok"])
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
     def test_disconnect_reconnect_resumes_same_session(self):
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id

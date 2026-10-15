@@ -355,6 +355,7 @@ def _settle_with_restore(
 
     extra: dict[str, tuple[bool, Any]] = {
         "active_combat": _attribute_snapshot(actor, "active_combat"),
+        "last_combat_receipt": _attribute_snapshot(actor, "last_combat_receipt"),
         "buffs": _attribute_snapshot(actor, "buffs"),
     }
     battlefield_buff_snapshots: list[tuple[Any, tuple[bool, Any]]] = []

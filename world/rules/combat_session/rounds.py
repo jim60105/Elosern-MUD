@@ -28,12 +28,15 @@ from world.rules.combat_session.errors import CombatSessionError, SessionReason
 from world.rules.combat_session.policies import (
     _overwhelm_provider,
     _round_provider,
+    _party_round_provider,
 )
 from world.rules.combat_session.lifecycle import _persist
 from world.rules.combat_session.records import (
     CombatSessionRecord,
     read_session,
     read_session_uncached,
+    read_last_combat_receipt,
+    write_last_combat_receipt,
 )
 from world.rules.combat_session.scans import (
     _scan_friendly_fire,
@@ -387,6 +390,14 @@ def preflight_draft_entries(
         if actor_obj is None:
             reselection_reasons[actor_id] = {"reason": "actor_missing", "detail": "actor not on battlefield"}
             continue
+        try:
+            authorize_combat_actor(commander, actor_obj, record, battlefield)
+        except CombatSessionError as auth_err:
+            reselection_reasons[actor_id] = {
+                "reason": "forbidden_actor",
+                "detail": str(auth_err.args[0]),
+            }
+            continue
 
         kind = entry.get("kind")
         payload = entry.get("payload", {})
@@ -473,7 +484,34 @@ def preflight_draft_entries(
     }
 
 
+from world.rules.combat_session.writer import serialized_combat_write
+
+
+@serialized_combat_write
 def confirm_actor_command(
+    commander: Any,
+    session_id: str,
+    round_revision: int,
+    draft_version: int,
+    actor_id: int,
+    command: dict[str, Any],
+) -> dict[str, Any]:
+    """Commit the edit before resolving a complete draft under the writer."""
+    result = _admit_actor_command(
+        commander, session_id, round_revision, draft_version, actor_id, command
+    )
+    if not result.get("ok") or not result.get("is_complete"):
+        return result
+    record = read_session_uncached(commander)
+    battlefield = reconstruct_battlefield(commander, record)
+    return _submit_request(
+        commander, record, battlefield, None,
+        commanded_kind="draft", commanded_key="",
+        complete_draft=True,
+    )
+
+
+def _admit_actor_command(
     commander: Any,
     session_id: str,
     round_revision: int,
@@ -484,9 +522,18 @@ def confirm_actor_command(
     """Admit or replace one actor's command in the persistent session draft under deterministic CAS."""
     combat_snapshot = attribute_snapshot(commander, "active_combat")
     try:
-        with transaction.atomic():
+        with transaction.atomic(durable=True):
             record = read_session_uncached(commander)
             if record is None:
+                receipt = read_last_combat_receipt(commander)
+                if receipt is not None and receipt.get("session_id") == session_id:
+                    return {
+                        "ok": False,
+                        "reason": "already_committed",
+                        "receipt": receipt,
+                        "session_id": session_id,
+                        "round_revision": round_revision,
+                    }
                 raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
             if record.session_id != session_id:
                 raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
@@ -497,6 +544,7 @@ def confirm_actor_command(
                     "current_round_revision": record.round_revision,
                     "draft_version": record.draft_version,
                     "session_id": record.session_id,
+                    "receipt": read_last_combat_receipt(commander),
                 }
             if record.draft_version != draft_version:
                 # Stale edit CAS rejection
@@ -605,6 +653,32 @@ def confirm_actor_command(
         raise
 
 
+def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> dict[int, combat.RoundRequest]:
+    """Bind persisted selections to this round's authoritative roster."""
+    entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
+    context = _context_for(battlefield, record)
+    requests = {}
+    for actor_id, entry in (record.draft_entries or {}).items():
+        entity = entities[actor_id]
+        payload = entry["payload"]
+        if entry["kind"] == "skill":
+            targets = payload["targets_or_shorthand"]
+            if not isinstance(targets, str):
+                targets = [entities[target_id] for target_id in targets]
+            requests[actor_id] = ActionRequest(
+                entity, payload["skill_key"], targets, context,
+                scale=float(payload.get("scale", 1.0)),
+            )
+        elif entry["kind"] == "item":
+            requests[actor_id] = ItemUseRequest(
+                actor=entity, item_key=payload["item_key"],
+                target=entities.get(payload.get("target_id")),
+            )
+        else:
+            raise ValueError(f"No round resolver registered for command kind {entry['kind']}")
+    return requests
+
+
 def _submit_request(
     actor: Any,
     record: CombatSessionRecord,
@@ -615,6 +689,7 @@ def _submit_request(
     first_actor: str | None = None,
     commanded_kind: str,
     commanded_key: str,
+    complete_draft: bool = False,
 ) -> dict[str, Any]:
     """Run the shared round/overwhelm/settlement body for one request.
 
@@ -643,6 +718,9 @@ def _submit_request(
     context and the result normalizer drops it before any send.
     """
     acting_entity = getattr(request, "actor", actor)
+    from world.rules.combat_session.snapshot import _snapshot_round_clock, _restore_round_clock
+
+    clock_before = _snapshot_round_clock(record, battlefield)
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     exam_host_before = _snapshot_exam_host(record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
@@ -658,7 +736,18 @@ def _submit_request(
     hp_before = _stored_trait_value(actor.traits.hp)
     opponent = _primary_opponent_id(battlefield, record)
     try:
-        with transaction.atomic():
+        with transaction.atomic(durable=complete_draft):
+            if complete_draft:
+                current = read_session_uncached(actor)
+                if current is None or (
+                    current.session_id, current.round_revision
+                ) != (record.session_id, record.round_revision):
+                    return {"ok": False, "reason": "stale_round_revision"}
+                record = current
+                preflight = preflight_draft_entries(actor, record, battlefield)
+                if not preflight["is_complete"]:
+                    return {"ok": False, "reason": "draft_incomplete", "progress": preflight}
+                requests = _draft_requests(record, battlefield)
             # Shared outer transaction (fix-combat-settlement-recovery D1):
             # round effects, friendly-fire and coercion penalties, session
             # metadata, and the terminal settlement commit (or roll back) as
@@ -710,7 +799,11 @@ def _submit_request(
                 # overwhelm opening is not one ordinary round and records
                 # nothing.
                 round_identities, round_hp_before = capture_round_hp(battlefield)
-                provider = _round_provider(acting_entity, request, battlefield, record)
+                provider = (
+                    _party_round_provider(requests, battlefield, record)
+                    if complete_draft
+                    else _round_provider(acting_entity, request, battlefield, record)
+                )
                 logs = run_round(
                     battlefield,
                     provider,
@@ -781,6 +874,12 @@ def _submit_request(
                 fled_ids=new_fled_ids,
                 knocked_out_ids=new_knocked_out_ids,
                 rounds_elapsed=base.rounds_elapsed + gained,
+                **({
+                    "round_revision": base.round_revision + 1,
+                    "draft_version": 0,
+                    "draft_entries": {},
+                    "confirmed_actors": (),
+                } if complete_draft else {}),
             )
             _persist(actor, new_record)
 
@@ -823,6 +922,16 @@ def _submit_request(
             result = _continue_or_settle(
                 actor, new_record, battlefield, logs, notification_count=len(notifications), opening=opening
             )
+            if complete_draft:
+                receipt = {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "rounds_elapsed": new_record.rounds_elapsed,
+                    "outcome": result.get("outcome"),
+                }
+                write_last_combat_receipt(actor, receipt)
+                result["receipt"] = receipt
+                result["ok"] = True
             if opening == "round":
                 # Internal slot only: the dispatcher reads it into the
                 # presentation context and ``_normalize_result`` drops it, so
@@ -861,6 +970,7 @@ def _submit_request(
         # skip safety because clear_session ran in-process.
         for journal in item_journals:
             journal.restore()
+        _restore_round_clock(clock_before)
         _restore_round_touched(
             actor,
             touched,

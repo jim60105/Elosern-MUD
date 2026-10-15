@@ -94,6 +94,7 @@ def _snapshot_round_touched(
                 )
     extra: dict[str, tuple[bool, Any]] = {
         "active_combat": _attribute_snapshot(actor, "active_combat"),
+        "last_combat_receipt": _attribute_snapshot(actor, "last_combat_receipt"),
     }
     if record.mode == "guild_exam":
         extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
@@ -186,3 +187,31 @@ def _restore_exam_host(snapshot: tuple[Any, dict[str, Any]] | None) -> None:
 
     host, surfaces = snapshot
     restore_exam_host_surfaces(host, surfaces)
+
+
+def _snapshot_round_clock(record: CombatSessionRecord, battlefield: Battlefield):
+    """Capture clock stage surfaces before any round or terminal write."""
+    from world.rules.clock import (
+        AdvanceSource, WorldClock, _snapshot_clock_tick,
+        build_advance_snapshot_registry, read_world_clock,
+    )
+    from world.rules.combat_session.settlement import _ROUND_SECONDS
+
+    clock = read_world_clock()
+    scope = tuple(battlefield.roster.values())
+    registry = build_advance_snapshot_registry(
+        clock if clock is not None else WorldClock(),
+        (record.rounds_elapsed + 1) * _ROUND_SECONDS,
+        AdvanceSource.COMBAT, scope,
+    )
+    return clock, _snapshot_clock_tick(clock) if clock is not None else None, registry, scope
+
+
+def _restore_round_clock(snapshot) -> None:
+    """Restore successful nested advances when their enclosing round fails."""
+    from world.rules.clock import _restore_advance_registry, _restore_clock_tick
+
+    clock, tick, registry, scope = snapshot
+    if clock is not None:
+        _restore_clock_tick(clock, tick)
+    _restore_advance_registry(registry, scope)

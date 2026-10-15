@@ -387,6 +387,28 @@ def _raw_active_combat(actor: Any) -> Any:
     return row
 
 
+def read_last_combat_receipt(actor: Any) -> dict[str, Any] | None:
+    """Query actor's last_combat_receipt directly from database bypassing in-process cache."""
+    if not hasattr(actor, "db_attributes") or not hasattr(actor, "pk") or actor.pk is None:
+        val = getattr(getattr(actor, "db", None), "last_combat_receipt", None)
+    else:
+        val = (
+            actor.db_attributes.through.objects.filter(
+                objectdb_id=actor.pk, attribute__db_key="last_combat_receipt"
+            )
+            .values_list("attribute__db_value", flat=True)
+            .first()
+        )
+    if val is None or not isinstance(val, dict):
+        return None
+    return dict(val)
+
+
+def write_last_combat_receipt(actor: Any, receipt: dict[str, Any]) -> None:
+    """Persist last_combat_receipt on actor."""
+    actor.db.last_combat_receipt = dict(receipt)
+
+
 def is_in_active_session(actor: Any) -> bool:
     """Return whether ``actor`` carries a valid active combat session."""
     try:

@@ -299,6 +299,10 @@ def run_round(
         else:
             count = 1
 
+        is_interactive_ally_fn = getattr(action_provider, "is_interactive_ally", None)
+        if is_interactive_ally_fn is not None and is_interactive_ally_fn(entity):
+            count = min(count, 1)
+
         count = min(count, _MAX_ACTIONS_PER_TURN)
 
         for slot_index in range(count):
@@ -340,6 +344,16 @@ def run_round(
                             observe(item_result.event_log)
                 continue
             result = ActionResolver.resolve(request)
+            if result.outcome == "rejected":
+                # Distinguish technical failure (CommitFailed) from gameplay invalidation
+                from world.rules.action import RejectReason
+                if result.reason in {
+                    RejectReason.COMMIT_FAILED,
+                    RejectReason.UNSNAPSHOTTED_EFFECT_SURFACE,
+                    RejectReason.EVENT_LOG_CONSTRUCTION_FAILED,
+                }:
+                    raise RuntimeError(f"technical failure during round execution: {result.reason} ({result.detail})")
+                continue
             if result.outcome == "success" and result.event_log is not None:
                 logs.append(result.event_log)
                 if observe is not None:
