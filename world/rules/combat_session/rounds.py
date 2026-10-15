@@ -20,6 +20,7 @@ from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
     _context_for,
     _session_policy,
+    get_required_combat_actors,
     authorize_combat_actor,
     reconstruct_battlefield,
 )
@@ -29,7 +30,11 @@ from world.rules.combat_session.policies import (
     _round_provider,
 )
 from world.rules.combat_session.lifecycle import _persist
-from world.rules.combat_session.records import CombatSessionRecord, read_session
+from world.rules.combat_session.records import (
+    CombatSessionRecord,
+    read_session,
+    read_session_uncached,
+)
 from world.rules.combat_session.scans import (
     _scan_friendly_fire,
     _scan_sexual_coercion,
@@ -42,6 +47,8 @@ from world.rules.combat_session.snapshot import (
     _snapshot_party_surfaces,
     _snapshot_round_touched,
 )
+from django.db import transaction
+from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.overwhelm import (
     classify_overwhelm,
@@ -341,6 +348,261 @@ def submit_player_item_use(
         commanded_kind="item",
         commanded_key=item_key,
     )
+
+
+def preflight_draft_entries(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> dict[str, Any]:
+    """Pure all-command preflight returning retained valid entries and member-specific reselection reasons.
+
+    Does NOT roll dice, apply tactical effects, deduct resources, consume items, run upkeep, or advance time.
+    """
+    required_actors = get_required_combat_actors(record, battlefield)
+    if not required_actors:
+        membership_changed = bool(record.confirmed_actors) and (record.confirmed_actors != ())
+        return {
+            "is_complete": False,
+            "empty_required": True,
+            "reason": "no_eligible_actors",
+            "required_actors": (),
+            "valid_entries": {},
+            "reselection_reasons": {},
+            "missing_actors": (),
+            "needs_reselection": False,
+            "membership_changed": membership_changed,
+        }
+
+    valid_entries: dict[int, dict[str, Any]] = {}
+    reselection_reasons: dict[int, dict[str, Any]] = {}
+    context = _context_for(battlefield, record)
+
+    draft_entries = record.draft_entries or {}
+    for actor_id, entry in draft_entries.items():
+        if actor_id not in required_actors:
+            # No longer required (e.g. knocked out / fled / incapacitated)
+            continue
+        actor_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == actor_id), None)
+        if actor_obj is None:
+            reselection_reasons[actor_id] = {"reason": "actor_missing", "detail": "actor not on battlefield"}
+            continue
+
+        kind = entry.get("kind")
+        payload = entry.get("payload", {})
+        if kind == "skill":
+            skill_key = payload.get("skill_key")
+            targets_or_shorthand = payload.get("targets_or_shorthand")
+            scale = float(payload.get("scale", 1.0))
+            # Map integer dbrefs back to live participant objects if list
+            if isinstance(targets_or_shorthand, (list, tuple)) or hasattr(targets_or_shorthand, "__iter__") and not isinstance(targets_or_shorthand, str):
+                resolved_targets = []
+                missing_target = False
+                for tid in targets_or_shorthand:
+                    t_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == tid), None)
+                    if t_obj is None:
+                        missing_target = True
+                        break
+                    resolved_targets.append(t_obj)
+                if missing_target:
+                    reselection_reasons[actor_id] = {"reason": "target_missing", "detail": "target not on battlefield"}
+                    continue
+                effective_targets = resolved_targets
+            else:
+                effective_targets = targets_or_shorthand
+
+            preview = revalidate_submission(actor_obj, skill_key, context, effective_targets, scale=scale)
+            if not preview.enabled:
+                reselection_reasons[actor_id] = {"reason": preview.reason, "detail": preview.detail}
+            else:
+                valid_entries[actor_id] = entry
+        elif kind == "item":
+            item_key = payload.get("item_key")
+            target_id = payload.get("target_id")
+            target_obj = None
+            if target_id is not None:
+                target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
+                if target_obj is None:
+                    reselection_reasons[actor_id] = {"reason": "target_missing", "detail": "item target not on battlefield"}
+                    continue
+            preflight = preflight_item_use(
+                ItemUseRequest(actor=actor_obj, item_key=item_key, target=target_obj),
+                in_combat=True,
+                context=context,
+            )
+            if not preflight.allowed:
+                reselection_reasons[actor_id] = {
+                    "reason": preflight.reason.value if preflight.reason else "item_rejected",
+                    "detail": preflight.detail,
+                }
+            else:
+                valid_entries[actor_id] = entry
+        elif kind == "tactical":
+            tactical_key = payload.get("tactical_key")
+            if tactical_key not in {"defend", "dodge", "taunt"}:
+                reselection_reasons[actor_id] = {"reason": "invalid_tactical_key", "detail": f"unsupported tactical action: {tactical_key}"}
+                continue
+            target_id = payload.get("target_id")
+            if tactical_key == "taunt":
+                if target_id is None:
+                    reselection_reasons[actor_id] = {"reason": "target_required", "detail": "taunt requires enemy target"}
+                    continue
+                target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
+                if target_obj is None or getattr(target_obj, "pk", None) not in record.enemy_ids:
+                    reselection_reasons[actor_id] = {"reason": "target_invalid", "detail": "taunt target not on enemy team"}
+                    continue
+            valid_entries[actor_id] = entry
+        else:
+            reselection_reasons[actor_id] = {"reason": "unknown_kind", "detail": f"unknown command kind {kind}"}
+
+    missing_actors = tuple(aid for aid in required_actors if aid not in valid_entries)
+    # Membership change guard:
+    # If required_actors differs from record.confirmed_actors (and confirmed_actors was set),
+    # a changed required set requires fresh explicit confirmation rather than executing an old draft.
+    membership_changed = bool(record.confirmed_actors) and (tuple(required_actors) != tuple(record.confirmed_actors))
+    is_complete = (len(missing_actors) == 0 and len(reselection_reasons) == 0 and not membership_changed)
+
+    return {
+        "is_complete": is_complete,
+        "empty_required": False,
+        "required_actors": required_actors,
+        "valid_entries": valid_entries,
+        "reselection_reasons": reselection_reasons,
+        "missing_actors": missing_actors,
+        "membership_changed": membership_changed,
+    }
+
+
+def confirm_actor_command(
+    commander: Any,
+    session_id: str,
+    round_revision: int,
+    draft_version: int,
+    actor_id: int,
+    command: dict[str, Any],
+) -> dict[str, Any]:
+    """Admit or replace one actor's command in the persistent session draft under deterministic CAS."""
+    combat_snapshot = attribute_snapshot(commander, "active_combat")
+    try:
+        with transaction.atomic():
+            record = read_session_uncached(commander)
+            if record is None:
+                raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
+            if record.session_id != session_id:
+                raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+            if record.round_revision != round_revision:
+                return {
+                    "ok": False,
+                    "reason": "stale_round_revision",
+                    "current_round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "session_id": record.session_id,
+                }
+            if record.draft_version != draft_version:
+                # Stale edit CAS rejection
+                battlefield = reconstruct_battlefield(commander, record)
+                progress = preflight_draft_entries(commander, record, battlefield)
+                return {
+                    "ok": False,
+                    "reason": "stale_draft_version",
+                    "current_draft_version": record.draft_version,
+                    "round_revision": record.round_revision,
+                    "session_id": record.session_id,
+                    "progress": progress,
+                }
+
+            battlefield = reconstruct_battlefield(commander, record)
+            actor_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == actor_id), None)
+            if actor_obj is None:
+                raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+            authorize_combat_actor(commander, actor_obj, record, battlefield)
+
+            # Validate the proposed new command
+            context = _context_for(battlefield, record)
+            kind = command.get("kind")
+            payload = command.get("payload", {})
+            if kind == "skill":
+                skill_key = payload.get("skill_key")
+                targets_or_shorthand = payload.get("targets_or_shorthand")
+                scale = float(payload.get("scale", 1.0))
+                if isinstance(targets_or_shorthand, (list, tuple)) or hasattr(targets_or_shorthand, "__iter__") and not isinstance(targets_or_shorthand, str):
+                    resolved_targets = []
+                    for tid in targets_or_shorthand:
+                        t_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == tid), None)
+                        if t_obj is None:
+                            return {"ok": False, "reason": "target_missing", "detail": "target not on battlefield"}
+                        resolved_targets.append(t_obj)
+                    effective_targets = resolved_targets
+                else:
+                    effective_targets = targets_or_shorthand
+                preview = revalidate_submission(actor_obj, skill_key, context, effective_targets, scale=scale)
+                if not preview.enabled:
+                    return {"ok": False, "reason": preview.reason, "detail": preview.detail}
+            elif kind == "item":
+                item_key = payload.get("item_key")
+                target_id = payload.get("target_id")
+                target_obj = None
+                if target_id is not None:
+                    target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
+                    if target_obj is None:
+                        return {"ok": False, "reason": "target_missing", "detail": "item target not on battlefield"}
+                preflight = preflight_item_use(
+                    ItemUseRequest(actor=actor_obj, item_key=item_key, target=target_obj),
+                    in_combat=True,
+                    context=context,
+                )
+                if not preflight.allowed:
+                    return {
+                        "ok": False,
+                        "reason": preflight.reason.value if preflight.reason else "item_rejected",
+                        "detail": preflight.detail,
+                    }
+            elif kind == "tactical":
+                tactical_key = payload.get("tactical_key")
+                if tactical_key not in {"defend", "dodge", "taunt"}:
+                    return {"ok": False, "reason": "invalid_tactical_key", "detail": f"unknown {tactical_key}"}
+                if tactical_key == "taunt":
+                    target_id = payload.get("target_id")
+                    target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
+                    if target_obj is None or getattr(target_obj, "pk", None) not in record.enemy_ids:
+                        return {"ok": False, "reason": "target_invalid", "detail": "taunt requires enemy target"}
+            else:
+                return {"ok": False, "reason": "unknown_kind", "detail": f"unknown command kind {kind}"}
+
+            # Now run all-command preflight on current draft to find valid entries and reselection reasons
+            pre = preflight_draft_entries(commander, record, battlefield)
+            new_valid = dict(pre["valid_entries"])
+            # Admit / replace the newly confirmed command
+            new_valid[actor_id] = command
+            new_reselection = {aid: reason for aid, reason in pre["reselection_reasons"].items() if aid != actor_id}
+            required_actors = pre["required_actors"] if not pre.get("empty_required") else get_required_combat_actors(record, battlefield)
+
+            new_record = replace(
+                record,
+                draft_version=record.draft_version + 1,
+                draft_entries=new_valid,
+                confirmed_actors=required_actors,
+            )
+            _persist(commander, new_record)
+
+            missing = tuple(aid for aid in required_actors if aid not in new_valid)
+            is_complete = (len(missing) == 0 and len(new_reselection) == 0 and bool(required_actors))
+
+            return {
+                "ok": True,
+                "session_id": new_record.session_id,
+                "round_revision": new_record.round_revision,
+                "draft_version": new_record.draft_version,
+                "draft_entries": new_valid,
+                "required_actors": required_actors,
+                "missing_actors": missing,
+                "reselection_reasons": new_reselection,
+                "is_complete": is_complete,
+                "empty_required": pre.get("empty_required", False),
+            }
+    except Exception:
+        restore_attribute_best_effort(commander, "active_combat", combat_snapshot)
+        raise
 
 
 def _submit_request(

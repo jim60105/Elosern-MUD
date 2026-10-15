@@ -121,6 +121,23 @@ def is_actor_eligible_to_act(
     return True
 
 
+def get_required_combat_actors(
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> tuple[int, ...]:
+    """Return the tuple of actor dbrefs currently required to submit round commands.
+
+    Evaluates all participants in ``record.player_ids`` in deterministic sorted order
+    and checks whether each is currently eligible to act via ``is_actor_eligible_to_act``.
+    """
+    required: list[int] = []
+    for pk in sorted(record.player_ids):
+        entity = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == pk), None)
+        if entity is not None and is_actor_eligible_to_act(entity, record, battlefield):
+            required.append(pk)
+    return tuple(required)
+
+
 def authorize_combat_actor(
     commander: Any,
     actor: Any,
