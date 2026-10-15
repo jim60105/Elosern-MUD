@@ -43,7 +43,7 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
 
 ## 3. Traceability and gates (≈1 h)
 
-- [ ] 3.1 At archive, after the sync, re-annotate the tests that carry the IDs of the three renamed requirements with
+- [x] 3.1 At archive, after the sync, re-annotate the tests that carry the IDs of the three renamed requirements with
   the new IDs. List the IDs with `uv run --locked python -m tools.spec_traceability list --json-output <scratch>/ids.json`.
 - [x] 3.2 Run each of the following and verify it passes:
   - `uv run --locked python -m tools.spec_traceability check`;

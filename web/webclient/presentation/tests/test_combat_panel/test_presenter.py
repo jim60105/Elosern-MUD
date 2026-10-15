@@ -639,7 +639,7 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             self.player.attributes.get("map_knowledge"), before["map_knowledge"]
         )
 
-    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-5-panel")
+    @covers_requirement("webclient-context-actions::context-actions-is-an-exact-read-only-version-6-panel")
     def test_creation_pending_renders_the_version_six_unavailable_form(self):
         payload = self.registry.render(
             "context_actions",

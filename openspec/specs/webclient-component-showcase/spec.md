@@ -98,7 +98,7 @@ non-local network requests blocked.
 ### Requirement: The action-dock family presents a finite, keyboard-and-pointer-actionable contract
 
 The action-dock family (`ActionDock`, `DockMenu`/`DockMenuItem`, `ExitCompass`, `ExplorationReadout`,
-`RestForm`) SHALL present the `context_actions` v5 menus and, in exploration, the exit compass beside
+`RestForm`) SHALL present the `context_actions` v6 menus and, in exploration, the exit compass beside
 the 建議 pill sharing one readout, with the mode's guidance line, focused/disabled states, and the
 exact server-authored suggestion card shape on the centred suggestions card.
 
@@ -215,7 +215,7 @@ OOB-backed payload and inventing no field.
   detail
 - **THEN** those fields render only when the character's skill data provides them (a row the data
   gives without detail renders without detail cells, so nothing is invented), and where the slice
-  carries them they are the display subset of the `context_actions` v5 skill descriptor: a `cost`
+  carries them they are the display subset of the `context_actions` v6 skill descriptor (unchanged by version 6 for the skill book): a `cost`
   object — the empty object is the free form —, `target_spec`, the optional `freeform_scales`, and
   the boolean `usable_out_of_combat`
 

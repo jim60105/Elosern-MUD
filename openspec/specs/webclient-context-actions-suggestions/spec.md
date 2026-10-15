@@ -8,9 +8,9 @@ capability pins the read-side contract.
 
 ## Requirements
 
-### Requirement: The context_actions panel carries a suggestions envelope at version 5
+### Requirement: The context_actions panel carries a suggestions envelope at version 6
 
-The production presentation registry SHALL register `context_actions` at schema version 5. The
+The production presentation registry SHALL register `context_actions` at schema version 6. The
 `suggestions` object SHALL contain exactly `status` and, present exactly when `status` is `ready`
 or `degraded`, `cards`. `status` SHALL be one of `"generating"`, `"ready"`, `"degraded"`, or
 `"unavailable"`, and `cards` SHALL be present iff `status` is `ready` or `degraded`. Server
@@ -18,28 +18,28 @@ validation SHALL reject unknown statuses, missing or extra fields, and cards und
 `generating`/`unavailable`.
 
 #### Scenario: Combat reports suggestions unavailable
-- **WHEN** a puppeted WebClient in an active combat session receives a full snapshot at version 5
+- **WHEN** a puppeted WebClient in an active combat session receives a full snapshot at version 6
 - **THEN** the combat form carries the exact `suggestions` object `{"status": "unavailable"}` while every combat field serializes identically to the version-4 form
 
 #### Scenario: The unavailable form carries no suggestions
 - **WHEN** the active puppet is creation-pending or has no location
-- **THEN** `context_actions` uses the common unavailable form whose field set and reason are identical to the version-4 form, whose `schema_version` equals 5, and which contains no `suggestions` object
+- **THEN** `context_actions` uses the common unavailable form whose field set and reason are identical to the version-4 form, whose `schema_version` equals 6, and which contains no `suggestions` object
 
 #### Scenario: A generating state carries no cards
 - **WHEN** the exploration snapshot reports `status` `"generating"`
 - **THEN** the exploration form's `suggestions` is exactly `{"status": "generating"}` and rejected by validation the moment a `cards` field appears
 
 #### Scenario: The common unavailable form rejects suggestions
-- **WHEN** a non-available `context_actions` payload at version 5 carries a `suggestions` field
+- **WHEN** a non-available `context_actions` payload at version 6 carries a `suggestions` field
 - **THEN** the common-unavailable-form validation (registry + client mirror) rejects it — the field set stays exactly `schema_version`, `available`, `reason` — and a synchronous per-panel test asserts the shared unavailable builder was not altered
 
 #### Scenario: Available forms carry their version-5 field set plus suggestions
-- **WHEN** either available form (combat or exploration) is built at version 5
+- **WHEN** either available form (combat or exploration) is built at version 6
 - **THEN** it contains exactly the version-5 field set of its kind plus a `suggestions` object
 
 #### Scenario: The common unavailable form keeps its version-4 semantics
-- **WHEN** the registered common unavailable form is built at version 5
-- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 5
+- **WHEN** the registered common unavailable form is built at version 6
+- **THEN** it keeps its exact field set, reason, and semantics with `schema_version` equal to 6
 
 #### Scenario: Combat never consults suggestion state
 - **WHEN** the combat form is rendered
@@ -155,10 +155,10 @@ emits.
 - **WHEN** the freshness gate evaluates a snapshot
 - **THEN** it is read-only and does not schedule, evict, or mutate state
 
-### Requirement: The v5 client mirror and parity contract enforce the suggestions shape
+### Requirement: The v6 client mirror and parity contract enforce the suggestions shape
 
-`web/static/webclient/js/elosern/protocol.js` SHALL register `context_actions` at version 5 in
-`PANEL_ALLOWLIST` and SHALL validate every v5 form — unavailable, combat, and exploration — with
+`web/static/webclient/js/elosern/protocol.js` SHALL register `context_actions` at version 6 in
+`PANEL_ALLOWLIST` and SHALL validate every v6 form — unavailable, combat, and exploration — with
 the same exact-field, status, card-shape, and count bounds as the server validator. A payload at
 any other version SHALL be rejected per the registered-version contract.
 
@@ -173,6 +173,10 @@ any other version SHALL be rejected per the registered-version contract.
 #### Scenario: The repository-wide parity contract covers suggestions
 - **WHEN** the repository-wide parity contract is evaluated
 - **THEN** it asserts numerically identical Python/JS bounds and shared enum fragments for the suggestions section
+
+#### Scenario: A version-5 payload is rejected by the mirror
+- **WHEN** the browser receives a schema-valid-at-5 `context_actions` payload
+- **THEN** the client mirror rejects it and the existing recovery/sync discipline applies
 
 ### Requirement: The suggestions card is the single suggestion surface
 The 建議 pill in the exploration command panel SHALL open the centred suggestions card, which SHALL be the only surface rendering `suggestions.cards`, and its presentation SHALL follow the committed `suggestions.status` exactly, per the status scenarios below. The narrative stream SHALL render no suggestion line, card group, or stream-end block under any status, including a ready group followed by appended narrative.
