@@ -174,3 +174,41 @@ export function combatSkills(participants) {
     },
   ];
 }
+
+// ---- Plate conditions (webclient-combat-figure-plates) ----
+// Participant condition rows exactly as the v6 combat panel carries them
+// (code, label, severity), and a deterministic spread over a roster: no
+// condition, one, two, three, five (a `+2` on a full plate) and eight (the
+// panel's bound), with every third figure at or below the 25% alarm.
+export const PLATE_CONDITIONS = Object.freeze({
+  poison: { code: "poison", label: "中毒", severity: "harmful" },
+  bless: { code: "bless", label: "祝福", severity: "beneficial" },
+  stun: { code: "stun", label: "暈眩", severity: "critical" },
+  slow: { code: "slow", label: "遲緩", severity: "warning" },
+  fog: { code: "fog", label: "迷霧", severity: "informational" },
+  haste: { code: "haste", label: "疾風", severity: "beneficial" },
+  bleed: { code: "bleed", label: "流血", severity: "harmful" },
+  fear: { code: "fear", label: "恐懼", severity: "warning" },
+});
+const C = PLATE_CONDITIONS;
+const CONDITION_SPREAD = [
+  [C.poison],
+  [],
+  [C.poison, C.bless],
+  [C.stun, C.slow, C.bless],
+  [],
+  [C.poison, C.haste, C.fog, C.stun, C.slow],
+  [C.bless],
+  [C.poison, C.bless, C.stun, C.slow, C.fog, C.haste, C.bleed, C.fear],
+];
+export function withPlateConditions(participants) {
+  return participants.map((p, index) => {
+    if (p.identity === 1) return p;
+    const low = index % 3 === 1;
+    return {
+      ...p,
+      conditions: CONDITION_SPREAD[index % CONDITION_SPREAD.length],
+      hp_current: low ? Math.max(1, Math.floor(p.hp_maximum * 0.2)) : p.hp_current,
+    };
+  });
+}
