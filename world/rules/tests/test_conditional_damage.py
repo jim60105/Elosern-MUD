@@ -507,7 +507,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         self.assertEqual(damage_both, damage_undead_only)
         self.assertEqual(damage_both, 40)
         # And must be strictly greater than neutral damage: 20 (40 * 1.5 - 20 vs 40 - 20)
-        self.assertEqual(damage_neutral, 20)
+        self.assertEqual(damage_neutral, 26)  # 40 * 40 / (40 + 20) = 26.666 -> 26
         self.assertGreater(damage_both, damage_neutral)
 
     @covers_requirement(
@@ -533,10 +533,10 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         result = self._resolve_cast(_T_EXECUTION_BURST.key, roll=60)
         self.assertEqual(result.outcome, "success")
         damage_not_bypassed = before_hp - _stored_hp(self.target)
-        self.assertEqual(damage_not_bypassed, 20)
+        self.assertEqual(damage_not_bypassed, 26)  # 40 * 40 / (40 + 20) = 26
 
         # Defense was 20; bypassed damage is exactly 20 higher than non-bypassed
-        self.assertEqual(damage_bypassed - damage_not_bypassed, 20)
+        self.assertEqual(damage_bypassed - damage_not_bypassed, 14)
 
     @covers_requirement(
         "skill-effect-model::conditional-damage-policies-compose-without-double-matching",
@@ -581,7 +581,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         result = self._resolve_cast(_T_BUFF_JUDGMENT.key, roll=60)
         self.assertEqual(result.outcome, "success")
         damage_without_buff = before_hp - _stored_hp(self.target)
-        self.assertEqual(damage_without_buff, 20)
+        self.assertEqual(damage_without_buff, 26)  # 40 * 40 / 60 = 26
 
         apply_buff(self.target, "focus")
         restore_gauges_to_full(self.target)
@@ -596,7 +596,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         result = self._resolve_cast(_T_BUFF_JUDGMENT.key, roll=60)
         self.assertEqual(result.outcome, "success")
         damage_expired_buff = before_hp - _stored_hp(self.target)
-        self.assertEqual(damage_expired_buff, 20)
+        self.assertEqual(damage_expired_buff, 26)
 
     @covers_requirement(
         "skill-effect-model::conditional-damage-policies-compose-without-double-matching"
@@ -659,7 +659,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         result = self._resolve_cast(_T_EXECUTION_BURST.key, roll=60)
         self.assertEqual(result.outcome, "success")
         damage_conditional_not_matched = before_hp - _stored_hp(self.target)
-        self.assertEqual(damage_conditional_not_matched, 20)
+        self.assertEqual(damage_conditional_not_matched, 26)
 
     @covers_requirement(
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
@@ -740,7 +740,7 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
     )
     def test_high_defense_clamped_to_floor_without_bypass_and_full_with_bypass(self):
         """High defense clamps damage to floor(1); bypass ignores defense completely."""
-        self.target.traits.defense.base = 500  # Absorbs all attack
+        self.target.traits.defense.base = 1600  # 40 * 40 / 1640 = 0 -> clamped to floor 1
         self.target.db.affinity_elements = []  # Neutral -> no bypass
         set_combat_traits(self.target, [])
         restore_gauges_to_full(self.target)
@@ -783,8 +783,8 @@ class ConditionalDamageMechanicsTests(EvenniaTestCase):
         result = self._resolve_cast(_T_WATER_HUNTER.key, roll=60)
         self.assertEqual(result.outcome, "success")
         damage_earth = before_hp - _stored_hp(self.target)
-        # Attack = 40, defense = 25 -> damage = 15
-        self.assertEqual(damage_earth, 15)
+        # Attack = 40, defense = 25 -> 40 * 40 / (40 + 25) = 24
+        self.assertEqual(damage_earth, 24)
 
         # Water target has defense bypassed AND 1.5x attack, so takes much higher damage
         self.assertGreater(damage_water, damage_earth + 25)

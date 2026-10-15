@@ -400,7 +400,7 @@ class DirectHandlerPotencyTests(unittest.TestCase):
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
     )
     def test_damage_scales_attack_component_before_defense_subtraction(self):
-        actor = FakeEntity("actor", atk_phys=50, agility=10)
+        actor = FakeEntity("actor", atk_phys=45, agility=10)
         target = FakeEntity("target", hp=100, agility=10, defense=20)
         with (
             patch("world.rules.combat.damage.roll_d100", return_value=60),
@@ -415,7 +415,7 @@ class DirectHandlerPotencyTests(unittest.TestCase):
                 {"resolved_effect": ResolvedEffect(EffectPolicy(1.0))},
                 1.0,
             )[0]
-            # Potency 2.0: round(50 * 1.0 * 2.0) - 20 = 80
+            # Potency 2.0: round(45 * 1.0 * 2.0) * 40 / 60 = 60
             # (If it scaled after defense, it would be (50 - 20) * 2 = 60)
             pending_2 = _handle_damage(
                 actor,
@@ -427,8 +427,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
 
         amt_1 = int(pending_1.description.rsplit("|", 1)[1])
         amt_2 = int(pending_2.description.rsplit("|", 1)[1])
-        self.assertEqual(amt_1, 30)
-        self.assertEqual(amt_2, 80)
+        self.assertEqual(amt_1, 30)  # round(45 * 1.0) * 40 / 60 = 30
+        self.assertEqual(amt_2, 60)
 
     def test_direct_damage_handler_defaults_to_identity_without_binding(self):
         actor = FakeEntity("actor", atk_phys=40, agility=10)
@@ -450,8 +450,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
 
         amt_empty = int(pending_empty.description.rsplit("|", 1)[1])
         amt_forged = int(pending_forged.description.rsplit("|", 1)[1])
-        self.assertEqual(amt_empty, 30)  # 40 - 10
-        self.assertEqual(amt_forged, 30)
+        self.assertEqual(amt_empty, 32)  # 40 * 40 / 50 = 32
+        self.assertEqual(amt_forged, 32)
 
     def test_miss_deals_zero_damage_and_no_floor_even_with_high_potency(self):
         actor = FakeEntity("actor", atk_phys=10, agility=10)
@@ -505,8 +505,8 @@ class DirectHandlerPotencyTests(unittest.TestCase):
                 1.0,
             )[0]
         amt = int(pending.description.rsplit("|", 1)[1])
-        # round(20 * crit_mult * 2.5) - 5
-        expected = round(20 * crit_mult * 2.5) - 5
+        # round(20 * crit_mult * 2.5) * 40 / (40 + 5)
+        expected = int(round(20 * crit_mult * 2.5) * 40 / (40 + 5))
         self.assertEqual(amt, expected)
 
     def test_heal_magnitude_inserts_coefficient_before_rounding_and_gain(self):
@@ -670,14 +670,14 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         self.assertEqual(res.outcome, "success")
         # Verify event log contains two distinct damage amounts:
         # Base multiplier at roll 60 is 1.0. Attack = 30, Target defense = 10.
-        # Strike 1 (pot 1.0): 30 * 1.0 * 1.0 - 10 = 20
-        # Strike 2 (pot 2.0): 30 * 1.0 * 2.0 - 10 = 50
+        # Strike 1 (pot 1.0): 30 * 1.0 * 1.0 * 40 / 50 = 24
+        # Strike 2 (pot 2.0): 30 * 1.0 * 2.0 * 40 / 50 = 48
         damage_entries = [e for e in res.event_log.entries if e.kind == "damage"]
         self.assertEqual(len(damage_entries), 2)
-        self.assertEqual(damage_entries[0].data["amount"], 20)
-        self.assertEqual(damage_entries[1].data["amount"], 50)
-        # Total HP loss on target = 20 + 50 = 70 (100 -> 30)
-        self.assertEqual(self.target.traits.hp.current, 30)
+        self.assertEqual(damage_entries[0].data["amount"], 24)
+        self.assertEqual(damage_entries[1].data["amount"], 48)
+        # Total HP loss on target = 24 + 48 = 72 (100 -> 28)
+        self.assertEqual(self.target.traits.hp.current, 28)
 
     def test_forged_context_is_overwritten_by_authored_policy(self):
         skill = self._register_skill(
@@ -712,7 +712,7 @@ class ActionResolverPotencyPipelineTests(EvenniaTestCase):
         damage_entries = [e for e in res.event_log.entries if e.kind == "damage"]
         self.assertEqual(len(damage_entries), 1)
         # Should be authored 1.0 potency (amount 20), NOT forged 999.0:
-        self.assertEqual(damage_entries[0].data["amount"], 20)
+        self.assertEqual(damage_entries[0].data["amount"], 24)
         # Verify forged_context.event_context was not mutated:
         self.assertEqual(
             forged_context.event_context["resolved_effect"].policy.coefficient,

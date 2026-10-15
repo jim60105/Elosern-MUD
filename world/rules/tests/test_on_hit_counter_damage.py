@@ -535,8 +535,8 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
             target_hp_after_strike = self.target.traits.hp.current
             self.assertEqual(self.actor.traits.hp.current, 200 - 40)
             # Initiating strike landed critical hit (roll=100 -> 2.0x mult: 50 * 2.0 - 10 def = 90 damage)
-            # Target HP must be exactly 110 (200 - 90), proving no secondary counter settled (which would be 70)
-            self.assertEqual(target_hp_after_strike, 110)
+            # Ratio mitigation: 100 * 40 / (40 + 10) = 80 damage. Target HP: 200 - 80 = 120.
+            self.assertEqual(target_hp_after_strike, 120)
 
     @covers_requirement(
         "damage-state-feedback::source-targeted-reaction-actions-settle-once-in-transaction-without-recursion"

@@ -454,12 +454,12 @@ class ScalarExpressionTests(unittest.TestCase):
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_the_strike_amount_composes_potency_defense_rider_and_scale(self):
-        # 30 x 1.0 x 2.0 rounds to 60, minus 10 defense.
+        # 30 x 1.0 x 2.0 rounds to 60; ratio mitigation 60 * 40 / (40 + 10) = 48
         self.assertEqual(
             strike_amount(attack=30.0, multiplier=1.0, coefficient=2.0, defense=10.0),
-            50,
+            48,
         )
-        # Half of the same solid hit: round(30 x 1.5) = 45, minus 10, halved.
+        # Half of the same solid hit: round(30 x 1.5) = 45; 45 * 40 / 50 = 36; halved = 18.
         self.assertEqual(
             strike_amount(
                 attack=30.0, multiplier=1.5, coefficient=1.0, defense=10.0, scale=0.5
@@ -471,7 +471,7 @@ class ScalarExpressionTests(unittest.TestCase):
             strike_amount(attack=1.0, multiplier=1.0, coefficient=1.0, defense=10.0),
             1,
         )
-        # The devastation rider is added after the defense subtraction.
+        # The devastation rider is added after ratio defense mitigation.
         self.assertEqual(
             strike_amount(
                 attack=10.0,
@@ -480,7 +480,7 @@ class ScalarExpressionTests(unittest.TestCase):
                 defense=10.0,
                 rider=4,
             ),
-            4,
+            12,
         )
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
@@ -545,22 +545,22 @@ class SpreadProjectionTests(unittest.TestCase):
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     @covers_requirement("monster-ai-effect-estimation::health-and-resource-features-are-bounded-and-signed")
     def test_one_strike_averages_the_range_inside_every_capacity_branch(self):
-        # Faces 1..50 miss; 51..90 land round(30) - 10 = 20; 91..99 land
-        # round(45) - 10 = 35; face 100 crits for round(60) - 10 = 50. Capped by
-        # the enemy's 30 health, the solid and critical branches lose 30, so the
-        # average actual loss is (40 x 20 + 9 x 30 + 30) / 100 = 11.0 -- not the
-        # 11.65 the uncapped average of the range would claim.
+        # Faces 1..50 miss; 51..90 land round(30 * 40 / 50) = 24; 91..99 land
+        # round(45 * 40 / 50) = 36; face 100 crits for round(60 * 40 / 50) = 48.
+        # Capped by the enemy's 30 health, the solid and critical branches lose 30,
+        # so the average actual loss is (40 x 24 + 9 x 30 + 30) / 100 = 12.60 -- not
+        # the 13.32 the uncapped average (40*24 + 9*36 + 48)/100 of the range would claim.
         estimate = _only(_estimate(self.actor, (self.enemy,)))
         projection = _recipient(estimate, self.enemy)
-        self.assertAlmostEqual(projection.damage, 11.0)
-        self.assertAlmostEqual(projection.nominal_damage, 11.65)
+        self.assertAlmostEqual(projection.damage, 12.60)
+        self.assertAlmostEqual(projection.nominal_damage, 13.32)
         # Ten faces reach zero health, so the knockout likelihood is ten percent.
         self.assertAlmostEqual(projection.finishing, 0.10)
         self.assertAlmostEqual(estimate.finishing, 0.10)
-        self.assertAlmostEqual(estimate.damage.magnitude, 11.0 / 30)
+        self.assertAlmostEqual(estimate.damage.magnitude, 12.60 / 30)
         self.assertEqual(estimate.damage.direction.name, "BENEFIT")
         # The wasted overkill is exactly the nominal effect capacity refused.
-        self.assertAlmostEqual(estimate.waste.magnitude, 0.65 / 11.65)
+        self.assertAlmostEqual(estimate.waste.magnitude, (13.32 - 12.60) / 13.32)
         self.assertEqual(estimate.waste.direction.name, "HARM")
         # The template charges twelve mana of the actor's twenty.
         self.assertAlmostEqual(estimate.cost, 0.6)
@@ -921,7 +921,7 @@ class SpreadProjectionTests(unittest.TestCase):
         estimate = _only(_estimate(self.actor, (self.enemy,)))
         self.assertIn(EstimationLimit.EVIDENCE_STRIKE_UNCREDITED, estimate.limits)
         # The unconditional strike is still modeled, so the row keeps a body.
-        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 11.0)
+        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 12.60)
 
     @covers_requirement("monster-ai-effect-estimation::uncertain-effects-have-conservative-explicit-limits")
     def test_a_plan_that_omits_nothing_classifies_as_exact(self):
@@ -972,13 +972,13 @@ class ScaleGateAndPoolTests(unittest.TestCase):
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_non_default_scale_scales_the_effects_and_their_cost(self):
-        # Faces 1..50 miss; 51..90 land round(30) - 10 = 20, 91..99 land
-        # round(45) - 10 = 35 and face 100 crits for 50. Halved, the same faces
-        # land 10, 18 and 25, so the expected loss is (400 + 162 + 25) / 100 =
-        # 5.87 while the twelve-mana cost is charged as six.
+        # Faces 1..50 miss; 51..90 land round(30 * 40 / 50) = 24, 91..99 land
+        # round(45 * 40 / 50) = 36 and face 100 crits for 48. Halved, the same faces
+        # land 12, 18 and 24, so the expected loss is (40*12 + 9*18 + 24) / 100 =
+        # 6.66 while the twelve-mana cost is charged as six.
         estimate = self._plan(STRIKE, (self.enemy,), ((self.enemy,),), scale=0.5)
         self.assertNotIsInstance(estimate, InvalidEstimate)
-        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 5.87)
+        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 6.66)
         self.assertAlmostEqual(estimate.cost, 6.0 / 20.0)
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
@@ -989,7 +989,7 @@ class ScaleGateAndPoolTests(unittest.TestCase):
         # branch would overstate the plan, so it is omitted and reported: the
         # estimate is the first occurrence's own range alone.
         estimate = self._plan(GATED, (self.enemy,), ((self.enemy,), (self.enemy,)))
-        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 11.65)
+        self.assertAlmostEqual(_recipient(estimate, self.enemy).damage, 13.32)
         self.assertIn(EstimationLimit.GATED_EFFECT_OMITTED, estimate.limits)
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")

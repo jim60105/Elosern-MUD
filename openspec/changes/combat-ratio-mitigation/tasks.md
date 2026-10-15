@@ -12,7 +12,7 @@ Total estimate: **5.5 hours**, including implementation, focused verification, d
 
 ## 3. Bounded implementation and evidence (1h)
 
-- [ ] 3.1 Replace subtraction-based golden assertions and affected handler docs; preserve ordinary hit-band and critical behavior with independent expectations.
+- [x] 3.1 Replace subtraction-based golden assertions and affected handler docs; preserve ordinary hit-band and critical behavior with independent expectations.
 
 ## 4. Bounded implementation and evidence (0.75h)
 

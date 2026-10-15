@@ -126,9 +126,9 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
     def test_divert_placement_post_defense(self):
         """Scenario: Divert runs after defense mitigation, not on pre-defense attack part."""
         # Attack=50, multiplier=1.0 (roll=50 -> margin=40 -> base_multiplier=1.0)
-        # Defense=20 -> post_defense = 50 - 20 = 30.
+        # Defense=20 -> post_mitigation = round(50 * 40 / 60) = 33.
         # Profile: fraction 0.3, cap 30, MP 100.
-        # Post-defense divert: round(30 * 0.3) = 9, residual HP damage = 30 - 9 = 21.
+        # Post-mitigation divert: round(33 * 0.3) = 10, residual HP damage = 33 - 10 = 23.
         # (Pre-defense divert would be round(50 * 0.3) = 15 -> residual 35 - 20 = 15).
         buff_def = BuffDefinition(
             key="synth_film_test",
@@ -150,19 +150,19 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.assertEqual(len(pending), 2)
         hp_effect = pending[0]
         self.assertTrue(hp_effect.description.startswith("damage|"))
-        self.assertEqual(int(hp_effect.description.rsplit("|", 1)[1]), 21)
+        self.assertEqual(int(hp_effect.description.rsplit("|", 1)[1]), 23)
 
         divert_effect = pending[1]
         self.assertTrue(divert_effect.description.startswith("damage_divert|"))
-        self.assertEqual(int(divert_effect.description.rsplit("|", 1)[1]), 9)
+        self.assertEqual(int(divert_effect.description.rsplit("|", 1)[1]), 10)
 
         # Apply both effects
         for effect in pending:
             effect.apply()
 
-        self.assertEqual(int(self.defender.traits.hp.current), 100 - 21)
-        self.assertEqual(int(self.defender.traits.mp.current), 100 - 9)
-        self.assertEqual(get_divert_consumed(self.defender.buffs.all[buff_def.key]), 9)
+        self.assertEqual(int(self.defender.traits.hp.current), 100 - 23)
+        self.assertEqual(int(self.defender.traits.mp.current), 100 - 10)
+        self.assertEqual(get_divert_consumed(self.defender.buffs.all[buff_def.key]), 10)
 
     @covers_requirement(
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a"
@@ -182,7 +182,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         # Bound 1: fraction binds (incoming 40 post-defense -> 50% = 20 <= cap 30, MP 100)
         apply_buff(self.defender, buff_def.key, source_skill="synth_cast", source_tier=T_APPRENTICE)
         self.attacker.traits.atk_phys.base = 60
-        self.defender.traits.defense.base = 20  # post-defense = 40
+        self.defender.traits.defense.base = 20  # 60 * 40 / 60 = 40
         self.defender.traits.mp.current = 100
 
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
@@ -192,7 +192,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
 
         # Bound 2: cap binds (remaining budget 10, fraction gives 40, MP 100)
         update_divert_consumed(self.defender.buffs.all[buff_def.key], 20)  # remaining cap = 10
-        self.attacker.traits.atk_phys.base = 100
+        self.attacker.traits.atk_phys.base = 120  # 120 * 40 / 60 = 80
         self.defender.traits.defense.base = 20  # post-defense = 80 -> 50% is 40 > cap 10
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
@@ -292,7 +292,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         apply_buff(self.defender, buff_a.key)
 
         self.attacker.traits.atk_phys.base = 100
-        self.defender.traits.defense.base = 20  # post-defense = 80
+        self.defender.traits.defense.base = 10  # 100 * 40 / 50 = 80
 
         with patch("world.rules.combat.damage.roll_d100", return_value=50):
             pending = _handle_damage(self.attacker, [self.defender], "damage:dark:physical", {}, 1.0)
@@ -652,7 +652,7 @@ class DamageDivertBehaviorTests(DamageDivertTestBase):
         self.defender.traits.mp.current = 100
 
         # Attacker deals 60 post-defense (80 attack - 20 defense)
-        self.attacker.traits.atk_phys.base = 80
+        self.attacker.traits.atk_phys.base = 90  # 90 * 40 / 60 = 60
         self.defender.traits.defense.base = 20
 
         # Two-strike damage policy
