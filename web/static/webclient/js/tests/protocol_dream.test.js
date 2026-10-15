@@ -1,11 +1,15 @@
 /*
- * dream panel v2 mirror: bounded shown experience requirements.
+ * dream panel v3 mirror: bounded shown experience requirements and the
+ * canonical scene descriptor.
  *
  * The dream stage's sheet displays the server-authored requirement rows and
  * echoes them back with their version identity, so the panel contract is
  * exactly the published shape: the rows and the identity are required fields
  * of the state, and a malformed row must be refused before the sheet can
  * render — or confirm — something the authoring store could never have shown.
+ * The stage's artwork is the SAME canonical scene descriptor every other scene
+ * surface carries (the shared artwork validator owns its facts), so the retired
+ * raw-URL shape is refused instead of adapted.
  * Shared fixtures live in ./protocol_support.js.
  */
 
@@ -18,6 +22,69 @@ const Protocol = require("../elosern/protocol.js");
 
 function requirement(kind, text) {
   return { kind: kind, text: text };
+}
+
+function digest(label) {
+  let out = "";
+  for (let i = 0; i < 64; i += 1) {
+    out += "0123456789abcdef"[(label.charCodeAt(i % label.length) + i) % 16];
+  }
+  return out;
+}
+
+// One bundled dream illustration: the repository's own fingerprinted identity.
+function bundledResource(key) {
+  const fingerprint = digest("bundled-" + key);
+  return {
+    resource_id: "bundled-scene/" + key + "/" + fingerprint + ".webp",
+    version: fingerprint,
+    url: "/art/bundled-scene/" + key + "/" + fingerprint + ".webp",
+    origin: "bundled_official",
+    geometry: { image_size: { width: 1536, height: 864 }, face_rect: null, stage: null, aspect_ratio: null },
+  };
+}
+
+// The dream stage's canonical descriptor: the optional preferred operator
+// identity, the required bundled dream illustration and the distinct town
+// terminal.
+function dreamDescriptor(overrides) {
+  const fingerprint = digest("dream-preferred");
+  return Object.assign(
+    {
+      subject_id: "dream:1:4f0f7a4e6b2c4c8d9a1e0b7d3c5f2a60",
+      revision: digest("dream-revision"),
+      generation_subject: null,
+      generation_state: null,
+      attempts: [
+        {
+          type: "image",
+          source_id: "scene.operator:dream_throne",
+          rank: 30,
+          resource: {
+            resource_id: "npc/dream_goddess/dream-throne.webp",
+            version: fingerprint,
+            url: "/art/official/" + fingerprint + "/npc/dream_goddess/dream-throne.webp",
+            origin: "official",
+            geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: null },
+          },
+        },
+        {
+          type: "image",
+          source_id: "scene.bundled:dream_throne",
+          rank: 40,
+          resource: bundledResource("dream_throne"),
+        },
+      ],
+      terminal: {
+        kind: "scene_image",
+        source_id: "scene.terminal:city_street",
+        rank: 100,
+        resource: bundledResource("city_street"),
+      },
+      retention_sources: [],
+    },
+    overrides || {}
+  );
 }
 
 function dreamState(overrides) {
@@ -38,7 +105,7 @@ function dreamState(overrides) {
       opening: "合成白色夢境",
       scene: "合成場景描述",
       dialogue: "合成對話",
-      scene_art: "",
+      scene_art: dreamDescriptor(),
       direction_parts: ["合成方向"],
       thread_choices: [],
       draft_preferences: null,
@@ -62,7 +129,7 @@ function dreamState(overrides) {
 }
 
 function dreamPanel(state) {
-  return { schema_version: 2, available: true, state: state === undefined ? dreamState() : state };
+  return { schema_version: 3, available: true, state: state === undefined ? dreamState() : state };
 }
 
 test("dream accepts the published requirement rows with and without an identity", () => {
@@ -77,7 +144,7 @@ test("dream accepts the published requirement rows with and without an identity"
     })
   );
   // A proposal the store has not persisted yet is a legal published shape.
-  assert.deepEqual(Protocol.validatePanel("dream", 2, proposed), proposed);
+  assert.deepEqual(Protocol.validatePanel("dream", 3, proposed), proposed);
 
   const shown = dreamPanel(
     dreamState({
@@ -85,7 +152,7 @@ test("dream accepts the published requirement rows with and without an identity"
       requirement_version: "t_dream_session:v1",
     })
   );
-  assert.deepEqual(Protocol.validatePanel("dream", 2, shown), shown);
+  assert.deepEqual(Protocol.validatePanel("dream", 3, shown), shown);
 });
 
 test("dream requires the requirement fields and an exact row shape", () => {
@@ -102,17 +169,17 @@ test("dream requires the requirement fields and an exact row shape", () => {
     "not-a-list",
   ]) {
     assert.throws(
-      () => Protocol.validatePanel("dream", 2, dreamPanel(dreamState({ requirements: rows }))),
+      () => Protocol.validatePanel("dream", 3, dreamPanel(dreamState({ requirements: rows }))),
       undefined,
       JSON.stringify(rows)
     );
   }
   const missing = dreamState();
   delete missing.requirements;
-  assert.throws(() => Protocol.validatePanel("dream", 2, dreamPanel(missing)));
+  assert.throws(() => Protocol.validatePanel("dream", 3, dreamPanel(missing)));
   const missingVersion = dreamState();
   delete missingVersion.requirement_version;
-  assert.throws(() => Protocol.validatePanel("dream", 2, dreamPanel(missingVersion)));
+  assert.throws(() => Protocol.validatePanel("dream", 3, dreamPanel(missingVersion)));
 });
 
 test("dream bounds the shown version identity and still refuses unknown fields", () => {
@@ -120,7 +187,7 @@ test("dream bounds the shown version identity and still refuses unknown fields",
     assert.throws(() =>
       Protocol.validatePanel(
         "dream",
-        2,
+        3,
         dreamPanel(dreamState({ requirement_version: version }))
       )
     );
@@ -128,18 +195,66 @@ test("dream bounds the shown version identity and still refuses unknown fields",
   assert.doesNotThrow(() =>
     Protocol.validatePanel(
       "dream",
-      2,
+      3,
       dreamPanel(
         dreamState({ requirements: [requirement("place", "合成地點")], requirement_version: "v".repeat(128) })
       )
     )
   );
   assert.throws(() =>
-    Protocol.validatePanel("dream", 2, dreamPanel(dreamState({ requirement_rows: [] })))
+    Protocol.validatePanel("dream", 3, dreamPanel(dreamState({ requirement_rows: [] })))
   );
 });
 
 test("dream is in the production panel allowlist at its registered version", () => {
-  assert.equal(Protocol.PANEL_ALLOWLIST.dream, 2);
-  assert.throws(() => Protocol.validatePanel("dream", 3, dreamPanel()));
+  assert.equal(Protocol.PANEL_ALLOWLIST.dream, 3);
+  assert.throws(() => Protocol.validatePanel("dream", 2, dreamPanel()));
+});
+
+test("dream carries the canonical scene descriptor and refuses the retired raw URL", () => {
+  const descriptor = dreamDescriptor();
+  const panel = dreamPanel(dreamState({ scene_art: descriptor }));
+  assert.deepEqual(Protocol.validatePanel("dream", 3, panel), panel);
+  // The reachable facts a dream descriptor carries: the optional preferred
+  // operator position, the required bundled illustration and the distinct
+  // terminal, with no generation claim at all.
+  assert.equal(descriptor.generation_subject, null);
+  assert.equal(descriptor.generation_state, null);
+  assert.deepEqual(
+    descriptor.attempts.map((entry) => [entry.type, entry.source_id, entry.rank]),
+    [
+      ["image", "scene.operator:dream_throne", 30],
+      ["image", "scene.bundled:dream_throne", 40],
+    ]
+  );
+  assert.equal(descriptor.terminal.kind, "scene_image");
+  assert.equal(descriptor.terminal.source_id, "scene.terminal:city_street");
+
+  // A reached fault names its source and reason, never a URL.
+  const refused = dreamDescriptor({
+    attempts: [
+      {
+        type: "fault",
+        source_id: "scene.operator:npc/dream_goddess/dream-throne.webp",
+        rank: 30,
+        reason: "source_rejected",
+      },
+      descriptor.attempts[1],
+    ],
+  });
+  assert.doesNotThrow(() => Protocol.validatePanel("dream", 3, dreamPanel(dreamState({ scene_art: refused }))));
+
+  // The retired shapes and the unbounded/incorrect facts are all refused.
+  for (const retired of [
+    "",
+    "/art/official/" + "0".repeat(64) + "/npc/dream_goddess/dream-throne.webp",
+    null,
+    "not-a-descriptor",
+    dreamDescriptor({ attempts: [{ type: "fault", source_id: "x", rank: 30, reason: "not_a_reason" }] }),
+    dreamDescriptor({ attempts: [{ type: "fault", source_id: "x".repeat(257), rank: 30, reason: "source_rejected" }] }),
+  ]) {
+    assert.throws(() =>
+      Protocol.validatePanel("dream", 3, dreamPanel(dreamState({ scene_art: retired })))
+    );
+  }
 });

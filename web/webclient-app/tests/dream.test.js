@@ -5,13 +5,21 @@ import DreamPanel from "../components/DreamPanel.vue";
 import Protocol from "../../static/webclient/js/elosern/protocol.js";
 import CommandEcho from "../../static/webclient/js/elosern/command_echo.js";
 import { Storyboard } from "../stories/World/DreamPanel.stories.js";
+import {
+  dreamBundledDescriptor,
+  dreamDescriptor,
+  dreamExhaustedDescriptor,
+  dreamRefusedDescriptor,
+} from "../stories/fixtures.js";
+import { observeError, observeLoad } from "./support/scene_layers.js";
 
 function state(overrides = {}) {
   return { session_id: "synthetic-dream", revision: 2, completed: 0, remaining: 6,
     can_input: true, can_confirm: true, can_draft: true, can_awaken: true,
     pending: false, open: true, confirmed: false, failure: false,
     opening: "合成白色夢境", scene: "<script>合成場景</script>", dialogue: "合成對話",
-    scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
+    // The shared canonical scene descriptor of the dream's own source chain.
+    scene_art: dreamDescriptor(),
     direction_parts: [], thread_choices: [], draft_preferences: null,
     requirements: [], requirement_version: null,
     track: { version: 1, completed: 0, pleasure: 0, level: "平靜", ordinal: 0, climax_phase: "未達", converging: false },
@@ -24,6 +32,12 @@ function fixture(value = state(), options = {}) {
 }
 const row = (wrapper, name) => wrapper.find(`[data-row='${name}']`);
 const reply = (wrapper) => wrapper.find("[data-testid='dream-reply'] textarea");
+// One settled frame: the driver's provisional retirement and the resolution
+// that follows it are watcher-driven, so a state change needs a real tick.
+async function frames() {
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  await nextTick();
+}
 async function openSheet(wrapper) {
   await row(wrapper, "edit").trigger("click");
   await flushPromises();
@@ -234,38 +248,104 @@ describe("server-authored dream surface", () => {
     expect(wrapper.find(".dream-toast").text()).toBe("念頭已記下，夢仍在繼續。");
   });
   it("mirrors the strict panel schema and truthful command echoes", () => {
-    const payload = { schema_version: 2, available: true, state: state() };
-    expect(Protocol.validatePanel("dream", 2, payload)).toEqual(payload);
-    expect(Protocol.validatePanel("dream", 2, { ...payload, state: null }).state).toBeNull();
-    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ remaining: 0 }) })).toThrow();
-    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ pending: true }) })).toThrow();
-    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ scene_art: null }) })).toThrow();
-    expect(Protocol.validatePanel("dream", 2, { ...payload, state: state({
+    const payload = { schema_version: 3, available: true, state: state() };
+    expect(Protocol.validatePanel("dream", 3, payload)).toEqual(payload);
+    expect(Protocol.validatePanel("dream", 3, { ...payload, state: null }).state).toBeNull();
+    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ remaining: 0 }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ pending: true }) })).toThrow();
+    // The retired raw-URL shape is refused, not adapted: the state's artwork is
+    // the canonical scene descriptor or nothing at all.
+    for (const retired of [
+      "/art/official/" + "0".repeat(64) + "/npc/dream_goddess/dream-throne.webp",
+      "",
+      null,
+      { ...dreamDescriptor(), attempts: [{ type: "image", source_id: "scene.operator:dream_throne", rank: 30, resource: { resource_id: "x", version: "y", url: "/art/x", origin: "official", geometry: null } }] },
+    ]) {
+      expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ scene_art: retired }) }))
+        .toThrow();
+    }
+    expect(Protocol.validatePanel("dream", 3, { ...payload, state: state({
       thread_choices: [{ id: "synthetic-thread", label: "合成已知故事" }],
     }) }).state.thread_choices[0].label).toBe("合成已知故事");
-    expect(() => Protocol.validatePanel("dream", 2, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
+    expect(() => Protocol.validatePanel("dream", 3, { ...payload, state: state({ thread_choices: ["synthetic-thread"] }) })).toThrow();
     expect(CommandEcho.commandLine("explore.wait", { sleep: true, dream: true })).toBe("sleep dream");
     expect(CommandEcho.commandLine("dream.say", { message_parts: ["合成", "方向"] })).toBe("dream say 合成方向");
     expect(CommandEcho.commandLine("dream.awaken", {})).toBe("dream awaken");
   });
   it("renders the server-resolved scene artwork, degrading on a failed load", async () => {
-    const { wrapper } = fixture();
-    expect(wrapper.find("img.dream-scene__art").attributes("src")).toBe(state().scene_art);
-    // A replaced or withdrawn file 404s by design (the URL embeds the startup
-    // fingerprint): the stage falls back to the flat ink background instead of
-    // a broken-image glyph.
-    await wrapper.find("img.dream-scene__art").trigger("error");
-    expect(wrapper.find("img.dream-scene__art").exists()).toBe(false);
-    // A changed URL is a new attempt.
-    const republished = state().scene_art.replace("0000", "1111");
-    await wrapper.setProps({ state: state({ scene_art: republished }) });
-    expect(wrapper.find("img.dream-scene__art").attributes("src")).toBe(republished);
+    const [preferred, bundled] = dreamDescriptor().attempts.map((entry) => entry.resource.url);
+    // A healthy preferred operator image paints as soon as its own element
+    // reports real pixels, and it carries no failure fact at all.
+    const healthy = fixture();
+    await observeLoad(healthy.wrapper, preferred);
+    expect(healthy.wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(preferred);
+    expect(healthy.wrapper.find("[data-testid='dream-scene-art']").attributes("data-art-role")).toBe("attempt");
+    expect(healthy.wrapper.find("[data-testid='dream-art-failure']").exists()).toBe(false);
+    healthy.wrapper.unmount();
+    // A withdrawn operator file 404s by design (the URL embeds the startup
+    // fingerprint): the reached failure stays stated while the REQUIRED bundled
+    // dream illustration follows it — never a broken-image glyph.
+    const broken = fixture();
+    await observeError(broken.wrapper, preferred);
+    await frames();
+    await observeLoad(broken.wrapper, bundled);
+    expect(broken.wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
+    expect(broken.wrapper.find("[data-testid='dream-art-failure']").text()).toBe("圖片載入失敗。");
+    broken.wrapper.unmount();
+  });
+  it("shows the bundled dream when the preferred image is absent and the reached fact when every illustration is missing", async () => {
+    const bundledOnly = dreamBundledDescriptor();
+    const { wrapper } = fixture(state({ scene_art: bundledOnly }));
+    const bundled = bundledOnly.attempts[0].resource.url;
+    await observeLoad(wrapper, bundled);
+    expect(wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
+    // Absence contributes no fact: the required bundled dream simply shows.
+    expect(wrapper.find("[data-testid='dream-art-failure']").exists()).toBe(false);
     wrapper.unmount();
-    const blank = mount(DreamPanel, {
-      props: { state: state({ scene_art: "" }), store: { view: reactive({ connected: true, dispatch: { inFlight: null } }), dispatchAction: vi.fn() } },
-    });
-    expect(blank.find("img.dream-scene__art").exists()).toBe(false);
-    blank.unmount();
+    const exhausted = fixture(state({ scene_art: dreamExhaustedDescriptor() }));
+    expect(exhausted.wrapper.find("[data-testid='dream-scene-art']").exists()).toBe(false);
+    expect(exhausted.wrapper.find("[data-testid='dream-art-control']").exists()).toBe(false);
+    expect(exhausted.wrapper.find("[data-testid='dream-art-failure']").text()).toBe("缺少必要的圖片資源。");
+    exhausted.wrapper.unmount();
+  });
+  it("opens the full view on the displayed resource with the same reached failure", async () => {
+    const refused = dreamRefusedDescriptor();
+    const { wrapper } = fixture(state({ scene_art: refused }));
+    const bundled = refused.attempts[1].resource.url;
+    await observeLoad(wrapper, bundled);
+    // The refused preferred image's reached fact leads the stage...
+    const marker = wrapper.find("[data-testid='dream-art-failure']");
+    expect(marker.exists()).toBe(true);
+    // ...and the full view shows exactly the displayed resource and that same
+    // failure, so no second resolution and no broken-only view exists.
+    await wrapper.find("[data-testid='dream-art-control']").trigger("click");
+    await flushPromises();
+    const view = wrapper.find("[data-testid='dream-art-view']");
+    expect(view.exists()).toBe(true);
+    expect(view.find("[data-testid='dream-art-view-image']").attributes("src")).toBe(bundled);
+    expect(view.find("[data-testid='dream-art-view-failure']").text()).toBe(marker.text());
+    // The stage beneath the full view is inert while it is open.
+    expect(wrapper.find(".dream-scene__main").attributes("inert")).toBeDefined();
+    await wrapper.find("[data-testid='dream-art-view']").trigger("keydown", { key: "Escape" });
+    expect(wrapper.find("[data-testid='dream-art-view']").exists()).toBe(false);
+    expect(wrapper.find(".dream-scene__main").attributes("inert")).toBeUndefined();
+    wrapper.unmount();
+  });
+  it("retires the previous dream session's callbacks when the subject changes", async () => {
+    const { wrapper } = fixture();
+    const stale = dreamDescriptor().attempts[0].resource.url;
+    const second = dreamBundledDescriptor({ subject_id: "dream:1:synthetic-second-session" });
+    await wrapper.setProps({ state: state({ session_id: "synthetic-second", scene_art: second }) });
+    // A new session is a new logical subject: nothing of the old resolution is
+    // presented, and a late event for its retired element settles nothing.
+    expect(wrapper.find("[data-testid='dream-scene-art']").exists()).toBe(false);
+    const staleLayer = wrapper.findAll("img").find((img) => img.attributes("src") === stale);
+    expect(staleLayer).toBeUndefined();
+    const bundled = second.attempts[0].resource.url;
+    await observeLoad(wrapper, bundled);
+    expect(wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
+    expect(wrapper.find("[data-testid='dream-scene-art']").attributes("data-art-role")).toBe("attempt");
+    wrapper.unmount();
   });
   it("rehydrates a same-session external draft change without clearing unsent chat", async () => {
     const { wrapper, store } = fixture();

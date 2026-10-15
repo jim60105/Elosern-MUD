@@ -17,6 +17,10 @@
 // top. Escape never awakens by itself: it closes the top layer, or moves
 // focus to the 醒來 row.
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from "vue";
+import { artworkAvailability } from "../lib/artwork.js";
+import { artworkFailureCategory } from "../lib/artwork-failure.js";
+import { displayedScene } from "../lib/scene-artwork.js";
+import { useArtwork } from "../composables/useArtwork.js";
 import { createFocusTrap } from "./focus-trap.js";
 import { useTypewriter } from "../composables/use-typewriter.js";
 import { effectiveCps } from "../lib/message_reveal.js";
@@ -64,7 +68,6 @@ const confirmOpen = ref(false);
 const refusal = ref("");
 const toast = ref("");
 const announcement = ref("");
-const artFailed = ref(false);
 const bloom = ref(false);
 const arrival = ref(false);
 // The authoritative direction, thread and preference snapshot most recently
@@ -120,7 +123,126 @@ const provenance = computed(() => {
   if (directionDirty.value) return "已改寫・未記下";
   return props.state.draft_preferences ? "已記下" : "取自你剛才的話";
 });
-const overlayOpen = computed(() => sheetOpen.value || confirmOpen.value);
+// ---- the stage's picture: the shared scene render/load path ----
+// The dream stage's artwork is the SAME canonical scene descriptor and the
+// SAME ordered-attempt lifecycle every scene surface consumes: the loading
+// core walks the descriptor's own positions, the driver observes the real
+// element it issued, reached faults stay local, and the descriptor's subject
+// identity is the resolution epoch — so a new dream session retires the
+// previous session's callbacks instead of letting a stale one settle the
+// surface. The dream descriptor authorizes no retained content (it has no
+// regeneration, and one logical place per session), so nothing is retained
+// here and no second resolution exists.
+const artwork = computed(() => props.state.scene_art ?? null);
+const availability = computed(() => artworkAvailability({
+  panel: { available: true },
+  required: true,
+  hasReference: true,
+  artwork: artwork.value,
+  viewSubjectId: artwork.value?.subject_id ?? null,
+}));
+// The ONE provisional source of this stage: the dream's own REQUIRED bundled
+// illustration, or its declared terminal when that image is unavailable. It is
+// fetched outside the ordered walk so the required dream painting stands in
+// while the preferred operator image is still loading — never a second loader,
+// and never a request for a resource the walk itself is fetching.
+const provisionalSource = computed(() => {
+  const descriptor = artwork.value;
+  if (!descriptor) return null;
+  const attempts = Array.isArray(descriptor.attempts) ? descriptor.attempts : [];
+  const bundled = attempts.find((entry) => entry?.type === "image" && entry.resource?.url
+    && String(entry.source_id ?? "").startsWith("scene.bundled:"));
+  if (bundled) return bundled.resource;
+  const terminal = descriptor.terminal;
+  return terminal?.kind === "scene_image" && terminal.resource?.url ? terminal.resource : null;
+});
+const load = useArtwork(artwork, availability, { provisionalSource });
+const display = computed(() => displayedScene({
+  retained: null,
+  selected: load.selected.value,
+  provisional: load.provisionalSelected.value,
+  available: availability.value.state,
+}));
+const artShown = computed(() => !!display.value?.url);
+const reachedFailure = computed(() => load.reachedFaults.value[0] ?? null);
+// ONE local, accessible indication: the panel's own availability failure, or
+// the first failure the resolution actually walked past. A preferred operator
+// image that cannot load stays stated even while the required bundled dream
+// stands in for it, exactly like every other scene surface.
+const artFailure = computed(() => {
+  if (load.panelUnavailable.value || availability.value.state === "failed") {
+    return artworkFailureCategory("panel_unavailable");
+  }
+  return reachedFailure.value ? artworkFailureCategory(reachedFailure.value.reason) : null;
+});
+
+// The layer that presents the picture, and the hidden probes for the
+// resources the driver is fetching right now: exactly one element per
+// resource, each reporting the real natural dimensions of the element the
+// driver issued.
+function layerFor(url, role, token) {
+  return { url, role, token };
+}
+const presented = computed(() => {
+  const shown = display.value;
+  if (!shown?.url) return null;
+  const ordered = load.attempt.value;
+  const provisional = load.provisionalAttempt.value;
+  if (ordered?.url === shown.url) return layerFor(shown.url, "attempt", ordered.token);
+  if (provisional?.url === shown.url) return layerFor(shown.url, "provisional", provisional.token);
+  return layerFor(shown.url, "content", null);
+});
+const probes = computed(() => {
+  const shown = display.value;
+  const out = [];
+  for (const [candidate, role] of [
+    [load.attempt.value, "attempt"],
+    [load.provisionalAttempt.value, "provisional"],
+  ]) {
+    if (!candidate?.url || candidate.url === shown?.url) continue;
+    out.push(layerFor(candidate.url, role, candidate.token));
+  }
+  return out;
+});
+function onLayerLoad(layer, event) {
+  if (layer.role === "attempt") load.onImageLoad(event);
+  else if (layer.role === "provisional") load.onProvisionalLoad(event);
+}
+function onLayerError(layer, event) {
+  if (layer.role === "attempt") load.onImageError(event);
+  else if (layer.role === "provisional") load.onProvisionalError(event);
+}
+// An element that ALREADY holds the bytes never fires another load: a commit
+// that re-issues a resolution for a resource whose element is on screen and
+// complete is reported to its owning driver once, and the driver's own token
+// and cursor checks make a repeated report a no-op.
+function reportCompleteLayers() {
+  const root = stage.value;
+  if (!root || typeof root.querySelectorAll !== "function") return;
+  for (const element of root.querySelectorAll("img[data-art-role]")) {
+    if (!element.complete || !element.naturalWidth) continue;
+    const layer = [...probes.value, presented.value]
+      .find((item) => item?.url === element.getAttribute("src"));
+    if (layer) onLayerLoad(layer, { target: element });
+  }
+}
+watch([probes, presented], () => { void nextTick().then(reportCompleteLayers); }, { flush: "post" });
+
+// The full view shows exactly what the stage displays and the same reached
+// failure: there is no second resolution, and it cannot open with nothing on
+// screen.
+const artOpen = ref(false);
+const artView = ref(null);
+function openArt() {
+  if (artOpen.value || !artShown.value) return;
+  return openLayer(artOpen, artView, () => artView.value);
+}
+function closeArt() { closeLayer(artOpen); }
+watch(display, (value) => {
+  if (!value?.url && artOpen.value) closeArt();
+});
+
+const overlayOpen = computed(() => sheetOpen.value || confirmOpen.value || artOpen.value);
 
 // ---- beats: what the message band is presenting ----
 const beats = ref([]);
@@ -189,8 +311,15 @@ onMounted(() => {
   }
   rootTrap = createFocusTrap(stage.value, { initialFocusEl: initialFocus(), openerEl: document.activeElement });
   rootTrap.enter();
+  reportCompleteLayers();
 });
-onUnmounted(() => { layerTrap = null; rootTrap?.restore(); rootTrap = null; clearTimeout(toastTimer); });
+onUnmounted(() => {
+  layerTrap = null;
+  rootTrap?.restore();
+  rootTrap = null;
+  load.dispose();
+  clearTimeout(toastTimer);
+});
 
 function initialFocus() {
   if (arrival.value) return page.value;
@@ -204,7 +333,6 @@ function focusHome() {
 }
 
 watch(() => props.state.session_id, () => { message.value = ""; lastSent.value = ""; });
-watch(() => props.state.scene_art, () => { artFailed.value = false; });
 watch(() => props.state.completed, (completed) => {
   // Only a live increase animates; a reconnect or same-count republish
   // keeps what is on screen.
@@ -391,7 +519,8 @@ function onKeydown(event) {
   event.stopPropagation();
   if (event.key === "Escape") {
     event.preventDefault();
-    if (confirmOpen.value) closeConfirm();
+    if (artOpen.value) closeArt();
+    else if (confirmOpen.value) closeConfirm();
     else if (sheetOpen.value) closeSheet();
     else if (isTextField(event.target)) page.value?.focus();
     else { awakenRow.value?.focus(); announcement.value = "再按 Enter 醒來，或繼續交談。"; }
@@ -406,14 +535,36 @@ function onKeydown(event) {
 </script>
 
 <template>
-  <section ref="stage" class="dream-scene" :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !state.scene_art || artFailed }"
+  <section ref="stage" class="dream-scene" :class="{ 'dream-scene--arrival': arrival, 'dream-scene--no-art': !artShown }"
     role="dialog" aria-modal="true" aria-labelledby="dream-title" tabindex="-1" data-testid="dream-panel"
     :data-state="state.pending ? 'pending' : state.failure ? 'failure' : atCap ? 'cap' : arrival ? 'arrival' : 'turn'"
     :style="{ '--dream-ordinal': ordinal }" @keydown="onKeydown">
-    <img v-if="state.scene_art && !artFailed" class="dream-scene__art" :src="state.scene_art" alt="雲海之上的純白王座與王座上的女神" decoding="async" @error="artFailed = true" />
+    <!-- The displayed picture: the live resolution of the committed descriptor,
+         rendered by the element the shared driver itself issued. -->
+    <img v-if="presented" :key="presented.url" class="dream-scene__art" data-testid="dream-scene-art"
+      :data-art-role="presented.role"
+      :data-attempt-token="presented.role === 'attempt' ? String(presented.token) : null"
+      :data-provisional-token="presented.role === 'provisional' ? String(presented.token) : null"
+      :src="presented.url" alt="雲海之上的純白王座與王座上的女神" decoding="async"
+      @load="onLayerLoad(presented, $event)" @error="onLayerError(presented, $event)" />
+    <!-- The hidden probes: the resources the driver is fetching now. They
+         report the real decoded dimensions and never paint anything. -->
+    <img v-for="probe in probes" :key="probe.url" class="dream-scene__art dream-scene__art--probe"
+      :data-art-role="probe.role" :src="probe.url" alt="" aria-hidden="true"
+      :data-attempt-token="probe.role === 'attempt' ? String(probe.token) : null"
+      :data-provisional-token="probe.role === 'provisional' ? String(probe.token) : null"
+      @load="onLayerLoad(probe, $event)" @error="onLayerError(probe, $event)" />
     <div class="dream-scene__veil" aria-hidden="true"></div>
     <div v-if="bloom" class="dream-scene__bloom" aria-hidden="true" @animationend="bloom = false"></div>
     <div v-if="$slots.storyTools" class="dream-scene__story-tools"><slot name="storyTools" /></div>
+    <!-- The stage's own local status and full-view control. Both belong to the
+         presented picture, so the marker stands beside the image the player is
+         looking at and the view can never open on nothing. -->
+    <div v-if="artShown || artFailure" class="dream-art">
+      <p v-if="artFailure" class="dream-art__failure" role="status" data-testid="dream-art-failure">{{ artFailure }}</p>
+      <button v-if="artShown" type="button" class="ui-btn ui-btn--ghost ui-btn--sm dream-art__control"
+        data-testid="dream-art-control" aria-label="開啟夢境全圖" @click="openArt">全圖</button>
+    </div>
 
     <div class="dream-scene__main" :inert="overlayOpen || undefined">
       <header class="dream-crest">
@@ -579,6 +730,18 @@ function onKeydown(event) {
         </div>
       </div>
     </template>
+
+    <!-- The full view of the stage's picture: the same displayed resource and
+         the same reached failure, focus-trapped, Escape closes and restores
+         focus to the control that opened it. -->
+    <aside v-if="artOpen" ref="artView" class="dream-art-view" role="dialog" aria-modal="true"
+      aria-label="夢境全圖" data-testid="dream-art-view" tabindex="-1">
+      <button class="ui-btn ui-btn--ghost dream-art-view__close" type="button" data-testid="dream-art-view-close"
+        aria-label="關閉全圖" @click="closeArt">關閉</button>
+      <img v-if="display" class="dream-art-view__image" data-testid="dream-art-view-image" :src="display.url"
+        alt="雲海之上的純白王座與王座上的女神" />
+      <p v-if="artFailure" class="dream-art-view__failure" role="status" data-testid="dream-art-view-failure">{{ artFailure }}</p>
+    </aside>
   </section>
 </template>
 
@@ -597,6 +760,23 @@ function onKeydown(event) {
 .dream-scene:focus { box-shadow: none; outline: none; }
 .dream-scene p, .dream-scene h2, .dream-scene h3, .dream-scene h4, .dream-scene blockquote { margin: 0; }
 .dream-scene__art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 68% 62%; }
+/* The probes cover the stage box too, so they really load and report their own
+   decoded size; they are invisible and never take a pointer. */
+.dream-scene__art--probe { opacity: 0; pointer-events: none; }
+/* The stage's local status and full-view control: the empty right third of the
+   art, above the message band. */
+.dream-art { position: absolute; z-index: 6; right: var(--dream-gutter); bottom: calc(var(--band-h) + var(--sp-4));
+  display: flex; align-items: center; gap: var(--sp-2); max-width: 40%; }
+.dream-art__failure { margin: 0; padding: var(--sp-1) var(--sp-3); border: 1px solid var(--band-edge-dim); border-radius: var(--radius-pill);
+  background: rgba(11, 13, 16, 0.78); color: #f3b9bc; font-size: var(--text-xs); line-height: 1.5; }
+.dream-art__control { flex: none; letter-spacing: 0.08em; }
+/* The full view: the same displayed bitmap at full screen, above every other
+   layer of the stage. */
+.dream-art-view { position: fixed; inset: 0; z-index: 10; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: var(--sp-2); background: var(--ink-950); outline: none; }
+.dream-art-view__image { max-width: 100%; max-height: 86vh; object-fit: contain; }
+.dream-art-view__failure { margin: 0; color: #f3b9bc; font-size: var(--text-xs); }
+.dream-art-view__close { position: absolute; top: var(--sp-4); right: var(--sp-4); }
 /* The pale fallback keeps the art's luminance so the chrome reads the same
    without it; the rose aura deepens with the goddess's excitement. */
 .dream-scene__veil { position: absolute; inset: 0; pointer-events: none;

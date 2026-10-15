@@ -452,7 +452,7 @@ var PANEL_ALLOWLIST = {
   lore_codex: 1,
   quest_log: 2,
   combat_beats: 1,
-  dream: 2,
+  dream: 3,
   skill_use: 1,
 };
 
