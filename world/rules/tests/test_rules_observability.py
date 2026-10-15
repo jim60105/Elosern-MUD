@@ -30,7 +30,13 @@ from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.combat_session import engage, forfeit, submit_player_action
 from world.rules.surfaces import restore_attribute_best_effort
 
-from ._combat_session_helpers import _monster, _player, open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import (
+    _monster,
+    _player,
+    fail_on_round_persist,
+    open_synthetic_scope,
+    synth_innate_overlay,
+)
 from .combat_fixtures import BattlefieldIsolation
 from ._knowledge_probes import basic_attack_key, race_key
 
@@ -217,7 +223,7 @@ class CombatBoundaryEventTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
                 "world.rules.combat_session.rounds._persist",
-                side_effect=RuntimeError("injected persist failure"),
+                side_effect=fail_on_round_persist("injected persist failure"),
             ),
             self.captureOnCommitCallbacks(execute=True),
             self.assertRaises(RuntimeError),

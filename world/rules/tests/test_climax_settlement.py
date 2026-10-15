@@ -408,6 +408,14 @@ class ClimaxRollbackTests(EvenniaTest):
                 return_value={},
             ),
             patch("world.rules.clock.get_world_clock", return_value=clock),
+            # The draft's required-actor derivation reads the same modifiers
+            # through the session's own namespace, so the climax zero-action
+            # lock would leave the player with no command to give. Neutralize
+            # it here exactly as the six namespaces above already are.
+            patch(
+                "world.rules.combat_session.battlefield.evaluate_combat_modifiers_no_create",
+                return_value={},
+            ),
             patch(
                 "world.rules.combat_session.settlement.settle_combat_result",
                 side_effect=RuntimeError("clock write failed"),

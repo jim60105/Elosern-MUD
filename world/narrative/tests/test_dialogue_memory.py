@@ -23,7 +23,11 @@ from world.rules.clock import AdvanceSource, get_world_clock
 from world.rules.combat_session import BASIC_ATTACK_KEY, read_session, submit_player_action
 from world.rules.party import leave_party
 from world.rules.protection_demo import prepare_protection_demo
-from world.rules.tests._combat_session_helpers import _player, open_synthetic_scope
+from world.rules.tests._combat_session_helpers import (
+    _player,
+    complete_party_draft,
+    open_synthetic_scope,
+)
 from world.rules.tests.combat_fixtures import BattlefieldIsolation
 
 
@@ -168,7 +172,11 @@ class DurableDialogueTests(BattlefieldIsolation, EvenniaTestCase):
         with patch("world.rules.combat.battlefield.roll_d100", return_value=1), \
              patch("world.rules.combat.damage.roll_d100", return_value=1), \
              patch("world.rules.combat.rounds.roll_d100", return_value=1):
-            submit_player_action(self.player, BASIC_ATTACK_KEY, [enemy])
+            complete_party_draft(
+                self.player,
+                enemy,
+                submit_player_action(self.player, BASIC_ATTACK_KEY, [enemy]),
+            )
         self.assertIsNone(read_session(self.player))
         event = NarrativeEvent.objects.get(event_type="encounter_protection")
         self.assertIn(str(npc.pk), event.participants)

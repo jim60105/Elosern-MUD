@@ -53,6 +53,7 @@ from ._combat_session_helpers import (
     _monster_tier_key,
     _race_key,
     _behaviour_archetype_key,
+    complete_party_draft,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -179,7 +180,9 @@ class FriendlyFireBase(BattlefieldIsolation, EvenniaTest):
 
     def _run_hit(self, skill_key, targets):
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            return submit_player_action(self.player, skill_key, targets)
+            return complete_party_draft(
+                self.player, self.monster, submit_player_action(self.player, skill_key, targets)
+            )
 
 
 class CombatFriendlyFireTests(FriendlyFireBase):
@@ -256,7 +259,9 @@ class CombatFriendlyFireTests(FriendlyFireBase):
                 if skill_key == _T_AREA:
                     targets = [companion, monster]
                 with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-                    result = submit_player_action(player, skill_key, targets)
+                    result = complete_party_draft(
+                        player, monster, submit_player_action(player, skill_key, targets)
+                    )
                 self.assertEqual(result["outcome"], "round")
                 self.assertEqual(companion.relations.affinity_for(player), 9)
 

@@ -293,22 +293,78 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_session(self.player).draft_version, 0)
 
     @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
-    def test_retained_companion_selection_is_reauthorized_before_final_execution(self):
+    def test_companion_out_of_reach_is_dropped_from_required_membership(self):
+        """A companion the commander can no longer command is not required.
+
+        Its retained selection must not execute and must not block the round:
+        the earlier submission is only an admitted draft, and the confirming
+        submission re-derives membership, drops the unreachable companion and
+        resolves exactly one round.
+        """
         from world.rules.combat_session import submit_player_action
 
         companion = self._waiting_companion()
         engage(self.player, self.monster)
         submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
         companion.location = create_object(Room, key="departed companion room")
+        with patch("world.rules.combat_session.rounds.run_round", return_value=[]) as run:
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        self.assertEqual(run.call_count, 1)
+        self.assertEqual(result["outcome"], "round")
+        current = read_session(self.player)
+        self.assertEqual(current.rounds_elapsed, 1)
+        self.assertEqual(current.draft_entries, {})
+        # The one committed round is the commander's own selection only: the
+        # unreachable companion contributed no log and no request.
+        self.assertEqual(
+            [str(log.actor) for log in result["logs"]],
+            [str(self.player.key) for _ in result["logs"]],
+        )
+
+    @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    def test_retained_entry_that_became_invalid_returns_a_reselection_reason(self):
+        """A still-required actor's invalidated entry blocks the round."""
+        from world.rules.combat_session import submit_player_action
+        from world.rules.tests.combat_fixtures import grant_lineage
+        from world.tests.synthetic_data import SYNTH_SKILLS
+
+        spell = SYNTH_SKILLS["t_ember_burst"].key
+        companion = self._waiting_companion()
+        grant_lineage(companion, [spell])
+        companion.traits.mp.current = 50
+        engage(self.player, self.monster)
+        submit_player_action(self.player, spell, [self.monster], commanded_actor=companion)
+        # The companion is still authorized and still required, but its retained
+        # spell is no longer affordable, so membership alone cannot complete.
+        companion.traits.mp.current = 0
         with patch("world.rules.combat_session.rounds.run_round") as run:
             result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         run.assert_not_called()
         self.assertEqual(result["outcome"], "draft")
-        self.assertEqual(result["reselection_reasons"][companion.pk]["reason"], "forbidden_actor")
+        self.assertIn("reason", result["reselection_reasons"][companion.pk])
+        self.assertIn(int(companion.pk), result["missing_actors"])
         current = read_session(self.player)
-        self.assertIn(self.player.pk, current.draft_entries)
-        self.assertNotIn(companion.pk, current.draft_entries)
         self.assertEqual(current.rounds_elapsed, 0)
+        self.assertIn(self.player.pk, current.draft_entries)
+
+    @covers_requirement("player-combat-session::no-eligible-actors-leaves-command-collection-paused-with-explicit-party-exits")
+    def test_action_locked_commander_alone_leaves_collection_paused(self):
+        """An action-forbidden commander is no required actor, so no round runs."""
+        from world.rules.combat_session import submit_player_action
+
+        engage(self.player, self.monster)
+        with (
+            patch(
+                "world.rules.combat_session.battlefield.evaluate_combat_modifiers_no_create",
+                return_value={"actions_per_turn": 0},
+            ),
+            patch("world.rules.combat_session.rounds.run_round") as run,
+        ):
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        run.assert_not_called()
+        self.assertEqual(result["outcome"], "draft")
+        self.assertTrue(result["empty_required"])
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
     def test_commit_failed_after_prior_actor_aborts_entire_selected_round(self):

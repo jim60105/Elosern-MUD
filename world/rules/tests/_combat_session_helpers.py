@@ -325,3 +325,68 @@ def _monster(key="goblin", hp=100, atk=10):
     monster.traits.hp.current = hp
     monster.traits.atk_phys.base = atk
     return monster
+
+
+def complete_party_draft(commander, enemy, admitted):
+    """Confirm one basic attack for every actor the party draft still needs.
+
+    An active-session submission admits one selection; only the confirmation
+    that completes the draft resolves the round. ``admitted`` is the
+    commander's own already-admitted submission: a rejection is a test bug and
+    raises, never a silent fall-through. Every required actor that still has no
+    admitted entry then confirms the innate ``basic_attack`` aimed at the
+    explicitly supplied ``enemy``, and the confirmation that completed the
+    draft -- the round's own result -- is returned. ``admitted`` comes back
+    unchanged when nothing was left to confirm, i.e. when the commander's own
+    selection already completed the draft.
+    """
+    from world.rules.combat_session import (
+        BASIC_ATTACK_KEY,
+        preflight_draft_entries,
+        read_session,
+        reconstruct_battlefield,
+        submit_player_action,
+    )
+
+    if admitted.get("outcome") == "rejected":
+        raise AssertionError(f"the commander's own selection was rejected: {admitted!r}")
+    if enemy is None:
+        raise AssertionError("complete_party_draft requires an explicit enemy target")
+    result = admitted
+    while result.get("outcome") == "draft":
+        record = read_session(commander)
+        if record is None:
+            raise AssertionError("complete_party_draft requires an active session")
+        battlefield = reconstruct_battlefield(commander, record)
+        entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
+        pending = [
+            pk
+            for pk in preflight_draft_entries(commander, record, battlefield)["required_actors"]
+            if pk not in (record.draft_entries or {}) and pk in entities
+        ]
+        if not pending:
+            return result
+        result = submit_player_action(
+            commander, BASIC_ATTACK_KEY, [enemy], commanded_actor=entities[pending[0]]
+        )
+    return result
+
+
+def fail_on_round_persist(message="injected settlement persist failure"):
+    """Build the side effect that fails only the ROUND's own ``_persist`` write.
+
+    Patch ``world.rules.combat_session.rounds._persist`` with this factory's
+    result. Draft admission persists a record that still carries its
+    ``draft_entries`` and is written through; the round body persists the
+    post-round record with the draft consumed and raises instead. The injected
+    failure therefore lands inside the round transaction, not inside the edit
+    transaction that admitted the draft.
+    """
+    from world.rules.combat_session.lifecycle import _persist as real_persist
+
+    def failing(actor, record):
+        if record.draft_entries:
+            return real_persist(actor, record)
+        raise RuntimeError(message)
+
+    return failing

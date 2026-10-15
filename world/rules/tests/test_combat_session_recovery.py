@@ -32,7 +32,7 @@ from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import SYNTH_SKILLS
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
-from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import fail_on_round_persist, open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import grant_lineage
 
 _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
@@ -294,7 +294,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.rounds._persist",
-                side_effect=RuntimeError("terminated"),
+                side_effect=fail_on_round_persist("terminated"),
             ),
         ):
             with self.assertRaises(RuntimeError):

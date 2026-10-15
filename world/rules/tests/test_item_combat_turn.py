@@ -55,6 +55,7 @@ from ._combat_session_helpers import (
     _race_key,
     _monster,
     _player,
+    fail_on_round_persist,
     live_item_effect_profiles,
     live_item_registry,
     open_synthetic_scope,
@@ -404,15 +405,15 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         hp_before = int(self.player.traits.hp.current)
         engage(self.player, self.monster)
 
-        def boom(*args, **kwargs):
-            raise RuntimeError("persist boom")
-
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),
             patch("world.rules.combat.damage.roll_d100", return_value=1),
             patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session.rounds._persist", side_effect=boom),
+            patch(
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist("persist boom"),
+            ),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _TONIC_KEY)
