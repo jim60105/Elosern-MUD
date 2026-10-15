@@ -486,6 +486,19 @@ class GenerationStateTests(_SceneFixture):
         settings_override = override_settings(ART_STORE_ROOT=str(self.store_root))
         settings_override.enable()
         self.addCleanup(settings_override.disable)
+        # ``test_successive_real_publications_yield_distinct_versions_and_urls``
+        # drives the REAL worker through ``drain_synchronous``. Inject the
+        # deterministic socket-free client through the same seam every other
+        # worker-driving test uses (internal-art-worker: no test ever opens a
+        # socket to an image service), so the drain is deterministic instead of
+        # depending on a reachable sd-webui.
+        from world.art.fake_sd_client import FakeSDWebUIClient
+
+        client_patch = patch(
+            "world.art.worker.resolve_sd_client", return_value=FakeSDWebUIClient()
+        )
+        client_patch.start()
+        self.addCleanup(client_patch.stop)
 
     def test_pending_generation_claims_no_candidate_and_counts_as_pending(self):
         ensure(self.subject(), SCENE_DESCRIPTION)
