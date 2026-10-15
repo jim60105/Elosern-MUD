@@ -6,7 +6,7 @@ The complete feature needs exercised multi-actor and recovery/exit paths after e
 
 ## What Changes
 
-- **BREAKING** pre-release behavior follows the complete approved `docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md`, source commit `8c47578d`. [The batch contract](../combat-ratio-mitigation/batch.md) assigns every approved behavior.
+- **BREAKING** pre-release behavior follows the complete approved `docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md`, source commit `8c47578d`. [The batch contract](../../../docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md#11-batch-planning-contract) assigns every approved behavior.
 - Real assembled browser/text party-combat acceptance. Delta requirements define acceptance; design.md fixes integration decisions and tasks.md includes implementation, focused evidence and required documentation.
 - No compatibility layer, stored-data migration, implementation in this proposal or edits to existing active UI proposals.
 
@@ -31,7 +31,7 @@ Canonical traceability annotations, affected test/fixture/shard ownership and ex
 
 ## Batch: party combat and equipment growth
 
-Declared implementation order: **20 of 20** new changes, with the active UI prerequisites interleaved in [the complete order/conflict matrix](../combat-ratio-mitigation/batch.md). This is the post-review bounded split; the matrix records adopted findings. Planning commits remain on primary; later apply work owns implementation branches.
+Declared implementation order: **20 of 20** new changes, with the active UI prerequisites interleaved in [the complete order/conflict matrix](../../../docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md#11-batch-planning-contract). This is the post-review bounded split; the matrix records adopted findings. Planning commits remain on primary; later apply work owns implementation branches.
 
 - depends-on: webclient-party-exit-confirmation
 - depends-on: party-combat-encounter-calibration

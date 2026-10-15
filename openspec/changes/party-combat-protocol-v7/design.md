@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation and `../combat-ratio-mitigation/batch.md` for complete coverage, order and conflicts. Current context_actions is v5; active panel-v6 adds conditions and polarity only. Exact server/client field validators and the parity test require a new version for mandatory party fields.
+See proposal.md for motivation and `docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md` §11 for complete coverage, order and conflicts. Current context_actions is v5; active panel-v6 adds conditions and polarity only. Exact server/client field validators and the parity test require a new version for mandatory party fields.
 
 Observed starting points are separate from proposed behavior below; no runtime result is claimed. The approved 2026-10-15 document explicitly amends engine §6.3 subtraction, allied autonomy and individual allied flee.
 

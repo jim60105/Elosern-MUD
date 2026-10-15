@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation and `../combat-ratio-mitigation/batch.md` for complete coverage, order and conflicts. The active warning proposal already uses QuestionCard with No initial focus and an inert background; party confirmation reuses that behavior.
+See proposal.md for motivation and `docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md` §11 for complete coverage, order and conflicts. The active warning proposal already uses QuestionCard with No initial focus and an inert background; party confirmation reuses that behavior.
 
 Observed starting points are separate from proposed behavior below; no runtime result is claimed. The approved 2026-10-15 document explicitly amends engine §6.3 subtraction, allied autonomy and individual allied flee.
 

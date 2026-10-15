@@ -2,7 +2,7 @@
 
 ## Context
 
-See proposal.md for motivation and `../combat-ratio-mitigation/batch.md` for complete coverage, order and conflicts. `build_combat_view` currently builds puppet-bound skills and `_round_provider` supplies policy actions for every nonplayer entity; item use already has preflight and rollback journals.
+See proposal.md for motivation and `docs/superpowers/specs/2026-10-15-party-combat-and-equipment-growth-design.md` §11 for complete coverage, order and conflicts. `build_combat_view` currently builds puppet-bound skills and `_round_provider` supplies policy actions for every nonplayer entity; item use already has preflight and rollback journals.
 
 Observed starting points are separate from proposed behavior below; no runtime result is claimed. The approved 2026-10-15 document explicitly amends engine §6.3 subtraction, allied autonomy and individual allied flee.
 
