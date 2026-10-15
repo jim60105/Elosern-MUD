@@ -9,6 +9,7 @@ damage:
   solid_hit_multiplier: 1.5
   base_multiplier: 1.0
   floor: 1
+  mitigation_k: 40
 
 heal:
   # Invented placeholder pending the later combat-balance pass.

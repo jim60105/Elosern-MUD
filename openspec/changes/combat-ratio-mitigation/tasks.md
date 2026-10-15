@@ -4,7 +4,7 @@ Total estimate: **5.5 hours**, including implementation, focused verification, d
 
 ## 1. Bounded implementation and evidence (1.5h)
 
-- [ ] 1.1 Implement ratio scalar and rulebook validation; prove 60 at defense 20 gives 40 with K=40 and reject invalid K using synthetic cases.
+- [x] 1.1 Implement ratio scalar and rulebook validation; prove 60 at defense 20 gives 40 with K=40 and reject invalid K using synthetic cases.
 
 ## 2. Bounded implementation and evidence (1.5h)
 

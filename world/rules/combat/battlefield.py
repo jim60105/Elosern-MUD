@@ -8,6 +8,7 @@ stored-hp and effective-stat readers, and the initiative/terminal predicates.
 
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from math import isfinite
 from pathlib import Path
 from typing import Any
 
@@ -25,11 +26,44 @@ from world.rules.items import ItemUseRequest
 from world.rules.targeting import Relation
 
 
-COMBAT_YAML = yaml.safe_load(
-    (Path(__file__).parent.parent / "rulebook" / "combat.yaml").read_text(
-        encoding="utf-8"
-    )
-)
+class CombatRulebookError(ValueError):
+    """The combat rulebook is malformed, missing required entries, or out of bounds."""
+
+
+def validate_combat_rulebook(data: Any) -> dict[str, Any]:
+    """Validate one loaded combat rulebook mapping against required schema contracts.
+
+    Finite positive ``damage.mitigation_k`` is strictly required: boolean,
+    non-numeric, non-finite (inf/nan), zero, and negative values raise
+    ``CombatRulebookError``.
+    """
+    if not isinstance(data, dict):
+        raise CombatRulebookError("combat rulebook must be a mapping")
+    damage = data.get("damage")
+    if not isinstance(damage, dict):
+        raise CombatRulebookError("combat rulebook must declare a 'damage' mapping")
+    if "mitigation_k" not in damage:
+        raise CombatRulebookError("damage section must declare 'mitigation_k'")
+    k = damage["mitigation_k"]
+    if isinstance(k, bool) or not isinstance(k, (int, float)):
+        raise CombatRulebookError(
+            f"damage.mitigation_k must be a finite positive number, got {k!r}"
+        )
+    if not isfinite(float(k)) or float(k) <= 0:
+        raise CombatRulebookError(
+            f"damage.mitigation_k must be a finite positive number, got {k!r}"
+        )
+    return data
+
+
+def load_combat_rulebook(path: Path | None = None) -> dict[str, Any]:
+    """Load and validate the combat rulebook from path or canonical disk location."""
+    target_path = path or (Path(__file__).parent.parent / "rulebook" / "combat.yaml")
+    raw = yaml.safe_load(target_path.read_text(encoding="utf-8"))
+    return validate_combat_rulebook(raw)
+
+
+COMBAT_YAML = load_combat_rulebook()
 
 _MAX_ACTIONS_PER_TURN: int = 3
 
