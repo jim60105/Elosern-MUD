@@ -204,10 +204,33 @@ export function useImageAttempts(request, availability, options = {}) {
       retireProvisional();
       return;
     }
+    const epoch = machine?.epoch ?? req?.epoch ?? null;
     const settledProvisional = provisionalOutcomes.value.get(key);
-    if (settledProvisional && settledProvisional.phase !== LOAD_PHASE.loading) {
-      retireProvisional();
-      return;
+    if (settledProvisional && settledProvisional.epoch === epoch) {
+      if (settledProvisional.phase === LOAD_PHASE.success) {
+        // A same-epoch re-resolution of a resource this driver already decoded
+        // keeps showing it: the observation is not repeated, and its temporary
+        // display is reconstructed from the CURRENT resource rather than lost.
+        provisionalAttempt.value = null;
+        const entry = machine?.order.find(
+          (item) => item.kind === "image" && item.key === key,
+        );
+        provisionalSelected.value = {
+          key,
+          sourceId: entry?.sourceId ?? null,
+          rank: entry?.rank ?? null,
+          resourceId: source.resource_id ?? null,
+          version: source.version ?? null,
+          url: source.url,
+          geometry: source.geometry ?? null,
+          dimensions: settledProvisional.dimensions ?? null,
+        };
+        return;
+      }
+      if (settledProvisional.phase !== LOAD_PHASE.loading) {
+        retireProvisional();
+        return;
+      }
     }
     if (knownOutcomes.has(key) || attempt.value?.key === key) {
       // The ordered walk already owns (or already observed) this exact
@@ -364,7 +387,11 @@ export function useImageAttempts(request, availability, options = {}) {
     const req = requestValue();
     const avail = availabilityValue();
     const epoch = req?.epoch ?? null;
-    if (knownEpoch !== epoch) {
+    // The comparison is captured BEFORE the assignment: every superseded epoch
+    // retires its observations, both the durable outcomes and the provisional
+    // ones, so a scene change can never inherit what another scene observed.
+    const epochChanged = knownEpoch !== epoch;
+    if (epochChanged) {
       knownOutcomes.clear();
       knownEpoch = epoch;
     }
@@ -376,7 +403,7 @@ export function useImageAttempts(request, availability, options = {}) {
     // of the retired resolution.
     retireProvisional();
     provisionalSelected.value = null;
-    if (knownEpoch !== epoch) {
+    if (epochChanged) {
       provisionalOutcomes.value = new Map();
     }
     clearResult();

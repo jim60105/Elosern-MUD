@@ -410,7 +410,24 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
             )
             self.assertNotEqual(displayed, generated_url)
 
-        # (7) The full view shares the same displayed resource and failure
+        # (7) Re-entering the place the character left commits that EXISTING
+        # logical identity again: whatever is on screen belongs to its own
+        # descriptor, and the identity is the one the browser left.
+        self._transition(page, "reuse_place")
+        wait_for_store_state(
+            page,
+            lambda state: (
+                (state["panels"]["art"]["scene"]["artwork"] or {}).get("subject_id")
+                == artwork["subject_id"]
+            ),
+            timeout=30000,
+        )
+        page.wait_for_timeout(800)
+        reentered = self._displayed(page)
+        if reentered is not None:
+            self.assertIn(reentered, self._admitted_urls(page))
+
+        # (8) The full view shares the same displayed resource and failure
         # state, and it closes back to the opener.
         displayed = self._wait_displayed(page)
         caption_label = page.locator('[data-testid="scene-backdrop-label"]').inner_text()
@@ -592,6 +609,8 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
         # media) exhausts: every permitted source fails, so the chain shows ONE
         # labelled non-image condition and never a broken image.
         fresh = self.new_page()
+        fresh_requests: list[str] = []
+        fresh.on("request", lambda request: fresh_requests.append(request.url))
         for pattern in ("**/art/scene/**", "**/art/official/**/scene/**", "**/art/bundled-scene/**"):
             fresh.route(
                 pattern,
@@ -600,9 +619,25 @@ class UnifiedScenesBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest
                 ),
             )
         login_and_open(fresh, self.webclient_url, self.base_url)
+        # The fresh context committed the SAME moved place (a real reused
+        # identity) and its own available panel.
+        wait_for_store_state(
+            fresh,
+            lambda state: (
+                (state["panels"]["art"]["scene"]["artwork"] or {}).get("subject_id")
+                == moved["subject_id"]
+            ),
+            timeout=30000,
+        )
+        self.assertTrue(store_state(fresh)["panels"]["art"]["available"])
         self._wait_badge(fresh)
         fresh.wait_for_timeout(1000)
+        # Settled exhaustion: nothing presented, no probe still fetching, and
+        # the final permitted resource was really attempted (and failed).
         self.assertEqual(fresh.locator(IMAGE).count(), 0)
+        self.assertEqual(fresh.locator('img[data-role]').count(), 0)
         self.assertEqual(fresh.locator(PLACEHOLDER).count(), 1)
         self.assertTrue(fresh.locator(PLACEHOLDER_LABEL).inner_text().strip())
+        terminal_url = moved["terminal"]["resource"]["url"]
+        self.assertIn(self._absolute(terminal_url), fresh_requests)
         fresh.close()

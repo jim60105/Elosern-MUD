@@ -323,8 +323,15 @@ const placeholderLabel = computed(() => failureText.value ?? "尚未生成");
 // its factual progress there; the failure fact outranks the progress notice
 // because it is the one the player must not miss.
 const captionFailure = computed(() => (displayPresented.value ? failureText.value : null));
+// The progress notice is an INDEPENDENT fact, never a fallback for the failure
+// text: a pending regeneration whose retained image is on screen states both
+// what is wrong (once) and what is still happening.
 const generating = computed(
-  () => displayPresented.value && !captionFailure.value && generationState.value === "pending",
+  () => displayPresented.value && generationState.value === "pending",
+);
+// Nothing on screen: the badge carries the same two facts in its own column.
+const badgeProgress = computed(
+  () => !displayPresented.value && generationState.value === "pending",
 );
 
 // The full-view open state + the opener element for focus restore.
@@ -526,6 +533,13 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
       <p class="scene-backdrop__placeholder-label" data-testid="scene-backdrop-placeholder-label">
         {{ placeholderLabel }}
       </p>
+      <p
+        v-if="badgeProgress"
+        class="scene-backdrop__placeholder-progress"
+        data-testid="scene-backdrop-placeholder-progress"
+      >
+        目前場景圖片生成中
+      </p>
     </div>
 
     <!-- The scene caption: one single-line plate holding the status facts, the
@@ -548,7 +562,7 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
           {{ captionFailure }}
         </p>
         <p
-          v-else-if="generating"
+          v-if="generating"
           class="scene-backdrop__generating"
           data-testid="scene-backdrop-generating"
         >
@@ -669,6 +683,12 @@ defineExpose({ openFullView, closeFullView, setPriorImage });
 .scene-backdrop .scene-backdrop__placeholder-label {
   margin: 0;
   color: var(--paper-300);
+}
+
+.scene-backdrop .scene-backdrop__placeholder-progress {
+  margin: 0;
+  color: var(--warn);
+  font-size: var(--text-xs);
 }
 
 /* The scene caption block: one plate (the status facts, the label, the alt

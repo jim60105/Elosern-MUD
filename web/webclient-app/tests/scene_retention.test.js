@@ -11,6 +11,7 @@
 import { flushPromises, mount } from "@vue/test-utils";
 import { afterEach, describe, expect, it } from "vitest";
 import { nextTick, ref } from "vue";
+import { artworkFailureCategory } from "../lib/artwork-failure.js";
 import SceneBackdrop from "../components/SceneBackdrop.vue";
 import { useArtwork } from "../composables/useArtwork.js";
 import {
@@ -427,6 +428,72 @@ describe("SceneBackdrop retention and provisional behaviour", () => {
     expect(
       wrapper.get('[data-testid="scene-backdrop-placeholder"]').attributes("data-kind"),
     ).toBe("image_load_failed");
+  });
+
+  it("states the pending progress AND the reached failure at once", async () => {
+    // A retained good image whose generation is pending while a lower source
+    // has already been reached and failed: both facts are true, so both are
+    // stated — the failure once, and the progress independently.
+    wrapper = mountBackdrop({
+      art: panelWithScene(
+        sceneBlock(
+          {},
+          descriptor({
+            generation_state: "pending",
+            attempts: [
+              {
+                type: "fault",
+                source_id: `scene.operator:${SCENE_SUBJECT}`,
+                rank: 30,
+                reason: "metadata_invalid",
+              },
+              {
+                type: "image",
+                source_id: "scene.bundled:river_dawn",
+                rank: 40,
+                resource: sceneBundledResource("river_dawn"),
+              },
+            ],
+            terminal: null,
+          }),
+        ),
+      ),
+    });
+    wrapper.vm.setPriorImage(RETAINED_URL);
+    await frames();
+    expect(displayedUrl(wrapper)).toBe(RETAINED_URL);
+    expect(wrapper.get('[data-testid="scene-backdrop-generating"]').text()).toBe(
+      "目前場景圖片生成中",
+    );
+    expect(wrapper.get('[data-testid="scene-backdrop-failure"]').text()).toBe(
+      artworkFailureCategory("metadata_invalid"),
+    );
+    // ONE failure indication: the badge belongs to the states with no bitmap.
+    expect(wrapper.find('[data-testid="scene-backdrop-placeholder"]').exists()).toBe(false);
+  });
+
+  it("does not inherit a previous scene's provisional observation", async () => {
+    // Scene A observes the bundled resource failing.
+    wrapper = mountBackdrop();
+    await observeError(wrapper, BUNDLED_URL);
+    await frames();
+    expect(renderedUrls(wrapper)).not.toContain(BUNDLED_URL);
+    // Scene B is a DIFFERENT logical place with the same resources: the
+    // observation belonged to A, so B fetches its own provisional background.
+    await wrapper.setProps({
+      art: panel({ subject_id: "grid:t_synth_map:7,7" }),
+    });
+    await frames();
+    expect(renderedUrls(wrapper)).toContain(BUNDLED_URL);
+    // Returning to A must not resurrect A's retired observation either.
+    await observeError(wrapper, BUNDLED_URL);
+    await wrapper.setProps({
+      art: panel({ subject_id: "grid:t_synth_map:8,8" }),
+    });
+    await frames();
+    await wrapper.setProps({ art: panel() });
+    await frames();
+    expect(renderedUrls(wrapper)).toContain(BUNDLED_URL);
   });
 
   it("settles a resource whose element is already complete", async () => {

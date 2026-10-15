@@ -49,6 +49,7 @@ SCENE_TRANSITIONS = frozenset(
         "done_scene",
         "remove_room_binding",
         "move_scene",
+        "reuse_place",
     }
 )
 
@@ -424,6 +425,28 @@ def _move_scene(character) -> dict:
     destination.scene_archetype = getattr(room, "scene_archetype", None)
     destination.scene_identity = f"{SCENE_FIXTURE_IDENTITY_PREFIX}moved-{destination.pk}"
     destination.room_art_key = None
+    # Remember the place the character leaves, so a later ``reuse_place`` can
+    # return to that EXISTING object: re-entering a committed place is the
+    # movement case where a logical identity comes back.
+    character.db.browser_scene_return_room = int(room.pk)
+    character.location = destination
+    return {"room": int(destination.pk)}
+
+
+def _reuse_place(character) -> dict:
+    """Move the character back to the place it last left.
+
+    The destination is the EXISTING room object the character came from, so the
+    committed logical identity returns rather than a fresh place appearing.
+    """
+    from evennia.objects.models import ObjectDB
+
+    identity = getattr(character.db, "browser_scene_return_room", None)
+    if not identity:
+        raise UnsupportedTransitionError("no previously left place is recorded")
+    destination = ObjectDB.objects.filter(id=int(identity)).first()
+    if destination is None:
+        raise UnsupportedTransitionError("the previously left place no longer exists")
     character.location = destination
     return {"room": int(destination.pk)}
 
@@ -452,6 +475,8 @@ def apply_transition(
             return _remove_room_binding(character)
         if name == "move_scene":
             return _move_scene(character)
+        if name == "reuse_place":
+            return _reuse_place(character)
         return _settle_scene(character, name, publish=True)
     handler = _APPLIERS.get(name)
     if handler is None:
