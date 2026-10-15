@@ -27,5 +27,5 @@ The scope is a pure module plus its tests. Follow the focused Vitest rule of roo
 
 ## 3. Gates (≈0.5 h)
 
-- [ ] 3.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`
+- [x] 3.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`
   and `openspec validate webclient-combat-formation-engine --strict`. Verify all pass.
