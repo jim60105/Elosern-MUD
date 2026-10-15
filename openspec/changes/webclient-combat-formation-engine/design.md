@@ -83,7 +83,7 @@ in one rank). Foes run to 16 minus the party size.
 
 | 1451x790 | foes 1–3 | 4–6 | 7 | 8–14 | 15 |
 |---|---|---|---|---|---|
-| party 1–3 figures | 0.84 F 1 | 0.72 F 1 | 0.60 F 1 | 0.50 F 2 | 0.50 C 2 (party 1 only) |
+| party 1–3 figures | 0.84 F 1 | 0.72 F 1 | 0.60 F 1 | 0.50 F 2 | 0.55 C 2 (party 1 only) |
 | party 4–5 figures | 0.72 F 1 | 0.72 F 1 | 0.60 F 1 | 0.50 F 2 | — |
 
 | 1600x900 and 1920x1080 | foes 1–3 | 4–6 | 7 | 8–14 | 15 |
@@ -93,6 +93,12 @@ in one rank). Foes run to 16 minus the party size.
 
 At 2560x1440: 0.90 for up to 4 foes, 0.84 for 5–7, 0.78 for 8, 0.66 for 9, then 0.55 with two ranks (a five-figure
 party caps at 0.84).
+
+The 1451x790 fifteen-foe cell was 0.50 C 2 in the planning prototype. The explicit fit rule and policy of D2 give
+0.55 C 2 there: with compact slots the two staggered back-rank lines and the marker clear the top band by 8.4px at
+0.55 (front rank 8, step 50.9px, so twice the step clears the 76px compact width). No reading of the rule reproduces
+the prototype's 0.50 there while keeping its 0.55 at 1600x900 and its 0.50 full cells for 8–14 foes, so the rule
+decides and the cell and the spec anchor follow it.
 
 The jump from one rank at 0.60 to two ranks at 0.50 is forced by headroom: a back rank lifted 0.27·actor-h with
 52px·S plates and a 24px·S marker only fits under the top band at 0.50 at 1451x790.
@@ -107,6 +113,11 @@ The jump from one rank at 0.60 to two ranks at 0.50 is forced by headroom: a bac
 
 - [Smaller figures than today in big fights] → the floor keeps figures ≥ 245px tall at the reference viewport, and
   two ranks are used before any further shrink.
+- [A marker slot overlaps a neighbour's raised plate] → with two staggered lines, a lower-line figure's 24px·S marker
+  slot sits beside the raised plates of its neighbours and overlaps them horizontally whenever the step is less than
+  half the slot width plus 12px·S (every 8–14 foe case at 1451x790). The invariants do not forbid it, since forbidding it
+  would leave no full-slot formation for eight or more foes; `webclient-combat-stage-target-picking` must draw the
+  marker above the plates or within this slot so it stays visible.
 - [The prototype's numbers drift in the real module] → the invariants are normative; the pinned table is updated
   deliberately in the same commit.
 

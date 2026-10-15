@@ -33,4 +33,4 @@ The client SHALL compute every combat figure box, plate slot and marker slot fro
 
 #### Scenario: Anchor values are normative
 - **WHEN** the function runs at 1451x790
-- **THEN** it returns scale 0.84 with `full` slots and one rank per side for one party figure against one to three foes; 0.72 with `full` slots for five party figures against one to six foes; 0.60 with one foe rank for one to five party figures against seven foes; 0.50 with two foe ranks and `full` slots for one party figure against eight to fourteen foes; and 0.50 with two foe ranks and `compact` slots for one party figure against fifteen foes
+- **THEN** it returns scale 0.84 with `full` slots and one rank per side for one party figure against one to three foes; 0.72 with `full` slots for five party figures against one to six foes; 0.60 with one foe rank for one to five party figures against seven foes; 0.50 with two foe ranks and `full` slots for one party figure against eight to fourteen foes; and 0.55 with two foe ranks and `compact` slots for one party figure against fifteen foes
