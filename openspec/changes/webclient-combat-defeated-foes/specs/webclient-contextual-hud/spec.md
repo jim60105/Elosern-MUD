@@ -1,23 +1,23 @@
 ## ADDED Requirements
 
 ### Requirement: Fallen combat figures read as defeated or down at a glance
-A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slot in a dedicated defeated treatment, and a party figure whose state is `knocked_out` SHALL stay in a sibling down treatment. Each treatment SHALL combine a shape channel, a text channel on the plate and a tone change, and SHALL differ from the listener dim, from the target step's unselectable dim, and from each other.
+A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slot in a dedicated defeated treatment, and a party figure whose state is `knocked_out` SHALL stay in a sibling down treatment. Each treatment SHALL combine a shape channel, a text channel on the plate and a tone change, and SHALL differ from the listener dim and from each other.
 
 #### Scenario: A defeated foe has its own look
 - **WHEN** a foe is `knocked_out` or `defeated` at rest
-- **THEN** its figure is slumped (rotated 8° away from the stage centre about its base and lowered by 6% of its height), fully desaturated and darkened (`grayscale(1)`, brightness 0.45) at 0.8 opacity with its silhouette intact, a broken-seal mark (a seal ring split by a crack, drawn in CSS/SVG from the seal tokens, `aria-hidden`) stands over its chest, its plate's readout is replaced by `✕ 已擊破` with an empty dashed stroke, and its accessible name ends with 已擊破
+- **THEN** its figure is collapsed about its base (lowered by 12% and compressed to 80% of its height, never rotated, so its transformed box stays inside its slot), fully desaturated and darkened (`grayscale(1)`, brightness 0.45) at 0.8 opacity with its silhouette intact, a broken-seal mark (a seal ring split by a crack, drawn in CSS/SVG from the seal tokens, `aria-hidden`) stands over its chest, its plate's readout is replaced by `✕ 已擊破` with an empty dashed stroke, and its accessible name ends with 已擊破
 
 #### Scenario: An ally that is down has a sibling look
 - **WHEN** a companion is `knocked_out` at rest
 - **THEN** its figure kneels (lowered by 8% of its height and compressed to 92% of its height about its base, without rotation), half desaturated and dimmed (`grayscale(0.6)`, brightness 0.7) at full opacity, carries no seal mark, its plate's readout is replaced by `▼ 倒地` with an empty dashed stroke, and its accessible name ends with 倒地
 
 #### Scenario: Fallen looks never read as a dim
-- **WHEN** a defeated foe, a down companion, a listener-dimmed figure in dialogue and a dimmed figure in a target step render side by side in stories and in the live client
-- **THEN** the dimmed figures keep their colour, pose and opacity and carry no mark or fallen text, while the defeated foe alone has the slump, the seal and 已擊破 and the down companion alone has the kneel and 倒地, so every pair differs by shape and text, not by brightness alone
+- **WHEN** a defeated foe, a down companion and a listener-dimmed figure in dialogue render side by side in stories and in the live client
+- **THEN** the dimmed figure keeps its colour, pose and opacity and carries no mark or fallen text, while the defeated foe alone has the collapse, the seal and 已擊破 and the down companion alone has the kneel and 倒地, so every pair differs by shape and text, not by brightness alone
 
 #### Scenario: Every art state takes the treatment
 - **WHEN** a defeated foe has a finished portrait, a placeholder silhouette with its initial, and failed art with its failure marker
-- **THEN** each takes the same slump, tone, opacity and seal mark on its figure wrapper, the placeholder initial and the failure marker stay legible, and no new bitmap is used
+- **THEN** each takes the same collapse, tone, opacity and seal mark on its figure wrapper, the placeholder initial and the failure marker stay legible, and no new bitmap is used
 
 #### Scenario: Falling plays with the beat and the motion level
 - **WHEN** a playing round's defeat beat names a foe at `full`, at `reduced`, and at `off`, and when the client reloads or reconnects with a defeated foe on the stage
@@ -30,19 +30,19 @@ A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slo
 ## MODIFIED Requirements
 
 ### Requirement: Combat figures stand in a shared-scale formation
-While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 15, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 16 minus the party count, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
 
 #### Scenario: Every active foe stands
 - **WHEN** a combat snapshot commits one, three, five, eight and fifteen foes that have not fled, some of them knocked out or defeated, with a solo player at 1451x790
 - **THEN** exactly that many foe stage actors render, in presenter order, at the formation's boxes (±1px), and no foe is left to another surface
 
 #### Scenario: Both sides are drawn at one scale
-- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes, and again while a foe joins, while one leaves, and during the entry into combat
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes, and again while a foe joins, while one leaves, and during the entry into combat
 - **THEN** every rendered figure box on both sides has the same height (±1px) as every other in the same frame, sampled at the start, the middle and the end of each transition
 
 #### Scenario: The dead-centre gap stays clear
-- **WHEN** combat renders any of those cases, including while a beat gesture plays at rest positions
-- **THEN** no figure box at rest intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S`
+- **WHEN** combat renders any of those cases, including at the farthest point of every beat gesture
+- **THEN** no figure box intersects the band from `stage centre − 132px × S` to `stage centre + 132px × S` (the card's columns) at any moment, and none intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S` at rest
 
 #### Scenario: The party forms up only in combat
 - **WHEN** the committed mode changes exploration → combat → exploration with a five-figure party, and exploration → dialogue
@@ -65,18 +65,18 @@ While the committed mode is `combat`, or while a round that ended the fight stil
 - **THEN** its figures are hidden from assistive technology, carry no focusable element, and intercept no pointer events outside the interactions other requirements define
 
 ### Requirement: Combat figures carry glance plates
-While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot, in the stage's `plates` layer, showing at a glance the participant's name, a thin hit-point stroke and a tabular hit-point readout; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the command card, the vitals dock or the top band.
+While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot, in the stage's `plates` layer, showing at a glance the participant's name, a thin hit-point stroke and a tabular hit-point readout, with a third line reserved for condition glyphs; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the command card, the vitals dock or the top band.
 
 #### Scenario: A full plate reads name, stroke and numbers
 - **WHEN** a companion at 42 of 120 hit points and a foe at 18 of 30 stand in a formation with `full` plate slots
-- **THEN** each plate shows the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), a 4px × S tapered stroke filled to the current fraction, and the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding, in tabular figures
+- **THEN** each 112px × S by 52px × S plate shows on its first line the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), on its second line a 4px × S tapered stroke filled to the current fraction followed by the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding in tabular figures, and keeps its third line empty for condition glyphs
 
 #### Scenario: A compact plate keeps the stroke and the number
 - **WHEN** the formation returns `compact` plate slots
-- **THEN** each plate hides the name visually (the name stays its accessible name), keeps the stroke and the current hit points, and fits its 72px × S by 30px × S slot
+- **THEN** each 72px × S by 36px × S plate hides the name visually (the name stays its accessible name), shows on its first line the stroke (at least 30px × S long) and the current hit points, and keeps its second line for a condition glyph
 
 #### Scenario: Plates never collide
-- **WHEN** combat renders for every party count 1–5 against foe counts 1, 3, 7, 8 and 15 at 1451x790 and 1600x900
+- **WHEN** combat renders for every party count 1–5 against foe counts 1, 3, 7, 8 and 16 minus the party count at 1451x790 and 1600x900
 - **THEN** every plate lies inside its slot (±1px), no two plates intersect, and no plate intersects the command card's column, the vitals dock or the top band
 
 #### Scenario: Plates follow playback
@@ -85,7 +85,11 @@ While the formation is shown, each drawn combat figure other than the controlled
 
 #### Scenario: The plates layer is outside the portrait anchors
 - **WHEN** the formation renders
-- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer carries no focusable element in this requirement, and outside combat the layer renders nothing
+- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer holds only the plates, carries no focusable element in this requirement, and outside combat renders nothing
+
+#### Scenario: Repeated names carry their session token
+- **WHEN** three foes share the display name 哥布林 and a fourth is named 狼
+- **THEN** each 哥布林 plate shows its session token after the name (`哥布林 e1`, `哥布林 e2`, `哥布林 e3`) and the 狼 plate shows no token; a token is shown only while two drawn participants share a name
 
 #### Scenario: Fallen figures show their state on the plate
 - **WHEN** a foe is defeated and a companion is down
@@ -96,7 +100,7 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 
 #### Scenario: Each beat kind plays its gesture
 - **WHEN** a beat's page is fully shown
-- **THEN** the first beat of each action: the acting stage actor steps 24px toward the stage's centre and back within 240ms; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor collapses into the defeated look that "Fallen combat figures read as defeated or down at a glance" defines and keeps its slot — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
+- **THEN** the first beat of each action: the acting stage actor steps 12px × S toward the stage's centre and back within 240ms, staying inside its 16px × S gutter beside the command card; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor collapses into the defeated look that "Fallen combat figures read as defeated or down at a glance" defines and keeps its slot — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
 
 #### Scenario: Pauses and actorless beats follow the gesture
 - **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the third)
@@ -258,7 +262,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 
 #### Scenario: Per-surface requirements stay consistent with the matrix
 - **WHEN** a per-surface requirement names its own visible-mode set
-- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration and combat, hidden in dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
+- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration, hidden in combat, dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
 
 #### Scenario: The mode gate outranks the dock's data rule
 - **WHEN** the committed mode is `dialogue` and a committed revision drops a vital below its maximum or adds a new condition

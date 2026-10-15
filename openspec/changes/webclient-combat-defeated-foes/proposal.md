@@ -10,7 +10,7 @@ unconscious ally. Today a defeated foe fades out of the line-up.
 ## What Changes
 
 - **Defeated foe** (`knocked_out` or `defeated`): the figure keeps its formation slot and shows:
-  - a slump (8° away from the centre, lowered 6%);
+  - a collapse (lowered 12% and compressed to 80% about its base; no rotation, so it stays in its slot);
   - `grayscale(1)` brightness 0.45 at 0.8 opacity, silhouette intact;
   - a CSS/SVG **broken-seal** mark over the chest;
   - plate text `✕ 已擊破` with an empty dashed stroke;
@@ -20,7 +20,8 @@ unconscious ally. Today a defeated foe fades out of the line-up.
   - `grayscale(0.6)` brightness 0.7;
   - no seal;
   - plate text `▼ 倒地`.
-- Both differ from the listener/target dim (colour, pose and opacity kept, no mark, no text) by shape and text.
+- Both differ from the listener dim (colour, pose and opacity kept, no mark, no text) by shape and text; the
+  comparison with the target-step dim is added by `webclient-combat-stage-target-picking`.
 - They work for a portrait, a placeholder silhouette and failed art (the treatment sits on the figure wrapper).
 - **Motion:**
   - the defeat beat collapses the foe over `--motion-beat-defeat` on the exit easing, and the seal fades in after;

@@ -18,7 +18,8 @@ Rules:
   it.
 - [ ] 1.3 Tests:
   - `tests/components/stage_actor*.test.js` (or `tests/app_client_stage_actor.test.js`): `data-fallen`, the seal
-    present only when defeated, `aria-hidden` on the seal, and no transition at off;
+    present only when defeated, `aria-hidden` on the seal, no transition at off, and the transformed box inside
+    the untransformed slot;
   - `tests/core/foe_lineup.test.js`: knocked-out and defeated foes stay and fled ones leave;
   - `tests/core/figure_plate.test.js`: 已擊破/倒地;
   - `tests/beat_queue.test.js` and `tests/beat_choreography.test.js`: the defeat beat keeps the foe.
@@ -43,7 +44,7 @@ Build once: `pnpm run build`.
 ## 3. Storybook (≈1 h)
 
 - [ ] 3.1 `Core/StageActor`: `DefeatedPortrait`, `DefeatedPlaceholder`, `DefeatedFailedArt`, `DownedAlly`,
-  `FallenVsDim` (a dialogue listener, a target-step dim, a defeated foe and a downed ally side by side) and
+  `FallenVsDim` (a dialogue listener, a defeated foe and a downed ally side by side) and
   `DefeatedReducedMotion`. `Core/AppShell`: `CombatSomeFoesDefeated` (six foes, two defeated, one downed companion).
   Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify both succeed.
 

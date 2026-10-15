@@ -16,10 +16,10 @@
 | State | Shape | Tone | Text (plate) | Mark |
 |---|---|---|---|---|
 | Listener / unselectable dim | none | brightness 0.6, colour kept | none | none |
-| Defeated foe | slump: `rotate(±8deg)` away from the centre about the base + `translateY(6%)` | `grayscale(1) brightness(.45)`, opacity .8 | `✕ 已擊破`, empty dashed stroke | broken seal over the chest |
+| Defeated foe | collapse: `translateY(12%) scaleY(.8)` about the base (no rotation, so the box never widens past its slot) | `grayscale(1) brightness(.45)`, opacity .8 | `✕ 已擊破`, empty dashed stroke | broken seal over the chest |
 | Downed ally | kneel: `translateY(8%) scaleY(.92)` about the base, no rotation | `grayscale(.6) brightness(.7)`, opacity 1 | `▼ 倒地`, empty dashed stroke | none |
 
-The defeated look is darker and lower in opacity than any dim. The seal and the slump are the shape channel, and
+The defeated look is darker and lower in opacity than any dim. The seal and the collapse are the shape channel, and
 已擊破/倒地 the text channel.
 
 ### D2. The seal mark
@@ -32,8 +32,9 @@ same over a portrait, a placeholder or failed art.
 ### D3. Where the treatment lives
 
 `StageActor` gets `fallen` and sets `data-fallen`. Pose and tone apply on a new `.stage-actor__fall` wrapper around
-`.stage-actor__beat`, so the beat gestures and the fall compose. The slump direction comes from `side` (a left-side
-figure falls left, a right-side one right).
+`.stage-actor__beat`, so the beat gestures and the fall compose. Both poses only shrink the box vertically, so a fallen
+figure stays inside its formation slot and out of the gap and the gutters. A knocked-out controlled figure takes the
+down look too; its values stay in the vitals dock.
 
 ### D4. Motion
 
@@ -52,9 +53,10 @@ keeps its slot. A flee removes the figure (fade) and re-forms.
 
 ## Risks / Trade-offs
 
-- [More figures stay on stage, so a larger shared scale is needed less often] → the formation already handles 15.
-- [The rotate transform may cross the gap] → an 8° slump of a box ≤ 0.9·actor-h moves its top corner by up to
-  ≈ 0.14·w toward its own side, away from the centre, so the gap is untouched. The Vitest checks the transformed box.
+- [A rotated slump would push the box past its slot] → rejected: an 8° rotation moves a 440px figure's top by about
+  61px (sin 8° × h); both poses are vertical only, and a Vitest checks the transformed box stays inside the slot.
+- [Fallen foes keep the shared scale small] → accepted: they keep their slots so nothing reflows mid-fight; a lone
+  survivor among fallen foes stays at the scale the full line-up needed.
 
 ## Migration Plan
 
