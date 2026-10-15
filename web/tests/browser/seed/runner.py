@@ -16,6 +16,7 @@ from web.tests.browser.seed.identity import (
     CREATION_ACCOUNT_USERNAME,
 )
 from web.tests.browser.seed.art_fixture import _art_fixture
+from web.tests.browser.seed.dream_fixture import _dream_art_fixture
 from web.tests.browser.seed.exploration_fixture import _exploration_fixture
 from web.tests.browser.seed.image_editor_fixture import _image_editor_fixture
 from web.tests.browser.seed.minimap_fixture import _minimap_fixture
@@ -273,6 +274,7 @@ def main() -> None:
     # their own real records only under their own flag; an unset flag is a
     # no-op, so this never affects the unrelated browser suites.
     _image_editor_fixture(character)
+    _dream_art_fixture(character)
     _exploration_fixture(character)
     _options_surface_fixture(character)
     _titles_fixture(character)
