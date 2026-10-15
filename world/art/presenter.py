@@ -29,6 +29,14 @@ configuration failure explicitly and falls back to the declared town terminal �
 never an invented or silently missing scene, and never a synthetic pending
 generation.
 
+``describe_dream_scene`` owns the DREAM stage's chain (change
+``unified-dream-rendering``) with the same vocabulary: the dream is not an
+explorable archetype, so its positions are the optional operator-preferred
+official identity, the required bundled ``dream_throne`` illustration and the
+distinct declared town terminal, with null generation facts and no retention.
+The dream's narrative read model reads that descriptor instead of resolving a
+raw artwork URL of its own.
+
 Every canonical resource carries the closed origin vocabulary: ``runtime`` for
 the scene's own generated output, ``official`` for an operator catalog image,
 ``bundled_official`` for a committed bundled illustration and ``silhouette``
@@ -1164,4 +1172,115 @@ def describe_scene(target) -> dict:
         attempts=_unique_attempts(attempts),
         terminal_payload=terminal_payload,
         retention_sources=_scene_retention_sources(target, subject, record),
+    )
+
+
+def describe_dream_scene(subject_id: str) -> dict:
+    """The canonical descriptor of the dream stage's OWN ordered source chain.
+
+    The dream is not an explorable archetype: it has no authored room binding
+    and no generated artwork of its own, so its chain is exactly the OPTIONAL
+    operator-preferred official image — the exact identity
+    ``world.art.scene_definitions.DREAM_PREFERRED_OFFICIAL_IDENTITY``, never a
+    directory default or a manifest choice — the REQUIRED bundled
+    ``dream_throne`` illustration and the distinct declared terminal image.
+    ``generation_subject``/``generation_state`` stay null and no retention is
+    authorized: the dream claims no generation, keeps no prior pixels across
+    sessions and shows no inherited physical background. Nothing here reads the
+    sleeper's location, enqueues a job, repairs geometry, touches a file or
+    contacts the network.
+
+    The preferred position states only the facts the startup snapshot retained
+    about that EXACT identity: a root the load could not use at all or a
+    content directory it could not enumerate (``source_unavailable``), an image
+    of that name present but refused at admission (``source_rejected``) and the
+    per-image metadata degradation of the very image that resolved. Plain
+    absence is the normal no-art configuration and contributes nothing at all —
+    never a reached failure — so an operator root without the dream image still
+    shows the required bundled dream without error styling. The directory's own
+    manifest-declared default is deliberately not consulted: it describes a
+    different image's selection, not this identity's.
+    """
+    from world.art import official
+    from world.art.scene_definitions import (
+        DREAM_PREFERRED_OFFICIAL_IDENTITY,
+        DREAM_PREFERRED_OFFICIAL_KEY,
+        DREAM_SCENE_KEY,
+        current_bundled_scenes,
+        scene_definition_for,
+    )
+
+    source_id = descriptors.scene_operator_source_id(DREAM_SCENE_KEY)
+    rank = descriptors.SCENE_RANK_OPERATOR
+    catalog = official.current_catalog()
+    identity_source_id = (
+        f"{descriptors.SCENE_OPERATOR_SOURCE_PREFIX}:{DREAM_PREFERRED_OFFICIAL_IDENTITY}"
+    )
+    preferred_faults: list[tuple[str, str]] = []
+    health = catalog.root_health()
+    if health is not None and health.fault:
+        preferred_faults.append((source_id, official.SOURCE_REASON_UNAVAILABLE))
+    for fault in catalog.source_faults("npc", DREAM_PREFERRED_OFFICIAL_KEY):
+        if fault.scope == official.SOURCE_SCOPE_SOURCE:
+            preferred_faults.append((source_id, fault.reason))
+
+    attempts: list[dict] = []
+    resource = _scene_official_resource(catalog, DREAM_PREFERRED_OFFICIAL_IDENTITY)
+    metadata = catalog.fault_for(DREAM_PREFERRED_OFFICIAL_IDENTITY)
+    if metadata is not None:
+        preferred_faults.append((identity_source_id, metadata.reason))
+    if resource is None and catalog.refusal_reason(DREAM_PREFERRED_OFFICIAL_IDENTITY) is not None:
+        preferred_faults.append((identity_source_id, descriptors.REASON_SOURCE_REJECTED))
+    for failed_source, reason in preferred_faults:
+        attempts.append(descriptors.fault_attempt(failed_source, rank, reason))
+    if resource is not None:
+        attempts.append(descriptors.image_attempt(source_id, rank, resource))
+
+    bundled_catalog = current_bundled_scenes()
+    bundled_source = descriptors.scene_bundled_source_id(DREAM_SCENE_KEY)
+    bundled = _scene_bundled_resource(bundled_catalog, DREAM_SCENE_KEY)
+    if bundled is None:
+        attempts.append(
+            descriptors.fault_attempt(
+                bundled_source,
+                descriptors.SCENE_RANK_BUNDLED,
+                descriptors.REASON_REQUIRED_RESOURCE_MISSING,
+            )
+        )
+    else:
+        attempts.append(
+            descriptors.image_attempt(
+                bundled_source, descriptors.SCENE_RANK_BUNDLED, bundled
+            )
+        )
+
+    definition = scene_definition_for(DREAM_SCENE_KEY)
+    terminal_key = definition.terminal_key if definition is not None else None
+    terminal_payload = None
+    if terminal_key is not None and terminal_key != DREAM_SCENE_KEY:
+        terminal_source = descriptors.scene_terminal_source_id(terminal_key)
+        terminal_resource = _scene_bundled_resource(bundled_catalog, terminal_key)
+        if terminal_resource is None:
+            attempts.append(
+                descriptors.fault_attempt(
+                    terminal_source,
+                    descriptors.SCENE_RANK_TERMINAL,
+                    descriptors.REASON_REQUIRED_RESOURCE_MISSING,
+                )
+            )
+        else:
+            terminal_payload = descriptors.terminal(
+                descriptors.TERMINAL_SCENE_IMAGE,
+                terminal_source,
+                descriptors.SCENE_RANK_TERMINAL,
+                terminal_resource,
+            )
+
+    return descriptors.descriptor(
+        subject_id=subject_id,
+        generation_subject=None,
+        generation_state=None,
+        attempts=_unique_attempts(attempts),
+        terminal_payload=terminal_payload,
+        retention_sources=[],
     )

@@ -21,7 +21,13 @@ from web.webclient.actions.exploration_actions import _wait_adapter, validate_wa
 from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.dream import dream_presenter
 from world.ai import dream, guardrail
-from world.art import formats, official as official_art, subjects
+from world.art import descriptors, formats, official as official_art, subjects
+from world.art.scene_definitions import (
+    ROOM_ART_KEY_SET,
+    load_bundled_scene_catalog,
+    reset_bundled_scenes,
+)
+from world.lore.scene_archetypes import SCENE_ARCHETYPE_REGISTRY
 from world.ai.fake_client import FakeLLMClient
 from world.ai.profiles import default_profiles
 from world.ai.schemas.registry import _OUTPUT_SCHEMAS
@@ -445,31 +451,178 @@ class DreamSurfaceTests(EvenniaTest):
     @covers_requirement(
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
     )
-    def test_scene_art_resolves_only_from_the_official_catalog(self):
-        # The dream stage's artwork is an external official asset: the panel
-        # carries the catalog URL only while the official snapshot admits the
-        # identity, and an empty snapshot (offline/absent folder) yields "".
+    def test_scene_art_is_the_canonical_descriptor_of_the_dream_chain(self):
+        # The stage's artwork is the SAME canonical descriptor every scene
+        # surface carries: the dream's own logical subject identity (scoped to
+        # this owner and this sleep session), the REQUIRED bundled dream
+        # illustration and the distinct declared town terminal, with no claimed
+        # generation and no retention authorization at all.
+        # The bundled collection's snapshot is process-global, so this test
+        # states both halves explicitly: unloaded first, then the committed
+        # collection the startup step admits.
+        reset_bundled_scenes()
+        self.addCleanup(reset_bundled_scenes)
+        state = self.enter()
+        artwork = service.dream_state(self.actor)["scene_art"]
+        self.assertEqual(artwork["subject_id"], f"dream:{self.actor.pk}:{state['session_id']}")
+        self.assertIsNone(artwork["generation_subject"])
+        self.assertIsNone(artwork["generation_state"])
+        self.assertEqual(artwork["retention_sources"], [])
+        self.assertEqual(
+            [(entry["type"], entry["source_id"], entry["rank"]) for entry in artwork["attempts"]],
+            [
+                ("fault", "scene.bundled:dream_throne", 40),
+                ("fault", "scene.terminal:city_street", 100),
+            ],
+        )
+        # Both required images state their missing resource while the bundled
+        # collection is unloaded: the fact is stated, never an invented image.
+        self.assertEqual(
+            [entry["reason"] for entry in artwork["attempts"]],
+            [descriptors.REASON_REQUIRED_RESOURCE_MISSING] * 2,
+        )
+        self.assertIsNone(artwork["terminal"])
+
+        # With the committed collection admitted, the stage's own two images are
+        # real same-origin bundled resources and the terminal is distinct.
+        load_bundled_scene_catalog()
+        self.addCleanup(reset_bundled_scenes)
+        artwork = service.dream_state(self.actor)["scene_art"]
+        self.assertEqual(
+            [(entry["type"], entry["source_id"], entry["rank"]) for entry in artwork["attempts"]],
+            [("image", "scene.bundled:dream_throne", 40)],
+        )
+        bundled = artwork["attempts"][0]["resource"]
+        self.assertEqual(bundled["origin"], "bundled_official")
+        self.assertTrue(bundled["url"].startswith("/art/bundled-scene/dream_throne/"))
+        self.assertEqual(artwork["terminal"]["kind"], "scene_image")
+        self.assertEqual(artwork["terminal"]["source_id"], "scene.terminal:city_street")
+        self.assertTrue(artwork["terminal"]["resource"]["url"].startswith("/art/bundled-scene/city_street/"))
+        # The resolution is a pure read: resolving again states the same facts.
+        self.assertEqual(service.dream_state(self.actor)["scene_art"], artwork)
+
+    @covers_requirement(
+        "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
+    )
+    def test_scene_art_preferred_position_states_absence_rejection_and_configured_fault(self):
+        # The preferred position is the OPTIONAL operator identity. Plain
+        # absence is the normal no-art configuration and contributes NOTHING —
+        # an undeclared image never becomes a reached failure — while an image
+        # of that name refused at admission and a root the load could not use
+        # are faults at exactly that position.
+        from world.art import scene_definitions
+
         self.enter()
-        identity = surface.DREAM_GODDESS_SCENE_IDENTITY
-        self.assertTrue(identity.startswith("npc/" + surface.DREAM_GODDESS_NPC_KEY + "/"))
-        self.assertEqual(service.dream_state(self.actor)["scene_art"], "")
+        identity = scene_definitions.DREAM_PREFERRED_OFFICIAL_IDENTITY
+
+        def artwork():
+            return service.dream_state(self.actor)["scene_art"]
+
+        def preferred(descriptor):
+            return [
+                entry for entry in descriptor["attempts"]
+                if entry["rank"] == descriptors.SCENE_RANK_OPERATOR
+            ]
+
+        # (1) No official snapshot at all: absence, and nothing else.
+        self.assertEqual(preferred(artwork()), [])
+        self.assertEqual(descriptors.SCENE_RANK_OPERATOR, 30)
+
         image = official_art.OfficialImage(
-            identity=identity, kind="npc", key=surface.DREAM_GODDESS_NPC_KEY,
+            identity=identity, kind="npc", key=scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY,
             fingerprint="a" * 64, image_size={"width": 2880, "height": 1600},
             face_rect={}, stage={},
         )
+        contents = {
+            (image.kind, image.key): official_art.OfficialContent(
+                kind=image.kind, key=image.key, default_identity=identity, images=(identity,)
+            )
+        }
+        # (2) The identity is admitted: one official candidate at the preferred
+        # position, ahead of the required bundled dream.
+        with patch.object(official_art, "_CATALOG", official_art.OfficialCatalog(contents, {identity: image})):
+            descriptor = artwork()
+        positions = preferred(descriptor)
+        self.assertEqual([(entry["type"], entry["source_id"]) for entry in positions],
+                         [("image", "scene.operator:dream_throne")])
+        self.assertEqual(positions[0]["resource"]["url"], f"/art/official/{'a' * 64}/{identity}")
+        self.assertEqual(positions[0]["resource"]["origin"], "official")
+        self.assertLessEqual(len(positions[0]["resource"]["url"]), 256)
+
+        # (3) A file of that name was present but refused at admission: the
+        # reached fact is attributed to that exact image, before the substitute.
         with patch.object(
             official_art, "_CATALOG",
             official_art.OfficialCatalog(
-                {(image.kind, image.key): official_art.OfficialContent(
-                    kind=image.kind, key=image.key, default_identity=identity,
-                    images=(identity,))},
-                {identity: image},
+                {}, {}, refusals={identity: "image_undecodable"}
             ),
         ):
-            url = service.dream_state(self.actor)["scene_art"]
-        self.assertEqual(url, f"/art/official/{'a' * 64}/{identity}")
-        self.assertLessEqual(len(url), 256)
+            positions = preferred(artwork())
+        self.assertEqual(
+            [(entry["type"], entry["source_id"], entry["reason"]) for entry in positions],
+            [("fault", f"scene.operator:{identity}", descriptors.REASON_SOURCE_REJECTED)],
+        )
+
+        # (4) The directory itself could not be enumerated: a root I/O fact at
+        # the preferred layer.
+        with patch.object(
+            official_art, "_CATALOG",
+            official_art.OfficialCatalog(
+                {},
+                {},
+                source_faults={
+                    ("npc", scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY): (
+                        official_art.SourceFault(
+                            official_art.SOURCE_SCOPE_SOURCE,
+                            f"npc/{scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY}",
+                            official_art.SOURCE_REASON_UNAVAILABLE,
+                        ),
+                    )
+                },
+            ),
+        ):
+            positions = preferred(artwork())
+        self.assertEqual(
+            [(entry["type"], entry["source_id"], entry["reason"]) for entry in positions],
+            [("fault", "scene.operator:dream_throne", descriptors.REASON_SOURCE_UNAVAILABLE)],
+        )
+
+        # (5) The configured root could not be used at all: the same availability
+        # fact, independent of any per-directory walk.
+        with patch.object(
+            official_art, "_CATALOG",
+            official_art.OfficialCatalog(
+                {},
+                {},
+                official_art.RootHealth(
+                    official_art.ROOT_STATE_UNAVAILABLE, True, True, "official_root_absent"
+                ),
+            ),
+        ):
+            positions = preferred(artwork())
+        self.assertEqual(
+            [(entry["type"], entry["source_id"], entry["reason"]) for entry in positions],
+            [("fault", "scene.operator:dream_throne", descriptors.REASON_SOURCE_UNAVAILABLE)],
+        )
+        # ...and a directory's own manifest-declared default is never consulted:
+        # it describes another image's selection, not this identity's.
+        with patch.object(
+            official_art, "_CATALOG",
+            official_art.OfficialCatalog(
+                {},
+                {},
+                source_faults={
+                    ("npc", scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY): (
+                        official_art.SourceFault(
+                            official_art.SOURCE_SCOPE_DEFAULT,
+                            f"npc/{scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY}/other.png",
+                            official_art.SOURCE_REASON_REFERENCE_MISSING,
+                        ),
+                    )
+                },
+            ),
+        ):
+            self.assertEqual(preferred(artwork()), [])
 
     @covers_requirement(
         "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
@@ -484,23 +637,90 @@ class DreamSurfaceTests(EvenniaTest):
         # no artwork and no failing request anywhere), and the deferred authored
         # npc/profile provenance adds a membership check this key — deliberately
         # not an authored npc/profile — would not satisfy.
-        parts = surface.DREAM_GODDESS_SCENE_IDENTITY.split("/")
+        from world.art import scene_definitions
+
+        identity = scene_definitions.DREAM_PREFERRED_OFFICIAL_IDENTITY
+        parts = identity.split("/")
         self.assertEqual(len(parts), 3)
         kind, key, filename = parts
+        self.assertEqual(kind, scene_definitions.DREAM_PREFERRED_OFFICIAL_KIND)
+        self.assertEqual(key, scene_definitions.DREAM_PREFERRED_OFFICIAL_KEY)
         self.assertIn(kind, official_art.OFFICIAL_CONTENT_KINDS)
         self.assertTrue(subjects.is_valid_subject_key(key))
         self.assertIn(Path(filename).suffix, formats.STORE_EXTENSIONS)
+        self.enter()
         with tempfile.TemporaryDirectory() as root:
-            target = Path(root) / surface.DREAM_GODDESS_SCENE_IDENTITY
+            target = Path(root) / identity
             target.parent.mkdir(parents=True)
             target.write_bytes(_synthetic_webp())
             with override_settings(ART_OFFICIAL_ROOT=root):
                 official_art.reset_catalog()
                 try:
                     official_art.load_catalog()
-                    self.assertTrue(surface.scene_art_url())
+                    artwork = service.dream_state(self.actor)["scene_art"]
+                    preferred = [
+                        entry for entry in artwork["attempts"]
+                        if entry["rank"] == descriptors.SCENE_RANK_OPERATOR
+                    ]
+                    self.assertEqual(len(preferred), 1)
+                    self.assertTrue(preferred[0]["resource"]["url"].startswith("/art/official/"))
+                    self.assertTrue(preferred[0]["resource"]["url"].endswith(identity))
                 finally:
                     official_art.reset_catalog()
+
+    @covers_requirement(
+        "dream-explicit-presentation::dream-collaboration-uses-the-approved-explicit-frame",
+    )
+    def test_dream_art_never_inherits_the_sleeper_location_or_writes_anything(self):
+        # The dream's descriptor owns its own chain: it never reads the
+        # sleeper's location metadata (so no physical room background is
+        # inherited and no generation job is enqueued for the sleeper's room),
+        # and resolving it leaves the session, the authoring store, the art
+        # records and the queue exactly as they were.
+        from world.art.store import ArtAssetRecord
+
+        self.enter()
+        location = self.actor.location
+        location.scene_archetype = sorted(SCENE_ARCHETYPE_REGISTRY)[0]
+        location.room_art_key = sorted(ROOM_ART_KEY_SET)[0]
+        location.scene_identity = "grid:t_synth_map:0,0"
+        session = surface.associated_session(self.actor)
+        def art_records():
+            # Any enqueue (the one thing that could inherit the sleeper's room)
+            # creates one of these records, so the exact key/status set is the
+            # authoritative no-job evidence.
+            return sorted(
+                (record.db_key, str(record.db.status))
+                for record in ArtAssetRecord.objects.all()
+            )
+
+        before = (
+            art_records(),
+            session.revision,
+            session.draft_id,
+            deepcopy(self.actor.db.dream_surface),
+        )
+        first = service.dream_state(self.actor)["scene_art"]
+        second = service.dream_state(self.actor)["scene_art"]
+        self.assertEqual(first, second)
+        self.assertFalse(
+            [
+                entry["source_id"]
+                for entry in first["attempts"]
+                if entry["source_id"].startswith(("scene.room:", "scene.generated:"))
+            ],
+            "the dream must not inherit the sleeper's physical scene positions",
+        )
+        session = surface.associated_session(self.actor)
+        self.assertEqual(
+            (
+                art_records(),
+                session.revision,
+                session.draft_id,
+                self.actor.db.dream_surface,
+            ),
+            before,
+        )
 
 
     @covers_requirement(
