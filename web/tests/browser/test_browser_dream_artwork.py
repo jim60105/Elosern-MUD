@@ -179,10 +179,18 @@ class DreamArtworkBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest)
         marker.wait_for(state="visible", timeout=60000)
         self.assertTrue(marker.inner_text().strip())
         self.assertTrue(self.displayed(page2).startswith(BUNDLED_PREFIX), self.displayed(page2))
-        reached = [
-            entry for entry in self.descriptor(page2)["attempts"] if entry["type"] == "fault"
-        ]
-        self.assertEqual([entry["reason"] for entry in reached], ["image_load_failed"])
+        # The failure is the browser's OWN local observation, so the committed
+        # server descriptor is unchanged: it still carries the admitted
+        # preferred image and no fault at all. Only the rendered marker states
+        # what this client could not load.
+        committed = self.descriptor(page2)
+        self.assertEqual(
+            [entry["source_id"] for entry in committed["attempts"]],
+            [PREFERRED_SOURCE, BUNDLED_SOURCE],
+        )
+        self.assertEqual(
+            [entry for entry in committed["attempts"] if entry["type"] == "fault"], []
+        )
 
         # The shared full view opens on exactly the displayed resource and the
         # same failure, and Escape closes it.

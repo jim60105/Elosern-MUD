@@ -292,6 +292,20 @@ describe("server-authored dream surface", () => {
     expect(broken.wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
     expect(broken.wrapper.find("[data-testid='dream-art-failure']").text()).toBe("圖片載入失敗。");
     broken.wrapper.unmount();
+    // When the required bundled dream cannot load either, the distinct
+    // declared town terminal is what the shared walk reaches — with the
+    // reached failures still stated and no broken image anywhere.
+    const terminal = fixture();
+    await observeError(terminal.wrapper, preferred);
+    await frames();
+    await observeError(terminal.wrapper, bundled);
+    await frames();
+    const town = dreamDescriptor().terminal.resource.url;
+    await observeLoad(terminal.wrapper, town);
+    expect(terminal.wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(town);
+    expect(terminal.wrapper.find("[data-testid='dream-art-failure']").text()).toBe("圖片載入失敗。");
+    expect(terminal.wrapper.findAll("img[src='']")).toHaveLength(0);
+    terminal.wrapper.unmount();
   });
   it("shows the bundled dream when the preferred image is absent and the reached fact when every illustration is missing", async () => {
     const bundledOnly = dreamBundledDescriptor();
@@ -345,6 +359,27 @@ describe("server-authored dream surface", () => {
     await observeLoad(wrapper, bundled);
     expect(wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
     expect(wrapper.find("[data-testid='dream-scene-art']").attributes("data-art-role")).toBe("attempt");
+    wrapper.unmount();
+  });
+  it("recomputes a changed descriptor revision and ignores the retired callback", async () => {
+    const { wrapper } = fixture();
+    const [preferred] = dreamDescriptor().attempts.map((entry) => entry.resource.url);
+    // A same-subject descriptor whose preferred resource changed: a new
+    // resource version is a new attempt, so the ordered walk starts afresh.
+    const republished = dreamRefusedDescriptor({
+      subject_id: dreamDescriptor().subject_id,
+    });
+    await wrapper.setProps({ state: state({ revision: 3, scene_art: republished }) });
+    expect(wrapper.find("[data-testid='dream-scene-art']").exists()).toBe(false);
+    // A late event from the retired element settles nothing: its URL is no
+    // longer rendered, and the new resolution still needs its own bytes.
+    const retired = wrapper.findAll("img").find((img) => img.attributes("src") === preferred);
+    expect(retired).toBeUndefined();
+    const bundled = republished.attempts[1].resource.url;
+    await observeLoad(wrapper, bundled);
+    expect(wrapper.find("[data-testid='dream-scene-art']").attributes("src")).toBe(bundled);
+    // The reached fact of the refused preferred position stays stated.
+    expect(wrapper.find("[data-testid='dream-art-failure']").text()).toBe("此圖片的來源未通過檢查。");
     wrapper.unmount();
   });
   it("rehydrates a same-session external draft change without clearing unsent chat", async () => {
