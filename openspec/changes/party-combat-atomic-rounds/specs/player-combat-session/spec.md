@@ -6,11 +6,9 @@
 **Reason**: The approved party-combat design replaces this conflicting behavior.
 **Migration**: Use the complete-draft automatic ordinary-round requirements and actor-scoped request contract. No compatibility route or data migration.
 
-
 ### Requirement: One submission inside an active session is one ordinary round, by default and structurally
 **Reason**: The approved party-combat design replaces this conflicting behavior.
 **Migration**: Member confirmations edit the draft; only its final valid confirmation submits one ordinary round. No compatibility route or data migration.
-
 
 ## MODIFIED Requirements
 
@@ -39,7 +37,6 @@ The shared submission body SHALL persist the round's action effects (HP/resource
 - **WHEN** a technical failure follows a participant, item mirror, session metadata or terminal-settlement write
 - **THEN** all durable and touched Evennia cache state returns to pre-round values and the accepted complete draft remains recoverable for retry
 
-
 ### Requirement: Combat boundaries emit observability events
 
 The complete-draft round submission SHALL emit one `combat_round_settled` info event
@@ -64,7 +61,6 @@ round's durable commit and MUST NOT alter the atomic round/settlement unit.
 - **WHEN** a partial draft confirmation or rejected final preflight occurs
 - **THEN** no combat_round_settled or settlement_done event is emitted for it
 
-
 ## ADDED Requirements
 
 ### Requirement: Final member confirmation automatically submits one complete ordinary round
@@ -82,7 +78,6 @@ The last required valid member confirmation SHALL automatically submit the compl
 - **WHEN** a complete draft resolves successfully
 - **THEN** upkeep and round-time accounting run once, execution gates still suppress actors unable to act and the next round starts with no selections
 
-
 ### Requirement: Round revisions execute at most once across retries and stale requests
 Admission SHALL serialize on the authoritative session and round revision inside the durable round unit. Duplicate, stale or concurrent final confirmations SHALL NOT resolve effects or settlement twice, including after a terminal session has been cleared or a process restarts.
 
@@ -94,7 +89,6 @@ Admission SHALL serialize on the authoritative session and round revision inside
 - **WHEN** normal final confirmation races another final confirmation or a confirmed party exit
 - **THEN** at most one operation consumes that session revision
 
-
 ### Requirement: Execution-time invalidation loses only the selected action opportunity
 A command made invalid by an earlier action SHALL lose its opportunity without retargeting, skill resource deduction or item consumption. The round SHALL NOT pause for replacement. Prior valid actions and normal upkeep SHALL remain committed. Valid misses SHALL retain normal costs.
 
@@ -105,5 +99,4 @@ A command made invalid by an earlier action SHALL lose its opportunity without r
 #### Scenario: Ordinary miss
 - **WHEN** a still-valid skill misses normally
 - **THEN** normal skill costs apply and the round remains consumed
-
 

@@ -1,6 +1,6 @@
 # Tasks
 
-Total estimate: **7.5 hours**, including implementation, focused verification, documentation and integration. Prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Every group lands its own relevant tests/docs; the final group checks integration.
+Total estimate: **7.5 hours**, including implementation, focused verification, documentation and integration. Direct prerequisites and file/spec conflicts are in proposal.md and the shared batch contract. Each group lands its own tests/docs; the final group checks integration.
 
 ## 1. Bounded implementation and evidence (1.5h)
 
@@ -8,7 +8,7 @@ Total estimate: **7.5 hours**, including implementation, focused verification, d
 
 ## 2. Bounded implementation and evidence (1.5h)
 
-- [ ] 2.1 Replace allied policy provisioning with one selected request per eligible actor, preserving enemy policy and initiative/execution gates; prove no hidden companion attack.
+- [ ] 2.1 Replace allied policy provisioning with one selected request per eligible actor, explicitly cap interactive allied positive action counts at one selected skill/item and retain zero locks; test no duplicate/fallback while enemy/noninteractive extra slots and liveness remain unchanged.
 
 ## 3. Bounded implementation and evidence (1.5h)
 

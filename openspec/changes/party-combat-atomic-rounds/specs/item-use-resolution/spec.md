@@ -12,7 +12,7 @@ consumes.
 
 #### Scenario: Valid potion use runs one combat round
 - **WHEN** an injured commanded ally has a preflight-valid healing potion selection and the complete party draft passes preflight
-- **THEN** the potion request resolves at that actor's initiative position, every other eligible participant receives its selected allied command or enemy policy action at most once, and the session round count increases exactly once
+- **THEN** the potion request resolves at that actor's initiative position, other eligible allies receive only their single selected commands and enemies retain their ordinary configured action slots, and the session round count increases exactly once
 
 #### Scenario: Full HP preserves the combat turn
 - **WHEN** a full-HP player attempts to use a healing potion during active combat
