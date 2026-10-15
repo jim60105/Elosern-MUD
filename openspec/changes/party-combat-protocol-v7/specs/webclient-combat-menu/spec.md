@@ -63,6 +63,10 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 - **WHEN** a valid active combat session renders `context_actions`
 - **THEN** the panel never fabricates exploration actions alongside the combat form
 
+#### Scenario: Version 6 adds read-only facts only
+- **WHEN** the combat available form is serialized at version 6
+- **THEN** its top-level field set is unchanged from version 5, every participant additionally carries `conditions`, every skill descriptor additionally carries `hostile` and `beneficial`, the presenter stays read-only, and the exploration and unavailable forms differ from version 5 only in `schema_version`
+
 #### Scenario: Version 7 adds authoritative party facts
 - **WHEN** the combat available form is serialized at version 7
 - **THEN** it carries bounded actor summaries, one actor-scoped choices object and durable draft progress, retains participant conditions and skill polarity, stays read-only, and changes exploration/unavailable forms only in schema_version
