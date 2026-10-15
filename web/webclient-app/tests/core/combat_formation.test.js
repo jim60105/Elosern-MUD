@@ -116,8 +116,51 @@ function violations({ input }, result) {
     if (figure.marker.height !== 24 * S || bottom(figure.marker) > figure.plate.top + TOL) fail("marker not above plate");
     const dims = figure.plate.form === "compact" ? COMPACT_SLOT : FULL_SLOT;
     if (figure.plate.width !== dims.width * S || figure.plate.height !== dims.height * S) fail("plate size");
-    if (bottom(figure.plate) > figure.box.top - 4 * S + TOL) fail("plate not above its figure");
     if (distance(figure.plate, input.vitalsDock) === 0) fail("plate touches the vitals dock");
+  }
+  // Plate placement (webclient-combat-formation): above the head, except the
+  // front rank of a two-rank side, whose plates stand on the floor line —
+  // 8px·S above the command-line row (44px·S on the band's top edge) and,
+  // for the party, 8px·S above the vitals dock — centred on their figure.
+  const commandLine = input.commandLineHeight ?? 44 * S;
+  for (const [sideName, side] of [["party", result.party], ["foes", result.foes]]) {
+    for (const figure of side.figures) {
+      const centred = Math.abs(figure.plate.left + figure.plate.width / 2 - (figure.box.left + figure.box.width / 2)) < 0.01;
+      if (!centred) fail("plate not centred on its figure");
+      if (side.ranks === 2 && figure.rank === 0) {
+        let floor = input.bandTop - commandLine - 8 * S;
+        if (sideName === "party" && input.vitalsDock) floor = Math.min(floor, input.vitalsDock.top - 8 * S);
+        if (bottom(figure.plate) > floor + TOL) fail(`floor plate below the floor line at ${bottom(figure.plate)}`);
+      } else if (bottom(figure.plate) > figure.box.top - 4 * S + TOL) {
+        fail("plate not above its figure");
+      }
+    }
+  }
+  // No head is covered (webclient-combat-formation): a head is the central
+  // 30% of a box's width and the top 22% of its height. No plate or marker
+  // overlaps any head; a front-rank box never reaches a back-rank head; the
+  // heads of one rank never overlap. Lower bodies may be covered.
+  const head = (box) => ({
+    left: box.left + 0.35 * box.width,
+    top: box.top,
+    width: 0.3 * box.width,
+    height: 0.22 * box.height,
+  });
+  const figures = allFigures(result);
+  for (const figure of figures) {
+    const h = head(figure.box);
+    for (const other of figures) {
+      if (overlaps(h, other.plate) || overlaps(h, other.marker)) fail("a plate or marker covers a head");
+    }
+  }
+  for (const side of [result.party, result.foes]) {
+    for (const a of side.figures) {
+      for (const b of side.figures) {
+        if (a === b) continue;
+        if (a.rank < b.rank && overlaps(a.box, head(b.box))) fail("a front-rank figure covers a back-rank head");
+        if (a.rank === b.rank && a.index < b.index && overlaps(head(a.box), head(b.box))) fail("two heads of one rank overlap");
+      }
+    }
   }
   for (const side of [result.party, result.foes]) {
     const plates = side.figures.map((figure) => figure.plate);
@@ -146,6 +189,8 @@ function oneRankFits(input, n, scale, slot) {
   const w = (h * 2) / 3;
   const step = n > 1 ? Math.min(0.62 * w, (zone - w) / (n - 1)) : 0;
   if (step < 0 || w > zone) return false;
+  // Neighbouring heads (the central 30% of the width) must not overlap.
+  if (n > 1 && step < 0.3 * w) return false;
   let lines;
   if (n <= 1 || step >= slot.width * S + 4 * S) lines = 1;
   else if (2 * step >= slot.width * S + 4 * S) lines = 2;
@@ -195,13 +240,13 @@ describe("combat formation: the policy", () => {
     }
   });
 
-  it("prefers all-full slots at a smaller scale over compact slots at a larger one", () => {
-    // 15 foes fit with compact slots at 0.55, so 14 foes would too; the
-    // full pass still wins at the floor.
+  it("prefers all-full slots, and uses compact slots only where no full layout fits at the floor", () => {
+    // Fourteen foes fit with full slots at the floor; fifteen do not, so
+    // they take the compact slots (webclient-combat-formation re-anchor).
     const fourteen = combatFormation(reference("1451x790", 1, 14));
     expect(code(fourteen)).toBe("0.50F2");
     const fifteen = combatFormation(reference("1451x790", 1, 15));
-    expect(code(fifteen)).toBe("0.55C2");
+    expect(code(fifteen)).toBe("0.50C2");
     expect(fifteen.foes.figures.every((figure) => figure.plate.form === "compact")).toBe(true);
     expect(fourteen.foes.figures.every((figure) => figure.plate.form === "full")).toBe(true);
   });
@@ -237,10 +282,12 @@ describe("combat formation: the spec's anchors at 1451x790", () => {
     }
   });
 
-  it("0.72 with full slots for five party figures against one to six foes", () => {
+  // Re-anchored by webclient-combat-formation (heads never covered): six
+  // foes in one rank now need 0.66 for their heads to stay apart (was 0.72).
+  it("0.72 with full slots for five party figures against one to five foes, and 0.66 against six", () => {
     for (let foes = 1; foes <= 6; foes += 1) {
       const result = combatFormation(reference("1451x790", 5, foes));
-      expect(result.scale).toBe(0.72);
+      expect(result.scale).toBe(foes <= 5 ? 0.72 : 0.66);
       expect(result.party.form).toBe("full");
       expect(result.foes.form).toBe("full");
     }
@@ -260,37 +307,38 @@ describe("combat formation: the spec's anchors at 1451x790", () => {
     }
   });
 
-  // Amended from the planning prototype's 0.50 (design D4 note): the spec's
-  // explicit fit rule admits compact slots at 0.55 here.
-  it("0.55 with two foe ranks and compact slots for one party figure against fifteen foes", () => {
-    expect(code(combatFormation(reference("1451x790", 1, 15)))).toBe("0.55C2");
+  // Re-anchored by webclient-combat-formation (heads never covered; was
+  // 0.55 compact): the front rank's eight heads stay apart only at the floor.
+  it("0.50 with two foe ranks and compact slots for one party figure against fifteen foes", () => {
+    expect(code(combatFormation(reference("1451x790", 1, 15)))).toBe("0.50C2");
   });
 });
 
-// The pinned reference table (design D4): any later change that moves a cell
+// The pinned reference table (design D4; re-pinned by webclient-combat-formation
+// when heads became never-covered): any later change that moves a cell
 // updates this literal deliberately. Rows are party sizes; each row lists
 // foes 1..(16 - party) as scale, foe slot form, foe rank count.
 const TABLE = Object.freeze({
   "1451x790": [
-    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.72F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.55C2",
-    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.72F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.72F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.66F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50C2",
+    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.66F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.84F1 0.84F1 0.84F1 0.72F1 0.72F1 0.66F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.66F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.66F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2",
   ],
   "1600x900": [
-    "0.84F1 0.84F1 0.84F1 0.78F1 0.78F1 0.78F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.55C2",
-    "0.84F1 0.84F1 0.84F1 0.78F1 0.78F1 0.78F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.84F1 0.84F1 0.84F1 0.78F1 0.78F1 0.78F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.78F1 0.78F1 0.78F1 0.78F1 0.78F1 0.78F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
-    "0.78F1 0.78F1 0.78F1 0.78F1 0.78F1 0.78F1 0.60F1 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.84F1 0.84F1 0.84F1 0.78F1 0.72F1 0.66F1 0.55F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50C2",
+    "0.84F1 0.84F1 0.84F1 0.78F1 0.72F1 0.66F1 0.55F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.84F1 0.84F1 0.84F1 0.78F1 0.72F1 0.66F1 0.55F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.78F1 0.78F1 0.78F1 0.78F1 0.72F1 0.66F1 0.55F1 0.50F2 0.50F2 0.50F2 0.50F2 0.50F2",
+    "0.72F1 0.72F1 0.72F1 0.72F1 0.72F1 0.66F1 0.55F1 0.50F2 0.50F2 0.50F2 0.50F2",
   ],
   "2560x1440": [
-    "0.90F1 0.90F1 0.90F1 0.90F1 0.84F1 0.84F1 0.84F1 0.78F1 0.66F1 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2",
-    "0.90F1 0.90F1 0.90F1 0.90F1 0.84F1 0.84F1 0.84F1 0.78F1 0.66F1 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2",
-    "0.90F1 0.90F1 0.90F1 0.90F1 0.84F1 0.84F1 0.84F1 0.78F1 0.66F1 0.55F2 0.55F2 0.55F2 0.55F2",
-    "0.90F1 0.90F1 0.90F1 0.90F1 0.84F1 0.84F1 0.84F1 0.78F1 0.66F1 0.55F2 0.55F2 0.55F2",
-    "0.84F1 0.84F1 0.84F1 0.84F1 0.84F1 0.84F1 0.84F1 0.78F1 0.66F1 0.55F2 0.55F2",
+    "0.90F1 0.90F1 0.90F1 0.90F1 0.78F1 0.66F1 0.66F2 0.66F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2 0.50F2",
+    "0.90F1 0.90F1 0.90F1 0.90F1 0.78F1 0.66F1 0.66F2 0.66F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2",
+    "0.90F1 0.90F1 0.90F1 0.90F1 0.78F1 0.66F1 0.66F2 0.66F2 0.55F2 0.55F2 0.55F2 0.55F2 0.55F2",
+    "0.90F1 0.90F1 0.90F1 0.90F1 0.78F1 0.66F1 0.66F2 0.66F2 0.55F2 0.55F2 0.55F2 0.55F2",
+    "0.78F1 0.78F1 0.78F1 0.78F1 0.78F1 0.66F1 0.66F2 0.66F2 0.55F2 0.55F2 0.55F2",
   ],
 });
 
@@ -427,6 +475,27 @@ describe("combat formation: edge rules", () => {
     expect(result.scale).toBe(0.9);
     expect(result.party.form).toBe("compact");
     expect(violations({ input }, result)).toEqual([]);
+  });
+
+  it("stands a two-rank side's front plates on the floor line over their figures' lower bodies", () => {
+    // webclient-combat-formation: above the head they would lie across the
+    // back rank's faces. The floor line sits 8px·S above the command-line row.
+    for (const commandLineHeight of [undefined, 60]) {
+      const input = { ...reference("1451x790", 1, 10), commandLineHeight };
+      const result = combatFormation(input);
+      expect(result.foes.ranks).toBe(2);
+      const floor = input.bandTop - (commandLineHeight ?? 44) - 8;
+      for (const figure of result.foes.figures) {
+        if (figure.rank === 0) {
+          expect(bottom(figure.plate)).toBeLessThanOrEqual(floor + 1e-6);
+          // Below the head band of its own figure: never on the face.
+          expect(figure.plate.top).toBeGreaterThanOrEqual(figure.box.top + 0.22 * figure.box.height - 1e-6);
+        } else {
+          expect(bottom(figure.plate)).toBeLessThanOrEqual(figure.box.top - 4 + 1e-6);
+        }
+      }
+      expect(violations({ input }, result)).toEqual([]);
+    }
   });
 
   it("rejects missing or non-finite required inputs", () => {

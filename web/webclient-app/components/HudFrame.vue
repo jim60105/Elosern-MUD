@@ -155,6 +155,7 @@ defineExpose({ menuOpen });
       <span data-metric="--actor-h"></span>
       <span data-metric="--header-h"></span>
       <span data-metric="--band-h"></span>
+      <span data-metric="--command-line-h"></span>
     </div>
     <div class="stage-vignette" data-testid="stage-vignette"></div>
     <!-- Decorative: always rendered, faded by opacity (design D2). -->
@@ -445,6 +446,7 @@ defineExpose({ menuOpen });
 .elosern-stage .stage-metrics > [data-metric="--actor-h"] { height: var(--actor-h); }
 .elosern-stage .stage-metrics > [data-metric="--header-h"] { height: var(--header-h); }
 .elosern-stage .stage-metrics > [data-metric="--band-h"] { height: var(--band-h); }
+.elosern-stage .stage-metrics > [data-metric="--command-line-h"] { height: var(--command-line-h); }
 
 /* choices (webclient-dialogue-choices-overlay D6): the dialogue choice
    list, horizontally centred on the stage at `min(560px, 40%)` wide and

@@ -691,6 +691,7 @@ describe("the combat formation stage (webclient-combat-formation)", () => {
       "--actor-h",
       "--header-h",
       "--band-h",
+      "--command-line-h",
     ]);
     const css = styleBlock("components/HudFrame.vue");
     expect(css).toContain('.elosern-stage .stage-metrics > [data-metric="--actor-h"] { height: var(--actor-h); }');

@@ -3,8 +3,9 @@
 // measured stage.
 //
 // - The stage geometry is measured from the DOM: the stage box, the vitals
-//   dock's box, `--ui-scale` (a plain number on the root), and the three
-//   length tokens the engine reads (`--actor-h`, `--header-h`, `--band-h`),
+//   dock's box, `--ui-scale` (a plain number on the root), and the length
+//   tokens the engine reads (`--actor-h`, `--header-h`, `--band-h`,
+//   `--command-line-h`),
 //   read as the heights of HudFrame's metrics probe because their computed
 //   custom-property text is an unresolved `min()`/`clamp()` expression.
 // - A ResizeObserver on the stage, the vitals anchor and the probe re-measures
@@ -45,6 +46,7 @@ export function measureStage(root) {
     actorHeight: probe("--actor-h"),
     headerHeight: probe("--header-h"),
     bandHeight: probe("--band-h"),
+    commandLineHeight: probe("--command-line-h"),
     vitals: vitalsRect && vitalsRect.width > 0 && vitalsRect.height > 0 ? vitalsRect : null,
   };
 }
@@ -61,6 +63,8 @@ export function formationFor(metrics, counts) {
     "--header-h": metrics.headerHeight,
     "--band-h": metrics.bandHeight,
   };
+  // An unmeasured command-line row leaves the engine its default.
+  if (metrics.commandLineHeight > 0) styles["--command-line-h"] = metrics.commandLineHeight;
   return combatFormation(formationInputFromStage(metrics.stage, styles, metrics.vitals, counts));
 }
 
@@ -95,7 +99,8 @@ export function useCombatFormation({ rootRef, active, counts }) {
       prev.uiScale === next.uiScale &&
       prev.actorHeight === next.actorHeight &&
       prev.headerHeight === next.headerHeight &&
-      prev.bandHeight === next.bandHeight
+      prev.bandHeight === next.bandHeight &&
+      prev.commandLineHeight === next.commandLineHeight
     ) {
       return;
     }
