@@ -17,4 +17,3 @@ For an active Taunt winner legal for an enemy single-target hostile action, cand
 - **WHEN** the winner fell before the next enemy decision
 - **THEN** candidate generation and estimation use ordinary legal target rules without promoting a losing declaration
 
-

@@ -13,4 +13,3 @@ Eligible allied Taunt SHALL select one living eligible enemy without a success r
 - **WHEN** the winning taunter becomes knocked out, defeated, absent or fled
 - **THEN** later enemy decisions are unrestricted for the remainder of the round and no losing taunter takes over
 
-
