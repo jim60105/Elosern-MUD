@@ -5,15 +5,15 @@ During the stage target step that "Combat targets are picked on the stage figure
 
 #### Scenario: The card collapses to a target prompt
 - **WHEN** the stage target step opens at 1451x790 and at 1600x900 with one, two and three standing foes and parties of one, four and five figures
-- **THEN** the card keeps its horizontal centre, width and top and its height is at most 136px × S; in `--text-sm` it shows one line with the action's label (with the chosen 威力 label when the skill carries one), 選擇目標 and `Esc 返回`, and one line with the focused position's summary, each ending in an ellipsis when too long; an AREA step adds one chip per group position and the confirm chip, wrapping onto at most two chip rows; the row region is hidden, DOM focus is on `#action-dock`, and the prompt intersects no arrow marker, foe name plate or gauge (the only marker inside the card's columns is the rearmost of three foes, whose marker top stands at y 209 at 1451x790 and y 239 at 1600x900)
+- **THEN** the card keeps its horizontal centre, width and top and its height is at most 136px × S; in `--text-sm` it shows one line with the action's label (with the chosen 威力 label when the skill carries one), 選擇目標 and `Esc 返回`, and one line with the focused position's summary, each ending in an ellipsis when too long; an AREA step adds one chip per group position and the confirm chip, wrapping onto at most two chip rows; the row region is hidden, DOM focus is on `#action-dock`, and the prompt intersects no arrow marker or figure plate (they all stand outside the formation's dead-centre gap)
 
 #### Scenario: Every figure dims except the lit set
-- **WHEN** the step focuses one foe among three standing foes with a four-figure party
-- **THEN** that foe's stage actor is lit (`data-speaking="true"`) and every other stage actor — the controlled figure, each companion and the other foes — carries the dialogue listener dim (`data-speaking="false"`, the shared `--actor-dim` brightness); no figure moves, resizes, lifts or changes z; when the step ends every figure returns in the same frame to its state before the step — in combat the controlled figure and the foes are undimmed and the companions keep their existing listener dim
+- **WHEN** the step focuses one foe among three standing foes with a four-figure party, one foe defeated
+- **THEN** that foe's stage actor is lit (`data-speaking="true"`) and every other stage actor — the controlled figure, each companion and the other foes — carries the dialogue listener dim (`data-speaking="false"`, the shared `--actor-dim` brightness) except the defeated foe, which keeps its defeated treatment; the figure plates are never dimmed, because they carry the hit points the choice depends on; no figure moves, resizes, lifts or changes z; when the step ends every figure returns in the same frame to its state before the step — in combat the controlled figure and the foes are undimmed and the companions keep their existing listener dim
 
 #### Scenario: Selectable figures carry arrow markers
 - **WHEN** the step renders with three candidates among five standing figures
-- **THEN** exactly the three candidate figures carry an arrow marker centred over their figure box with its bottom 4px × S above the box's top and never inside the top band; the focused marker is a larger filled arrow and an unfocused one an outlined arrow, each showing the digit of its item in the frame's server order when that digit is 1–9; an AREA member already selected adds a check mark; a non-candidate figure carries no marker
+- **THEN** exactly the three candidate figures carry an arrow marker in their formation marker slot, directly above their plate; the focused marker is a larger filled arrow and an unfocused one an outlined arrow, each showing the digit of its item in the frame's server order when that digit is 1–9; an AREA member already selected adds a check mark; a non-candidate figure carries no marker
 
 #### Scenario: A group position lights the whole group
 - **WHEN** the step focuses the `all-enemies` group position with three standing foes
@@ -24,16 +24,20 @@ During the stage target step that "Combat targets are picked on the stage figure
 - **THEN** at `full` the lit figure carries a highlight ring that pulses in a steady loop; at `reduced`, at `off` and under the reduced-motion request it carries a static brighter ring and an underline under its arrow with no animation; in every case the focused arrow's filled shape distinguishes the focus without relying on brightness
 
 #### Scenario: The focused target is announced
-- **WHEN** the step opens on a foe, the focus moves to an ally, to an off-stage foe, to the `all-allies` group position, and to the AREA confirm position with two members selected
-- **THEN** a polite live region inside the card announces, in order, exactly `目標：<foe name>，敵方`, `目標：<ally name>，我方`, `目標：<foe name>，敵方，場外`, `目標：全體我方，共 <n> 名` and `施展：已選 2 名`; a selected member appends `，已選`, the confirm position with a chosen shorthand reads `施展：<group label>，共 <n> 名` and with nothing chosen `施展：尚未選擇目標`, a SELF step reads `目標：自己`, and when two candidates share a display name each member announcement appends the participant's session token in full-width parentheses (`（e2）`); it announces only focus and selection changes, never a dim or pulse change
+- **WHEN** the step opens on a foe, the focus moves to an ally, to a listed fled foe, to the `all-allies` group position, and to the AREA confirm position with two members selected
+- **THEN** a polite live region inside the card announces, in order, exactly `目標：<foe name>，敵方`, `目標：<ally name>，我方`, `目標：<foe name>，敵方，場外` (a fled participant still listed), `目標：全體我方，共 <n> 名` and `施展：已選 2 名`; a selected member appends `，已選`, the confirm position with a chosen shorthand reads `施展：<group label>，共 <n> 名` and with nothing chosen `施展：尚未選擇目標`, a SELF step reads `目標：自己`, and when two candidates share a display name each member announcement appends the participant's session token in full-width parentheses (`（e2）`); it announces only focus and selection changes, never a dim or pulse change
 
-#### Scenario: An off-stage position cues the participant frame
-- **WHEN** the step focuses a candidate that no stage figure draws
-- **THEN** no stage figure is lit, every stage figure is dimmed, the prompt marks the target 場外, and the participant frame row of that candidate carries the focused-target cue
+#### Scenario: A candidate without a figure is named, not cued elsewhere
+- **WHEN** the step focuses a listed candidate that no stage figure draws (a fled participant)
+- **THEN** no stage figure is lit, every stage figure is dimmed, and the prompt and the announcement name the target with 場外; no other surface carries a cue
+
+#### Scenario: Tooltips and the step coexist
+- **WHEN** a plate's condition tooltip is open and the step starts, and during the step the pointer rests on a plate's glyph
+- **THEN** starting the step closes the tooltip, and during the step hovering a glyph opens its tooltip without moving the target focus or taking a target's pointer action
 
 #### Scenario: Pointer hit areas exist only during the step
 - **WHEN** the step is open, and after it ends
-- **THEN** during the step each candidate figure has one hit area over its figure box and its arrow marker that take a pointer, and no other part of either portrait anchor does; after the step no hit area, marker or pointer-taking element remains in the portrait anchors
+- **THEN** during the step each candidate figure has one hit area over its figure box and its arrow marker takes a pointer, and no other part of either portrait anchor does; after the step no hit area, marker or pointer-taking element remains
 
 #### Scenario: A reload or reconnect renders the step at rest
 - **WHEN** the client mounts, reloads or reconnects, or a panel replacement commits, while the current frame is a stage target step
@@ -42,7 +46,7 @@ During the stage target step that "Combat targets are picked on the stage figure
 ## MODIFIED Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
 #### Scenario: The requirement carries its amendments
 - **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
@@ -142,11 +146,11 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The actor-left anchor carries the controlled figure and the party line
 - **WHEN** the shell renders in exploration, dialogue, and combat mode
-- **THEN** the `actor-left` anchor carries the controlled character's stage actor — the current roster character's portrait, or the possessed companion's while the possession banner is available — with the committed party's companion stage actors lined up behind it as "Companion standing portraits line up behind the controlled character in the actor-left anchor" defines, each with the truthful placeholder when no image exists
+- **THEN** the `actor-left` anchor carries the controlled character's stage actor — the current roster character's portrait, or the possessed companion's while the possession banner is available — with the committed party's companion stage actors lined up behind it as "Companion standing portraits line up behind the controlled character in the actor-left anchor" defines, each with the truthful placeholder when no image exists; in combat these figures stand at the boxes "Combat figures stand in a shared-scale formation" sets
 
 #### Scenario: The actor-right anchor's content follows the committed mode
 - **WHEN** the committed mode is `dialogue` with an available `dialogue` panel whose host identity does not already join to a committed party or controlled lineup figure, and later `combat` with at least one foe active or while a round that ended the fight still plays as "Combat beats are choreographed on the stage at the motion level" defines, and later any other state
-- **THEN** the `actor-right` anchor carries the dialogue host's stage actor in the first state, the foe line-up that "Foes stand opposite the player during combat" defines in the second, and no content in every other state; the foe line-up MAY extend leftward beyond the anchor's own box, within the bounds that requirement sets, and SHALL NOT cross the stage's horizontal centre, which the companion line-up's figures also never cross; every stage actor follows "Stage actors present the player and the dialogue host with a speaking state"
+- **THEN** the `actor-right` anchor carries the dialogue host's stage actor in the first state, every active foe at the boxes that "Combat figures stand in a shared-scale formation" sets in the second, and no content in every other state; in combat the portrait anchors span the stage so formation boxes are stage coordinates, and no figure enters the dead-centre gap that requirement keeps clear; every stage actor follows "Stage actors present the player and the dialogue host with a speaking state"
 
 #### Scenario: The portrait anchors are non-interactive art
 - **WHEN** any stage actor renders
@@ -164,35 +168,35 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 - **WHEN** a transient popover is opened from a top-band element, and when a surface that permanently occupies vertical space is proposed for the band
 - **THEN** the transient popover MAY overlay the island anchors while open, provided it does not change the band's own rendered box and closes on Escape and on outside activation, and a surface that permanently occupies vertical space is not introduced into the band this way
 
+#### Scenario: The plates layer is a named stage layer
+- **WHEN** combat renders its formation
+- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates and the markers other requirements place there
+
 ### Requirement: The combat command card stands at the stage's dead centre
-While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one narrow card in the stage's `choices` anchor, framed like the stage's other choice cards, with the band's command region collapsed. The card's horizontal centre SHALL be the stage's horizontal centre in every combat state; its width SHALL follow the gap on the party side; and it SHALL NOT cover a foe name plate, foe gauge or focused-target cue.
+While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one 264px × S wide card in the stage's `choices` anchor, framed like the other choice cards, centred on the stage's horizontal centre in every combat state, inside the dead-centre gap the combat formation keeps clear; the band's command region SHALL collapse.
 
-#### Scenario: The width and height follow the stated formulas
+#### Scenario: The card is at dead centre with a fixed width
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes (eleven with five figures)
+- **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 264px × S (±1px: 264 and 291.1), and it is the same in every case
+
+#### Scenario: The card never covers the formation
+- **WHEN** combat renders any of those cases, including during the entry into combat and while a foe joins or leaves
+- **THEN** the card intersects no figure box at rest, no figure plate and no target-marker slot, because every one of them stands at least 16px × S outside the card's edges
+
+#### Scenario: The width and height follow the stated rules
 - **WHEN** combat renders at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
-
-#### Scenario: The card is at dead centre for every party size and foe count
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two, three and five active foes, each with a solo player, a four-figure party (the player and three companions) and a five-figure party
-- **THEN** `#action-dock` lies inside the `choices` anchor and its horizontal centre is the stage's horizontal centre (±1px) in every case; no case shifts it left or right of the centre
-
-#### Scenario: The width follows the guaranteed gap on the party side
-- **WHEN** combat renders with a solo player, a three-figure party, a four-figure party and a five-figure party at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 240 at 1451x790 and 308.8, 308.8, 264.6 and 264.6 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 24.5px at 1451x790 and 49.5px at 1600x900
-
-#### Scenario: The card never covers a foe plate, gauge or cue
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two and three active foes, including while the attack target frame focuses the rearmost foe
-- **THEN** the card's bottom edge is at least 8px × S above the top edge of every foe name plate, so it intersects no foe name plate, no foe gauge and no focused-target cue; with one foe it intersects no foe stage actor box either
+- **THEN** the card's top is the `choices` anchor's top and its height is the smaller of 400px × S and the anchor's span (from the top band's inset to 8px × S above the scene caption row), so the card is 400px tall at 1451x790 (anchor 58–472 → 414px) and 441.1px at 1600x900
 
 #### Scenario: The card keeps the stage's other surfaces clear
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one and with three active foes and the command line expanded
-- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, `map` (the place card and the participant frame), band, or command-line anchor, and the vitals dock stays visible
+- **WHEN** combat renders at 1451x790 and at 1600x900 with the command line expanded
+- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, band, or command-line anchor, and the vitals dock stays visible
 
 #### Scenario: No frame resizes the card
 - **WHEN** the player moves at 1451x790 from the combat root through Skills, a category, a group, a skill frame, a master's 威力 scale step and the target step, and separately opens the Forfeit confirmation
 - **THEN** the card's rendered box is identical (±1px) in every frame except the stage target step, where it collapses to the target prompt that "The stage target step presents the targets on the stage figures" defines at the same centre, width and top; the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
 
 #### Scenario: Every frame lays out in one narrow column
-- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 240px × S wide card
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in the 264px × S card
 - **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
 
 #### Scenario: The detail folds into a strip below the rows
@@ -231,162 +235,51 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 - **WHEN** a combat round plays by itself and locks the commands, and later the player activates 跳過演出
 - **THEN** the waiting cue with its skip control covers the card's body inside the card while the card keeps its box, and the skip ends the round through the existing skip path
 
-## MODIFIED Requirements
+### Requirement: Combat figures stand in a shared-scale formation
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 15, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
 
-### Requirement: Foes stand opposite the player during combat
-While the committed mode is `combat`, the `actor-right` anchor SHALL carry a foe line-up: one stage actor for each committed combat participant whose team is the opposing side and whose state is active, in the presenter's order, at most three. When no foe is active the line-up SHALL render nothing.
+#### Scenario: Every active foe stands
+- **WHEN** a combat snapshot commits one, three, five, eight and fifteen foes that have not fled, some of them knocked out or defeated, with a solo player at 1451x790
+- **THEN** exactly that many foe stage actors render, in presenter order, at the formation's boxes (±1px), and no foe is left to another surface
 
-#### Scenario: Only foes of the opposing side stand on the stage
-- **WHEN** more than three foes are active, or party members other than the player are committed
-- **THEN** foes beyond the third do not stand on the stage — the participant frame lists them, and no "+N" count is drawn — party members other than the player do not stand on the stage, and the player alone stands in `actor-left`
+#### Scenario: Both sides are drawn at one scale
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes, and again while a foe joins, while one leaves, and during the entry into combat
+- **THEN** every rendered figure box on both sides has the same height (±1px) as every other in the same frame, sampled at the start, the middle and the end of each transition
 
-#### Scenario: The line-up is a depth-staged row that grows leftward
-- **WHEN** one, two, or three foes stand
-- **THEN** the first foe stands in front, nearest the stage's right edge, and each later foe stands behind the one before it: further toward the stage's centre, overlapping that foe and drawn behind it, smaller, and standing a little higher (up-stage) than it
+#### Scenario: The dead-centre gap stays clear
+- **WHEN** combat renders any of those cases, including while a beat gesture plays at rest positions
+- **THEN** no figure box at rest intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S`
 
-#### Scenario: Staged sizes follow the reference ratios
-- **WHEN** one, two, or three foes are shown
-- **THEN** the foes' heights are, front to back, 100%; 90% and 78%; or 80%, 70%, and 61% of the player's stage actor's height, and every later foe shows 46% of its width past the foe in front of it; the front foe stands on the band's upper edge, and each foe behind stands 3.5% of the portrait anchor's height higher than the one in front of it
+#### Scenario: The party forms up only in combat
+- **WHEN** the committed mode changes exploration → combat → exploration with a five-figure party, and exploration → dialogue
+- **THEN** in combat the party stands at the formation's boxes; on the return to exploration, and in dialogue, every party figure stands where the exploration line-up places it today (±1px)
 
-#### Scenario: The row's inset clears the participant frame
-- **WHEN** the line-up renders at 1451x790 and at every larger viewport up to the chrome cap
-- **THEN** the row's right inset is the portrait anchor's right inset, grown just enough that the front foe's horizontal centre (its face) lies at least 24px left of the participant frame's column, within the `map` anchor in combat, and no foe's stage actor crosses the stage's vertical centre line or intersects the player's stage actor
+#### Scenario: Entering and leaving combat moves figures with the motion level
+- **WHEN** the mode live-changes into and out of combat at `full`, at `reduced`, and at `off`, and when the client reloads or reconnects in combat
+- **THEN** at `full` each party figure glides and scales from its exploration box to its formation box (and back) over the actor duration times the travel factor, with the foes entering as the flash releases at the formation scale; at `reduced` the figures take their final boxes in the commit's frame and only fade where they enter or leave; at `off`, and on a reload or reconnect, every figure renders at its final box in the commit's frame
 
-#### Scenario: Each foe plate names, gauges, and cues
-- **WHEN** a foe stage actor renders
-- **THEN** it exposes that participant's portrait reference as a data attribute for tests and for the beat presentation; it shows its display name above its decorative hit-point gauge and distinguishes acting or focused-target presentation with a non-colour cue (during the stage target step, also the arrow marker over the figure); names ellipsize within their plate while retaining full DOM text; and its gauge is a slim track centred under the figure on the scene caption's baseline, above the command-line row, filled to that foe's current hit points (the displayed value while a combat round plays) over its maximum, with a trailing bar that follows a drop after the vitals' trail delay so the damage shows as a gap
+#### Scenario: A changing roster re-forms the line together
+- **WHEN** a foe joins or flees during combat so that the shared scale or the rank count changes
+- **THEN** every figure on both sides glides to its new box and scale with the same duration and easing in the same frames (instant below `full`), and the leaving foe fades where it stands
 
-#### Scenario: The line-up is decorative art
-- **WHEN** the line-up renders
-- **THEN** it is hidden from assistive technology, carries no focusable element, intercepts no pointer events outside the stage target step — during that step only the hit areas and arrow markers over selectable foes, which "The stage target step presents the targets on the stage figures" defines, take a pointer — and states no tokens, hit-point numerals, or participant states, which remain the participant frame's
+#### Scenario: Resizing keeps the formation and its pointer targets live
+- **WHEN** the viewport is resized from 1451x790 to 1600x900 and back while combat is shown
+- **THEN** the formation is recomputed from the new stage geometry within one frame of the resize, every figure box, plate and pointer target matches the new formation, and a pointer action on a figure's target or a plate works at once after the resize
 
-#### Scenario: A playing round holds the line-up to its beats
-- **WHEN** a combat round plays by itself, and later ends — by itself or because the player ended it
-- **THEN** during the round the line-up stands the foes that were active before the round, in the presenter's order, and a foe leaves it only when its own defeat beat plays; when the round ends the line-up stands the committed active foes
-
-#### Scenario: Mode changes and set changes animate the line-up
-- **WHEN** the committed mode live-changes into or out of `combat`, or a foe joins or leaves the active set within combat
-- **THEN** entering brings the line-up in — after half the flash's duration it fades in over the actor duration of the client's motion level (350ms at `full`) while each foe slides in from the right, the front foe furthest; leaving fades it out while the foes drift a step to the right; within combat a leaving foe fades out where it stands, a joining foe slides and fades in, and the remaining foes glide to their new places and sizes; every leaving copy is out of reach as "A leaving element is out of reach while it animates out" requires
-
-#### Scenario: Entrances never replay and motion levels hold
-- **WHEN** the client mounts in combat, reloads, or reconnects, or the motion level is `reduced` or `off`
-- **THEN** mount, reload, and reconnect play no entrance; at `reduced` the line-up only fades, within 150ms, and nothing in it moves or glides; at `off` every change renders its final state in the commit's frame; and no change scrolls the stage or any element that contains it
-
-#### Scenario: One foe stands opposite the player
-- **WHEN** a combat snapshot commits one active foe with a catalog portrait at 1451x790
-- **THEN** `actor-right` renders one foe stage actor with that image, its bottom edge on the band's top
-  edge, its height equal to the player's stage actor's height (±1px), its horizontal centre at least 24px
-  left of the participant frame's left edge, a gauge and name under it, and no focusable element
-
-#### Scenario: Three foes stand in depth toward the centre
-- **WHEN** a combat snapshot commits three active foes at 1451x790 and at 2560x1440
-- **THEN** three foe stage actors render in presenter order at 80%, 70%, and 61% of the player's height
-  (±1px), each later one further left, higher, and behind the one before it, and none crosses the stage's
-  centre line or intersects the player's stage actor
-
-#### Scenario: Foes beyond three stay in the participant frame
-- **WHEN** a combat snapshot commits five active foes
-- **THEN** the line-up shows the first three in presenter order, and the participant frame lists all five
-  foes with their tokens and hit points
-
-#### Scenario: The gauge follows the committed hit points
-- **WHEN** a committed update lowers an active foe's `hp_current`
-- **THEN** that foe's gauge fill shrinks to the new ratio, its trailing bar follows after the trail delay,
-  and neither the gauge nor the line-up states an HP numeral
-
-#### Scenario: Only active foes stand on the stage
-- **WHEN** a committed update that carries no playable round changes the first of two foes to defeated,
-  and later a playing round defeats the other foe
-- **THEN** the first foe's stage actor fades out at the commit and is inert while it leaves, the other
-  foe glides to the front place, the second foe stays on the stage until its defeat beat plays, and the
-  participant frame still lists both defeated foes with their text markers
-
-#### Scenario: A missing portrait shows the truthful placeholder
-- **WHEN** an active foe's portrait reference is `null`, and another's names no catalog entry
-- **THEN** both foes' stage actors show the display name's initial and the display name, and neither
-  renders an image or a constructed URL
-
-#### Scenario: Entering combat brings the foes in
-- **WHEN** the effective level is `full` and a committed revision changes the mode from exploration to
-  combat with two active foes
-- **THEN** the line-up fades in over 350ms while its foes slide in from the right, and after a later change
-  back to exploration it fades out and is inert while it leaves, and at no frame does any stage ancestor
-  scroll horizontally
-
-#### Scenario: A reload in combat plays no entrance
-- **WHEN** the client reloads or reconnects while the committed mode is combat
-- **THEN** the line-up renders in its final state with no running transition
-
-#### Scenario: Reduced and off keep the foes still
-- **WHEN** the effective level is `reduced`, and later `off`, and the mode enters and leaves combat
-- **THEN** at `reduced` the line-up only fades within 150ms and never moves, and at `off` it is present
-  or absent in the commit's frame
+#### Scenario: The formation is decorative art
+- **WHEN** the formation renders
+- **THEN** its figures are hidden from assistive technology, carry no focusable element, and intercept no pointer events outside the interactions other requirements define
 
 #### Scenario: Foes take the listener dim during the stage target step
 - **WHEN** the stage target step is active with two foes standing and the focus on the front foe
-- **THEN** the rear foe's stage actor carries the same listener dim as a non-speaking figure in dialogue and the front foe's does not; outside the stage target step no foe is dimmed
+- **THEN** the other foe's stage actor carries the same listener dim as a non-speaking figure in dialogue and the focused foe's does not; a fallen foe keeps its fallen treatment whether lit or not; outside the stage target step no standing foe is dimmed
 
-### Requirement: The combat participant frame presents the session's participants and their portraits
-In combat the shell SHALL render a participant frame as a HUD island in the stage's top-right `map` anchor, where the minimap is hidden in combat, and SHALL NOT place it in either portrait anchor, grouped into the player's side and the opposing side using the committed participants' server-authored team values, in the presenter's order. The frame SHALL NOT invent a field the participant descriptor does not carry.
-
-#### Scenario: Each participant row states its backed values
-- **WHEN** a participant renders in the frame
-- **THEN** it renders its session token, its display name, its current and maximum hit points as numerals — the current value being, while a combat round plays, the displayed value that `webclient-combat-menu` "A combat round plays beat by beat" defines — and its state
-
-#### Scenario: Non-active states carry an explicit text marker
-- **WHEN** a participant's state is not active
-- **THEN** it is conveyed by an explicit text marker in addition to any colour
-
-#### Scenario: The frame is the sole numeral surface
-- **WHEN** the frame and the foe line-up render together
-- **THEN** the frame lists every participant of both sides, including the foes the foe line-up does not stand on the stage, and remains the only surface that states participant tokens, hit points, and states: the foe line-up in `actor-right` carries decorative portraits, names, non-colour acting/target cues and hit-point gauges without numerals
-
-#### Scenario: Long names bound; six rows clear the foe heads
-- **WHEN** a display name exceeds the frame's width, or the frame holds six participants at 1451x790 and 2560x1440
-- **THEN** the name ends in an ellipsis on screen while its full text stays in the DOM, and the frame's rows are compact enough that a frame of six participants ends above the foe line-up's gauges; at both acceptance sizes its visible content does not cover a standing foe head
-
-#### Scenario: Portraits resolve only through the committed catalog
-- **WHEN** a participant's server-authored portrait reference is looked up in the committed art panel's portrait catalog
-- **THEN** a resolvable entry renders that entry; an entry that resolves to a placeholder renders a compact initial with its truthful availability state accessible outside the bitmap; an entry whose image URL fails to load renders a compact initial with a localized load-failure state accessible outside the bitmap; and a null reference or an unavailable art panel renders no portrait at all — the client constructs no portrait subject key or URL
-
-#### Scenario: The frame and stage actors alone present the catalog
-- **WHEN** the participant frame is mounted
-- **THEN** the frame and the stage actors are the only presenters of the portrait catalog, so no separate portrait strip is rendered alongside them
-
-#### Scenario: The frame never competes for focus
-- **WHEN** the participant frame renders
-- **THEN** it is display-only: it is not a row container, not part of the dock's composite widget, and not a second tab stop — targets are chosen in the stage target step, where a focused or selectable candidate that stands on no stage figure is cued on its frame row
-
-#### Scenario: Both sides render from the payload
-- **WHEN** a combat session commits participants on both teams
-- **THEN** the frame renders the player's side and the opposing side in presenter order, each participant showing its token, display name, current and maximum hit points, and state
-
-#### Scenario: A non-active participant is marked in text
-- **WHEN** a participant's state is fled, knocked out or defeated
-- **THEN** the frame renders an explicit text marker for that state alongside any colour treatment
-
-#### Scenario: A portrait comes only from the catalog
-- **WHEN** a participant carries a portrait reference present in the committed portrait catalog
-- **THEN** the frame renders that catalog entry, and when the reference is null or the art panel is unavailable it renders no portrait and constructs no URL
-
-#### Scenario: A catalog portrait fails to load
-- **WHEN** a catalog entry has an image URL that fails to load
-- **THEN** the frame replaces the bitmap with the participant's initial and an accessible `肖像載入失敗` state, without changing its token or numeric HP
-
-#### Scenario: The frame does not compete for focus
-- **WHEN** the participant frame is mounted during combat
-- **THEN** it is not reachable by sequential keyboard navigation, the dock's active row container remains the surface's only listbox, and no portrait strip is rendered outside the frame and the stage actors
-
-#### Scenario: The frame sits in the map anchor, not on a portrait anchor
-- **WHEN** a combat session commits participants at 1451x790 and 2560x1440
-- **THEN** the participant frame is a descendant of the `map` anchor, the `actor-right` anchor holds only the foe line-up's stage actors and gauges and no frame row, token, or hit-point numeral, and the frame's visible box intersects neither the bottom band nor the command line
-
-#### Scenario: An off-stage candidate is cued on its frame row
-- **WHEN** the stage target step focuses a candidate that no stage figure draws — a fourth foe, a knocked-out foe, or a party participant the line-up does not draw
-- **THEN** that participant's frame row carries the focused-target cue (an arrow glyph and a non-colour outline, exposed as `data-target-cue="focus"`), every other selectable off-stage row carries `data-target-cue="selectable"`, the frame stays display-only and outside the tab order, and the cue clears when the step ends
+#### Scenario: Only the step's hit areas take a pointer
+- **WHEN** the stage target step is open, and after it ends
+- **THEN** during the step each candidate figure has one hit area over its figure box that takes a pointer, and nothing else in the portrait anchors does; after the step no hit area remains
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, and no pointer events outside the stage target step, during which only the hit areas and arrow markers over selectable figures take a pointer.
+The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat the same figures stand at the boxes "Combat figures stand in a shared-scale formation" sets. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, and no pointer events outside the stage target step, during which only the hit areas over selectable figures take a pointer.
 
 #### Scenario: Portraits resolve through the catalog
 - **WHEN** a companion portrait renders
@@ -397,7 +290,7 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 - **THEN** every figure, including the controlled character, has the same full anchor size and ground line; no progressively smaller scale, lift ramp or depth dimming
 
 #### Scenario: The row compresses to stay in the left half
-- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in any mode
+- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in exploration and dialogue
 - **THEN** horizontal overlap compresses as necessary to keep the row inside the stage's left half, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half; in dialogue the group compresses overlap to clear the choice list without resizing figures; zero companions render the existing solo portrait at its standard anchor position; the anchor has `overflow: visible`; and the vitals dock MAY cover the lowest strip of feet, never face or torso
 
 #### Scenario: Visibility follows the mode
@@ -409,8 +302,8 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 - **THEN** companions use the existing StageActor listener dim otherwise; the speaking companion temporarily receives z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes; dialogue speaking and exploration focus change only dim and z, never position, lift or size, and remains correct at off/reduced motion; and the controlled figure retains its existing speaking and beat behavior
 
 #### Scenario: No figure crosses the stage's centre
-- **WHEN** the lineup and the foe lineup render together
-- **THEN** no figure box crosses the stage's horizontal centre, and the foe lineup is unchanged
+- **WHEN** the lineup and the foe lineup render together in combat
+- **THEN** no figure box enters the dead-centre gap of "Combat figures stand in a shared-scale formation", and both sides are drawn at the same scale
 
 #### Scenario: A two-companion party renders a three-figure group
 - **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in exploration mode
@@ -426,7 +319,7 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 
 #### Scenario: The full party fits the left half at every viewport
 - **WHEN** the committed party carries four slots and the shell renders at 1451x790 and at 2560x1440
-- **THEN** all five equally sized figures render with compressed horizontal overlap inside the left half; in exploration/combat each face is at least partially visible, and in dialogue a speaking companion is brought above the overlapping listeners without moving its slot
+- **THEN** all five equally sized figures render with compressed horizontal overlap inside the left half in exploration, each face at least partially visible; in combat they stand in the formation at the shared scale; and in dialogue a speaking companion is brought above the overlapping listeners without moving its slot
 
 #### Scenario: A speaking companion rises temporarily without moving
 - **WHEN** the committed dialogue host is a companion and the existing speaker signal changes from player to host and back
@@ -450,4 +343,4 @@ The `actor-left` anchor SHALL render the currently controlled character's standi
 
 #### Scenario: The party takes the listener dim during the stage target step
 - **WHEN** the stage target step is active for a skill whose candidates include the controlled figure and one companion, with the focus on that companion
-- **THEN** that companion's stage actor is lit (`data-speaking="true"`) and every other party figure, the controlled figure included, carries the listener dim; no figure moves, lifts, resizes or changes z for the step, and when the step ends every figure returns to its combat dim state
+- **THEN** that companion's stage actor is lit (`data-speaking="true"`) and every other party figure, the controlled figure included, carries the listener dim; no figure moves, lifts, resizes or changes z for the step, and when the step ends every figure returns to the state it had before the step (in combat the controlled figure undimmed and the companions in their existing listener dim)

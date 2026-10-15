@@ -8,8 +8,8 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 - **THEN** SINGLE has one position per server candidate (its `target-<id>` item); SELF has one position, its `self-confirm` item, on the controlled figure; AREA has one position per candidate (its `area-<id>` item), then one group position per approved shorthand the skill carries (its `shorthand-<key>` item), then the `area-confirm` position; NONE and a disabled skill's frame start no stage target step and render their rows in the card as before
 
 #### Scenario: Positions follow stage order
-- **WHEN** the stage target step builds its positions with a four-figure party and three standing foes, all of them candidates, and a fifth-listed foe that stands only in the participant frame
-- **THEN** the member positions run in on-screen left-to-right order — the party's rearmost companion to the controlled figure, then the rearmost standing foe to the front foe — followed by candidates no stage figure draws in the server's order, then (AREA) the group positions in the server's shorthand order, then the confirm position; the order is derived from the same line-up helpers the stage draws with, never from measured boxes
+- **WHEN** the stage target step builds its positions with a four-figure party and nine standing foes in two ranks, all of them candidates, and a fled participant the server still lists
+- **THEN** the member positions run in the formation's stage order — every drawn figure by the horizontal centre of its formation box, from left to right (the front rank first on a tie), so the party comes before the foes — followed by candidates no stage figure draws (only a fled participant can be one) in the server's order, then (AREA) the group positions in the server's shorthand order, then the confirm position; the order is the formation engine's stage order, never measured from the DOM
 
 #### Scenario: Arrow keys move along the stage
 - **WHEN** the player presses ArrowRight, ArrowDown, ArrowLeft and ArrowUp in a stage target step with four positions
@@ -41,7 +41,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 
 #### Scenario: Knocked-out and unlisted participants
 - **WHEN** a revive-style SINGLE skill lists a knocked-out companion and a knocked-out foe as candidates while a defeated foe is not listed
-- **THEN** the knocked-out companion is a position on its stage figure, the knocked-out foe (which the foe line-up does not draw) is an off-stage position cued on its participant-frame row, and the unlisted defeated foe is no position and carries no marker
+- **THEN** the knocked-out companion and the knocked-out foe are positions on their stage figures, which keep their fallen treatment and carry the arrow marker, and the unlisted defeated foe is no position and carries no marker
 
 #### Scenario: A changing target set follows the panel
 - **WHEN** a committed panel replacement removes the focused candidate while the stage target step is open, and later a replacement adds a candidate
@@ -103,7 +103,7 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: The participant frame renders the committed session
 - **WHEN** a combat session commits participants on both teams, one of them fled or knocked out
-- **THEN** the participant frame renders both sides in presenter order with each participant's token, display name, current and maximum hit points, and an explicit text marker for the non-active state, and it is not reachable by sequential keyboard navigation
+- **THEN** every drawn figure other than the controlled one carries its plate with display name, hit-point stroke and current and maximum hit points (the controlled figure's values stay in the vitals dock), the session token is part of the plate's accessible name only, and no plate is reachable by sequential keyboard navigation in this requirement
 
 #### Scenario: A participant portrait comes only from the catalog
 - **WHEN** a participant carries a `portrait_ref` present in the committed portrait catalog, and another carries `null`
@@ -168,9 +168,9 @@ one level, and disabled entries SHALL send no packet.
   steps are unchanged in behaviour and in payload
 
 #### Scenario: The participant frame is display-only in the HUD island
-- **WHEN** combat presents the participant frame in the HUD island area
-- **THEN** it is not a row container, not a tab stop, and not part of the dock's
-  composite widget; targets are chosen in the stage target step
+- **WHEN** combat presents the figure plates
+- **THEN** they are not a row container and not part of the dock's composite widget;
+  targets are chosen in the stage target step
 
 #### Scenario: Category frames carry per-row descriptor counts
 - **WHEN** the category or group frame renders its entries
@@ -193,9 +193,9 @@ one level, and disabled entries SHALL send no packet.
   skill frame directly, so no level ever offers a single choice
 
 #### Scenario: Participant hit points are numerals and missing art means no portrait
-- **WHEN** the participant frame renders committed participants, or the art panel is
+- **WHEN** the figure plates render committed participants, or the art panel is
   unavailable
-- **THEN** each participant shows its session token, display name, current and maximum
-  hit points as numerals, and its state with an explicit text marker for any non-active
-  state, and a null reference or an unavailable art panel yields no portrait at all with
-  no client-constructed subject key or URL
+- **THEN** each plate shows its participant's display name and current and maximum hit
+  points as numerals (its session token only in the accessible name), and a null reference
+  or an unavailable art panel yields the figure's truthful placeholder with no
+  client-constructed subject key or URL

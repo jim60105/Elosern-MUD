@@ -1,7 +1,8 @@
 # Tasks
 
-Prerequisite: `webclient-combat-command-card-centred` is archived on master (this change's deltas MODIFY its
-requirement). Scope: presentation and input routing only — `web/static/webclient/js/elosern/combat_menu.js`, the
+Prerequisites: `webclient-combat-figure-plates`, `webclient-combat-defeated-foes` and
+`webclient-combat-command-card-centred` are archived (this change's deltas MODIFY their requirements). Mind the
+Styling pitfall in `web/webclient-app/AGENTS.md`. Scope: presentation and input routing only — `web/static/webclient/js/elosern/combat_menu.js`, the
 keyboard router source, item order, dispatch payloads, the protocol and telnet stay untouched. Paths are relative to
 `web/webclient-app/` unless they start with `web/` or `.github/`.
 
@@ -13,10 +14,8 @@ same class of defect.
 ## 1. The step model and the arrow claim (≈2.5 h)
 
 - [ ] 1.1 Create `stores/elosern/stage_targets.js` with `stageTargetModel(...)` and its helpers (design D1): step
-  detection, positions per form, stage order from `drawnParty`/`drawnFoes`, off-stage members, group and confirm
-  positions, lit/selectable/selected sets, digits, and the announcement strings. Export a `drawnStageOrder(panels,
-  beatStage)` helper built on `components/companion-lineup.js` (`companionFigures`, `displayedLineup`) and
-  `components/foe-lineup.js` (`activeFoes`, `FOE_LINEUP_MAX`).
+  detection, positions per form, stage order from the formation's `formationOrder` (design D1), undrawn (fled) members, group and confirm
+  positions, lit/selectable/selected sets, digits, and the announcement strings. AppClient publishes `formationOrder` from the `formation` object to the store.
 - [ ] 1.2 In `stores/elosern/view.js` publish `stageTarget` (null outside a step or while `beatLocked()`); in
   `stores/elosern/interaction.js` claim the four arrow keys in `focusPress` while `stageTarget` is non-null
   (design D2); in `stores/elosern/combat.js` add `stageTargetPointer(key, action)` (design D5).
@@ -25,32 +24,32 @@ same class of defect.
   card-row payload); SELF (one position on the controlled identity; arrows no-op; payload has no target field); AREA
   (members then `shorthand-*` then `area-confirm`; Space toggles; group lit sets for `all-enemies`, `all-allies`,
   `all`; confirm lit = selection, then = chosen shorthand; payloads unchanged); NONE and a disabled skill (no step,
-  arrows reach the router); a fifth foe and a knocked-out foe as off-stage positions; a knocked-out companion
-  candidate on stage; a panel replacement removing the focused candidate (focus repaired, lit set follows);
+  arrows reach the router); a knocked-out foe and a knocked-out companion candidate on stage with their fallen look; a listed
+  fled participant as the only undrawn position; a panel replacement removing the focused candidate (focus repaired, lit set follows);
   `beatLocked` (null model, arrows unclaimed); digits still address server order; an arrow from a back-row focus goes to the first/last position; the exact
   announcement templates (and the token suffix for duplicate names) for member,
   ally, off-stage, group and confirm. Run `pnpm test -- web/webclient-app/tests/store/stage_target_step.test.js
   web/webclient-app/tests/store/combat_command_window.test.js web/webclient-app/tests/store/digit_row_picks.test.js`
   and verify it passes.
 
-## 2. Figures, prompt and participant frame (≈2.5 h)
+## 2. Figures, markers and prompt (≈2.5 h)
 
 - [ ] 2.1 `components/FoeLineup.vue` and `components/CompanionLineup.vue`: the `targeting` prop, the dim expression
   through StageActor's `dimmed`, the marker and hit-area elements, `data-target-focus`, the pulse keyframes and the
   reduced/off/`prefers-reduced-motion` static ring and underline (design D4); marker/pulse tokens in
   `styles/tokens.css`. `StageActor.vue` stays unchanged.
-- [ ] 2.2 `components/ParticipantFrame.vue`: `targetCues` → `data-target-cue` and the arrow glyph on off-stage rows.
+- [ ] 2.2 `components/HudFrame.vue` plates layer: render the markers at the formation marker slots (design D4); AppClient
+  bumps `plateTooltipClose` when a step starts.
 - [ ] 2.3 `components/ActionDock.vue`: the target prompt, the hidden row region, the focus move to `#action-dock`,
   the AREA chips and the polite live region (design D3); `components/HudFrame.vue`: the step's `height: auto;
-  max-height: 136px·S` card rule; chips are `tabindex="-1"` buttons that return DOM focus to `#action-dock`. `AppClient.vue`: pass `targeting`/`targetCues`/`stageTarget` from
+  max-height: 136px·S` card rule; chips are `tabindex="-1"` buttons that return DOM focus to `#action-dock`. `AppClient.vue`: pass `targeting`/`stageTarget` from
   `store.view.stageTarget` and wire the hit areas and chips to `stageTargetPointer`.
 - [ ] 2.4 Extend `tests/core/foe_lineup.test.js` and `tests/core/companion_lineup.test.js` (lit vs dimmed
   `data-speaking`, markers only on selectable slots with the right `data-state`, digit and ✓, hit areas only while
   `targeting` is non-null, no box/z change, the reduced-motion rule present), `tests/action/action_dock.test.js`
-  (prompt content per form, hidden row region, live-region text, chips emit the pointer entry) and the participant
-  frame test that exists for `ParticipantFrame.vue` (cue attributes). Run
+  (prompt content per form, hidden row region, live-region text, chips emit the pointer entry) and `tests/core/figure_plate.test.js` (plates never dimmed in a step). Run
   `pnpm test -- web/webclient-app/tests/core/foe_lineup.test.js web/webclient-app/tests/core/companion_lineup.test.js web/webclient-app/tests/action/action_dock.test.js
-  web/webclient-app/tests/core/participant_frame.test.js web/webclient-app/tests/combat/participant_frame.test.js`, and verify they pass.
+  web/webclient-app/tests/core/figure_plate.test.js`, and verify they pass.
 
 ## 3. Live-client browser verification (≈2 h)
 
@@ -65,8 +64,8 @@ Build once: `pnpm run build`.
   an AREA chip click followed by ArrowRight and Enter activates the focused position, not the chip) and
   `test_area_targets_light_groups_on_the_stage` (an AREA skill: Space selects two foes with ✓ markers; the
   `all-allies` position lights every party candidate; confirm sends `target_shorthand`; under `reduced` motion the
-  focused figure's computed `animation-name` is `none` and the underline is present; a fifth foe focused cues its
-  participant-frame row). Annotate both with existing IDs they establish (confirm spellings with
+  focused figure's computed `animation-name` is `none` and the underline is present; a knocked-out foe candidate shows its
+  fallen look plus the arrow; starting a step closes an open plate tooltip). Annotate both with existing IDs they establish (confirm spellings with
   `uv run --locked python -m tools.spec_traceability list`). Register both in `.github/browser-shards.json` beside
   `CombatStageBrowserTest.test_foes_stand_opposite_the_player`. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage`

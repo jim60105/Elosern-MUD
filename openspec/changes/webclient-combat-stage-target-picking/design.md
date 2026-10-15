@@ -20,10 +20,10 @@ See `proposal.md` for the motivation and `specs/` for the contract. Builds on
   - A disabled skill's frame is one `skill-disabled` item.
 - Participants carry `team` `party` | `foes` and `state` `active` | `fled` | `knocked_out` | `defeated`
   (`world/rules/combat_view.py`); identities are ObjectDB ids.
-- **The stage draws**: the controlled figure plus up to four companions (`companionFigures`, `displayedLineup`,
-  `COMPANION_LINEUP_MAX = 5`) and up to three *active* foes (`activeFoes`, `FOE_LINEUP_MAX = 3`; during playback the
-  round's pre-round foes). A candidate may therefore have no figure: foes four and five, any non-active foe, a party
-  participant the line-up does not draw.
+- **The stage draws** (after `webclient-combat-formation` and `webclient-combat-defeated-foes`): the controlled
+  figure, up to four companions, and every foe that has not fled (up to 15), all at the formation engine's boxes,
+  with fallen figures in their defeated/down treatment and one plate per non-controlled figure with a marker slot
+  above it. Only a fled participant can be a candidate without a figure. There is no participant frame.
 - **Existing machinery**: `AppClient.vue` `focusedCombatTarget` already resolves the focused item's single identity
   and `FoeLineup` marks `data-target` on the plate; `onRouterEvent` handles `toggle-target`, `choose-shorthand`,
   confirm and `target-*` submit; `focusPress` (`stores/elosern/interaction.js`) already claims keys before the
@@ -36,26 +36,24 @@ See `proposal.md` for the motivation and `specs/` for the contract. Builds on
 **Goals:** pick every real target form on the stage with keyboard and pointer; reuse the dialogue dim; keep items,
 payloads, the router source, the UMD model and the protocol unchanged; accessible without colour or motion.
 
-**Non-Goals:** confirming friendly fire (`webclient-combat-cross-side-confirm`); drawing more than three foes;
+**Non-Goals:** confirming friendly fire (`webclient-combat-cross-side-confirm`); the formation itself;
 changing which participants the server lists as candidates; the SkillBook (exploration) casting flow.
 
 ## Decisions
 
 ### D1. One pure model of the step: `stores/elosern/stage_targets.js`
 
-`stageTargetModel({ menu, skill, participants, drawnParty, drawnFoes, focusKey, selected, shorthand })` returns
-`null` outside a step, else
-`{ form, skillKey, label, positions[], focusKey, lit[], selectable[], selectedIds[], offStage[], announce }`, where each
-position is `{ key, kind: "member"|"group"|"confirm"|"self", identities[], side, digit, offStage }`. It is a step only
-when the current descriptor source is `combat.target`/`combat.skill`, the menu's items are target items of an
-enabled `single`/`self`/`area` skill (never `scaleChoice`, `none-confirm` or `skill-disabled`), and playback is not
+`stageTargetModel({ menu, skill, participants, formationOrder, focusKey, selected, shorthand })` returns `null` outside
+a step, else `{ form, skillKey, label, positions[], focusKey, lit[], selectable[], selectedIds[], offStage[], announce }`,
+where each position is `{ key, kind: "member"|"group"|"confirm"|"self", identities[], side, digit, offStage }`. It is
+a step only when the current descriptor source is `combat.target`/`combat.skill`, the menu's items are target items of
+an enabled `single`/`self`/`area` skill (never `scaleChoice`, `none-confirm` or `skill-disabled`), and playback is not
 locked.
 
-- **Stage order**: `drawnParty` is the displayed party figure identities rear → controlled (the reverse of the
-  `companionFigures` slot order) and `drawnFoes` the drawn foe identities rear → front (the reverse of the line-up's
-  slot order); both come from the same pure helpers the components draw with, so the store needs no DOM
-  measurement. Members = drawn candidates in that order, then undrawn candidates in server order (`offStage`). AREA
-  then appends group positions in the descriptor's shorthand order and the confirm position.
+- **Stage order**: `formationOrder` is the drawn identities sorted by their formation box's horizontal centre, from
+  left to right (the front rank first on a tie), published by AppClient from the same `formation` object the stage
+  draws. Members = drawn candidates in that order, then undrawn candidates (only a fled participant) in server order
+  (`offStage`). AREA then appends group positions in the descriptor's shorthand order and the confirm position.
 - **Lit sets**: member → `[id]`; group → the candidates of that side (`all-enemies` → `team === "foes"`,
   `all-allies` → `team === "party"`, `all` → every candidate); confirm → the explicit selection, else the chosen
   shorthand's set, else empty; self → the controlled figure's identity.
@@ -86,37 +84,34 @@ gaps, wrapping onto at most two rows (全體敵人, 全體我方, 全體 and 施
 returns DOM focus to `#action-dock`, because `bridge.js` leaves Enter on a focused button to the button. The DockMenu row region stays mounted with the `hidden` attribute
 (so router state and focus bookkeeping are unchanged) and DOM focus moves to `#action-dock` when it was inside the
 row region. The card's anchor rule from the previous change keeps `left`/`width`/`top`; in the step the dock's
-height is `auto` with `max-height: 136px·S` (12 + 22 + 22 + 28 + 4 + 28 + 12 = 128 at S = 1). Clearance: markers are
-24px·S tall with their bottom 4px·S above the figure box. The only marker inside the card's columns at the measured
-configurations is the rearmost of three foes (box centre 856.1 vs card right edge ≤ 865.5 at 1451; marker 948.8–975.2
-vs card right edge ≤ 954.4 at 1600), whose marker top is 237 − 4 − 24 = 209 / 269.9 − 4.4 − 26.5 = 239; the prompt
-ends by 58 + 136 = 194 / 70.6 + 150 = 220.6, at least 8px·S above it. With two foes the rear marker centre (947.1 /
-1065.8) and every party marker (controlled box centre ≤ 466.6 / 531.0) lie outside the card's columns.
+height is `auto` with `max-height: 136px·S` (12 + 22 + 22 + 28 + 4 + 28 + 12 = 128 at S = 1). Clearance needs no
+derivation any more: every marker slot and plate stands outside the formation's dead-centre gap, and the card fills
+only that gap.
 
 A `<p role="status" aria-live="polite" class="sr-only">` inside the card carries `stageTarget.announce`; it changes
 only with the focus or the selection.
 
-### D4. Figures: dim, lit, markers, hit areas — inside the existing line-ups
+### D4. Figures: dim, lit, markers, hit areas
 
 `FoeLineup` and `CompanionLineup` take `targeting` (`null` or `{ lit, selectable, selected, focused, digits }` keyed by
-`String(identity)`). When non-null:
+`String(identity)`). When it is non-null:
 
-- each StageActor's `dimmed` is `!lit.has(id)` (CompanionLineup ignores `speakingIdentity`/`dimmed` for the step;
-  FoeLineup's `:dimmed="false"` becomes this expression) — the dialogue dim, no parallel treatment;
-- each selectable slot renders `<span class="stage-target__marker" data-testid="stage-target-marker"
-  :data-state="focus|selectable" :data-selected>` (▼ filled + digit when focused, ▽ outline + digit otherwise, ✓
-  when selected) positioned `bottom: calc(100% + 4px·S)` of the slot, clamped below the top band with
-  `max(…)` on its top, and a `<span class="stage-target__hit" data-testid="stage-target-hit">` covering the slot
-  box; both are the only `pointer-events: auto` elements and carry `aria-hidden` like the rest of the line-up
-  (keyboard and the live region are the accessible path);
-- a lit focused slot gets `data-target-focus="true"`: at `full` a `filter: drop-shadow(...)` ring animated by
-  `elosern-target-pulse` (1.2s, `infinite alternate`, `--ease-standard`); under `[data-motion-level="reduced"]`,
-  `[data-motion-level="off"]` and `@media (prefers-reduced-motion: reduce)` the ring is static and brighter and the
-  marker gains an underline bar. No figure's box, z or position changes.
+- each StageActor's `dimmed` is `!lit.has(id)`, the dialogue dim with no parallel treatment; a fallen figure keeps its
+  fallen treatment whether lit or not, and the focus ring still applies to it;
+- each selectable slot renders a hit area `<span class="stage-target__hit" data-testid="stage-target-hit">` covering
+  its figure box, the only `pointer-events: auto` element in the portrait anchors (`aria-hidden`; the keyboard and
+  the live region are the accessible path);
+- the arrow markers render in the `plates` layer at each figure's formation marker slot, directly above its plate:
+  `<span class="stage-target__marker" data-testid="stage-target-marker" :data-state="focus|selectable"
+  :data-selected>`, ▼ filled with the digit when focused, ▽ outlined with the digit otherwise, ✓ when selected;
+  markers take a pointer like the hit area;
+- a lit focused figure gets `data-target-focus="true"`: at `full` a `filter: drop-shadow(...)` ring animated by
+  `elosern-target-pulse` (1.2s, `infinite alternate`); under reduced, off and `prefers-reduced-motion` the ring is
+  static and brighter and the marker gains an underline bar;
+- plates are never dimmed: they carry the hit points the choice depends on. No figure's box, z or position changes.
 
-`FoeLineup`'s existing `data-target` plate cue keeps following `focusedCombatTarget` (now extended to groups by
-`lit`). `ParticipantFrame` takes `targetCues` and sets `data-target-cue` (`focus`/`selectable`) plus an arrow glyph on
-rows of off-stage positions.
+AppClient bumps the plates' `plateTooltipClose` counter (`webclient-combat-figure-plates` D3) when a step starts.
+Hovering a glyph during the step opens its tooltip only; the glyph is not a hit area.
 
 ### D5. Pointer
 
@@ -156,5 +151,4 @@ Pre-release client; no data or protocol migration. Rollback is reverting the cha
 
 ## Open Questions
 
-- Whether foes four and five should stand on the stage at all is out of scope; they are off-stage positions cued on
-  the participant frame.
+None.
