@@ -13,8 +13,8 @@ Escape SHALL dispatch nothing and restore focus to the originating tile.
 - **WHEN** the player activates `背包` from the combat dock root
 - **THEN** the inventory drawer opens with no `ui_action`, no router frame push, and no change to the committed combat action list
 
-#### Scenario: Exploration healing potion asks before use
-- **WHEN** an eligible healing-potion tile is activated
+#### Scenario: Healing potion asks before use
+- **WHEN** an eligible healing-potion tile is activated in exploration
 - **THEN** a confirmation dialog names the healing potion and no request is sent until the player confirms
 
 #### Scenario: Cancel preserves the item
@@ -49,5 +49,4 @@ Escape SHALL dispatch nothing and restore focus to the originating tile.
 #### Scenario: Combat use belongs to the commanded member
 - **WHEN** a usable item is chosen through the in-combat drawer
 - **THEN** it uses that actor canonical choices and the same target/review/combat.command flow, never actorless inventory.use; inspection and commander equipment toggles remain free and no companion equipment-management surface is introduced
-
 

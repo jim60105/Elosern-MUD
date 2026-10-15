@@ -13,7 +13,7 @@ one level, and disabled entries SHALL send no packet.
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
 - **THEN** the browser submits `combat.command` with the guarded selected actor and skill payload for `basic_attack` exactly once and the draft facade saves it and resolves only a complete valid round
 
-#### Scenario: Implemented item and tactical choices are live
+#### Scenario: Placeholder mechanics cannot be invoked
 - **WHEN** the selected actor has an eligible item, Defend, Dodge or Taunt choice
 - **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
@@ -161,5 +161,4 @@ Items SHALL present the commanded actor own usable stock and legal targets with 
 #### Scenario: Item warning
 - **WHEN** an item can harm an ally or benefit an enemy
 - **THEN** existing item review and actor-bound cross-side confirmation apply without dropping targets or server validation
-
 
