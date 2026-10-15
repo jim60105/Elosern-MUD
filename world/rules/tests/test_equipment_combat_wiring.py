@@ -402,6 +402,9 @@ class AccessorFoldTests(_WearerCase):
                 evaluate_combat_modifiers_no_create(entity), {"atk_phys": 2}
             )
 
+    @covers_requirement(
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration"
+    )
     def test_equipment_weapon_multiplier_precedence_and_controls(self):
         from dataclasses import replace
         from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES

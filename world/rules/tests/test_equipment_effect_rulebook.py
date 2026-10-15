@@ -325,7 +325,8 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value",
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
     )
     def test_weapon_multiplier_budget_overflow_is_rejected(self):
         # plain_sword is common (weapon_multiplier ceiling 1.0).
@@ -336,7 +337,8 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time",
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
     )
     def test_weapon_multiplier_on_non_weapon_is_rejected(self):
         # knight_platemail is armor, not a weapon.
@@ -347,7 +349,8 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         )
 
     @covers_requirement(
-        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time",
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
     )
     def test_malformed_weapon_multiplier_values_are_rejected(self):
         for val in (True, False, 0.9, -1.0, float("nan"), float("inf"), "1.5", 10**400):
@@ -359,7 +362,8 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
                 )
 
     @covers_requirement(
-        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time",
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
     )
     def test_valid_synthetic_weapon_multiplier_loads(self):
         document = _canonical_document()

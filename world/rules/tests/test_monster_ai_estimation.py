@@ -1191,7 +1191,10 @@ class EstimationIntegrationTests(EvenniaTestCase):
             settled += 500 - self._committed(target, "hp")
         self.assertAlmostEqual(settled / 100, projection.damage, places=4)
 
-    @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
+    @covers_requirement(
+        "monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement",
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
+    )
     def test_the_estimate_and_settlement_match_with_equipped_weapon_multiplier(self):
         from world.lore.items import EquipmentSlot, EquipmentModifierKey
         from world.rules.equipment_effects import EquipmentEffectRule

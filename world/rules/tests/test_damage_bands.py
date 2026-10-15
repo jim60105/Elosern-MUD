@@ -119,6 +119,9 @@ class DamageBandTests(unittest.TestCase):
         )
         self.assertEqual(estimated, int(phys_pending.description.split("|")[-1]))
 
+    @covers_requirement(
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor"
+    )
     def test_weapon_damage_multiplier_physical_consumer_and_controls(self):
         from world.rules.combat import _handle_heal
         from world.lore.items import EquipmentSlot, EquipmentModifierKey
@@ -166,6 +169,9 @@ class DamageBandTests(unittest.TestCase):
         self.assertEqual(int(phys_pending.description.split("|")[-1]), 60)
         self.assertEqual(int(mag_pending.description.split("|")[-1]), 40)
 
+    @covers_requirement(
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor"
+    )
     def test_weapon_damage_multiplier_critical_conditional_and_multistrike(self):
         from world.lore.items import EquipmentSlot, EquipmentModifierKey
         from world.rules.equipment_effects import EquipmentEffectRule
