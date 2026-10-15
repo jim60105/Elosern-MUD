@@ -102,21 +102,31 @@ def _shared_descriptor(subject_id: str, *, with_candidate: bool = True) -> dict:
     return descriptor
 
 
+def _scene_descriptor() -> dict:
+    """The v4 scene block's own descriptor: the real candidate the journey
+    serves, the scene's silhouette terminal and its unchanged generation
+    truth (``done``). The retired flat scene fields (``url``/``status``/
+    ``subject_key``/``placeholder``/``stage``) no longer exist on the wire."""
+    descriptor = _artwork_descriptor("scene:street", SCENE_URL, terminal=_terminal())
+    descriptor["attempts"][0]["resource"]["geometry"] = {
+        "image_size": None,
+        "face_rect": None,
+        "stage": dict(STAGE_TRIPLE),
+        "aspect_ratio": "16:9",
+    }
+    return descriptor
+
+
 def _art_panel(*, with_candidate: bool = True) -> dict:
     return {
-        "schema_version": 3,
+        "schema_version": 4,
         "available": True,
         "kind": "scene",
         "scene": {
             "archetype": None,
             "label": "南門街道",
-            "subject_key": None,
-            "status": "done",
-            "url": SCENE_URL,
-            "aspect_ratio": "16:9",
             "alt": "當前場景",
-            "placeholder": None,
-            "stage": dict(STAGE_TRIPLE),
+            "artwork": _scene_descriptor(),
         },
         "portrait_catalog": {
             "7": {
