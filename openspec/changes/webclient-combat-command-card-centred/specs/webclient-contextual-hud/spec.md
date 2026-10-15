@@ -1,31 +1,43 @@
 ## ADDED Requirements
 
-### Requirement: The combat command card stands centred over the stage
-While the committed mode is `combat`, the client SHALL present the action dock — the same `#action-dock` element with its breadcrumb, rows, detail, playback cue and shortcut legend — as one card in the stage's `choices` anchor, framed like the stage's other choice cards and centred over the stage as far as the open span between the player and the foe line-up allows. The band's command region SHALL collapse so the message window spans the band.
+### Requirement: The combat command card stands at the stage's dead centre
+While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one narrow card in the stage's `choices` anchor, framed like the stage's other choice cards, with the band's command region collapsed. The card's horizontal centre SHALL be the stage's horizontal centre in every combat state; its width SHALL follow the gap on the party side; and it SHALL NOT cover a foe name plate, foe gauge or focused-target cue.
 
-#### Scenario: One foe leaves the card dead centre
-- **WHEN** combat renders at 1451x790 and at 2560x1440 with one active foe
-- **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 400px multiplied by the desktop chrome factor (±1px), and it intersects neither the player's stage actor box nor the foe's stage actor box
+#### Scenario: The width and height follow the stated formulas
+- **WHEN** combat renders at 1451x790 and at 1600x900
+- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
 
-#### Scenario: A wider line-up narrows and shifts the card instead of covering a foe
-- **WHEN** combat renders at 1451x790 and at 2560x1440 with three active foes, including while the attack target frame focuses one of them
-- **THEN** the card's width is the smaller of 400px × the chrome factor and the open span — from 16px × the chrome factor right of the player's stage actor box to 16px × the chrome factor left of the leftmost foe's stage actor box — and the card lies inside that span as close to the stage's centre as the span allows, so no foe stage actor, foe name, foe gauge or focused-target cue is covered by it
+#### Scenario: The card is at dead centre for every party size and foe count
+- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two, three and five active foes, each with a solo player, a four-figure party (the player and three companions) and a five-figure party
+- **THEN** `#action-dock` lies inside the `choices` anchor and its horizontal centre is the stage's horizontal centre (±1px) in every case; no case shifts it left or right of the centre
 
-#### Scenario: A full party compresses instead of crowding the card
-- **WHEN** combat renders at 1451x790 and at 2560x1440 with four companions and three active foes
-- **THEN** no party figure's box extends right of the controlled figure's standard anchor box, and the card intersects no party figure's box and no foe stage actor's box
+#### Scenario: The width follows the guaranteed gap on the party side
+- **WHEN** combat renders with a solo player, a three-figure party, a four-figure party and a five-figure party at 1451x790 and at 1600x900
+- **THEN** the card's width is `clamp(224px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 224 at 1451x790 and 308.8, 308.8, 249.8 and 247.0 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 16.5px at 1451x790 and 40.5px at 1600x900
+
+#### Scenario: The card never covers a foe plate, gauge or cue
+- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two and three active foes, including while the attack target frame focuses the rearmost foe
+- **THEN** the card's bottom edge is at least 8px × S above the top edge of every foe name plate, so it intersects no foe name plate, no foe gauge and no focused-target cue; with one foe it intersects no foe stage actor box either
 
 #### Scenario: The card keeps the stage's other surfaces clear
-- **WHEN** combat renders at 1451x790 and at 2560x1440 with one, and with three, active foes and the command line expanded
-- **THEN** the card lies inside the stage box above the scene caption row and intersects no `vitals`, `map` (the place card and the participant frame), band, or command-line anchor, and the vitals dock stays visible
+- **WHEN** combat renders at 1451x790 and at 1600x900 with one and with three active foes and the command line expanded
+- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, `map` (the place card and the participant frame), band, or command-line anchor, and the vitals dock stays visible
 
 #### Scenario: No frame resizes the card
 - **WHEN** the player moves at 1451x790 from the combat root through Skills, a category, a group, a skill frame, a master's 威力 scale step and the target step, and separately opens the Forfeit confirmation
-- **THEN** the card's rendered box is identical (±1px) in every frame, its height is the smaller of 420px × the chrome factor and the `choices` anchor's span, the row region scrolls inside the card keeping the focused row in view, and the shortcut legend stays at the card's foot
+- **THEN** the card's rendered box is identical (±1px) in every frame, the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
 
-#### Scenario: The detail stacks below the rows
-- **WHEN** a frame with a detail renders in the card — the combat root, a category, a skill frame, or a master's scale step
-- **THEN** the row region and the detail region are direct children of the pane host, the detail region lies entirely below the row region across the card's inner width, both lie inside the card, the detail names the focused entry (and a disabled entry's reason), and nothing in the card overflows it horizontally
+#### Scenario: Every frame lays out in one narrow column
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 224px × S wide card
+- **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
+
+#### Scenario: The detail folds into a strip below the rows
+- **WHEN** a frame with a detail renders in the card — the combat root, a category, a skill frame, or a master's scale step — and a disabled entry is focused
+- **THEN** the row region and the detail strip are direct children of the pane host, the strip lies entirely below the row region across the card's inner width at a fixed height of three text lines, its first line states the focused entry's cost and target requirement where it carries them, the remaining lines state its description or, for a disabled entry, its server-authored reason in place of the description, clipped with an ellipsis, and the strip's full text stays in the DOM and is the focused row's accessible description
+
+#### Scenario: The breadcrumb and the legend fit the narrow card
+- **WHEN** the card renders a frame three levels below the root, and the shortcut legend
+- **THEN** the breadcrumb is one line whose back control and current frame name stay visible while earlier crumbs ellipsize, and the legend keeps its text, wrapping at its separators onto at most two lines
 
 #### Scenario: The card wears the shared card frame
 - **WHEN** the card renders
@@ -170,7 +182,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The choices anchor is bounded by the stage box
 - **WHEN** dialogue mode renders the choice content, taller than the available span allows
-- **THEN** the `choices` anchor renders only in dialogue mode, while an exploration card is open, and in combat mode — where it holds the combat command card, whose horizontal placement and width "The combat command card stands centred over the stage" sets — and otherwise it is horizontally centred on the stage box, at most `min(560px, 40%)` of the stage width wide; in every mode it stands above the portrait anchors, its content vertically centred in and bounded by the part of the stage box between the top band and the scene caption row that stands on the command-line row so it never meets the scene caption or the expanded command line, scrolling internally when its content is taller than that span allows, and it never grows into the top band, the command-line row, or the bottom band
+- **THEN** the `choices` anchor renders only in dialogue mode, while an exploration card is open, and in combat mode — where it holds the combat command card, whose horizontal placement, width, top-anchored placement and height "The combat command card stands at the stage's dead centre" sets — and otherwise it is horizontally centred on the stage box, at most `min(560px, 40%)` of the stage width wide; in every mode it stands above the portrait anchors, its content vertically centred in and bounded by the part of the stage box between the top band and the scene caption row that stands on the command-line row so it never meets the scene caption or the expanded command line, scrolling internally when its content is taller than that span allows, and it never grows into the top band, the command-line row, or the bottom band
 
 #### Scenario: Interactive anchors never overlap at or above the reference viewport
 - **WHEN** the shell renders at 1451x790, and at every larger viewport up to the chrome factor's cap
@@ -205,7 +217,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 
 #### Scenario: Combat presents the dock as the centred card
 - **WHEN** the committed mode changes from exploration to combat, and later back to exploration
-- **THEN** in combat the band's command region is `display:none`, the message region spans the band, and the same `#action-dock` element renders as the combat command card in the `choices` anchor as "The combat command card stands centred over the stage" defines; on the return the command region renders at the band's right third holding that element again, and the `choices` anchor holds no dock
+- **THEN** in combat the band's command region is `display:none`, the message region spans the band, and the same `#action-dock` element renders as the combat command card in the `choices` anchor as "The combat command card stands at the stage's dead centre" defines; on the return the command region renders at the band's right third holding that element again, and the `choices` anchor holds no dock
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
@@ -310,7 +322,7 @@ In combat, opening Skills SHALL present the committed skill categories as a boun
 
 #### Scenario: The skill frame lists descriptors beside a detail region
 - **WHEN** a skill frame renders
-- **THEN** it lists that group's descriptors in the server's order, each row carrying the skill's label and its resource cost, with a detail region — stacked below the rows inside the combat command card — naming the focused skill, its description, its cost, its target requirement and, when it is unavailable, its server-authored reason
+- **THEN** it lists that group's descriptors in the server's order, each row carrying the skill's label and its resource cost, with a detail region — a strip below the rows inside the combat command card — naming the focused skill, its description, its cost, its target requirement and, when it is unavailable, its server-authored reason
 
 #### Scenario: Server grouping is never reshaped
 - **WHEN** any skill level renders
@@ -349,7 +361,7 @@ In combat, opening Skills SHALL present the committed skill categories as a boun
 - **THEN** the row region scrolls so the focused row is visible after every focus change
 
 ### Requirement: The action dock fills the band's command region at a fixed size
-Outside combat the action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. In combat mode the dock SHALL instead stand as the combat command card that "The combat command card stands centred over the stage" defines. Its box SHALL be the command region's box in exploration and creation mode and the card's fixed box in combat, for every frame, and no other surface SHALL be positioned from the frame the dock currently carries.
+Outside combat the action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. In combat mode the dock SHALL instead stand as the combat command card that "The combat command card stands at the stage's dead centre" defines. Its box SHALL be the command region's box in exploration and creation mode and the card's fixed box in combat, for every frame, and no other surface SHALL be positioned from the frame the dock currently carries.
 
 #### Scenario: No frame moves or resizes the dock
 - **WHEN** the dock carries the exploration root (with or without a person's verb card or a room card open over the stage), the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
@@ -541,66 +553,3 @@ While combat playback locks mutation controls, the combat command card SHALL com
 #### Scenario: Skip settles the lock
 - **WHEN** the player skips a locked playing round
 - **THEN** the cue clears with playback and the existing canonical command state becomes available
-
-### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, no pointer events.
-
-#### Scenario: Portraits resolve through the catalog
-- **WHEN** a companion portrait renders
-- **THEN** it resolves from `portrait_ref` through `art.portrait_catalog`, falling back to its display name's initial-letter placeholder when null or unresolved
-
-#### Scenario: Every figure shares one size and ground line
-- **WHEN** the lineup renders any number of figures
-- **THEN** every figure, including the controlled character, has the same full anchor size and ground line; no progressively smaller scale, lift ramp or depth dimming
-
-#### Scenario: The row compresses to stay in the left half
-- **WHEN** the row renders at 1451x790, 1741x948 and 2560x1440, in any mode
-- **THEN** horizontal overlap compresses as necessary to keep the row inside the stage's left half, preserving a scaled left gutter; a multi-figure group MAY shift horizontally within that half; in dialogue the group compresses overlap to clear the choice list without resizing figures; in combat the group compresses overlap so that no figure stands right of the controlled figure's standard anchor position, clearing the combat command card without resizing figures; zero companions render the existing solo portrait at its standard anchor position; the anchor has `overflow: visible`; and the vitals dock MAY cover the lowest strip of feet, never face or torso
-
-#### Scenario: Visibility follows the mode
-- **WHEN** the committed mode is exploration, combat, dialogue, or creation
-- **THEN** the lineup is visible in exploration, combat and dialogue, and hidden in creation
-
-#### Scenario: A speaking companion rises in z only
-- **WHEN** a non-controlled rendered companion is the active host speaker in dialogue mode or the selected surviving exploration verb-card target, and when that speaking/focus changes or ends
-- **THEN** companions use the existing StageActor listener dim otherwise; the speaking companion temporarily receives z above every baseline figure, returning to its exact baseline z when speaking changes or ends, including across possession swaps and lineup count changes; dialogue speaking and exploration focus change only dim and z, never position, lift or size, and remains correct at off/reduced motion; and the controlled figure retains its existing speaking and beat behavior
-
-#### Scenario: No figure crosses the stage's centre
-- **WHEN** the lineup and the foe lineup render together
-- **THEN** no figure box crosses the stage's horizontal centre, and the foe lineup is unchanged
-
-#### Scenario: A two-companion party renders a three-figure group
-- **WHEN** the committed `party` panel carries two resolved-portrait slots at 1451x790 in exploration mode
-- **THEN** three equally sized figures share a ground line, the player is rightmost with highest baseline z, the companions overlap leftward in party order, no box crosses the horizontal centre and no figure is focusable
-
-#### Scenario: A zero-companion party renders only the player
-- **WHEN** the committed `party` panel is available with an empty `slots` list
-- **THEN** the `actor-left` anchor renders the player's solo portrait at the standard standing position, byte-stable with the solo layout before this change
-
-#### Scenario: A companion with no portrait shows the initial letter
-- **WHEN** a party slot carries `portrait_ref: null` for display name `蕾娜`
-- **THEN** that figure renders the initial `蕾` through the stage actor's truthful placeholder, with no invented image or constructed URL
-
-#### Scenario: The full party fits the left half at every viewport
-- **WHEN** the committed party carries four slots and the shell renders at 1451x790 and at 2560x1440
-- **THEN** all five equally sized figures render with compressed horizontal overlap inside the left half; in exploration each face is at least partially visible, in combat the rear figures compress behind the controlled figure at its standard position, and in dialogue a speaking companion is brought above the overlapping listeners without moving its slot
-
-#### Scenario: A speaking companion rises temporarily without moving
-- **WHEN** the committed dialogue host is a companion and the existing speaker signal changes from player to host and back
-- **THEN** that companion changes from dim baseline z to lit highest z and back, preserving its exact geometry; possession swaps, lineup changes and off motion cannot retain stale speaking z
-
-#### Scenario: The companion line and the foe line-up do not overlap
-- **WHEN** the committed mode is combat with two companions and three active foes at 1451x790
-- **THEN** no companion figure's rendered box intersects any foe figure's rendered box
-
-#### Scenario: Exploration reuses companion emphasis
-- **WHEN** a verb card opens for a non-controlled rendered companion while another companion and the controlled figure are present
-- **THEN** only the selected companion gains the existing highest focus z and loses listener dim; the other companion keeps baseline/listener dim and the controlled figure keeps its independent dim/beat behavior, without position, size or ground-line changes
-
-#### Scenario: Exploration closure restores current baselines
-- **WHEN** that card closes through back, look-close, departure, movement or invalidation, including after lineup count changes
-- **THEN** the surviving non-controlled figures use the current geometry's exact baseline z and listener dim with no remembered focus z, at full, reduced and off motion
-
-#### Scenario: Possession preserves the controlled role during focus
-- **WHEN** possession/release swaps the front figure while an exploration card is open
-- **THEN** identity joins use the current rendered figures, a selected non-controlled companion can be emphasized at its current slot, and the controlled front never receives companion-listener elevation or loses its existing beat/dim semantics

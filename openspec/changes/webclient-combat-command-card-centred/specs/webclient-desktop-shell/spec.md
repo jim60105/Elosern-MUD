@@ -2,7 +2,7 @@
 
 ### Requirement: The action dock's row region and detail panes are direct children of its pane host
 The action dock's pane host SHALL lay out the active frame's focusable row region and any displayed
-detail pane as direct children of that host: side by side when a detail pane is displayed in the band's command region, and stacked with the detail pane below the row region inside the combat command card. The exploration root is the explicit exception, composing a compass beside a right column containing the 建議 pill and the readout. The
+detail pane as direct children of that host: side by side when a detail pane is displayed in the band's command region, and stacked with the detail pane as a strip below the row region inside the combat command card. The exploration root is the explicit exception, composing a compass beside a right column containing the 建議 pill and the readout. The
 action dock's pane host SHALL be the only host of the dock's row region: no reference drawer body
 renders it.
 
@@ -12,7 +12,7 @@ renders it.
 - **THEN** the focusable row region and the visible detail pane are siblings
   whose parent is the pane host, no intermediate layout element wraps either
   of them, and the pair renders side by side in the band's command region and
-  stacked, the detail pane below the row region, in the combat command card
+  stacked, the detail pane as a strip below the row region, in the combat command card
 
 #### Scenario: A frame without a detail pane renders the row region directly
 - **WHEN** the active dock frame renders without a detail pane (any full-width
