@@ -26,3 +26,4 @@ class SessionReason(StrEnum):
     MALFORMED_SESSION = "malformed_session"
     INVALID_RECOVERY = "invalid_recovery"
     UNKNOWN_SESSION_ID = "unknown_session_id"
+    FORBIDDEN_ACTOR = "forbidden_actor"

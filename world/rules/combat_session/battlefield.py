@@ -12,6 +12,9 @@ from evennia.objects.models import ObjectDB
 from world.rules.action import _stored_trait_value
 from world.rules.combat import Battlefield, BattlefieldActionContext
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
+from world.rules.buffs import active_buff_keys_from_storage, BLOCKING_BUFF_KEYS
+from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
+from world.rules.party import bound_owner_of, is_companion
 from world.rules.combat_session.records import CombatSessionRecord
 
 
@@ -78,6 +81,80 @@ def reconstruct_battlefield(actor: Any, record: CombatSessionRecord) -> Battlefi
         if dbref in key_by_pk
     }
     return battlefield
+
+
+def is_actor_eligible_to_act(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> bool:
+    """Return whether ``actor`` is currently controllable and able to act.
+
+    An eligible actor must be:
+    - Present in the session's allied roster (``player_ids``).
+    - In the session room and matching the battlefield roster.
+    - Not fled (neither in ``record.fled_ids`` nor ``battlefield.fled``).
+    - Not knocked out (neither in ``record.knocked_out_ids`` nor ``battlefield.knocked_out``).
+    - Alive (stored HP > 0).
+    - Not blocked by a blocking buff.
+    - Not action-forbidden (``actions_per_turn`` > 0).
+    """
+    actor_pk = getattr(actor, "pk", None)
+    if actor_pk is None or actor_pk not in record.player_ids:
+        return False
+    actor_key = str(getattr(actor, "key", ""))
+    if actor_key not in battlefield.roster:
+        return False
+    if actor_pk in record.fled_ids or actor_key in battlefield.fled:
+        return False
+    if actor_pk in record.knocked_out_ids or actor_key in battlefield.knocked_out:
+        return False
+    if _stored_trait_value(getattr(actor.traits, "hp", None)) <= 0:
+        return False
+    # Ability-to-act check
+    blocked = bool(active_buff_keys_from_storage(actor) & BLOCKING_BUFF_KEYS)
+    if blocked:
+        return False
+    modifiers = evaluate_combat_modifiers_no_create(actor)
+    if modifiers.get("actions_per_turn", 1) == 0:
+        return False
+    return True
+
+
+def authorize_combat_actor(
+    commander: Any,
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> Any:
+    """Authorize ``actor`` under authenticated ``commander`` for a combat command.
+
+    Returns the authorized live entity or raises ``CombatSessionError(SessionReason.FORBIDDEN_ACTOR)``.
+    derive authorization from:
+    1. Commander's active session: ``commander.pk`` must be in ``record.player_ids``.
+    2. If ``actor is commander`` (or ``actor.pk == commander.pk``): commander must be eligible to act.
+    3. If ``actor`` is a companion:
+       - Must be in ``record.player_ids``.
+       - Must be bound to ``commander`` (``is_companion(actor, commander)`` or ``bound_owner_of(actor) is commander``).
+       - Must be co-located with commander.
+       - Must be eligible to act (not fled, not knocked out, HP > 0, ability to act).
+    4. Otherwise, rejects with ``FORBIDDEN_ACTOR``.
+    """
+    if commander.pk not in record.player_ids:
+        raise CombatSessionError(SessionReason.UNKNOWN_SESSION_ID)
+    if getattr(actor, "pk", None) not in record.player_ids:
+        raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+    is_self = actor is commander or actor.pk == commander.pk
+    if not is_self:
+        # Bound party membership validation
+        owner = bound_owner_of(actor)
+        if not (is_companion(actor, commander) or (owner is not None and owner.pk == commander.pk)):
+            raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+        if actor.location is not commander.location:
+            raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+        if not is_actor_eligible_to_act(actor, record, battlefield):
+            raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
+    return actor
 
 
 def _session_policy(

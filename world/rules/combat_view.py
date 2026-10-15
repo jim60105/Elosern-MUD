@@ -33,6 +33,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
+from world.rules.action_preview import adjusted_cost
 from world.rules.action_preview import preview_skill
 from world.rules.combat import BattlefieldActionContext
 from world.rules.combat_session import (
@@ -305,9 +306,12 @@ def combat_participants(actor: Any) -> tuple[int, ...]:
     return tuple((*record.player_ids, *record.enemy_ids))
 
 
-def build_combat_view(actor: Any) -> CombatView:
+def build_combat_view(actor: Any, *, for_actor: Any | None = None) -> CombatView:
     """Build the frozen combat view for ``actor`` or raise ``CombatViewError``.
 
+    When ``for_actor`` is specified, builds the choices for that authorized
+    allied actor (companion or commander) under the authenticated ``actor``
+    (commander). Raises ``CombatViewError`` if ``for_actor`` is unauthorized.
     A missing record raises ``CombatViewError`` so the caller can choose
     unavailable presentation. A strictly parsed but unreconstructable session
     returns a recovery view instead: no cast or flee action, one confirmed
@@ -344,8 +348,15 @@ def build_combat_view(actor: Any) -> CombatView:
             secondary_actions=RECOVERY_SECONDARY_ACTIONS,
         )
 
+    target_actor = actor if for_actor is None else for_actor
+    from world.rules.combat_session.battlefield import authorize_combat_actor
+    try:
+        authorize_combat_actor(actor, target_actor, record, battlefield)
+    except CombatSessionError as err:
+        raise CombatViewError(f"unauthorized actor: {err}") from err
+
     participants = _build_participants(actor, record, battlefield, roster)
-    skills = _build_skills(actor, record, battlefield, participants)
+    skills = _build_skills(target_actor, record, battlefield, participants)
     return CombatView(
         session=session,
         participants=participants,
@@ -458,7 +469,7 @@ def _build_skills(
                 key=key,
                 label=skill.label,
                 description=skill.description,
-                cost=dict(skill.cost),
+                cost=adjusted_cost(actor, skill),
                 target_spec=skill.target_spec.value,
                 element=element,
                 category=skill.category.value,

@@ -36,6 +36,8 @@ The server derives the required actor set from authoritative session membership 
 
 A member's skills, costs, inventory, equipment, legal targets, and disabled reasons are queried for that member. SELF effects bind to that member. Skill resources and item consumption are charged to that member. The server validates ownership and capability independently of client menu contents.
 
+Implementation note (`party-combat-actor-commands`): `world/rules/combat_session/battlefield.py::authorize_combat_actor` derives and enforces actor eligibility from active session records and party membership; `world/rules/items/planning.py::enumerate_actor_item_choices` provides immutable actor-local usable item options with preflighted targets and polarity.
+
 ### 3.2 Draft and automatic submission
 
 Each session has one server-owned draft for the next round. It records the session identity, round revision, and at most one selected round command per required actor. Commands carry actor identity, action kind, and the action's existing payload data. Object references are reconstructed from validated identities rather than persisted as live objects.

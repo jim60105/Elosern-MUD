@@ -20,6 +20,7 @@ from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
     _context_for,
     _session_policy,
+    authorize_combat_actor,
     reconstruct_battlefield,
 )
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
@@ -106,8 +107,13 @@ def submit_player_action(
     skill_key: str,
     targets_or_shorthand: list[Any] | str,
     scale: float = 1.0,
+    *,
+    commanded_actor: Any | None = None,
 ) -> dict[str, Any]:
-    """Run one ordinary round for one player action.
+    """Run one ordinary round for one player or commanded companion action.
+
+    ``actor`` is the authenticated commander. ``commanded_actor`` is the
+    authorized action actor (defaulting to ``actor``).
 
     ``targets_or_shorthand`` is either a concrete list of live participant
     objects or one approved AREA shorthand (``all-enemies``, ``all-allies``,
@@ -126,7 +132,7 @@ def submit_player_action(
     rejection returns before initiative and consumes no round or world time.
     """
     record, battlefield, request, rejection = _preflight_skill_submission(
-        submit_player_action, actor, skill_key, targets_or_shorthand, scale=scale
+        submit_player_action, actor, skill_key, targets_or_shorthand, scale=scale, commanded_actor=commanded_actor
     )
     if rejection is not None:
         return rejection
@@ -146,6 +152,8 @@ def _preflight_skill_submission(
     skill_key: str,
     targets_or_shorthand: list[Any] | str,
     scale: float = 1.0,
+    *,
+    commanded_actor: Any | None = None,
 ) -> tuple[CombatSessionRecord, Battlefield, "ActionRequest | None", "dict[str, Any] | None"]:
     """Shared session read, reconstruction, preview, and resolver preflight.
 
@@ -169,6 +177,8 @@ def _preflight_skill_submission(
     battlefield = reconstruct_battlefield(actor, record)
     if _stored_trait_value(actor.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.INVALID_RECOVERY)
+    effective_actor = actor if commanded_actor is None else commanded_actor
+    authorize_combat_actor(actor, effective_actor, record, battlefield)
     if not isinstance(targets_or_shorthand, (list, str)):
         raise TypeError(f"{name} requires an explicit target list or shorthand")
     if not isinstance(targets_or_shorthand, str) and not all(
@@ -179,7 +189,7 @@ def _preflight_skill_submission(
 
     context = _context_for(battlefield, record)
     preview = revalidate_submission(
-        actor, skill_key, context, targets_or_shorthand, scale=scale
+        effective_actor, skill_key, context, targets_or_shorthand, scale=scale
     )
     if not preview.enabled:
         return (
@@ -194,7 +204,7 @@ def _preflight_skill_submission(
         )
 
     request = ActionRequest(
-        actor=actor,
+        actor=effective_actor,
         skill_key=skill_key,
         targets=targets_or_shorthand,
         context=context,
@@ -280,9 +290,12 @@ def submit_opening_action(
 
 
 def submit_player_item_use(
-    actor: Any, item_key: str, *, target: Any | None = None
+    actor: Any, item_key: str, *, target: Any | None = None, commanded_actor: Any | None = None
 ) -> dict[str, Any]:
-    """Run one ordinary combat round whose player turn consumes one held item.
+    """Run one ordinary combat round whose turn consumes one held item.
+
+    ``actor`` is the authenticated commander. ``commanded_actor`` is the
+    authorized action actor (defaulting to ``actor``).
 
     The facade revalidates the request through the shared item preflight
     with combat allowed, and only then starts exactly one ordinary round
@@ -305,10 +318,12 @@ def submit_player_item_use(
     battlefield = reconstruct_battlefield(actor, record)
     if _stored_trait_value(actor.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.INVALID_RECOVERY)
+    effective_actor = actor if commanded_actor is None else commanded_actor
+    authorize_combat_actor(actor, effective_actor, record, battlefield)
     if not isinstance(item_key, str):
         raise TypeError("submit_player_item_use requires an item key string")
     preflight = preflight_item_use(
-        ItemUseRequest(actor=actor, item_key=item_key, target=target),
+        ItemUseRequest(actor=effective_actor, item_key=item_key, target=target),
         in_combat=True,
         context=_context_for(battlefield, record),
     )
@@ -322,7 +337,7 @@ def submit_player_item_use(
         actor,
         record,
         battlefield,
-        ItemUseRequest(actor=actor, item_key=item_key, target=target),
+        ItemUseRequest(actor=effective_actor, item_key=item_key, target=target),
         commanded_kind="item",
         commanded_key=item_key,
     )
@@ -365,6 +380,7 @@ def _submit_request(
     The slot is internal: the presentation layer reads it into the read
     context and the result normalizer drops it before any send.
     """
+    acting_entity = getattr(request, "actor", actor)
     touched, extra = _snapshot_round_touched(actor, battlefield, record)
     exam_host_before = _snapshot_exam_host(record)
     party_before, members_before, relations_before = _snapshot_party_surfaces(
@@ -408,12 +424,12 @@ def _submit_request(
                 round_index=record.rounds_elapsed + 1,
             )
             if opening == "overwhelm":
-                provider = _overwhelm_provider(actor, request, battlefield, record)
+                provider = _overwhelm_provider(acting_entity, request, battlefield, record)
                 result = resolve_overwhelm(
                     battlefield,
                     provider,
                     max_rounds=12,
-                    commanded_actor=str(actor.key),
+                    commanded_actor=str(acting_entity.key),
                     commanded_action_kind=commanded_kind,
                     commanded_action_key=commanded_key,
                     simulated=simulated,
@@ -432,7 +448,7 @@ def _submit_request(
                 # overwhelm opening is not one ordinary round and records
                 # nothing.
                 round_identities, round_hp_before = capture_round_hp(battlefield)
-                provider = _round_provider(actor, request, battlefield, record)
+                provider = _round_provider(acting_entity, request, battlefield, record)
                 logs = run_round(
                     battlefield,
                     provider,
