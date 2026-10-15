@@ -292,6 +292,59 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
                 confirm_actor_command(self.player, record.session_id, 0, 0, self.player.pk, {})
         self.assertEqual(read_session(self.player).draft_version, 0)
 
+    @covers_requirement("player-combat-session::draft-completeness-is-derived-again-from-authoritative-membership")
+    def test_retained_companion_selection_is_reauthorized_before_final_execution(self):
+        from world.rules.combat_session import submit_player_action
+
+        companion = self._waiting_companion()
+        engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
+        companion.location = create_object(Room, key="departed companion room")
+        with patch("world.rules.combat_session.rounds.run_round") as run:
+            result = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        run.assert_not_called()
+        self.assertEqual(result["outcome"], "draft")
+        self.assertEqual(result["reselection_reasons"][companion.pk]["reason"], "forbidden_actor")
+        current = read_session(self.player)
+        self.assertIn(self.player.pk, current.draft_entries)
+        self.assertNotIn(companion.pk, current.draft_entries)
+        self.assertEqual(current.rounds_elapsed, 0)
+
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    def test_commit_failed_after_prior_actor_aborts_entire_selected_round(self):
+        from types import SimpleNamespace
+        from world.rules.action import RejectReason
+        from world.rules.combat_session import submit_player_action
+
+        companion = self._waiting_companion()
+        engage(self.player, self.monster)
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=companion)
+        before = self.monster.traits.hp.current
+
+        def resolve(request):
+            if request.actor.pk == self.player.pk:
+                self.monster.traits.hp.current = before - 1
+                return SimpleNamespace(outcome="success", event_log=None, notifications=())
+            return SimpleNamespace(
+                outcome="rejected", reason=RejectReason.COMMIT_FAILED, detail="injected commit failure"
+            )
+
+        with (
+            patch("world.rules.combat.rounds.roll_initiative", return_value=[
+                self.player.key, companion.key, self.monster.key,
+            ]),
+            patch("world.rules.combat.rounds.ActionResolver.resolve", side_effect=resolve),
+            patch("world.rules.combat.rounds._end_of_round_upkeep") as upkeep,
+        ):
+            with self.assertRaisesRegex(RuntimeError, "commit_failed"):
+                submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
+        upkeep.assert_not_called()
+        self.assertEqual(self.monster.traits.hp.current, before)
+        current = read_session(self.player)
+        self.assertEqual((current.round_revision, current.rounds_elapsed), (0, 0))
+        self.assertEqual(set(current.draft_entries), {self.player.pk, companion.pk})
+        self.assertIsNone(self.player.db.last_combat_receipt)
+
     def test_disconnect_reconnect_resumes_same_session(self):
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
