@@ -1,19 +1,19 @@
 ## ADDED Requirements
 
 ### Requirement: Combat figures stand in a shared-scale formation
-While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every active foe (up to 15, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every active foe (up to 16 minus the party count, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
 
 #### Scenario: Every active foe stands
 - **WHEN** a combat snapshot commits one, three, five, eight and fifteen active foes with a solo player at 1451x790
 - **THEN** exactly that many foe stage actors render, in presenter order, at the formation's boxes (±1px), and no foe is left to another surface
 
 #### Scenario: Both sides are drawn at one scale
-- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes, and again while a foe joins, while one leaves, and during the entry into combat
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes, and again while a foe joins, while one leaves, and during the entry into combat
 - **THEN** every rendered figure box on both sides has the same height (±1px) as every other in the same frame, sampled at the start, the middle and the end of each transition
 
 #### Scenario: The dead-centre gap stays clear
-- **WHEN** combat renders any of those cases, including while a beat gesture plays at rest positions
-- **THEN** no figure box at rest intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S`
+- **WHEN** combat renders any of those cases, including at the farthest point of every beat gesture
+- **THEN** no figure box intersects the band from `stage centre − 132px × S` to `stage centre + 132px × S` (the card's columns) at any moment, and none intersects the band from `stage centre − 148px × S` to `stage centre + 148px × S` at rest
 
 #### Scenario: The party forms up only in combat
 - **WHEN** the committed mode changes exploration → combat → exploration with a five-figure party, and exploration → dialogue
@@ -36,18 +36,18 @@ While the committed mode is `combat`, or while a round that ended the fight stil
 - **THEN** its figures are hidden from assistive technology, carry no focusable element, and intercept no pointer events outside the interactions other requirements define
 
 ### Requirement: Combat figures carry glance plates
-While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot, in the stage's `plates` layer, showing at a glance the participant's name, a thin hit-point stroke and a tabular hit-point readout; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the command card, the vitals dock or the top band.
+While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot, in the stage's `plates` layer, showing at a glance the participant's name, a thin hit-point stroke and a tabular hit-point readout, with a third line reserved for condition glyphs; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the command card, the vitals dock or the top band.
 
 #### Scenario: A full plate reads name, stroke and numbers
 - **WHEN** a companion at 42 of 120 hit points and a foe at 18 of 30 stand in a formation with `full` plate slots
-- **THEN** each plate shows the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), a 4px × S tapered stroke filled to the current fraction, and the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding, in tabular figures
+- **THEN** each 112px × S by 52px × S plate shows on its first line the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), on its second line a 4px × S tapered stroke filled to the current fraction followed by the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding in tabular figures, and keeps its third line empty for condition glyphs
 
 #### Scenario: A compact plate keeps the stroke and the number
 - **WHEN** the formation returns `compact` plate slots
-- **THEN** each plate hides the name visually (the name stays its accessible name), keeps the stroke and the current hit points, and fits its 72px × S by 30px × S slot
+- **THEN** each 72px × S by 36px × S plate hides the name visually (the name stays its accessible name), shows on its first line the stroke (at least 30px × S long) and the current hit points, and keeps its second line for a condition glyph
 
 #### Scenario: Plates never collide
-- **WHEN** combat renders for every party count 1–5 against foe counts 1, 3, 7, 8 and 15 at 1451x790 and 1600x900
+- **WHEN** combat renders for every party count 1–5 against foe counts 1, 3, 7, 8 and 16 minus the party count at 1451x790 and 1600x900
 - **THEN** every plate lies inside its slot (±1px), no two plates intersect, and no plate intersects the command card's column, the vitals dock or the top band
 
 #### Scenario: Plates follow playback
@@ -56,7 +56,11 @@ While the formation is shown, each drawn combat figure other than the controlled
 
 #### Scenario: The plates layer is outside the portrait anchors
 - **WHEN** the formation renders
-- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer carries no focusable element in this requirement, and outside combat the layer renders nothing
+- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer holds only the plates, carries no focusable element in this requirement, and outside combat renders nothing
+
+#### Scenario: Repeated names carry their session token
+- **WHEN** three foes share the display name 哥布林 and a fourth is named 狼
+- **THEN** each 哥布林 plate shows its session token after the name (`哥布林 e1`, `哥布林 e2`, `哥布林 e3`) and the 狼 plate shows no token; a token is shown only while two drawn participants share a name
 
 ## MODIFIED Requirements
 
@@ -185,7 +189,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The plates layer is a named stage layer
 - **WHEN** combat renders its formation
-- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates and the markers other requirements place there
+- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates
 
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves the accessibility tree and the tab order, excepting only the two hold states defined in the scenarios below. The matrix SHALL be:
@@ -294,7 +298,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 
 #### Scenario: Per-surface requirements stay consistent with the matrix
 - **WHEN** a per-surface requirement names its own visible-mode set
-- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration and combat, hidden in dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
+- **THEN** it stays consistent with this matrix; the place card's visibility follows the matrix exactly — shown in exploration, hidden in combat, dialogue and creation — hiding the `map` anchor in dialogue hides the place card with the minimap, and the card's own visibility rule SHALL NOT claim dialogue after this change
 
 #### Scenario: The mode gate outranks the dock's data rule
 - **WHEN** the committed mode is `dialogue` and a committed revision drops a vital below its maximum or adds a new condition
@@ -425,12 +429,89 @@ The combat presentation SHALL show each standing participant's name, hit-point s
 - **WHEN** a participant catalog entry is a placeholder
 - **THEN** the figure shows its truthful placeholder with one initial and accessible state, and its plate keeps the participant's name; the session token stays in the plate's accessible name only
 
+### Requirement: The place card names the current location and the world time
+The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's top-right corner directly below the top band and directly above the minimap island, while the committed mode is exploration, and SHALL NOT render it in combat mode (where the combat formation uses the stage's right column), creation mode or settled dialogue mode. The card SHALL state the current location as its heading and the world date/time beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
+
+#### Scenario: Dialogue entry leaves only inert exit paint
+- **WHEN** the mode live-enters dialogue
+- **THEN** the card MAY retain only the inert exit paint permitted by "Surface visibility is gated by the committed game mode", outside the accessibility tree and tab order from commit, and becomes `display:none` when the anchor's fade ends
+
+#### Scenario: The card carries the room actions at the exploration root
+- **WHEN** the committed mode is exploration while the exploration panel is available and the exploration dock is at its root frame
+- **THEN** the card also carries the room actions `webclient-room-actions` defines — a 查看房間 icon button beside the heading and a 等待 button beside the time — and in every other mode and state it carries no control
+
+#### Scenario: The location resolves in a fixed order
+- **WHEN** the card resolves its location
+- **THEN** it uses the best server-authored place name the client already holds: the committed `local_map` panel's `current_node` label when that panel is available, names a current node, that node is present in the panel's nodes, and its label is a non-empty string; otherwise the committed status panel's actor location label; otherwise the card's own unavailable placeholder `位置：--`
+
+#### Scenario: The world time is committed or placeholdered
+- **WHEN** the card renders its world date/time
+- **THEN** it is the committed world-time label, and the card's own unavailable placeholder `時間：--` when none is committed
+
+#### Scenario: The card composes and guesses nothing
+- **WHEN** location candidates exist or identifiers are available
+- **THEN** the card composes no third string from the two location candidates, derives no name from any node or room identifier, renders no raw room key while a committed panel carries the authored place name for the same room, and renders no raw mode label in place of the location
+
+#### Scenario: The card wears island chrome at a fixed size
+- **WHEN** the card renders
+- **THEN** it wears the HUD island chrome (the translucent panel fill, the backdrop blur, the hairline border, the shared radius and shadow, all from the shared design tokens), spans the same content-column width as the minimap island beneath it, keeps a fixed height whatever the label lengths, and truncates a label that exceeds its width with an overflow indicator while keeping the full label as its accessible text
+
+#### Scenario: The card is display-only
+- **WHEN** the card renders outside exploration, or while the exploration panel is unavailable
+- **THEN** it carries no control, no tab stop, and no dispatch; in exploration with the panel available its only controls are the 查看房間 and 等待 buttons, which never truncate the heading's accessible name, and the card itself dispatches nothing
+
+#### Scenario: The two values read on two levels
+- **WHEN** the card renders heading and time
+- **THEN** it sets them on two levels: the location heading in the serif face at the `--text-lg` step, then a quiet decorative gold rule, hidden from assistive technology, then the world-time line; the heading, the rule, and the time line fit the card's fixed height
+
+#### Scenario: The time line keeps every server value intact
+- **WHEN** the world-time line renders
+- **THEN** it carries no leading separator glyph or rule before its first value, uses the numeral face with tabular, lining figures at the `--text-sm` step (no smaller than the 16px chrome floor), and renders the committed world-time label (or its placeholder) verbatim, with every date and time value intact: all time values remain server-authored, and the card reformats, abbreviates, or derives none of them
+
+#### Scenario: The card names the location and the time
+- **WHEN** the shell renders in exploration mode with a committed status location `測試起點` and world time `春季 3 日 ‧ 12:00`, and no `local_map` panel
+- **THEN** the place card's heading reads `測試起點`, its second line reads `春季 3 日 ‧ 12:00`, and no other stage or top-band element states either string
+
+#### Scenario: The card heads the map column
+- **WHEN** the shell renders in exploration mode with a committed `local_map` panel
+- **THEN** the place card is the first island of the `map` anchor, its rendered width equals the minimap island's rendered width, and the stage renders no place card in its left column
+
+#### Scenario: The card names the region, not the raw room key
+- **WHEN** the player stands in a wilderness cell whose status location label is the raw room key `Wilderness` while the committed `local_map` panel's current node is labelled 西部丘陵與谷地
+- **THEN** the card's heading reads 西部丘陵與谷地, `Wilderness` is rendered nowhere in the card, and no composed string pairing the two appears
+
+#### Scenario: The card falls back to its placeholders
+- **WHEN** neither the `local_map` panel nor the status panel supplies a location label, and no world time is committed
+- **THEN** the card reads `位置：--` and `時間：--`
+
+#### Scenario: The card keeps its size and is absent in creation
+- **WHEN** a location label longer than the card's width commits, and later the committed mode becomes creation, and later dialogue
+- **THEN** the card's rendered box is unchanged and the label is truncated with its full text still exposed to assistive technology, and in creation mode and in settled dialogue mode the place card is not rendered and holds no tab stop; during live dialogue entry only its inert exit paint may remain until the map anchor's fade ends
+
+#### Scenario: No prefix exists
+- **WHEN** a time line has no preceding qualifier
+- **THEN** it renders without a leading dash and retains every actual date/time value
+
+#### Scenario: The heading and the time read as two levels
+- **WHEN** the place card renders a location and a committed world time
+- **THEN** a decorative gold rule lies between the heading and the time line, the heading is set one
+  step below the display size the stage's island chrome uses at `--text-lg`, the time line's numerals
+  are tabular lining figures in the numeral face, and the card keeps its fixed height
+
+#### Scenario: The place card carries its amendment
+- **WHEN** the `place-card-relocation` amendment applies to this requirement
+- **THEN** the visible-mode set narrows to exploration and combat with this change, matching the visibility matrix's dialogue `hidden` cells
+
+#### Scenario: The card is absent in combat
+- **WHEN** the committed mode changes from exploration to combat, and later back
+- **THEN** in combat the place card is not rendered (`display:none`, outside the accessibility tree) while it keeps its committed location and time, and on the return it renders again as the first island of the `map` anchor
+
 ### Requirement: Combat beats are choreographed on the stage at the motion level
 While a combat round plays by itself, as `webclient-combat-menu` "A combat round plays beat by beat" defines, each beat SHALL play one stage gesture once its page is fully shown, on the stage actors that the beat names and that stand on the stage (the player in `actor-left`, a foe in the foe line-up), taking every duration and distance from the client's motion tokens.
 
 #### Scenario: Each beat kind plays its gesture
 - **WHEN** a beat's page is fully shown
-- **THEN** the first beat of each action: the acting stage actor steps 24px toward the stage's centre and back within 240ms; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor fades and drops out of the line-up — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
+- **THEN** the first beat of each action: the acting stage actor steps 12px × S toward the stage's centre and back within 240ms, staying inside its 16px × S gutter beside the command card; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor fades and drops out of the line-up — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
 
 #### Scenario: Pauses and actorless beats follow the gesture
 - **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the third)

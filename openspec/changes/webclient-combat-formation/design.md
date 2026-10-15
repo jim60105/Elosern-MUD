@@ -26,11 +26,14 @@ foe maximum (15) and the reference table.
 - Outside combat the prop is `null` and today's CSS layout applies unchanged, which is what keeps exploration and
   dialogue identical.
 
-### D2. The map anchor in combat
+### D2. The map anchor in combat (and the place card requirement)
 
 `[data-elosern-mode="combat"] [data-anchor="map"] { display: none; }`. The participant frame component is deleted
 and the place card is hidden. Evidence: with the place card kept, the prototype found no valid formation for 11 or
 more foes at any viewport except 2560x1440, and single foes dropped to 0.72–0.78 because their plates hit the card.
+
+The place card requirement is amended to "exploration only" with an absent-in-combat scenario, and the matrix's
+consistency scenario now says "shown in exploration, hidden in combat, dialogue and creation".
 
 Decision-first argument: in a fight, the location name and the world time change no decision. The scene caption and
 the log still carry the place.
@@ -54,8 +57,10 @@ the log still carry the place.
 - **Layout:** `components/FigurePlate.vue` takes `name`, `side`, `hpCurrent`, `hpMaximum`, `form` (`full`/`compact`) and
   `slot` (its box). It is positioned absolutely in the HudFrame `plates` layer (`z` between the portrait anchors and
   the islands; `pointer-events: none` in this change).
-  - Full: `--text-sm` serif name, then one row: the 4px stroke (flex) and the readout.
-  - Compact: the stroke and the current value only.
+  - Full (112×52px·S): line 1 the `--text-sm` serif name (with the session token after it only while two drawn
+    participants share the name); line 2 the 4px stroke (flex, ≥ 40px·S) and the readout; line 3 reserved for the
+    condition glyphs of `webclient-combat-figure-plates`.
+  - Compact (72×36px·S): line 1 the stroke (≥ 30px·S) and the current value; line 2 reserved for one glyph.
 - **Stroke:** a 4px·S line with `clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 50%, calc(100% - 10px) 100%, 0 100%)`.
   - Allies use the vitals HP hue; foes the existing foe gauge red gradient.
   - A trailing segment uses the vitals trail tokens.
@@ -70,6 +75,11 @@ the log still carry the place.
 - **Motion:** the plate appears with its figure's motion (fade, rising out of its anchored bottom edge at `full`),
   with tokens only.
 - **Removed:** the floor `foe-lineup__name`/`foe-lineup__gauge` (and the `foe-gauge` test id).
+
+### D4b. Beat lunges stay out of the card
+
+The beat step toward the centre shrinks from 24px to `12px·S`, so a lunging figure stays inside its 16px·S gutter and
+never enters the card's columns, even for its 240ms gesture (the beats requirement is amended).
 
 ### D5. Test-id migration (explicit)
 

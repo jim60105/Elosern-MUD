@@ -26,9 +26,12 @@ The user ruled the following:
   fit 11 or more foes at any scale and pushed even single foes down to 0.72–0.78. The place card returns in
   exploration.
 - **Glance plates.** A new `plates` stage layer holds one `FigurePlate` per non-controlled figure in its engine slot:
-  - `full` form: the name, a 4px tapered hit-point stroke with the trailing damage segment, and a tabular readout
-    (current bright, `/ max` receding);
-  - `compact` form: no visible name (it stays the accessible name), the stroke and the current value.
+  - `full` form (112×52px·S): the name (plus the session token only when names repeat), a 4px tapered hit-point
+    stroke with the trailing damage segment and a tabular readout (current bright, `/ max` receding), and a line
+    reserved for condition glyphs;
+  - `compact` form (72×36px·S): no visible name (it stays the accessible name), the stroke and the current value.
+- The place card requirement becomes exploration-only, and the beat lunge shrinks to 12px·S so no figure ever enters
+  the card's columns.
   - Plates read `displayHp` during playback.
   - The chrome follows `tmp/core-panel-design-notes.md`: no box, a feathered ground fading upward, one brass hairline
     crown and no lozenge, token colours only.
@@ -52,7 +55,8 @@ None.
     participants and their portraits";
   - amends the full-bleed stage (the `plates` layer, the combat positions), the visibility matrix (the place card is
     hidden in combat, plus a plates row), the companion line-up (combat uses the formation), the HUD island stack,
-    "Combat identity and status remain legible…" and the beat-choreography damage wording.
+    "Combat identity and status remain legible…", the beat choreography (damage wording, a 12px·S step) and "The place
+    card names the current location and the world time" (exploration only).
 - `webclient-combat-menu`: amends the keyboard-hierarchy scenarios and the beat-playback scenarios that named the
   participant frame.
 - `webclient-art-panel`: drops the participant frame from the framed-portrait surface lists.

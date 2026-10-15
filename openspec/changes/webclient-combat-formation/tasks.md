@@ -33,7 +33,8 @@ Rules:
 
 ## 2. Glance plates and roster removal (≈2.5 h)
 
-- [ ] 2.1 Create `components/FigurePlate.vue` (design D4) and render one per non-controlled figure in the plates
+- [ ] 2.1 Create `components/FigurePlate.vue` (design D4: the 52/36px·S line layouts, the repeated-name token) and
+  change the beat step distance to `12px·S` in `components/StageActor.vue`'s lunge keyframes (design D4b) and render one per non-controlled figure in the plates
   layer from `formation` slots, `displayHp`/committed HP, and the participant names.
 - [ ] 2.2 Delete `components/ParticipantFrame.vue`, `stories/Data/ParticipantFrame.stories.js`,
   `tests/core/participant_frame.test.js` and `tests/combat/participant_frame.test.js`. Update
@@ -50,13 +51,16 @@ Build once: `pnpm run build`.
 
 - [ ] 3.1 Add `test_combat_formation_shares_one_scale_and_keeps_the_centre_clear` to
   `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest`. At 1451x790 and 1600x900, for parties
-  of 1, 3 and 5 figures against 1, 4, 8 and 15 foes (11 with five figures):
+  of 1, 3 and 5 figures against 1, 4, 8 and 16 − party foes (fixtures must stay within the 16-participant bound):
   - every figure box on both sides has equal height (±1px), including at three sampled frames while entering combat
     at `full`;
   - no box or plate is inside `centre ± 148px·S`;
   - plates are pairwise disjoint and clear of the vitals dock and the top band;
   - the place card and the `map` anchor are not rendered;
-  - leaving combat restores the exploration boxes (±1px).
+  - leaving combat restores the exploration boxes (±1px);
+  - during a played round, no figure box enters the card's columns (`centre ± 132px·S`) at the lunge's farthest
+    frame;
+  - three same-named foes show their tokens on their plates.
 
   Register it in `.github/browser-shards.json` beside `CombatStageBrowserTest.test_foes_stand_opposite_the_player`.
   Rewrite that existing method's three-foe depth assertions as formation assertions; it guarded the foe placement
