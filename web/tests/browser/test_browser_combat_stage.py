@@ -237,16 +237,20 @@ _LUNGE_PEAK = """() => {
   const actors = [...document.querySelectorAll(
       '[data-anchor="actor-left"] [data-testid="stage-actor"], [data-anchor="actor-right"] [data-testid="stage-actor"]')];
   const out = [];
+  const rest = actors.map((actor) => {
+    const r = actor.getBoundingClientRect();
+    return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+  });
   for (const actor of actors) {
     const beat = actor.querySelector(':scope > .stage-actor__beat');
     beat.setAttribute('data-beat', 'lunge');
     beat.style.animationDelay = `-${step * 0.45}ms`;
     beat.style.animationPlayState = 'paused';
   }
-  for (const actor of actors) {
+  actors.forEach((actor, index) => {
     const r = actor.querySelector(':scope > .stage-actor__beat').getBoundingClientRect();
-    out.push({ side: actor.getAttribute('data-side'), left: r.left, right: r.right });
-  }
+    out.push({ side: actor.getAttribute('data-side'), left: r.left, right: r.right, rest: rest[index] });
+  });
   for (const actor of actors) {
     const beat = actor.querySelector(':scope > .stage-actor__beat');
     beat.removeAttribute('data-beat');
@@ -464,6 +468,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                                 "top": b["top"], "bottom": b["top"] + 0.22 * b["height"],
                             }
 
+                        for rank, _ in standing:
+                            self.assertIn(rank, ("0", "1"), f"a figure without a formation rank at {size}")
                         for rank, b in standing:
                             h = head(b)
                             for p in s["plates"]:
@@ -483,11 +489,25 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                         # card's columns.
                         card = {"left": centre - CARD_HALF * S, "right": centre + CARD_HALF * S}
                         self.assertAlmostEqual(s["lunge"], 12 * S, delta=0.5)
-                        for peak in page.evaluate(_LUNGE_PEAK):
+                        peaks = page.evaluate(_LUNGE_PEAK)
+                        for peak in peaks:
                             self.assertTrue(
                                 peak["right"] <= card["left"] + 1 or peak["left"] >= card["right"] - 1,
                                 f"a stepping figure enters the card's columns at {size}: {peak}",
                             )
+                            # At the step's peak its head reaches no other head
+                            # of its rank (same side, same top) at rest.
+                            shift = peak["left"] - peak["rest"]["left"]
+                            moved = head({**peak["rest"], "left": peak["rest"]["left"] + shift})
+                            for other in peaks:
+                                if other is peak or other["side"] != peak["side"]:
+                                    continue
+                                if abs(other["rest"]["top"] - peak["rest"]["top"]) > 1:
+                                    continue
+                                self.assertFalse(
+                                    _intersects(moved, head(other["rest"])),
+                                    f"a stepping figure leans its head over a neighbour's at {size}",
+                                )
                 # Leaving combat restores the exploration boxes.
                 s = self._commit(page, "exploration", _exploration_panels(companions))
                 self._wait(page, "s.rows.length === 0")
