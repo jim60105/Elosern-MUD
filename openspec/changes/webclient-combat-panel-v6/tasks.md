@@ -22,16 +22,16 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
 
 ## 2. Wire v6 (≈2.5 h)
 
-- [ ] 2.1 Update the wire mirrors (design D4):
+- [x] 2.1 Update the wire mirrors (design D4):
   - `web/webclient/presentation/combat_panel.py`: set `CONTEXT_ACTIONS_SCHEMA_VERSION = 6` and update the serializers
     and exact validators.
   - `web/static/webclient/js/elosern/protocol/constants.js`: set `context_actions: 6` and add the bound.
   - `protocol/panels/combat.js`: update the participant and skill validators.
   - `tests/test_panel_schema_version_parity_contract.py`: update its expectations if it pins the number.
-- [ ] 2.2 Update the fixtures, preferring the shared builders. Find them with
+- [x] 2.2 Update the fixtures, preferring the shared builders. Find them with
   `grep -rln "\"shorthands\"\|shorthands:\|shorthands=\|portrait_ref" web/webclient/presentation/tests web/static/webclient/js/tests web/webclient-app/tests web/webclient-app/stories web/tests/browser world/rules/tests`.
   The grep is a starting point; the runs in 2.3 are the authority.
-- [ ] 2.3 Run each of the following and verify it passes:
+- [x] 2.3 Run each of the following and verify it passes:
   - the Evennia focused labels `web.webclient.presentation.tests.test_combat_panel`,
     `web.webclient.presentation.tests.test_registry`, `tests.test_panel_schema_version_parity_contract` and
     `tests.test_context_actions_parity_contract`;
@@ -45,7 +45,7 @@ containing `MUD_TEST_SETTINGS=1`, passed as `--env-file=<file>`. Add no new Pyth
 
 - [ ] 3.1 At archive, after the sync, re-annotate the tests that carry the IDs of the three renamed requirements with
   the new IDs. List the IDs with `uv run --locked python -m tools.spec_traceability list --json-output <scratch>/ids.json`.
-- [ ] 3.2 Run each of the following and verify it passes:
+- [x] 3.2 Run each of the following and verify it passes:
   - `uv run --locked python -m tools.spec_traceability check`;
   - `uv run --locked python -m tools.contract_gate`;
   - the Evennia focused labels `tests.test_evennia_test_optimization_contract` and
