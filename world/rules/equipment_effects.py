@@ -141,7 +141,12 @@ def _require_finite_number(
         raise EquipmentEffectsRulebookError(
             f"{field} must be a number in [{minimum}, {maximum}], got {value!r}"
         )
-    val_float = float(value)
+    try:
+        val_float = float(value)
+    except OverflowError:
+        raise EquipmentEffectsRulebookError(
+            f"{field} must be a number in [{minimum}, {maximum}], got {value!r}"
+        )
     if not math.isfinite(val_float) or not (minimum <= val_float <= maximum):
         raise EquipmentEffectsRulebookError(
             f"{field} must be a number in [{minimum}, {maximum}], got {value!r}"

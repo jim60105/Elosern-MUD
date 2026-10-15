@@ -350,13 +350,23 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
     )
     def test_malformed_weapon_multiplier_values_are_rejected(self):
-        for val in (True, False, 0.9, -1.0, float("nan"), float("inf"), "1.5"):
+        for val in (True, False, 0.9, -1.0, float("nan"), float("inf"), "1.5", 10**400):
             with self.subTest(val=val):
                 self._expect_rejection(
                     lambda d, v=val: d["effects"]["plain_sword"].update(
                         {"weapon_damage_multiplier": v}
                     )
                 )
+
+    @covers_requirement(
+        "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time"
+    )
+    def test_valid_synthetic_weapon_multiplier_loads(self):
+        document = _canonical_document()
+        document["budgets"]["common"]["weapon_multiplier"] = 2.0
+        document["effects"]["plain_sword"]["weapon_damage_multiplier"] = 1.5
+        loaded = load_equipment_effect_rules(_write_rulebook(document))
+        self.assertEqual(loaded[EquipmentModifierKey.PLAIN_SWORD].weapon_damage_multiplier, 1.5)
 
     @covers_requirement(
         "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value"
@@ -409,6 +419,7 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
             "weapon-multiplier-boolean": lambda d: d["budgets"]["common"].update({"weapon_multiplier": True}),
             "weapon-multiplier-nan": lambda d: d["budgets"]["common"].update({"weapon_multiplier": float("nan")}),
             "weapon-multiplier-inf": lambda d: d["budgets"]["common"].update({"weapon_multiplier": float("inf")}),
+            "weapon-multiplier-overflow": lambda d: d["budgets"]["common"].update({"weapon_multiplier": 10**400}),
         }
         for name, mutate in mutations.items():
             with self.subTest(case=name):
