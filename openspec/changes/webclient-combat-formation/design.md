@@ -65,7 +65,9 @@ the log still carry the place.
   - Allies use the vitals HP hue; foes the existing foe gauge red gradient.
   - A trailing segment uses the vitals trail tokens.
   - Empty ground is a paper wash.
-- **Readout:** `--f-mono` 600 `tabular-nums lining-nums`; the current value in `--paper-50`, `/ max` in `--paper-500`
+- **Readout:** `--f-num` 600 `tabular-nums lining-nums` (amended at apply time from `--f-mono`: the chrome-type
+  contract reserves the monospace role for command input, keycaps, badges and map art, and gauge values use the
+  numeral role, as the vitals readout does); the current value in `--paper-50`, `/ max` in `--paper-500`
   at a smaller size; a 1px dark text shadow.
 - **Chrome:** a `::before` ground of `var(--panel)` plus the backdrop blur, masked to fade upward and to the sides (the
   plate is anchored at its bottom, on the figure's head); an `::after` brass crown hairline along the bottom edge
