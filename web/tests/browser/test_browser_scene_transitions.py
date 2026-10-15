@@ -20,6 +20,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     inject_update,
+    scene_block,
     snapshot_envelope,
     valid_art_panel,
     valid_local_map_panel,
@@ -50,10 +51,19 @@ _LEAVING = ", ".join(
 
 
 def _art(name: str) -> dict:
+    """One committed scene panel whose v4 descriptor carries the named c11b
+    output for the SAME logical place: the subject identity is fixed across
+    the pair (``None`` in the retired flat shape), while the candidate's
+    resource identity, version and the descriptor revision all follow the
+    requested URL — so ``a`` and ``b`` are two resources of one scene the
+    same-place crossfade replaces, never a move to a different place."""
     panel = valid_art_panel()
-    panel["scene"]["url"] = f"/art/scene/c11b_{name}.png"
-    panel["scene"]["label"] = f"場景{name}"
-    panel["scene"]["alt"] = f"場景{name}的描述"
+    panel["scene"] = scene_block(
+        f"/art/scene/c11b_{name}.png",
+        "scene:c11b",
+        label=f"場景{name}",
+        alt=f"場景{name}的描述",
+    )
     return panel
 
 
