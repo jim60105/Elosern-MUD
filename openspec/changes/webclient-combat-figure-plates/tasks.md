@@ -16,7 +16,8 @@ Rules:
   (design D5), and the conditions in the accessible name. `AppClient.vue`: pass the participant `conditions` and the
   `plateTooltipClose` counter (design D3).
 - [ ] 1.3 Tests:
-  - `tests/core/figure_plate.test.js`: glyph counts per form, `+N`, the compact severity order, the 危險 tag at
+  - `tests/core/figure_plate.test.js`: glyph counts per form, `+N`, the compact severity order, the name and stroke boxes unchanged in width with the
+    maximum glyph count, the 危險 tag at
     exactly 25% and its absence at 26%, and the accessible name with conditions;
   - `tests/core/condition_chips.test.js` (or the existing ConditionChips test file): the default cap unchanged, and
     `tabbable=false` puts no glyph in the tab order.

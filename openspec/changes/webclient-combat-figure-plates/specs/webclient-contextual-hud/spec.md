@@ -5,11 +5,11 @@ Each combat figure plate SHALL show the participant's committed conditions (`con
 
 #### Scenario: Conditions are glyphs with accessible names
 - **WHEN** a foe is poisoned (`harmful`) and blessed (`beneficial`) and a companion carries five conditions, in `full` plates
-- **THEN** the foe's plate shows the two severity glyphs (the vitals dock's distinct shapes, never colour alone) after its name, the companion's plate shows its first three glyphs and a `+2` glyph, every glyph's accessible name is the shared condition label, and no condition word is permanently visible
+- **THEN** the foe's plate shows the two severity glyphs (the vitals dock's distinct shapes, never colour alone) on its third line, the companion's plate shows its first three glyphs and a `+2` glyph there, each glyph drawn 14px × S tall inside a 24px × S hit box that stays inside the plate slot, the name and the stroke keep their own lines at full width, every glyph's accessible name is the shared condition label, and no condition word is permanently visible
 
 #### Scenario: A compact plate keeps one glyph
 - **WHEN** a plate takes the `compact` form with three conditions
-- **THEN** it shows the most severe condition's glyph and `+2`, and its accessible name lists all three conditions
+- **THEN** it shows on its second line the most severe condition's glyph and `+2` (and the `危險` tag when low), the first line keeping its stroke at least 30px × S long, and its accessible name lists all three conditions
 
 #### Scenario: The tooltip opens on demand and closes on every exit
 - **WHEN** the pointer rests on a plate's glyph, and separately keyboard focus reaches it; then the pointer leaves, focus moves on, Escape is pressed, the stage resizes, the condition disappears from the committed panel, a combat round starts playing, and the mode leaves combat

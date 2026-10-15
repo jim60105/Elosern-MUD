@@ -3,7 +3,7 @@
 ## Context
 
 - The glance plate (`webclient-combat-formation` D4) shows the name, the HP stroke and the readout in a `full`
-  (112×40px·S) or `compact` (72×30px·S) slot.
+  (112×52px·S, three lines) or `compact` (72×36px·S, two lines) slot.
 - The vitals dock's `ConditionChips.vue` already renders glyph-only severity icons with a tooltip, a `+N` overflow
   and the shared `conditionLabel`. `vitals.js` holds `LOW_HP_THRESHOLD = 0.25`, and `VitalsTrack.vue` shows the 危險
   marker.
@@ -29,8 +29,10 @@ is in danger, and whether it carries a condition worth acting on (cleanse, finis
   plates, where the group manages focus).
 - The plate renders it with `cap = 3` (full) or `cap = 1` (compact), ordering conditions by severity
   (critical > harmful > warning > beneficial) for the compact form.
-- The glyph row sits on the plate's name line, right-aligned. In the compact form it sits after the readout.
-- Plate sizes are unchanged: a 22px·S glyph hit box fits the 40px·S full plate's top line and the 30px·S compact line.
+- The glyph row has its own line: the third line of the 112×52px·S full plate (up to 3 glyphs + `+N` = 4 × 24px·S hit
+  boxes = 96px·S, inside the 104px·S content width) and the second line of the 72×36px·S compact plate (one glyph,
+  `+N`, and the `危險` tag when low). Glyphs draw 14px·S tall inside 24px·S hit boxes that stay inside the slot.
+- The name (full line 1) and the stroke (line 2; at least 40px·S full, 30px·S compact) never share a line with glyphs.
 
 ### D3. Tooltip
 
@@ -63,6 +65,8 @@ attention.
 - [Many tab stops] → avoided: the whole layer is one tab stop.
 - [Tooltip over the card] → tooltips are on demand and close on Escape. They render above the card only while asked
   for.
+- [Keyboard collision with the stage target step] → `webclient-combat-stage-target-picking` moves focus out of the
+  group to `#action-dock` when a step starts, so the step's arrow claim and the group never compete.
 
 ## Migration Plan
 
