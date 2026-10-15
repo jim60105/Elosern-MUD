@@ -21,7 +21,7 @@
 ## Goals / Non-Goals
 
 **Goals:** one pure, DOM-free function that returns every combat figure box, plate slot and marker slot for the full
-matrix (party 1–5 × foes 1–15) at the supported viewports, with a guaranteed dead-centre gap and one shared scale;
+matrix (party 1–5 × foes 1–(16 − party)) at the supported viewports, with a guaranteed dead-centre gap and one shared scale;
 plus a Vitest that proves the invariants over the matrix.
 
 **Non-Goals:** applying it to the stage (`webclient-combat-formation`); plate content (`webclient-combat-figure-plates`).
@@ -42,8 +42,8 @@ plus a Vitest that proves the invariants over the matrix.
 
 ### D2. The formation
 
-- **Scale ladder:** 0.90, 0.84, 0.78, 0.72, 0.66, 0.60, 0.55. The floor 0.55 keeps a figure 269px tall at 1451x790
-  and 307px at 1600x900.
+- **Scale ladder:** 0.90, 0.84, 0.78, 0.72, 0.66, 0.60, 0.55, 0.50. The floor 0.50 keeps a figure 245px tall at
+  1451x790 and 279px at 1600x900 (the plates have fixed sizes, so they stay readable at any scale).
 - **Per side:** one rank if it fits, else two ranks:
   - the front rank has `ceil(n/2)` figures and the back rank `floor(n/2)`;
   - the back rank stands `0.27 × actor-h` up-stage, at the same scale, offset by half a step so its figures show
@@ -51,53 +51,51 @@ plus a Vitest that proves the invariants over the matrix.
 - **Spacing:** step = `min(0.62 × w, (zone − w) / (count − 1 + backShift))`. The group's outer edge sits at the
   side's home inset (6vw) when it fits, and is otherwise pushed toward the outer gutter, never into the gap.
 - **Plate slots:** centred over each figure, bottom edge 4px·S above the figure box top.
-  - `full` slots are 112×40px·S. If one line would make neighbours closer than the slot width, alternate figures
+  - `full` slots are 112×52px·S. If one line would make neighbours closer than the slot width, alternate figures
     use a second line raised by slot height + 4px·S.
-  - `compact` slots are 72×30px·S, used only when full ones cannot fit at any ladder scale.
-- **Marker slot:** 20px·S above the plate slot (the target arrow of `webclient-combat-stage-target-picking`).
-- **Policy:** take the largest scale at which both sides fit with all-`full` slots, else the largest with `compact`
-  slots. Party size also limits the shared scale: five figures cap it at 0.78 at 1451x790. Two ranks are a fallback
-  before shrinking below the floor, never after.
+  - `compact` slots are 72×36px·S, used only when full ones cannot fit at any ladder scale.
+- **Marker slot:** 24px·S above the plate slot (a 24px·S pointer target) (the target arrow of `webclient-combat-stage-target-picking`).
+- **Policy:** at each ladder scale a side takes one rank if it fits, else two ranks if they fit (so a second rank is
+  always tried before the scale shrinks further); the first scale where both sides fit with all-`full` slots wins,
+  else the first with `compact` slots. Vertical headroom decides most cases: the plate stack and the marker must stay
+  under the top band, which is why a back rank (lifted 0.27·actor-h) only fits at small scales. If nothing fits at
+  the floor (an unsupported stage), the function returns the floor two-rank compact formation with `fits: false`.
 
 ### D3. Invariants (Vitest over the matrix)
 
-The test covers party 1–5 × foes 1–15 × {1451x790, 1600x900, 1920x1080, 2560x1440} with the reference vitals dock
+The test covers party 1–5 × foes 1–(16 − party) × {1451x790, 1600x900, 1920x1080, 2560x1440} with the reference vitals dock
 (25vw × 92px·S on the band). For every case:
 
-- A formation is returned, with scale ≥ 0.55.
+- `fits` is true, with scale ≥ 0.50.
 - Every figure box has the same height on both sides.
 - The gap `[C − Wc/2 − g, C + Wc/2 + g]` is free of all boxes and slots.
 - Plate slots are pairwise ≥ 2px·S apart.
-- Plate and marker slots stay ≥ 8px·S below the top band.
+- Plate and 24px·S marker slots stay ≥ 8px·S below the top band.
 - No plate slot touches the vitals dock, and the dock covers ≤ 40% of any party box.
 - Everything stays inside the stage gutters.
 
-The case party 5 × foes 15 exceeds the 16-participant cap but is kept as the upper bound.
+Cells beyond the 16-participant bound are not part of the matrix.
 
-### D4. Reference table (planning prototype; the Vitest pins the engine's actual table)
+### D4. Reference table (planning prototype; the spec's anchors are normative, the rest is pinned by the Vitest)
 
-Each cell gives the shared scale, the plate form (F full / C compact), and the number of ranks for the party and for
-the foes:
+Each cell gives the shared scale, the plate form (F full / C compact) and the foe rank count (the party always fits
+in one rank). Foes run to 16 minus the party size.
 
-| 1451x790 | foes 1 | 2 | 3 | 4–6 | 7 | 8–14 | 15 |
-|---|---|---|---|---|---|---|---|
-| party 1–3 | 0.90 F 1/1 | 0.90 F 1/1 | 0.90 F 1/1 | 0.78 F 1/1 | 0.60 F 1/1 | 0.55 F 1/2 | 0.55 C 1/2 |
-| party 4–5 | 0.78 F 1/1 | 0.78 F 1/1 | 0.78 F 1/1 | 0.78 F 1/1 | 0.60 F 1/1 | 0.55 F 1/2 | 0.55 C 1/2 |
-
-| 1600x900 | foes 1–3 | 4–6 | 7 | 8–13 | 14–15 |
+| 1451x790 | foes 1–3 | 4–6 | 7 | 8–14 | 15 |
 |---|---|---|---|---|---|
-| party 1–3 | 0.90 F 1/1 | 0.78 F 1/1 | 0.60 F 1/1 | 0.55 F 1/2 | 0.60 C 1/2 |
-| party 4–5 | 0.78 F 1/1 | 0.78 F 1/1 | 0.60 F 1/1 | 0.55 F 1/2 | 0.60 C 1/2 |
+| party 1–3 figures | 0.84 F 1 | 0.72 F 1 | 0.60 F 1 | 0.50 F 2 | 0.50 C 2 (party 1 only) |
+| party 4–5 figures | 0.72 F 1 | 0.72 F 1 | 0.60 F 1 | 0.50 F 2 | — |
 
-- The engine first tries all-`full` slots down to the floor, then `compact`. That is why 14–15 foes at 1600x900 come
-  out at 0.60 with compact plates, larger than 13 foes at 0.55 with full plates.
-- 1920x1080 matches 1600x900.
-- At 2560x1440: 0.90 full in one rank up to 7 foes, then 0.78 / 0.66 for 8–9, then 0.60 in two ranks.
-- Sample boxes at 1451x790:
-  - Solo against one foe at 0.90: the player 87–381 and the foe 1070–1364, both x 129–570.
-  - Five figures against three foes at 0.78: the party's front figure 323–578, the foes 874–1435.
-  - One figure against fifteen foes at 0.55: the foes in two ranks from x 874; the front rank stands on the band and
-    the back rank's boxes span y 169–438.
+| 1600x900 and 1920x1080 | foes 1–3 | 4–6 | 7 | 8–14 | 15 |
+|---|---|---|---|---|---|
+| party 1–3 figures | 0.84 F 1 | 0.78 F 1 | 0.60 F 1 | 0.50 F 2 | 0.55 C 2 (party 1 only) |
+| party 4–5 figures | 0.78 F 1 | 0.78 F 1 | 0.60 F 1 | 0.50 F 2 | — |
+
+At 2560x1440: 0.90 for up to 4 foes, 0.84 for 5–7, 0.78 for 8, 0.66 for 9, then 0.55 with two ranks (a five-figure
+party caps at 0.84).
+
+The jump from one rank at 0.60 to two ranks at 0.50 is forced by headroom: a back rank lifted 0.27·actor-h with
+52px·S plates and a 24px·S marker only fits under the top band at 0.50 at 1451x790.
 
 ### D5. Module
 

@@ -12,11 +12,11 @@ testable function, before any component uses it.
 ## What Changes
 
 - New `web/webclient-app/components/combat-formation.js`: `combatFormation(input)` returns the shared scale and every
-  figure box, plate slot (full 112×40px·S or compact 72×30px·S, one or two staggered lines) and target-marker slot.
-  It covers party 1–5 × foes 1–15, using one or two ranks per side.
+  figure box, plate slot (full 112×52px·S or compact 72×36px·S, one or two staggered lines) and target-marker slot.
+  It covers party 1–5 × foes 1–(16 − party), using one or two ranks per side.
 - The geometry rules:
   - a fixed dead-centre gap of the card width (264px·S) plus a 16px·S gutter on each side;
-  - one scale ladder from 0.90 down to a floor of 0.55;
+  - one scale ladder from 0.90 down to a floor of 0.50, trying a second rank at each scale before shrinking;
   - all-full plates preferred before compact ones.
 - A Vitest proves the invariants over the full matrix at 1451x790, 1600x900, 1920x1080 and 2560x1440, and pins the
   reference table.

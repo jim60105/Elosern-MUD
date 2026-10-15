@@ -17,8 +17,9 @@ The scope is a pure module plus its tests. Follow the focused Vitest rule of roo
   - every invariant of design D3 over the full matrix at the four viewports, with the reference vitals dock;
   - the policy (all-full preferred before compact; two ranks only when one does not fit);
   - the shared height of every box;
-  - the pinned reference table for 1451x790 and 1600x900 (design D4; update the design table if the engine's
-    deliberate values differ, in the same commit);
+  - the spec's normative anchors, and a snapshot of the full table for 1451x790 and 1600x900 (design D4) that any
+    later change updates deliberately;
+  - the `fits: false` fallback for a stage smaller than the reference;
   - a determinism case (same input → same output);
   - a guard that the module imports nothing from Vue or the DOM.
 
