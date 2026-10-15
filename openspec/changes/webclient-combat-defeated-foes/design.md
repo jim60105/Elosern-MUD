@@ -1,0 +1,65 @@
+# Design: Defeated foes and downed allies
+
+## Context
+
+- `StageActor.vue` dims a listener through `data-speaking="false"` with `filter: brightness(var(--actor-dim))` (0.6).
+  It plays beat gestures on `.stage-actor__beat`, including `defeat` (fade and drop), and renders `ReferenceArtwork`,
+  which covers the finished portrait, the placeholder initial card and the failure marker.
+- Participant states are `active`, `fled`, `knocked_out` and `defeated`. Foes leave the line-up today when not active;
+  a held round keeps them until their defeat beat.
+- Motion tokens: `--motion-beat-defeat`, `--ease-exit`, and `--motion-travel` (0 at reduced).
+
+## Decisions
+
+### D1. Channels per state (never brightness alone)
+
+| State | Shape | Tone | Text (plate) | Mark |
+|---|---|---|---|---|
+| Listener / unselectable dim | none | brightness 0.6, colour kept | none | none |
+| Defeated foe | slump: `rotate(±8deg)` away from the centre about the base + `translateY(6%)` | `grayscale(1) brightness(.45)`, opacity .8 | `✕ 已擊破`, empty dashed stroke | broken seal over the chest |
+| Downed ally | kneel: `translateY(8%) scaleY(.92)` about the base, no rotation | `grayscale(.6) brightness(.7)`, opacity 1 | `▼ 倒地`, empty dashed stroke | none |
+
+The defeated look is darker and lower in opacity than any dim. The seal and the slump are the shape channel, and
+已擊破/倒地 the text channel.
+
+### D2. The seal mark
+
+An inline SVG inside StageActor (`aria-hidden`, `pointer-events: none`): a circle ring in `--seal-400` with a
+jagged crack path across it and a small missing wedge. It is sized at 28% of the figure width and centred at 42% of
+the figure height. CSS draws it from tokens; there is no bitmap. Because it sits on the figure wrapper, it shows the
+same over a portrait, a placeholder or failed art.
+
+### D3. Where the treatment lives
+
+`StageActor` gets `fallen` and sets `data-fallen`. Pose and tone apply on a new `.stage-actor__fall` wrapper around
+`.stage-actor__beat`, so the beat gestures and the fall compose. The slump direction comes from `side` (a left-side
+figure falls left, a right-side one right).
+
+### D4. Motion
+
+- `full`: a `transition` on transform/filter/opacity over `--motion-beat-defeat` with `--ease-exit`, and the seal's
+  opacity transition delayed by the same duration. This is triggered when the beat queue applies the defeat beat (it
+  sets the participant's displayed state).
+- `reduced`: `--motion-travel` is 0, so the transform jumps while the filter and seal fade at ≤ 150ms.
+- `off` and hydration: no transition.
+
+The beat queue stops removing a defeated foe from `beatStage.foes`; the foe stays with `fallen: "defeated"`.
+
+### D5. Drawn set
+
+`drawnFoes = participants.filter(team === "foes" && state !== "fled")`, capped at 15. A defeated or downed figure
+keeps its slot. A flee removes the figure (fade) and re-forms.
+
+## Risks / Trade-offs
+
+- [More figures stay on stage, so a larger shared scale is needed less often] → the formation already handles 15.
+- [The rotate transform may cross the gap] → an 8° slump of a box ≤ 0.9·actor-h moves its top corner by up to
+  ≈ 0.14·w toward its own side, away from the centre, so the gap is untouched. The Vitest checks the transformed box.
+
+## Migration Plan
+
+Pre-release; rollback by revert.
+
+## Open Questions
+
+None.
