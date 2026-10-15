@@ -23,6 +23,7 @@ from tools.spec_traceability import covers_requirement
 from .browser_base import BrowserAcceptanceTest, ui_scale
 from .browser_helpers import (
     focus_action_dock,
+    inject_snapshot,
     install_outbound_recorder,
     narrative_log_length,
     narrative_log_text,
@@ -34,13 +35,27 @@ from .browser_helpers import (
 from .harness import ManagedServerTearDownMixin
 from .seed import FIXTURE_VALID_PNG
 
-# The art fixture's archetype/display pair for the CURRENT boot mode (kit
-# row under the synthetic install; the seed fixture places the character in
-# a room carrying exactly this archetype).
+# The art fixture's archetype/display pair for the CURRENT boot mode (kit row
+# under the synthetic install, shipped row otherwise). Resolved lazily from the
+# boot-mode flag the journey's own runtime sets before startup (see
+# ArtSceneBrowserTest), never frozen at module import: a journey's boot mode is
+# a per-class decision.
 from web.browser_support.browser_fixtures_data import art_room_monster_key, art_scene_values
 
-SCENE_ARCHETYPE_KEY, SCENE_LABEL = art_scene_values()
-SCENE_SUBJECT = f"scene:{SCENE_ARCHETYPE_KEY}"
+
+def _scene_archetype_key() -> str:
+    """The art fixture room's archetype key for the current boot mode."""
+    return art_scene_values()[0]
+
+
+def _scene_label() -> str:
+    """The art fixture archetype's authored display label for the current boot mode."""
+    return art_scene_values()[1]
+
+
+def _scene_subject() -> str:
+    """The art fixture's full scene subject key for the current boot mode."""
+    return f"scene:{_scene_archetype_key()}"
 
 # A same-origin-free image URL (the seed fixture's minimal valid 4x4 PNG as a
 # data URL) so the pending-scene generating notice can be seeded without any
@@ -232,16 +247,47 @@ class ArtSceneBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     Each test boots its own isolated server so the seeded art mode (done /
     pending / failed / missing) is deterministic per journey.
+
+    ``SYNTHETIC_CATALOGS`` selects the boot mode. A journey that renders the
+    scene chain's REQUIRED bundled illustration (the pending and failed
+    regeneration cases) needs the SHIPPED catalogs: the synthetic kit declares
+    no bundled scene definitions, so its kit archetype has no required
+    illustration and the chain has no bundled candidate at all. A journey that
+    relies on the generated-only chain degrading with no bundled fallback
+    (``ArtImageLoadFailureTest``) keeps the synthetic install.
     """
 
+    #: Boot the isolated server with the synthetic kit catalogs (harness
+    #: default) rather than the shipped ones.
+    SYNTHETIC_CATALOGS = True
+
     def setUp(self) -> None:
+        from .fixtures import create_runtime
         from .harness import ManagedServer
 
-        self.server = ManagedServer()
+        # The boot-mode flag is set BEFORE seed and startup, on the isolated
+        # runtime AND in this process: the seed/server read the runtime env,
+        # while the Playwright-side fixture vocabulary
+        # (``art_scene_values``/``art_room_monster_key``) reads this process's
+        # environment, so the two must agree on the same shipped or kit keys.
+        flag = "1" if self.SYNTHETIC_CATALOGS else "0"
+        previous = os.environ.get("ELOSERN_BROWSER_SYNTH_CATALOGS")
+        os.environ["ELOSERN_BROWSER_SYNTH_CATALOGS"] = flag
+        self.addCleanup(self._restore_synth_flag, previous)
+        runtime = create_runtime()
+        runtime.env["ELOSERN_BROWSER_SYNTH_CATALOGS"] = flag
+        self.server = ManagedServer(runtime=runtime)
         self.server.start()
         self.base_url = f"http://127.0.0.1:{self.server.runtime.http_port}"
         self.webclient_url = self.server.runtime.webclient_url
         super().setUp()
+
+    @staticmethod
+    def _restore_synth_flag(previous: str | None) -> None:
+        if previous is None:
+            os.environ.pop("ELOSERN_BROWSER_SYNTH_CATALOGS", None)
+        else:
+            os.environ["ELOSERN_BROWSER_SYNTH_CATALOGS"] = previous
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -262,11 +308,11 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         page = self.logged_in_page()
         wait_for_store_state(page, _art_scene_done, timeout=20000)
         artwork = _scene_artwork(store_state(page))
-        self.assertEqual(artwork["generation_subject"], SCENE_SUBJECT)
+        self.assertEqual(artwork["generation_subject"], _scene_subject())
         generated = _scene_candidate(store_state(page), "scene.generated:")
         self.assertIsNotNone(generated, "the done scene carries no generated candidate")
         resource = generated["resource"]
-        self.assertTrue(resource["url"].startswith(f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"))
+        self.assertTrue(resource["url"].startswith(f"/art/scene/{_scene_archetype_key()}.png"))
         self.assertEqual(resource["origin"], "runtime")
         # The image element is present with a same-origin src: the element the
         # shared driver issued, presenting the descriptor's own resource.
@@ -284,13 +330,34 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         page = self.logged_in_page()
         # Requirement: the scene label and alternative text SHALL remain visible
         # outside the bitmap. The scene moved to the full-bleed `SceneBackdrop`
-        # (H1); the label/alt render as DOM text nodes
-        # (`[data-testid="scene-backdrop-label"]`, `[data-testid="scene-backdrop-alt"]`),
-        # so the alt text is the `scene-backdrop-alt` node, not the img `alt` attribute.
-        alt = page.locator('[data-testid="scene-backdrop-alt"]').inner_text()
-        self.assertTrue(alt.strip(), "scene alternative text must be meaningful and non-empty")
-        caption = page.locator('[data-testid="scene-backdrop-label"]').inner_text()
-        self.assertEqual(caption, SCENE_LABEL)
+        # (H1); the label renders as DOM text (`[data-testid="scene-backdrop-label"]`).
+        # The server's descriptor states ``alt == label``, and the caption never
+        # repeats an identical alternative text (the archived HUD delta), so the
+        # label IS the visible alternative text and no duplicate alt node renders
+        # beside it.
+        label = page.locator('[data-testid="scene-backdrop-label"]')
+        label.wait_for(state="visible", timeout=20000)
+        self.assertEqual(label.inner_text(), _scene_label())
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-alt"]').count(),
+            0,
+            "an alt identical to the label is not repeated",
+        )
+        # A descriptor whose alternative text really differs from its label
+        # states both, still outside the bitmap. The distinct alt is injected
+        # through the committed descriptor (the same panel with one changed
+        # bounded display string), never a fabricated artwork fact.
+        distinct = "夜裡的酒館大廳，昏黃的燈火與木頭的氣味"
+        panel = store_state(page)["panels"]["art"]
+        scene = dict(panel["scene"], alt=distinct)
+        inject_snapshot(page, {"art": dict(panel, scene=scene)}, mode="exploration")
+        alt = page.locator('[data-testid="scene-backdrop-alt"]')
+        alt.wait_for(state="visible", timeout=15000)
+        self.assertEqual(alt.inner_text(), distinct)
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-label"]').inner_text(),
+            _scene_label(),
+        )
 
     @covers_requirement("webclient-art-panel::art-panel-browser-acceptance-is-keyboard-first-accessible-and-desktop-bounded")
     def test_scene_caption_and_status_usable_at_the_reference_viewport(self):
@@ -300,8 +367,10 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
         img = page.locator('[data-testid="scene-backdrop-image"]')
         self.assertEqual(img.count(), 1)
         self.assertTrue(img.is_visible())
-        self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), SCENE_LABEL)
-        self.assertTrue(page.locator('[data-testid="scene-backdrop-alt"]').inner_text().strip())
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-label"]').inner_text(), _scene_label())
+        # The scene's own alternative text equals its label here, so the caption
+        # states it once and renders no duplicate alt node.
+        self.assertEqual(page.locator('[data-testid="scene-backdrop-alt"]').count(), 0)
         self.assertTrue(page.locator('[data-testid="scene-backdrop"]').is_visible())
 
     @covers_requirement("webclient-contextual-hud::the-scene-backdrop-renders-the-art-payload-truthfully-behind-the-stage")
@@ -322,6 +391,10 @@ class ArtDoneSceneTest(ArtSceneBrowserTest):
 
 
 class ArtPendingSceneTest(ArtSceneBrowserTest):
+    # The pending regeneration presents the scene's REQUIRED bundled
+    # illustration, which only the shipped catalogs declare.
+    SYNTHETIC_CATALOGS = False
+
     def setUp(self) -> None:
         os.environ["ELOSERN_BROWSER_ART"] = "pending"
         super().setUp()
@@ -421,6 +494,11 @@ class ArtPendingSceneTest(ArtSceneBrowserTest):
 
 
 class ArtFailedSceneTest(ArtSceneBrowserTest):
+    # The failed regeneration keeps the scene's REQUIRED bundled illustration on
+    # the stage beside its reached-failure caption, so it needs the shipped
+    # catalogs that declare it.
+    SYNTHETIC_CATALOGS = False
+
     def setUp(self) -> None:
         # Point the image-generation client at the deterministic failing
         # double, so ``@art run`` produces a real failed record at runtime (a
@@ -445,36 +523,44 @@ class ArtFailedSceneTest(ArtSceneBrowserTest):
         page.evaluate("Evennia.msg('text', ['@art run --limit 1'], {})")
         page.wait_for_timeout(1500)
         page.evaluate("Evennia.msg('text', ['look'], {})")
-        # The failed-scene placeholder-count assertion is gated on the shared
-        # bounded-wait helper: the committed art-panel store state plus a
-        # single-node DOM-readiness descriptor, within one bounded deadline —
-        # not a single raw `.count()` sample that a snapshot-refresh or Vue
-        # re-render double-node window under a loaded runner would race.
+        # A failed regeneration keeps the scene chain's REQUIRED bundled
+        # illustration on the stage and states the reached failure beside it in
+        # the caption; only an EXHAUSTED chain (no image at all) degrades to the
+        # non-image placeholder. The gate is the shared bounded-wait helper:
+        # the committed art-panel store state plus a single-node DOM-readiness
+        # descriptor, within one bounded deadline.
         wait_for_store_state(
             page,
             _art_scene_failed,
             {
-                "selector": '[data-testid="scene-backdrop"] [data-testid="scene-backdrop-placeholder"]',
+                "selector": '[data-testid="scene-backdrop-failure"]',
                 "predicate": (
-                    "() => { const els = document.querySelectorAll('[data-testid=\"scene-backdrop\"] [data-testid=\"scene-backdrop-placeholder\"]'); "
-                    "if (els.length !== 1) { return false; } "
-                    "const el = els[0]; const r = el.getBoundingClientRect(); "
+                    "() => { const el = document.querySelector('[data-testid=\"scene-backdrop-failure\"]'); "
+                    "if (!el) { return false; } const r = el.getBoundingClientRect(); "
                     "return r.width > 0 && r.height > 0 && el.offsetParent !== null; }"
                 ),
-                "description": "single visible scene placeholder inside the scene frame",
+                "description": "visible reached-failure caption",
             },
             timeout=20000,
         )
-        # The reached regeneration failure is locally indicated beside the
-        # healthy bundled fallback — never hidden, and never a broken image.
+        # The reached regeneration failure keeps the healthy bundled fallback
+        # displayed beside it — never hidden, and never a broken image.
         self.assertEqual(_scene_artwork(store_state(page)).get("generation_state"), "failed")
+        bundled = _scene_candidate(store_state(page), "scene.bundled:")
+        self.assertIsNotNone(
+            bundled, "the failed regeneration keeps the required bundled illustration"
+        )
+        image = page.locator('[data-testid="scene-backdrop-image"]')
+        image.wait_for(state="visible", timeout=20000)
+        self.assertEqual(image.first.get_attribute("src"), bundled["resource"]["url"])
         failure = page.locator('[data-testid="scene-backdrop-failure"]')
         failure.wait_for(state="visible", timeout=20000)
         self.assertTrue(failure.inner_text().strip())
-        self.assertTrue(
-            page.locator('[data-testid="scene-backdrop-image"]').count()
-            + page.locator('[data-testid="scene-backdrop-placeholder"]').count()
-            >= 1
+        # The chain is not exhausted, so the non-image placeholder is absent.
+        self.assertEqual(
+            page.locator('[data-testid="scene-backdrop-placeholder"]').count(),
+            0,
+            "a failed regeneration with a healthy bundled fallback is not a placeholder state",
         )
 
 
@@ -673,17 +759,20 @@ class ArtImageLoadFailureTest(ArtSceneBrowserTest):
         super().setUp()
         os.environ.pop("ELOSERN_BROWSER_ART", None)
 
-    # The generated scene output's stable path: its bounded cache version is
-    # part of the URL, so the route matches the path and counts every request
-    # the browser makes for it.
-    GENERATED_PATH = f"/art/scene/{SCENE_ARCHETYPE_KEY}.png"
+    def _generated_path(self) -> str:
+        """The generated scene output's stable path for the current boot mode.
+
+        Its bounded cache version is part of the URL, so the route matches the
+        path and counts every request the browser makes for it.
+        """
+        return f"/art/scene/{_scene_archetype_key()}.png"
 
     def _abort_art_media(self, page) -> None:
         """Abort the generated scene media and count its requests."""
         self._art_requests = []
 
         def _handler(route):
-            if route.request.url.split("?")[0].endswith(self.GENERATED_PATH):
+            if route.request.url.split("?")[0].endswith(self._generated_path()):
                 self._art_requests.append(route.request.url)
                 route.abort("failed")
             else:
