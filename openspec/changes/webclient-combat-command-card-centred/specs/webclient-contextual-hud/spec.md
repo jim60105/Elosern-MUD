@@ -1,34 +1,30 @@
 ## ADDED Requirements
 
 ### Requirement: The combat command card stands at the stage's dead centre
-While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one narrow card in the stage's `choices` anchor, framed like the stage's other choice cards, with the band's command region collapsed. The card's horizontal centre SHALL be the stage's horizontal centre in every combat state; its width SHALL follow the gap on the party side; and it SHALL NOT cover a foe name plate, foe gauge or focused-target cue.
+While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one 264px × S wide card in the stage's `choices` anchor, framed like the other choice cards, centred on the stage's horizontal centre in every combat state, inside the dead-centre gap the combat formation keeps clear; the band's command region SHALL collapse.
 
-#### Scenario: The width and height follow the stated formulas
+#### Scenario: The card is at dead centre with a fixed width
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and fifteen foes (eleven with five figures)
+- **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 264px × S (±1px: 264 and 291.1), and it is the same in every case
+
+#### Scenario: The card never covers the formation
+- **WHEN** combat renders any of those cases, including during the entry into combat and while a foe joins or leaves
+- **THEN** the card intersects no figure box at rest, no figure plate and no target-marker slot, because every one of them stands at least 16px × S outside the card's edges
+
+#### Scenario: The width and height follow the stated rules
 - **WHEN** combat renders at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − party edge − 16px × S), 280px × S)` (±1px), where S is the desktop chrome factor and the party edge is the right edge of the controlled figure's box as the uncompressed companion line-up places it; its top is the `choices` anchor's top, its bottom stands at least 8px × S above the foe name-plate line, its height is the smaller of 400px × S and that span, and it MAY stand over foe art or the margin of the controlled figure's box
-
-#### Scenario: The card is at dead centre for every party size and foe count
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two, three and five active foes, each with a solo player, a four-figure party (the player and three companions) and a five-figure party
-- **THEN** `#action-dock` lies inside the `choices` anchor and its horizontal centre is the stage's horizontal centre (±1px) in every case; no case shifts it left or right of the centre
-
-#### Scenario: The width follows the guaranteed gap on the party side
-- **WHEN** combat renders with a solo player, a three-figure party, a four-figure party and a five-figure party at 1451x790 and at 1600x900
-- **THEN** the card's width is `clamp(240px × S, 2 × (stage centre − controlled figure's box right edge − 16px × S), 280px × S)` (±1px): 280, 280, 263.6 and 240 at 1451x790 and 308.8, 308.8, 264.6 and 264.6 at 1600x900; with up to four figures the card does not intersect any party figure's box, and with five figures it intersects only the controlled figure's box and by at most 24.5px at 1451x790 and 49.5px at 1600x900
-
-#### Scenario: The card never covers a foe plate, gauge or cue
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one, two and three active foes, including while the attack target frame focuses the rearmost foe
-- **THEN** the card's bottom edge is at least 8px × S above the top edge of every foe name plate, so it intersects no foe name plate, no foe gauge and no focused-target cue; with one foe it intersects no foe stage actor box either
+- **THEN** the card's top is the `choices` anchor's top and its height is the smaller of 400px × S and the anchor's span (from the top band's inset to 8px × S above the scene caption row), so the card is 400px tall at 1451x790 (anchor 58–472 → 414px) and 441.1px at 1600x900
 
 #### Scenario: The card keeps the stage's other surfaces clear
-- **WHEN** combat renders at 1451x790 and at 1600x900 with one and with three active foes and the command line expanded
-- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, `map` (the place card and the participant frame), band, or command-line anchor, and the vitals dock stays visible
+- **WHEN** combat renders at 1451x790 and at 1600x900 with the command line expanded
+- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, band, or command-line anchor, and the vitals dock stays visible
 
 #### Scenario: No frame resizes the card
 - **WHEN** the player moves at 1451x790 from the combat root through Skills, a category, a group, a skill frame, a master's 威力 scale step and the target step, and separately opens the Forfeit confirmation
 - **THEN** the card's rendered box is identical (±1px) in every frame, the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
 
 #### Scenario: Every frame lays out in one narrow column
-- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in a 240px × S wide card
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in the 264px × S card
 - **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
 
 #### Scenario: The detail folds into a strip below the rows
@@ -70,7 +66,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 ## MODIFIED Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
 #### Scenario: The requirement carries its amendments
 - **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
@@ -170,11 +166,11 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The actor-left anchor carries the controlled figure and the party line
 - **WHEN** the shell renders in exploration, dialogue, and combat mode
-- **THEN** the `actor-left` anchor carries the controlled character's stage actor — the current roster character's portrait, or the possessed companion's while the possession banner is available — with the committed party's companion stage actors lined up behind it as "Companion standing portraits line up behind the controlled character in the actor-left anchor" defines, each with the truthful placeholder when no image exists
+- **THEN** the `actor-left` anchor carries the controlled character's stage actor — the current roster character's portrait, or the possessed companion's while the possession banner is available — with the committed party's companion stage actors lined up behind it as "Companion standing portraits line up behind the controlled character in the actor-left anchor" defines, each with the truthful placeholder when no image exists; in combat these figures stand at the boxes "Combat figures stand in a shared-scale formation" sets
 
 #### Scenario: The actor-right anchor's content follows the committed mode
 - **WHEN** the committed mode is `dialogue` with an available `dialogue` panel whose host identity does not already join to a committed party or controlled lineup figure, and later `combat` with at least one foe active or while a round that ended the fight still plays as "Combat beats are choreographed on the stage at the motion level" defines, and later any other state
-- **THEN** the `actor-right` anchor carries the dialogue host's stage actor in the first state, the foe line-up that "Foes stand opposite the player during combat" defines in the second, and no content in every other state; the foe line-up MAY extend leftward beyond the anchor's own box, within the bounds that requirement sets, and SHALL NOT cross the stage's horizontal centre, which the companion line-up's figures also never cross; every stage actor follows "Stage actors present the player and the dialogue host with a speaking state"
+- **THEN** the `actor-right` anchor carries the dialogue host's stage actor in the first state, every active foe at the boxes that "Combat figures stand in a shared-scale formation" sets in the second, and no content in every other state; in combat the portrait anchors span the stage so formation boxes are stage coordinates, and no figure enters the dead-centre gap that requirement keeps clear; every stage actor follows "Stage actors present the player and the dialogue host with a speaking state"
 
 #### Scenario: The portrait anchors are non-interactive art
 - **WHEN** any stage actor renders
@@ -192,22 +188,27 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 - **WHEN** a transient popover is opened from a top-band element, and when a surface that permanently occupies vertical space is proposed for the band
 - **THEN** the transient popover MAY overlay the island anchors while open, provided it does not change the band's own rendered box and closes on Escape and on outside activation, and a surface that permanently occupies vertical space is not introduced into the band this way
 
+#### Scenario: The plates layer is a named stage layer
+- **WHEN** combat renders its formation
+- **THEN** the `plates` layer is a stage-sized, non-scrolling layer above the portrait anchors and below the HUD islands, the band, the `choices` anchor and the command line, holding only the figure plates and the markers other requirements place there
+
 ### Requirement: Surface visibility is gated by the committed game mode
 The shell SHALL expose the committed mode on the stage root as `data-elosern-mode`, and surface visibility SHALL be derived from that single attribute. A surface hidden for the current mode SHALL be removed from rendering with `display:none` — never dimmed, never merely visually hidden — so it leaves the accessibility tree and the tab order, excepting only the two hold states defined in the scenarios below. The matrix SHALL be:
 
 ```text
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
-| place card (location, world time; `map` anchor, above the minimap) | visible | visible | **hidden** | hidden |
+| place card (location, world time; `map` anchor, above the minimap) | visible | **hidden** (the formation needs the right column) | **hidden** | hidden |
 | message window (band message region) | visible | visible (whole band width, paged) | visible (whole band width, paged, name plate) | hidden |
 | dialogue choice list (`choices` anchor, centred over the stage) | not rendered | not rendered | once the current response's last page is fully shown, while no action is in flight | not rendered |
 | combat command card (`choices` anchor; the action dock itself) | not rendered | visible | not rendered | not rendered |
 | vitals dock (condition icons + vitals bars; `vitals` anchor, lower-left) | by the vitals rule | visible | **hidden** | hidden |
 | minimap island | visible | **hidden** | **hidden** | hidden |
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
-| controlled character and companion standing portraits (`actor-left`) | visible | visible | visible (listeners dimmed while the host speaks; the party line stays) | hidden |
+| controlled character and companion standing portraits (`actor-left`) | visible | visible (in the combat formation) | visible (listeners dimmed while the host speaks; the party line stays) | hidden |
 | dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
-| foe line-up (`actor-right`, at most three active foes) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
+| foe line-up (`actor-right`, every foe that has not fled, up to 15, in the combat formation; fallen foes in their defeated look) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
+| figure plates (`plates` layer, one per drawn non-controlled combat figure) | only while a round that ended the fight still plays (held, inert) | visible | not rendered | not rendered |
 | action dock (band command region) | visible | **in the combat command card** (command region collapsed: `display:none`) | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
@@ -221,11 +222,11 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
-- **THEN** the minimap island is absent from the DOM layout and from the tab order, and it is not merely dimmed, while the participant frame renders in the `map` anchor below the still-visible place card and the foe line-up renders in `actor-right`
+- **THEN** the minimap island is absent from the DOM layout and from the tab order, and it is not merely dimmed, while the `map` anchor renders nothing, every active foe stands in the combat formation, and each non-controlled figure carries its plate
 
 #### Scenario: The place card stays visible through combat
 - **WHEN** the committed mode changes from exploration to combat with a committed location and world time
-- **THEN** the place card remains rendered above the participant frame, and returns to standing above the minimap island when the mode returns to exploration
+- **THEN** the place card keeps its committed location and time but is not rendered (`display:none`) while the mode is combat, because the combat formation uses the stage's right column, and it renders again above the minimap island when the mode returns to exploration
 
 #### Scenario: The minimap returns on leaving combat
 - **WHEN** the committed mode changes from combat back to exploration, including by a round whose beats

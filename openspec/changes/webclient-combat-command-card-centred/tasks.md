@@ -12,42 +12,34 @@ assertion that detects the same class of defect, never delete it outright. Obtai
 `uv run --locked python -m tools.spec_traceability list --json-output <scratch>/ids.json`; MODIFIED requirements
 keep their IDs.
 
-## 0. Gate
+Prerequisites: `webclient-combat-formation` and `webclient-combat-defeated-foes` are archived. Mind the Styling
+pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elosern-root` rules on `action-dock`,
+`dock-menu`, `dock-detail`, `skill-detail-pane` and `choices`).
 
-- [ ] 0.1 Confirm the user has signed off design D3's forced overlap of the rear foe's box (two or more foes) and of
-  the controlled figure's box (five-figure party); if not, stop and return the change for re-planning.
+## 1. Stage: the card anchor, the Teleport, geometry and focus (≈2 h)
 
-## 1. Stage: the card anchor, the Teleport, geometry and focus (≈2.5 h)
-
-- [ ] 1.1 In `styles/tokens.css` add `--foe-plate-h` and `--foe-plate-rise` (design D3); rewrite the
-  `.foe-lineup__name` / `.foe-lineup__gauge` `bottom` rules in `components/FoeLineup.vue` to read them with no
-  visual change (the plate line stays at y 459.9 at 1451x790 and 528.6 at 1600x900, ±1px). In `AppClient.vue`
-  write `--party-reach` = `(n − 1) × EXPOSURE[n]` on `.elosern-root` from the displayed line-up count (export the
-  exposure lookup from `components/companion-lineup.js`, e.g. `companionReach(count)`), beside `--foe-lineup-span`.
-  Verify with 1.4.
+- [ ] 1.1 (folded into 1.2; the earlier plate-line and party-reach plumbing is not needed with the formation's gap)
 - [ ] 1.2 In `components/HudFrame.vue`: give the `choices` anchor an `id` from `useId()`; wrap the `band-command`
   slot in `<Teleport :to="'#' + choicesId" defer :disabled="mode !== 'combat'">` (design D1); show the `choices`
-  anchor in combat; declare `--stage-party-edge` and `--combat-card-w` (design D3) and the combat anchor rule
-  (`left: calc(50% - var(--combat-card-w) / 2)`, `width`, top-anchored content, card height
-  `min(400px·S, …plate line − 8px·S)`) with its glide transition; add a comment that `--stage-party-edge` mirrors
-  CompanionLineup's translate (and the reverse comment in `CompanionLineup.vue`); collapse the band in combat
-  (design D2); stop setting `data-flip` for `*-combat` changes and delete the `-combat` flip-in rule (keep
-  `combat-exploration`); add the `elosern-combat-card-in` keyframes and the entrance rule keyed on
-  `[data-mode-change$="-combat"]` (design D6). Update the header comment's anchor/band description. Verify with 1.4.
+  anchor in combat; add the combat anchor rule (`width: calc(264px * var(--ui-scale))`,
+  `left: calc(50% - 132px * var(--ui-scale))`, top-anchored content, card height
+  `min(calc(400px * var(--ui-scale)), 100%)`) with a comment that the formation engine's `CARD_WIDTH` is the same
+  number (design D3); collapse the band in combat (design D2); stop setting `data-flip` for `*-combat` changes and
+  delete the `-combat` flip-in rule (keep `combat-exploration`); add the `elosern-combat-card-in` keyframes and the
+  entrance rule keyed on `[data-mode-change$="-combat"]` (design D6). Update the header comment. Verify with 1.4.
 - [ ] 1.3 In `components/AppShell.vue`: after the flush of a mode change into combat, call `restoreFocusHome()` when
   `focusIsLost(document.activeElement)` (design D7); update the header comment. Verify with 1.4.
 - [ ] 1.4 Extend `web/webclient-app/tests/hud_frame.test.js` (mount `AppShell` with `attachTo`, as the file does):
   in combat the slot's root element is inside `[data-anchor="choices"]`, not inside `band-command`, and it is the
   same DOM node across exploration → combat → exploration and combat → dialogue; a mount directly in combat places
-  it in the anchor; the combat anchor rule uses `calc(50% - var(--combat-card-w) / 2)` and
-  `clamp(calc(240px * var(--ui-scale)), …, calc(280px * var(--ui-scale)))` over `--stage-party-edge`; the band rule
-  collapses `band-command` with `display: none` in combat; focus on a dock descendant before entering combat ends
-  on `#action-dock` after `nextTick`. Add to `web/webclient-app/tests/core/companion_lineup.test.js` a case pinning
-  `companionReach(n)` to `(n − 1) × EXPOSURE[n]` for n = 1…5 and to `tests/core/foe_lineup.test.js` a case that
-  the plate rule reads `--foe-plate-rise`. Update `web/webclient-app/tests/mode_transitions.test.js`: `data-flip`
+  it in the anchor; the combat anchor rule uses `calc(264px * var(--ui-scale))` and `calc(50% - 132px * var(--ui-scale))`;
+  a source-level test reads `components/combat-formation.js`' `CARD_WIDTH` and the HudFrame rule and asserts they
+  name the same width (the two copies of one geometry number); the band rule collapses `band-command` with
+  `display: none` in combat; focus on a dock descendant before entering combat ends on `#action-dock` after
+  `nextTick`. Update `web/webclient-app/tests/mode_transitions.test.js`: `data-flip`
   is not set for `exploration-combat`, still set for `combat-exploration`, and the card entrance rule is keyed on
   `[data-mode-change$="-combat"]` with `var(--motion-flash)` as its delay. Run
-  `pnpm test -- web/webclient-app/tests/hud_frame.test.js web/webclient-app/tests/mode_transitions.test.js web/webclient-app/tests/core/companion_lineup.test.js web/webclient-app/tests/core/foe_lineup.test.js`
+  `pnpm test -- web/webclient-app/tests/hud_frame.test.js web/webclient-app/tests/mode_transitions.test.js`
   and verify it passes.
 
 ## 2. The narrow card layout (≈2 h)
@@ -84,14 +76,12 @@ file.
 - [ ] 3.1 Add `test_combat_command_card_stands_at_dead_centre` to
   `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest` (reuse `_combat_panels(count)`, the
   `_COMMIT_AND_READ` pattern and `_party_panel(n)` from `test_browser_shell_surfaces.py`; read `#action-dock`, the
-  `choices` anchor, every `companion-figure`, every foe slot, `.foe-lineup__name`, `foe-gauge`, the `vitals`/`map`/
-  command-line anchors and `band-command`). At 1451x790 and 1600x900, for parties of 1, 4 and 5 figures and 1, 2,
-  3 and 5 foes: the card's centre is the stage centre (±1px); its width matches the design D3 table (±1px); its
-  bottom is ≥ 8px·S above every plate's top; it intersects no plate, gauge, `vitals`, `map` or command-line anchor;
-  with ≤ 4 figures it intersects no party figure box; with 1 foe it intersects no foe box; `band-command` is
-  `display:none` and the message region spans the band; with the attack target frame open the focused foe's plate
-  cue is not covered; with a five-figure party (240px·S card) the 威力 scale step and an AREA target frame show every
-  chip and token inside the card with no horizontal overflow; the card box is identical (±1px) across root → Skills → category → skill frame. Annotate it
+  `choices` anchor, every `companion-figure`, every foe slot, every `figure-plate`, the `vitals`/command-line
+  anchors and `band-command`). At 1451x790 and 1600x900, for parties of 1, 3 and 5 figures against 1, 4, 8 and 15
+  foes (11 with five figures): the card's centre is the stage centre (±1px); its width is 264px·S (±1px); its height
+  is min(400px·S, the anchor span); it intersects no figure box, plate, `vitals` or command-line anchor;
+  `band-command` is `display:none` and the message region spans the band; the 威力 scale step and an AREA target
+  frame show every chip and token inside the card with no horizontal overflow; the card box is identical (±1px) across root → Skills → category → skill frame. Annotate it
   with the existing IDs it establishes
   (`webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode`,
   `webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size`; confirm spellings
@@ -132,17 +122,16 @@ file.
 
 - [ ] 4.1 `stories/Core/AppShell.stories.js`: add a `combatKeys` arg replayed through `store.focusPress(key, false)`
   after the snapshot commits; add `CombatTargetStep`, `CombatSkillDetail`, `CombatDisabledCommand`,
-  `CombatMasterScale`, `CombatFourFigureParty` (three companions, three foes) and `CombatFullParty` (four
-  companions, three foes); keep the existing combat stories. Update the file's combat comments (card, not band).
-- [ ] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in 240×394 and
-  280×394 hosts; add `CombatTargets`, `CombatMasterScale` and `CombatDisabledDetail`. `stories/Action/SkillDetailPane.stories.js`:
-  add `Strip`. `stories/Action/DockMenu.stories.js`: render `TargetFrame` and `FixedGridFrame` in a 240px host.
+  and `CombatMasterScale`; the formation corner stories of `webclient-combat-formation` now show the card; keep the
+  existing combat stories. Update the file's combat comments (card, not band).
+- [ ] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in a 264×400 host; add `CombatTargets`, `CombatMasterScale` and `CombatDisabledDetail`. `stories/Action/SkillDetailPane.stories.js`:
+  add `Strip`. `stories/Action/DockMenu.stories.js`: render `TargetFrame` and `FixedGridFrame` in a 264px host.
 - [ ] 4.3 Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify both succeed with
   `component-manifest.json` unchanged; then run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_resize_keeps_pointer_targets_live`
-  and verify it passes. Open `core-appshell--combat-hud`, `--combat-one-foe`, `--combat-four-figure-party`,
-  `--combat-full-party`, `--combat-five-foes` and `--dialogue-selector` at 1451x790 and 1600x900 in the built
-  Storybook and confirm by screenshot that the card sits at the stage centre with every plate and gauge visible.
+  and verify it passes. Open `core-appshell--combat-solo-one-foe`, `--combat-solo-fifteen-foes`, `--combat-full-party-eleven-foes`,
+  `--combat-hud` and `--dialogue-selector` at 1451x790 and 1600x900 in the built
+  Storybook and confirm by screenshot that the card sits at the stage centre with every figure and plate clear of it.
 
 ## 5. Documentation (≈0.25 h)
 

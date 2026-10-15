@@ -115,7 +115,7 @@ mode the message window spans the whole band while the command region collapses.
 
 #### Scenario: Required surfaces stay visible through the supported viewport range
 - **WHEN** the shell renders at 1451x790 or any larger viewport up to the chrome factor's cap
-- **THEN** the brand, the top-meta pill, the place card, the action dock (in every playing mode except dialogue, where the command region collapses) and the command-line toggle are visible
+- **THEN** the brand, the top-meta pill, the place card (outside dialogue and combat, where the visibility matrix hides it), the action dock (in every playing mode except dialogue, where the command region collapses, and as the centred card in combat) and the command-line toggle are visible
 
 #### Scenario: Each HUD island follows its own contextual-HUD rule
 - **WHEN** the shell renders the HUD islands
