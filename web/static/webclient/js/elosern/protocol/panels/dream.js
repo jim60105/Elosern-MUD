@@ -1,7 +1,7 @@
 "use strict";
 
+var artwork = require("../artwork.js");
 var core = require("../core.js");
-var MAX_SCENE_ART_URL = 256; // mirrors world.art.presenter MAX_PORTRAIT_MEDIA_URL
 // Mirrors world.narrative.authoring's bounded shown-requirement contract: the
 // readable planning rows a confirmation may freeze, and the identity of the
 // persisted version they were shown at.
@@ -12,7 +12,7 @@ var REQUIREMENT_KINDS = ["place", "new_character", "private_commission"];
 
 function validateDreamPanel(payload) {
   core.requireExactFields(payload, "dream", ["schema_version", "available", "state"], []);
-  if (payload.schema_version !== 2 || payload.available !== true) throw new Error("invalid dream panel");
+  if (payload.schema_version !== 3 || payload.available !== true) throw new Error("invalid dream panel");
   var state = payload.state;
   if (state === null) return payload;
   core.requireExactFields(state, "dream state", [
@@ -33,7 +33,13 @@ function validateDreamPanel(payload) {
   ["opening", "scene", "dialogue", "ending", "ending_phase"].forEach(function (key) {
     if (typeof state[key] !== "string" || Array.from(state[key]).length > 2048) throw new Error("invalid dream prose");
   });
-  if (typeof state.scene_art !== "string" || state.scene_art.length > MAX_SCENE_ART_URL) throw new Error("invalid dream scene art");
+  // The dream stage's artwork is the SAME canonical scene descriptor every
+  // other scene surface carries (mirror of
+  // world.art.presenter.describe_dream_scene through
+  // web.webclient.presentation.artwork.validate_artwork): the shared validator
+  // owns the exact fact shape, the source bounds and the media ceilings, so a
+  // retired raw URL string fails the wire instead of being adapted.
+  artwork.validateArtwork(state.scene_art);
   if (!Array.isArray(state.direction_parts) || state.direction_parts.length > 2 ||
       state.direction_parts.some(function (part) { return typeof part !== "string" || Array.from(part).length > 2000; })) throw new Error("invalid dream direction");
   if (!Array.isArray(state.thread_choices) || state.thread_choices.length > 32) throw new Error("invalid dream thread choices");

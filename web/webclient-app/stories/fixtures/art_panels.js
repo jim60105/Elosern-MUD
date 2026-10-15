@@ -338,3 +338,123 @@ export const ART_PANEL_UNAVAILABLE_SAMPLE = {
   available: false,
   reason: { code: "art_unavailable", message: "場景圖像目前無法顯示" },
 };
+
+// --- The dream stage's artwork vocabulary (change unified-dream-rendering) --
+//
+// The dream is not an explorable archetype, so its descriptor's positions are
+// the OPTIONAL operator-preferred official identity, the REQUIRED bundled
+// dream_throne illustration and the distinct declared town terminal, with null
+// generation facts and no retention authorization.
+export const DREAM_SUBJECT = "dream:1:4f0f7a4e6b2c4c8d9a1e0b7d3c5f2a60";
+
+// One admitted operator-preferred dream image: an exact official identity, so
+// its URL embeds the startup fingerprint of those bytes.
+export function dreamPreferredResource(overrides = {}) {
+  const fingerprint = fixtureDigest("dream-preferred");
+  return {
+    resource_id: "npc/dream_goddess/dream-throne.webp",
+    version: fingerprint,
+    url: `/art/official/${fingerprint}/npc/dream_goddess/dream-throne.webp`,
+    origin: "official",
+    geometry: { image_size: null, face_rect: null, stage: null, aspect_ratio: null },
+    ...overrides,
+  };
+}
+
+// The dream's preferred position: its reached facts and its admitted candidate.
+export function dreamPreferredAttempt(overrides = {}) {
+  return {
+    type: "image",
+    source_id: "scene.operator:dream_throne",
+    rank: 30,
+    resource: dreamPreferredResource(),
+    ...overrides,
+  };
+}
+
+export function dreamBundledAttempt() {
+  return {
+    type: "image",
+    source_id: "scene.bundled:dream_throne",
+    rank: 40,
+    resource: sceneBundledResource("dream_throne"),
+  };
+}
+
+export function dreamTerminal() {
+  return {
+    kind: "scene_image",
+    source_id: "scene.terminal:city_street",
+    rank: 100,
+    resource: sceneBundledResource("city_street"),
+  };
+}
+
+// One dream descriptor: the preferred operator image ahead of the required
+// bundled dream illustration and the distinct town terminal.
+export function dreamDescriptor(overrides = {}) {
+  return {
+    subject_id: DREAM_SUBJECT,
+    revision: fixtureDigest("dream-revision"),
+    generation_subject: null,
+    generation_state: null,
+    attempts: [dreamPreferredAttempt(), dreamBundledAttempt()],
+    terminal: dreamTerminal(),
+    retention_sources: [],
+    ...overrides,
+  };
+}
+
+// The dream descriptor of an operator root that holds no preferred image:
+// absence contributes no fact at all, and the required bundled dream
+// illustration is the current attempt.
+export function dreamBundledDescriptor(overrides = {}) {
+  return dreamDescriptor({
+    revision: fixtureDigest("dream-bundled-revision"),
+    attempts: [dreamBundledAttempt()],
+    ...overrides,
+  });
+}
+
+// The dream descriptor of a preferred image that was refused at admission:
+// the reached source_rejected fact precedes the bundled dream that follows it.
+export function dreamRefusedDescriptor(overrides = {}) {
+  return dreamDescriptor({
+    revision: fixtureDigest("dream-refused-revision"),
+    attempts: [
+      {
+        type: "fault",
+        source_id: "scene.operator:npc/dream_goddess/dream-throne.webp",
+        rank: 30,
+        reason: "source_rejected",
+      },
+      dreamBundledAttempt(),
+    ],
+    ...overrides,
+  });
+}
+
+// The dream descriptor of a stage whose every position is unavailable: the
+// required bundled illustration and the terminal both state their missing
+// resource, so nothing is presented and the reached fact is the whole picture.
+export function dreamExhaustedDescriptor(overrides = {}) {
+  return dreamDescriptor({
+    revision: fixtureDigest("dream-exhausted-revision"),
+    attempts: [
+      {
+        type: "fault",
+        source_id: "scene.bundled:dream_throne",
+        rank: 40,
+        reason: "required_resource_missing",
+      },
+      {
+        type: "fault",
+        source_id: "scene.terminal:city_street",
+        rank: 100,
+        reason: "required_resource_missing",
+      },
+    ],
+    terminal: null,
+    ...overrides,
+  });
+}

@@ -9,25 +9,12 @@ from dataclasses import asdict
 from django.db import transaction
 from evennia.utils.dbserialize import deserialize
 
-from world.art import official
 from world.narrative import dream_session as lifecycle
 from world.narrative.authoring import REQUIREMENT_FIELDS, draft_is_confirmed, get_draft
 from world.narrative.dream_track import render_ending, track_state
 from world.narrative.models import StoryThread
 from world.narrative.threads import TERMINAL_THREAD_STATES, thread_accessible
 from world.observability import log_info
-
-# The dream stage's official artwork identity: the cloud-throne goddess scene
-# lives in the operator-prepared official-artwork directory (never in git,
-# never bundled into the frontend). An absent official root degrades to the
-# empty URL, exactly like every other missing-official-art case. The identity
-# is a fixed ASCII node, so the resolved URL is a fixed 114 characters and the
-# client's shared 256-unit media bound (``MAX_SCENE_ART_URL`` in
-# web/static/webclient/js/elosern/protocol/panels/dream.js, mirroring
-# world.art.presenter.MAX_PORTRAIT_MEDIA_URL) stays inert — which is why that
-# client check is a plain length test rather than a code-point walk.
-DREAM_GODDESS_NPC_KEY = "dream_goddess"
-DREAM_GODDESS_SCENE_IDENTITY = f"npc/{DREAM_GODDESS_NPC_KEY}/dream-throne.webp"
 
 OPENING = (
     "雲海之上矗立著一座純白的王座。王座上的女神面容始終無法辨明，卻一邊撫慰著自己、"
@@ -37,14 +24,26 @@ OPENING = (
 )
 
 
-def scene_art_url():
-    """The same-origin official-media URL for the dream stage's artwork."""
-    return official.current_catalog().url_for(DREAM_GODDESS_SCENE_IDENTITY) or ""
-
-
 def owner_id(actor):
     """Use the same persistent character identity on both transports."""
     return str(actor.pk)
+
+
+def scene_subject_id(actor):
+    """The dream stage's logical subject identity, scoped to owner and session.
+
+    The dream is one logical place per SLEEP SESSION, so a later session is a
+    different subject: the shared loading lifecycle keys its resolution epoch
+    on this identity, which is what retires a previous session's callbacks
+    instead of letting them settle the surface the player is now looking at.
+    The identity is bounded by construction (the owner's decimal pk plus the
+    session handle the lifecycle already bounds at 64 characters), so it always
+    fits the descriptor's own subject bound.
+    """
+    session = associated_session(actor)
+    if session is None:
+        return f"dream:{owner_id(actor)}"
+    return f"dream:{owner_id(actor)}:{session.session_id}"
 
 
 def association(actor):
@@ -148,6 +147,11 @@ def reset_cache(actor):
 
 def dream_state(actor):
     """Server-authored actions, count, track, prose and committed sleep identity."""
+    # Imported lazily: the art owner's scene resolver is the single artwork
+    # seam, and keeping the import inside the read keeps this model's own
+    # module-level surface as light as it was before the artwork moved.
+    from world.art.presenter import describe_dream_scene
+
     value = association(actor)
     if value is None:
         return None
@@ -183,7 +187,11 @@ def dream_state(actor):
                               if key not in ("summary", *REQUIREMENT_FIELDS)}
         if draft_direction else None,
         "opening": OPENING, "scene": value.get("scene", ""),
-        "scene_art": scene_art_url(),
+        # The stage's artwork is the shared canonical scene descriptor of the
+        # dream's own chain, resolved read-only by the art owner: this model
+        # never builds a URL, never reads the sleeper's location and never
+        # mutates the session, the authoring store or any art record.
+        "scene_art": describe_dream_scene(scene_subject_id(actor)),
         "dialogue": value.get("dialogue", ""),
         "direction_parts": [displayed_direction[offset:offset + 2000]
                             for offset in range(0, len(displayed_direction), 2000)],

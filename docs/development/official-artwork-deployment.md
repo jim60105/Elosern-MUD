@@ -498,9 +498,13 @@ keys), and the missing identities answer 404 rather than a substitute image.
 
 For the collaborative dream stage specifically, the indexed image count must
 include `npc/dream_goddess/dream-throne.webp`: run one `sleep dream` and check
-that the dream panel's `scene_art` state field is a non-empty
-`/art/official/...` URL (an empty value means the artwork was not indexed,
-which the stage survives by design).
+that the dream panel's `scene_art` state field is the canonical scene
+descriptor whose preferred position (`scene.operator:dream_throne`) carries an
+`/art/official/...` URL. When the artwork was not indexed, that position is
+simply absent and the REQUIRED bundled `dream_throne` illustration is what the
+stage presents — the absence is normal and never an error marker. A refused
+file, an unreadable directory or an unusable root is instead a reached fact on
+that same position.
 
 ### Troubleshooting
 

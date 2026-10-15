@@ -1,5 +1,11 @@
 import { h, reactive, ref } from "vue";
 import DreamPanel from "../../components/DreamPanel.vue";
+import {
+  dreamBundledDescriptor,
+  dreamDescriptor,
+  dreamExhaustedDescriptor,
+  dreamRefusedDescriptor,
+} from "../fixtures.js";
 
 export default { title: "World/DreamPanel", component: DreamPanel };
 
@@ -10,7 +16,10 @@ function fixture(overrides = {}) {
     pending: false, open: true, confirmed: false, failure: false,
     opening: "雲海之上矗立著一座純白的王座。王座上的女神面容模糊，卻像一直在等你。積水漫過你的腳踝，湧如泉水的液面映著王座。你可以在這裡商談故事方向，也可以隨時醒來。",
     scene: "", dialogue: "",
-    scene_art: "/art/official/0000000000000000000000000000000000000000000000000000000000000000/npc/dream_goddess/dream-throne.webp",
+    // The stage's picture is the canonical scene descriptor of the dream's own
+    // source chain: the optional operator-preferred image, the required bundled
+    // dream illustration and the distinct town terminal.
+    scene_art: dreamDescriptor(),
     direction_parts: [], draft_preferences: null,
     requirements: [], requirement_version: null,
     thread_choices: [{ id: "synthetic-known-thread", label: "合成故事：碼頭上留下的信" }],
@@ -140,4 +149,12 @@ export const AtCap = { render, args: { ...conversing, completed: 6, remaining: 0
 export const ManyThreads = { render, args: { ...conversing, thread_choices: Array.from({ length: 32 }, (_, index) => ({
   id: `synthetic-thread-${index}`, label: `合成故事線 ${index + 1}：${"在港灣與雪原之間往返的長篇委託紀錄".repeat(index % 3 + 1)}` })) } };
 export const Disconnected = { render, args: { ...conversing, disconnected: true } };
-export const NoArt = { render, args: { ...conversing, scene_art: "" } };
+// The operator root holds no preferred image: absence is normal, so the
+// required bundled dream illustration carries the stage with no error styling.
+export const BundledDream = { render, args: { ...conversing, scene_art: dreamBundledDescriptor() } };
+// The preferred image was refused at admission: its reached failure stays
+// stated while the bundled dream it precedes stands in for it.
+export const PreferredRefused = { render, args: { ...conversing, scene_art: dreamRefusedDescriptor() } };
+// Every position is unavailable: nothing is presented and the stage states the
+// reached fact instead of a broken image.
+export const MissingArt = { render, args: { ...conversing, scene_art: dreamExhaustedDescriptor() } };

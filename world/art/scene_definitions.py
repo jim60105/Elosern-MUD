@@ -100,6 +100,19 @@ BUNDLED_SCENE_MEDIA_PREFIX = "/art/bundled-scene/"
 # archetype, so it is declared here rather than in the lore registry.
 DREAM_SCENE_KEY = "dream_throne"
 
+# The dream stage's OPTIONAL operator-preferred source: the exact official
+# identity the dream chain resolves first, in the operator catalog's
+# ``npc/<key>/<file>`` layout. It is an exact filename, never a directory
+# default (the operator resolves that path or nothing), and it lives here
+# because it is art-domain authored content: the narrative read model reads the
+# dream's descriptor from :func:`world.art.presenter.describe_dream_scene` and
+# never names an artwork identity itself.
+DREAM_PREFERRED_OFFICIAL_KIND = "npc"
+DREAM_PREFERRED_OFFICIAL_KEY = "dream_goddess"
+DREAM_PREFERRED_OFFICIAL_IDENTITY = (
+    f"{DREAM_PREFERRED_OFFICIAL_KIND}/{DREAM_PREFERRED_OFFICIAL_KEY}/dream-throne.webp"
+)
+
 # The closed terminal vocabulary: a scene's declared terminal image is always
 # one of the two terminal members, and every terminal key is itself a required
 # bundled definition.
