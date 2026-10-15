@@ -74,7 +74,7 @@ class CombatParticipantPolishEvidenceTest(unittest.TestCase):
     def test_participant_identity_hp_round_and_noninteractive_cues(self):
         result = run_npm([
             "test", "--",
-            "web/webclient-app/tests/combat/participant_frame.test.js",
+            "web/webclient-app/tests/core/figure_plate.test.js",
             "web/webclient-app/tests/core/foe_lineup.test.js",
         ], timeout=120)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -147,7 +147,7 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 "Action/RestForm",
                 "Action/DockBreadcrumb", "Action/SkillDetailPane", "Action/SkillUseDock",
                 "Data/VitalsTrack", "Data/ConditionChips",
-                "Data/ParticipantFrame", "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
+                "Data/EquipmentDoll", "Data/CharacterStatusDrawer",
                 "World/LocalMap", "World/ShopPanel",
                 "World/QuestDrawer", "World/LoreCodexDrawer", "World/InventoryPanel",
                 "World/MapLattice",
@@ -216,6 +216,9 @@ class VueShowcaseDataEvidenceTest(ShowcaseEvidenceMixin, unittest.TestCase):
                 # The foe line-up (webclient-combat-foes-on-stage), the combat foes
                 # standing opposite the player on the stage.
                 "Core/FoeLineup",
+                # The combat figures' glance plates (webclient-combat-formation), which
+                # replaced the participant frame.
+                "Core/FigurePlate",
                 # The dialogue choice list (webclient-dialogue-choices-overlay), centred
                 # over the stage once the session line is read.
                 "Core/DialogueChoices",
