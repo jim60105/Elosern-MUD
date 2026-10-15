@@ -44,7 +44,7 @@ function entry(subject, url, faceRect, generation = "done") {
 // offline args for the showcase.
 
 const ART_PANEL = {
-  schema_version: 3,
+  schema_version: 4,
   available: true,
   portrait_catalog: {
     p1: entry("port_hero", "/art/defaults/man.webp", { x: 0.25, y: 0.06, w: 0.5, h: 0.5 }),

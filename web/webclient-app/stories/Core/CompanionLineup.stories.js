@@ -25,7 +25,9 @@ const player = {
   panel: ROSTER_PANEL,
   hasReference: true,
 };
-const ART_PANEL = { schema_version: 3, available: true, portrait_catalog: COMPANION_PORTRAIT_CATALOG };
+// The art-panel slice the lineup renderer consumes: only `portrait_catalog`
+// is read, but the panel is the registered v4 form, not the retired v3.
+const ART_PANEL = { schema_version: 4, available: true, portrait_catalog: COMPANION_PORTRAIT_CATALOG };
 const renderLineup = (args) => ({
   setup() {
     const possessing = ref(!!args.possession);

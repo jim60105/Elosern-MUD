@@ -23,6 +23,11 @@ import {
   STATUS_SLICE_SAMPLE,
   SERVICES_PANEL_SAMPLE,
   STAGE_JOURNEY_STOPS,
+  SCENE_SUBJECT,
+  fixtureDigest,
+  sceneBlock,
+  sceneDescriptor,
+  sceneResource,
   stageJourneyLocalMap,
   stageJourneyScene,
 } from "../fixtures.js";
@@ -368,7 +373,18 @@ const renderPlayer = (args) => ({
           ...(args.dialogue && args.dialogue !== "missing" ? { art: {
             ...ART_PANEL_PENDING_SAMPLE,
             // A local scene image for layout review (optional arg).
-            ...(args.sceneUrl ? { scene: { ...ART_PANEL_SAMPLE.scene, url: args.sceneUrl } } : {}),
+            ...(args.sceneUrl ? { scene: sceneBlock({}, sceneDescriptor({
+              attempts: [{
+                type: "image",
+                source_id: `scene.generated:${SCENE_SUBJECT}`,
+                rank: 20,
+                resource: sceneResource({
+                  resource_id: args.sceneUrl,
+                  version: fixtureDigest(args.sceneUrl),
+                  url: args.sceneUrl,
+                }),
+              }],
+            })) } : {}),
             portrait_catalog: {
               ...(args.populated ? COMPANION_PORTRAIT_CATALOG : {}),
               "7": args.dialogue === "pending" ? {
