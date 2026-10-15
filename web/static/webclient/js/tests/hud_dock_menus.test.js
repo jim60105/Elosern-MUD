@@ -81,6 +81,7 @@ function combatPanel(overrides) {
           hp_current: 100,
           hp_maximum: 100,
           portrait_ref: null,
+          conditions: [],
         },
       ],
       root_actions: ["attack", "skills", "items", "defend", "flee"],
@@ -105,6 +106,8 @@ function combatPanel(overrides) {
                   disabled_reason: null,
                   targets: [2],
                   shorthands: [],
+                  hostile: false,
+                  beneficial: false,
                   freeform_scales: [
                     { scale: 0.5, label: "小", mp_cost: 10 },
                     { scale: 1, label: "中", mp_cost: 20 },
@@ -128,6 +131,8 @@ function combatPanel(overrides) {
                   disabled_reason: null,
                   targets: [2],
                   shorthands: [],
+                  hostile: false,
+                  beneficial: false,
                 },
               ],
             },
@@ -372,6 +377,8 @@ test("openCategory: a single-sub-group category collapses straight to the skill 
                 disabled_reason: null,
                 targets: [2],
                 shorthands: [],
+                hostile: false,
+                beneficial: false,
               },
             ],
           },
@@ -489,6 +496,8 @@ function attackPanel(participants, overrides) {
       disabled_reason: null,
       targets: participants.map((participant) => participant.identity),
       shorthands: [],
+      hostile: false,
+      beneficial: false,
     },
     overrides || {}
   );
@@ -498,8 +507,8 @@ function attackPanel(participants, overrides) {
   });
 }
 
-const ALLY = { identity: 5, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null };
-const FOE = { identity: 2, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null };
+const ALLY = { identity: 5, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null, conditions: [] };
+const FOE = { identity: 2, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] };
 
 test("basic attack focuses the first listed foe even behind an ally, without reordering", () => {
   const combat = CombatMenu.buildMenus(attackPanel([ALLY, FOE]), {});

@@ -21,6 +21,7 @@ function foe(identity, hp = 30, state = "active") {
     hp_current: hp,
     hp_maximum: 30,
     portrait_ref: String(identity),
+    conditions: [],
   };
 }
 
@@ -40,6 +41,7 @@ const ROSTER = [
     hp_current: 80,
     hp_maximum: 100,
     portrait_ref: PLAYER,
+    conditions: [],
   },
   {
     identity: 43,
@@ -50,6 +52,7 @@ const ROSTER = [
     hp_current: 60,
     hp_maximum: 100,
     portrait_ref: ALLY,
+    conditions: [],
   },
 ];
 

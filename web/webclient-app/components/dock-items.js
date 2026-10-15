@@ -1,5 +1,5 @@
 // Action-dock item contract (B2, webclient-vue-03-showcase-action): derives
-// the preserved `action-`/`target-` item keys from `context_actions` v5 panel
+// the preserved `action-`/`target-` item keys from `context_actions` v6 panel
 // items and maps an activated item to the exact OOB action intent (the
 // `action_id` + `payload` of the `ui_action` envelope). Pure functions — no
 // DOM, no store (C1) — so the key/intent contract stays Node-testable and the

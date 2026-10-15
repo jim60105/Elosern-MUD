@@ -105,6 +105,8 @@ def _valid_skill(**overrides):
         "disabled_reason": None,
         "targets": [2],
         "shorthands": [],
+        "hostile": True,
+        "beneficial": False,
     }
     value.update(overrides)
     return value
@@ -140,6 +142,7 @@ def _valid_participant(**overrides):
         "hp_current": 100,
         "hp_maximum": 100,
         "portrait_ref": None,
+        "conditions": [],
     }
     value.update(overrides)
     return value
@@ -147,7 +150,7 @@ def _valid_participant(**overrides):
 
 def _valid_panel(**overrides):
     value = {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "combat",
         "session": {
@@ -169,7 +172,7 @@ def _valid_panel(**overrides):
 
 def _recovery_panel(**overrides):
     value = {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "combat",
         "session": {
@@ -198,7 +201,7 @@ def _player(key="panel player"):
 
 def _exploration_panel(**overrides):
     value = {
-        "schema_version": 5,
+        "schema_version": 6,
         "available": True,
         "kind": "exploration",
         "affordances": [

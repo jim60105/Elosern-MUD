@@ -18,6 +18,9 @@ var MAX_SAFE_INTEGER = C.MAX_SAFE_INTEGER;
 var MAX_MESSAGE_CODE_POINTS = C.MAX_MESSAGE_CODE_POINTS;
 var MAX_SESSION_ID_CODE_POINTS = C.MAX_SESSION_ID_CODE_POINTS;
 var MAX_PARTICIPANTS = C.MAX_PARTICIPANTS;
+var MAX_PARTICIPANT_CONDITIONS = C.MAX_PARTICIPANT_CONDITIONS;
+var MAX_CONDITION_LABEL = C.MAX_CONDITION_LABEL;
+var SEVERITIES = C.SEVERITIES;
 var MAX_SKILLS = C.MAX_SKILLS;
 var MAX_DISPLAY_NAME = C.MAX_DISPLAY_NAME;
 var MAX_LABEL = C.MAX_LABEL;
@@ -103,7 +106,7 @@ function validateParticipant(value) {
   requireExactFields(
     value,
     "participant",
-    ["identity", "token", "display_name", "team", "state", "hp_current", "hp_maximum", "portrait_ref"],
+    ["identity", "token", "display_name", "team", "state", "hp_current", "hp_maximum", "portrait_ref", "conditions"],
     []
   );
   requireInt(value.identity, "identity", 1, MAX_SAFE_INTEGER);
@@ -132,6 +135,28 @@ function validateParticipant(value) {
       throw new Error("portrait_ref exceeds its bound");
     }
   }
+  validateParticipantConditions(value.conditions);
+  return value;
+}
+
+// v6 participant conditions: the status panel's code, label and severity.
+function validateParticipantConditions(value) {
+  if (!Array.isArray(value) || value.length > MAX_PARTICIPANT_CONDITIONS) {
+    throw new Error(
+      "participant conditions must be a list of at most " + MAX_PARTICIPANT_CONDITIONS + " rows"
+    );
+  }
+  value.forEach(function (row) {
+    requireExactFields(row, "participant condition", ["code", "label", "severity"], []);
+    validateIdentifier(row.code, "participant condition code");
+    var label = requireString(row.label, "participant condition label", MAX_CONDITION_LABEL);
+    if (!label.trim()) {
+      throw new Error("participant condition label must be non-empty");
+    }
+    if (SEVERITIES.indexOf(row.severity) === -1) {
+      throw new Error("participant condition severity is not a stable severity");
+    }
+  });
   return value;
 }
 
@@ -150,7 +175,7 @@ function validateSkill(value) {
   requireExactFields(
     value,
     "skill",
-    ["key", "label", "description", "cost", "target_spec", "element", "enabled", "disabled_reason", "targets", "shorthands"],
+    ["key", "label", "description", "cost", "target_spec", "element", "enabled", "disabled_reason", "targets", "shorthands", "hostile", "beneficial"],
     ["freeform_scales"]
   );
   validateIdentifier(value.key, "skill key");
@@ -215,6 +240,8 @@ function validateSkill(value) {
   if (value.target_spec !== "area" && shorthands.length > 0) {
     throw new Error("only area skills may carry shorthands");
   }
+  requireBool(value.hostile, "hostile");
+  requireBool(value.beneficial, "beneficial");
   if (value.freeform_scales !== undefined) {
     if (typeof value.cost.mp !== "number" || !Number.isInteger(value.cost.mp) || value.cost.mp <= 0) {
       throw new Error("a skill without an mp cost cannot carry freeform_scales");
@@ -239,7 +266,7 @@ function validateActionKeys(value, name) {
   return value;
 }
 
-// Exact available context_actions combat/exploration panel v4 schema.
+// Exact available context_actions combat/exploration panel v6 schema.
 
 function validateContextActionsAffordance(value) {
   if (!isPlainObject(value)) {
@@ -331,7 +358,9 @@ function validateContextActionsExplorationForm(payload) {
   }
   var affordances = payload.affordances.map(validateContextActionsAffordance);
   return {
-    schema_version: 5,
+    // The caller (validateContextActionsPanel) already pinned the registered
+    // version; echo it rather than restating a literal that can drift.
+    schema_version: payload.schema_version,
     available: true,
     kind: "exploration",
     affordances: affordances,
@@ -347,7 +376,7 @@ function validateContextActionsPanel(payload) {
     ["session", "participants", "root_actions", "secondary_actions", "skills", "affordances", "suggestions"]
   );
   requireInt(payload.schema_version, "schema_version", 1, MAX_SAFE_INTEGER);
-  if (payload.schema_version !== 5) {
+  if (payload.schema_version !== 6) {
     throw new Error("unsupported context_actions panel schema_version");
   }
   if (payload.available !== true) {

@@ -66,7 +66,7 @@ export function statusPanel(overrides = undefined) {
 export function explorationActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "exploration",
       affordances: [
@@ -144,7 +144,7 @@ export function explorationPanel(overrides = undefined) {
 export function combatActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "combat",
       session: { session_id: "s-1", mode: "hostile", round: 1, state: "ready", reason: null },
@@ -158,6 +158,7 @@ export function combatActions(overrides = undefined) {
           hp_current: 80,
           hp_maximum: 100,
           portrait_ref: null,
+          conditions: [],
         },
         {
           identity: 8,
@@ -168,6 +169,7 @@ export function combatActions(overrides = undefined) {
           hp_current: 100,
           hp_maximum: 100,
           portrait_ref: null,
+          conditions: [],
         },
       ],
       root_actions: ["attack", "skills", "items", "defend", "flee"],

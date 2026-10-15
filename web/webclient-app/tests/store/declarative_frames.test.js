@@ -145,6 +145,8 @@ describe("declarative frame stack (store contract)", () => {
                 disabled_reason: null,
                 targets: [],
                 shorthands: [],
+                hostile: false,
+                beneficial: false,
               })),
             },
           ],

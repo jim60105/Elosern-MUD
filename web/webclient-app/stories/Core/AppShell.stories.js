@@ -428,7 +428,7 @@ const renderPlayer = (args) => ({
           skills: [{ category: "martial_arts", label: "武技", groups: [{ group: "basic", label: "基本", skills: [{
             key: CombatMenu.BASIC_ATTACK_KEY, label: "基本攻擊", description: "選擇一名敵人。",
             cost: {}, target_spec: "single", element: null, enabled: true, disabled_reason: null,
-            targets: [31, 32, 33], shorthands: [],
+            targets: [31, 32, 33], shorthands: [], hostile: true, beneficial: false,
           }] }] }],
         });
         snapshot.panels.status = protocolFixtures.statusPanel({ combat: { mode: "hostile", round: 0 } });

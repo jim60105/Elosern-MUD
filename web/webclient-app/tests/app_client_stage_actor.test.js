@@ -141,10 +141,10 @@ describe("the stage actors in the portrait anchors", () => {
     // webclient-combat-foes-on-stage D1: the active foes in presenter order;
     // party members and non-active foes stay in the participant frame.
     const participants = [
-      { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null },
-      { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 40, hp_maximum: 60, portrait_ref: "7" },
-      { identity: 9, token: "e2", display_name: "逃兵", team: "foes", state: "fled", hp_current: 10, hp_maximum: 60, portrait_ref: null },
-      { identity: 10, token: "e3", display_name: "哥布林", team: "foes", state: "active", hp_current: 30, hp_maximum: 30, portrait_ref: null },
+      { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [] },
+      { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 40, hp_maximum: 60, portrait_ref: "7", conditions: [] },
+      { identity: 9, token: "e2", display_name: "逃兵", team: "foes", state: "fled", hp_current: 10, hp_maximum: 60, portrait_ref: null, conditions: [] },
+      { identity: 10, token: "e3", display_name: "哥布林", team: "foes", state: "active", hp_current: 30, hp_maximum: 30, portrait_ref: null, conditions: [] },
     ];
     const response = store.receive(
       1,

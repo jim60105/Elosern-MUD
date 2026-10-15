@@ -83,6 +83,7 @@ function participants(foeHp = 80) {
       hp_current: foeHp,
       hp_maximum: 80,
       portrait_ref: FOE_REF,
+      conditions: [],
     },
     {
       identity: 42,
@@ -93,6 +94,7 @@ function participants(foeHp = 80) {
       hp_current: 80,
       hp_maximum: 100,
       portrait_ref: PLAYER_REF,
+      conditions: [],
     },
   ];
 }

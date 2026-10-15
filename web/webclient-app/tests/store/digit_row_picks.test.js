@@ -47,6 +47,8 @@ function sixSkillCategory() {
             disabled_reason: null,
             targets: [],
             shorthands: [],
+            hostile: false,
+            beneficial: false,
           })),
         },
       ],

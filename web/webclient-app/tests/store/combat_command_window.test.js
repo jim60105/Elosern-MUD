@@ -28,6 +28,8 @@ function skills(attackTargets) {
     disabled_reason: null,
     targets,
     shorthands: [],
+    hostile: false,
+    beneficial: false,
   });
   return [
     {
@@ -58,8 +60,8 @@ describe("combat command window (store)", () => {
   // The presenter order lists the ally first, so an opposing candidate is
   // never simply the first row.
   const PARTICIPANTS = [
-    { identity: ALLY, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
-    { identity: FOE, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null },
+    { identity: ALLY, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
+    { identity: FOE, token: "e1", display_name: "灰袍盜賊", team: "foes", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [] },
   ];
 
   function enterCombat(attackTargets) {

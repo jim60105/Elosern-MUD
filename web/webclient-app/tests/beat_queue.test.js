@@ -72,6 +72,7 @@ const ROSTER = [
     hp_current: 30,
     hp_maximum: 30,
     portrait_ref: "3",
+    conditions: [],
   },
   {
     identity: 42,
@@ -82,6 +83,7 @@ const ROSTER = [
     hp_current: 80,
     hp_maximum: 100,
     portrait_ref: "42",
+    conditions: [],
   },
 ];
 

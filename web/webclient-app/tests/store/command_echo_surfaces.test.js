@@ -68,6 +68,8 @@ const SKILL_ATTACK = {
   disabled_reason: null,
   targets: [7, 8],
   shorthands: [],
+  hostile: false,
+  beneficial: false,
 };
 
 const SKILL_WIND = {
@@ -81,6 +83,8 @@ const SKILL_WIND = {
   disabled_reason: null,
   targets: [7, 8],
   shorthands: [],
+  hostile: false,
+  beneficial: false,
   freeform_scales: FREEFORM_SCALES,
 };
 
@@ -95,6 +99,8 @@ const SKILL_FIRE = {
   disabled_reason: null,
   targets: [7, 8],
   shorthands: ["all-enemies"],
+  hostile: false,
+  beneficial: false,
 };
 
 describe("per-surface command echo (complete-ui-command-echo D6)", () => {

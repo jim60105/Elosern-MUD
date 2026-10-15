@@ -1,11 +1,12 @@
-"""Exact schema-version-5 ``context_actions`` panel and presenter.
+"""Exact schema-version-6 ``context_actions`` panel and presenter.
 
 The presenter serializes the frozen combat view owned by
 ``world.rules.combat_view`` and validates its own output against the exact
 bounded schema before returning it to the presentation registry. Inside a
 valid active combat session it emits the combat available form (byte-identical
-to schema version 4 apart from the version field and the ``suggestions``
-envelope); in exploration mode it emits the exploration available form
+to schema version 4 apart from the version field, the ``suggestions`` envelope
+of version 5, and the version-6 participant ``conditions`` and skill
+``hostile``/``beneficial`` facts); in exploration mode it emits the exploration available form
 carrying the canonical affordance vocabulary
 (``web.webclient.presentation.affordances``) and the state-backed
 ``suggestions`` envelope; only outside both modes (creation-pending or absent
@@ -19,7 +20,8 @@ state, battlefield, session, quest, location, or world time.
 
 The ``skills`` field is an ordered array of category groups (each optionally
 containing element/line sub-groups); the individual skill descriptor object is
-byte-identical to schema version 2.
+byte-identical to schema version 2 plus the two required version-6 booleans
+``hostile`` and ``beneficial``.
 """
 
 from typing import Any
@@ -54,6 +56,7 @@ from web.webclient.presentation.protocol import (
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.combat_view import (
     MAX_DISPLAY_NAME_CODE_POINTS,
+    MAX_PARTICIPANT_CONDITIONS,
     MAX_PARTICIPANTS,
     MAX_REASON_MESSAGE_CODE_POINTS,
     MAX_SESSION_ID_CODE_POINTS,
@@ -69,9 +72,10 @@ from world.rules.progression import (
     FREEFORM_CAST_SCALES,
     scaled_mp_cost,
 )
+from world.rules.status_display import _SEVERITIES
 from world.skills.registry import SkillCategory
 
-CONTEXT_ACTIONS_SCHEMA_VERSION = 5
+CONTEXT_ACTIONS_SCHEMA_VERSION = 6
 
 # The exploration form carries the complete canonical affordance vocabulary of
 # a room. The bound derives from the shared vocabulary caps (<= 32 targets x
@@ -98,6 +102,10 @@ MAX_STATE = 16
 MAX_ACTION_KEYS = 16
 MAX_REASON_CODE = 64
 MAX_PARTICIPANT_REF = 32
+# Participant condition rows reuse the status panel's label bound and
+# severity vocabulary.
+MAX_CONDITION_LABEL = 128
+CONDITION_SEVERITIES = frozenset(_SEVERITIES)
 
 # Participant display-state values the panel emits.
 PARTICIPANT_STATES = frozenset({"active", "fled", "knocked_out", "defeated"})
@@ -168,6 +176,7 @@ def _validate_participant(value: Any) -> dict[str, Any]:
             "hp_current",
             "hp_maximum",
             "portrait_ref",
+            "conditions",
         },
         {},
     )
@@ -196,6 +205,7 @@ def _validate_participant(value: Any) -> dict[str, Any]:
             )
         if len(portrait_ref) > MAX_PARTICIPANT_REF:
             raise ProtocolValidationError("portrait_ref exceeds its bound")
+    conditions = _validate_participant_conditions(value["conditions"])
     return {
         "identity": identity,
         "token": token,
@@ -205,7 +215,27 @@ def _validate_participant(value: Any) -> dict[str, Any]:
         "hp_current": hp_current,
         "hp_maximum": hp_maximum,
         "portrait_ref": portrait_ref,
+        "conditions": conditions,
     }
+
+
+def _validate_participant_conditions(value: Any) -> list[dict[str, str]]:
+    """Validate one participant's bounded ``conditions`` rows."""
+    if not isinstance(value, list) or len(value) > MAX_PARTICIPANT_CONDITIONS:
+        raise ProtocolValidationError(
+            f"participant conditions must be a list of at most {MAX_PARTICIPANT_CONDITIONS} rows"
+        )
+    rows: list[dict[str, str]] = []
+    for row in value:
+        _require_exact_fields(row, "participant condition", {"code", "label", "severity"}, {})
+        code = _validate_identifier(row["code"], "participant condition code")
+        label = _require_str(row, "label", maximum=MAX_CONDITION_LABEL)
+        if not label.strip():
+            raise ProtocolValidationError("participant condition label must be non-empty")
+        if row["severity"] not in CONDITION_SEVERITIES:
+            raise ProtocolValidationError("participant condition severity is not a stable severity")
+        rows.append({"code": code, "label": label, "severity": row["severity"]})
+    return rows
 
 
 def _validate_disabled_reason(value: Any) -> dict[str, Any] | None:
@@ -289,6 +319,8 @@ def _validate_skill(value: Any) -> dict[str, Any]:
             "disabled_reason",
             "targets",
             "shorthands",
+            "hostile",
+            "beneficial",
         },
         {"freeform_scales": "optional"},
     )
@@ -341,6 +373,8 @@ def _validate_skill(value: Any) -> dict[str, Any]:
         raise ProtocolValidationError("skill shorthands must be unique")
     if target_spec != "area" and shorthands:
         raise ProtocolValidationError("only area skills may carry shorthands")
+    hostile = _require_bool(value, "hostile")
+    beneficial = _require_bool(value, "beneficial")
     normalized = {
         "key": key,
         "label": label,
@@ -352,6 +386,8 @@ def _validate_skill(value: Any) -> dict[str, Any]:
         "disabled_reason": disabled_reason,
         "targets": list(targets),
         "shorthands": list(shorthands),
+        "hostile": hostile,
+        "beneficial": beneficial,
     }
     scales = validate_freeform_scales(
         value.get("freeform_scales"),
@@ -666,6 +702,8 @@ def _serialize_skill(skill: Any) -> dict[str, Any]:
         ),
         "targets": list(skill.valid_target_ids),
         "shorthands": list(skill.shorthands),
+        "hostile": skill.hostile,
+        "beneficial": skill.beneficial,
     }
     if skill.freeform_scales:
         descriptor["freeform_scales"] = [
@@ -807,8 +845,9 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
     """Return the exact available panel for the authenticated puppet.
 
     Inside a valid active combat session the combat form is emitted
-    (byte-identical to schema version 4 apart from the version field and the
-    ``suggestions`` envelope pinned to unavailable); in exploration mode the
+    (byte-identical to schema version 4 apart from the version field, the
+    ``suggestions`` envelope pinned to unavailable, and the version-6
+    participant and skill facts); in exploration mode the
     exploration available form carries the canonical affordance vocabulary
     and the state-backed suggestions envelope; outside both modes the registry
     emits the shared unavailable form.
@@ -853,6 +892,10 @@ def context_actions_presenter(context: PresentationContext) -> dict[str, Any]:
             "hp_current": participant.hp_current,
             "hp_maximum": participant.hp_maximum,
             "portrait_ref": participant.portrait_ref,
+            "conditions": [
+                {"code": row.code, "label": row.label, "severity": row.severity}
+                for row in participant.conditions
+            ],
         }
         for participant in view.participants
     ]

@@ -64,6 +64,8 @@ function validSkill(overrides) {
       disabled_reason: null,
       targets: [2],
       shorthands: [],
+      hostile: false,
+      beneficial: false,
     },
     overrides
   );
@@ -80,6 +82,7 @@ function validParticipant(overrides) {
       hp_current: 100,
       hp_maximum: 100,
       portrait_ref: null,
+      conditions: [],
     },
     overrides
   );
@@ -126,6 +129,8 @@ function readyPanel(overrides) {
           target_spec: "area",
           targets: [2],
           shorthands: ["all-enemies", "all"],
+          hostile: false,
+          beneficial: false,
         })
       ),
       suggestions: { status: "unavailable" },
@@ -277,6 +282,8 @@ test("AREA supports Space toggle, explicit list, and mutually exclusive shorthan
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
+      hostile: false,
+      beneficial: false,
     })
   );
   const combat = CombatMenu.buildMenus(panel, {});
@@ -307,6 +314,8 @@ test("AREA payload preserves presenter order regardless of toggle order", () => 
       target_spec: "area",
       targets: [2, 3],
       shorthands: ["all-enemies", "all"],
+      hostile: false,
+      beneficial: false,
     })
   );
   const combat = CombatMenu.buildMenus(panel, {});
@@ -380,6 +389,8 @@ function freeformSkill(overrides) {
         target_spec: "area",
         targets: [2],
         shorthands: ["all-enemies"],
+        hostile: false,
+        beneficial: false,
         freeform_scales: [
           { scale: 0.25, label: "1/4", mp_cost: 4 },
           { scale: 0.5, label: "1/2", mp_cost: 7 },

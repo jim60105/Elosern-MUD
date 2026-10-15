@@ -263,6 +263,8 @@ describe("H1 preserved DOM contract (design D6)", () => {
                         disabled_reason: null,
                         targets: [7, 8],
                         shorthands: [],
+                        hostile: false,
+                        beneficial: false,
                       },
                     ],
                   },

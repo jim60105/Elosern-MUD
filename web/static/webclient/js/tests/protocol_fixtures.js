@@ -23,6 +23,8 @@ function validCombatSkill(overrides) {
       disabled_reason: null,
       targets: [2],
       shorthands: [],
+      hostile: true,
+      beneficial: false,
     },
     overrides
   );
@@ -61,6 +63,7 @@ function validCombatParticipant(overrides) {
       hp_current: 100,
       hp_maximum: 100,
       portrait_ref: null,
+      conditions: [],
     },
     overrides
   );
@@ -69,7 +72,7 @@ function validCombatParticipant(overrides) {
 function validCombatPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "combat",
       session: {
@@ -92,7 +95,7 @@ function validCombatPanel(overrides) {
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "combat",
       session: {
@@ -129,7 +132,7 @@ function validSuggestions(overrides) {
 function validContextActionsExplorationPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "exploration",
       affordances: [],

@@ -86,14 +86,15 @@ export function foeParticipants(count, overrides = {}) {
     hp_current: hp,
     hp_maximum: max,
     portrait_ref: String(identity),
+    conditions: [],
     ...(overrides[identity] || {}),
   }));
 }
 
 // The player's side as the combat panel lists it.
 export const PARTY_PARTICIPANTS = Object.freeze([
-  { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null },
-  { identity: 8, token: "a2", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null },
+  { identity: 1, token: "a1", display_name: "艾莉亞", team: "party", state: "active", hp_current: 80, hp_maximum: 100, portrait_ref: null, conditions: [] },
+  { identity: 8, token: "a2", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
 ]);
 
 // The combat panel's committed skill categories for the stage stories
@@ -101,6 +102,9 @@ export const PARTY_PARTICIPANTS = Object.freeze([
 // candidates put the ally before the foes, and a second strike) and 元素魔法
 // with two sub-groups, so the command window shows its counts and its
 // category → group → skill path.
+// The v6 target polarity of the damage skills below.
+const HOSTILE = Object.freeze({ hostile: true });
+
 export function combatSkills(participants) {
   const foes = participants.filter((p) => p.team === "foes").map((p) => p.identity);
   const allies = participants.filter((p) => p.team === "party" && p.identity !== 1).map((p) => p.identity);
@@ -115,6 +119,8 @@ export function combatSkills(participants) {
     disabled_reason: null,
     targets,
     shorthands: [],
+    hostile: false,
+    beneficial: false,
     ...extra,
   });
   return [
@@ -126,8 +132,8 @@ export function combatSkills(participants) {
           group: null,
           label: null,
           skills: [
-            skill("basic_attack", "普通攻擊", "以手中武器攻擊一名目標。", {}, "single", [...allies, ...foes]),
-            skill("heavy_slash", "重斬", "蓄力一擊，對單一敵人造成較重的傷害。", { sp: 6 }, "single", foes),
+            skill("basic_attack", "普通攻擊", "以手中武器攻擊一名目標。", {}, "single", [...allies, ...foes], HOSTILE),
+            skill("heavy_slash", "重斬", "蓄力一擊，對單一敵人造成較重的傷害。", { sp: 6 }, "single", foes, HOSTILE),
           ],
         },
       ],
@@ -139,13 +145,14 @@ export function combatSkills(participants) {
         {
           group: "fire",
           label: "火",
-          skills: [skill("firebolt", "火矢", "射出一道火焰箭矢。", { mp: 10 }, "single", foes)],
+          skills: [skill("firebolt", "火矢", "射出一道火焰箭矢。", { mp: 10 }, "single", foes, HOSTILE)],
         },
         {
           group: "water",
           label: "水",
           skills: [
             skill("mend_glow", "微光治癒", "以柔和的水光治癒自己。", { mp: 11 }, "self", [], {
+              beneficial: true,
               enabled: false,
               disabled_reason: { code: "insufficient_mp", message: "魔力不足。" },
             }),
