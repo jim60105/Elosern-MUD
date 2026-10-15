@@ -12,7 +12,7 @@ import { createPinia, setActivePinia } from "pinia";
 import FigurePlate from "../../components/FigurePlate.vue";
 import AppClient from "../../AppClient.vue";
 import { combatFormation } from "../../components/combat-formation.js";
-import { plateHpCurrent, plateHpPercent, plateLabel, repeatedNames } from "../../components/figure-plate.js";
+import { bySeverity, isLowPlateHp, plateHpCurrent, plateHpPercent, plateLabel, repeatedNames } from "../../components/figure-plate.js";
 import { useElosernStore } from "../../stores/elosern.js";
 import { PARTY_PANEL_FULL_SAMPLE } from "../../stories/fixtures/party_panels.js";
 import { ART_PANEL_SAMPLE } from "../../stories/fixtures.js";
@@ -50,10 +50,12 @@ describe("FigurePlate", () => {
     const readout = plate.get('[data-testid="figure-plate-readout"]');
     expect(readout.get(".figure-plate__current").text()).toBe("42");
     expect(readout.get(".figure-plate__maximum").text()).toBe("/120");
-    // Line 3 is kept empty for the condition glyphs.
+    // Line 3 holds the condition glyphs: none committed, none drawn.
     expect(plate.get('[data-testid="figure-plate-glyphs"]').text()).toBe("");
-    // Display-only: a named group, nothing focusable.
+    // A named group, a stop of the plates group only (tabindex -1), with
+    // nothing of its own in the tab order.
     expect(plate.attributes("role")).toBe("group");
+    expect(plate.attributes("tabindex")).toBe("-1");
     expect(plate.attributes("aria-label")).toBe("蕾娜 a2，我方，生命 42/120");
     expect(plate.findAll("button, a, input, [tabindex]")).toHaveLength(0);
   });
@@ -110,6 +112,115 @@ describe("FigurePlate", () => {
   });
 });
 
+// webclient-combat-figure-plates (design D2/D3/D5): the glyph line, the
+// low-HP alarm and the accessible name with the conditions.
+const cond = (code, label, severity) => ({ code, label, severity });
+const POISON = cond("poison", "中毒", "harmful");
+const BLESS = cond("bless", "祝福", "beneficial");
+const FIVE = [cond("c1", "灼燒", "harmful"), cond("c2", "疾風", "beneficial"), cond("c3", "迷霧", "informational"), cond("c4", "暈眩", "critical"), cond("c5", "遲緩", "warning")];
+const EIGHT = [...FIVE, cond("c6", "護盾", "beneficial"), cond("c7", "流血", "harmful"), cond("c8", "恐懼", "warning")];
+
+describe("FigurePlate conditions and alarm", () => {
+  let wrapper;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.replaceChildren();
+  });
+  const glyphs = (w) => w.findAll('[data-testid^="figure-plate__condition--"]');
+  const overflow = (w) => w.find('[data-testid="figure-plate__condition-overflow"]');
+  const tip = () => document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+
+  it("shows a full plate's conditions as glyphs on the third line, three and +N at most", () => {
+    wrapper = mount(FigurePlate, { props: { name: "哥布林", token: "e1", side: "foes", hpCurrent: 20, hpMaximum: 24, form: "full", conditions: [POISON, BLESS] } });
+    const line = wrapper.get('[data-testid="figure-plate-glyphs"]');
+    expect(glyphs(wrapper).map((g) => g.get(".glyph").text())).toEqual(["▼", "▲"]);
+    expect(line.findAll("button").every((b) => b.attributes("tabindex") === "-1")).toBe(true);
+    expect(glyphs(wrapper)[0].attributes("aria-label")).toBe("中毒");
+    // No condition word is permanently visible.
+    expect(wrapper.text()).not.toContain("中毒");
+    expect(overflow(wrapper).exists()).toBe(false);
+    // The name and the stroke keep their own lines.
+    expect(wrapper.get(".figure-plate__name").find("button").exists()).toBe(false);
+    expect(wrapper.get(".figure-plate__line").find("button").exists()).toBe(false);
+  });
+
+  it("caps a full plate at three glyphs and a +N whose tooltip lists the hidden ones", async () => {
+    wrapper = mount(FigurePlate, { attachTo: document.body, props: { name: "蕾娜", side: "party", hpCurrent: 90, hpMaximum: 120, form: "full", conditions: EIGHT } });
+    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["c1", "c2", "c3"]);
+    expect(overflow(wrapper).text()).toBe("+5");
+    await overflow(wrapper).trigger("mouseenter");
+    expect([...tip().querySelectorAll(".tip-item .detail-label")].map((n) => n.textContent)).toEqual(["暈眩", "遲緩", "護盾", "流血", "恐懼"]);
+    await overflow(wrapper).trigger("mouseleave");
+    expect(tip()).toBeNull();
+    // A five-condition companion: three glyphs and +2.
+    await wrapper.setProps({ conditions: FIVE });
+    expect(glyphs(wrapper)).toHaveLength(3);
+    expect(overflow(wrapper).text()).toBe("+2");
+  });
+
+  it("shows a compact plate's most severe glyph and +N, in severity order", () => {
+    wrapper = mount(FigurePlate, { props: { name: "狼", side: "foes", hpCurrent: 20, hpMaximum: 24, form: "compact", conditions: [BLESS, POISON, cond("x", "暈眩", "critical")] } });
+    expect(glyphs(wrapper).map((g) => g.attributes("data-code"))).toEqual(["x"]);
+    expect(overflow(wrapper).text()).toBe("+2");
+    expect(wrapper.attributes("aria-label")).toBe("狼，敵方，生命 20/24，狀態：祝福、中毒、暈眩");
+    expect(wrapper.find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
+  });
+
+  it("folds a low compact plate's +N into its glyph to make room for 危險", async () => {
+    wrapper = mount(FigurePlate, { attachTo: document.body, props: { name: "狼", side: "foes", hpCurrent: 6, hpMaximum: 24, form: "compact", conditions: [BLESS, POISON, cond("x", "暈眩", "critical")] } });
+    const line = wrapper.get('[data-testid="figure-plate-glyphs"]');
+    expect(line.get('[data-testid="figure-plate-danger"]').text()).toBe("危險");
+    expect(overflow(wrapper).exists()).toBe(false);
+    const carrier = glyphs(wrapper)[0];
+    expect(carrier.attributes("data-code")).toBe("x");
+    expect(carrier.attributes("data-carries")).toBe("2");
+    expect(carrier.attributes("aria-label")).toBe("暈眩；中毒；祝福");
+    await carrier.trigger("focus");
+    expect([...tip().querySelectorAll(".tip-item .detail-label")].map((n) => n.textContent)).toEqual(["暈眩", "中毒", "祝福"]);
+    expect(wrapper.attributes("aria-label")).toBe("狼，敵方，生命 6/24，危險，狀態：祝福、中毒、暈眩");
+  });
+
+  it.each(["full", "compact"])("raises the 危險 alarm at exactly 25%% and not at 26%% (%s)", async (form) => {
+    wrapper = mount(FigurePlate, { props: { name: "蕾娜", side: "party", hpCurrent: 25, hpMaximum: 100, form } });
+    expect(wrapper.attributes("data-low-hp")).toBe("true");
+    expect(wrapper.get('[data-testid="figure-plate-danger"]').text()).toBe("危險");
+    expect(wrapper.get(".figure-plate__current").classes()).toContain("figure-plate__current--low");
+    // The tag stands after the name on a full plate, on the glyph line of a compact one.
+    const home = form === "full" ? ".figure-plate__name" : '[data-testid="figure-plate-glyphs"]';
+    expect(wrapper.get(home).find('[data-testid="figure-plate-danger"]').exists()).toBe(true);
+    await wrapper.setProps({ hpCurrent: 26 });
+    expect(wrapper.attributes("data-low-hp")).toBeUndefined();
+    expect(wrapper.find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
+    expect(wrapper.get(".figure-plate__current").classes()).not.toContain("figure-plate__current--low");
+  });
+
+  it("closes an open tooltip on the close signal, keeps it across a same-content commit, and closes it when the condition goes", async () => {
+    wrapper = mount(FigurePlate, { attachTo: document.body, props: { name: "哥布林", side: "foes", hpCurrent: 20, hpMaximum: 24, conditions: [POISON, BLESS] } });
+    await glyphs(wrapper)[0].trigger("mouseenter");
+    expect(tip().textContent).toContain("中毒");
+    // A new revision with the same content keeps it open.
+    await wrapper.setProps({ conditions: [{ ...POISON }, { ...BLESS }] });
+    expect(tip()).not.toBeNull();
+    await wrapper.setProps({ closeSignal: 1 });
+    expect(tip()).toBeNull();
+    await glyphs(wrapper)[0].trigger("mouseenter");
+    expect(tip()).not.toBeNull();
+    await wrapper.setProps({ conditions: [BLESS] });
+    expect(tip()).toBeNull();
+  });
+
+  it("keeps the glyph styling in the component, its hit boxes inside the slot", () => {
+    const plateCss = readFileSync(join(APP_ROOT, "components/FigurePlate.vue"), "utf8");
+    expect(plateCss).toMatch(/\.figure-plate__glyphs \{[^}]*align-self: end;[^}]*height: calc\(24px \* var\(--ui-scale\)\);/);
+    const chipsCss = readFileSync(join(APP_ROOT, "components/ConditionChips.vue"), "utf8");
+    expect(chipsCss).toMatch(/\.conditions--plate \.chip \{[^}]*width: calc\(24px \* var\(--ui-scale\)\);[^}]*height: calc\(24px \* var\(--ui-scale\)\);/);
+    // The app shell carries no duplicate of these rules (web/webclient-app/AGENTS.md).
+    const shell = readFileSync(join(APP_ROOT, "styles/app-shell.css"), "utf8");
+    expect(shell).not.toMatch(/figure-plate|conditions--plate|condition-tip/);
+  });
+});
+
 describe("the plate helpers", () => {
   it("fills the stroke from the numbers, clamped, and empty without a maximum", () => {
     expect(plateHpPercent(18, 30)).toBe(60);
@@ -126,6 +237,19 @@ describe("the plate helpers", () => {
     expect(plateHpCurrent(row, null)).toBe(30);
     // A null reference keeps the committed value even if a key matches.
     expect(plateHpCurrent({ hp_current: 30, portrait_ref: null }, { null: 1 })).toBe(30);
+  });
+
+  it("raises low hit points at the vitals threshold, never without numbers", () => {
+    expect(isLowPlateHp(25, 100)).toBe(true);
+    expect(isLowPlateHp(26, 100)).toBe(false);
+    expect(isLowPlateHp(0, 30)).toBe(true);
+    expect(isLowPlateHp(null, 30)).toBe(false);
+    expect(isLowPlateHp(0, 0)).toBe(false);
+  });
+
+  it("orders conditions by severity, committed order within one", () => {
+    const rows = [cond("a", "A", "beneficial"), cond("b", "B", "harmful"), cond("c", "C", "warning"), cond("d", "D", "harmful"), cond("e", "E", "critical"), cond("f", "F", "informational")];
+    expect(bySeverity(rows).map((c) => c.code)).toEqual(["e", "b", "d", "c", "f", "a"]);
   });
 
   it("composes the accessible name with side and token", () => {
@@ -221,6 +345,33 @@ describe("the plates layer in the client", () => {
     await nextTick();
     await nextTick();
     expect(wrapper.get('[data-anchor="plates"]').findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert)).toHaveLength(0);
+  });
+
+  it("passes each participant's conditions and stage x to its plate, and closes a plate tooltip when a round starts", async () => {
+    const participants = [
+      { ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] },
+      foeRow(202, "e2", "狼", 4),
+    ];
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: { status: fx.statusPanel(), exploration: fx.explorationPanel(), context_actions: fx.combatActions({ participants }), art: ART_PANEL_SAMPLE },
+    })], {});
+    await nextTick();
+    await nextTick();
+    const plates = wrapper.findAll('[data-anchor="plates"] [data-testid="figure-plate"]');
+    expect(plates[0].find('[data-testid="figure-plate__condition--poison"]').exists()).toBe(true);
+    expect(plates[0].attributes("aria-label")).toBe("哥布林 e1，敵方，生命 24/24，狀態：中毒");
+    expect(plates[1].attributes("data-low-hp")).toBe("true");
+    for (const plate of plates) {
+      const style = plate.element.style;
+      expect(Number(plate.attributes("data-stage-x"))).toBeCloseTo(parseFloat(style.left) + parseFloat(style.width) / 2, 3);
+    }
+    await plates[0].get('[data-testid="figure-plate__condition--poison"]').trigger("mouseenter");
+    expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).not.toBeNull();
+    store.view.dispatch.beatLocked = true;
+    await nextTick();
+    await nextTick();
+    expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
   });
 
   it("gives the player's own figure a plate while a companion is possessed, and none to the possessed one", async () => {

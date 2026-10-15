@@ -57,8 +57,11 @@ export function conditionLabel(condition) {
   return parts.join("，");
 }
 
+// A row without `provenance` (the combat panel's participant conditions,
+// webclient-combat-figure-plates) states no source.
 export function conditionSource(condition) {
   const provenance = condition.provenance;
+  if (!provenance) return "";
   if (provenance.kind === "unknown") return "來源暫無資料";
   if (provenance.kind === "non_equipment") return "";
   const labels = provenance.equipment_sources.map((source) => source.label).join("、");
