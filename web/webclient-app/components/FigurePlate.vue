@@ -125,23 +125,25 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
 
 /* The ground: the panel ink under a light backdrop blur, feathered so it
    is densest at the plate's foot (over the figure's head) and fades out
-   upward and toward both sides. It overhangs the slot a little sideways so
-   the fade happens outside the type, never across it. */
+   upward and toward both sides. It overhangs the slot above and to the
+   sides, so the fade happens outside the type, never across it: the name
+   and the readout always sit on the dense part, and a face behind the
+   plate's thin edges still reads through. */
 .figure-plate::before {
   content: "";
   position: absolute;
-  inset: calc(-4px * var(--ui-scale)) calc(-10px * var(--ui-scale)) 0;
+  inset: calc(-12px * var(--ui-scale)) calc(-12px * var(--ui-scale)) 0;
   z-index: -1;
   background: var(--panel);
-  opacity: 0.72;
+  opacity: 0.78;
   backdrop-filter: blur(calc(3px * var(--ui-scale)));
   -webkit-mask-image:
-    linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.9) 40%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    linear-gradient(0deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.7) 78%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(0deg, #000 0%, rgba(0, 0, 0, 0.9) 40%, transparent 100%),
-    linear-gradient(90deg, transparent 0%, #000 18%, #000 82%, transparent 100%);
+    linear-gradient(0deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.7) 78%, transparent 100%),
+    linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   mask-composite: intersect;
 }
 /* The crown: one brass hairline along the foot, brightest at its centre. */
