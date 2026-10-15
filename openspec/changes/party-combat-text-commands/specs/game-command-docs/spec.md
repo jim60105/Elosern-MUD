@@ -13,4 +13,3 @@ Both player command documents SHALL describe combat command skill/item/tactic sy
 - **WHEN** a text player invokes combat retreat, combat forfeit or an allied flee/surrender alias
 - **THEN** a party consequence prompt requires confirm plus its token, other continuations cancel, and no documented command bypasses that confirmation
 
-

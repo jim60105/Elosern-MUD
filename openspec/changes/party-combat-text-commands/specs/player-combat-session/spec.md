@@ -33,7 +33,6 @@
 - **WHEN** combat command names a2 as actor and a1 or e1 as target
 - **THEN** only authorized a2 capabilities and costs are used, and SELF ignores target tokens and binds a2
 
-
 ## ADDED Requirements
 
 ### Requirement: Text clients can complete and revise every party command kind
@@ -46,5 +45,4 @@ Text clients SHALL offer actor-scoped skill including scale/targets, usable own 
 #### Scenario: Commander cast and use
 - **WHEN** existing cast or use is entered during a multi-actor session
 - **THEN** it confirms the commander entry through the same facade and cannot execute an incomplete round
-
 
