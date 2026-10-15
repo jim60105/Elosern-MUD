@@ -181,7 +181,10 @@ _INSTALL_READER = """() => {
           label: el.getAttribute('aria-label'),
           token: el.querySelector('[data-testid="figure-plate-token"]')?.textContent ?? null,
         })),
-      platesLayerFocusable: q('[data-anchor="plates"]').querySelectorAll('button, a, input, textarea, select, [tabindex]').length,
+      // Descendants in the tab order: the plates and their glyphs are
+      // tabindex=-1 stops of the one group (webclient-combat-figure-plates).
+      platesLayerFocusable: [...q('[data-anchor="plates"]').querySelectorAll('button, a, input, textarea, select, [tabindex]')]
+        .filter((el) => el.tabIndex >= 0).length,
       platesZ: Number(getComputedStyle(q('[data-anchor="plates"]')).zIndex),
       actorsZ: Math.max(...['actor-left', 'actor-right'].map((a) => Number(getComputedStyle(q(`[data-anchor="${a}"]`)).zIndex))),
       captionLeft: root.getPropertyValue('--caption-left').trim(),
@@ -398,6 +401,113 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="participant-frame"]').count(), 0)
         page.close()
 
+    @covers_requirement("webclient-contextual-hud::combat-figures-carry-glance-plates")
+    @covers_requirement(
+        "webclient-contextual-hud::figure-plates-show-conditions-at-a-glance-and-their-details-on-demand"
+    )
+    def test_figure_plates_show_conditions_and_alarm(self):
+        """A poisoned foe's plate shows its glyph, whose tooltip opens on demand
+        only and closes on every exit tried here; a companion at 20% carries
+        危險 and the critical hue; the plates are one tab stop after the dock
+        (webclient-combat-figure-plates)."""
+        page = self._page(REFERENCE, companions=1)
+        panels = _combat_panels(2, companions=1)
+        for p in panels["context_actions"]["participants"]:
+            if p["identity"] == 11:
+                p["conditions"] = [{"code": "poison", "label": "中毒", "severity": "harmful"}]
+            if p["identity"] == 101:
+                p["hp_current"] = 24  # of 120: 20%
+        self._commit(page, "combat", panels)
+        self._wait(page, "s.plates.length === 3")
+        plates = page.locator('[data-anchor="plates"] [data-testid="figure-plate"]')
+        foe = page.locator('[data-anchor="plates"] [data-testid="figure-plate"][data-identity="11"]')
+        ally = page.locator('[data-anchor="plates"] [data-testid="figure-plate"][data-identity="101"]')
+        glyph = foe.locator('[data-testid="figure-plate__condition--poison"]')
+        tooltip = page.locator('[data-testid="figure-plate__condition-tooltip"]')
+
+        # The glyph stands inside its plate's slot, and nothing is open at rest.
+        self.assertEqual(glyph.inner_text().strip(), "▼")
+        self.assertEqual(glyph.get_attribute("aria-label"), "中毒")
+        plate_box, glyph_box = foe.bounding_box(), glyph.bounding_box()
+        self.assertGreaterEqual(glyph_box["x"], plate_box["x"] - 0.5)
+        self.assertLessEqual(glyph_box["x"] + glyph_box["width"], plate_box["x"] + plate_box["width"] + 0.5)
+        self.assertGreaterEqual(glyph_box["y"], plate_box["y"] - 0.5)
+        self.assertLessEqual(glyph_box["y"] + glyph_box["height"], plate_box["y"] + plate_box["height"] + 0.5)
+        self.assertNotIn("中毒", foe.inner_text())
+        self.assertEqual(page.locator('[role="tooltip"]').count(), 0, "no tooltip at rest")
+
+        # Hover opens it inside the viewport; leaving closes it.
+        glyph.hover()
+        tooltip.wait_for(state="visible", timeout=5000)
+        self.assertEqual(tooltip.get_attribute("role"), "tooltip")
+        self.assertIn("中毒", tooltip.inner_text())
+        self.assertEqual(glyph.get_attribute("aria-describedby"), tooltip.get_attribute("id"))
+        tip_box = tooltip.bounding_box()
+        self.assertGreaterEqual(tip_box["x"], 4 - 0.5)
+        self.assertLessEqual(tip_box["x"] + tip_box["width"], REFERENCE[0] - 4 + 0.5)
+        self.assertGreaterEqual(tip_box["y"], 0)
+        page.mouse.move(5, REFERENCE[1] // 2)
+        tooltip.wait_for(state="detached", timeout=5000)
+        # Hover again, then a round starts playing: it closes.
+        glyph.hover()
+        tooltip.wait_for(state="visible", timeout=5000)
+        page.evaluate("() => { window.__elosernBridge.store.view.dispatch.beatLocked = true; }")
+        tooltip.wait_for(state="detached", timeout=5000)
+        page.evaluate("() => { window.__elosernBridge.store.view.dispatch.beatLocked = false; }")
+        page.mouse.move(5, REFERENCE[1] // 2)
+
+        # The companion at 20% carries 危險 and the critical hue.
+        self.assertEqual(ally.get_attribute("data-low-hp"), "true")
+        self.assertEqual(ally.locator('[data-testid="figure-plate-danger"]').inner_text(), "危險")
+        crit = page.evaluate(
+            "() => { const p = document.createElement('span'); p.style.color = 'var(--crit)';"
+            " document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; }"
+        )
+        self.assertEqual(ally.locator(".figure-plate__current").evaluate("el => getComputedStyle(el).color"), crit)
+        self.assertIn("，危險", ally.get_attribute("aria-label"))
+        self.assertNotEqual(
+            foe.locator(".figure-plate__current").evaluate("el => getComputedStyle(el).color"), crit
+        )
+
+        # One tab stop after the dock: Tab walks out of the dock and lands on
+        # the leftmost plate, crossing no other stop inside the layer.
+        page.evaluate("() => document.getElementById('action-dock').focus()")
+        landed = None
+        for _ in range(6):
+            page.keyboard.press("Tab")
+            landed = page.evaluate(
+                "() => { const a = document.activeElement;"
+                " return { inPlates: !!a.closest('[data-anchor=\"plates\"]'),"
+                " inDock: !!a.closest('#action-dock'), identity: a.getAttribute('data-identity') }; }"
+            )
+            if not landed["inDock"]:
+                break
+        self.assertTrue(landed["inPlates"], f"Tab from the dock does not reach the plates group: {landed}")
+        order = page.evaluate(
+            "() => [...document.querySelectorAll('[data-anchor=\"plates\"] [data-testid=\"figure-plate\"]')]"
+            ".sort((a, b) => a.getBoundingClientRect().left - b.getBoundingClientRect().left)"
+            ".map((el) => el.getAttribute('data-identity'))"
+        )
+        self.assertEqual(landed["identity"], order[0])
+        self.assertEqual(page.locator('[data-anchor="plates"]').get_attribute("tabindex"), "-1")
+        page.keyboard.press("ArrowRight")
+        self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-identity')"), order[1])
+        # Focus reaches the foe's glyph: its tooltip opens; Escape closes it,
+        # and the next Escape returns to the dock.
+        while page.evaluate("() => document.activeElement.getAttribute('data-identity')") != "11":
+            page.keyboard.press("ArrowRight")
+        page.keyboard.press("ArrowDown")
+        self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-code')"), "poison")
+        tooltip.wait_for(state="visible", timeout=5000)
+        page.keyboard.press("Escape")
+        tooltip.wait_for(state="detached", timeout=5000)
+        self.assertEqual(page.evaluate("() => document.activeElement.getAttribute('data-code')"), "poison")
+        page.keyboard.press("Escape")
+        self.assertEqual(page.evaluate("() => document.activeElement.id"), "action-dock")
+        self.assertEqual(page.locator('[data-anchor="plates"]').get_attribute("tabindex"), "0")
+        self.assertEqual(plates.count(), 3)
+        page.close()
+
     @covers_requirement(
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
@@ -484,6 +594,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                         self.assertGreater(s["platesZ"], s["actorsZ"], "the plates layer must paint above the figures")
                         self.assertEqual(s["mapDisplay"], "none", size)
                         self.assertFalse(s["placeCardShown"], size)
+                        # The layer itself is the one tab stop (webclient-combat-figure-plates).
                         self.assertEqual(s["platesLayerFocusable"], 0)
                         # The beat step's farthest frame stays out of the
                         # card's columns.

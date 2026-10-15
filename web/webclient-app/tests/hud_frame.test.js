@@ -664,15 +664,26 @@ describe("the combat formation stage (webclient-combat-formation)", () => {
     const order = [...stage.children].map((el) => el.getAttribute("data-testid") || el.className);
     expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("stage-flash"));
     expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("anchor-actor-right"));
-    expect(order.indexOf("anchor-plates")).toBeLessThan(order.indexOf("anchor-vitals"));
+    // After the band in DOM order (webclient-combat-figure-plates D4), so
+    // Tab from the action dock reaches the plates group next; the paint
+    // order rests on the explicit z-indexes below, not on DOM order.
+    expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("stage-band"));
+    expect(order.indexOf("anchor-plates")).toBeLessThan(order.indexOf("anchor-command-line"));
     const layer = wrapper.get('[data-testid="anchor-plates"]');
     expect(layer.attributes("data-anchor")).toBe("plates");
     expect(layer.find('[data-testid="a-plate"]').exists()).toBe(true);
+    // The layer itself is the one tab stop: the group 戰場.
+    expect(layer.attributes("role")).toBe("group");
+    expect(layer.attributes("aria-label")).toBe("戰場");
+    expect(layer.attributes("tabindex")).toBe("0");
     expect(layer.findAll("button, a, input, [tabindex]")).toHaveLength(0);
     expect(layer.attributes("inert")).toBeUndefined();
     await wrapper.setProps({ beatHold: true, mode: "exploration" });
     expect(layer.attributes("inert")).toBeDefined();
     expect(layer.attributes("aria-hidden")).toBe("true");
+    // Held or outside the formation, the layer is no tab stop.
+    expect(layer.attributes("tabindex")).toBeUndefined();
+    expect(layer.attributes("role")).toBeUndefined();
     const css = styleBlock("components/HudFrame.vue");
     const rule = extractRule(css, '.elosern-stage [data-anchor="plates"]');
     expect(rule).toContain("inset: 0;");
@@ -680,6 +691,7 @@ describe("the combat formation stage (webclient-combat-formation)", () => {
     expect(rule).toContain("pointer-events: none;");
     // The islands stand above it (z-index 4) and the band above them.
     expect(extractRule(css, '.elosern-stage [data-anchor="map"]')).toContain("z-index: 4;");
+    expect(extractRule(css, ".elosern-stage .stage-flash")).toContain("z-index: 3;");
     wrapper.unmount();
   });
 

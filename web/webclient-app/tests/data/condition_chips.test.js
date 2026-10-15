@@ -1,5 +1,7 @@
 import { mount } from "@vue/test-utils";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { nextTick } from "vue";
+import { conditionLabel } from "../../lib/condition_label.js";
 import ConditionChips from "../../components/ConditionChips.vue";
 import { STATUS_PANEL_SAMPLE } from "../../stories/fixtures.js";
 
@@ -271,5 +273,123 @@ describe("ConditionChips (chromeless condition icon row)", () => {
     expect(w.find('[data-testid="status-panel__conditions"]').exists()).toBe(false);
     expect(w.find('[data-testid="status-panel__conditions-empty"]').exists()).toBe(false);
     expect(w.find("button").exists()).toBe(false);
+  });
+
+  // webclient-combat-figure-plates (design D2/D3): the props the plates use,
+  // and the tooltip kept inside the viewport.
+  it("keeps every icon in the tab order by default and none with tabbable=false", () => {
+    const w = mountChips({ conditions: manyConditions(8) });
+    expect(w.findAll("button").every((b) => b.attributes("tabindex") === undefined)).toBe(true);
+    const w2 = mount(ConditionChips, { props: { conditions: manyConditions(8), tabbable: false } });
+    expect(w2.findAll("button")).toHaveLength(7);
+    expect(w2.findAll("button").every((b) => b.attributes("tabindex") === "-1")).toBe(true);
+    w2.unmount();
+  });
+
+  it("names a participant row (no provenance) by its label alone", () => {
+    expect(conditionLabel({ code: "poison", label: "中毒", severity: "harmful" })).toBe("中毒");
+  });
+
+  it("gives the plate variant its own hooks, a cap, and a +N tooltip instead of the disclosure", async () => {
+    const w = mountChips({ conditions: manyConditions(5), variant: "plate", cap: 3 }, true);
+    expect(w.find('[data-testid="status-panel__conditions"]').exists()).toBe(false);
+    expect(w.find('[data-testid="figure-plate__conditions"]').exists()).toBe(true);
+    expect(w.findAll(".chip:not(.more)")).toHaveLength(3);
+    const more = w.get('[data-testid="figure-plate__condition-overflow"]');
+    expect(more.text()).toBe("+2");
+    expect(more.attributes("aria-expanded")).toBeUndefined();
+    expect(more.attributes("aria-label")).toBe(`另有 2 個狀態：${manyConditions(5).slice(3).map(conditionLabel).join("；")}`);
+    await more.trigger("click");
+    expect(w.find('[data-testid="figure-plate__condition-disclosure"]').exists()).toBe(false);
+    await more.trigger("focus");
+    const tip = document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+    expect([...tip.querySelectorAll(".detail-label")].map((n) => n.textContent)).toEqual(["狀態4", "狀態5"]);
+    expect(more.attributes("aria-describedby")).toBe(tip.id);
+    // Escape closes it and is consumed.
+    const reached = [];
+    const outer = (event) => reached.push(event.key);
+    document.body.addEventListener("keydown", outer);
+    try {
+      await more.trigger("keydown", { key: "Escape" });
+      expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
+      expect(reached).toEqual([]);
+    } finally {
+      document.body.removeEventListener("keydown", outer);
+    }
+  });
+
+  it("shifts a tooltip left inside the viewport and flips it below an icon near the top", async () => {
+    const rects = new Map();
+    const original = Element.prototype.getBoundingClientRect;
+    const spy = vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function rect() {
+      const r = rects.get(this.getAttribute("role") === "tooltip" ? "tip" : this.getAttribute("data-testid"));
+      return r ? { ...r, x: r.left, y: r.top, right: r.left + r.width, bottom: r.top + r.height, toJSON() {} } : original.call(this);
+    });
+    try {
+      const width = window.innerWidth;
+      rects.set("tip", { left: 0, top: 0, width: 200, height: 60 });
+      rects.set("figure-plate__condition--cond_0", { left: width - 30, top: 300, width: 24, height: 24 });
+      rects.set("figure-plate__condition--cond_1", { left: 100, top: 20, width: 24, height: 24 });
+      const w = mountChips({ conditions: manyConditions(2), variant: "plate" }, true);
+      await w.get('[data-testid="figure-plate__condition--cond_0"]').trigger("mouseenter");
+      await nextTick();
+      await nextTick();
+      let tip = document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+      expect(parseFloat(tip.style.left)).toBe(width - 4 - 200);
+      expect(tip.getAttribute("data-placement")).toBe("above");
+      // The tick still points at the icon's centre.
+      expect(parseFloat(tip.style.getPropertyValue("--tip-tick"))).toBe(width - 30 + 12 - (width - 204));
+      await w.get('[data-testid="figure-plate__condition--cond_0"]').trigger("mouseleave");
+      await w.get('[data-testid="figure-plate__condition--cond_1"]').trigger("mouseenter");
+      await nextTick();
+      await nextTick();
+      tip = document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+      expect(tip.getAttribute("data-placement")).toBe("below");
+      expect(tip.style.top).toBe(`${20 + 24 + 6}px`);
+      expect(tip.style.bottom).toBe("");
+      expect(tip.classList.contains("condition-tip--below")).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it("closes on a window resize, and on a scroll only of the document or a container of the icon", async () => {
+    const host = document.body.appendChild(document.createElement("div"));
+    const log = document.body.appendChild(document.createElement("div"));
+    const w = mount(ConditionChips, { attachTo: host, props: { conditions: manyConditions(2), variant: "plate" } });
+    const icon = w.get('[data-testid="figure-plate__condition--cond_0"]');
+    const tip = () => document.querySelector('[data-testid="figure-plate__condition-tooltip"]');
+    await icon.trigger("mouseenter");
+    log.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(tip()).not.toBeNull();
+    host.dispatchEvent(new Event("scroll"));
+    await nextTick();
+    expect(tip()).toBeNull();
+    await icon.trigger("mouseenter");
+    window.dispatchEvent(new Event("resize"));
+    await nextTick();
+    expect(tip()).toBeNull();
+    w.unmount();
+  });
+
+  it("lets a plate tooltip claim Escape wherever focus is, and only while open", async () => {
+    const outside = document.body.appendChild(document.createElement("button"));
+    const w = mountChips({ conditions: manyConditions(2), variant: "plate" }, true);
+    const reached = [];
+    const outer = (event) => reached.push(event.key);
+    document.addEventListener("keydown", outer);
+    try {
+      outside.focus();
+      await w.get('[data-testid="figure-plate__condition--cond_0"]').trigger("mouseenter");
+      outside.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      await nextTick();
+      expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
+      expect(reached).toEqual([]);
+      outside.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+      expect(reached).toEqual(["Escape"]);
+    } finally {
+      document.removeEventListener("keydown", outer);
+    }
   });
 });

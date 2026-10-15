@@ -5,7 +5,7 @@
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model). The behavior
 // groups live in ./composables/ (each watch stays with the state it mutates).
-import { computed, ref, watch } from "vue";
+import { computed, provide, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { useAppClient } from "./composables/use-app-client.js";
 import AppShell from "./components/AppShell.vue";
@@ -372,6 +372,7 @@ const plateEntries = computed(() => {
       showToken: repeated.has(slot.displayName),
       hpCurrent: row ? plateHpCurrent(row, displayHp) : null,
       hpMaximum: row?.hp_maximum ?? null,
+      conditions: row?.conditions ?? [],
       plate: shape.party.figures[index].plate,
       target: false,
       acting: false,
@@ -390,6 +391,7 @@ const plateEntries = computed(() => {
       showToken: repeated.has(p.display_name),
       hpCurrent: plateHpCurrent(row, displayHp),
       hpMaximum: row.hp_maximum ?? null,
+      conditions: row.conditions ?? [],
       plate: shape.foes.figures[index].plate,
       target: focusedCombatTarget.value != null && String(focusedCombatTarget.value) === String(p.identity),
       acting: actingIdentity.value != null && p.portrait_ref != null && String(p.portrait_ref) === actingIdentity.value,
@@ -397,6 +399,26 @@ const plateEntries = computed(() => {
   });
   return entries;
 });
+
+// The plates' condition tooltips (webclient-combat-figure-plates, design
+// D3) close when a round starts playing and when the committed mode
+// changes; a resize and a scroll close them inside ConditionChips. The
+// counter is provided, not passed, so a plate already fading out of the
+// stage (no longer patched) still sees it.
+const plateTooltipClose = ref(0);
+provide("plateTooltipClose", plateTooltipClose);
+watch(
+  () => !!store.view.dispatch.beatLocked,
+  (locked) => {
+    if (locked) plateTooltipClose.value += 1;
+  },
+);
+watch(
+  () => store.view.mode,
+  () => {
+    plateTooltipClose.value += 1;
+  },
+);
 
 // The scene caption stays centred in the open stage between the party's
 // innermost figure and the leftmost foe (app-shell.css reads
@@ -633,6 +655,8 @@ const rootStyle = computed(() => {
               :box="entry.plate"
               :target="entry.target"
               :acting="entry.acting"
+              :conditions="entry.conditions"
+              :stage-x="entry.plate.left + entry.plate.width / 2"
             />
           </TransitionGroup>
         </template>

@@ -14,18 +14,42 @@
 //
 // The tooltip is teleported to `body` and placed from the icon's box: the
 // `vitals` anchor is a scroll container, so an absolutely positioned tip
-// hung above the dock would be clipped. A scroll or resize while it is open
-// closes it rather than leaving it adrift.
-import { computed, onBeforeUnmount, ref, useId, watch } from "vue";
+// hung above the dock would be clipped. Once rendered it measures itself:
+// it shifts left to stay 4px inside the viewport (its tick still points at
+// the icon) and opens below the icon when it would cross the viewport's top.
+// A scroll or resize while it is open closes it rather than leaving it adrift.
+//
+// The `plate` variant (webclient-combat-figure-plates, design D2/D3) is the
+// row a combat figure plate carries: `cap` icons, the `+N` icon opening a
+// tooltip of the hidden conditions instead of the dock's in-flow disclosure
+// (which would grow the plate out of its slot), `fold` carrying the hidden
+// conditions in the last icon instead of a `+N`, its own test hooks
+// (`figure-plate__condition…`), and icons out of the tab order when the
+// plate group manages focus (`tabbable=false`).
+import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import { conditionLabel, conditionModifiers, conditionSource } from "../lib/condition_label.js";
 
 const props = defineProps({
-  // The committed `status.conditions[]` array.
+  // The committed `status.conditions[]` array (or a combat participant's
+  // `conditions`: code, label and severity only).
   conditions: { type: Array, default: () => [] },
   // Whether the dock showing the row is revealed: a hiding dock fires no
   // mouseleave, so the open tooltip is dropped here.
   revealed: { type: Boolean, default: true },
+  // How many icons show before the `+N` icon.
+  cap: { type: Number, default: 6 },
+  // false: no icon is in the tab order (a roving group focuses them).
+  tabbable: { type: Boolean, default: true },
+  variant: { type: String, default: "dock", validator: (value) => value === "dock" || value === "plate" },
+  // Plate only: no `+N` icon; the last visible icon carries the hidden ones.
+  fold: { type: Boolean, default: false },
+  // Every change closes the open tooltip (a round starts, the mode changes).
+  closeSignal: { type: Number, default: 0 },
 });
+
+const plate = computed(() => props.variant === "plate");
+const hook = computed(() => (plate.value ? "figure-plate__condition" : "status-panel__condition"));
+const tabindex = computed(() => (props.tabbable ? null : "-1"));
 
 // Five distinct glyph shapes: the `warning` glyph changed from the old
 // panel's `▲` (shared with `beneficial`) to `▽`, so no two severities are
@@ -41,11 +65,16 @@ function glyph(condition) {
   return SEVERITY_GLYPHS[condition.severity] ?? "◆";
 }
 
-const VISIBLE_CAP = 6;
-
-const visible = computed(() => props.conditions.slice(0, VISIBLE_CAP));
-const overflowCount = computed(() => Math.max(0, props.conditions.length - VISIBLE_CAP));
-const overflowItems = computed(() => props.conditions.slice(VISIBLE_CAP));
+const visibleCap = computed(() => Math.max(1, Math.floor(props.cap)));
+const visible = computed(() => props.conditions.slice(0, visibleCap.value));
+const hiddenCount = computed(() => Math.max(0, props.conditions.length - visibleCap.value));
+const overflowItems = computed(() => props.conditions.slice(visibleCap.value));
+// Folded, the hidden conditions ride the last visible icon: no `+N` icon.
+const folded = computed(() => plate.value && props.fold && hiddenCount.value > 0);
+const overflowCount = computed(() => (folded.value ? 0 : hiddenCount.value));
+function carriesHidden(index) {
+  return folded.value && index === visible.value.length - 1;
+}
 
 // The `+N` disclosure (design D7): bounded + scrollable, collapses on
 // re-activation or Escape.
@@ -57,34 +86,77 @@ function toggleOverflow() {
 // The accessible icon name is the shared condition label rule (the same
 // label, duration, and modifier prose the character-status drawer roster
 // renders) — one copy in lib/condition_label.js.
-const chipName = conditionLabel;
+function chipName(condition, index) {
+  if (index !== undefined && carriesHidden(index)) {
+    return [condition, ...overflowItems.value].map(conditionLabel).join("；");
+  }
+  return conditionLabel(condition);
+}
+const overflowName = computed(() =>
+  plate.value
+    ? `另有 ${overflowCount.value} 個狀態：${overflowItems.value.map(conditionLabel).join("；")}`
+    : `剩餘 ${overflowCount.value} 個狀態`,
+);
 function hasTimer(condition) {
   return typeof condition.remaining_seconds === "number";
 }
 
 // The one tooltip of the row. Pointer and keyboard are two sources: the
-// icon the pointer rests on wins, else the focused icon.
+// icon the pointer rests on wins, else the focused icon. A code is an icon
+// index, or OVERFLOW for the plate's `+N` icon.
+const OVERFLOW = "overflow";
 const tipId = `condition-tip-${useId()}`;
 const hoverCode = ref(null);
 const focusCode = ref(null);
 const tipCode = computed(() => hoverCode.value ?? focusCode.value);
-const tipCondition = computed(() =>
-  tipCode.value === null ? null : props.conditions[tipCode.value] ?? null,
-);
-const tipPlace = ref({ left: 0, bottom: 0, tick: 0 });
+// The conditions the open tooltip describes: one for an icon, the hidden
+// ones for the `+N` icon, an icon's own plus the hidden ones when folded.
+const tipItems = computed(() => {
+  const code = tipCode.value;
+  if (code === null) return [];
+  if (code === OVERFLOW) return overflowCount.value > 0 ? overflowItems.value : [];
+  const condition = props.conditions[code];
+  if (!condition || code >= visible.value.length) return [];
+  return carriesHidden(code) ? [condition, ...overflowItems.value] : [condition];
+});
+const tipCondition = computed(() => tipItems.value[0] ?? null);
+const tipRef = ref(null);
+const tipPlace = ref({ left: 0, bottom: 0, top: null, tick: 0 });
+let anchorRect = null;
 
+const TIP_GAP = 6;
+const VIEWPORT_INSET = 4;
 function place(event) {
+  anchorEl = event.currentTarget;
   const rect = event.currentTarget.getBoundingClientRect();
-  const inset = rect.width / 2;
+  anchorRect = { left: rect.left, top: rect.top, bottom: rect.bottom, width: rect.width };
+  const centre = rect.left + rect.width / 2;
+  const left = Math.max(VIEWPORT_INSET, centre - 14);
+  tipPlace.value = { left, bottom: window.innerHeight - rect.top + TIP_GAP, top: null, tick: centre - left };
+}
+// Measured once rendered: shift left inside the viewport, flip below the
+// icon when the tip would cross the viewport's top.
+async function keepInView() {
+  await nextTick();
+  const tip = tipRef.value;
+  if (!tip || !anchorRect) return;
+  const box = tip.getBoundingClientRect();
+  const centre = anchorRect.left + anchorRect.width / 2;
+  let left = tipPlace.value.left;
+  const overflowRight = left + box.width - (window.innerWidth - VIEWPORT_INSET);
+  if (overflowRight > 0) left = Math.max(VIEWPORT_INSET, left - overflowRight);
+  const flip = anchorRect.top - TIP_GAP - box.height < VIEWPORT_INSET;
   tipPlace.value = {
-    left: Math.max(4, rect.left + inset - 14),
-    bottom: window.innerHeight - rect.top + 6,
-    tick: rect.left + inset - Math.max(4, rect.left + inset - 14),
+    left,
+    bottom: flip ? null : tipPlace.value.bottom,
+    top: flip ? anchorRect.bottom + TIP_GAP : null,
+    tick: centre - left,
   };
 }
 function onEnter(event, code) {
   place(event);
   hoverCode.value = code;
+  keepInView();
 }
 function onLeave() {
   hoverCode.value = null;
@@ -92,6 +164,7 @@ function onLeave() {
 function onFocus(event, code) {
   place(event);
   focusCode.value = code;
+  keepInView();
 }
 function onBlur() {
   focusCode.value = null;
@@ -106,9 +179,22 @@ function closeTip() {
 watch(tipCondition, (condition) => {
   if (tipCode.value !== null && condition === null) closeTip();
 });
-// Local indices distinguish duplicate definition codes. A replaced roster
-// closes the tooltip so reordering cannot silently retarget its detail.
-watch(() => props.conditions, closeTip);
+watch(() => props.closeSignal, closeTip);
+// Local indices distinguish duplicate definition codes. A roster whose
+// content under the open tooltip changes closes it, so reordering cannot
+// silently retarget its detail; a commit that only replaces the array with
+// the same content (every combat revision does) keeps it open.
+function signature(items) {
+  return JSON.stringify(
+    items.map((c) => [c.code, c.label ?? null, c.severity, c.remaining_seconds ?? null, c.modifiers ?? null, c.provenance ?? null]),
+  );
+}
+watch(
+  () => [tipCode.value, signature(tipItems.value)],
+  ([code, next], [previousCode, previous]) => {
+    if (code !== null && code === previousCode && next !== previous) closeTip();
+  },
+);
 watch(
   () => props.revealed,
   (revealed) => {
@@ -116,19 +202,40 @@ watch(
   },
 );
 const tipOpen = computed(() => tipCondition.value !== null);
+// A scroll moves the icon only when it scrolls the document or a container
+// of the icon; any other scroll (the message log following a new line)
+// leaves the tooltip open.
+let anchorEl = null;
+function onScroll(event) {
+  const target = event.target;
+  if (!anchorEl || target === document || target === document.documentElement || target === window || (target?.contains && target.contains(anchorEl))) {
+    closeTip();
+  }
+}
+// Plate variant: an open tooltip claims the next Escape wherever focus is
+// (a focused plate, or the dock while the pointer rests on a glyph), so the
+// plates group never moves focus away from a tooltip left open.
+function onWindowEscape(event) {
+  if (event.key !== "Escape" || !tipOpen.value) return;
+  event.stopPropagation();
+  event.preventDefault();
+  closeTip();
+}
+function unlisten() {
+  window.removeEventListener("scroll", onScroll, true);
+  window.removeEventListener("resize", closeTip);
+  window.removeEventListener("keydown", onWindowEscape, true);
+}
 watch(tipOpen, (open) => {
   if (open) {
-    window.addEventListener("scroll", closeTip, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", closeTip);
+    if (plate.value) window.addEventListener("keydown", onWindowEscape, true);
   } else {
-    window.removeEventListener("scroll", closeTip, true);
-    window.removeEventListener("resize", closeTip);
+    unlisten();
   }
 });
-onBeforeUnmount(() => {
-  window.removeEventListener("scroll", closeTip, true);
-  window.removeEventListener("resize", closeTip);
-});
+onBeforeUnmount(unlisten);
 
 // Escape closes an open tooltip (then the disclosure) and is consumed only
 // while one of them is open, mirroring DesktopNavigation.onToolKeydown: with
@@ -151,20 +258,23 @@ function onRowKeydown(event) {
   <div
     v-if="conditions.length > 0"
     class="conditions"
-    data-testid="status-panel__conditions"
+    :class="{ 'conditions--plate': plate }"
+    :data-testid="`${hook}s`"
     @keydown="onRowKeydown"
   >
     <div class="icons">
       <button
         v-for="(condition, index) in visible"
-        :key="index"
+        :key="`${index}:${condition.code}`"
         type="button"
         class="chip"
-        :class="[`chip--${condition.severity}`, { active: tipCode === index }]"
-        :data-testid="`status-panel__condition--${condition.code}`"
+        :class="[`chip--${condition.severity}`, { active: tipCode === index, carries: carriesHidden(index) }]"
+        :tabindex="tabindex"
+        :data-testid="`${hook}--${condition.code}`"
         :data-severity="condition.severity"
         :data-code="condition.code"
-        :aria-label="chipName(condition)"
+        :data-carries="carriesHidden(index) ? String(hiddenCount) : null"
+        :aria-label="chipName(condition, index)"
         :aria-describedby="tipCode === index && tipOpen ? tipId : null"
         @focus="onFocus($event, index)"
         @blur="onBlur"
@@ -173,14 +283,32 @@ function onRowKeydown(event) {
       >
         <span class="glyph" aria-hidden="true">{{ glyph(condition) }}</span>
       </button>
+      <!-- The plate's `+N`: a tooltip of the hidden conditions. -->
       <button
-        v-if="overflowCount > 0"
+        v-if="overflowCount > 0 && plate"
+        type="button"
+        class="chip more"
+        :class="{ active: tipCode === OVERFLOW }"
+        :tabindex="tabindex"
+        :data-testid="`${hook}-overflow`"
+        :aria-label="overflowName"
+        :aria-describedby="tipCode === OVERFLOW && tipOpen ? tipId : null"
+        @focus="onFocus($event, OVERFLOW)"
+        @blur="onBlur"
+        @mouseenter="onEnter($event, OVERFLOW)"
+        @mouseleave="onLeave"
+      >
+        +{{ overflowCount }}
+      </button>
+      <button
+        v-else-if="overflowCount > 0"
         type="button"
         class="chip more"
         :class="{ open: overflowOpen }"
-        data-testid="status-panel__condition-overflow"
+        :tabindex="tabindex"
+        :data-testid="`${hook}-overflow`"
         :aria-expanded="String(overflowOpen)"
-        :aria-label="`剩餘 ${overflowCount} 個狀態`"
+        :aria-label="overflowName"
         @click="toggleOverflow"
       >
         +{{ overflowCount }}
@@ -189,16 +317,16 @@ function onRowKeydown(event) {
     <!-- The disclosure: the hidden conditions' tooltip content as one
          bounded column, in flow, so the bottom-anchored dock grows upward. -->
     <div
-      v-if="overflowOpen && overflowCount > 0"
+      v-if="!plate && overflowOpen && overflowCount > 0"
       class="disclosure"
-      data-testid="status-panel__condition-disclosure"
+      :data-testid="`${hook}-disclosure`"
     >
       <div
         v-for="(condition, index) in overflowItems"
-        :key="index + VISIBLE_CAP"
+        :key="index + visibleCap"
         class="detail-row"
         :class="`detail--${condition.severity}`"
-        :data-testid="`status-panel__condition--${condition.code}`"
+        :data-testid="`${hook}--${condition.code}`"
         :data-severity="condition.severity"
         :aria-label="chipName(condition)"
       >
@@ -209,7 +337,7 @@ function onRowKeydown(event) {
           v-for="modifier in conditionModifiers(condition)"
           :key="modifier.key"
           class="detail-mod"
-          :data-testid="`status-panel__condition-mod--${modifier.key}`"
+          :data-testid="`${hook}-mod--${modifier.key}`"
         >{{ modifier.text }}</span>
         <span v-if="conditionSource(condition)" class="detail-source">{{ conditionSource(condition) }}</span>
       </div>
@@ -218,33 +346,43 @@ function onRowKeydown(event) {
       <div
         v-if="tipCondition"
         :id="tipId"
+        ref="tipRef"
         role="tooltip"
         class="condition-tip"
-        :class="`detail--${tipCondition.severity}`"
-        data-testid="status-panel__condition-tooltip"
+        :class="[`detail--${tipCondition.severity}`, { 'condition-tip--below': tipPlace.top !== null, 'condition-tip--list': tipItems.length > 1 }]"
+        :data-testid="`${hook}-tooltip`"
         :data-code="tipCondition.code"
+        :data-placement="tipPlace.top !== null ? 'below' : 'above'"
         :style="{
           left: `${tipPlace.left}px`,
-          bottom: `${tipPlace.bottom}px`,
+          bottom: tipPlace.top === null ? `${tipPlace.bottom}px` : null,
+          top: tipPlace.top === null ? null : `${tipPlace.top}px`,
           '--tip-tick': `${tipPlace.tick}px`,
         }"
       >
-        <p class="tip-title">
-          <span class="detail-glyph" aria-hidden="true">{{ glyph(tipCondition) }}</span>
-          <span class="detail-label">{{ tipCondition.label ?? tipCondition.code }}</span>
-        </p>
-        <p
-          v-if="hasTimer(tipCondition)"
-          class="detail-timer"
-          data-testid="status-panel__condition-timer"
-        >剩 {{ tipCondition.remaining_seconds }} 秒</p>
-        <p
-          v-for="modifier in conditionModifiers(tipCondition)"
-          :key="modifier.key"
-          class="detail-mod"
-          :data-testid="`status-panel__condition-mod--${modifier.key}`"
-        >{{ modifier.text }}</p>
-        <p v-if="conditionSource(tipCondition)" class="detail-source">{{ conditionSource(tipCondition) }}</p>
+        <div
+          v-for="(item, index) in tipItems"
+          :key="index"
+          class="tip-item"
+          :class="`detail--${item.severity}`"
+        >
+          <p class="tip-title">
+            <span class="detail-glyph" aria-hidden="true">{{ glyph(item) }}</span>
+            <span class="detail-label">{{ item.label ?? item.code }}</span>
+          </p>
+          <p
+            v-if="hasTimer(item)"
+            class="detail-timer"
+            :data-testid="`${hook}-timer`"
+          >剩 {{ item.remaining_seconds }} 秒</p>
+          <p
+            v-for="modifier in conditionModifiers(item)"
+            :key="modifier.key"
+            class="detail-mod"
+            :data-testid="`${hook}-mod--${modifier.key}`"
+          >{{ modifier.text }}</p>
+          <p v-if="conditionSource(item)" class="detail-source">{{ conditionSource(item) }}</p>
+        </div>
       </div>
     </Teleport>
   </div>
@@ -432,6 +570,66 @@ function onRowKeydown(event) {
   gap: calc(6px * var(--ui-scale));
   margin: 0 0 calc(2px * var(--ui-scale));
   font-size: var(--text-sm);
+}
+
+/* Below the icon (too close to the viewport's top): the tick moves to the
+   upper edge and points up at the glyph. */
+.condition-tip--below::after {
+  bottom: auto;
+  top: -1px;
+}
+
+/* Several conditions (a plate's `+N`, or a folded icon): one block each,
+   divided by a hairline. */
+.condition-tip--list .tip-item + .tip-item {
+  margin-top: calc(5px * var(--ui-scale));
+  padding-top: calc(5px * var(--ui-scale));
+  border-top: 1px solid rgba(54, 54, 56, 0.9);
+}
+
+/* The plate variant (webclient-combat-figure-plates, design D2): 24px·S
+   hit boxes, the glyph at the smallest text step, the row flush with the
+   plate's own edge so no box leaves the slot. */
+.conditions--plate {
+  margin: 0;
+}
+.conditions--plate .icons {
+  gap: calc(2px * var(--ui-scale));
+  margin-left: 0;
+}
+.conditions--plate .chip {
+  width: calc(24px * var(--ui-scale));
+  height: calc(24px * var(--ui-scale));
+  align-items: flex-end;
+  padding-bottom: calc(2px * var(--ui-scale));
+  box-sizing: border-box;
+  pointer-events: auto;
+  opacity: 0.92;
+}
+.conditions--plate .chip .glyph {
+  font-size: var(--text-xs);
+}
+.conditions--plate .chip::after {
+  bottom: 0;
+}
+.conditions--plate .chip.more {
+  min-width: calc(24px * var(--ui-scale));
+  padding: 0 calc(2px * var(--ui-scale)) calc(2px * var(--ui-scale));
+  line-height: 1;
+}
+/* A folded icon carries hidden conditions: a small drawn plus at its
+   upper right (an icon mark, not text). */
+.conditions--plate .chip.carries::before {
+  content: "";
+  position: absolute;
+  top: calc(6px * var(--ui-scale));
+  right: calc(2px * var(--ui-scale));
+  width: calc(6px * var(--ui-scale));
+  height: calc(6px * var(--ui-scale));
+  background:
+    linear-gradient(currentColor, currentColor) center / 100% 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 1.5px 100% no-repeat;
+  filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.85));
 }
 
 @keyframes condition-tip-in {
