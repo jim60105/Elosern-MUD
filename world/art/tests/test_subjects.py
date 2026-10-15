@@ -128,16 +128,19 @@ class StableKeyContractTests(unittest.TestCase):
 
     @covers_requirement("art-stable-key-contract::stable-keys-share-one-producer-contract")
     def test_full_wire_subject_key_always_fits_the_wire_bound(self):
-        from web.webclient.presentation.art import MAX_SUBJECT_KEY
+        # The wire bound for a subject identity string is the descriptor
+        # vocabulary's own ``MAX_SUBJECT_ID`` (the art v4 panel no longer carries
+        # a flat scene subject key, so the retired panel constant is gone).
+        from world.art.descriptors import MAX_SUBJECT_ID
 
         key = "x" * MAX_SUBJECT_KEY_LENGTH
         for kind in ArtSubjectKind:
             with self.subTest(kind=kind):
                 full = f"{kind.value}:{key}"
-                self.assertLessEqual(len(full), MAX_SUBJECT_KEY)
+                self.assertLessEqual(len(full), MAX_SUBJECT_ID)
         # The wire bound stays at 128; a 64-character producer key plus the
         # longest kind prefix (portrait:character:) still fits with headroom.
-        self.assertEqual(MAX_SUBJECT_KEY, 128)
+        self.assertEqual(MAX_SUBJECT_ID, 128)
 
     @covers_requirement("art-subject-model::subject-producer-validation-rejects-unrepresentable-keys")
     def test_unrepresentable_keys_reject_with_a_named_error(self):
