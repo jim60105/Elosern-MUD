@@ -60,6 +60,8 @@ MAX_DISPLAY_NAME_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 512
 # Per-participant condition rows presented on the combat panel (v6).
 MAX_PARTICIPANT_CONDITIONS = 8
+# Wire bound of one condition label (the status panel's MAX_CONDITION_LABEL).
+MAX_PARTICIPANT_CONDITION_LABEL = 128
 
 # Stable root action keys in approved keyboard order.
 ROOT_ACTIONS = ("attack", "skills", "items", "defend", "flee")
@@ -263,16 +265,22 @@ def participant_conditions(entity: Any) -> tuple[ConditionRow, ...]:
 
     An entity the status read model does not model (``StatusQueryError``) or
     one carrying a condition without display metadata yields ``()`` so one
-    participant never makes the whole panel unavailable.
+    participant never makes the whole panel unavailable; so does a presented
+    row whose label exceeds the wire bound.
     """
     try:
         model = build_status_read_model(entity)
     except (StatusQueryError, MissingDisplayMetadataError):
         return ()
-    return tuple(
+    rows = tuple(
         ConditionRow(code=row.code, label=row.label, severity=row.severity)
         for row in model.conditions[:MAX_PARTICIPANT_CONDITIONS]
     )
+    if any(
+        sum(1 for _ in row.label) > MAX_PARTICIPANT_CONDITION_LABEL for row in rows
+    ):
+        return ()
+    return rows
 
 
 def _bound(value: str, maximum: int, field: str) -> str:
@@ -587,6 +595,7 @@ __all__ = [
     "CombatViewError",
     "ConditionRow",
     "MAX_DISPLAY_NAME_CODE_POINTS",
+    "MAX_PARTICIPANT_CONDITION_LABEL",
     "MAX_PARTICIPANT_CONDITIONS",
     "MAX_PARTICIPANTS",
     "MAX_REASON_MESSAGE_CODE_POINTS",

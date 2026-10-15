@@ -523,6 +523,29 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(view.recovery)
         self.assertEqual(self._row(view, self.monster).conditions, ())
 
+    def test_an_over_bound_condition_label_empties_only_that_list(self):
+        from world.rules import combat_view
+        from world.rules.status_query.models import ConditionValue
+
+        engage(self.player, self.monster)
+        real = combat_view.build_status_read_model
+
+        def long_label(entity):
+            model = real(entity)
+            if entity.pk != self.monster.pk:
+                return model
+            row = ConditionValue(
+                code="t_mark", label="長" * (combat_view.MAX_PARTICIPANT_CONDITION_LABEL + 1),
+                severity="warning", remaining_seconds=None, modifiers={},
+                provenance=None,
+            )
+            return replace(model, conditions=(row,))
+
+        with patch.object(combat_view, "build_status_read_model", side_effect=long_label):
+            view = build_combat_view(self.player)
+        self.assertFalse(view.recovery)
+        self.assertEqual(self._row(view, self.monster).conditions, ())
+
     def test_condition_rows_have_no_owner_only_visibility_to_filter(self):
         """Design D2 tripwire: the status rows carry no visibility facet.
 
@@ -934,6 +957,20 @@ class SkillTargetPolarityTests(unittest.TestCase):
         self.assertEqual(parsed_kinds, produced)
         self.assertEqual(set(EFFECT_TARGET_POLARITY), produced)
         self.assertTrue(set(EFFECT_TARGET_POLARITY.values()) <= POLARITY_CLASSES)
+
+    def test_rulebook_fallback_agrees_with_the_loaded_buff_definitions(self):
+        import sys
+
+        from world.rules.buffs import BUFF_DEFINITIONS
+        from world.skills.effects import polarity
+
+        loaded = {key: definition.polarity for key, definition in BUFF_DEFINITIONS.items()}
+        polarity._rulebook_buff_polarities.cache_clear()
+        with patch.dict(sys.modules, {"world.rules.buffs": None}):
+            fallback = {key: polarity._loaded_buff_polarity(key) for key in loaded}
+            with self.assertRaises(KeyError):
+                polarity._loaded_buff_polarity("t_no_such_buff")
+        self.assertEqual(fallback, loaded)
 
     def test_unclassified_kind_fails_closed(self):
         skill = SimpleNamespace(

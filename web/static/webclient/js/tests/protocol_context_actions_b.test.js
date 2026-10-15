@@ -190,7 +190,7 @@ test("freeform_scales is optional and validated when present", () => {
 test("rejects malformed context_actions panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("context_actions", Protocol.PANEL_ALLOWLIST.context_actions, {
-      schema_version: 5,
+      schema_version: 6,
       available: false,
     })
   );

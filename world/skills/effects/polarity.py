@@ -27,6 +27,7 @@ present, or else from the rulebook YAML, mirroring ``_known_buff_keys``.
 """
 
 from collections.abc import Callable
+from functools import cache
 from pathlib import Path
 import sys
 from typing import Any
@@ -132,19 +133,35 @@ EFFECT_TARGET_POLARITY: dict[type, str] = {
 }
 
 
+@cache
+def _rulebook_buff_polarities() -> dict[str, str]:
+    """Parse the rulebook's buff polarities once (the unloaded-rules fallback).
+
+    An omitted ``polarity`` reads ``buff``, exactly as the rules loader
+    (``world.rules.buffs.definitions.load_buff_definitions``) defaults it.
+    """
+    import yaml
+
+    path = Path(__file__).parent.parent.parent / "rules" / "rulebook" / "buffs.yaml"
+    return {
+        entry["key"]: str(entry.get("polarity", "buff"))
+        for entry in yaml.safe_load(path.read_text(encoding="utf-8")) or ()
+        if isinstance(entry, dict) and "key" in entry
+    }
+
+
 def _loaded_buff_polarity(buff_key: str) -> str:
-    """Return one buff definition's polarity without importing ``world.rules``."""
+    """Return one buff definition's polarity without importing ``world.rules``.
+
+    The live (possibly test-patched) ``BUFF_DEFINITIONS`` is authoritative
+    whenever ``world.rules.buffs`` is loaded, as it is in every game process;
+    otherwise the rulebook YAML is read. An unknown key raises ``KeyError``.
+    """
     rules_buffs = sys.modules.get("world.rules.buffs")
     definitions = getattr(rules_buffs, "BUFF_DEFINITIONS", None)
     if definitions is not None:
         return str(definitions[buff_key].polarity)
-    import yaml
-
-    path = Path(__file__).parent.parent.parent / "rules" / "rulebook" / "buffs.yaml"
-    for entry in yaml.safe_load(path.read_text(encoding="utf-8")) or ():
-        if isinstance(entry, dict) and entry.get("key") == buff_key:
-            return str(entry.get("polarity", "buff"))
-    raise KeyError(buff_key)
+    return _rulebook_buff_polarities()[buff_key]
 
 
 def effect_target_polarity(

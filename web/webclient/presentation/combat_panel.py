@@ -56,6 +56,7 @@ from web.webclient.presentation.protocol import (
 from web.webclient.presentation.registry import PanelUnavailableError
 from world.rules.combat_view import (
     MAX_DISPLAY_NAME_CODE_POINTS,
+    MAX_PARTICIPANT_CONDITION_LABEL,
     MAX_PARTICIPANT_CONDITIONS,
     MAX_PARTICIPANTS,
     MAX_REASON_MESSAGE_CODE_POINTS,
@@ -72,7 +73,7 @@ from world.rules.progression import (
     FREEFORM_CAST_SCALES,
     scaled_mp_cost,
 )
-from world.rules.status_display import _SEVERITIES
+from world.rules.status_display import CONDITION_SEVERITIES
 from world.skills.registry import SkillCategory
 
 CONTEXT_ACTIONS_SCHEMA_VERSION = 6
@@ -104,8 +105,7 @@ MAX_REASON_CODE = 64
 MAX_PARTICIPANT_REF = 32
 # Participant condition rows reuse the status panel's label bound and
 # severity vocabulary.
-MAX_CONDITION_LABEL = 128
-CONDITION_SEVERITIES = frozenset(_SEVERITIES)
+MAX_CONDITION_LABEL = MAX_PARTICIPANT_CONDITION_LABEL
 
 # Participant display-state values the panel emits.
 PARTICIPANT_STATES = frozenset({"active", "fled", "knocked_out", "defeated"})

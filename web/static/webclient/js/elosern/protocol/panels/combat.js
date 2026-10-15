@@ -348,6 +348,9 @@ function validateContextActionsExplorationForm(payload) {
   if (payload.available !== true || payload.kind !== "exploration") {
     throw new Error("exploration form must be available with kind exploration");
   }
+  if (payload.schema_version !== C.PANEL_ALLOWLIST.context_actions) {
+    throw new Error("unsupported context_actions panel schema_version");
+  }
   if (
     !Array.isArray(payload.affordances) ||
     payload.affordances.length > CONTEXT_ACTIONS_MAX_AFFORDANCES
@@ -358,8 +361,7 @@ function validateContextActionsExplorationForm(payload) {
   }
   var affordances = payload.affordances.map(validateContextActionsAffordance);
   return {
-    // The caller (validateContextActionsPanel) already pinned the registered
-    // version; echo it rather than restating a literal that can drift.
+    // Pinned to the registered version above; never a restated literal.
     schema_version: payload.schema_version,
     available: true,
     kind: "exploration",

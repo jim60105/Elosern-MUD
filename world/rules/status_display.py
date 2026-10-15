@@ -29,6 +29,8 @@ class ConditionDisplay:
 
 
 _SEVERITIES = {"beneficial", "informational", "warning", "harmful", "critical"}
+# The public, immutable severity vocabulary other presenters validate against.
+CONDITION_SEVERITIES = frozenset(_SEVERITIES)
 
 
 def _build_display_metadata() -> dict[str, ConditionDisplay]:

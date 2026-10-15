@@ -61,7 +61,7 @@ function explorationPanel(overrides) {
 function combatPanel(overrides) {
   return Object.assign(
     {
-      schema_version: 5,
+      schema_version: 6,
       available: true,
       kind: "combat",
       session: {
