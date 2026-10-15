@@ -1,6 +1,8 @@
 """Deterministic action providers for one persistent session's rounds.
 
-Supplies the queued player request and the deterministic enemy/basic-attack
+Supplies the exploration opening's single queued request
+(:func:`_round_provider`), the complete draft's per-actor selections
+(:func:`_party_round_provider`), and the deterministic enemy/basic-attack
 policies consumed by ``run_round()`` and ``resolve_overwhelm()``, each built
 with the session's combat context.
 """
@@ -95,7 +97,12 @@ def _enemy_policy(
 
 
 def _round_provider(actor: Any, request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
-    """Supply the queued player request exactly once and deterministic enemy policies."""
+    """Supply one queued opening request exactly once and deterministic enemy policies.
+
+    The single-request provider serving the exploration opening
+    (``submit_opening_action()``); the complete-draft ordinary round uses
+    :func:`_party_round_provider` instead.
+    """
     used = False
 
     def provider(entity, field):

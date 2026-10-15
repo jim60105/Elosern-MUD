@@ -70,6 +70,7 @@ from world.rules.combat import (
 from world.rules.combat_session import (
     BASIC_ATTACK_KEY,
     engage_group,
+    preflight_draft_entries,
     read_session,
     reconstruct_battlefield,
     to_storage,
@@ -1321,6 +1322,43 @@ class CampaignHarness:
                     "single-target plans"
                 )
 
+    def _confirm_remaining_allies(
+        self, initiator: Any, target: Any, result: dict[str, Any]
+    ) -> dict[str, Any]:
+        """Confirm one basic attack per remaining required ally of the draft.
+
+        The player side is a complete party draft: the initiator's own
+        submission only admits its selection, so every other required allied
+        actor must select its own command before the round resolves. This
+        harness supplies exactly the ``basic_attack`` each companion already
+        owns, one actor at a time, and returns the confirmation that completed
+        the draft -- the round's own result. A draft that cannot complete is a
+        simulator failure reported loudly, never a silently capped encounter.
+        """
+        while result.get("outcome") == "draft":
+            record = read_session(initiator)
+            if record is None:
+                break
+            battlefield = reconstruct_battlefield(initiator, record)
+            progress = preflight_draft_entries(initiator, record, battlefield)
+            entities = {
+                int(entity.pk): entity for entity in battlefield.roster.values()
+            }
+            pending = [
+                pk
+                for pk in progress["required_actors"]
+                if pk not in (record.draft_entries or {}) and pk in entities
+            ]
+            if not pending:
+                raise CampaignFailure(
+                    f"the party draft cannot complete for {initiator.key}: "
+                    f"{progress!r}"
+                )
+            result = submit_player_action(
+                initiator, BASIC_ATTACK_KEY, [target], commanded_actor=entities[pending[0]]
+            )
+        return result
+
     def _play(
         self,
         encounter: _Encounter,
@@ -1330,9 +1368,11 @@ class CampaignHarness:
     ) -> tuple[list[reports.DecisionSample], int, str]:
         """Drive one session round-by-round until terminal settlement or the cap.
 
-        The initiating player is the session's own requester, so every round
-        submits one ordinary action from it against a currently legal living
-        opponent. A submission that settlement refuses, a monster action the
+        The initiating player is the session's own requester: it selects one
+        ordinary action per round against a currently legal living opponent,
+        and every remaining required allied actor then confirms its own
+        ``basic_attack`` so the last confirmation resolves the one ordinary
+        round this harness measures. A submission that settlement refuses, a monster action the
         resolver refuses, or an active session with no legal living opponent
         left, is a simulator failure reported loudly rather than a capped
         encounter; only the session's own terminal outcome or this run's actual
@@ -1377,6 +1417,7 @@ class CampaignHarness:
                         "session is still active"
                     )
                 result = submit_player_action(initiator, PLAYER_DRIVER_KEY, [target])
+                result = self._confirm_remaining_allies(initiator, target, result)
                 rounds += 1
                 last_outcome = result.get("outcome")
                 if last_outcome not in ("round", "victory", "defeat", "fled", "cap"):

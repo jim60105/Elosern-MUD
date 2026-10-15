@@ -18,9 +18,9 @@ from world.rules.combat import Battlefield, ExecutionScopeBase, run_round
 from world.rules.combat_beats import RoundRecord, capture_round_hp
 from world.rules.clock import read_world_clock
 from world.rules.combat_session.battlefield import (
+    _commandable_required_actors,
     _context_for,
     _session_policy,
-    get_required_combat_actors,
     authorize_combat_actor,
     reconstruct_battlefield,
 )
@@ -122,7 +122,7 @@ def submit_player_action(
     *,
     commanded_actor: Any | None = None,
 ) -> dict[str, Any]:
-    """Run one ordinary round for one player or commanded companion action.
+    """Admit one player or commanded companion skill selection into the draft.
 
     ``actor`` is the authenticated commander. ``commanded_actor`` is the
     authorized action actor (defaulting to ``actor``).
@@ -136,12 +136,16 @@ def submit_player_action(
     gate forbids rejects before initiative and consumes no round or world
     time. The facade revalidates the
     submitted target value through the shared side-effect-free preview, runs
-    ``ActionResolver.preflight()``, and only then starts exactly one ordinary
-    round -- whatever ``classify_overwhelm()`` decides for the session. A
-    submission made inside an already-active session never compresses;
-    compression is reachable only by opening a fight from exploration through
-    ``submit_opening_action()`` (combat-session-opening-dispatch D-1/D-2). A
-    rejection returns before initiative and consumes no round or world time.
+    ``ActionResolver.preflight()``, and only then admits the entry into the
+    persistent draft under the current session/revision/draft-version CAS.
+    Anything short of the confirmation that completes every required actor
+    returns ``outcome="draft"`` with per-member reselection progress and
+    resolves nothing; that final confirmation resolves exactly one ordinary
+    round and never compresses -- whatever ``classify_overwhelm()`` decides
+    for the session. Compression is reachable only by opening a fight from
+    exploration through ``submit_opening_action()``
+    (combat-session-opening-dispatch D-1/D-2). A rejection returns before
+    initiative and consumes no round or world time.
     """
     record, battlefield, request, rejection = _preflight_skill_submission(
         submit_player_action, actor, skill_key, targets_or_shorthand, scale=scale, commanded_actor=commanded_actor
@@ -309,20 +313,21 @@ def submit_opening_action(
 def submit_player_item_use(
     actor: Any, item_key: str, *, target: Any | None = None, commanded_actor: Any | None = None
 ) -> dict[str, Any]:
-    """Run one ordinary combat round whose turn consumes one held item.
+    """Admit one commanded actor's held-item selection into the draft.
 
     ``actor`` is the authenticated commander. ``commanded_actor`` is the
     authorized action actor (defaulting to ``actor``).
 
     The facade revalidates the request through the shared item preflight
-    with combat allowed, and only then starts exactly one ordinary round
-    whatever ``classify_overwhelm()`` decides, exactly like
-    ``submit_player_action`` (combat-session-opening-dispatch D-5: a
-    consumable is not an attack, so item submissions lose the compression
+    with combat allowed, and only then admits the entry under the same
+    session/revision/draft-version CAS as ``submit_player_action``, exactly
+    like a skill selection (combat-session-opening-dispatch D-5: a
+    consumable is not an attack, so item selections lose the compression
     branch outright rather than gaining the opening gate). A rejection
-    returns before initiative and consumes no round or world time; a
-    successful use resolves on the player's turn and the item journal is
-    merged into the session's outer rollback safety net.
+    returns before initiative and consumes no round or world time; the item
+    is consumed exactly once when the complete draft's final confirmation
+    resolves the round, on the commander's turn, and its journal is merged
+    into the session's outer rollback safety net.
 
     ``target`` is the player's one explicit choice (add-item-effect-targeting
     design D1): the session's battlefield context resolves it — and every
@@ -367,8 +372,14 @@ def preflight_draft_entries(
     """Pure all-command preflight returning retained valid entries and member-specific reselection reasons.
 
     Does NOT roll dice, apply tactical effects, deduct resources, consume items, run upkeep, or advance time.
+
+    The required set is the COMMANDABLE one: a participant the commander may no
+    longer command (a companion that left the party, moved away or was
+    dismissed) is dropped from membership instead of reported as an unfillable
+    reselection, so a changed roster pauses collection only until the next
+    explicit confirmation re-derives it.
     """
-    required_actors = get_required_combat_actors(record, battlefield)
+    required_actors = _commandable_required_actors(commander, record, battlefield)
     if not required_actors:
         membership_changed = bool(record.confirmed_actors) and (record.confirmed_actors != ())
         return {
@@ -499,7 +510,17 @@ def confirm_actor_command(
     actor_id: int,
     command: dict[str, Any],
 ) -> dict[str, Any]:
-    """Commit the edit before resolving a complete draft under the writer."""
+    """Commit one draft edit, then resolve the round once the draft completes.
+
+    Runs entirely under the shared combat writer. The edit is admitted in
+    its own durable transaction against the caller's
+    session/revision/draft-version token; whenever the admitted draft does
+    not cover every required actor, the result is ``outcome="draft"`` (or
+    ``"rejected"`` for an unadmitted edit) carrying per-member reselection
+    progress and resolving nothing. Only the edit that completes the draft
+    proceeds into the durable round transaction, so a duplicate, stale or
+    concurrent confirmation can never resolve the same revision twice.
+    """
     result = _admit_actor_command(
         commander, session_id, round_revision, draft_version, actor_id, command
     )
@@ -627,7 +648,12 @@ def _admit_actor_command(
             # Admit / replace the newly confirmed command
             new_valid[actor_id] = command
             new_reselection = {aid: reason for aid, reason in pre["reselection_reasons"].items() if aid != actor_id}
-            required_actors = pre["required_actors"] if not pre.get("empty_required") else get_required_combat_actors(record, battlefield)
+            # Always the preflight's own SET, never the eligibility-only
+            # roster: the preflight's set is the commandable one, and this
+            # record's ``confirmed_actors`` is what the next preflight compares
+            # against to detect a changed roster. Storing an uncommandable
+            # member here would leave the session uncompletable.
+            required_actors = pre["required_actors"]
 
             new_record = replace(
                 record,
@@ -746,11 +772,23 @@ def _submit_request(
                 if current is None or (
                     current.session_id, current.round_revision
                 ) != (record.session_id, record.round_revision):
-                    return {"ok": False, "reason": "stale_round_revision"}
+                    # A concurrent writer consumed this revision between
+                    # admission and resolution. Report it in the facade's
+                    # result shape: every caller renders ``outcome``.
+                    return {
+                        "ok": False,
+                        "outcome": "rejected",
+                        "reason": "stale_round_revision",
+                    }
                 record = current
                 preflight = preflight_draft_entries(actor, record, battlefield)
                 if not preflight["is_complete"]:
-                    return {"ok": False, "reason": "draft_incomplete", "progress": preflight}
+                    return {
+                        "ok": False,
+                        "outcome": "draft",
+                        "reason": "draft_incomplete",
+                        "progress": preflight,
+                    }
                 requests = _draft_requests(record, battlefield)
             # Shared outer transaction (fix-combat-settlement-recovery D1):
             # round effects, friendly-fire and coercion penalties, session
@@ -763,14 +801,14 @@ def _submit_request(
             # only ``submit_opening_action()`` may pass ``opening =
             # "overwhelm"``, and only after its own two-part player-direction
             # plus damage-reaches-enemy judgement. Every in-session
-            # submission takes the default ``"round"`` -- one ordinary round
-            # per submission, whatever the verdict, so the player always
+            # completion takes the default ``"round"`` -- one ordinary round
+            # per completed draft, whatever the verdict, so the player always
             # keeps per-round agency. The session's simulated/nonlethal
             # policy threads into both entries so upkeep-settled ticks honor
             # the same credit rules as direct damage (fix-dot-kill-credit D4).
             # Both entries carry the encounter's real decision identity
             # (monster-ai-attack-selection): the durable session id and the
-            # actual round number this submission resolves, counted from the
+            # actual round number this resolution consumes, counted from the
             # record's committed rounds. The ordinary path settles exactly one
             # round; overload compression numbers each internal round from the
             # same base, so no two real rounds share a decision scope.
