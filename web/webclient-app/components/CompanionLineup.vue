@@ -31,7 +31,11 @@ function slotStyle(index) {
   const figure = props.formation?.figures?.[index];
   if (figure) {
     const { left, top, width, height } = figure.box;
-    return { left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`, zIndex: figure.z };
+    // The beat step, cut to the space before the next head (the engine's `lunge`).
+    return {
+      left: `${left}px`, top: `${top}px`, width: `${width}px`, height: `${height}px`, zIndex: figure.z,
+      "--motion-beat-lunge": `${figure.lunge ?? 0}px`,
+    };
   }
   const { scale, lift, z } = geometry.value[index];
   const speaking = !shown.value[index].isControlled && shown.value[index].identity === props.speakingIdentity;

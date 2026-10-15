@@ -153,6 +153,18 @@ function violations({ input }, result) {
       if (overlaps(h, other.plate) || overlaps(h, other.marker)) fail("a plate or marker covers a head");
     }
   }
+  // The beat step: at most 12px·S, and at its peak (the figure shifted that
+  // far toward the centre) a head never reaches another head of its rank.
+  for (const [sideName, side] of [["party", result.party], ["foes", result.foes]]) {
+    for (const a of side.figures) {
+      if (!(a.lunge >= 0) || a.lunge > 12 * S + TOL) fail(`beat step ${a.lunge} outside 0..12px·S`);
+      const towardCentre = sideName === "party" ? a.lunge : -a.lunge;
+      const peak = head({ ...a.box, left: a.box.left + towardCentre });
+      for (const b of side.figures) {
+        if (b !== a && b.rank === a.rank && overlaps(peak, head(b.box))) fail("a beat step leans a head over another");
+      }
+    }
+  }
   for (const side of [result.party, result.foes]) {
     for (const a of side.figures) {
       for (const b of side.figures) {
@@ -592,6 +604,19 @@ describe("combat formation: the stage input adapter", () => {
     const input = formationInputFromStage({ left: 0, top: 0, width: 1451, height: 790 }, record, null, { party: 1, foes: 3 });
     expect(input.actorHeight).toBe(489.8);
     expect(input.bandTop).toBeCloseTo(790 - 220.015, 6);
+  });
+
+  it("reads the command-line row's height when given, and leaves the engine its default otherwise", () => {
+    const stage = { left: 0, top: 0, width: 1451, height: 790 };
+    const base = { "--ui-scale": "1", "--actor-h": "489.8px", "--header-h": "48px", "--band-h": "220px" };
+    const measured = formationInputFromStage(stage, { ...base, "--command-line-h": "60px" }, null, { party: 1, foes: 10 });
+    expect(measured.commandLineHeight).toBe(60);
+    const unmeasured = formationInputFromStage(stage, base, null, { party: 1, foes: 10 });
+    expect(unmeasured.commandLineHeight).toBeUndefined();
+    // The default floor line (44px·S) sits lower than the measured 60px one.
+    const front = (input) => combatFormation(input).foes.figures.filter((figure) => figure.rank === 0)[0].plate;
+    expect(bottom(front(measured))).toBeCloseTo(570 - 60 - 8, 6);
+    expect(bottom(front(unmeasured))).toBeCloseTo(570 - 44 - 8, 6);
   });
 
   it("rejects an unresolved custom property instead of computing a NaN formation", () => {

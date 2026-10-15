@@ -2,7 +2,9 @@
 // FigurePlate (OpenSpec change webclient-combat-formation, design D4): the
 // glance plate a combat figure other than the controlled one carries in the
 // stage's `plates` layer, standing in the plate slot the combat formation
-// engine (combat-formation.js) returns, its bottom edge on the figure's head.
+// engine (combat-formation.js) returns: above its figure's head, or, in the
+// front rank of a two-rank side, on the floor line over its figure's lower
+// body. No plate ever covers a head, and nothing covers a plate.
 //
 // - `full` (112×52px·S): the serif name (with the session token only while
 //   two drawn participants share the name), then a 4px tapered hit-point
@@ -15,9 +17,8 @@
 // passes `displayHp`'s value as `hpCurrent`), and a pale trailing segment
 // follows a drop after the vitals' trail delay, so the damage reads as a gap.
 // Chrome follows the HUD panel notes: no box, border, radius or shadow — a
-// feathered ground that fades upward and to the sides (so a back-rank face
-// behind a front-rank plate still reads through it), and one brass hairline
-// crown along the bottom edge. Display-only: `role="group"` with the whole
+// feathered ground, densest at the foot, kept inside the slot's height, and
+// one brass hairline crown along the bottom edge. Display-only: `role="group"` with the whole
 // reading as its accessible name, no focusable element, no pointer events.
 import { computed } from "vue";
 import { plateHpPercent, plateLabel } from "./figure-plate.js";
@@ -123,26 +124,24 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
   height: calc(36px * var(--ui-scale));
 }
 
-/* The ground: the panel ink under a light backdrop blur, feathered so it
-   is densest at the plate's foot (over the figure's head) and fades out
-   upward and toward both sides. It overhangs the slot above and to the
-   sides, so the fade happens outside the type, never across it: the name
-   and the readout always sit on the dense part, and a face behind the
-   plate's thin edges still reads through. */
+/* The ground: the panel ink under a light backdrop blur, densest at the
+   plate's foot and lighter toward its top, feathered out to both sides. It
+   never reaches above the plate's own slot, so it can cover nothing the
+   formation keeps clear (a head is never under a plate). */
 .figure-plate::before {
   content: "";
   position: absolute;
-  inset: calc(-12px * var(--ui-scale)) calc(-12px * var(--ui-scale)) 0;
+  inset: 0 calc(-12px * var(--ui-scale)) 0;
   z-index: -1;
   background: var(--panel);
-  opacity: 0.78;
+  opacity: 0.8;
   backdrop-filter: blur(calc(3px * var(--ui-scale)));
   -webkit-mask-image:
-    linear-gradient(0deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.7) 78%, transparent 100%),
+    linear-gradient(0deg, #000 0%, #000 60%, rgba(0, 0, 0, 0.72) 100%),
     linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   -webkit-mask-composite: source-in;
   mask-image:
-    linear-gradient(0deg, #000 0%, #000 55%, rgba(0, 0, 0, 0.7) 78%, transparent 100%),
+    linear-gradient(0deg, #000 0%, #000 60%, rgba(0, 0, 0, 0.72) 100%),
     linear-gradient(90deg, transparent 0%, #000 14%, #000 86%, transparent 100%);
   mask-composite: intersect;
 }

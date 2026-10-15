@@ -23,7 +23,12 @@
 // - no head is ever covered (webclient-combat-formation): no plate or marker
 //   slot overlaps any figure's head (the central HEAD_WIDTH × top HEAD_HEIGHT
 //   of its box), a front-rank box never reaches a back-rank head, and the
-//   heads of one rank stay apart; lower bodies may be covered;
+//   heads of one rank stay apart, and each figure's beat step (`lunge`) is
+//   cut to the space before the next head toward the centre, so a figure
+//   acting in a round never leans its head over a neighbour's; lower bodies
+//   may be covered. The rule holds for every resting layout and at the beat step's
+//   peak; a glide between two layouts and a foe fading where it stood are
+//   transitions, not layouts;
 // - a floor plate (see below) stays FLOOR_CLEARANCE above the command-line
 //   row and, for the party, above the vitals dock.
 //
@@ -86,6 +91,11 @@ export const DOCK_COVER_MAX = 0.4;
 // no head is ever covered — not by a plate, a marker or another figure).
 export const HEAD_WIDTH = 0.3;
 export const HEAD_HEIGHT = 0.22;
+// The beat step (`--motion-beat-lunge`, 12px·S): a figure acting in a combat
+// round leans at most this far toward the centre. Each figure's `lunge` is
+// that distance cut to the clear space between its head and the next head of
+// its rank toward the centre, so a step never brings one head over another.
+export const BEAT_STEP = 12;
 // The command-line row docked on the band's top edge (`--command-line-h`), in
 // px·S, used when the input does not measure it.
 export const COMMAND_LINE_HEIGHT = 44;
@@ -228,6 +238,22 @@ function layoutSide(input, zone, side, n, scale, ranks, form) {
     const plate = { ...rect(centreX - slotWidth / 2, plateBottom - slotHeight, slotWidth, slotHeight), form, line };
     const marker = rect(centreX - markerSize / 2, plate.top - markerSize, markerSize, markerSize);
     figures.push({ index, rank, box, plate, marker, z: n - index, floor: onFloor });
+  }
+
+  // The beat step each figure may take toward the centre: BEAT_STEP·S, cut to
+  // the clear space before the next head of its rank (the next figure toward
+  // the centre). The innermost figure of a rank leans into its gutter, which is
+  // wider than the step.
+  for (const figure of figures) {
+    const next = figures.find((other) => other.rank === figure.rank && other.index === figure.index + 1);
+    let lunge = BEAT_STEP * S;
+    if (next) {
+      const own = headOf(figure.box);
+      const theirs = headOf(next.box);
+      const clear = side === "party" ? theirs.left - right(own) : own.left - right(theirs);
+      lunge = Math.max(0, Math.min(lunge, clear));
+    }
+    figure.lunge = lunge;
   }
 
   if (ok) ok = sideFits(input, zone, side, figures);

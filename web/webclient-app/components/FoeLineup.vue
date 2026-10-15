@@ -113,6 +113,9 @@ function slotStyle(index) {
     width: `${width}px`,
     height: `${height}px`,
     zIndex: figure.z,
+    // The beat step, cut to the space before the next head (the engine's
+    // `lunge`), so a foe acting in a round never leans over a neighbour's head.
+    "--motion-beat-lunge": `${figure.lunge ?? 0}px`,
   };
 }
 
