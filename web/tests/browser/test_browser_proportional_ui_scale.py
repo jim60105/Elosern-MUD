@@ -50,6 +50,20 @@ MEASURE = """() => {
 }"""
 
 
+# The combat formation's rendered figures (webclient-combat-formation).
+FORMATION_MEASURE = """() => {
+  const box = (el) => { const r = el.getBoundingClientRect(); return { x: r.left, y: r.top, w: r.width, h: r.height }; };
+  const actors = (sel) => [...document.querySelectorAll(sel)].map(box);
+  return {
+    width: document.querySelector('[data-testid="elosern-stage"]').getBoundingClientRect().width,
+    actorH: document.querySelector('.stage-metrics > [data-metric="--actor-h"]').getBoundingClientRect().height,
+    party: actors('[data-anchor="actor-left"] [data-testid="stage-actor"]'),
+    foes: actors('[data-anchor="actor-right"] [data-testid="foe-slot"]:not(.foe-leave-active) [data-testid="stage-actor"]'),
+    plates: document.querySelectorAll('[data-anchor="plates"] [data-testid="figure-plate"]').length,
+  };
+}"""
+
+
 class _QuietHandler(SimpleHTTPRequestHandler):
     def log_message(self, *args):
         pass
@@ -184,6 +198,24 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
             RATIO,
             places=3,
         )
+        # webclient-combat-formation: the formation follows the resized stage
+        # within the resize's frames — one shared figure scale on a rung of
+        # the engine's ladder for the new actor height, both sides outside the
+        # dead-centre gap, and one plate per drawn non-controlled figure.
+        self.page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+        formation = self.page.evaluate(FORMATION_MEASURE)
+        heights = [box["h"] for box in formation["party"] + formation["foes"]]
+        self.assertTrue(formation["foes"], formation)
+        self.assertLessEqual(max(heights) - min(heights), 1.0, formation)
+        ratio = heights[0] / formation["actorH"]
+        self.assertTrue(
+            any(abs(ratio - rung) < 0.005 for rung in (0.9, 0.84, 0.78, 0.72, 0.66, 0.6, 0.55, 0.5)),
+            f"the figures stand at {ratio:.3f} of the actor height, off the shared ladder",
+        )
+        centre, gap = formation["width"] / 2, 148 * RATIO
+        self.assertTrue(all(box["x"] + box["w"] <= centre - gap + 1 for box in formation["party"]), formation)
+        self.assertTrue(all(box["x"] >= centre + gap - 1 for box in formation["foes"]), formation)
+        self.assertEqual(formation["plates"], len(formation["party"]) - 1 + len(formation["foes"]))
         # 攻擊 opens the target frame; the first enabled foe row sends once.
         self.page.locator('[data-testid="dock-menu"] button[role="option"]', has_text="攻擊").first.click()
         target = self.page.locator('[data-testid="dock-menu"] button[role="option"]:not([aria-disabled="true"])', has_text="灰袍盜賊").first

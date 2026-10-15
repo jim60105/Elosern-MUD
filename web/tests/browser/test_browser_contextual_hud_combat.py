@@ -21,7 +21,6 @@ from .browser_helpers import (
 from ._journey_support import (
     _combat_panel,
     _art_panel,
-    _TINY_PNG,
     _inject_snapshot,
     _wait_mode,
     _press,
@@ -32,23 +31,21 @@ from ._journey_support import (
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
     """Contextual HUD action-dock behavior on the shared managed server."""
     @covers_requirement(
-        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits"
+        "webclient-contextual-hud::the-combat-participant-frame-presents-the-session-s-participants-and-their-portraits",
+        "webclient-contextual-hud::combat-identity-and-status-remain-legible-without-changing-authority",
     )
-    def test_combat_participant_frame_presents_participants_and_portraits(self):
-        """The combat participant frame presents the session's participants and portraits."""
+    def test_combat_figure_plates_present_the_drawn_participants(self):
+        """Each drawn figure but the controlled one carries its plate; no roster renders.
+
+        webclient-combat-formation replaced the participant frame with one
+        glance plate per drawn non-controlled figure in the stage's `plates`
+        layer. The frame's assertions (both sides from the committed rows,
+        tokens, names, numerals, no portrait strip, nothing on actor-right
+        but decorative foes) move to the plates: each foe's plate states its
+        name, its side and its numerals as text, the session token rides its
+        accessible name, and no roster or numbers panel remains anywhere.
+        """
         page = self.logged_in_page()
-        # The injected catalog's fake URLs must actually load: a failed
-        # portrait load steps past to the row's identity glyph and keeps the
-        # shared local failure marker, so an unresolvable URL would assert the
-        # failure behavior instead of the catalog-image behavior this journey
-        # owns (same route-stub technique as test_browser_art's degradation
-        # journey, here fulfilling instead of aborting).
-        page.route(
-            "**/art/portrait_*.png",
-            lambda route: route.fulfill(
-                status=200, content_type="image/png", body=_TINY_PNG
-            ),
-        )
         _inject_snapshot(
             page,
             {
@@ -59,52 +56,40 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         )
         _wait_mode(page, "combat")
 
-        frame = page.locator('[data-testid="participant-frame"]')
-        self.assertEqual(frame.count(), 1, "the participant frame mounts in the HUD area")
-        self.assertTrue(frame.is_visible())
+        self.assertEqual(page.locator('[data-testid="participant-frame"]').count(), 0, "no roster renders")
+        self.assertFalse(page.locator('[data-anchor="map"]').is_visible(), "the map anchor is hidden in combat")
 
-        # Both sides render from the committed participants, in presenter order.
-        frame_text = frame.inner_text()
-        self.assertIn("我方", frame_text, "the player's side renders")
-        self.assertIn("敵方", frame_text, "the opposing side renders")
-        self.assertIn("a1", frame_text, "the participant token renders")
-        self.assertIn("勇者", frame_text, "the participant display name renders")
-        self.assertIn("100/100", frame_text, "the current/maximum HP render as numerals")
-        # A non-active participant carries an explicit text state marker.
-        self.assertIn("倒地", frame_text, "a knocked-out participant is marked in text, not colour alone")
-
-        # Portraits resolve only through the committed art portrait catalog: the
-        # shared figure renderer's avatar position carries one attempt element
-        # per admitted row, and a null reference draws the identity glyph
-        # instead (never a failure marker).
-        imgs = frame.locator(
-            '[data-testid="avatar-artwork"] img.avatar-artwork__figure'
-        )
-        self.assertEqual(imgs.count(), 2, "resolvable portrait references render the catalog image")
-        imgs.first.wait_for(state="attached", timeout=15000)
-        page.wait_for_function(
-            "() => Array.from(document.querySelectorAll("
-            "'[data-testid=\"participant-frame\"] img.avatar-artwork__figure'))"
-            ".every((img) => img.complete && img.naturalWidth > 0)",
-            timeout=15000,
-        )
+        plates = page.locator('[data-anchor="plates"] [data-testid="figure-plate"]')
+        plates.first.wait_for(state="visible", timeout=15000)
+        # Only the controlled player is drawn on the party side (no party
+        # panel), so its values stay in the vitals dock and the two active
+        # foes carry the plates, in presenter order.
+        self.assertEqual(plates.count(), 2)
+        labels = [plates.nth(i).get_attribute("aria-label") for i in range(plates.count())]
+        self.assertEqual(labels, ["哥布林 e1，敵方，生命 60/60", "史萊姆 e2，敵方，生命 30/30"])
         self.assertEqual(
-            frame.locator('[data-testid="artwork-failure"]').count(),
-            0,
-            "a resolvable portrait reference reports no local failure",
+            [plates.nth(i).get_attribute("data-side") for i in range(plates.count())], ["foes", "foes"]
         )
-        # actor-right holds only the foe line-up's decorative actors
-        # (webclient-combat-foes-on-stage): the active foes, no frame content.
+        # The visible reading: the name, then the numerals (current / max).
+        first = plates.nth(0)
+        self.assertIn("哥布林", first.locator(".figure-plate__name").inner_text())
+        self.assertEqual("".join(first.locator('[data-testid="figure-plate-readout"]').text_content().split()), "60/60")
+        # No token shows while the names differ.
+        self.assertEqual(page.locator('[data-testid="figure-plate-token"]').count(), 0)
+        # Display-only: nothing focusable, no pointer events.
+        layer = page.locator('[data-anchor="plates"]')
+        self.assertEqual(layer.locator("button, a, input, textarea, select, [tabindex]").count(), 0)
+        self.assertEqual(layer.evaluate("(el) => getComputedStyle(el).pointerEvents"), "none")
+
+        # actor-right holds only the foe line-up's decorative actors.
         right = page.locator('[data-anchor="actor-right"]')
         self.assertEqual(right.locator('[data-testid="foe-lineup"]').count(), 1)
         self.assertEqual(right.locator('[data-testid="foe-slot"]').count(), 2)
-        self.assertEqual(right.locator('[data-testid="participant-frame"]').count(), 0)
         self.assertNotIn("/", right.inner_text(), "actor-right states no hit-point numerals")
-        # While the participant frame is mounted, no separate portrait strip renders.
         self.assertEqual(
             page.locator('[data-testid="art-panel"]').count(),
             0,
-            "while the participant frame is mounted, no separate portrait strip renders",
+            "no separate portrait strip renders",
         )
 
     @covers_requirement("webclient-contextual-hud::combat-details-follow-the-active-command-frame")

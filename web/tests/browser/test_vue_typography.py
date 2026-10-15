@@ -64,7 +64,7 @@ class VueTypographyBrowserTest(unittest.TestCase):
     def test_dense_chrome_floor_and_bounded_controls(self):
         stories = (
             ("core-appshell--populated-hud", ".vitals"),
-            ("core-appshell--combat-five-foes", ".participant-frame"),
+            ("core-appshell--combat-five-foes", ".figure-plate"),
             ("core-appshell--dialogue-selector", ".dialogue-choices__row"),
             ("data-characterstatusdrawer--full", ".character-status-drawer"),
             ("overlays-creationoverlay--custom-draft", ".creation-overlay"),
