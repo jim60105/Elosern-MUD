@@ -74,6 +74,14 @@ export const CompactLowHpFold = { render, args: { name: "哥布林", token: "e6"
 export const CompactLowHpNoConditions = { render, args: { name: "哥布林", token: "e6", side: "foes", hpCurrent: 4, hpMaximum: 24, form: "compact" } };
 // A round's beats drain the displayed value (`displayHp`) page by page: the
 // stroke trails each drop, and the alarm rises as it crosses 25%.
+// Fallen plates (webclient-combat-defeated-foes D1): the name stays, the
+// stroke empties to a dashed outline and the glyph and the word replace the
+// numbers; a compact plate moves them to its glyph line.
+export const DefeatedFoe = { render, args: { name: "灰袍盜賊", token: "e1", side: "foes", hpCurrent: 0, hpMaximum: 30, form: "full", fallen: "defeated" } };
+export const DownedAlly = { render, args: { name: "蕾娜", token: "a2", side: "party", hpCurrent: 0, hpMaximum: 120, form: "full", fallen: "down", conditions: [C.bleed] } };
+export const CompactDefeated = { render, args: { name: "哥布林", token: "e6", side: "foes", hpCurrent: 0, hpMaximum: 24, form: "compact", fallen: "defeated" } };
+export const CompactDowned = { render, args: { name: "幽", token: "a3", side: "party", hpCurrent: 0, hpMaximum: 160, form: "compact", fallen: "down" } };
+
 export const PlaybackDrain = {
   args: { name: "灰袍盜賊", token: "e1", side: "foes", hpMaximum: 60, form: "full", conditions: [C.poison] },
   render: (args) => ({

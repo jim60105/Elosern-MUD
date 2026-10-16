@@ -48,7 +48,7 @@
 // figure wrapper, so a portrait, a placeholder card and failed art take it
 // alike, and the seal is decorative (`aria-hidden`): the plate states
 // 已擊破 / 倒地.
-import { computed, ref, watch } from "vue";
+import { computed, ref, useId, watch } from "vue";
 import ReferenceArtwork from "./ReferenceArtwork.vue";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 import { artworkOriginal, artworkTerminalUrl } from "../lib/artwork.js";
@@ -117,6 +117,8 @@ const portraitKey = computed(() => {
 });
 
 const transitionCss = computed(() => props.motionLevel !== "off");
+// The seal's crack mask needs a document-unique id per figure.
+const sealMaskId = `stage-seal-crack-${useId()}`;
 // The fall eases only at a live change above `off` (design D4).
 const fallInstant = computed(() => props.fallInstant || props.motionLevel === "off");
 
@@ -183,13 +185,22 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
         aria-hidden="true"
         focusable="false"
       >
-        <circle class="stage-actor__seal-halo" cx="50" cy="50" r="46" />
-        <path class="stage-actor__seal-under" d="M 72.5 13.5 A 43 43 0 1 1 46 7.2" />
-        <path class="stage-actor__seal-ring" d="M 72.5 13.5 A 43 43 0 1 1 46 7.2" />
-        <circle class="stage-actor__seal-inner" cx="50" cy="50" r="33" />
-        <path class="stage-actor__seal-mark" d="M 38 38 L 62 62 M 62 38 L 38 62" />
-        <path class="stage-actor__seal-crack-under" d="M 30 6 L 41 27 L 34 40 L 55 55 L 47 68 L 63 79 L 58 95" />
-        <path class="stage-actor__seal-crack" d="M 30 6 L 41 27 L 34 40 L 55 55 L 47 68 L 63 79 L 58 95" />
+        <defs>
+          <!-- The crack is cut out of the whole seal, so the figure shows
+               through the split rather than a drawn line. -->
+          <mask :id="sealMaskId" maskUnits="userSpaceOnUse" x="-10" y="-10" width="120" height="120">
+            <rect x="-10" y="-10" width="120" height="120" fill="#fff" />
+            <path class="stage-actor__seal-crack" d="M 44 -4 L 51 18 L 43 33 L 58 47 L 47 61 L 60 75 L 53 104" />
+          </mask>
+        </defs>
+        <g :mask="`url(#${sealMaskId})`">
+          <circle class="stage-actor__seal-halo" cx="50" cy="50" r="47" />
+          <path class="stage-actor__seal-under" d="M 76.6 16.2 A 43 43 0 1 1 63.3 9.1" />
+          <path class="stage-actor__seal-ring" d="M 76.6 16.2 A 43 43 0 1 1 63.3 9.1" />
+          <circle class="stage-actor__seal-inner" cx="50" cy="50" r="34" />
+          <path class="stage-actor__seal-rune" d="M 50 30 L 64 50 L 50 70 L 36 50 Z" />
+          <circle class="stage-actor__seal-dot" cx="50" cy="50" r="4.5" />
+        </g>
       </svg>
     </Transition>
     <span
@@ -325,7 +336,7 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
 /* The broken seal: 28% of the figure's width, centred over the chest of the
    collapsed figure (42% down the figure from its lowered head). A dark under
    stroke and halo keep the seal-red ring legible over pale robes and dark
-   art alike; the crack is cut in ink through ring and mark. */
+   art alike; the crack is cut through ring, rune and halo by a mask. */
 .stage-actor__seal {
   position: absolute;
   left: 50%;
@@ -339,41 +350,36 @@ const beatKey = computed(() => (props.gesture ? props.gestureKey || props.gestur
   filter: drop-shadow(0 0 calc(10px * var(--ui-scale)) var(--seal-glow));
 }
 .stage-actor__seal-halo {
-  fill: rgba(14, 8, 10, 0.42);
+  fill: rgba(14, 8, 10, 0.38);
 }
-.stage-actor__seal-under,
-.stage-actor__seal-crack-under {
+.stage-actor__seal-under {
   fill: none;
-  stroke: rgba(10, 6, 8, 0.85);
+  stroke: rgba(10, 6, 8, 0.8);
   stroke-width: 10;
-  stroke-linecap: round;
-  stroke-linejoin: round;
 }
 .stage-actor__seal-ring {
   fill: none;
   stroke: var(--seal-400);
   stroke-width: 5.5;
-  stroke-linecap: butt;
 }
 .stage-actor__seal-inner {
   fill: none;
   stroke: var(--seal-500);
-  stroke-width: 1.6;
-  stroke-dasharray: 5 3;
+  stroke-width: 1.4;
 }
-.stage-actor__seal-mark {
+.stage-actor__seal-rune {
   fill: none;
   stroke: var(--seal-400);
-  stroke-width: 6;
-  stroke-linecap: square;
+  stroke-width: 3.2;
+  stroke-linejoin: miter;
 }
-.stage-actor__seal-crack-under {
-  stroke-width: 7;
+.stage-actor__seal-dot {
+  fill: var(--seal-400);
 }
 .stage-actor__seal-crack {
   fill: none;
-  stroke: var(--ink-950);
-  stroke-width: 3.2;
+  stroke: #000;
+  stroke-width: 6;
   stroke-linecap: round;
   stroke-linejoin: miter;
 }

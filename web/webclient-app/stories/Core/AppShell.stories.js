@@ -229,15 +229,17 @@ const MODE_JOURNEY_DIALOGUE_CLOSED = {
 // its plate its numbers (webclient-combat-formation) — then the foes in
 // presenter order, each with a catalog portrait; `overrides` edits a foe by
 // identity (a defeat, a missing ref).
-const partyParticipants = (companions) => [
+// `downed`: the companion indexes that are knocked out (webclient-combat-
+// defeated-foes: they kneel in their slots with a 倒地 plate).
+const partyParticipants = (companions, downed = []) => [
   PARTY_PARTICIPANTS[0],
   ...PARTY_PANEL_FULL_SAMPLE.slots.slice(0, companions).map((slot, index) => ({
     identity: slot.identity,
     token: `a${index + 2}`,
     display_name: slot.display_name,
     team: "party",
-    state: "active",
-    hp_current: slot.hp_current,
+    state: downed.includes(index) ? "knocked_out" : "active",
+    hp_current: downed.includes(index) ? 0 : slot.hp_current,
     hp_maximum: slot.hp_maximum,
     portrait_ref: slot.portrait_ref,
     conditions: [],
@@ -245,8 +247,8 @@ const partyParticipants = (companions) => [
 ];
 // `conditions` spreads the plate conditions and low hit points over the
 // roster (webclient-combat-figure-plates).
-const combatPanelWith = (foes, overrides = {}, companions = 2, conditions = false) => {
-  const roster = [...partyParticipants(companions), ...foeParticipants(foes, overrides)];
+const combatPanelWith = (foes, overrides = {}, companions = 2, conditions = false, downed = []) => {
+  const roster = [...partyParticipants(companions, downed), ...foeParticipants(foes, overrides)];
   return protocolFixtures.combatActions({ ...combatRoster(conditions ? withPlateConditions(roster) : roster) });
 };
 const combatRoster = (participants) => ({ participants, skills: combatSkills(participants) });
@@ -337,7 +339,7 @@ const renderPlayer = (args) => ({
               }] : []),
             ],
           }),
-          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat, {}, args.companions ?? 2, !!args.conditions) : protocolFixtures.explorationActions({
+          context_actions: args.combat ? combatPanelWith(args.combat === true ? 3 : args.combat, args.foeOverrides || {}, args.companions ?? 2, !!args.conditions, args.downedCompanions || []) : protocolFixtures.explorationActions({
             suggestions: { status: "ready", cards: [
               { kind: "known_action", action_code: "explore.look", label: "查看房間", params: { room: true } },
               { kind: "known_action", action_code: "explore.wait", label: "等到黃昏", params: { daypart: "dusk" } },
@@ -743,6 +745,22 @@ export const CombatFullPartyElevenFoes = { render: renderPlayer, args: { combat:
 // group (戰場) and walk it with the arrow keys.
 export const CombatConditionsSoloFifteenFoes = { render: renderPlayer, args: { combat: 15, companions: 0, conditions: true } };
 export const CombatConditionsFullParty = { render: renderPlayer, args: { combat: 8, companions: 4, conditions: true } };
+// Fallen figures (webclient-combat-defeated-foes): six foes, two of them
+// defeated (one knocked out, one defeated), keep their slots collapsed under
+// a broken seal with ✕ 已擊破 plates, and a knocked-out companion kneels
+// with a ▼ 倒地 plate; the formation keeps every slot, so nothing re-forms.
+export const CombatSomeFoesDefeated = {
+  render: renderPlayer,
+  args: {
+    combat: 6,
+    companions: 2,
+    foeOverrides: {
+      32: { state: "knocked_out", hp_current: 0 },
+      34: { state: "defeated", hp_current: 0 },
+    },
+    downedCompanions: [1],
+  },
+};
 // Exploration → combat → exploration at `full`: the party glides and scales
 // from its exploration row into the formation while the foes enter at the
 // same height as the flash releases, then the plates rise; leaving combat

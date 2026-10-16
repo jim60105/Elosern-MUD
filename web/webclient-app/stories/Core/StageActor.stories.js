@@ -45,9 +45,10 @@ const descriptor = (subject, url, faceRect, overrides = {}) =>
 //
 // Props: artwork (the canonical descriptor of this figure position, or null),
 // panel (the committed panel it is judged against), hasReference, name, side
-// ("left" | "right"), dimmed, motionLevel, and the combat
+// ("left" | "right"), dimmed, motionLevel, the combat
 // beat gesture (gesture: null | "lunge" | "hit" | "defeat", gestureKey,
-// floatAmount). Emits nothing (decorative
+// floatAmount), and the fallen look (fallen: null | "defeated" | "down",
+// fallInstant). Emits nothing (decorative
 // art: no focusable element, no pointer events).
 
 export default {
@@ -59,6 +60,7 @@ export default {
     dimmed: { control: "boolean" },
     motionLevel: { control: "inline-radio", options: ["full", "reduced", "off"] },
     gesture: { control: "inline-radio", options: [null, "lunge", "hit", "defeat"] },
+    fallen: { control: "inline-radio", options: [null, "defeated", "down"] },
   },
 };
 
@@ -269,9 +271,100 @@ export const BeatHit = {
   args: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right", dimmed: false, gesture: "hit", floatAmount: 12 },
 };
 
-// A foe's defeat beat: the figure fades and sinks out (it stays gone until
-// the rest beat brings it back for the replay).
+// A foe's defeat beat (webclient-combat-defeated-foes D4): the figure
+// collapses into its defeated look in place and the seal presses in after
+// it; the rest beat brings it back up for the replay.
+const renderFallLoop = ({ fallen, ...args }) => ({
+  components: { StageActor },
+  setup() {
+    const step = ref(0);
+    let timer = null;
+    onMounted(() => {
+      timer = setInterval(() => {
+        step.value += 1;
+      }, 1600);
+    });
+    onBeforeUnmount(() => clearInterval(timer));
+    return { args, step, fallen };
+  },
+  template:
+    '<div style="width:420px;height:630px;padding:0;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
+    '<StageActor v-bind="args" :fallen="step % 2 === 1 ? fallen : null"' +
+    ' :gesture="step % 2 === 1 ? \'defeat\' : null" :gesture-key="`story:${step}`" /></div>',
+});
+
 export const BeatDefeat = {
-  render: renderBeatLoop,
-  args: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right", dimmed: false, gesture: "defeat", floatAmount: null },
+  render: renderFallLoop,
+  args: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right", dimmed: false, fallen: "defeated" },
+};
+
+// The fallen looks (webclient-combat-defeated-foes design D1/D2), at rest:
+// a defeated foe collapses to 80% about its base, greyed and darkened at
+// 0.8 opacity with a broken seal over its chest; the look sits on the figure
+// wrapper, so a portrait, a placeholder card and failed art take it alike.
+export const DefeatedPortrait = {
+  render: renderActor,
+  args: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right", fallen: "defeated" },
+};
+export const DefeatedPlaceholder = {
+  render: renderActor,
+  args: { artwork: null, panel: PANEL, hasReference: false, name: "哥布林", side: "right", fallen: "defeated" },
+};
+export const DefeatedFailedArt = {
+  render: renderActor,
+  args: { artwork: { ...HOST_PENDING_ENTRY, generation_state: "failed" }, panel: PANEL, name: "灰婆婆", side: "right", fallen: "defeated" },
+};
+// A downed ally: kneeling at 92%, half desaturated, no seal; its plate says 倒地.
+export const DownedAlly = {
+  render: renderActor,
+  args: { artwork: HOST_ENTRY, panel: PANEL, name: "艾莉亞", side: "left", fallen: "down" },
+};
+
+// The four reads side by side: a standing figure, a dialogue listener
+// (dimmed: colour, pose and opacity kept, no mark), a downed ally (the
+// kneel) and a defeated foe (the collapse and the seal). Every fallen pair
+// differs by shape and mark, never by brightness alone; the plates add the
+// words.
+export const FallenVsDim = {
+  render: () => ({
+    components: { StageActor },
+    setup: () => ({ PANEL, PLAYER_PORTRAIT, HOST_ENTRY }),
+    template:
+      '<div style="display:flex;gap:28px;align-items:flex-end;padding:24px;background:radial-gradient(120% 90% at 50% 20%,#3b4250,#15171b 70%)">' +
+      [
+        ["站立", '<StageActor :artwork="HOST_ENTRY" :panel="PANEL" name="灰婆婆" side="right" />'],
+        ["聆聽（變暗）", '<StageActor :artwork="HOST_ENTRY" :panel="PANEL" name="灰婆婆" side="left" dimmed />'],
+        ["倒地", '<StageActor :artwork="HOST_ENTRY" :panel="PANEL" name="灰婆婆" side="left" fallen="down" />'],
+        ["已擊破", '<StageActor :artwork="HOST_ENTRY" :panel="PANEL" name="灰婆婆" side="right" fallen="defeated" />'],
+      ]
+        .map(
+          ([label, actor]) =>
+            '<figure style="margin:0;display:grid;gap:10px;justify-items:center">' +
+            `<div style="width:220px;height:330px">${actor}</div>` +
+            `<figcaption style="font:16px/1 var(--f-sans);color:var(--paper-300)">${label}</figcaption></figure>`,
+        )
+        .join("") +
+      "</div>",
+  }),
+};
+
+// The defeat at `reduced` (webclient-combat-defeated-foes D4): the pose lands
+// at once with no travel; only the tone and the seal fade, within 150ms.
+export const DefeatedReducedMotion = {
+  render: (args) => ({
+    ...renderFallLoop(args),
+    setup() {
+      const inner = renderFallLoop(args).setup();
+      const previous = document.documentElement.dataset.motion;
+      onMounted(() => {
+        document.documentElement.dataset.motion = "reduced";
+      });
+      onBeforeUnmount(() => {
+        if (previous === undefined) delete document.documentElement.dataset.motion;
+        else document.documentElement.dataset.motion = previous;
+      });
+      return inner;
+    },
+  }),
+  args: { artwork: HOST_ENTRY, panel: PANEL, name: "灰婆婆", side: "right", dimmed: false, fallen: "defeated", motionLevel: "reduced" },
 };
