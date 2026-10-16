@@ -49,8 +49,21 @@ const isStrip = computed(() => (props.variant || providedVariant?.value || "pane
 // In the strip variant the focused row is described by the strip, whichever
 // component renders it (this detail, or SkillDetailPane while a skill is
 // focused).
+// The generic strip renders only while no SkillDetailPane strip stands in
+// for it (`hideGenericDetail`), so the strip id is never doubled.
+const genericStripShown = computed(
+  () =>
+    isStrip.value &&
+    !props.hideGenericDetail &&
+    ((props.showDetail && !!focusedRow.value) || !!props.detailMessage),
+);
 function describedBy(row) {
-  return isStrip.value && row.key === props.focusedKey ? DOCK_DETAIL_STRIP_ID : null;
+  if (!isStrip.value || row.key !== props.focusedKey) {
+    return null;
+  }
+  // Either this component's strip or the skill pane's strip (the host
+  // renders SkillDetailPane exactly when it asks to hide this detail).
+  return genericStripShown.value || props.hideGenericDetail ? DOCK_DETAIL_STRIP_ID : null;
 }
 
 const emit = defineEmits(["activate", "focus-change"]);
@@ -385,14 +398,13 @@ watch(
     <!-- The detail pane: names the focused skill/item (tasks 5.8/6.5).
          The scene overview (the exploration root) is not a DockMenu frame,
          so every pane kind here renders the aside by the same rule. -->
-    <aside
-      v-if="isStrip && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
+    <div
+      v-if="genericStripShown"
       :id="DOCK_DETAIL_STRIP_ID"
       class="dock-detail dock-detail--strip"
       :class="{ 'dock-detail--command': paneKind === 'commands' }"
       :data-testid="props.detailTestId"
       tabindex="-1"
-      aria-label="項目詳情"
       :title="stripTitle"
     >
       <span v-if="focusedRow" class="visually-hidden" aria-hidden="true">{{ focusedRow.item.label }}</span>
@@ -407,9 +419,9 @@ watch(
         class="dock-detail__body"
         :class="stripBody.reason ? 'dock-detail__disabled' : 'dock-detail__desc'"
       >{{ stripBody.text }}</div>
-    </aside>
+    </div>
     <aside
-      v-else-if="(props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage"
+      v-else-if="!isStrip && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
       class="dock-detail"
       :class="{ 'dock-detail--command': paneKind === 'commands' }"
       :data-testid="props.detailTestId"

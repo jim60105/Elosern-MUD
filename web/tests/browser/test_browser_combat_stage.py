@@ -10,6 +10,10 @@ runner can only lengthen an in-flight window, never skip it.
 
 from __future__ import annotations
 
+import re
+
+from playwright.sync_api import expect
+
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
@@ -557,6 +561,11 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                     self.assertAlmostEqual(frame[edge], boxes[0][edge], delta=1.0, msg=f"{edge} at {viewport}")
             for skill, kind in (("t_fireball", "scales"), ("t_firestorm", "targets")):
                 self.assertTrue(page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('{skill}')"))
+                # The focused row's accessible description is the strip's
+                # text (its cost and description), not a label.
+                expect(page.locator(f'#action-dock [data-item-key="{skill}"]')).to_have_accessible_description(
+                    re.compile("MP .*(凝聚火焰|席捲戰場)")
+                )
                 page.keyboard.press("Enter")
                 page.wait_for_timeout(120)
                 c = page.evaluate(_READ_CARD)

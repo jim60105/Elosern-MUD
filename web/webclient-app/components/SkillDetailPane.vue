@@ -100,15 +100,16 @@ function onScale(entry) {
 </script>
 
 <template>
-  <!-- The strip (the combat card). The visually hidden name and labels keep
-       the full reading in the DOM; the name is aria-hidden because the row
-       it describes already names itself. -->
-  <aside
+  <!-- The strip (the combat card): a plain block, not a labelled landmark,
+       so its text — not a label — is the focused row's accessible
+       description. The visually hidden name and labels keep the full reading
+       in the DOM; the name is aria-hidden because the row it describes
+       already names itself. -->
+  <div
     v-if="skill && isStrip"
     :id="DOCK_DETAIL_STRIP_ID"
     class="skill-detail-pane skill-detail-pane--strip"
     data-testid="combat-detail"
-    aria-label="技能詳情"
     :title="stripTitle"
   >
     <span class="skill-detail-pane__sr" aria-hidden="true">{{ skill.label }}</span>
@@ -120,7 +121,7 @@ function onScale(entry) {
     <p v-if="reason" class="skill-detail-pane__disabled skill-detail-pane__body">{{ reason }}</p>
     <p v-else-if="skill.description" class="skill-detail-pane__desc skill-detail-pane__body">{{ skill.description }}</p>
     <span v-if="scalesText" class="skill-detail-pane__sr">{{ scalesText }}</span>
-  </aside>
+  </div>
   <aside
     v-else-if="skill"
     class="skill-detail-pane"

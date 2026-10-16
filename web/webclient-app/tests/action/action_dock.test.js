@@ -271,3 +271,22 @@ describe("ActionDock card presentation", () => {
     card.unmount();
   });
 });
+
+describe("DockMenu strip id", () => {
+  it("renders one strip and never doubles its id while a skill pane stands in", () => {
+    // Role: one element carries the strip id the focused row names. Detects
+    // a generic strip rendered beside SkillDetailPane's (a duplicate id).
+    const items = [{ key: "skill-a", label: "甲", enabled: false, action_id: "open-skill", params: {}, disabled_reason: { code: "x", message: "不可" } }];
+    const w = mount(DockMenu, {
+      props: { items, focusedKey: "skill-a", idPrefix: "combat-row", variant: "strip", hideGenericDetail: true, detailMessage: "訊息" },
+    });
+    expect(w.findAll("#action-dock-detail-strip")).toHaveLength(0);
+    expect(w.get("#combat-row-0").attributes("aria-describedby")).toBe("action-dock-detail-strip");
+    expect(w.find('[aria-label="項目詳情"]').exists()).toBe(false);
+    w.unmount();
+    const own = mount(DockMenu, { props: { items, focusedKey: "skill-a", idPrefix: "combat-row", variant: "strip", showDetail: false } });
+    expect(own.find("#action-dock-detail-strip").exists()).toBe(false);
+    expect(own.get("#combat-row-0").attributes("aria-describedby")).toBeUndefined();
+    own.unmount();
+  });
+});
