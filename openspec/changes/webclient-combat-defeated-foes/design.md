@@ -59,6 +59,9 @@ keeps its slot. A flee removes the figure (fade) and re-forms.
   base puts the feet 12% below the slot's floor, into the plates and the band. Both poses are a pure `scaleY` about
   the base, so the feet stay planted, and a Vitest checks the transformed box's top lies inside the slot and its bottom
   on the slot's floor.
+- [A playing round shows its own looks] → accepted: while a round plays, the fallen looks are the pre-round states
+  plus the round's defeat beats, so a change the beats do not name (a revive, or a companion with no beat key) shows
+  at the round's end commit, as the committed values do.
 - [Fallen foes keep the shared scale small] → accepted: they keep their slots so nothing reflows mid-fight; a lone
   survivor among fallen foes stays at the scale the full line-up needed.
 

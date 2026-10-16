@@ -122,9 +122,16 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
     if (look) {
       fallenAtStart[String(row.identity)] = look;
     }
+    // A row's `portrait_ref` is the same decimal key as its identity (C12
+    // D6), so beat keys never collide between participants.
     if (row.portrait_ref != null) {
       keyIdentity[String(row.portrait_ref)] = { identity: String(row.identity), team: row.team };
     }
+  }
+  // The player's own key is the status actor identity: a defeat beat that
+  // names it kneels the player even when its row carries no reference.
+  if (playerKey != null && !keyIdentity[String(playerKey)]) {
+    keyIdentity[String(playerKey)] = { identity: String(playerKey), team: "party" };
   }
 
   // Bounded decorative retention: capture only the pre-round active foes'

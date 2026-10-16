@@ -188,6 +188,12 @@ describe("stageFor (design D3)", () => {
     expect(stageFor(at(1, "pause", { beats })).fallen["42"]).toBe("down");
   });
 
+  it("kneels the player on its defeat beat even when its row carries no reference", () => {
+    const roster = ROSTER.map((row) => (row.identity === 42 ? { ...row, portrait_ref: null } : row));
+    const beats = [beat(0, 0, "damage", "4", PLAYER, { amount: 80, hp_after: 0 }), beat(1, 0, "target_defeated", "4", PLAYER)];
+    expect(stageFor(at(1, "act", { beats, roster })).fallen["42"]).toBe("down");
+  });
+
   it("starts a round with an ally already down, and fells an ally on its beat", () => {
     const roster = ROSTER.map((row) => (row.identity === 43 ? { ...row, state: "knocked_out", hp_current: 0 } : row));
     expect(stageFor(at(0, "text", { roster })).fallen).toEqual({ 5: "defeated", 43: "down" });
