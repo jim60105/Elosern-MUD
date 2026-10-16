@@ -29,10 +29,6 @@ from world.rules.tests._combat_session_helpers import (
     synth_innate_overlay,
 )
 
-_ACTIVE_SESSIONS_REQUIREMENT = (
-    "player-combat-session::active-sessions-block-movement-and-define-pause-"
-    "forfeit-and-recovery-outcomes"
-)
 _TOKEN_PATTERN = re.compile(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})")
 
 
@@ -59,7 +55,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         command.func()
         return "\n".join(self.sent)
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_a_bare_forfeit_returns_the_prompt_and_mutates_nothing(self):
         from world.rules.combat_session import engage
 
@@ -76,7 +72,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_session(self.player), before)
         self.assertTrue(is_in_active_session(self.player))
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_the_prompted_token_settles_while_a_forged_token_does_not(self):
         from world.rules.combat_session import engage
 
@@ -101,7 +97,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_in_active_session(self.player))
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_in_session_flee_reaches_the_party_boundary_without_escaping(self):
         from world.rules.combat_session import engage
 

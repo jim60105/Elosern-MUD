@@ -51,19 +51,6 @@ from ._combat_session_helpers import (
     synth_innate_overlay,
 )
 
-_ACTIVE_SESSIONS_REQUIREMENT = (
-    "player-combat-session::active-sessions-block-movement-and-define-pause-"
-    "forfeit-and-recovery-outcomes"
-)
-_SETTLES_ONCE_REQUIREMENT = (
-    "player-combat-session::combat-time-settles-once-at-terminal-session-outcome"
-)
-_REVISION_REQUIREMENT = (
-    "player-combat-session::round-revisions-execute-at-most-once-across-retries-"
-    "and-stale-requests"
-)
-
-
 class PartyExitFixture(BattlefieldIsolation, EvenniaTestCase):
     def setUp(self):
         open_synthetic_scope(
@@ -99,7 +86,7 @@ class PartyExitFixture(BattlefieldIsolation, EvenniaTestCase):
 
 
 class PartyExitRequestTests(PartyExitFixture):
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_request_returns_the_party_prompt_and_cancelling_changes_nothing(self):
         _companion, record = self._engaged_with_pending_draft()
         before = to_storage(record)
@@ -157,7 +144,7 @@ class PartyExitRequestTests(PartyExitFixture):
 
 
 class PartyExitConfirmationTests(PartyExitFixture):
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_forged_cross_bound_and_malformed_tokens_reject_without_mutation(self):
         _companion, record = self._engaged_with_pending_draft()
         before = to_storage(record)
@@ -213,7 +200,7 @@ class PartyExitConfirmationTests(PartyExitFixture):
         self.assertEqual(to_storage(read_session(self.player)), before)
         self.assertEqual(get_world_clock().tick, 0)
 
-    @covers_requirement(_REVISION_REQUIREMENT)
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
     def test_a_round_consumed_revision_makes_the_confirmation_stale(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -249,7 +236,10 @@ class PartyExitConfirmationTests(PartyExitFixture):
 
 
 class ConfirmedSurrenderTests(PartyExitFixture):
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT, _SETTLES_ONCE_REQUIREMENT)
+    @covers_requirement(
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+    )
     def test_confirmed_surrender_discards_the_draft_and_settles_once(self):
         companion, record = self._engaged_with_pending_draft()
         # One committed ordinary round first, so the accumulated time is real
@@ -317,7 +307,10 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertIsNone(self.player.db.active_combat)
         self.assertFalse(is_in_active_session(self.player))
 
-    @covers_requirement(_SETTLES_ONCE_REQUIREMENT, _REVISION_REQUIREMENT)
+    @covers_requirement(
+        "player-combat-session::combat-time-settles-once-at-terminal-session-outcome",
+        "player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests",
+    )
     def test_a_repeated_confirmation_replays_the_recorded_outcome_once(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -353,7 +346,10 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertEqual(get_world_clock().tick, tick_after_first)
         self.assertIsNone(self.player.db.active_combat)
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT, _REVISION_REQUIREMENT)
+    @covers_requirement(
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+        "player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests",
+    )
     def test_an_exit_and_a_round_race_for_one_revision_admits_only_one(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -386,7 +382,7 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertEqual(rejected["reason"], "already_committed")
         self.assertEqual(rejected["receipt"]["operation"], PARTY_EXIT_SURRENDER)
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_a_failure_after_the_settlement_restores_the_draft_and_the_retry_completes(self):
         companion, _record = self._engaged_with_pending_draft()
         with (
@@ -469,7 +465,7 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertEqual(result["outcome"], "defeat")
         self.assertIsNone(self.player.db.active_combat)
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_retreat_confirmation_reaches_no_settlement(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -498,7 +494,7 @@ class ConfirmedSurrenderTests(PartyExitFixture):
 
 
 class AlliedFleeRemovalTests(PartyExitFixture):
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_the_facade_cannot_perform_an_allied_personal_flee(self):
         engage(self.player, self.monster)
         before = to_storage(read_session(self.player))
@@ -510,7 +506,7 @@ class AlliedFleeRemovalTests(PartyExitFixture):
         self.assertEqual(to_storage(read_session(self.player)), before)
         self.assertEqual(get_world_clock().tick, 0)
 
-    @covers_requirement(_ACTIVE_SESSIONS_REQUIREMENT)
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
     def test_a_persisted_personal_flee_entry_never_resolves(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -543,7 +539,7 @@ class AlliedFleeRemovalTests(PartyExitFixture):
         with self.assertRaisesRegex(ValueError, "confirmed party exit"):
             _draft_requests(current, battlefield)
 
-    @covers_requirement(_SETTLES_ONCE_REQUIREMENT)
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     def test_enemy_disengagement_still_resolves_through_the_action_pipeline(self):
         engage(self.player, self.monster)
         hp_before = self.player.traits.hp.current
