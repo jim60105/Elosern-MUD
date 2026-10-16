@@ -244,6 +244,8 @@ def submit_opening_action(
     skill_key: str,
     targets: list[Any],
     scale: float = 1.0,
+    *,
+    nested: bool = False,
 ) -> dict[str, Any]:
     """Seed the exploration opening's selection as the initiating draft entry.
 
@@ -293,6 +295,7 @@ def submit_opening_action(
             "targets_or_shorthand": [int(target.pk) for target in targets],
             "scale": scale,
         }},
+        nested=nested,
     )
 
 
@@ -495,6 +498,8 @@ def confirm_actor_command(
     draft_version: int,
     actor_id: int,
     command: dict[str, Any],
+    *,
+    nested: bool = False,
 ) -> dict[str, Any]:
     """Commit one draft edit, then resolve the round once the draft completes.
 
@@ -508,14 +513,20 @@ def confirm_actor_command(
     concurrent confirmation can never resolve the same revision twice.
     """
     result = _admit_actor_command(
-        commander, session_id, round_revision, draft_version, actor_id, command
+        commander,
+        session_id,
+        round_revision,
+        draft_version,
+        actor_id,
+        command,
+        nested=nested,
     )
     if not result.get("ok") or not result.get("is_complete"):
         result["outcome"] = "draft" if result.get("ok") else "rejected"
         return result
     record = read_session_uncached(commander)
     battlefield = reconstruct_battlefield(commander, record)
-    return _submit_request(commander, record, battlefield)
+    return _submit_request(commander, record, battlefield, nested=nested)
 
 
 def _admit_actor_command(
@@ -525,11 +536,13 @@ def _admit_actor_command(
     draft_version: int,
     actor_id: int,
     command: dict[str, Any],
+    *,
+    nested: bool = False,
 ) -> dict[str, Any]:
     """Admit or replace one actor's command in the persistent session draft under deterministic CAS."""
     combat_snapshot = attribute_snapshot(commander, "active_combat")
     try:
-        with durable_combat_atomic():
+        with durable_combat_atomic(nested=nested):
             record = read_session_uncached(commander)
             if record is None:
                 receipt = read_last_combat_receipt(commander)
@@ -738,6 +751,8 @@ def _submit_request(
     actor: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield,
+    *,
+    nested: bool = False,
 ) -> dict[str, Any]:
     """Run the completed draft's one ordinary round and its settlement.
 
@@ -782,7 +797,7 @@ def _submit_request(
     hp_before = _stored_trait_value(actor.traits.hp)
     opponent = _primary_opponent_id(battlefield, record)
     try:
-        with durable_combat_atomic():
+        with durable_combat_atomic(nested=nested):
             current = read_session_uncached(actor)
             if current is None or (
                 current.session_id, current.round_revision

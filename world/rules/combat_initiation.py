@@ -320,7 +320,12 @@ def initiate_field_combat(
                 actor, targets, opening_first_actor=str(actor.key)
             )
             engaged_record = engaged["record"]
-            result = submit_opening_action(actor, skill_key, targets, scale=scale)
+            # ``nested=True``: this outer ``transaction.atomic()`` owns the
+            # whole unit, so the seed's own durable boundary degrades to a
+            # savepoint of it instead of raising (writer.durable_combat_atomic).
+            result = submit_opening_action(
+                actor, skill_key, targets, scale=scale, nested=True
+            )
             if result.get("outcome") == "rejected":
                 # Candidate/persisted divergence: roll the session back
                 # and surface the rejection with nothing persisted.

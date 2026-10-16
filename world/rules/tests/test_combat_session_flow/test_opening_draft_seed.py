@@ -61,6 +61,21 @@ def _acting_actors(result):
     return [str(log.actor) for log in result.get("logs", ()) if log.entries]
 
 
+@contextlib.contextmanager
+def _dice(value):
+    """Every combat roll of one round pinned to ``value``."""
+    patches = (
+        patch("world.rules.combat.battlefield.roll_d100", return_value=value),
+        patch("world.rules.combat.damage.roll_d100", return_value=value),
+        patch("world.rules.combat.rounds.roll_d100", return_value=value),
+        patch("world.rules.action.gates.roll_d100", return_value=value),
+    )
+    with contextlib.ExitStack() as stack:
+        for patcher in patches:
+            stack.enter_context(patcher)
+        yield
+
+
 class OpeningSeedTests(BattlefieldIsolation, EvenniaTestCase):
     """The opening is a draft seed: it waits, resolves one ordinary round, and
     never compresses for any verdict or target shape."""
@@ -72,19 +87,6 @@ class OpeningSeedTests(BattlefieldIsolation, EvenniaTestCase):
         self.player = _dominant_player("seed duelist")
         self.player.location = self.room
         grant_lineage(self.player, [_T_CAST, _T_FOCUS.key])
-
-    @contextlib.contextmanager
-    def _dice(self, value):
-        patches = (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=value),
-            patch("world.rules.combat.damage.roll_d100", return_value=value),
-            patch("world.rules.combat.rounds.roll_d100", return_value=value),
-            patch("world.rules.action.gates.roll_d100", return_value=value),
-        )
-        with contextlib.ExitStack() as stack:
-            for patcher in patches:
-                stack.enter_context(patcher)
-            yield
 
     @covers_requirement(
     "player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression"
@@ -133,7 +135,7 @@ class OpeningSeedTests(BattlefieldIsolation, EvenniaTestCase):
         join_party(companion, self.player)
         weak = _monster("waiting goblin", hp=100, atk=10)
         weak.location = self.room
-        with self._dice(50):
+        with _dice(50):
             seeded = initiate_field_combat(self.player, _T_CAST, weak)
         # The overwhelming verdict did not compress: the initiating choice is
         # saved and the round waits for the companion's command.
@@ -144,7 +146,7 @@ class OpeningSeedTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(record.opening_first_actor, str(self.player.key))
         self.assertEqual(int(weak.traits.hp.current), 100)
         self.assertEqual(int(companion.traits.hp.current), companion.traits.hp.base)
-        with self._dice(50):
+        with _dice(50):
             resolved = submit_player_action(
                 self.player,
                 BASIC_ATTACK_KEY,
@@ -218,6 +220,40 @@ class OpeningOrderPolicyTests(BattlefieldIsolation, EvenniaTestCase):
             second = submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])
         self.assertIn(second["outcome"], ("round", "continue", "victory", "defeat"))
         self.assertEqual(_acting_actors(second)[0], str(self.monster.key))
+
+    @covers_requirement(
+    "player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression"
+)
+    def test_initiator_dropped_before_completion_spends_the_override_safely(self):
+        # The initiator stops being able to act (action-forbidden) while the
+        # seed still waits: the completion round runs without it, the override
+        # is a silent no-op, and nothing raises.
+        companion = create_object(NPC, key="remaining companion", location=self.room)
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        join_party(companion, self.player)
+        monster = _monster("patient wolf", hp=2000, atk=1)
+        monster.location = self.room
+        with _dice(50):
+            seeded = initiate_field_combat(self.player, BASIC_ATTACK_KEY, monster)
+            self.assertEqual(seeded["outcome"], "draft")
+            def initiator_only_modifiers(entity, *args, **kwargs):
+                return {"actions_per_turn": 0} if entity is self.player else {}
+
+            with patch(
+                "world.rules.combat_session.battlefield.evaluate_combat_modifiers_no_create",
+                side_effect=initiator_only_modifiers,
+            ):
+                result = submit_player_action(
+                    self.player,
+                    BASIC_ATTACK_KEY,
+                    [monster],
+                    commanded_actor=companion,
+                )
+        self.assertIn(result["outcome"], ("round", "continue", "victory"))
+        self.assertEqual(result["rounds_elapsed"], 1)
+        self.assertNotIn(str(self.player.key), _acting_actors(result))
+        self.assertIsNone(read_session(self.player).opening_first_actor)
 
     @covers_requirement(
     "player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression"
