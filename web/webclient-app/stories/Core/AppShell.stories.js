@@ -479,6 +479,24 @@ const renderPlayer = (args) => ({
       const result = store.receive(1, "ui_snapshot", [snapshot], {});
       if (!result.accepted || store.lastPanelRejection) throw new Error(`Player layout fixture was rejected: ${JSON.stringify(store.lastPanelRejection || result)}`);
       if (args.pane) store.tabToRootAndConfirm(args.pane, "pointer");
+      // A combat line in the message window, so the band shows the message
+      // region spanning it while the command card stands at the stage centre
+      // (webclient-combat-command-card-centred).
+      if (args.combat && !args.participantPolish) {
+        store.appendText("out", "灰袍盜賊掀翻木桌，與同夥拔出短刀，一步步逼近。");
+      }
+      // `combatKeys` (webclient-combat-command-card-centred): router keys
+      // replayed through the store's keyboard entry once the snapshot has
+      // committed, so a story opens a deeper frame of the command card.
+      for (const key of args.combatKeys || []) {
+        await nextTick();
+        store.focusPress(key, false);
+      }
+      // `combatFocus`: then focus one row of that frame by its key.
+      if (args.combatFocus) {
+        await nextTick();
+        store.focusItemByKey(args.combatFocus);
+      }
       // The exploration companion-focus variants (reuse-lineup-person-focus
       // 3.1): the client-local verb card of a RENDERED companion. Opening it
       // lights that existing actor-left figure and lifts it above every
@@ -717,8 +735,28 @@ export const ExplorationCompanionFocusRestored = {
 export const DialogueFullParty = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true } };
 export const DialogueCompanionSpeaks = { render: renderPlayer, args: { populated: true, companions: 4, dialogue: true, companionSpeaks: true } };
 // Combat: the `map` anchor (place card, minimap, objective line) is hidden,
-// and both sides stand in one shared-scale formation with glance plates.
+// both sides stand in one shared-scale formation with glance plates, and the
+// command menu is the narrow card at the stage's dead centre, in the gap the
+// formation keeps clear, while the message window spans the band
+// (webclient-combat-command-card-centred).
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
+// The combat command card's deeper frames (webclient-combat-command-card-
+// centred), reached through the router's own keys: the AREA target step
+// (技能 → 元素魔法 → 火 → 火風暴), a skill detail, a disabled command's
+// reason, and a master's 威力 step (火球).
+export const CombatTargetStep = {
+  render: renderPlayer,
+  args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown", "ArrowDown", "Enter"], combatFocus: "area-32" },
+};
+export const CombatSkillDetail = {
+  render: renderPlayer,
+  args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown"] },
+};
+export const CombatDisabledCommand = { render: renderPlayer, args: { combat: true, combatKeys: ["ArrowDown", "ArrowDown"] } };
+export const CombatMasterScale = {
+  render: renderPlayer,
+  args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown", "Enter"], combatFocus: "scale-2" },
+};
 // Four foes (one defeated), a long foe name ellipsized on its plate. The
 // offline journey exposes round()/round(true) for normal/terminal playback.
 export const CombatParticipantPolish = { render: renderPlayer, args: { combat: 4, participantPolish: true } };
@@ -731,7 +769,8 @@ export const GroundedThreeFoes = { render: renderPlayer, args: { combat: 3, grou
 export const CombatFiveFoes = { render: renderPlayer, args: { combat: 5 } };
 // The combat formation (webclient-combat-formation design D6): the corners
 // of the party × foe matrix, each at the shared scale the engine picks for
-// the viewport — review them at 1451x790 and at 1600x900. The party is the
+// the viewport — review them at 1451x790 and at 1600x900, with the command
+// card standing in the formation's dead-centre gap. The party is the
 // player plus `companions`; foes run up to the participant cap (16).
 export const CombatSoloOneFoe = { render: renderPlayer, args: { combat: 1, companions: 0 } };
 export const CombatSoloFifteenFoes = { render: renderPlayer, args: { combat: 15, companions: 0 } };
@@ -787,9 +826,10 @@ export const StageJourney = { render: renderPlayer, args: { journey: true, autop
 // conversation (the command panel slides out over the widened message
 // window, the host walks on from the right, the name plate fades in, and
 // the choices stagger in once the greeting is read), ends it (the reverse),
-// then enters combat (the flash, the veil, the panel flip, and the foes
-// stepping in as the flash releases), defeats the front foe (it fades and
-// the others step forward), and leaves combat (the foes fade out).
+// then enters combat (the flash, the veil, the command card fading in at the
+// stage centre, and the foes stepping in as the flash releases), defeats the front foe (it fades and
+// the others step forward), and leaves combat (the foes fade out and the
+// band's command panel flips back).
 // It walks on its own every few seconds; the host element's
 // `__modeJourney.go(step)` takes one step on demand
 // (`talk`, `leave`, `fight`, `defeat`, `flee`).
