@@ -73,26 +73,44 @@ describe("HudFrame mode layers", () => {
     });
   }
 
-  it("flips the command panel once per live combat change, never on a later remount", async () => {
+  it("flips the band's returning dock only on leaving combat, once, never on a later remount", async () => {
+    // Role: the band flip is one-shot and plays only where the dock is in the
+    // band. Detects a flip keyed on entering combat (the dock has left the
+    // band for the centred card, webclient-combat-command-card-centred D2) or
+    // a flip that replays after its own end.
     const wrapper = mount(HudFrame, { props: { mode: "exploration" } });
     const region = () => wrapper.get('[data-anchor="band-command"]');
     expect(region().attributes("data-flip")).toBeUndefined();
     await wrapper.setProps({ mode: "combat", modeChange: "exploration-combat" });
-    expect(region().attributes("data-flip")).toBe("exploration-combat");
-    // The flip's own end clears the one-shot key, while the stage keeps its
-    // persistent `data-mode-change`, so a dock remounted later never flips.
-    const end = new Event("animationend", { bubbles: true });
-    end.animationName = "elosern-panel-flip-in";
-    region().element.dispatchEvent(end);
-    await wrapper.vm.$nextTick();
     expect(region().attributes("data-flip")).toBeUndefined();
     expect(wrapper.get('[data-testid="elosern-stage"]').attributes("data-mode-change")).toBe("exploration-combat");
     await wrapper.setProps({ mode: "exploration", modeChange: "combat-exploration" });
     expect(region().attributes("data-flip")).toBe("combat-exploration");
+    // The flip's own end clears the one-shot key, while the stage keeps its
+    // persistent `data-mode-change`, so a dock remounted later never flips.
+    const end = new Event("animationend", { bubbles: true });
+    end.animationName = "elosern-panel-flip-out";
+    region().element.dispatchEvent(end);
+    await wrapper.vm.$nextTick();
+    expect(region().attributes("data-flip")).toBeUndefined();
     // A dialogue change flips nothing.
     await wrapper.setProps({ mode: "dialogue", modeChange: "exploration-dialogue" });
     expect(region().attributes("data-flip")).toBeUndefined();
     wrapper.unmount();
+  });
+
+  it("keys the combat card's entrance on a live change into combat, after the flash, and drops the band flip-in", () => {
+    // Role: the card enters only on a live change (mount and reconnect never
+    // set data-mode-change) and waits for the flash. Detects an entrance keyed
+    // on the mode itself (it would play on a reload) or one without the delay.
+    const css = readFileSync(join(process.cwd(), "web/webclient-app/components/HudFrame.vue"), "utf8");
+    const start = css.indexOf('.elosern-stage[data-mode-change$="-combat"] [data-anchor="choices"] .stage-card-host > .action-dock--card {');
+    expect(start).toBeGreaterThanOrEqual(0);
+    const rule = css.slice(start, css.indexOf("}", start) + 1);
+    expect(rule).toContain("animation: elosern-combat-card-in var(--motion-reveal) var(--ease-enter) var(--motion-flash) backwards;");
+    expect(css).toMatch(/@keyframes elosern-combat-card-in \{\s*from \{\s*opacity: 0;\s*transform: translateY\(calc\(var\(--motion-shift-sm\) \* var\(--motion-travel\)\)\);/);
+    expect(css).not.toContain('[data-flip$="-combat"]');
+    expect(css).toContain('[data-anchor="band-command"][data-flip="combat-exploration"] > *');
   });
 
   it("renders the mode change it is given on the stage root", async () => {

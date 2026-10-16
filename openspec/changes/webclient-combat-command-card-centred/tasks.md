@@ -18,8 +18,8 @@ pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elos
 
 ## 1. Stage: the card anchor, the Teleport, geometry and focus (≈2 h)
 
-- [ ] 1.1 (folded into 1.2; the earlier plate-line and party-reach plumbing is not needed with the formation's gap)
-- [ ] 1.2 In `components/HudFrame.vue`: create the per-instance card host and append it into the `choices` anchor;
+- [x] 1.1 (folded into 1.2; the earlier plate-line and party-reach plumbing is not needed with the formation's gap)
+- [x] 1.2 In `components/HudFrame.vue`: create the per-instance card host and append it into the `choices` anchor;
   wrap the `band-command` slot in `<Teleport :to="cardHost" :disabled="mode !== 'combat' || !cardHost">` (design
   D1); show the `choices`
   anchor in combat; add the combat anchor rule (`width: calc(264px * var(--ui-scale))`,
@@ -28,9 +28,9 @@ pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elos
   number (design D3); collapse the band in combat (design D2); stop setting `data-flip` for `*-combat` changes and
   delete the `-combat` flip-in rule (keep `combat-exploration`); add the `elosern-combat-card-in` keyframes and the
   entrance rule keyed on `[data-mode-change$="-combat"]` (design D6). Update the header comment. Verify with 1.4.
-- [ ] 1.3 In `components/AppShell.vue`: after the flush of a mode change into combat, call `restoreFocusHome()` when
+- [x] 1.3 In `components/AppShell.vue`: after the flush of a mode change into combat, call `restoreFocusHome()` when
   `focusIsLost(document.activeElement)` (design D7); update the header comment. Verify with 1.4.
-- [ ] 1.4 Extend `web/webclient-app/tests/hud_frame.test.js` (mount `AppShell` with `attachTo`, as the file does):
+- [x] 1.4 Extend `web/webclient-app/tests/hud_frame.test.js` (mount `AppShell` with `attachTo`, as the file does):
   in combat the slot's root element is inside `[data-anchor="choices"]`, not inside `band-command`, and it is the
   same DOM node across exploration → combat → exploration and combat → dialogue; a mount directly in combat places
   it in the anchor; the combat anchor rule uses `calc(264px * var(--ui-scale))` and `calc(50% - 132px * var(--ui-scale))`;

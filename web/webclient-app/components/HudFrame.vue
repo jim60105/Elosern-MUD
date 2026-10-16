@@ -26,16 +26,23 @@
 //   centred card — the dialogue choice list, or in exploration the
 //   person-focus verb card and the presence overflow card
 //   (exploration-presence-rail) — between the portraits and above the
-//   expanded command-line row, rendered only in dialogue mode or while an
-//   exploration card is open (`cardOpen`);
+//   expanded command-line row, rendered only in dialogue mode, while an
+//   exploration card is open (`cardOpen`), or in combat. In combat it holds
+//   the combat command card (webclient-combat-command-card-centred D1/D3):
+//   the band-command slot — the one `#action-dock` — is teleported, never
+//   remounted, into a card host this component creates and appends into the
+//   anchor; the anchor narrows to the formation's dead-centre gap
+//   (264px·S, the formation engine's `CARD_WIDTH`) and the card stands at
+//   its top, `min(400px·S, the anchor's span)` tall;
 // - the `presence` anchor (exploration-presence-rail design D4): the
 //   presence rail on the stage floor, right-aligned and inset left of the
 //   right-hand island column, its baseline just above the band;
 // - the bottom band `.stage-band`: one fixed-height (`--band-h`) container
 //   split into the message region `band-message` (left 2/3) and the command
 //   region `band-command` (right 1/3). No frame, mode, or content resizes it;
-//   creation hides the message region and dialogue collapses the command
-//   region, so the other one spans the band;
+//   creation hides the message region, dialogue collapses the command
+//   region, and combat sets it `display:none` (its content is the centred
+//   card), so the other one spans the band;
 // - the `command-line` row, docked on the message region's top edge and
 //   collapsed by default (`data-expanded="false"` -> `display:none`,
 //   webclient-collapsible-command-line design D1/D4).
@@ -68,9 +75,10 @@
 //   the window would re-page every frame). The region is inert from the
 //   commit and `visibility: hidden` once its slide ends (design D1);
 // - entering combat plays the white flash once, fades the veil in, and
-//   turns the command region's content over to the combat root (a short
-//   horizontal wipe and fade, webclient-band-material-pass); leaving combat
-//   fades the veil out and turns the content back (design D2).
+//   fades the command card in (rising at `full`) as the flash releases
+//   (webclient-combat-command-card-centred D6); leaving combat fades the veil
+//   out and turns the band's returning content back (a short horizontal
+//   wipe and fade, webclient-band-material-pass; design D2).
 //
 // The open-surface registry (design D9): a drawer or full-screen overlay
 // marks the stage `menu-open` so the surfaces behind it are visually
@@ -120,11 +128,14 @@ const menuOpen = computed(() => props.openSurfaces.length > 0);
 // flip on it would replay the flip if the dock remounted mid-combat. The
 // flip is keyed on `data-flip` instead: set in the patch of a live change
 // into or out of combat, cleared when the flip's own animation ends.
+// Entering combat no longer flips the band: the dock leaves it for the
+// centred card, whose own entrance plays (webclient-combat-command-card-centred
+// D2/D6).
 const flip = ref(null);
 watch(
   () => props.modeChange,
   (change) => {
-    flip.value = change && (change.endsWith("-combat") || change === "combat-exploration") ? change : null;
+    flip.value = change === "combat-exploration" ? change : null;
   },
 );
 function onFlipEnd(event) {
@@ -154,6 +165,24 @@ onMounted(() => {
 onBeforeUnmount(() => {
   unbindPlateGroup?.();
 });
+
+// The combat command card's host (webclient-combat-command-card-centred D1):
+// one element per stage, created here so the Teleport has a real target at
+// the first render — attached to the document or not, and in combat at mount —
+// and appended into this stage's own `choices` anchor by its function ref.
+// The Teleport is enabled only in combat; Vue then moves the band-command
+// slot's existing nodes into the host and back, so the dock keeps its node,
+// its component state, and its test ids.
+const cardHost = typeof document === "undefined" ? null : document.createElement("div");
+if (cardHost) {
+  cardHost.className = "stage-card-host";
+  cardHost.setAttribute("data-testid", "stage-card-host");
+}
+function mountCardHost(el) {
+  if (el && cardHost && cardHost.parentNode !== el) {
+    el.appendChild(cardHost);
+  }
+}
 
 defineExpose({ menuOpen });
 </script>
@@ -237,6 +266,7 @@ defineExpose({ menuOpen });
       class="stage-anchor"
       data-anchor="choices"
       data-testid="anchor-choices"
+      :ref="mountCardHost"
     >
       <slot name="choices" />
     </div>
@@ -256,7 +286,9 @@ defineExpose({ menuOpen });
         @animationend="onFlipEnd"
         :inert="mode === 'dialogue' || personFocus || null"
       >
-        <slot name="band-command" />
+        <Teleport :to="cardHost" :disabled="mode !== 'combat' || !cardHost">
+          <slot name="band-command" />
+        </Teleport>
       </div>
     </div>
     <!-- The figure plates (webclient-combat-formation D4): filled only
@@ -499,8 +531,29 @@ defineExpose({ menuOpen });
   justify-content: center;
   pointer-events: none;
 }
-.elosern-stage:not([data-elosern-mode="dialogue"]):not([data-card-open="true"]) [data-anchor="choices"] {
+.elosern-stage:not([data-elosern-mode="dialogue"]):not([data-elosern-mode="combat"]):not([data-card-open="true"]) [data-anchor="choices"] {
   display: none;
+}
+/* The combat command card (webclient-combat-command-card-centred D3): the
+   anchor narrows to a fixed 264px·S column centred on the stage — the same
+   width as the formation engine's `CARD_WIDTH` (components/combat-formation.js),
+   whose dead-centre gap keeps every figure, plate and marker outside it —
+   and the card stands at the anchor's top, `min(400px·S, the anchor's
+   span)` tall. No frame resizes it: the rows scroll inside the card. */
+.elosern-stage[data-elosern-mode="combat"] [data-anchor="choices"] {
+  left: calc(50% - 132px * var(--ui-scale));
+  width: calc(264px * var(--ui-scale));
+  justify-content: flex-start;
+}
+.elosern-stage .stage-card-host {
+  display: none;
+}
+.elosern-stage[data-elosern-mode="combat"] .stage-card-host {
+  display: flex;
+  flex-direction: column;
+  flex: none;
+  height: min(calc(400px * var(--ui-scale)), 100%);
+  min-height: 0;
 }
 
 /* presence (exploration-presence-rail design D4; redesign §4.1): the
@@ -695,6 +748,16 @@ defineExpose({ menuOpen });
   opacity: 0;
   visibility: hidden;
 }
+/* Combat (webclient-combat-command-card-centred D2): the command region's
+   content is the centred card, so the region leaves the layout and the
+   message region spans the band at the same fixed height from the commit's
+   frame; the message page keeps its reading measure. */
+.elosern-stage[data-elosern-mode="combat"] .stage-band {
+  grid-template-columns: minmax(0, 1fr);
+}
+.elosern-stage[data-elosern-mode="combat"] [data-anchor="band-command"] {
+  display: none;
+}
 .elosern-stage[data-elosern-mode="combat"] .local-map {
   display: none !important;
 }
@@ -738,17 +801,30 @@ defineExpose({ menuOpen });
 .elosern-stage[data-mode-change] .stage-combat-veil {
   transition: opacity var(--motion-actor) var(--ease-standard);
 }
-/* The command region's content turns over to the committed menu: the combat
-   root wipes in from one side on entering combat and the exploration
-   overview from the other on leaving it. The dock switched its content at
-   the commit and keeps focus throughout; the flip only reveals it. Keyed on
-   the one-shot `data-flip` (see the script), so a dock remounted later in
-   the same mode never flips again. */
-.elosern-stage [data-anchor="band-command"][data-flip$="-combat"] > * {
-  animation: elosern-panel-flip-in var(--motion-panel) var(--ease-enter) 1;
-}
+/* Leaving combat, the dock that has just moved back from the card turns the
+   exploration overview over in the band (a wipe and fade). It switched its
+   content at the commit; the flip only reveals it. Keyed on the one-shot
+   `data-flip` (see the script), so a dock remounted later in the same mode
+   never flips again. */
 .elosern-stage [data-anchor="band-command"][data-flip="combat-exploration"] > * {
   animation: elosern-panel-flip-out var(--motion-panel) var(--ease-enter) 1;
+}
+
+/* The combat card's entrance (webclient-combat-command-card-centred D6):
+   on a live change into combat the card fades in while it rises the small
+   shift, starting once the flash has played. `data-mode-change` is never set
+   on a mount or a reconnect, so those render the card at rest; at `reduced`
+   the tokens leave a 150ms fade with no delay and no rise, at `off` nothing.
+   `backwards` only holds the paint: the rows take keys and pointer from the
+   commit's frame. */
+.elosern-stage[data-mode-change$="-combat"] [data-anchor="choices"] .stage-card-host > .action-dock--card {
+  animation: elosern-combat-card-in var(--motion-reveal) var(--ease-enter) var(--motion-flash) backwards;
+}
+@keyframes elosern-combat-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(var(--motion-shift-sm) * var(--motion-travel)));
+  }
 }
 
 /* The open-surface registry (design D9): when a drawer or overlay is open
