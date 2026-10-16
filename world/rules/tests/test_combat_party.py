@@ -1099,6 +1099,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         return seen, counting
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_the_contest_uses_the_slowest_able_ally_against_the_fastest_pursuer(self):
         from world.rules.disengage import _adjusted_agility
 
@@ -1139,6 +1140,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_accuracy_never_moves_the_contest(self):
         # The Dodge threshold bonus is a round-start declaration, and the
         # failed-retreat test below establishes that no declaration is even
@@ -1169,6 +1171,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(is_active_session(self.player))
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::successful-retreat-carries-the-entire-present-party-and-counts-one-round")
     def test_a_success_carries_the_knocked_out_companion_and_settles_one_round_once(self):
         self.player.traits.agility.base = 20
         self.player.traits.hp.base = 100
@@ -1239,6 +1242,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.player.location, self.room)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round")
     def test_a_failed_retreat_consumes_every_opportunity_and_runs_one_enemy_round(self):
         self.player.traits.agility.base = 20
         self.player.traits.hp.base = 1000
@@ -1308,6 +1312,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("party_retreat", kinds)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round")
     def test_a_failed_retreat_still_honors_an_enemys_own_capability(self):
         # "Eligible enemies act under normal rules": an enemy the ordinary
         # round's own action gate locks takes no action, logs the existing skip
@@ -1353,6 +1358,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(settled, [])
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_a_party_with_no_pursuer_left_escapes_without_a_roll(self):
         self.player.traits.agility.base = 20
         companion = _companion(self.player, "同行者", hp=200, agility=10)
@@ -1377,6 +1383,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(is_active_session(companion))
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round")
     def test_a_failed_escape_write_rolls_the_party_back_into_combat(self):
         from world.rules.clock import get_world_clock
 
@@ -1425,6 +1432,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertNotIn(str(entity.pk), _BATTLEFIELDS)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_no_able_allied_member_takes_the_ordinary_defeat_path(self):
         engage(self.player, self.monster)
         prompt = self._retreat_prompt()
@@ -1487,6 +1495,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
+    @covers_requirement("player-combat-session::successful-retreat-carries-the-entire-present-party-and-counts-one-round")
     def test_a_replayed_confirmation_settles_once(self):
         self.player.traits.agility.base = 20
         engage(self.player, self.monster)
@@ -1546,6 +1555,7 @@ class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_session(self.player).round_revision, 1)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::failed-retreat-consumes-all-allied-actions-and-runs-one-ordinary-enemy-upkeep-round")
     def test_a_failure_after_the_round_rolls_every_touched_surface_back(self):
         from world.rules.clock import get_world_clock
 
@@ -1625,6 +1635,7 @@ class PartyRetreatContestTests(EvenniaTestCase):
             roster=roster,
         )
 
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_no_pursuer_escapes_without_drawing_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
@@ -1642,6 +1653,7 @@ class PartyRetreatContestTests(EvenniaTestCase):
         self.assertEqual(detail["allied_agility"], 3)
         self.assertIsNone(detail["pursuer_agility"])
 
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_no_acting_ally_reports_the_defeat_branch_without_a_roll(self):
         from world.rules.disengage import party_retreat_attempt
 
@@ -1653,6 +1665,7 @@ class PartyRetreatContestTests(EvenniaTestCase):
         self.assertIsNone(success)
         self.assertIsNone(detail["allied_agility"])
 
+    @covers_requirement("player-combat-session::retreat-contests-the-slowest-acting-ally-against-the-fastest-pursuer")
     def test_one_roll_compares_the_slowest_ally_and_the_fastest_pursuer(self):
         # Saturation gaps, not the boundary arithmetic: each arm offers the
         # same fixed roll to two calls whose ally set (or pursuer set) differs
