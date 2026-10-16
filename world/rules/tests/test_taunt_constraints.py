@@ -380,6 +380,39 @@ class TauntSessionTests(EvenniaTestCase):
         self.assertEqual(self.companion.traits.hp.current, companion_hp)
         self.assertLess(self.player.traits.hp.current, player_hp)
 
+    def test_two_taunters_of_one_enemy_both_spend_their_action(self):
+        from dataclasses import replace
+
+        from world.rules.combat_session import reconstruct_battlefield
+        from world.rules.combat_session.rounds import (
+            _draft_requests,
+            _draft_taunt_declarations,
+        )
+
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        battlefield = reconstruct_battlefield(self.player, record)
+        taunt = {
+            "kind": "tactical",
+            "payload": {"tactical_key": "taunt", "target_id": int(self.monster.pk)},
+        }
+        record = replace(
+            record,
+            draft_entries={self.player.pk: taunt, self.companion.pk: taunt},
+        )
+        requests = _draft_requests(record, battlefield)
+        # Both declarations are consumed as their actors' action, whatever the
+        # initiative ranking later decides; neither takes an ordinary action.
+        self.assertNotIn(self.player.pk, requests)
+        self.assertNotIn(self.companion.pk, requests)
+        self.assertEqual(
+            _draft_taunt_declarations(record, battlefield),
+            {
+                str(self.player.key): str(self.monster.key),
+                str(self.companion.key): str(self.monster.key),
+            },
+        )
+
 
 if __name__ == "__main__":  # pragma: no cover
     unittest.main()
