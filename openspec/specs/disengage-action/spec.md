@@ -5,10 +5,12 @@ Define resolver-driven combat fleeing and its deterministic battlefield outcome.
 ## Requirements
 
 ### Requirement: flee is a SkillDef resolved through the unmodified ActionResolver pipeline
-`world/rules/disengage.py` SHALL declare `FLEE_SKILL_KEY = "flee"` and register a `SkillDef` under that
-key into `world.skills.registry.SKILL_REGISTRY` with `kind=SkillKind.ACTIVE`,
-`target_spec=TargetSpec.SELF`, `faction_constraint=
-FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`, and `effects=["disengage:self"]`.
+This individual mechanism SHALL apply to enemies and noninteractive combat; allied interactive requests SHALL instead enter the confirmed party retreat before this effect.
+
+`world/rules/disengage.py` SHALL declare `FLEE_SKILL_KEY = "flee"` and register a `SkillDef` in
+`world.skills.registry.SKILL_REGISTRY` with `kind=SkillKind.ACTIVE`, `target_spec=TargetSpec.SELF`,
+`faction_constraint=FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`,
+`effects=["disengage:self"]`.
 
 #### Scenario: Downstream policy imports the canonical key and registration owner
 - **WHEN** change 10d imports `FLEE_SKILL_KEY` from `world.rules.disengage`
@@ -64,12 +66,17 @@ FactionConstraint.SELF_ONLY`, `cost={}`, `usable_out_of_combat=False`, and `effe
   pipeline step, no new combat-state branch in `action.py` or `targeting.py`, and no dedicated
   command
 
+#### Scenario: Allied interactive escape uses party confirmation
+- **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
+- **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
+
 ### Requirement: The disengage effect handler computes flee success from the same agility-difference
+This contest SHALL remain the enemy and noninteractive mechanism; allied interactive retreat uses the party contest.
+
 formula and the same recalibrated constant dice-combat's own to-hit check uses
-`world/rules/disengage.py` SHALL register a `disengage` effect handler via
-`register_effect_handler("disengage", ..., surfaces=frozenset({"battlefield"}))`. The handler SHALL
-compute success as `roll_d100() + fleeing_entity_adjusted_agility >= combat.COMBAT_YAML["to_hit"]
-["defender_constant"] + fastest_pursuer_adjusted_agility`.
+`world/rules/disengage.py` SHALL register `register_effect_handler("disengage", ...,
+surfaces=frozenset({"battlefield"}))`; success is `roll_d100() +
+fleeing_entity_adjusted_agility >= combat.COMBAT_YAML["to_hit"]["defender_constant"] + fastest_pursuer_adjusted_agility`.
 
 #### Scenario: Exact agility parity yields a 50% escape rate
 - **WHEN** a flee attempt is evaluated where the fleeing entity's adjusted agility exactly equals the
@@ -127,7 +134,13 @@ player-chosen target
 - **THEN** it is the greatest `effective_value("agility")` among every living, non-fled member of
   the opposing team
 
+#### Scenario: Allied interactive escape uses party confirmation
+- **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
+- **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
+
 ### Requirement: A successful flee adds the fleeing entity's key to Battlefield.fled; a failed attempt
+The individual mutation below SHALL remain the enemy and noninteractive mechanism. Allied interactive exit SHALL mutate the whole party only through confirmed retreat.
+
 mutates nothing
 `_handle_disengage()`'s returned `PendingEffect` SHALL, on success, stage `battlefield.fled.add(actor.
 key)` as its sole mutation. On failure, it SHALL stage a no-op (`apply` performs no mutation). Neither
@@ -146,6 +159,10 @@ outcome SHALL write to any entity's `traits`, `sexual`, `buffs`, or `skill_grant
 - **WHEN** a `flee` request resolves, whether the underlying attempt succeeds or fails
 - **THEN** `ActionResult.success()` returns a non-`None` `event_log` containing an entry describing the
   attempt's outcome, and the standard flat time cost is reported in both cases
+
+#### Scenario: Allied interactive escape uses party confirmation
+- **WHEN** an allied actor in an interactive player session requests this innate flee mechanism
+- **THEN** the request is routed to confirmed party retreat before any individual effect mutates the battlefield; enemy individual flee keeps the mechanism above unchanged
 
 ### Requirement: A missing battlefield reference in event_context is a named rejection, not a crash
 `_handle_disengage()` SHALL raise `RejectedAction(RejectReason.EFFECT_RESOLUTION_FAILED, ...)` naming

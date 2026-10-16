@@ -25,10 +25,13 @@ attack and adds no artificial round. Whatever fails inside that unit — the
 settlement body itself, the durable commit, or the operation receipt written
 after it — restores the draft and every touched durable/cache surface, so a
 later valid retry completes. The retreat operation's dispatch is supplied by
-``party-combat-retreat-resolution``; until that handler is registered,
-confirming a retreat token rejects deterministically with
-``party_exit_unavailable`` before any write, so no placeholder retreat ships.
-Enemy individual disengagement keeps its own resolver and AI policy.
+``party-combat-retreat-resolution`` and resolves against the round boundary it
+shares with an ordinary round: it decides before any ordinary action, replaces
+the party's pending personal commands with one attempt, and leaves the whole
+party's outcome — escape or a failed round — to the same settlement entry.
+Both operations bind to the same token, admission, rollback and receipt, so a
+cancel keeps the draft and a repeated or stale confirmation can never settle
+twice. Enemy individual disengagement keeps its own resolver and AI policy.
 """
 
 import hashlib
@@ -246,6 +249,7 @@ class _ExitSnapshots:
     exam_host: Any
     battlefield: Battlefield | None
     skip_safety: tuple[tuple[str, Any], ...]
+    practice_dedupe: tuple[int | None, frozenset]
 
     def restore(self, actor: Any, action_context: Any) -> None:
         """Reinstate every snapshotted surface, in the round path's order."""
@@ -255,6 +259,13 @@ class _ExitSnapshots:
         _restore_round_touched(actor, self.touched, self.extra, *self.party)
         _restore_exam_host(self.exam_host)
         actor.ndb.action_context = action_context
+        # A confirmed retreat's failed round resolves real actions, which claim
+        # per-tick practice entries; the exit unit is their outer transaction
+        # owner, so a rolled-back unit must release those claims for a
+        # same-tick retry (exactly as the ordinary round's own unit does).
+        from world.rules.progression import restore_practice_dedupe
+
+        restore_practice_dedupe(self.practice_dedupe)
         if self.skip_safety:
             # An unreconstructable battlefield has no roster to re-register
             # from, so the registry entries themselves are restored: a
@@ -294,8 +305,10 @@ def _snapshot_exit_surfaces(
     )
     from world.rules.combat_session.snapshot import _ROUND_ENTITY_SURFACES
     from world.rules.combat_session.settlement import _ROUND_SECONDS
+    from world.rules.progression import snapshot_practice_dedupe
     from world.rules.skip_safety import _BATTLEFIELDS
 
+    practice_dedupe = snapshot_practice_dedupe()
     if battlefield is None:
         clock = read_world_clock()
         clock_snapshot = (
@@ -339,6 +352,7 @@ def _snapshot_exit_surfaces(
             exam_host=_snapshot_exam_host(record),
             battlefield=None,
             skip_safety=skip_safety,
+            practice_dedupe=practice_dedupe,
         )
     touched, extra = _snapshot_round_touched(commander, battlefield, record)
     return _ExitSnapshots(
@@ -349,6 +363,7 @@ def _snapshot_exit_surfaces(
         exam_host=_snapshot_exam_host(record),
         battlefield=battlefield,
         skip_safety=(),
+        practice_dedupe=practice_dedupe,
     )
 
 
@@ -376,14 +391,35 @@ def _confirm_surrender(
     )
 
 
-#: One dispatch per operation. ``retreat`` is registered together with the
-#: confirmed retreat's resolution (``party-combat-retreat-resolution``); until
-#: then a retreat confirmation rejects with ``party_exit_unavailable`` before
-#: any write, so no placeholder retreat behaviour ships.
+def _confirm_retreat(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> dict[str, Any]:
+    """Resolve one confirmed retreat round at this serialized revision boundary.
+
+    The retreat's own behavior lives with the round boundary it integrates
+    against (:func:`world.rules.combat_session.rounds.resolve_party_retreat`):
+    it decides before any ordinary action, replaces the pending personal
+    commands, and settles the whole party's outcome through the same
+    settlement entry every round uses. The import is local because this
+    boundary is imported before the round module by their package.
+    """
+    from world.rules.combat_session.rounds import resolve_party_retreat
+
+    return resolve_party_retreat(commander, record, battlefield)
+
+
+#: One dispatch per operation, so confirming either party exit reaches its own
+#: resolution. ``retreat`` resolves one retreat round at the session's
+#: serialized revision boundary (``party-combat-retreat-resolution``); the
+#: ``party_exit_unavailable`` guard below stays as the fail-closed answer for
+#: an operation the boundary knows but dispatches nowhere.
 _OPERATION_HANDLERS: dict[
     str, Callable[[Any, CombatSessionRecord, "Battlefield | None"], dict[str, Any]]
 ] = {
     PARTY_EXIT_SURRENDER: _confirm_surrender,
+    PARTY_EXIT_RETREAT: _confirm_retreat,
 }
 
 
@@ -410,7 +446,11 @@ def _revision_already_consumed(
     leaves the tick unchanged, so a later engagement in the same tick can share
     this id and the same initial revision. A durable receipt on that exact pair
     therefore means a previous instance of this session id already spent the
-    revision, and the replay is refused.
+    revision, and the replay is refused. A failed retreat writes the very same
+    kind of receipt: it consumes its revision like the ordinary round
+    ``_submit_request`` resolves while advancing no time itself, and its own record
+    then carries the next revision, so the receipt can neither refuse the
+    session's following round nor be reached by a replay of the spent revision.
 
     The guard is deliberately blunt: it cannot tell a replayed token from a
     genuine first confirmation of such a same-tick twin, so a player who
