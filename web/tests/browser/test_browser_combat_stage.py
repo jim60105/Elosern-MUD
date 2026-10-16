@@ -1120,6 +1120,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::the-combat-command-card-stands-at-the-stage-s-dead-centre",
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
+        "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
+        "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
     )
     def test_targets_are_picked_on_the_stage(self):
         """Attack with a four-figure party against three foes, at both
@@ -1238,6 +1240,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor",
         "webclient-contextual-hud::fallen-combat-figures-read-as-defeated-or-down-at-a-glance",
+        "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
+        "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
     )
     def test_area_targets_light_groups_on_the_stage(self):
         """An AREA skill against four foes (one knocked out, one defeated)

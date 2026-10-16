@@ -50,7 +50,7 @@ During the stage target step that "Combat targets are picked on the stage figure
 ## MODIFIED Requirements
 
 ### Requirement: The WebClient renders a full-bleed cinematic stage with anchored HUD surfaces
-The WebClient SHALL render as a full-bleed stage filling the viewport, layered bottom-up: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among the persistent surfaces. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
+The WebClient SHALL render as a full-bleed stage filling the viewport, layered: the scene backdrop, the portrait anchors, the HUD islands, the bottom band, and the command line topmost among persistent ones. HUD surfaces SHALL be placed by named stage anchors — `vitals`, `map`, `actor-left`, `actor-right`, `band-message`, `band-command`, `choices`, `presence`, `plates`, and `command-line` — and SHALL NOT sit inside a page-scrolling container that can push a required surface out of view.
 
 #### Scenario: The requirement carries its amendments
 - **WHEN** the `place-card-relocation` and `vitals-bar-redesign` amendments apply to this requirement
@@ -240,7 +240,7 @@ While the committed mode is `combat`, the client SHALL present the same `#action
 - **THEN** the waiting cue with its skip control covers the card's body inside the card while the card keeps its box, and the skip ends the round through the existing skip path
 
 ### Requirement: Combat figures stand in a shared-scale formation
-While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled (active, knocked out or defeated; up to 16 minus the party count, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled, fallen ones included (up to 16 minus the party count, in presenter order), at the boxes that "Combat formation geometry is one pure shared-scale function" returns. Every figure on both sides SHALL be drawn at one scale at every moment; exploration and dialogue SHALL keep their standing positions.
 
 #### Scenario: Every active foe stands
 - **WHEN** a combat snapshot commits one, three, five, eight and fifteen foes that have not fled, some of them knocked out or defeated, with a solo player at 1451x790
@@ -283,7 +283,7 @@ While the committed mode is `combat`, or while a round that ended the fight stil
 - **THEN** during the step each candidate figure has one hit area over its figure box that takes a pointer, and nothing else in the portrait anchors does; after the step no hit area remains
 
 ### Requirement: Companion standing portraits line up behind the controlled character in the actor-left anchor
-The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat the same figures stand at the boxes "Combat figures stand in a shared-scale formation" sets. Each figure SHALL reuse the existing StageActor rendering and remain non-interactive decorative art: no focusable element, and no pointer events outside the stage target step, during which only the hit areas over selectable figures take a pointer.
+The `actor-left` anchor SHALL render the currently controlled character's standing portrait as the group's rightmost figure with highest baseline z, and SHALL render each companion in committed `party.slots` order to its left, forming an overlapping horizontal row outside combat; in combat they stand at the formation's boxes. Each figure SHALL reuse StageActor rendering and stay non-interactive decorative art: no focusable element, and no pointer events except the stage target step's hit areas.
 
 #### Scenario: Portraits resolve through the catalog
 - **WHEN** a companion portrait renders
