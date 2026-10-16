@@ -141,6 +141,8 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         join_party(companion, self.player)
         return companion
 
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
     def test_final_confirmation_commits_once_and_clears_draft(self):
         from world.rules.combat_session import confirm_actor_command
         engage(self.player, self.monster)
@@ -179,6 +181,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
     def test_receipt_failure_after_terminal_clock_and_clear_restores_round(self):
         from world.rules.combat_session import confirm_actor_command
         from world.rules.combat_session.records import read_session_uncached, write_last_combat_receipt
@@ -224,6 +227,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(duplicate["reason"], "already_committed")
         self.assertEqual(get_world_clock().tick, tick + 6)
 
+    @covers_requirement("player-combat-session::execution-time-invalidation-loses-only-the-selected-action-opportunity")
     def test_earlier_defeat_invalidates_selected_spell_without_retarget_or_cost(self):
         from world.rules.combat_session import engage_group, submit_player_action
         from world.rules.tests.combat_fixtures import grant_lineage
@@ -259,6 +263,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(upkeep.call_count, 1)
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
+    @covers_requirement("player-combat-session::execution-time-invalidation-loses-only-the-selected-action-opportunity")
     def test_valid_spell_miss_pays_cost_and_consumes_one_round(self):
         from world.rules.combat_session import submit_player_action
         from world.rules.tests.combat_fixtures import grant_lineage
@@ -704,6 +709,7 @@ class DurableRoundAdmissionTests(BattlefieldIsolation, TransactionTestCase):
             "skill_key": BASIC_ATTACK_KEY, "targets_or_shorthand": [self.monster.pk], "scale": 1.0,
         }}
 
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
     def test_concurrent_final_confirmations_consume_one_revision(self):
         from concurrent.futures import ThreadPoolExecutor
         from threading import Barrier

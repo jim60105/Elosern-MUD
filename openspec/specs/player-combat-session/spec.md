@@ -36,45 +36,6 @@ or Battlefield instances SHALL NOT be stored.
 - **WHEN** a player already has a valid active session
 - **THEN** a second `engage` request is rejected without replacing it
 
-### Requirement: One preflight-valid player action drives one complete ordinary combat round
-During active combat, a selected skill SHALL build one player `ActionRequest` and a selected usable item SHALL build one `ItemUseRequest`. The combat-session facade SHALL call the matching side-effect-free preflight before any initiative action. After successful preflight, `run_round()` SHALL preserve initiative, resolution, and upkeep and SHALL dispatch the closed request union explicitly to `ActionResolver` or the deterministic item-use resolver.
-
-#### Scenario: Player chooses a skill action before NPC turns run
-- **WHEN** the player submits a valid combat cast
-- **THEN** initiative may place any combatant first, but the queued request is returned exactly once and every eligible non-player participant receives at most one policy action that round
-
-#### Scenario: Player chooses an item action before NPC turns run
-- **WHEN** the injured player submits a valid combat item use
-- **THEN** initiative may place any combatant first, the queued item request is returned exactly once at the player's position, and every eligible non-player participant receives at most one policy action that round
-
-#### Scenario: Companions receive policy actions like monsters
-- **WHEN** a round runs with the player, allied companions, and hostile monsters
-- **THEN** each companion and each monster receives at most one deterministic policy request, and companion requests target the opposing team
-
-#### Scenario: A knocked-out companion receives no action
-- **WHEN** a round runs after a companion was knocked out
-- **THEN** the companion is absent from initiative action, receives no policy request, and is not a selectable target for the player's shortcuts or the opposing team's targeting
-
-#### Scenario: Invalid selected action preserves the round before initiative
-- **WHEN** skill or item preflight rejects the player action
-- **THEN** no NPC acts, round count and world clock remain unchanged, no item is consumed, and the player may choose again
-
-#### Scenario: Mid-round invalidation does not roll back prior turns
-- **WHEN** preflight succeeds but an earlier initiative action makes the player's selected skill or item request invalid
-- **THEN** the player's resolution may reject, prior actions and upkeep remain committed, and the round count increases once
-
-#### Scenario: A preflight rejection consumes nothing
-- **WHEN** the matching side-effect-free preflight rejects the selected request
-- **THEN** no NPC actions or upkeep run and no round is consumed
-
-#### Scenario: The action provider supplies every participant's request
-- **WHEN** preflight succeeds and the round is assembled
-- **THEN** a session action provider supplies the selected request once for the player and deterministic behavior-policy `ActionRequest` values for every other participant — monsters and allied companions alike, each at most one per round, with targets selected from the opposing team
-
-#### Scenario: A started round stays consumed
-- **WHEN** an earlier initiative action makes the preflight-valid request reject at the player's turn
-- **THEN** the already-started round remains consumed
-
 ### Requirement: Combat time settles once at terminal session outcome
 Session rounds SHALL accumulate without command-default cast time. On enemy defeat, player defeat,
 successful flee, nonlethal exam outcome, or bounded terminal condition, the total rounds times six
@@ -120,7 +81,7 @@ settle with outcome `defeat` — the defeated player SHALL be settled at HP
 
 ### Requirement: A round and its settlement form one atomic persistence unit
 
-The shared submission body SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state.
+The shared submission body SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets), and any terminal settlement (exam outcome, clock advance, session clearing) together with draft consumption, round-revision admission and its durable completion receipt as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state.
 
 #### Scenario: Termination mid-round leaves no half-committed round
 
@@ -138,6 +99,10 @@ The shared submission body SHALL persist the round's action effects (HP/resource
 #### Scenario: Departure deletions ride on_commit
 - **WHEN** the defeat aftermath deletes the departing entities physically
 - **THEN** the deletions ride `transaction.on_commit`, so an outer round transaction's rollback discards them too
+
+#### Scenario: Accepted draft survives technical failure
+- **WHEN** a technical failure follows a participant, item mirror, session metadata or terminal-settlement write
+- **THEN** all durable and touched Evennia cache state returns to pre-round values and the accepted complete draft remains recoverable for retry
 
 ### Requirement: Overwhelm waits for one player choice before compressed resolver-backed outcome
 At engagement the session SHALL record overwhelm classification but SHALL run no action before player input. Compression SHALL be reachable only through `submit_opening_action()`, and only when its two-part condition holds: `classify_overwhelm()` decides for the player's team **and** the submitted skill damages a member of the opposing team. A submission made inside an already-active session SHALL NEVER compress, whatever the verdict and whatever was submitted.
@@ -372,7 +337,7 @@ cleanup, with exam recovery settling FAIL.
 
 ### Requirement: Combat boundaries emit observability events
 
-`submit_player_action` SHALL emit one `combat_round_settled` info event
+The complete-draft round submission SHALL emit one `combat_round_settled` info event
 through the `world.observability` facade whenever an ordinary round commits,
 with `char`, `opponent`, `tick`, `hp_before`, and `hp_after` context, and one
 `settlement_done` info event when a terminal settlement commits, with `char`,
@@ -390,45 +355,9 @@ round's durable commit and MUST NOT alter the atomic round/settlement unit.
 - **WHEN** a round's settlement fails and the whole unit rolls back
 - **THEN** no `settlement_done` event is logged for that attempt
 
-### Requirement: One submission inside an active session is one ordinary round, by default and structurally
-`world/rules/combat_session.py`'s shared submission body SHALL accept keyword-only
-`opening: Literal["round", "overwhelm"] = "round"` and `first_actor: str | None = None`, and SHALL
-run one `combat.run_round()` whenever `opening` is `"round"`. It SHALL NOT consult
-`classify_overwhelm()` to choose between an ordinary round and compression; the choice SHALL be the
-caller's, expressed through `opening`.
-
-#### Scenario: An overwhelming verdict no longer compresses an in-session submission
-- **WHEN** the player submits a preflight-valid skill in a session for which `classify_overwhelm()`
-  returns the player's team
-- **THEN** exactly one ordinary round resolves, `rounds_elapsed` increases by one, and
-  `resolve_overwhelm()` is not called
-
-#### Scenario: An item can never compress
-- **WHEN** the player submits a preflight-valid item use in a session for which
-  `classify_overwhelm()` returns the player's team
-- **THEN** exactly one ordinary round resolves and `resolve_overwhelm()` is not called
-
-#### Scenario: The public in-session entries never opt in
-- **WHEN** `submit_player_action()`'s and `submit_player_item_use()`'s implementations are inspected
-- **THEN** neither passes `opening` to the shared submission body and neither calls
-  `classify_overwhelm()` to decide dispatch
-
-#### Scenario: Round policy forwarding is identical for both openings
-- **WHEN** the shared submission body runs with `opening="round"` and again with
-  `opening="overwhelm"` for a session carrying `simulated` and non-empty `nonlethal_keys`
-- **THEN** both forward the same `simulated`, `nonlethal_keys`, journal sink, and notification sink
-  values into resolution
-
-#### Scenario: In-session entries never opt into compression
-- **WHEN** `submit_player_action()` and `submit_player_item_use()` run
-- **THEN** they pass no `opening` and call no `classify_overwhelm()` for dispatch, so every
-  submission made inside an already-active session resolves exactly one round regardless of the
-  power verdict
-
-#### Scenario: Policy and sinks forward identically for both openings
-- **WHEN** the shared submission body runs under either `opening` value
-- **THEN** the session's `simulated` and companion `nonlethal_keys` policy, the item journal sink,
-  and the notification sink are forwarded identically for both `opening` values
+#### Scenario: Editing does not pretend a round committed
+- **WHEN** a partial draft confirmation or rejected final preflight occurs
+- **THEN** no combat_round_settled or settlement_done event is emitted for it
 
 ### Requirement: engage_group opens one session against several co-located hostile targets
 `world/rules/combat_session.py` SHALL provide `engage_group(actor, targets)`, applying every
@@ -603,3 +532,40 @@ When the required actor set is empty, draft collection SHALL remain paused and r
 #### Scenario: All members action forbidden
 - **WHEN** transient capability rules leave no member eligible to choose a command
 - **THEN** progress shows no-eligible-actors and party exit paths; reconnect or preview does not execute all-empty completeness
+
+### Requirement: Final member confirmation automatically submits one complete ordinary round
+The last required valid member confirmation SHALL automatically submit the complete draft without another whole-party confirmation. All commands SHALL preflight against current state before initiative. Initiative SHALL be computed once; each eligible allied selected command SHALL be supplied once and enemies SHALL retain their deterministic policies.
+
+#### Scenario: Complete skill and item draft
+- **WHEN** all required allies have valid skill/item commands after the final confirmation
+- **THEN** one ordinary round executes in initiative order, with no additional autonomous companion request
+
+#### Scenario: Invalid preflight
+- **WHEN** any confirmed entry fails current-state preflight
+- **THEN** no actor acts, no enemy decision or upkeep runs and valid draft entries remain available for revision
+
+#### Scenario: One upkeep
+- **WHEN** a complete draft resolves successfully
+- **THEN** upkeep and round-time accounting run once, execution gates still suppress actors unable to act and the next round starts with no selections
+
+### Requirement: Round revisions execute at most once across retries and stale requests
+Admission SHALL serialize on the authoritative session and round revision inside the durable round unit. Duplicate, stale or concurrent final confirmations SHALL NOT resolve effects or settlement twice, including after a terminal session has been cleared or a process restarts.
+
+#### Scenario: Duplicate final request
+- **WHEN** the final confirmation is retried before or after restart or terminal cleanup
+- **THEN** the same revision has at most one committed round and one time settlement; retries return committed or stale status
+
+#### Scenario: Competing requests
+- **WHEN** normal final confirmation races another final confirmation or a confirmed party exit
+- **THEN** at most one operation consumes that session revision
+
+### Requirement: Execution-time invalidation loses only the selected action opportunity
+A command made invalid by an earlier action SHALL lose its opportunity without retargeting, skill resource deduction or item consumption. The round SHALL NOT pause for replacement. Prior valid actions and normal upkeep SHALL remain committed. Valid misses SHALL retain normal costs.
+
+#### Scenario: Earlier target removed
+- **WHEN** an earlier initiative action defeats or removes a later command target
+- **THEN** the later actor spends no resource or item, no new target is chosen, earlier effects remain and the round count increases once
+
+#### Scenario: Ordinary miss
+- **WHEN** a still-valid skill misses normally
+- **THEN** normal skill costs apply and the round remains consumed

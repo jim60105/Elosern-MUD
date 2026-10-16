@@ -358,7 +358,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally"
+        "player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round"
     )
     def test_player_overwhelming_verdict_item_use_never_compresses(self):
         # combat-session-opening-dispatch 5.2: an item submission under a

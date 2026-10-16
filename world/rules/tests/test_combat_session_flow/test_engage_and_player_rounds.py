@@ -111,7 +111,7 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster = _monster("goblin", hp=100)
         self.monster.location = self.room
 
-    @covers_requirement("player-combat-session::one-preflight-valid-player-action-drives-one-complete-ordinary-combat-round")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_invalid_cast_preserves_round_before_initiative(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -175,8 +175,8 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["record"].rounds_elapsed, 0)
         self.assertEqual(self.monster.traits.hp.current, 100)
 
-    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
     @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_overwhelming_player_resolves_after_first_action(self):
         # combat-session-opening-dispatch: an in-session submission under a
         # player-overwhelming verdict resolves exactly one ordinary round and

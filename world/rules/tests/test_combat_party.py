@@ -182,7 +182,7 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn(outcome["outcome"], ("round", "victory", "defeat"))
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
 
-    @covers_requirement("player-combat-session::one-preflight-valid-player-action-drives-one-complete-ordinary-combat-round")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_each_participant_receives_at_most_one_request_per_round(self):
         first = _companion(self.player, "第一", hp=500)
         second = _companion(self.player, "第二", hp=500)

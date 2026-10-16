@@ -295,11 +295,12 @@ roster member unconditionally and SHALL call change 7's
 - **THEN** it accepts keyword-only `simulated` and `nonlethal_keys` policy flags and forwards them to the upkeep settlement
 
 ### Requirement: The turn loop consumes actions_per_turn as the round's action count, with zero skipping before ActionResolver is called
-`world/rules/combat.py`'s `run_round()` SHALL consult each acting combatant's combat-modifier
-evaluation (the merged bundle and the matched rules' per-rule bundles) and consume the table's
-`actions_per_turn` output as that combatant's action count for the round. The zero-lock decision
-SHALL read the matched rules' per-rule zero-action results, and every entity not locked SHALL
-provision its count from the merged bundle's positive `actions_per_turn` value.
+`world/rules/combat.py`'s `run_round()` SHALL read each combatant's combat-modifier output
+(merged and per-rule bundles) and use its `actions_per_turn` as the action count. The zero-lock
+decision SHALL read the per-rule zero-action results; unlocked entities take their count from the
+merged bundle's positive value, except an interactive-player-session ally SHALL have at most one
+selected-command slot, never gaining one under a zero-action lock. Enemy and noninteractive slots
+stay unchanged.
 
 #### Scenario: A climax-in-progress combatant's turn is skipped, not attempted
 - **WHEN** `evaluate_combat_modifiers(entity)` returns `{"actions_per_turn": 0}` for the acting
@@ -319,7 +320,7 @@ provision its count from the merged bundle's positive `actions_per_turn` value.
   sequence matches the pre-widening behaviour value-for-value
 
 #### Scenario: A count of two grants a second slot at the same position and a mid-round defeat cuts it
-- **WHEN** a synthetic bundle gives one combatant `actions_per_turn: 2`, the provider returns a
+- **WHEN** a synthetic bundle gives an enemy or noninteractive combatant `actions_per_turn: 2`, the provider returns a
   resolvable request for both slots, and a separate fixture has an earlier actor's strike defeat or
   knock out that combatant after its first slot lands
 - **THEN** the first fixture's combatant resolves two provider interactions inside the one round
@@ -328,7 +329,7 @@ provision its count from the merged bundle's positive `actions_per_turn` value.
   cut slot
 
 #### Scenario: A runaway bundle hits the fuse, not an unbounded loop
-- **WHEN** a synthetic merge produces an `actions_per_turn` value above the loop's declared maximum
+- **WHEN** an enemy or noninteractive synthetic merge produces an `actions_per_turn` value above the loop's declared maximum
 - **THEN** the combatant provisions exactly the declared maximum number of slots and round
   resolution completes without error
 
@@ -358,6 +359,10 @@ provision its count from the merged bundle's positive `actions_per_turn` value.
 
 - **WHEN** an entity matches any zero-action rule
 - **THEN** its turn is skipped entirely (producing an `EventLog` with kind `"action_skipped"`) without calling `ActionResolver.resolve()`
+
+#### Scenario: Extra allied action count does not duplicate selected commands
+- **WHEN** an interactive allied actor with actions_per_turn2 selects a skill and separately selects an item in a later complete draft
+- **THEN** each selected command executes once with no duplicate cost/consumption or policy fallback, while equivalent enemy/noninteractive fixtures retain two ordinary slots
 
 ### Requirement: Golden fixed-seed tests cover a normal exchange and a lopsided exchange
 `world/rules/tests/` SHALL contain a fixed-seed golden test for a same-tier ("normal") combat exchange

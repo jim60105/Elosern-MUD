@@ -48,7 +48,7 @@ from ..combat_fixtures import grant_lineage
 class SubmissionStructuralTests(unittest.TestCase):
     """combat-session-opening-dispatch 5.3/5.8: structural tripwires."""
 
-    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_in_session_entries_never_request_or_judge_compression(self):
         import ast as _ast
 

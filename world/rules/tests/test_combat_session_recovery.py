@@ -590,7 +590,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
     @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
-    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_player_overwhelming_in_session_submission_never_dispatches(self):
         # combat-session-opening-dispatch: with compression stripped from the
         # in-session entries, a player-overwhelming verdict no longer reaches
