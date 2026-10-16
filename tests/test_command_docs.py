@@ -94,7 +94,10 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
     },
     "lineage": {"syntax": "lineage", "context": "一般（戰鬥內外皆可用）"},
     "engage": {"syntax": "engage <target>", "context": "戰鬥（需有敵對魔物）"},
-    "combat forfeit": {"syntax": "combat forfeit", "context": "戰鬥（需在進行中的戰鬥）"},
+    "combat forfeit": {
+        "syntax": "combat forfeit、combat forfeit confirm <token>",
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
     "combat actions": {"syntax": "combat actions", "context": "戰鬥（需在進行中的戰鬥）"},
     "guild register": {
         "syntax": "guild register",
