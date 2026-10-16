@@ -287,24 +287,38 @@ class CombatCommandBranchTests(TestCase):
             command.func()
         command.caller.msg.assert_called_with("無法開始戰鬥。")
 
-    def test_forfeit_maps_known_and_unknown_outcomes(self):
+    def test_forfeit_confirm_maps_the_settled_outcome_and_the_no_session_reason(self):
+        # The confirming route reports the shared terminal announcement of the
+        # settlement it admitted (party-combat-confirmed-surrender §6); the
+        # boundary itself is stubbed, so this pins the command's mapping only.
+        session = SimpleNamespace(
+            session_id="hostile:1:0", round_revision=0, rounds_elapsed=0
+        )
         for outcome, message in (
-            ("defeat", "你投降了，戰鬥以失敗告終。"),
-            ("exam_failed", "你放棄了考核。"),
-            ("other", "戰鬥結束。"),
+            ("defeat", "你被擊敗了，倒地不起，許久之後才在原地醒轉。"),
+            ("exam_failed", "你未能通過公會考核。"),
+            ("other", "繼續戰鬥。"),
         ):
-            command = _command(CmdCombatForfeit)
-            with patch("commands.combat.forfeit", return_value={"outcome": outcome}):
+            command = _command(CmdCombatForfeit, "confirm S-0-0123456789ABCDEF0123")
+            with patch("commands.combat.read_session", return_value=session), patch(
+                "commands.combat.confirm_party_exit",
+                return_value={"outcome": outcome},
+            ):
                 command.func()
             command.caller.msg.assert_called_with(message)
 
         command = _command(CmdCombatForfeit)
         with patch(
-            "commands.combat.forfeit",
+            "commands.combat.read_session",
             side_effect=CombatSessionError(SessionReason.NO_ACTIVE_SESSION),
         ):
             command.func()
         command.caller.msg.assert_called_with("目前沒有進行中的戰鬥。")
+
+        # The bare alias only asks for the prompt; a junk argument is usage.
+        command = _command(CmdCombatForfeit, "nonsense")
+        command.func()
+        self.assertIn("用法", command.caller.msg.call_args.args[0])
 
     def test_exam_maps_every_rule_reason_and_success(self):
         # The shared coordinator owns authority, attendance and the start;
