@@ -1338,7 +1338,10 @@ class CampaignHarness:
         while result.get("outcome") == "draft":
             record = read_session(initiator)
             if record is None:
-                break
+                raise CampaignFailure(
+                    f"the session of {initiator.key} ended with an incomplete "
+                    f"party draft: {result!r}"
+                )
             battlefield = reconstruct_battlefield(initiator, record)
             progress = preflight_draft_entries(initiator, record, battlefield)
             entities = {

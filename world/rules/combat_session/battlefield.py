@@ -192,12 +192,13 @@ def _commandable_required_actors(
     Only ``FORBIDDEN_ACTOR`` is filtered: every other authorization reason
     (``UNKNOWN_SESSION_ID`` and the ``CombatSessionError``s raised inside
     eligibility) reports a broken session invariant and propagates.
+
+    ``get_required_combat_actors`` already only reports pks whose roster
+    entity it resolved, so the entity here is always the live participant.
     """
     commandable: list[int] = []
     for pk in get_required_combat_actors(record, battlefield):
         entity = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == pk), None)
-        if entity is None:
-            continue
         try:
             authorize_combat_actor(commander, entity, record, battlefield)
         except CombatSessionError as error:
