@@ -140,13 +140,18 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertGreaterEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(result["rounds_elapsed"], 1)
 
-    def test_flee_closes_the_same_session(self):
+    def test_personal_flee_is_refused_and_the_same_session_stays_open(self):
+        # An allied personal flee is not a session action (§6): the confirmed
+        # party exit is the only escape route, so the submission facade refuses
+        # it outright and the session stays exactly where it was.
         engage(self.player, self.monster)
-        with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "flee", [])
-        self.assertEqual(result["outcome"], "fled")
-        self.assertIsNone(self.player.db.active_combat)
-        self.assertFalse(is_in_active_session(self.player))
+        with self.assertRaises(CombatSessionError) as ctx:
+            submit_player_action(self.player, "flee", [])
+        self.assertEqual(
+            ctx.exception.args[0], SessionReason.PERSONAL_FLEE_FORBIDDEN
+        )
+        self.assertIsNotNone(self.player.db.active_combat)
+        self.assertTrue(is_in_active_session(self.player))
 
     @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
     def test_terminal_victory_settles_rounds_once_and_clears(self):

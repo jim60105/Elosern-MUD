@@ -8,6 +8,11 @@ runs the shared side-effect-free preview revalidation, calls only public
 combat-session APIs, and never assigns ``.db`` attributes, traits, buffs,
 sexual state, battlefield members, quests, location, wallet, or inventory
 directly.
+
+``combat.flee`` and ``combat.forfeit`` are party-level exits
+(party-combat-confirmed-surrender §6): neither performs an individual allied
+escape, and both reach the rules boundary's session/round/operation-bound
+confirmation rather than an unconfirmed settlement.
 """
 
 from typing import Any
@@ -16,11 +21,14 @@ from world.rules.action import RejectReason
 from world.rules.action_preview import revalidate_submission
 from world.rules.combat_result import emit_settlement, settle_to_oob_result
 from world.rules.combat_session import (
+    PARTY_EXIT_RETREAT,
+    PARTY_EXIT_SURRENDER,
     CombatSessionError,
     SessionReason,
-    forfeit,
+    confirm_party_exit,
     read_session,
     reconstruct_battlefield,
+    request_party_exit,
     submit_player_action,
 )
 from world.rules.player_messages import (
@@ -257,31 +265,42 @@ def _cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> d
 
 
 def _flee_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """Invoke the innate SELF flee path for the session puppet."""
+    """Route the allied flee row to the confirmed party exit boundary.
+
+    An allied personal flee no longer exists (§6): this route reaches the
+    same party-scoped confirmation boundary the text aliases reach and can
+    never perform an individual allied escape. It deliberately does not
+    auto-confirm either — the dock's flee row is a single dispatch with no
+    confirmation window, so confirming on its behalf would be an unconfirmed
+    whole-party retreat. The window and its ``combat.exit_confirm`` payload
+    belong to ``webclient-party-exit-confirmation``; until it ships, the row
+    returns the boundary's deterministic rejection and nothing mutates.
+    """
     del payload, session
     record = read_session(actor)
     if record is None:
         return _rejected_result(SessionReason.NO_ACTIVE_SESSION)
-    battlefield = reconstruct_battlefield(actor, record)
-    context = _context_for(battlefield, record)
-    preview = revalidate_submission(actor, "flee", context, [])
-    if not preview.enabled:
-        reason = preview.reason or RejectReason.UNKNOWN_SKILL
-        return {
-            "outcome": "rejected",
-            "code": reason.value,
-            "message": rejection_message(reason),
-        }
     try:
-        result = submit_player_action(actor, "flee", [])
+        request_party_exit(
+            actor, record.session_id, record.round_revision, PARTY_EXIT_RETREAT
+        )
     except CombatSessionError as error:
         return _rejected_result(error.args[0])
-    emit_settlement(actor, result)
-    return settle_to_oob_result(result)
+    return _rejected_result(SessionReason.PARTY_EXIT_UNAVAILABLE)
 
 
 def _forfeit_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -> dict[str, Any]:
-    """End the actor's current session only when the stale-guard matches."""
+    """Confirm the actor's party surrender when the stale-guard matches.
+
+    The mounted dock asks the player to confirm before this action is sent,
+    and that window is the explicit human step; this adapter then reaches the
+    rules boundary's own confirmation, requesting the session/round/operation
+    bound token and confirming it in the same call, so an unconfirmed
+    surrender never reaches the settlement and the admission serializes on the
+    same session/revision a round uses. The exact-token wire step
+    (``combat.exit_confirm``, which carries the token to the client) belongs to
+    ``webclient-party-exit-confirmation``.
+    """
     record = read_session(actor)
     if record is None:
         return _rejected_result(SessionReason.NO_ACTIVE_SESSION)
@@ -291,7 +310,16 @@ def _forfeit_adapter(actor: Any, payload: dict[str, Any], session: Any = None) -
             "forfeit session_id does not match the active record",
         )
     try:
-        result = forfeit(actor)
+        prompt = request_party_exit(
+            actor, record.session_id, record.round_revision, PARTY_EXIT_SURRENDER
+        )
+        result = confirm_party_exit(
+            actor,
+            prompt["session_id"],
+            prompt["round_revision"],
+            prompt["operation"],
+            prompt["confirmation_token"],
+        )
     except CombatSessionError as error:
         return _rejected_result(error.args[0])
     emit_settlement(actor, result)

@@ -188,7 +188,20 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTest):
             {"session_id": read_session(self.player).session_id},
             request_id="same",
         )
-        with patch("web.webclient.actions.combat_actions.forfeit") as forfeit_mock:
+        # The adapter reaches the confirmed party exit now, so the settlement
+        # it delegates to is the one to stub: the boundary request/confirmation
+        # is what the dispatcher must call exactly once.
+        with patch(
+            "web.webclient.actions.combat_actions.request_party_exit"
+        ) as request_mock, patch(
+            "web.webclient.actions.combat_actions.confirm_party_exit"
+        ) as forfeit_mock:
+            request_mock.return_value = {
+                "operation": "surrender",
+                "session_id": read_session(self.player).session_id,
+                "round_revision": read_session(self.player).round_revision,
+                "confirmation_token": "S-0-0123456789ABCDEF0123",
+            }
             forfeit_mock.return_value = {
                 "outcome": "defeat",
                 "rounds_elapsed": 0,

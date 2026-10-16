@@ -522,7 +522,6 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             roles["spell_key"],
             roles["prereq_key"],
             roles["none_key"],
-            "flee",
             roles["attack_key"],
         ):
             self.assertNotIn("freeform_scales", by_key[key])

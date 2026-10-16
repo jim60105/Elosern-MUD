@@ -586,6 +586,54 @@ class ExamCombatTests(ExamHostFixture, EvenniaTestCase):
         self.assertEqual(_read_exams(self.player)[0].state, ExamState.PASSED)
 
     @covers_requirement(
+        "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
+        "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
+    )
+    @covers_requirement("player-combat-session::confirmed-surrender-enters-existing-defeat-or-exam-fail-without-an-extra-round")
+    def test_confirmed_surrender_fails_once_and_its_retry_settles_nothing(self):
+        from world.rules.clock import get_world_clock
+        from world.rules.combat_session import (
+            PARTY_EXIT_SURRENDER,
+            confirm_party_exit,
+            request_party_exit,
+        )
+
+        baseline = self._host_normal()
+        start_guild_exam(self.player, self.host, "E")
+        record = read_session(self.player)
+        prompt = request_party_exit(
+            self.player, record.session_id, record.round_revision,
+            PARTY_EXIT_SURRENDER,
+        )
+        result = confirm_party_exit(
+            self.player,
+            prompt["session_id"],
+            prompt["round_revision"],
+            PARTY_EXIT_SURRENDER,
+            prompt["confirmation_token"],
+        )
+        self.assertEqual(result["outcome"], "exam_failed")
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self.assertEqual(self.player.guild_rank, "F")
+        self._assert_host_restored(baseline)
+        tick_once = get_world_clock().tick
+        # The retried confirmation replays the recorded outcome: no second
+        # FAIL, no second host restoration and no second time settlement.
+        replay = confirm_party_exit(
+            self.player,
+            prompt["session_id"],
+            prompt["round_revision"],
+            PARTY_EXIT_SURRENDER,
+            prompt["confirmation_token"],
+        )
+        self.assertTrue(replay["idempotent"])
+        self.assertEqual(replay["outcome"], "exam_failed")
+        self.assertEqual(len(_read_exams(self.player)), 1)
+        self.assertEqual(_read_exams(self.player)[0].state, ExamState.FAILED)
+        self.assertEqual(get_world_clock().tick, tick_once)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement(
         "guild-rank-exams::exam-opponents-use-validated-true-stat-rank-profiles",
         "guild-rank-exams::exam-opponents-use-collision-free-unique-display-keys",
     )

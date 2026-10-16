@@ -571,20 +571,23 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._engage(page)
         # The utility SELF caster is disabled in combat: the session context
         # cannot supply its handler's event-context key, so the menu exposes
-        # the disabled explanation instead of a cast. flee is the enabled SELF
-        # skill. H3 (design D11): skills row -> category frame; martial_arts is
-        # single-group and opens the skill frame directly, then focus lands on flee.
+        # the disabled explanation instead of a cast. The granted SELF-shape
+        # skill is the payload journey's target now — the allied flee row is
+        # not a session skill any more (§6) — so the mode's own SELF role is
+        # driven. H3 (design D11): skills row -> category frame -> the role's
+        # group frame when the category has sub-groups -> the skill row.
+        roles = self._roles()
         self._open_skills(page)
-        self._open_category(page, "martial_arts")
-        self._focus_skill(page, "martial_arts", "flee")
-        self._press(page, "Enter")  # open-skill (flee) -> self-confirm
+        self._open_category(page, roles["self_category"])
+        self._focus_skill(page, roles["self_category"], roles["self_key"])
+        self._press(page, "Enter")  # open-skill (SELF) -> self-confirm
         self._press(page, "Enter")  # confirm self-cast
 
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
         self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], "flee")
+        self.assertEqual(envelope["payload"]["skill_key"], roles["self_key"])
         self.assertNotIn("target_ids", envelope["payload"])
         self.assertNotIn("target_shorthand", envelope["payload"])
         self.assertNotIn("actor", envelope["payload"])

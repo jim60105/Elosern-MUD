@@ -344,14 +344,24 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(clock.tick, 18)
         self.assertIsNone(self.player.db.active_combat)
 
-    def test_flee_settlement_failure_rolls_back_and_retry_flees(self):
-        # The flee terminal source shares the same atomic seam: a failed
-        # settlement rolls the flee, the round effects, and the metadata back
-        # together, and the retry can flee again and settle exactly once.
+    def test_flee_settlement_failure_rolls_back_and_retry_settles_once(self):
+        # The fled terminal source shares the same atomic seam: a failed
+        # settlement rolls the fled state and the metadata back together, and
+        # the retry settles exactly once. The allied flee *selection* now
+        # reaches the confirmed party exit (§6), so the fled source is driven
+        # at the settlement seam itself.
+        from world.rules.combat_session import _continue_or_settle
+        from world.rules.combat_session import _persist
+
         engage(self.player, self.monster)
         clock = WorldClock()
+        # One accumulated round gives the fled settlement real combat time to
+        # settle exactly once.
+        record = replace(read_session(self.player), rounds_elapsed=1)
+        _persist(self.player, record)
+        battlefield = reconstruct_battlefield(self.player, record)
+        battlefield.fled.add(str(self.player.key))
         with (
-            patch("world.rules.disengage.roll_d100", return_value=100),
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.settlement.settle_combat_result",
@@ -359,16 +369,14 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             ),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, "flee", [])
-        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
+                _continue_or_settle(self.player, record, battlefield, ())
+        # The failed settlement left the accumulated round and the clock
+        # exactly as they were: nothing was settled twice or half-settled.
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(clock.tick, 0)
-        self.assertNotIn(str(self.player.key), read_session(self.player).fled_ids)
-        self.assertEqual(self.monster.traits.hp.current, 100)
-        with (
-            patch("world.rules.disengage.roll_d100", return_value=100),
-            patch("world.rules.clock.get_world_clock", return_value=clock),
-        ):
-            result = submit_player_action(self.player, "flee", [])
+        self.assertTrue(is_in_active_session(self.player))
+        with patch("world.rules.clock.get_world_clock", return_value=clock):
+            result = _continue_or_settle(self.player, record, battlefield, ())
         self.assertEqual(result["outcome"], "fled")
         self.assertEqual(clock.tick, 6)
         self.assertIsNone(self.player.db.active_combat)
@@ -568,13 +576,16 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertEqual(result["overwhelming_team"], "foes")
             self.assertEqual(read_session(self.player).rounds_elapsed, 1)
             self.assertEqual(clock.tick, 0)
-            # The player retains full agency: flee stays available next
-            # round, and the foe-overwhelming verdict still never compresses.
-            with patch("world.rules.disengage.roll_d100", return_value=100):
-                result = submit_player_action(self.player, "flee", [])
-        self.assertEqual(result["outcome"], "fled")
-        self.assertEqual(clock.tick, 12)
-        self.assertIsNone(self.player.db.active_combat)
+            with self.assertRaises(CombatSessionError) as ctx:
+                submit_player_action(self.player, "flee", [])
+            # The player retains full agency, but a personal flee is refused
+            # (§6): the confirmed party exit is the only escape route now, and
+            # the foe-overwhelming verdict still never compresses.
+            self.assertEqual(
+                ctx.exception.args[0], SessionReason.PERSONAL_FLEE_FORBIDDEN
+            )
+            self.assertTrue(is_in_active_session(self.player))
+        self.assertEqual(clock.tick, 0)
 
     @covers_requirement("player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression")
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")

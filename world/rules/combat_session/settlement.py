@@ -8,7 +8,7 @@ settlement-recovery D1/D2, guild-economy D-6).
 
 import time
 from collections.abc import Mapping
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from types import SimpleNamespace
 from typing import Any
 
@@ -337,29 +337,64 @@ def _restore_exam_participants(
     restore_exam_host(host, record.exam_id)
 
 
-def _settle_with_restore(
+@dataclass(frozen=True)
+class _SettlementRestore:
+    """The pre-settlement in-process surfaces one settlement unit reinstates.
+
+    Built before the durable unit starts, so a failure anywhere inside it —
+    the settlement body, the unit's own commit, or a later write of the same
+    unit (the confirmed exit's operation receipt) — can put every touched
+    in-process surface back. The idmapper attribute cache is not
+    transaction-aware, so a rolled-back durable write alone would leave
+    readers observing post-settlement values (fix-combat-settlement-recovery
+    D1/D2). ``clear_session`` clears the action context and the battlefield's
+    skip-safety registration in-process as well, so both ride this snapshot.
+    """
+
+    actor: Any
+    attributes: tuple[tuple[str, tuple[bool, Any]], ...]
+    battlefield_buffs: tuple[tuple[Any, tuple[bool, Any]], ...]
+    traits: tuple[tuple[Any, Any], ...]
+    exam_host: tuple[Any, Any] | None
+    action_context: Any
+    battlefield: Battlefield | None
+
+    def restore(self) -> None:
+        """Reinstate every snapshotted surface, in the round path's order."""
+        from world.rules.action import _restore_attribute
+        from world.rules.skip_safety import register_active_battlefield
+
+        for key, snapshot in self.attributes:
+            _restore_attribute(self.actor, key, snapshot)
+        for entity, snapshot in self.battlefield_buffs:
+            _restore_attribute(entity, "buffs", snapshot)
+        for entity, snapshot in self.traits:
+            from world.rules.surfaces import restore_traits
+
+            restore_traits(entity, snapshot)
+        if self.exam_host is not None:
+            from world.rules.guild_exams import restore_exam_host_surfaces
+
+            host, snapshot = self.exam_host
+            restore_exam_host_surfaces(host, snapshot)
+        self.actor.ndb.action_context = self.action_context
+        if self.battlefield is not None:
+            register_active_battlefield(self.battlefield)
+
+
+def _snapshot_settlement_restore(
     actor: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield | None,
-    outcome: str,
-    logs=(),
-) -> dict[str, Any]:
-    """Settle a session outside a round, restoring actor surfaces on failure.
+) -> _SettlementRestore:
+    """Snapshot every in-process surface a terminal settlement may touch."""
+    from world.rules.action import _attribute_snapshot
 
-    ``settle_session`` runs its own durable transaction; when it fails (for
-    example a clock write error during forfeit or startup restoration), the
-    database keeps the session but the in-process ``active_combat``/exam
-    attributes were already reassigned by the settlement steps. Restoring
-    them keeps the retry path consistent without waiting for a reload
-    (the idmapper attribute cache is not transaction-aware).
-    """
-    from world.rules.action import _attribute_snapshot, _restore_attribute
-
-    extra: dict[str, tuple[bool, Any]] = {
-        "active_combat": _attribute_snapshot(actor, "active_combat"),
-        "last_combat_receipt": _attribute_snapshot(actor, "last_combat_receipt"),
-        "buffs": _attribute_snapshot(actor, "buffs"),
-    }
+    attributes: list[tuple[str, tuple[bool, Any]]] = [
+        ("active_combat", _attribute_snapshot(actor, "active_combat")),
+        ("last_combat_receipt", _attribute_snapshot(actor, "last_combat_receipt")),
+        ("buffs", _attribute_snapshot(actor, "buffs")),
+    ]
     battlefield_buff_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
     if battlefield is not None:
         for entity in battlefield.roster.values():
@@ -368,11 +403,10 @@ def _settle_with_restore(
                     (entity, _attribute_snapshot(entity, "buffs"))
                 )
     trait_snapshots: list[tuple[Any, tuple[bool, Any]]] = []
-    host = None
-    host_snapshot = None
+    exam_host: tuple[Any, Any] | None = None
     if record.mode == "guild_exam":
-        extra["guild_rank"] = _attribute_snapshot(actor, "guild_rank")
-        extra["guild_exams"] = _attribute_snapshot(actor, "guild_exams")
+        attributes.append(("guild_rank", _attribute_snapshot(actor, "guild_rank")))
+        attributes.append(("guild_exams", _attribute_snapshot(actor, "guild_exams")))
         # The settlement transaction restores the exam sides' gauges; when it
         # rolls back, restore the in-process trait surfaces too (the idmapper
         # cache is not transaction-aware), for the actor and the opponent.
@@ -383,28 +417,73 @@ def _settle_with_restore(
         if host is not None:
             from world.rules.guild_exams import snapshot_exam_host_surfaces
 
-            host_snapshot = snapshot_exam_host_surfaces(host)
+            exam_host = (host, snapshot_exam_host_surfaces(host))
+    return _SettlementRestore(
+        actor=actor,
+        attributes=tuple(attributes),
+        battlefield_buffs=tuple(battlefield_buff_snapshots),
+        traits=tuple(trait_snapshots),
+        exam_host=exam_host,
+        action_context=actor.ndb.action_context,
+        battlefield=battlefield,
+    )
+
+
+def _settle_with_restore(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+    outcome: str,
+    logs=(),
+    *,
+    nested_round: bool = False,
+    discard_draft: bool = False,
+) -> dict[str, Any]:
+    """Settle a session outside a round, restoring surfaces on failure.
+
+    ``settle_session`` runs its own durable transaction; when it fails (for
+    example a clock write error during forfeit or startup restoration), the
+    database keeps the session but the in-process ``active_combat``/exam
+    attributes were already reassigned by the settlement steps. Restoring
+    them keeps the retry path consistent without waiting for a reload
+    (the idmapper attribute cache is not transaction-aware).
+
+    ``nested_round`` marks the settlement as committing through an enclosing
+    durable unit (a confirmed exit), so the aftermath's undo is armed for that
+    unit. ``discard_draft`` clears the pending party draft inside the
+    settlement's own write, so a confirmed surrender discards selections
+    atomically with the outcome it enters and a failed unit keeps them. A
+    confirmed exit that spans the settlement plus its own receipt takes the
+    wider snapshot itself, so this helper's own bundle covers the settlement
+    body exactly as it does for a direct forfeit.
+    """
+    restore = _snapshot_settlement_restore(actor, record, battlefield)
+    if discard_draft:
+        record = replace(record, draft_entries={}, confirmed_actors=())
     try:
-        return settle_session(actor, record, battlefield, outcome, logs)
+        return settle_session(
+            actor, record, battlefield, outcome, logs, nested_round=nested_round
+        )
     except Exception:
-        for key, snapshot in extra.items():
-            _restore_attribute(actor, key, snapshot)
-        for entity, snapshot in battlefield_buff_snapshots:
-            _restore_attribute(entity, "buffs", snapshot)
-        for entity, snapshot in trait_snapshots:
-            from world.rules.surfaces import restore_traits
+        from world.rules.defeat_aftermath import drain_pending_undos
 
-            restore_traits(entity, snapshot)
-        if host_snapshot is not None:
-            from world.rules.guild_exams import restore_exam_host_surfaces
-
-            restore_exam_host_surfaces(host, host_snapshot)
+        for undo in drain_pending_undos():
+            undo()
+        restore.restore()
         raise
 
 
 @serialized_combat_write
 def forfeit(actor: Any) -> dict[str, Any]:
-    """Settle accumulated time, record defeat/exam FAIL, and clean up."""
+    """Settle accumulated time, record defeat/exam FAIL, and clean up.
+
+    Internal, test-only defeat seam: package code reaches this settlement
+    through the confirmed party exit only
+    (:func:`world.rules.combat_session.exit.confirm_party_exit`), so no
+    player-facing route can perform an unconfirmed forfeit. Never re-export it
+    as a public route — that is exactly the bypass
+    ``party-combat-confirmed-surrender`` removed.
+    """
     record = read_session(actor)
     if record is None:
         raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)

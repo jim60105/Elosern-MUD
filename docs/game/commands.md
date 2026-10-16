@@ -54,7 +54,7 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`engage`](/game/command-reference?id=engage) | 與敵對魔物開戰。 |
-| [`combat forfeit`](/game/command-reference?id=combat-forfeit) | 投降結束戰鬥。 |
+| [`combat forfeit`](/game/command-reference?id=combat-forfeit) | 取得整隊投降的確認提示，確認後才結束戰鬥。 |
 | [`combat actions`](/game/command-reference?id=combat-actions) | 列出戰鬥動作與目標。 |
 
 ## 技能施放

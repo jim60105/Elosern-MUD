@@ -11,6 +11,11 @@ is the field opening's own seed path into that same draft -- and the
 accumulated round time settles exactly once at a terminal outcome through
 ``settle_combat_result``.
 
+One party exit leaves that loop on purpose: ``request_party_exit`` returns the
+session/round/operation-bound confirmation prompt and ``confirm_party_exit``
+admits exactly one confirmed retreat or surrender, so an allied personal flee
+is never an individual escape and an unconfirmed forfeit never mutates.
+
 Package layers (dependency direction one-way, low to high):
 
 - :mod:`~world.rules.combat_session.errors` -- error type and stable reasons
@@ -24,6 +29,7 @@ Package layers (dependency direction one-way, low to high):
 - :mod:`~world.rules.combat_session.scans` -- post-round affinity scans
 - :mod:`~world.rules.combat_session.settlement` -- terminal settlement/recovery
 - :mod:`~world.rules.combat_session.rounds` -- submissions + round transaction
+- :mod:`~world.rules.combat_session.exit` -- confirmed party retreat/surrender
 """
 
 from world.rules import combat as _combat
@@ -48,6 +54,15 @@ from world.rules.combat_session.battlefield import (
 from world.rules.combat_session.errors import (  # noqa: F401
     CombatSessionError,
     SessionReason,
+)
+from world.rules.combat_session.exit import (  # noqa: F401
+    PARTY_EXIT_OPERATIONS,
+    PARTY_EXIT_RETREAT,
+    PARTY_EXIT_SURRENDER,
+    confirm_party_exit,
+    party_exit_operation_of_token,
+    party_exit_token,
+    request_party_exit,
 )
 from world.rules.combat_session.lifecycle import (  # noqa: F401
     _persist,
@@ -132,6 +147,9 @@ __all__ = [
     "BattlefieldActionContext",
     "CombatSessionError",
     "CombatSessionRecord",
+    "PARTY_EXIT_OPERATIONS",
+    "PARTY_EXIT_RETREAT",
+    "PARTY_EXIT_SURRENDER",
     "SessionReason",
     "_basic_attack_request",
     "_context_for",
@@ -161,9 +179,9 @@ __all__ = [
     "clear_session",
     "combat",
     "confirm_actor_command",
+    "confirm_party_exit",
     "engage",
     "engage_group",
-    "forfeit",
     "from_storage",
     "get_world_clock",
     "is_actor_eligible_to_act",
@@ -172,9 +190,12 @@ __all__ = [
     "monster_behaviour_policy",
     "overwhelm",
     "parse_session_targets",
+    "party_exit_operation_of_token",
+    "party_exit_token",
     "read_session",
     "reconstruct_battlefield",
     "preflight_draft_entries",
+    "request_party_exit",
     "resolve_overwhelm",
     "resolve_target_token",
     "restore_active_session",

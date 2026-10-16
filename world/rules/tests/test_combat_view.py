@@ -235,7 +235,6 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
             [
                 _T_AREA.key,
                 _T_CAST.key,
-                flee_key,
                 attack_key,
                 *sorted(
                     key
@@ -244,6 +243,10 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
                 ),
             ],
         )
+        # The allied flee row is not a session skill any more (§6): the
+        # party's escape is the confirmed party exit, so the personal-flee
+        # bypass may not appear in the skill list at all.
+        self.assertNotIn(flee_key, keys)
         self.assertNotIn(_T_PASSIVE.key, keys)
         wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
         self.assertEqual(wind.target_spec, "area")
@@ -597,8 +600,9 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # The kit cast is a single elemental damage spell.
         self.assertEqual((cast.hostile, cast.beneficial), (True, False))
         flee_key, _ = _innate_keys()
-        flee = next(skill for skill in view.skills if skill.key == flee_key)
-        self.assertEqual((flee.hostile, flee.beneficial), (False, False))
+        # The allied flee descriptor is absent by design (§6), so no session
+        # skill row can be the individual-escape bypass.
+        self.assertNotIn(flee_key, [skill.key for skill in view.skills])
 
     def test_no_session_raises_view_error(self):
         with self.assertRaises(CombatViewError):

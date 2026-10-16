@@ -257,7 +257,10 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         ]
         self.assertNotIn("◆", martial)
         self.assertIn("t_reed_cut（蘆斷）", martial)
-        self.assertIn("flee（合成逃跑）", martial)
+        # The allied flee row is gone from the session skill list (§6): the
+        # party's escape is the confirmed party exit, so no personal-flee
+        # bypass is advertised here.
+        self.assertNotIn("flee（合成逃跑）", martial)
         # The innate overlay re-seeds the production-forced basic-attack key
         # with a synthetic row whose label is authored in the helper.
         self.assertIn("basic_attack（合成基本攻擊）", martial)

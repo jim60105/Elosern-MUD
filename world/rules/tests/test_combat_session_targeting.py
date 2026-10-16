@@ -158,9 +158,13 @@ class ExplicitTargetContractTests(BattlefieldIsolation, EvenniaTestCase):
         with self.assertRaises(TypeError):
             submit_player_action(self.player, _T_ANY_SINGLE, self.monster_a)
 
-    def test_self_facade_requires_empty_list(self):
+    def test_self_flee_is_refused_by_the_facade(self):
+        # The allied flee selection is the confirmed party exit now (§6), so
+        # the facade refuses it outright: no individual escape resolves and
+        # the session stays exactly where it was.
         engage(self.player, self.monster_a)
         with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = submit_player_action(self.player, FLEE_SKILL_KEY, [])
-        self.assertEqual(result["outcome"], "fled")
-        self.assertIsNone(self.player.db.active_combat)
+            with self.assertRaises(CombatSessionError) as ctx:
+                submit_player_action(self.player, FLEE_SKILL_KEY, [])
+        self.assertEqual(ctx.exception.args[0], "personal_flee_forbidden")
+        self.assertIsNotNone(self.player.db.active_combat)

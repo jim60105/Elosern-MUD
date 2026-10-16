@@ -76,6 +76,10 @@ class CmdCast(Command):
         shorthand, matching the combat-session facade contract. ``scale`` is
         the optional freeform magnitude modifier; a scale the deterministic
         gate forbids rejects before initiative with the stable message.
+
+        ``flee`` is not a personal action inside a session (§6): the allied
+        escape is the confirmed party retreat, so this route only returns the
+        party-scoped confirmation prompt and selects nothing.
         """
         from world.rules.combat_session import (
             CombatSessionError,
@@ -83,6 +87,9 @@ class CmdCast(Command):
             submit_player_action,
         )
 
+        if skill_key == FLEE_SKILL_KEY:
+            self._request_party_flee(session)
+            return
         try:
             targets = parse_session_targets(
                 self.caller,
@@ -109,6 +116,42 @@ class CmdCast(Command):
         for line in lines:
             self.caller.msg(line)
         self.caller.msg(message)
+
+    def _request_party_flee(self, session) -> None:
+        """Return the party-scope retreat prompt for an in-session ``flee``.
+
+        No draft entry is selected, no round resolves and no time advances
+        until the player confirms with the returned token; enemy
+        disengagement keeps its own mechanism and never comes through here.
+        """
+        from world.rules.combat_session import (
+            PARTY_EXIT_RETREAT,
+            CombatSessionError,
+            request_party_exit,
+        )
+        from world.rules.player_messages import party_exit_prompt_lines
+
+        try:
+            prompt = request_party_exit(
+                self.caller,
+                session.session_id,
+                session.round_revision,
+                PARTY_EXIT_RETREAT,
+            )
+        except CombatSessionError as error:
+            self.caller.msg(session_reason_message(str(error.args[0])))
+            return
+        for line in party_exit_prompt_lines(
+            prompt["operation"],
+            scope_count=len(prompt["party_scope"]),
+            session_id=prompt["session_id"],
+            round_number=session.rounds_elapsed + 1,
+            confirmation_token=prompt["confirmation_token"],
+            # The confirmation entry point of this slice; the expanded text
+            # syntax names the retreat command in party-combat-text-commands.
+            confirm_command="combat forfeit",
+        ):
+            self.caller.msg(line)
 
     def _cast_out_of_combat(
         self,
