@@ -4,23 +4,58 @@ Total estimate: **7.5 hours**, including implementation, focused verification, d
 
 ## 1. Bounded implementation and evidence (1.5h)
 
-- [ ] 1.1 Attach automatic execution to the last confirmation with durable revision admission/receipt; test duplicate final confirm, concurrent stale requests and terminal retries.
+- [x] 1.1 Attach automatic execution to the last confirmation with durable revision admission/receipt; test duplicate final confirm, concurrent stale requests and terminal retries.
+
+  Evidence: `test_final_confirmation_commits_once_and_clears_draft`,
+  `test_technical_failure_preserves_accepted_final_draft`,
+  `test_receipt_failure_after_terminal_clock_and_clear_restores_round`
+  (terminal retry after the clock/clear writes, plus the fresh-interpreter
+  receipt read) and the concurrent final-confirmation coverage in
+  `test_combat_session_persistence.py`.
 
 ## 2. Bounded implementation and evidence (1.5h)
 
-- [ ] 2.1 Replace allied policy provisioning with one selected request per eligible actor, explicitly cap interactive allied positive action counts at one selected skill/item and retain zero locks; test no duplicate/fallback while enemy/noninteractive extra slots and liveness remain unchanged.
+- [x] 2.1 Replace allied policy provisioning with one selected request per eligible actor, explicitly cap interactive allied positive action counts at one selected skill/item and retain zero locks; test no duplicate/fallback while enemy/noninteractive extra slots and liveness remain unchanged.
+
+  Evidence: `_party_round_provider` plus the `is_interactive_ally` cap in
+  `world/rules/combat/rounds.py::run_round`;
+  `test_interactive_allies_cap_skill_and_item_without_enemy_cap_or_fallback`
+  and the unchanged lock/slot/liveness scenarios in
+  `test_initiative_and_turn_loop.py`.
 
 ## 3. Bounded implementation and evidence (1.5h)
 
-- [ ] 3.1 Extend the existing round transaction and cache snapshots to every actor, inventory mirror, draft, receipt and terminal write; inject failures after item, metadata and settlement writes and retry recovered draft.
+- [x] 3.1 Extend the existing round transaction and cache snapshots to every actor, inventory mirror, draft, receipt and terminal write; inject failures after item, metadata and settlement writes and retry recovered draft.
+
+  Evidence: the receipt and clock surfaces joined `_snapshot_round_touched`/
+  `_snapshot_round_clock`; `test_outer_rollback_restores_the_deleted_mirror_and_surfaces`,
+  `test_upkeep_failure_after_item_use_restores_everything`,
+  `test_terminal_settlement_failure_after_item_use_restores_everything`,
+  `test_termination_between_effects_and_persist_leaves_no_half_round`,
+  `test_rolled_back_round_emits_no_round_boundary`,
+  `test_a_fault_after_the_utility_action_rolls_back_everything` and the
+  `COMMIT_FAILED` whole-round abort cover the injected failures and the
+  retained-draft retry. The injected faults were re-pointed at the round
+  body's own write after draft admission began writing first.
 
 ## 4. Bounded implementation and evidence (1h)
 
-- [ ] 4.1 Prove mid-round invalid target loses its action with no retarget/cost while prior actions/upkeep persist; prove valid misses still cost and upkeep/time occur once.
+- [x] 4.1 Prove mid-round invalid target loses its action with no retarget/cost while prior actions/upkeep persist; prove valid misses still cost and upkeep/time occur once.
+
+  Evidence: `test_earlier_defeat_invalidates_selected_spell_without_retarget_or_cost`,
+  `test_valid_spell_miss_pays_cost_and_consumes_one_round` and
+  `test_mid_round_invalidation_consumes_the_round_without_consuming_the_item`.
 
 ## 5. Bounded implementation and evidence (1h)
 
-- [ ] 5.1 Update related canonical requirement/test IDs, session/provider docs and manifests; retain existing nonlethal/exam policy, session stamps and observation journals.
+- [x] 5.1 Update related canonical requirement/test IDs, session/provider docs and manifests; retain existing nonlethal/exam policy, session stamps and observation journals.
+
+  Evidence: the four MODIFIED ids are annotated on their establishing tests;
+  the module/facade docstrings and the provider docstrings now describe draft
+  admission; `tools.contract_gate` passes its manifests contract; the
+  nonlethal/exam policy, session stamps and observation journals are unchanged
+  and stay green in `test_combat_session_recovery.py`,
+  `test_guild_exams.py` and `test_rules_observability.py`.
 
   Traceability ordering (`docs/development/spec-test-traceability.md`):
   `tools.spec_traceability` resolves ids against main specs under
@@ -50,4 +85,14 @@ Total estimate: **7.5 hours**, including implementation, focused verification, d
 
 ## 6. Integration gate (1h)
 
-- [ ] 6.1 Run focused transactional session, provider and item-turn tests plus tools.contract_gate and observability lint/focused event tests; record durable restart and concurrency outcomes.
+- [x] 6.1 Run focused transactional session, provider and item-turn tests plus tools.contract_gate and observability lint/focused event tests; record durable restart and concurrency outcomes.
+
+  Evidence: focused modules pass standalone (session persistence, recovery,
+  flow, item combat turns, initiative/action counts, party combat, round
+  records, combat commands, friendly fire, sexual-coercion turn cost, rules
+  observability, monster-AI selection, manual-campaign reports, markers, party
+  offline loop, dialogue memory, climax settlement), plus the wider sweep of
+  the 81 modules that touch the session; `tools.contract_gate` (traceability,
+  the two lints, shard manifests, contracts) and
+  `openspec validate --strict` pass. Durable restart, concurrency and the
+  inapplicability of the process-local flag are recorded in design.md.
