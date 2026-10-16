@@ -93,6 +93,17 @@ def default_attack_policy(
         candidates = [c for c in candidates if not has_positional_marker(c)]
         if not candidates:
             return None
+    # An active Taunt winner (party-combat-taunt-constraints) is the enemy's
+    # forced target when it is ordinarily legal for this damage strike: the
+    # winner mapping is one of the ordinary candidates already, so a winner a
+    # mandatory restriction excluded (fled, knocked out, or stripped as a
+    # displaced target) grants no exception and changes nothing. This
+    # delegated policy is the non-``Monster`` enemy path; Monsters route
+    # through ``monster_behaviour_policy``, which applies the same constraint
+    # in its legacy and utility bodies.
+    winner = battlefield.taunt_winner(str(entity.key))
+    if winner is not None and any(candidate is winner for candidate in candidates):
+        candidates = [winner]
     target = min(
         candidates,
         key=lambda candidate: (_stored_hp(candidate), candidate.key),
@@ -193,28 +204,48 @@ def run_round(
     first_actor: str | None = None,
     decision_scope_base: ExecutionScopeBase | None = None,
     tactical_declarations: Mapping[str, str] | None = None,
+    taunt_declarations: Mapping[str, str] | None = None,
 ) -> list[EventLog]:
     """Resolve one round inside its round-start tactical scope.
 
     The keyword-only ``tactical_declarations`` (party-combat-defend-dodge) is
     the round's accepted allied Defend/Dodge declarations, keyed by roster key
     (``"defend"`` or ``"dodge"``). ``run_round`` is the sole writer of the
-    round execution context: it activates the declarations on
-    ``battlefield.tactical`` before :func:`_resolve_round` rolls initiative,
-    so a slow defending actor is protected before its own initiative position,
-    and clears the context in a ``finally`` so no activated effect leaks past
-    the round (or survives a technically failed round) and none stacks across
-    rounds. The context is transient in-battle state, never a durable buff. An
-    omitted or empty mapping leaves ``battlefield.tactical`` unset, so
-    default-mode callers are byte-identical to the pre-parameter behaviour.
+    round execution context: it computes the round's initiative sequence once,
+    resolves the ``taunt_declarations`` winners against it, activates the
+    declarations and winners on ``battlefield.tactical`` before
+    :func:`_resolve_round` runs any action, and clears the context in a
+    ``finally`` so no activated effect leaks past the round (or survives a
+    technically failed round) and none stacks across rounds. The context is
+    transient in-battle state, never a durable buff. An omitted or empty
+    declaration mapping leaves that part of the context unset, so callers
+    without declarations are byte-identical to the pre-parameter behaviour.
 
-    Every other contract (initiative order, ``first_actor`` reordering, the
-    closed request union, the shared resolver, upkeep settlement, the decision
-    scope, and the outer transaction boundary) lives on
-    :func:`_resolve_round`, the body this scope wraps.
+    The keyword-only ``taunt_declarations`` (party-combat-taunt-constraints) is
+    the round's accepted allied Taunt declarations, keyed by the taunter's
+    roster key with the taunted enemy's roster key as the value. The winner per
+    enemy is the first such taunter in the round's own initiative sequence
+    (:func:`_resolve_taunt_winners`); Taunt costs no resource, rolls no dice and
+    consumes the taunter's selected action (the session provider returns no
+    request for it). The winner mapping rides ``RoundTactical.taunt_winners``
+    and expires with the rest of the context at round end.
+
+    The initiative sequence is rolled exactly once here -- Taunt winner ranking
+    adds no draw -- and handed to :func:`_resolve_round`, so the reordering and
+    the execution order it drives cannot disagree with the sequence Taunt was
+    ranked against.
+
+    Every other contract (the closed request union, the shared resolver, upkeep
+    settlement, the decision scope, and the outer transaction boundary) lives
+    on :func:`_resolve_round`, the body this scope wraps.
     """
+    order = _initiative_order(battlefield, first_actor)
+    declarations = dict(tactical_declarations or {})
+    taunt_winners = _resolve_taunt_winners(taunt_declarations, order, battlefield)
     battlefield.tactical = (
-        RoundTactical(dict(tactical_declarations)) if tactical_declarations else None
+        RoundTactical(declarations, taunt_winners)
+        if declarations or taunt_winners
+        else None
     )
     try:
         return _resolve_round(
@@ -224,11 +255,64 @@ def run_round(
             nonlethal_keys=nonlethal_keys,
             journal_sink=journal_sink,
             notifications_sink=notifications_sink,
-            first_actor=first_actor,
             decision_scope_base=decision_scope_base,
+            initiative=order,
         )
     finally:
         battlefield.tactical = None
+
+
+def _initiative_order(battlefield: Battlefield, first_actor: str | None) -> list[str]:
+    """Return the round's one initiative sequence, with the opening reorder.
+
+    The keyword-only ``first_actor`` is the round's reorder-only initiative
+    override (combat-opening-seams D-1): ``roll_initiative()`` still computes
+    the sequence exactly as before, and the named key is then moved to the head
+    of that returned sequence with every other key's relative order unchanged.
+    It never re-rolls, re-scores, or bypasses ``roll_initiative()``, never
+    grants the named combatant an additional action, and never skips another
+    combatant. A key absent from the rolled sequence is a silent no-op.
+
+    ``run_round`` is the only caller, so this is the round's single dice draw
+    for initiative and the one sequence both Taunt winner ranking and
+    :func:`_resolve_round`'s turn order read.
+    """
+    order = roll_initiative(battlefield)
+    if first_actor is not None and first_actor in order:
+        order = [first_actor] + [key for key in order if key != first_actor]
+    return order
+
+
+def _resolve_taunt_winners(
+    taunt_declarations: "Mapping[str, str] | None",
+    order: "list[str]",
+    battlefield: Battlefield,
+) -> dict[str, str]:
+    """Return one winning taunter's roster key per taunted enemy.
+
+    ``taunt_declarations`` maps each declaring taunter's roster key to the
+    taunted enemy's roster key. The winner of one enemy is the taunter that
+    appears first in the round's already-computed initiative ``order`` -- the
+    sequence returned by :func:`_initiative_order`, before any per-slot
+    ``round_order`` fold -- so declaration entry order and confirmation order
+    have no influence and no extra dice are drawn. Exactly one winner is kept
+    per enemy, so no runner-up is ever promoted.
+
+    A taunter absent from ``order`` (already unable to act) or absent from the
+    roster is not a winner, and an unknown enemy is ignored: the enemy is then
+    simply unrestricted.
+    """
+    if not taunt_declarations:
+        return {}
+    rank = {key: index for index, key in enumerate(order)}
+    winners: dict[str, str] = {}
+    for taunter_key, enemy_key in taunt_declarations.items():
+        if enemy_key not in battlefield.roster or taunter_key not in rank:
+            continue
+        current = winners.get(enemy_key)
+        if current is None or rank[taunter_key] < rank[current]:
+            winners[enemy_key] = taunter_key
+    return winners
 
 
 def _resolve_round(
@@ -239,21 +323,17 @@ def _resolve_round(
     nonlethal_keys: frozenset[str] = frozenset(),
     journal_sink: "list[object] | None" = None,
     notifications_sink: "list[str] | None" = None,
-    first_actor: str | None = None,
     decision_scope_base: ExecutionScopeBase | None = None,
+    initiative: "list[str] | None" = None,
 ) -> list[EventLog]:
     """Resolve one action per capable combatant, then perform upkeep.
 
-    The keyword-only ``first_actor`` is a reorder-only initiative override
-    (combat-opening-seams D-1): ``roll_initiative()`` still computes the
-    sequence exactly as today, and the named key is then moved to the head of
-    that returned sequence with every other key's relative order unchanged.
-    It never re-rolls, re-scores, or bypasses ``roll_initiative()``, never
-    grants the named combatant an additional action, and never skips another
-    combatant. A key absent from the rolled sequence — dead, fled, knocked
-    out, or not in the roster — is a silent no-op. ``None`` (every existing
-    call site) leaves the iteration byte-identical to the pre-parameter
-    behaviour.
+    The keyword-only ``initiative`` is the round's own pre-computed initiative
+    sequence (:func:`_initiative_order`), supplied by ``run_round`` so the
+    sequence Taunt winner ranking used and the sequence this body iterates are
+    the same list. When omitted, this body rolls its own via ``roll_initiative``
+    exactly as before, so a direct caller keeps the pre-parameter behaviour.
+    The sequence is never re-sorted or re-rolled here.
 
     The round's upkeep settlement (fix-dot-kill-credit D3) turns the damaging
     tick records into defeat crossings, kill XP, and quest effects inside the
@@ -305,10 +385,7 @@ def _resolve_round(
                 battlefield=battlefield,
             )
 
-    order = roll_initiative(battlefield)
-    if first_actor is not None and first_actor in order:
-        order = [first_actor] + [key for key in order if key != first_actor]
-    remaining = list(order)
+    remaining = list(roll_initiative(battlefield) if initiative is None else initiative)
     while remaining:
         remaining = _fold_round_order(remaining, battlefield)
         key = remaining.pop(0)

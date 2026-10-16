@@ -353,6 +353,34 @@ def submit_player_item_use(
     )
 
 
+def _eligible_taunt_target(
+    battlefield: Battlefield,
+    record: CombatSessionRecord,
+    target_id: Any,
+) -> Any | None:
+    """Return one Taunt declaration's living eligible enemy, or ``None``.
+
+    A Taunt names exactly one living enemy on the opposing team. Admission and
+    preflight share this predicate -- and the battlefield's own capability rule
+    (:meth:`Battlefield.is_eligible`) -- so an absent, fled, knocked-out or
+    defeated participant is never a legal declaration target, and the two
+    boundaries cannot drift.
+    """
+    target = next(
+        (
+            entity
+            for entity in battlefield.roster.values()
+            if getattr(entity, "pk", None) == target_id
+        ),
+        None,
+    )
+    if target is None or int(target.pk) not in record.enemy_ids:
+        return None
+    if not battlefield.is_eligible(str(target.key)):
+        return None
+    return target
+
+
 def preflight_draft_entries(
     commander: Any,
     record: CombatSessionRecord,
@@ -464,9 +492,8 @@ def preflight_draft_entries(
                 if target_id is None:
                     reselection_reasons[actor_id] = {"reason": "target_required", "detail": "taunt requires enemy target"}
                     continue
-                target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
-                if target_obj is None or getattr(target_obj, "pk", None) not in record.enemy_ids:
-                    reselection_reasons[actor_id] = {"reason": "target_invalid", "detail": "taunt target not on enemy team"}
+                if _eligible_taunt_target(battlefield, record, target_id) is None:
+                    reselection_reasons[actor_id] = {"reason": "target_invalid", "detail": "taunt target is not a living enemy"}
                     continue
             valid_entries[actor_id] = entry
         else:
@@ -631,9 +658,8 @@ def _admit_actor_command(
                     return {"ok": False, "reason": "invalid_tactical_key", "detail": f"unknown {tactical_key}"}
                 if tactical_key == "taunt":
                     target_id = payload.get("target_id")
-                    target_obj = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == target_id), None)
-                    if target_obj is None or getattr(target_obj, "pk", None) not in record.enemy_ids:
-                        return {"ok": False, "reason": "target_invalid", "detail": "taunt requires enemy target"}
+                    if _eligible_taunt_target(battlefield, record, target_id) is None:
+                        return {"ok": False, "reason": "target_invalid", "detail": "taunt requires a living enemy target"}
             else:
                 return {"ok": False, "reason": "unknown_kind", "detail": f"unknown command kind {kind}"}
 
@@ -681,13 +707,13 @@ def _admit_actor_command(
 def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> dict[int, combat.RoundRequest]:
     """Bind persisted selections to this round's authoritative roster.
 
-    A ``defend``/``dodge`` draft entry is a round-start tactical declaration,
-    not an ordinary action: it is activated through
-    ``run_round(tactical_declarations=...)`` and its actor consumes its
-    selected action by receiving no request here (the party provider returns
-    ``None`` for it), so this binding deliberately skips it. Every other
-    command kind without a resolver (currently ``taunt``, owned by the later
-    taunt change) still fails loudly rather than silently consuming an action.
+    A ``defend``/``dodge``/``taunt`` draft entry is a round-start tactical
+    declaration, not an ordinary action: it is activated through
+    ``run_round(tactical_declarations=...)``/``run_round(taunt_declarations=...)``
+    and its actor consumes its selected action by receiving no request here
+    (the party provider returns ``None`` for it), so this binding deliberately
+    skips it. Every other command kind without a resolver still fails loudly
+    rather than silently consuming an action.
     """
     entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
     context = _context_for(battlefield, record)
@@ -710,7 +736,7 @@ def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> di
             )
         elif (
             entry["kind"] == "tactical"
-            and payload.get("tactical_key") in {"defend", "dodge"}
+            and payload.get("tactical_key") in {"defend", "dodge", "taunt"}
         ):
             # Round-start declaration: activated by run_round, not an action.
             continue
@@ -725,14 +751,10 @@ def _draft_tactical_declarations(
     """Return the round's accepted allied Defend/Dodge declarations by roster key.
 
     A pure projection of the persistent draft: each tactical entry whose key
-    is ``defend`` or ``dodge`` contributes the bound actor's roster key. Taunt
-    (owned by the later taunt change) is not a Defend/Dodge declaration and is
-    omitted here; it fails loudly in :func:`_draft_requests`.
-
-    Call-order invariant: the round builder runs :func:`_draft_requests` first,
-    which raises for an unresolvable tactical key (currently ``taunt``). A
-    caller that projects the declarations alone would instead silently drop
-    such an entry, so this helper is only ever used beside that check.
+    is ``defend`` or ``dodge`` contributes the bound actor's roster key and its
+    verb. Taunt is a different declaration shape (:func:`_draft_taunt_declarations`),
+    so it contributes nothing here; every tactical key is still resolved by
+    :func:`_draft_requests`, which raises for an unknown one.
     """
     keys_by_actor = {
         int(entity.pk): str(entity.key) for entity in battlefield.roster.values()
@@ -744,6 +766,40 @@ def _draft_tactical_declarations(
         tactical_key = entry["payload"].get("tactical_key")
         if tactical_key in {"defend", "dodge"} and actor_id in keys_by_actor:
             declarations[keys_by_actor[actor_id]] = tactical_key
+    return declarations
+
+
+def _draft_taunt_declarations(
+    record: CombatSessionRecord, battlefield: Battlefield
+) -> dict[str, str]:
+    """Return the round's accepted allied Taunt declarations by roster key.
+
+    A pure projection of the persistent draft: each ``taunt`` tactical entry
+    contributes its declaring actor's roster key mapped to the taunted enemy's
+    roster key (the draft payload's bound enemy dbref). Exactly one enemy per
+    taunter, so the mapping direction is taunter -> enemy; the winning taunter
+    per enemy is resolved later from the round's initiative sequence, not here.
+    An entry whose actor or enemy is no longer on the roster contributes
+    nothing: the enemy is then simply unrestricted.
+    """
+    keys_by_actor = {
+        int(entity.pk): str(entity.key) for entity in battlefield.roster.values()
+    }
+    enemy_keys = {
+        int(entity.pk): str(entity.key)
+        for entity in battlefield.roster.values()
+        if int(entity.pk) in record.enemy_ids
+    }
+    declarations: dict[str, str] = {}
+    for actor_id, entry in (record.draft_entries or {}).items():
+        if entry["kind"] != "tactical":
+            continue
+        if entry["payload"].get("tactical_key") != "taunt":
+            continue
+        taunter_key = keys_by_actor.get(actor_id)
+        enemy_key = enemy_keys.get(entry["payload"].get("target_id"))
+        if taunter_key is not None and enemy_key is not None:
+            declarations[taunter_key] = enemy_key
     return declarations
 
 
@@ -792,6 +848,7 @@ def _submit_request(
     item_journals: list[Any] = []
     grant_notifications: list[str] = []
     tactical_declarations: dict[str, str] | None = None
+    taunt_declarations: dict[str, str] | None = None
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     dedupe_before = snapshot_practice_dedupe()
     hp_before = _stored_trait_value(actor.traits.hp)
@@ -821,6 +878,7 @@ def _submit_request(
                 }
             requests = _draft_requests(record, battlefield)
             tactical_declarations = _draft_tactical_declarations(record, battlefield)
+            taunt_declarations = _draft_taunt_declarations(record, battlefield)
             # The encounter's durable opening-order policy, consumed here: the
             # initiating actor acts first in this first complete round, and
             # the persisted value is cleared below in the same unit, so no
@@ -862,6 +920,7 @@ def _submit_request(
                 first_actor=first_actor,
                 decision_scope_base=scope_base,
                 tactical_declarations=tactical_declarations,
+                taunt_declarations=taunt_declarations,
             )
             # Boundary event for the committed ordinary round: the on_commit
             # callback fires once the OUTERMOST transaction commits and is
