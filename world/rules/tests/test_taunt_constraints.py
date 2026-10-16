@@ -28,6 +28,8 @@ import contextlib
 import unittest
 from unittest.mock import patch
 
+from tools.spec_traceability import covers_requirement
+
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
@@ -121,6 +123,9 @@ class TauntWinnerResolutionTests(unittest.TestCase):
             roster,
         )
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_the_first_taunter_in_initiative_wins_regardless_of_entry_order(self):
         battlefield = self._field("slower", "faster", "boss")
         order = ["faster", "slower", "boss"]
@@ -135,6 +140,9 @@ class TauntWinnerResolutionTests(unittest.TestCase):
             {"boss": "faster"},
         )
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_only_one_winner_is_kept_per_enemy(self):
         battlefield = self._field("slower", "faster", "boss")
         winners = _resolve_taunt_winners(
@@ -142,6 +150,9 @@ class TauntWinnerResolutionTests(unittest.TestCase):
         )
         self.assertEqual(list(winners), ["boss"])
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_an_unknown_taunter_enemy_or_absent_taunter_is_ignored(self):
         battlefield = self._field("slower", "faster", "boss")
         order = ["faster", "slower", "boss"]
@@ -170,6 +181,9 @@ class TauntRoundContextTests(unittest.TestCase):
             {"winner": FakeEntity("winner"), "boss": FakeEntity("boss")},
         )
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_the_winner_is_revalidated_on_every_read(self):
         battlefield = self._field()
         winner = battlefield.roster["winner"]
@@ -185,6 +199,9 @@ class TauntRoundContextTests(unittest.TestCase):
         battlefield.fled.add("winner")
         self.assertIsNone(battlefield.taunt_winner("boss"))
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_run_round_activates_the_winner_for_the_round_then_expires(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         boss = FakeEntity("boss", hp=100, agility=99)
@@ -213,6 +230,9 @@ class TauntRoundContextTests(unittest.TestCase):
         self.assertTrue(all(winner is None for winner in seen))
         self.assertIsNone(battlefield.tactical)
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_taunt_ranking_draws_no_extra_initiative_roll(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         boss = FakeEntity("boss", hp=100, agility=99)
@@ -278,6 +298,9 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
     def _target_keys(self, request):
         return [str(target.key) for target in request.targets]
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_the_legacy_policy_attacks_the_winner_over_a_weaker_ally(self):
         # The ally is the lowest-HP target, so without the taunt the policy
         # would pick it; the active winner overrides that ordinary choice.
@@ -289,6 +312,9 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         )
         self.assertEqual(self._target_keys(request), [str(self.taunter.key)])
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_suppressed_winner_leaves_the_ordinary_choice(self):
         self.other.traits.hp.base = 40
         self.other.traits.hp.current = 40
@@ -299,6 +325,9 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         )
         self.assertEqual(self._target_keys(request), [str(self.other.key)])
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_the_delegated_policy_constrains_a_non_monster_enemy(self):
         self.other.traits.hp.base = 40
         self.other.traits.hp.current = 40
@@ -306,6 +335,9 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         request = default_attack_policy(self.monster, field)
         self.assertEqual(self._target_keys(request), [str(self.taunter.key)])
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_taunted_enemy_still_flees(self):
         # Stored HP at the flee boundary while the maximum stays full: the
         # taunt does not suppress the profile's own flee decision.
@@ -316,6 +348,9 @@ class TauntedEnemyPolicyTests(EvenniaTestCase):
         )
         self.assertEqual(request.skill_key, FLEE_SKILL_KEY)
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_taunted_enemy_still_uses_its_area_action(self):
         self.assertEqual(
             BEHAVIOUR_PROFILES[AREA_ARCHETYPE].decision_mode, DecisionMode.LEGACY
@@ -357,6 +392,9 @@ class TauntSessionTests(EvenniaTestCase):
         self.companion.traits.hp.current = 10
         join_party(self.companion, self.player)
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_a_taunt_declaration_constrains_the_enemy_and_spends_no_resource(self):
         engage(self.player, self.monster)
         record = read_session(self.player)
@@ -386,6 +424,9 @@ class TauntSessionTests(EvenniaTestCase):
         self.assertEqual(self.companion.traits.hp.current, companion_hp)
         self.assertLess(self.player.traits.hp.current, player_hp)
 
+    @covers_requirement(
+        "player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative"
+    )
     def test_two_taunters_of_one_enemy_both_spend_their_action(self):
         from dataclasses import replace
 

@@ -1302,6 +1302,9 @@ class TauntConstraintTests(EvenniaTestCase):
         # examination, so the bound still holds with an active taunt.
         self.assertLessEqual(result.examined, 1)
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_an_active_winner_narrows_a_hostile_damage_single_to_itself(self):
         self._own(MAGIC.key)
         taunter = self._participant("t_cand_taunter")
@@ -1313,6 +1316,9 @@ class TauntConstraintTests(EvenniaTestCase):
             [(stable_identity(taunter),)],
         )
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_non_damage_hostile_single_is_constrained_too(self):
         self._own(SINGLE_DEBUFF.key)
         taunter = self._participant("t_cand_taunter")
@@ -1324,6 +1330,9 @@ class TauntConstraintTests(EvenniaTestCase):
             [(stable_identity(taunter),)],
         )
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_suppressed_winner_is_removed_without_promoting_a_loser(self):
         self._own(MAGIC.key)
         winner = self._participant("t_cand_winner")
@@ -1347,6 +1356,9 @@ class TauntConstraintTests(EvenniaTestCase):
             {stable_identity(loser), stable_identity(other)},
         )
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_mandatory_seal_exclusion_grants_no_exception(self):
         self._own(STRIKE.key)
         taunter = self._participant("t_cand_taunter")
@@ -1361,6 +1373,9 @@ class TauntConstraintTests(EvenniaTestCase):
             [(stable_identity(bearer),)],
         )
 
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
     def test_a_winner_that_fails_the_shared_gates_grants_no_narrowing(self):
         self._own(GUARDED.key)
         winner = self._participant("t_cand_winner")
