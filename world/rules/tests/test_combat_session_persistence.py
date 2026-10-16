@@ -141,6 +141,9 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         join_party(companion, self.player)
         return companion
 
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
     def test_round_start_declaration_is_projected_and_skips_the_ordinary_request(self):
         from dataclasses import replace
 

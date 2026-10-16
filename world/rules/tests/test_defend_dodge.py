@@ -37,6 +37,9 @@ def _damage_residual(pending) -> int:
 
 
 class DefendScalarTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
     def test_defend_reduces_the_final_scaled_amount_after_scale_and_floors_it(self):
         # Ordinary scaled damage 40 with reduction 0.35 -> 26 (the spec example).
         self.assertEqual(
@@ -67,6 +70,9 @@ class DodgeScalarTests(unittest.TestCase):
     @covers_requirement(
         "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
     def test_dodge_subtracts_the_rulebook_threshold_bonus_from_the_margin(self):
         base = hit_margin(
             60, attacker_agility=5.0, attacker_accuracy=2.0, defender_agility=8.0
@@ -83,6 +89,9 @@ class DodgeScalarTests(unittest.TestCase):
 
     @covers_requirement(
         "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
+    )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
     )
     def test_a_raw_100_critical_still_requires_landing_through_dodge(self):
         # defender agility 30: threshold 81, so raw 100 (margin 19) lands
@@ -108,6 +117,9 @@ class DamageHandlerTacticalTests(unittest.TestCase):
                 1.0,
             )
 
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
     def test_defend_is_the_recipients_declaration_and_bypass_is_exempt(self):
         hero = FakeEntity("hero", atk_phys=40, agility=10, defense=0)
         defended = FakeEntity("defended", hp=100, max_hp=100, defense=0, agility=10)
@@ -137,6 +149,9 @@ class DamageHandlerTacticalTests(unittest.TestCase):
     @covers_requirement(
         "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
     def test_dodge_is_applied_per_recipient_and_raw_100_never_overrides_it(self):
         hero = FakeEntity("hero", atk_phys=40, agility=0, defense=0)
         dodging = FakeEntity("dodging", hp=100, max_hp=100, defense=0, agility=30)
@@ -156,6 +171,9 @@ class DamageHandlerTacticalTests(unittest.TestCase):
 
 
 class RoundTacticalScopeTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
     def test_run_round_activates_declarations_for_the_whole_round_then_expires(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         fast = FakeEntity("fast", hp=100, agility=99)
@@ -196,6 +214,9 @@ class RoundTacticalScopeTests(unittest.TestCase):
         self.assertTrue(all(tactic is None for _key, tactic in seen))
         self.assertIsNone(battlefield.tactical)
 
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
     def test_run_round_clears_declarations_when_the_round_raises(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         fast = FakeEntity("fast", hp=100, agility=99)
@@ -246,6 +267,9 @@ class RoundTacticalScopeTests(unittest.TestCase):
 
 
 class UpkeepExemptionTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
     def test_defend_does_not_reduce_a_damaging_upkeep_tick(self):
         # Damaging upkeep is applied by the buff tick itself, outside
         # strike_amount, so a defending recipient takes the full tick.
@@ -278,6 +302,9 @@ class UpkeepExemptionTests(unittest.TestCase):
 
 
 class EnemyUnavailableTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
     def test_declarations_are_scoped_to_the_named_roster_key_only(self):
         tactical = RoundTactical({"slow": "defend"})
         self.assertTrue(tactical.is_defending("slow"))

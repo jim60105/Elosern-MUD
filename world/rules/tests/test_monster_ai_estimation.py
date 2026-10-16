@@ -987,6 +987,9 @@ class ScaleGateAndPoolTests(unittest.TestCase):
     @covers_requirement(
         "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
     def test_round_start_declarations_drive_the_estimated_strike(self):
         # Same probe matchup as the scale test: no declaration is 13.32.
         baseline = self._plan(STRIKE, (self.enemy,), ((self.enemy,),))
