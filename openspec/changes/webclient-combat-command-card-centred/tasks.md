@@ -124,13 +124,13 @@ file.
 
 ## 4. Storybook (≈1 h)
 
-- [ ] 4.1 `stories/Core/AppShell.stories.js`: add a `combatKeys` arg replayed through `store.focusPress(key, false)`
+- [x] 4.1 `stories/Core/AppShell.stories.js`: add a `combatKeys` arg replayed through `store.focusPress(key, false)`
   after the snapshot commits; add `CombatTargetStep`, `CombatSkillDetail`, `CombatDisabledCommand`,
   and `CombatMasterScale`; the formation corner stories of `webclient-combat-formation` now show the card; keep the
   existing combat stories. Update the file's combat comments (card, not band).
-- [ ] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in a 264×400 host; add `CombatTargets`, `CombatMasterScale` and `CombatDisabledDetail`. `stories/Action/SkillDetailPane.stories.js`:
+- [x] 4.2 `stories/Action/ActionDock.stories.js`: render the combat stories with `card: true` in a 264×400 host; add `CombatTargets`, `CombatMasterScale` and `CombatDisabledDetail`. `stories/Action/SkillDetailPane.stories.js`:
   add `Strip`. `stories/Action/DockMenu.stories.js`: render `TargetFrame` and `FixedGridFrame` in a 264px host.
-- [ ] 4.3 Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify both succeed with
+- [x] 4.3 Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify both succeed with
   `component-manifest.json` unchanged; then run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_proportional_ui_scale.ProportionalUiScaleBrowserTest.test_resize_keeps_pointer_targets_live`
   and verify it passes. Open `core-appshell--combat-solo-one-foe`, `--combat-solo-fifteen-foes`, `--combat-full-party-eleven-foes`,
