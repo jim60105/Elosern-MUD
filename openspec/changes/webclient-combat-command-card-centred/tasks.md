@@ -19,8 +19,9 @@ pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elos
 ## 1. Stage: the card anchor, the Teleport, geometry and focus (≈2 h)
 
 - [ ] 1.1 (folded into 1.2; the earlier plate-line and party-reach plumbing is not needed with the formation's gap)
-- [ ] 1.2 In `components/HudFrame.vue`: give the `choices` anchor an `id` from `useId()`; wrap the `band-command`
-  slot in `<Teleport :to="'#' + choicesId" defer :disabled="mode !== 'combat'">` (design D1); show the `choices`
+- [ ] 1.2 In `components/HudFrame.vue`: create the per-instance card host and append it into the `choices` anchor;
+  wrap the `band-command` slot in `<Teleport :to="cardHost" :disabled="mode !== 'combat' || !cardHost">` (design
+  D1); show the `choices`
   anchor in combat; add the combat anchor rule (`width: calc(264px * var(--ui-scale))`,
   `left: calc(50% - 132px * var(--ui-scale))`, top-anchored content, card height
   `min(calc(400px * var(--ui-scale)), 100%)`) with a comment that the formation engine's `CARD_WIDTH` is the same
@@ -90,10 +91,10 @@ file.
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_command_card_stands_at_dead_centre web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player`
   and verify both pass.
 - [ ] 3.2 Update `web/tests/browser/test_browser_combat_menu.py`
-  `CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports`: the dock lies inside
+  `CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports`: the dock lies inside
   `[data-anchor="choices"]` (not `anchor-band-command`) and inside the viewport; keep the plate/formation assertions
   `webclient-combat-formation` migrated there and the confirm-control assertions. Run
-  `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_participant_frame_geometry_at_both_desktop_viewports web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once`
+  `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once`
   and verify all pass.
 - [ ] 3.3 Update `web/tests/browser/test_browser_mode_transitions.py`: the reader takes the dock animations from
   `#action-dock` (wherever it stands) and reports whether it is inside the `choices` anchor and the active element;

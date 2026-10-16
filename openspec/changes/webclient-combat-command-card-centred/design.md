@@ -28,16 +28,21 @@ payloads, protocol and telnet.
 
 ### D1. Move the same `#action-dock` node with a Teleport owned by HudFrame
 
-HudFrame wraps its `band-command` slot in `<Teleport :to="#<choices-id>" defer :disabled="mode !== 'combat'">`,
-where `<choices-id>` comes from `useId()` and is set as the `id` of the `choices` anchor element. While disabled the
-slot renders in place (exploration, dialogue, creation); in combat Vue moves the existing DOM nodes into the
+HudFrame creates one card-host element per instance in `setup` (`div.stage-card-host`), appends it into its
+`choices` anchor through a function template ref, and wraps its `band-command` slot in
+`<Teleport :to="cardHost" :disabled="mode !== 'combat' || !cardHost">`. While disabled the slot renders in place
+(exploration, dialogue, creation); in combat Vue moves the existing DOM nodes into the card host inside the
 `choices` anchor and back without unmounting the components.
+
+- Why an element and not a `useId` selector with `defer`: Vue 3.5 resolves a selector target with
+  `document.querySelector`, so a stage mounted outside the document (component tests) finds no target; mounted in
+  combat, the slot would never mount, and a later enable would move children into a null target. An element exists
+  at the first render, so the Teleport always resolves its target, attached or not, and needs no `defer`.
 
 - Keeps exactly one `#action-dock`, the same node and component instance (the `__tracked` test, DockMenu/ExitCompass
   state, `compassRef`), all test ids, and the focus-home lookup `document.getElementById("action-dock")`.
-- A `useId` selector instead of a static selector keeps several stages on one Storybook docs page from teleporting
-  into the first stage; `defer` lets the target (rendered by the same component) resolve after mount, so a reload
-  directly into combat works.
+- A per-instance host element instead of a static selector keeps several stages on one Storybook docs page from
+  teleporting into the first stage, and a reload directly into combat mounts the dock straight into the host.
 - Alternatives rejected: (a) CSS-only repositioning of `band-command` — its containing block is the band; (b) a
   second ActionDock in the `choices` slot under `v-if` — remounts the dock and breaks the persistent-node contract;
   (c) re-implementing the combat menu inside `ChoiceCard` — duplicates the router's key handling.
@@ -115,7 +120,7 @@ SkillUseDock.
 
 ### D6. Motion: entrance keyed on the live mode change; reconnect at rest
 
-`.elosern-stage[data-mode-change$="-combat"] [data-anchor="choices"] > .action-dock--card` runs
+`.elosern-stage[data-mode-change$="-combat"] [data-anchor="choices"] .stage-card-host > .action-dock--card` runs
 `elosern-combat-card-in var(--motion-reveal) var(--ease-enter) var(--motion-flash) backwards` (opacity 0 and
 `translateY(var(--motion-shift-sm) × var(--motion-travel))` → rest). `data-mode-change` is never set on mount or
 reconnect, so those render at rest; reduced resolves to a 150ms fade with no delay and no rise, off to 0ms. The
@@ -147,7 +152,8 @@ overlay is not lost and is left alone.
   method asserts real focus after entering and leaving combat.
 - [Truncated detail] → the strip clips description lines; the full text stays the row's accessible description and
   the strip's `title`.
-- [A reload straight into combat must find the Teleport target] → `defer` + an id on the same component's anchor.
+- [A reload straight into combat must find the Teleport target] → the target is an element HudFrame creates in
+  `setup`, so it exists at the first render whether or not the stage is attached to the document.
 - [Beat lunges] → `webclient-combat-formation` shrinks the step toward the centre to 12px·S, inside the 16px·S
   gutter, so no figure ever enters the card's columns.
 
