@@ -5,6 +5,15 @@ damage handler's per-recipient tactical application (including the bypass and
 zero-defense cases and per-recipient AREA resolution), and ``run_round``'s
 round execution context (activation before ordinary actions and expiry at
 round end). No database, no settings, no live skill resolution.
+
+Traceability ordering (``docs/development/spec-test-traceability.md``):
+``tools.spec_traceability`` resolves ids against the main specs under
+``openspec/specs/`` only, so the ids this change ADDS do not exist until
+``openspec archive`` syncs the delta and cannot be annotated now. The dodge
+tests therefore carry the MODIFIED to-hit requirement id
+(``combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60``),
+whose delta adds the Dodge scenario; the ADDED defend and round-start ids are
+annotated at archive time.
 """
 
 import unittest
@@ -27,7 +36,6 @@ def _damage_residual(pending) -> int:
 
 
 class DefendScalarTests(unittest.TestCase):
-    @covers_requirement("combat-resolution::defend-reduces-eligible-final-scaled-direct-damage")
     def test_defend_reduces_the_final_scaled_amount_after_scale_and_floors_it(self):
         # Ordinary scaled damage 40 with reduction 0.35 -> 26 (the spec example).
         self.assertEqual(
@@ -56,7 +64,7 @@ class DefendScalarTests(unittest.TestCase):
 
 class DodgeScalarTests(unittest.TestCase):
     @covers_requirement(
-        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
     def test_dodge_subtracts_the_rulebook_threshold_bonus_from_the_margin(self):
         base = hit_margin(
@@ -73,7 +81,7 @@ class DodgeScalarTests(unittest.TestCase):
         self.assertEqual(dodging, base - 25.0)
 
     @covers_requirement(
-        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
     def test_a_raw_100_critical_still_requires_landing_through_dodge(self):
         # defender agility 30: threshold 81, so raw 100 (margin 19) lands
@@ -99,7 +107,6 @@ class DamageHandlerTacticalTests(unittest.TestCase):
                 1.0,
             )
 
-    @covers_requirement("combat-resolution::defend-reduces-eligible-final-scaled-direct-damage")
     def test_defend_is_the_recipients_declaration_and_bypass_is_exempt(self):
         hero = FakeEntity("hero", atk_phys=40, agility=10, defense=0)
         defended = FakeEntity("defended", hp=100, max_hp=100, defense=0, agility=10)
@@ -127,7 +134,7 @@ class DamageHandlerTacticalTests(unittest.TestCase):
         self.assertEqual(_damage_residual(bypassed[0]), 40)
 
     @covers_requirement(
-        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
     def test_dodge_is_applied_per_recipient_and_raw_100_never_overrides_it(self):
         hero = FakeEntity("hero", atk_phys=40, agility=0, defense=0)
@@ -148,9 +155,6 @@ class DamageHandlerTacticalTests(unittest.TestCase):
 
 
 class RoundTacticalScopeTests(unittest.TestCase):
-    @covers_requirement(
-        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
-    )
     def test_run_round_activates_declarations_for_the_whole_round_then_expires(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         fast = FakeEntity("fast", hp=100, agility=99)
@@ -191,9 +195,6 @@ class RoundTacticalScopeTests(unittest.TestCase):
         self.assertTrue(all(tactic is None for _key, tactic in seen))
         self.assertIsNone(battlefield.tactical)
 
-    @covers_requirement(
-        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
-    )
     def test_run_round_clears_declarations_when_the_round_raises(self):
         slow = FakeEntity("slow", hp=100, agility=1)
         fast = FakeEntity("fast", hp=100, agility=99)
@@ -215,9 +216,6 @@ class RoundTacticalScopeTests(unittest.TestCase):
 
 
 class EnemyUnavailableTests(unittest.TestCase):
-    @covers_requirement(
-        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
-    )
     def test_declarations_are_scoped_to_the_named_roster_key_only(self):
         tactical = RoundTactical({"slow": "defend"})
         self.assertTrue(tactical.is_defending("slow"))
@@ -241,9 +239,6 @@ class RoundStartConstantValidationTests(unittest.TestCase):
                 return key
         raise AssertionError("the shipped combat rulebook declares no round-start section")
 
-    @covers_requirement(
-        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
-    )
     def test_round_start_constant_bounds_are_enforced_at_load(self):
         key = self._section_key()
         section = COMBAT_YAML[key]

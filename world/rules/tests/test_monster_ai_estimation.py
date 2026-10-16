@@ -984,9 +984,8 @@ class ScaleGateAndPoolTests(unittest.TestCase):
             reads=reads,
         )
 
-    @covers_requirement("combat-resolution::defend-reduces-eligible-final-scaled-direct-damage")
     @covers_requirement(
-        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
     )
     def test_round_start_declarations_drive_the_estimated_strike(self):
         # Same probe matchup as the scale test: no declaration is 13.32.
