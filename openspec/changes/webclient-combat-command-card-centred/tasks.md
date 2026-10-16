@@ -45,28 +45,28 @@ pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elos
 
 ## 2. The narrow card layout (≈2 h)
 
-- [ ] 2.1 In `components/ActionDock.vue` add the `card` prop (design D5): root classes
+- [x] 2.1 In `components/ActionDock.vue` add the `card` prop (design D5): root classes
   `action-dock--card choice-card choice-card--still`, the decorative `choice-card__corners` span (`aria-hidden`),
   the scoped `::after` focus mark limited to `:not(.action-dock--card)`, the focused-frame brightening under
   `:has(:focus-visible)`, the card sizing and padding, the one-line breadcrumb and the wrapping legend. In
   `AppClient.vue` pass `:card="store.view.mode === 'combat'"`. Verify with 2.4.
-- [ ] 2.2 Add `variant` (`"pane"` | `"strip"`) to `components/DockMenu.vue`'s generic detail and to
+- [x] 2.2 Add `variant` (`"pane"` | `"strip"`) to `components/DockMenu.vue`'s generic detail and to
   `components/SkillDetailPane.vue`; ActionDock passes `"strip"` in card mode. The strip renders the meta line
   (cost ‧ target requirement ‧ element) and the description or disabled reason clamped to two lines, a `title` with
   the full text, and keeps the existing `action-dock-description` / `combat-detail` hooks. Verify with 2.4.
-- [ ] 2.3 In `styles/app-shell.css` add the `.action-dock--card .dock-pane-host--bounded` column rules (row region
+- [x] 2.3 In `styles/app-shell.css` add the `.action-dock--card .dock-pane-host--bounded` column rules (row region
   `flex: 1 1 auto` with a three-row minimum and scrolling; the strip fixed at three lines), the single-column row
   width rules, the AREA `minmax(0, 1fr)` two-column grid and the scale-chip `minmax(0, 1fr)` columns, unprefixed,
   next to the existing bounded rules. Move the `.elosern-root .skill-detail-pane*` typography rules into
   `components/SkillDetailPane.vue`'s scoped style (same values) and delete them from `app-shell.css`; leave the
   `[data-anchor="band-command"]` detail rules (exploration SkillUseDock). Verify with 2.4 and 2.5.
-- [ ] 2.4 Extend `web/webclient-app/tests/action/action_dock.test.js` (card classes, one `aria-hidden` corners span,
+- [x] 2.4 Extend `web/webclient-app/tests/action/action_dock.test.js` (card classes, one `aria-hidden` corners span,
   legend/breadcrumb/playback cue inside the root, none of them without `card`) and
   `web/webclient-app/tests/action/skill_detail_pane.test.js` (the `strip` variant renders the meta line, clamps the
   description, shows the disabled reason instead of the description, and carries the full text in `title`). Run
   `pnpm test -- web/webclient-app/tests/action/action_dock.test.js web/webclient-app/tests/action/skill_detail_pane.test.js web/webclient-app/tests/action/dock_menu_panes.test.js web/webclient-app/tests/store/combat_command_window.test.js`
   and verify it passes (the last file is the unchanged store guard).
-- [ ] 2.5 Run `node --test web/static/webclient/js/tests/ui_contract.test.js` (it scans `app-shell.css` and
+- [x] 2.5 Run `node --test web/static/webclient/js/tests/ui_contract.test.js` (it scans `app-shell.css` and
   `AppClient.vue`) and verify it passes.
 
 ## 3. Live-client browser verification (≈2.5 h)

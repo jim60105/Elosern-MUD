@@ -187,3 +187,87 @@ describe("ActionDock (B2 action-dock family)", () => {
     expect(w.find('[data-item-key="action-options.dismiss"]').exists()).toBe(false);
   });
 });
+
+// webclient-combat-command-card-centred D5: the narrow combat card
+// presentation of the same dock.
+describe("ActionDock card presentation", () => {
+  const FOCUS_KEY = "attack";
+  const view = { dockTrail: ["戰鬥", "技能", "元素魔法", "火焰"], dockDepth: 4 };
+
+  function mountCard(props = {}) {
+    return mount(ActionDock, {
+      props: { mode: "combat", rootItems: COMBAT_ROOT_ITEMS, view, ...props },
+      slots: {
+        default: () =>
+          h(DockMenu, {
+            items: [
+              { key: "attack", surface: "attack", label: "攻擊", enabled: true, command: true, navigation: true, description: "選擇一名目標。" },
+              { key: "items", surface: "items", label: "物品", enabled: false, command: true, navigation: true, disabled_reason: { code: "empty", message: "背包是空的。" } },
+            ],
+            focusedKey: FOCUS_KEY,
+            idPrefix: "combat-row",
+            detailTestId: "combat-detail",
+          }),
+      },
+    });
+  }
+
+  it("wears the shared card frame only as the card", () => {
+    // Role: the card frame and its decoration exist exactly in card mode.
+    // Detects a band dock painted as a card, or a card without its brackets.
+    const card = mountCard({ card: true });
+    const root = card.get("#action-dock");
+    expect(root.classes()).toEqual(expect.arrayContaining(["action-dock--card", "choice-card", "choice-card--still"]));
+    const corners = card.findAll(".choice-card__corners");
+    expect(corners).toHaveLength(1);
+    expect(corners[0].attributes("aria-hidden")).toBe("true");
+    // The breadcrumb, the legend and the playback cue stay inside the card.
+    const cued = mountCard({ card: true, playback: true });
+    const cuedRoot = cued.get("#action-dock").element;
+    for (const selector of ['[data-testid="dock-crumb"]', '[data-testid="action-dock-description"]', '[data-testid="action-dock-playback"]']) {
+      expect(cuedRoot.querySelector(selector)).not.toBeNull();
+    }
+    const band = mountCard({ card: false });
+    const bandRoot = band.get("#action-dock");
+    expect(bandRoot.classes()).not.toContain("action-dock--card");
+    expect(bandRoot.classes()).not.toContain("choice-card");
+    expect(band.find(".choice-card__corners").exists()).toBe(false);
+    for (const wrapper of [card, cued, band]) wrapper.unmount();
+  });
+
+  it("asks its frames for the detail strip as the card and for the pane in the band", () => {
+    // Role: the detail variant follows the presentation. Detects a band dock
+    // folding its detail into a strip, or a card keeping the side pane.
+    const card = mountCard({ card: true });
+    const strip = card.get('[data-testid="combat-detail"]');
+    expect(strip.classes()).toContain("dock-detail--strip");
+    expect(strip.attributes("id")).toBe("action-dock-detail-strip");
+    expect(card.get("#combat-row-0").attributes("aria-describedby")).toBe("action-dock-detail-strip");
+    expect(card.get("#combat-row-1").attributes("aria-describedby")).toBeUndefined();
+    expect(strip.text()).toContain("選擇一名目標。");
+    expect(strip.attributes("title")).toContain("攻擊");
+    const band = mountCard({ card: false });
+    expect(band.get('[data-testid="combat-detail"]').classes()).not.toContain("dock-detail--strip");
+    expect(band.get("#combat-row-0").attributes("aria-describedby")).toBeUndefined();
+    card.unmount();
+    band.unmount();
+  });
+
+  it("keeps the legend's text while splitting it into segments that break only at separators", () => {
+    const card = mountCard({ card: true });
+    const legend = card.get('[data-testid="action-dock-description"]');
+    expect(legend.text()).toBe("數字鍵 1–9 ‧ Enter 執行 ‧ Esc 返回");
+    expect(legend.findAll(".action-dock__legend-seg").map((seg) => seg.text())).toEqual([
+      "數字鍵 1–9 ‧",
+      "Enter 執行 ‧",
+      "Esc 返回",
+    ]);
+    // The breadcrumb keeps the back control and the current frame apart from
+    // the ellipsizing earlier crumbs.
+    const crumb = card.get('[data-testid="dock-crumb"]');
+    expect(crumb.get(".dock-crumb__parents").text()).toBe("戰鬥 › 技能 › 元素魔法 ›");
+    expect(crumb.get(".dock-crumb__current").text()).toBe("火焰");
+    expect(crumb.find(".dock-crumb__back").exists()).toBe(true);
+    card.unmount();
+  });
+});

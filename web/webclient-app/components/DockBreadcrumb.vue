@@ -50,7 +50,7 @@ function onBack() {
     >‹</button>
     <span v-if="guidancePrefix" class="dock-crumb__prefix">{{ guidancePrefix }}</span>
     <span class="dock-crumb__trail">
-      <template v-if="parents">{{ parents }} › </template>
+      <span v-if="parents" class="dock-crumb__parents">{{ parents }} › </span>
       <span class="dock-crumb__current">{{ current }}</span>
     </span>
   </div>

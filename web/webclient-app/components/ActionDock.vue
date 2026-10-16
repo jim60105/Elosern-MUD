@@ -34,8 +34,20 @@
 // while staying the programmatic focus target. The `context_actions.
 // suggestions` envelope is the centred suggestions card's, opened by the
 // pill; the dock renders no suggestions element.
-import { computed } from "vue";
+//
+// The combat card (webclient-combat-command-card-centred D5, `card`): in
+// combat HudFrame moves this same element into the stage's `choices` anchor,
+// and the dock presents as the narrow centred card — the shared ChoiceCard
+// frame (gold-edged ink panel, crest, corner brackets), a one-line
+// breadcrumb, the row region, the detail strip below it (its frames read the
+// provided `"strip"` variant), and the shortcut legend wrapping at its
+// separators. The playback cue still veils the body inside the card.
+import { computed, provide } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
+import { DOCK_DETAIL_VARIANT } from "./dock-panes.js";
+// The card frame's rules are ChoiceCard's global (unscoped) styles; importing
+// the component registers them wherever the dock renders, Storybook included.
+import "./ChoiceCard.vue";
 
 const props = defineProps({
   // The contextual dock mode slice (exploration/combat/...), rendered as the
@@ -55,7 +67,15 @@ const props = defineProps({
   // Whether the container itself is a tab stop (false at the exploration
   // root, whose zones are the tab stops).
   tabStop: { type: Boolean, default: true },
+  // The narrow combat command card presentation (design D5): AppClient
+  // passes `store.view.mode === 'combat'`.
+  card: { type: Boolean, default: false },
 });
+
+provide(
+  DOCK_DETAIL_VARIANT,
+  computed(() => (props.card ? "strip" : "pane")),
+);
 
 const emit = defineEmits(["action", "back", "skip"]);
 
@@ -92,10 +112,14 @@ function onPaneActivate(payload) {
   <section
     id="action-dock"
     class="action-dock"
+    :class="{ 'action-dock--card choice-card choice-card--still': card }"
     :tabindex="tabStop ? 0 : -1"
     :data-mode="mode"
     data-testid="action-dock"
   >
+    <!-- The card frame's corner brackets (decorative; the crest is the
+         frame's own pseudo-elements). -->
+    <span v-if="card" class="choice-card__corners" aria-hidden="true"></span>
     <!-- The per-surface guidance line (the B2 Node-contract hook
          `action-dock-guidance`), rendered from the committed `guidancePrefix`. -->
     <div v-if="guidancePrefix" class="action-dock__guidance" data-testid="action-dock-guidance">
@@ -150,7 +174,9 @@ function onPaneActivate(payload) {
       class="action-dock__legend"
       data-testid="action-dock-description"
     >
-      <span class="action-dock__legend-text">數字鍵 1–9 ‧ <kbd>Enter</kbd> 執行 ‧ <kbd>Esc</kbd> 返回</span>
+      <!-- Three unbreakable segments: in the narrow card the legend wraps
+           only at the space after a separator; the text is unchanged. -->
+      <span class="action-dock__legend-text"><span class="action-dock__legend-seg">數字鍵 1–9 ‧</span> <span class="action-dock__legend-seg"><kbd>Enter</kbd> 執行 ‧</span> <span class="action-dock__legend-seg"><kbd>Esc</kbd> 返回</span></span>
     </p>
 
   </section>
@@ -180,12 +206,17 @@ function onPaneActivate(payload) {
 .action-dock:focus,
 .action-dock:focus-visible {
   outline: none;
+}
+/* The card keeps its frame's drop shadow under focus. */
+.action-dock:not(.action-dock--card):focus,
+.action-dock:not(.action-dock--card):focus-visible {
   box-shadow: none;
 }
 
 /* Its right edge sits on the column's own edge: an outset there would count
-   as horizontal overflow of the dock (webclient-combat-command-window). */
-.action-dock::after {
+   as horizontal overflow of the dock (webclient-combat-command-window). The
+   card presentation has no such mark: its `::after` is the frame's crest. */
+.action-dock:not(.action-dock--card)::after {
   content: "";
   position: absolute;
   inset: calc(-4px * var(--ui-scale)) 0 calc(-4px * var(--ui-scale)) -2px;
@@ -203,11 +234,11 @@ function onPaneActivate(payload) {
 
 /* A pointer focus keeps a fainter mark, so the container never loses its
    indication when no row carries the focused state. */
-.action-dock:focus::after {
+.action-dock:not(.action-dock--card):focus::after {
   opacity: 0.45;
 }
 
-.action-dock:focus-visible::after {
+.action-dock:not(.action-dock--card):focus-visible::after {
   opacity: 1;
 }
 
@@ -359,5 +390,104 @@ function onPaneActivate(payload) {
   border-radius: var(--radius-sm);
   padding: 0 calc(4px * var(--ui-scale));
   color: var(--paper-300);
+}
+
+/* The combat command card (webclient-combat-command-card-centred D5). The
+   frame itself (ground, gold edge, shadow, crest, brackets) is ChoiceCard's;
+   here the card fills the host the stage sizes (264px·S by min(400px·S, the
+   anchor's span)) and lays its chrome out for the narrow column. */
+.action-dock.action-dock--card {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  margin: 0;
+  padding: calc(12px * var(--ui-scale));
+  gap: calc(6px * var(--ui-scale));
+}
+/* Keyboard focus within the card brightens its frame, as the dialogue
+   card's does (the base rule above clears the global ring). */
+.action-dock.action-dock--card:focus-visible,
+.action-dock.action-dock--card:has(:focus-visible) {
+  border-color: rgba(228, 200, 142, 0.72);
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 1px rgba(228, 200, 142, 0.18),
+    0 0 calc(22px * var(--ui-scale)) calc(-6px * var(--ui-scale)) var(--gold-glow),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 1px rgba(238, 221, 180, 0.06);
+}
+.action-dock--card:focus-visible > .choice-card__corners,
+.action-dock--card:has(:focus-visible) > .choice-card__corners {
+  opacity: 1;
+}
+/* The pane never scrolls in the card: the row region inside it does. */
+.action-dock--card .action-dock__pane {
+  overflow: hidden;
+  padding: 0;
+}
+/* The breadcrumb is one line: the back control and the current frame never
+   shrink; earlier crumbs share what is left and ellipsize. */
+.action-dock--card :deep(.dock-crumb) {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  gap: calc(4px * var(--ui-scale));
+  margin: calc(-4px * var(--ui-scale)) 0 0 calc(-4px * var(--ui-scale));
+  border-bottom: 1px solid rgba(185, 154, 96, 0.16);
+}
+.action-dock--card :deep(.dock-crumb__back) {
+  flex: none;
+  min-width: calc(30px * var(--ui-scale));
+  min-height: calc(30px * var(--ui-scale));
+  padding: 0;
+}
+.action-dock--card :deep(.dock-crumb__trail) {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  column-gap: 0.35em;
+}
+.action-dock--card :deep(.dock-crumb__parents) {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.action-dock--card :deep(.dock-crumb__current) {
+  flex: none;
+  letter-spacing: 0.06em;
+}
+/* The waiting cue stacks into one centred column in the narrow card. */
+.action-dock--card .action-dock__playback {
+  grid-template-columns: auto;
+  grid-template-rows: auto auto auto auto;
+  justify-items: center;
+  row-gap: calc(8px * var(--ui-scale));
+}
+.action-dock--card .action-dock__playback-hint {
+  grid-row: 4;
+}
+.action-dock--card .action-dock__playback-line {
+  grid-row: 2;
+}
+.action-dock--card .action-dock__playback-skip {
+  grid-row: 3;
+}
+/* The legend keeps its text and wraps at its separators onto at most two
+   centred lines. */
+.action-dock--card .action-dock__legend {
+  height: auto;
+  min-height: var(--band-strip-h);
+  justify-content: center;
+  padding: calc(6px * var(--ui-scale)) 0 0;
+  border-top-color: rgba(185, 154, 96, 0.18);
+  white-space: normal;
+  text-align: center;
+}
+.action-dock--card .action-dock__legend-text {
+  overflow: visible;
+  line-height: 1.55;
+}
+.action-dock__legend-seg {
+  white-space: nowrap;
 }
 </style>
