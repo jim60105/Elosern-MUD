@@ -733,6 +733,11 @@ def _draft_tactical_declarations(
     is ``defend`` or ``dodge`` contributes the bound actor's roster key. Taunt
     (owned by the later taunt change) is not a Defend/Dodge declaration and is
     omitted here; it fails loudly in :func:`_draft_requests`.
+
+    Call-order invariant: the round builder runs :func:`_draft_requests` first,
+    which raises for an unresolvable tactical key (currently ``taunt``). A
+    caller that projects the declarations alone would instead silently drop
+    such an entry, so this helper is only ever used beside that check.
     """
     keys_by_actor = {
         int(entity.pk): str(entity.key) for entity in battlefield.roster.values()

@@ -21,6 +21,7 @@ from unittest.mock import patch
 
 from tools.spec_traceability import covers_requirement
 
+from world.rules.buffs import TickRecord
 from world.rules.combat import Battlefield, RoundTactical, run_round
 from world.rules.combat.battlefield import COMBAT_YAML, CombatRulebookError, validate_combat_rulebook
 from world.rules.combat.damage import _handle_damage
@@ -213,6 +214,67 @@ class RoundTacticalScopeTests(unittest.TestCase):
         ):
             run_round(battlefield, exploding_provider, tactical_declarations={"slow": "dodge"})
         self.assertIsNone(battlefield.tactical)
+
+    def test_a_pre_set_round_context_is_not_an_input(self):
+        # run_round is the sole writer: a context left on the battlefield by a
+        # caller is neither read nor preserved, so a stale declaration can
+        # never bleed into a round that declares none.
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+        battlefield.tactical = RoundTactical({"slow": "defend"})
+        seen: list[object] = []
+
+        def provider(entity, field):
+            seen.append(field.tactical)
+            return None
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, provider)
+        self.assertTrue(seen)
+        self.assertTrue(all(tactic is None for tactic in seen))
+        self.assertIsNone(battlefield.tactical)
+
+
+class UpkeepExemptionTests(unittest.TestCase):
+    def test_defend_does_not_reduce_a_damaging_upkeep_tick(self):
+        # Damaging upkeep is applied by the buff tick itself, outside
+        # strike_amount, so a defending recipient takes the full tick.
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+        tick = TickRecord(definition_key="t_dot", source_pk=7, delta=-10, hp_before=100)
+
+        def fake_tick(entity, seconds):
+            if str(entity.key) == "slow":
+                entity.traits.hp.current = entity.traits.hp.current - 10
+                return (tick,)
+            return ()
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", side_effect=fake_tick),
+            patch("world.rules.combat.rounds.settle_upkeep", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, lambda entity, field: None, tactical_declarations={"slow": "defend"})
+        # 10 lost, not floor(10 * 0.65) = 6: the Defend reduction never reaches
+        # the upkeep tick.
+        self.assertEqual(slow.traits.hp.current, 90)
 
 
 class EnemyUnavailableTests(unittest.TestCase):

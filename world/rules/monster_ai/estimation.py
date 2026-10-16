@@ -67,6 +67,7 @@ from math import isfinite
 from typing import Any
 
 from world.rules.buffs import BUFF_DEFINITIONS
+from world.rules.combat.battlefield import RoundTactical
 from world.rules.combat_modifiers import (
     agility_with_bundle,
     attack_with_bundle,
@@ -889,7 +890,8 @@ class _Decision:
         # snapshot fingerprint: it is not authored tuning and not durable
         # state, so a recorded decision with no active declaration stays
         # byte-identical and ``AI_ALGORITHM_VERSION`` is unchanged.
-        self.tactical = getattr(getattr(context, "battlefield", None), "tactical", None)
+        tactical = getattr(getattr(context, "battlefield", None), "tactical", None)
+        self.tactical = tactical if isinstance(tactical, RoundTactical) else None
         self.pool = decision_pool(snapshot, actor, dict(roster), context)
         self.enemies = hostile_domain(snapshot, self.pool)
         self.allies = group_members(KIND_FRIENDLY, snapshot, self.pool)
@@ -1401,6 +1403,8 @@ class _Decision:
         # an explicitly defense-bypassing occurrence skips Defend just as it
         # zeroes defense in settlement.
         recipient_key = str(participant.entity.key)
+        # Dodge is deliberately bypass-independent (the design gives it no
+        # damage-bypass exemption); only Defend below honors ``bypassing``.
         recipient_dodging = (
             self.tactical is not None and self.tactical.is_dodging(recipient_key)
         )

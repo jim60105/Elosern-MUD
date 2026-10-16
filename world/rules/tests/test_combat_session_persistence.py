@@ -153,6 +153,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         self._waiting_companion()
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
+        mp_before = self.player.traits.mp.current
         command = {
             "kind": "tactical",
             "payload": {"tactical_key": "defend", "target_id": None},
@@ -160,6 +161,9 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         result = confirm_actor_command(self.player, session_id, 0, 0, self.player.pk, command)
         self.assertTrue(result["ok"], result)
         self.assertFalse(result["is_complete"])
+        # The declaration costs no resource and advances no time.
+        self.assertEqual(self.player.traits.mp.current, mp_before)
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
 
         record = read_session(self.player)
         battlefield = reconstruct_battlefield(self.player, record)
