@@ -682,6 +682,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::combat-figures-carry-glance-plates",
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
+        "webclient-contextual-hud::fallen-combat-figures-read-as-defeated-or-down-at-a-glance",
     )
     def test_fallen_figures_keep_their_slot_and_read_as_fallen(self):
         """webclient-combat-defeated-foes task 2.1: with three foes and a
