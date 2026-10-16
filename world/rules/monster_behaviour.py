@@ -1074,6 +1074,19 @@ def _legacy_action(
             return None
     else:
         candidates = base
+    # An active Taunt winner (party-combat-taunt-constraints) is the enemy's
+    # forced target when it is ordinarily legal here: the winner is narrowed to
+    # itself only from the ordinary candidate set, so a winner a mandatory
+    # restriction excluded grants no exception. The seal preference above the
+    # metric stays authoritative: when a seal selects a different bearer, the
+    # taunter is excluded and the taunt changes nothing.
+    winner = battlefield.taunt_winner(str(entity.key))
+    if (
+        winner is not None
+        and any(candidate is winner for candidate in candidates)
+        and (not sealed or candidates[0] is winner)
+    ):
+        candidates = [winner]
     if sealed:
         # Multi-seal canonical order IS the target resolution: the first
         # seal-bearer is chosen without strategy-metric evaluation or
