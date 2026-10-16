@@ -556,6 +556,18 @@ damage   (atk_phys × roll multiplier) − defender defense, floor 1
 > `damage = int(max(attack_part * K / (K + max(0, defense)) + rider, floor))`
 > where finite positive `K` is configured in `rulebook/combat.yaml` (`mitigation_k`, initially 40).
 >
+> **Amended 2026-10-16 (change `party-combat-defend-dodge`).** The one shared damage expression
+> gains a round-scoped final stage for the round-start Defend declaration: an eligible defended
+> recipient's already-scaled amount becomes
+> `amount = max(floor(scaled_amount * (1 - defend_reduction)), damage_floor)`, where finite
+> `tactics.defend_reduction` in `[0, 1)` is configured in `rulebook/combat.yaml` (initially 0.35).
+> An explicitly defense-bypassing occurrence and a damaging upkeep tick skip it; low or zero
+> defense does not. The to-hit threshold of a recipient that declared Dodge gains the finite
+> non-negative `tactics.dodge_threshold_bonus` (initially 25), so the shared hit margin (and the
+> solid-hit band it drives) shrinks by it; the raw-roll critical still requires the attack to land.
+> Both declarations cost no resource, consume the actor's selected action, activate before ordinary
+> initiative actions, expire at round end and never stack.
+>
 > **Amended 2026-08-09 (change `dice-combat`).** The to-hit defender constant is **51**, not 60, in
 > `rulebook/combat.yaml` (`defender_constant: 51`): dice-combat's D-2 recalibrated it against the
 > real stat bands so the inclusive 1..100 roll reaches exact 50% parity. The formula shape is

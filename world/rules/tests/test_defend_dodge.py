@@ -13,6 +13,7 @@ from unittest.mock import patch
 from tools.spec_traceability import covers_requirement
 
 from world.rules.combat import Battlefield, RoundTactical, run_round
+from world.rules.combat.battlefield import COMBAT_YAML, CombatRulebookError, validate_combat_rulebook
 from world.rules.combat.damage import _handle_damage
 from world.rules.combat.scalars import hit_margin, strike_amount, strike_lands
 from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
@@ -223,6 +224,48 @@ class EnemyUnavailableTests(unittest.TestCase):
         self.assertFalse(tactical.is_defending("fast"))
         self.assertFalse(tactical.is_dodging("fast"))
         self.assertIsNone(tactical.tactic_for("fast"))
+
+
+class RoundStartConstantValidationTests(unittest.TestCase):
+    """The shipped round-start constants are bounded at the load boundary."""
+
+    @staticmethod
+    def _section_key() -> str:
+        """Return the round-start section key from its own required leaf.
+
+        Located by contract rather than by a literal shipped token, so this
+        behaviour test names no catalog content.
+        """
+        for key, value in COMBAT_YAML.items():
+            if isinstance(value, dict) and "defend_reduction" in value:
+                return key
+        raise AssertionError("the shipped combat rulebook declares no round-start section")
+
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
+    def test_round_start_constant_bounds_are_enforced_at_load(self):
+        key = self._section_key()
+        section = COMBAT_YAML[key]
+        # The shipped authored values themselves revalidate untouched.
+        self.assertIs(validate_combat_rulebook(COMBAT_YAML), COMBAT_YAML)
+        for bad in (1.0, 1.5, -0.1, float("nan"), float("inf"), True, "0.35", None):
+            with self.subTest(defend_reduction=bad):
+                with self.assertRaises(CombatRulebookError):
+                    validate_combat_rulebook(
+                        {**COMBAT_YAML, key: {**section, "defend_reduction": bad}}
+                    )
+        for bad in (-1, -0.5, float("nan"), float("inf"), True, "25", None):
+            with self.subTest(dodge_threshold_bonus=bad):
+                with self.assertRaises(CombatRulebookError):
+                    validate_combat_rulebook(
+                        {**COMBAT_YAML, key: {**section, "dodge_threshold_bonus": bad}}
+                    )
+        # The round-start section is required, not optional.
+        with self.assertRaises(CombatRulebookError):
+            validate_combat_rulebook(
+                {k: v for k, v in COMBAT_YAML.items() if k != key}
+            )
 
 
 if __name__ == "__main__":  # pragma: no cover
