@@ -58,7 +58,62 @@ SESSION_REASON_MESSAGES: dict[str, str] = {
     "invalid_recovery": "你已經無法行動，戰鬥結束了。",
     "unknown_session_id": "無法確認當前戰鬥。",
     "forbidden_actor": "指定的角色目前無法接受指令。",
+    "stale_round_revision": "戰鬥階段已經改變，請重新確認。",
+    "unknown_party_exit_operation": "無法確認這項隊伍行動。",
+    "invalid_confirmation_token": "這項確認已經失效，請重新取得確認提示。",
+    "party_exit_unavailable": "這項隊伍行動目前無法執行。",
+    "personal_flee_forbidden": "個別逃跑已經取消，整隊的行動需要明確確認。",
 }
+
+# Party-exit prompt copy (party-combat-confirmed-surrender §6): the request
+# boundary returns one operation-bound token plus these stable zh-TW lines, so
+# the text client and the later confirmation window render one source instead
+# of inventing prose each.
+PARTY_EXIT_OPERATION_LABELS: dict[str, str] = {
+    "surrender": "投降",
+    "retreat": "撤退",
+}
+
+PARTY_EXIT_CONSEQUENCE_LINES: dict[str, tuple[str, ...]] = {
+    "surrender": (
+        "整隊退出戰鬥，並結算目前已累積的戰鬥時間。",
+        "一般戰鬥會以戰敗收場；公會考核會記錄為未通過。",
+        "不會獲得新的安全離場、治療或恢復優待。",
+    ),
+    "retreat": (
+        "以整隊的名義嘗試脫離戰鬥，取代所有已選擇的個人指令。",
+        "失敗時整隊留在戰鬥中，本回合的行動機會全部消耗。",
+        "已經倒地的同伴會被一起帶走，不會因此獲得治療。",
+    ),
+}
+
+PARTY_EXIT_PROMPT_CANCEL_LINE = "取消不需要任何指令；不確認就不會改變戰況，也不會推進時間。"
+
+
+def party_exit_prompt_lines(
+    operation: str,
+    *,
+    scope_count: int,
+    session_id: str,
+    round_number: int,
+    confirmation_token: str,
+    confirm_command: str,
+) -> tuple[str, ...]:
+    """Return the whole-party consequence prompt for one exit operation.
+
+    Every line is stable, bounded Traditional Chinese prose: the party scope,
+    the operation's consequences, the session/round the confirmation binds to,
+    the exact confirmation syntax, and the cancel semantics.
+    """
+    label = PARTY_EXIT_OPERATION_LABELS.get(operation, operation)
+    lines = [
+        f"你將以整隊（{scope_count} 名成員）的名義{label}。",
+        *PARTY_EXIT_CONSEQUENCE_LINES.get(operation, ()),
+        f"確認綁定於本次戰鬥：{session_id}，第 {round_number} 回合。",
+        f"若要確認，請輸入：{confirm_command} confirm {confirmation_token}",
+        PARTY_EXIT_PROMPT_CANCEL_LINE,
+    ]
+    return tuple(lines)
 
 # Stable terminal outcome announcements shared by command and adapter paths.
 TERMINAL_OUTCOME_MESSAGES: dict[str, str] = {

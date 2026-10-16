@@ -51,6 +51,7 @@ from world.rules.combat_session.snapshot import (
     _snapshot_party_surfaces,
     _snapshot_round_touched,
 )
+from world.rules.disengage import FLEE_SKILL_KEY
 from django.db import transaction
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
@@ -190,6 +191,12 @@ def _preflight_skill_submission(
     battlefield = reconstruct_battlefield(actor, record)
     if _stored_trait_value(actor.traits.hp) <= 0:
         raise CombatSessionError(SessionReason.INVALID_RECOVERY)
+    # An allied personal flee is not an action any more (§6): the party's
+    # escape is the confirmed party operation, so no submission may place an
+    # individual allied escape in the draft at all. Enemy disengagement keeps
+    # its own resolver and AI policy and never reaches this facade.
+    if skill_key == FLEE_SKILL_KEY:
+        raise CombatSessionError(SessionReason.PERSONAL_FLEE_FORBIDDEN)
     effective_actor = actor if commanded_actor is None else commanded_actor
     authorize_combat_actor(actor, effective_actor, record, battlefield)
     if not isinstance(targets_or_shorthand, (list, str)):
@@ -437,6 +444,15 @@ def preflight_draft_entries(
         payload = entry.get("payload", {})
         if kind == "skill":
             skill_key = payload.get("skill_key")
+            if skill_key == FLEE_SKILL_KEY:
+                # A persisted allied personal flee (a draft written before the
+                # party-exit boundary replaced it) is never a valid selection:
+                # it is a reselection reason, so no round can execute it.
+                reselection_reasons[actor_id] = {
+                    "reason": "personal_flee_forbidden",
+                    "detail": "allied flee resolves through the confirmed party exit",
+                }
+                continue
             targets_or_shorthand = payload.get("targets_or_shorthand")
             scale = float(payload.get("scale", 1.0))
             # Map integer dbrefs back to live participant objects if list
@@ -618,6 +634,14 @@ def _admit_actor_command(
             payload = command.get("payload", {})
             if kind == "skill":
                 skill_key = payload.get("skill_key")
+                if skill_key == FLEE_SKILL_KEY:
+                    # Forged or stale allied personal flee: refuse before the
+                    # draft is written, whatever the caller claims (§6).
+                    return {
+                        "ok": False,
+                        "reason": "personal_flee_forbidden",
+                        "detail": "allied flee resolves through the confirmed party exit",
+                    }
                 targets_or_shorthand = payload.get("targets_or_shorthand")
                 scale = float(payload.get("scale", 1.0))
                 if isinstance(targets_or_shorthand, (list, tuple)) or hasattr(targets_or_shorthand, "__iter__") and not isinstance(targets_or_shorthand, str):
@@ -722,6 +746,14 @@ def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> di
         entity = entities[actor_id]
         payload = entry["payload"]
         if entry["kind"] == "skill":
+            if payload["skill_key"] == FLEE_SKILL_KEY:
+                # Defence in depth: the preflight rejects a persisted allied
+                # flee before any round is built, so this is unreachable
+                # through the facade — and it stays loud rather than letting
+                # an individual allied escape resolve.
+                raise ValueError(
+                    "allied flee is a confirmed party exit, not a round action"
+                )
             targets = payload["targets_or_shorthand"]
             if not isinstance(targets, str):
                 targets = [entities[target_id] for target_id in targets]

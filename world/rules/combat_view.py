@@ -41,6 +41,7 @@ from world.rules.combat_session import (
     read_session,
     reconstruct_battlefield,
 )
+from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.player_messages import rejection_message
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_display import MissingDisplayMetadataError
@@ -440,6 +441,12 @@ def _build_skills(
         seen.add(key)
         skill = SKILL_REGISTRY.get(key)
         if skill is None or skill.kind is not SkillKind.ACTIVE:
+            continue
+        # An allied personal flee is not a session action (§6): the party's
+        # escape is the confirmed party operation (the root ``flee`` action),
+        # so the skill list never offers the personal-flee bypass. Enemy
+        # disengagement is decided by the AI policy, not from this list.
+        if key == FLEE_SKILL_KEY:
             continue
         from world.skills.eligibility import skill_identity_eligible
 

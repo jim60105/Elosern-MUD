@@ -27,3 +27,13 @@ class SessionReason(StrEnum):
     INVALID_RECOVERY = "invalid_recovery"
     UNKNOWN_SESSION_ID = "unknown_session_id"
     FORBIDDEN_ACTOR = "forbidden_actor"
+    # Party-exit confirmation (party-combat-confirmed-surrender): the exit
+    # operations' own stable reasons. A token that does not verify for the
+    # claimed commander/session/round/operation, a round revision that moved
+    # past the confirmation, an operation whose dispatch change has not landed
+    # yet, and an allied personal flee route all report distinctly.
+    STALE_ROUND_REVISION = "stale_round_revision"
+    UNKNOWN_PARTY_EXIT_OPERATION = "unknown_party_exit_operation"
+    INVALID_CONFIRMATION_TOKEN = "invalid_confirmation_token"
+    PARTY_EXIT_UNAVAILABLE = "party_exit_unavailable"
+    PERSONAL_FLEE_FORBIDDEN = "personal_flee_forbidden"

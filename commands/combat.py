@@ -3,11 +3,15 @@
 from commands.command import Command
 
 from world.rules.combat_session import (
+    PARTY_EXIT_SURRENDER,
     CombatSessionError,
     SessionReason,
+    confirm_party_exit,
     engage,
-    forfeit,
     is_in_active_session,
+    party_exit_operation_of_token,
+    read_session,
+    request_party_exit,
 )
 from world.rules.combat_view import (
     CombatViewError,
@@ -21,7 +25,10 @@ from world.rules.guild_exam_request import (
 )
 from world.rules.guild_exams import GuildExamError
 from world.rules.event_log import render_plain_text
-from world.rules.player_messages import session_reason_message
+from world.rules.player_messages import (
+    party_exit_prompt_lines,
+    session_reason_message,
+)
 from world.rules.service_messages import (
     exam_schedule_message,
     exam_started_message,
@@ -64,23 +71,101 @@ class CmdEngage(Command):
 
 
 class CmdCombatForfeit(Command):
-    """Forfeit the active combat session."""
+    """Ask for, or explicitly confirm, the party's surrender.
+
+    A bare invocation only returns the party-scoped consequence prompt: it
+    states the party scope, the consequences, the session/round the
+    confirmation binds to, and the exact confirmation syntax with a
+    server-issued token. Nothing mutates until the token is confirmed, and any
+    other input simply cancels by doing nothing.
+    """
 
     key = "combat forfeit"
     aliases = ("combat 投降", "投降")
 
-    def func(self) -> None:
+    def _current_session(self):
+        """Return the caller's parsed session record, or ``None`` with a message."""
         try:
-            result = forfeit(self.caller)
+            record = read_session(self.caller)
+        except CombatSessionError as error:
+            self.caller.msg(session_reason_message(str(error.args[0])))
+            return None
+        if record is None:
+            self.caller.msg(session_reason_message(str(SessionReason.NO_ACTIVE_SESSION)))
+            return None
+        return record
+
+    def func(self) -> None:
+        args = self.args.strip()
+        if args.partition(" ")[0] == "confirm":
+            self._confirm(args.partition(" ")[2].strip())
+            return
+        if args:
+            self.caller.msg(
+                f"用法：{self.key}（取得整隊確認提示）、"
+                f"{self.key} confirm <token>（確認）"
+            )
+            return
+        self._request()
+
+    def _request(self) -> None:
+        """Return the party-scope confirmation prompt without mutating anything."""
+        record = self._current_session()
+        if record is None:
+            return
+        try:
+            prompt = request_party_exit(
+                self.caller,
+                record.session_id,
+                record.round_revision,
+                PARTY_EXIT_SURRENDER,
+            )
         except CombatSessionError as error:
             self.caller.msg(session_reason_message(str(error.args[0])))
             return
-        self.caller.msg(
-            {
-                "defeat": "你投降了，戰鬥以失敗告終。",
-                "exam_failed": "你放棄了考核。",
-            }.get(result["outcome"], "戰鬥結束。")
-        )
+        for line in party_exit_prompt_lines(
+            prompt["operation"],
+            scope_count=len(prompt["party_scope"]),
+            session_id=prompt["session_id"],
+            round_number=record.rounds_elapsed + 1,
+            confirmation_token=prompt["confirmation_token"],
+            confirm_command=self.key,
+        ):
+            self.caller.msg(line)
+
+    def _confirm(self, confirmation_token: str) -> None:
+        """Execute the exit one token binds, or report why it cannot."""
+        if not confirmation_token:
+            self.caller.msg(
+                f"用法：{self.key} confirm <token>（請先輸入「{self.key}」取得確認提示）"
+            )
+            return
+        operation = party_exit_operation_of_token(confirmation_token)
+        record = self._current_session()
+        if record is None:
+            return
+        if operation is None:
+            self.caller.msg(
+                session_reason_message(str(SessionReason.INVALID_CONFIRMATION_TOKEN))
+            )
+            return
+        try:
+            result = confirm_party_exit(
+                self.caller,
+                record.session_id,
+                record.round_revision,
+                operation,
+                confirmation_token,
+            )
+        except CombatSessionError as error:
+            self.caller.msg(session_reason_message(str(error.args[0])))
+            return
+        from world.rules.combat_result import settle_to_messages
+
+        lines, message = settle_to_messages(result)
+        for line in lines:
+            self.caller.msg(line)
+        self.caller.msg(message)
 
 
 class CmdCombatActions(Command):
