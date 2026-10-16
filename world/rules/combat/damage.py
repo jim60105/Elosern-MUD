@@ -239,7 +239,9 @@ def _handle_damage(
 
         for _ in range(total_strikes):
             raw_roll = roll_d100()
-            hit, margin = _to_hit(actor, target, raw_roll, defender_dodging)
+            hit, margin = _to_hit(
+                actor, target, raw_roll, defender_dodging=defender_dodging
+            )
             hit_evidence_items = (DamageHitEvidence(target=target, hit=hit),)
             amount = 0
             if hit:
