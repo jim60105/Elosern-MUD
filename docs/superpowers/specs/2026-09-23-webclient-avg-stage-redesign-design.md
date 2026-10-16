@@ -141,8 +141,8 @@ away in a drawer, never permanently on screen.
 | Player standing portrait (`actor-left`) | ✓ | ✓ (dimmed when not speaking) | ✓ | — |
 | Opposite portrait (`actor-right`) | — | dialogue host | foes | — |
 | Party mini-portraits | only when party size > 0 | only when party size > 0 | ✓ | — |
-| Message window | 2/3 width | full width, with name plate | 2/3 width | — |
-| Command panel | scene overview | collapsed | combat choice tree | full band |
+| Message window | 2/3 width | full width, with name plate | full width | — |
+| Command panel | scene overview | collapsed | collapsed: the combat choice tree is a narrow card at the stage's dead centre (`choices` anchor) | full band |
 | Dialogue choices | — | centred over the stage | — | — |
 | Command line | collapsed; expands on `/` or ⌨ | same | same | closed |
 
@@ -209,8 +209,11 @@ changes as part of this presentation contract.
   status island and the party strip), `map` (top-right: minimap, one-line
   objective, the combat participant frame, the title ballot), `band-message`
   and `band-command` (the band), `actor-left` and `actor-right` (portraits,
-  above the backdrop and below the band), `choices` (dialogue only, centred),
-  and `command-line`. The old `hud-left` / `hud-right` / `feed` / `dock` /
+  above the backdrop and below the band), `choices` (centred: the dialogue
+  list, an exploration card, or in combat the command card — the same
+  `#action-dock` moved out of `band-command` into a 264px·S card at the
+  stage's dead centre, `webclient-combat-command-card-centred`), and
+  `command-line`. The old `hud-left` / `hud-right` / `feed` / `dock` /
   `objectives` anchors are gone.
 - Proportional chrome (A19, `webclient-proportional-ui-scale`): one factor
   `S = clamp(1, min(viewport height / 1080, viewport width / 1920), 1.4)`,
@@ -266,7 +269,7 @@ changes as part of this presentation contract.
 | `SceneOverview`, `DockVerbPopover` (new) | The exploration root of the command panel (§7). |
 | `DockTabBar` | Deleted (A9, `webclient-combat-command-window`): the combat root renders through `DockMenu`'s vertical `commands` form. |
 | `DialogueChoices` (new) | The centred dialogue choice list (§8.2). |
-| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
+| `ActionDock` + `DockMenu` | Hosted in `band-command` at fixed size with internal scroll; in combat the same element moves into the `choices` anchor as the narrow centred command card (rows over a three-line detail strip, `webclient-combat-command-card-centred`); `ActionDock` owns one legend strip and the combat playback cue; `DockMenu` renders every frame's rows, including the combat command window (§7). |
 | `CommandLine` | Collapsible (§5.5). |
 | `DrawerHeader` (new, A10 `webclient-drawer-frame-unification`) | The one presentational header of every reference drawer, utility overlay, gallery editor and (A15) the full log: registry glyph (the same key the opening navigation control draws), serif title, subtitle, one 36px close control; emits `close` only, so `HudDrawer` and `OverlayHost` keep their own focus traps and Escape handling. |
 | `EmptyState` (new, A11 `webclient-drawer-content-polish`) | The one presentational body of an available but empty drawer list (quest book, codex, bag items, party): decorative registry glyph, headline, one guidance line in a solid ink frame; no control of its own. An unavailable panel keeps its registry reason instead. |

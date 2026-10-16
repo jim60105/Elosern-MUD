@@ -139,7 +139,7 @@ file.
 
 ## 5. Documentation (≈0.25 h)
 
-- [ ] 5.1 Amend `web/webclient-app/AGENTS.md` "Layout" (bottom band = message window 2/3 + command panel 1/3
+- [x] 5.1 Amend `web/webclient-app/AGENTS.md` "Layout" (bottom band = message window 2/3 + command panel 1/3
   outside combat; in combat the command menu is a narrow card at the stage's dead centre in the `choices` anchor
   and the message window spans the band) and the combat lines of
   `docs/superpowers/specs/2026-09-23-webclient-avg-stage-redesign-design.md` (surface table "Command panel" combat
