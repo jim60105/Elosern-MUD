@@ -88,6 +88,7 @@ from world.skills.effects import (
     SelfHealEffect,
     SexualCounterEffect,
 )
+from world.skills.effects.polarity import skill_target_polarity
 from world.skills.registry import FactionConstraint, SkillDef, SkillKind, TargetSpec
 from world.skills.sexual_acts import SEXUAL_ACT_REGISTRY
 
@@ -466,6 +467,47 @@ def enumerate_candidates(
         """Charge one examination slot, unless the plan was already examined."""
         return _proposal_key(proposal) in ledger or budget_state.take()
 
+    battlefield = getattr(context, "battlefield", None)
+    taunter = (
+        None if battlefield is None else battlefield.taunt_winner(str(actor.key))
+    )
+
+    def taunt_narrow(skill: SkillDef, base: tuple[Any, ...]) -> tuple[Any, ...]:
+        """Restrict one hostile single's ordinary target base to a legal winner.
+
+        An active Taunt winner (party-combat-taunt-constraints) constrains an
+        enemy single-target *hostile* action to itself, but only when it is
+        ordinarily legal for that action: the winner's own single-target plan
+        must pass the identical shared settlement gates every candidate passes.
+        A winner the mandatory single-target restrictions already excluded (the
+        seal narrowing, the displaced removal) is not in ``base`` and grants no
+        exception, so a seal or range rule that excludes the taunter stays
+        authoritative. Hostility is the authoritative typed-effect
+        classification (:func:`skill_target_polarity`), not a skill name or
+        school, so a non-damage hostile effect is constrained exactly as a
+        damage strike is. A narrowed plan is the same proposal the family ring
+        would examine, so the examination is shared and never paid twice; it is
+        still charged through ``admit`` exactly like the mandatory-filter
+        capability probe, so the examined set can never exceed the authored
+        budget. An unaffordable or gate-rejected winner leaves the ordinary
+        candidates in place.
+        """
+        if taunter is None or skill.target_spec is not TargetSpec.SINGLE:
+            return base
+        if not skill_target_polarity(skill)[0]:
+            return base
+        winner_identity = stable_identity(taunter)
+        if not any(
+            stable_identity(entity) == winner_identity for entity in base
+        ):
+            return base
+        proposal = _single_proposal(
+            skill, taunter, actor, context, reader, magnitude
+        )
+        if not admit(proposal) or not isinstance(outcome(proposal), Candidate):
+            return base
+        return (taunter,)
+
     # Only a hostile single-target *damage* skill can satisfy the alternative
     # attack the displacement rule asks about: a support single is not an
     # attack at all, and probing one against the hostile domain would both
@@ -516,6 +558,7 @@ def enumerate_candidates(
             sealed,
             displaced,
             alternative,
+            taunt_narrow,
         )
         for proposal in proposals:
             families.setdefault(proposal.family, []).append(proposal)
@@ -586,8 +629,17 @@ def _skill_proposals(
     sealed: tuple[Any, ...],
     displaced: frozenset[str],
     alternative: bool,
+    narrow: Callable[[SkillDef, tuple[Any, ...]], tuple[Any, ...]],
 ) -> list[_Proposal]:
-    """Return one skill's proposals for the decision's own target shapes."""
+    """Return one skill's proposals for the decision's own target shapes.
+
+    ``narrow`` is the decision's active-Taunt constraint
+    (:func:`enumerate_candidates.taunt_narrow`): it restricts a single-target
+    hostile action's ordinary base to a legal winner, or returns the base
+    unchanged. AREA, friendly and implicit shapes are never narrowed -- Taunt
+    affects only the single-target hostile action, never a group, a support
+    plan or the actor's own binding.
+    """
     if _is_actor_bound_only(skill):
         return [_implicit_proposal(skill, actor, context, reads, scale)]
     if skill.target_spec is TargetSpec.SINGLE:
@@ -602,6 +654,7 @@ def _skill_proposals(
             base = hostile
         else:
             base = _friendly_base(skill, actor, snapshot, pool)
+        base = narrow(skill, base)
         return [
             _single_proposal(skill, target, actor, context, reads, scale)
             for target in base

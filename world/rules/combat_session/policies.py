@@ -26,7 +26,13 @@ def _basic_attack_request(
     battlefield: Battlefield,
     record: CombatSessionRecord,
 ) -> ActionRequest | None:
-    """Return a deterministic ``basic_attack`` against the lowest-HP living enemy."""
+    """Return a deterministic ``basic_attack`` against the lowest-HP living enemy.
+
+    The post-first-action filler of :func:`_overwhelm_provider` only: an
+    interactive round resolves through :func:`_party_round_provider`, whose
+    enemy slots build their request in ``monster_behaviour_policy``, so this
+    helper never carries an active Taunt constraint. It reads no round context.
+    """
     from world.rules.buffs import has_positional_marker
 
     enemy_keys = next(

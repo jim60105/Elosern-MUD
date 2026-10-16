@@ -107,9 +107,17 @@ class RoundTactical:
     durable buff, and expires when the round ends. It is the one channel
     settlement's damage staging and the monster-AI estimator both read, so
     ``is_defending``/``is_dodging`` cannot disagree between them.
+
+    ``taunt_winners`` maps one taunted enemy's roster key to the roster key of
+    the taunter that won that enemy for this round (the first taunter of that
+    enemy in the round's own initiative sequence). One winner is stored per
+    enemy, so a losing declaration can never take over; a winner that later
+    becomes unable to act is revalidated live by
+    :meth:`Battlefield.taunt_winner` rather than promoted from a runner-up.
     """
 
     declarations: dict[str, str]
+    taunt_winners: dict[str, str] = field(default_factory=dict)
 
     def tactic_for(self, key: str) -> str | None:
         """Return the activated tactical verb for one roster key, or ``None``."""
@@ -122,6 +130,10 @@ class RoundTactical:
     def is_dodging(self, key: str) -> bool:
         """Return whether one roster key declared Dodge for the active round."""
         return self.declarations.get(key) == "dodge"
+
+    def taunter_for(self, enemy_key: str) -> str | None:
+        """Return the winning taunter's roster key for one enemy, or ``None``."""
+        return self.taunt_winners.get(enemy_key)
 
 
 @dataclass
@@ -170,6 +182,42 @@ class Battlefield:
     def is_knocked_out(self, key: str) -> bool:
         """Whether one roster key is marked knocked out on the battlefield."""
         return key in self.knocked_out
+
+    def is_eligible(self, key: str) -> bool:
+        """Whether one roster key is still a capable combatant this round.
+
+        The single capability predicate initiative filtering, Taunt winner
+        revalidation and session preflight all read, so a change to what
+        "unable to act" means can never drift between them: the key is on the
+        roster, has not fled, is not marked knocked out, and has stored HP
+        above zero.
+        """
+        if key not in self.roster:
+            return False
+        return (
+            key not in self.fled
+            and not self.is_knocked_out(key)
+            and _stored_hp(self.roster[key]) > 0
+        )
+
+    def taunt_winner(self, enemy_key: str) -> Any | None:
+        """Return the active Taunt winner entity for one enemy, or ``None``.
+
+        The winner was recorded on the round context at round start (the first
+        taunter of that enemy in the round's own initiative sequence). It is
+        revalidated live on every call: a winner no longer able to act --
+        knocked out, defeated, fled, or absent from the roster -- has no active
+        taunt, so the enemy is unrestricted for the remainder of the round and
+        no losing taunter takes over. There is no taunt outside a round
+        context, so ``None`` (every unrouted arena round) leaves selection
+        byte-identical to the pre-taunt behaviour.
+        """
+        if self.tactical is None:
+            return None
+        winner_key = self.tactical.taunter_for(enemy_key)
+        if winner_key is None or not self.is_eligible(winner_key):
+            return None
+        return self.roster[winner_key]
 
 
 class BattlefieldActionContext:
@@ -285,9 +333,7 @@ def roll_initiative(battlefield: Battlefield) -> list[str]:
     scores = {
         key: entity.skills.effective_value("agility") * weight + roll_d100()
         for key, entity in battlefield.roster.items()
-        if key not in battlefield.fled
-        and not battlefield.is_knocked_out(key)
-        and _stored_hp(entity) > 0
+        if battlefield.is_eligible(key)
     }
     return sorted(scores, key=lambda key: (-scores[key], key))
 

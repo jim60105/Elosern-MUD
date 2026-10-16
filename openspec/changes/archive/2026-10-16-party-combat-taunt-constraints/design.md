@@ -14,6 +14,47 @@ This slice owns initiative-priority taunt and legal enemy decision constraints, 
 
 Reuse the typed effect hostility classifier owned by active panel-v6, including non-damage hostile effects; do not infer hostility from skill names or physical/magic school. A Taunt request picks one living eligible enemy and no success roll. Rank accepted taunts with the already-computed initiative sequence. Store one winner per enemy for this round; no runner-up promotion. Determine ordinary legal target candidates first, including presence/range/faction, seal and displacement restrictions; when the winner is legal for this single-target hostile action restrict candidates to that identity. A seal or range rule that excludes the taunter stays authoritative; Taunt grants no exception. Apply the same constrained candidates to fallback/profile and utility/rollout estimation plus final execution revalidation, never silently rewrite a resolved target. AREA, self/allied benefits and flee remain legal ordinary alternatives. Recheck winner presence/eligibility before each later enemy decision; if down/dead/absent/fled, remove restriction permanently for that round. Losing taunts remain spent actions. Enemies gain no basic Taunt.
 
+### Applied precedence and classifier ownership
+
+Recorded at apply time, so a later reader does not have to re-derive it.
+
+- **Winner ranking order.** ``run_round`` owns the round's single
+  ``roll_initiative`` draw and hands the resulting sequence (with the
+  ``first_actor`` opening reorder already applied) to ``_resolve_round``. One
+  winner per enemy is the first taunter in that sequence; the per-slot
+  ``round_order`` fold that runs afterwards never re-ranks Taunt. Declaration
+  entry order, confirmation order and a losing declaration's later position
+  have no influence, and no second roll exists to be affected.
+- **Precedence (most authoritative first).** (1) The mandatory single-target
+  restrictions: the ``lamb_seal`` narrowing to its canonical first bearer and
+  the displaced-target removal for a strike-class basis; (2) the action's own
+  shared settlement gates for the winner's plan; (3) the Taunt narrowing to
+  the winner's identity. A winner excluded at (1) or rejected at (2) grants no
+  exception and the ordinary candidates stand, so the enemy never loses a
+  legal action to a plan only the winner could submit. The Monster legacy body
+  keeps the seal *preference* it already had and narrows only from its own
+  candidate list (the seal preference and the positional-marker filter, which
+  is exactly the legality that body already models), and only when the winner
+  is that preference's own selected bearer; it does not add a shared-gate
+  probe it never had. The utility producer additionally requires the winner's
+  plan to pass the shared settlement gates, and the delegated
+  ``default_attack_policy`` narrows from its own strike candidates the same
+  way. Neither invents legality: a winner the ordinary restriction or the
+  shared gates exclude is never forced, and a narrowed target rejected at
+  settlement still loses the action without any redirect.
+- **Classifier ownership.** ``world.skills.effects.polarity.skill_target_polarity``
+  (owned by ``webclient-combat-panel-v6``) is the authoritative typed-effect
+  hostility classifier and the only one Taunt reads: the constraint applies to
+  a SINGLE-target action whose chosen-target effects are hostile under it,
+  which covers a non-damage hostile effect exactly as it covers a damage
+  strike. ``monster_ai.candidates`` keeps its own ``_hostile_intent`` for the
+  *target domain* a single-target skill presents (an existing contract of the
+  candidate producer, unchanged by this slice); the two agree across the
+  supported-effect population, and where they diverge the divergence is in the
+  safe direction (a plan the domain classifier would aim at the hostile side
+  but the typed classifier does not read hostile is only ever left
+  unconstrained, never wrongly constrained).
+
 ## Risks / Trade-offs
 
 - [Shared integration seams] -> Respect direct prerequisites and the complete conflict matrix, preserving earlier delta additions. No obsolete adapter or duplicate formula remains after the coordinated cutover.

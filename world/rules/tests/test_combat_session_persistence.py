@@ -177,6 +177,7 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         from world.rules.combat_session.rounds import (
             _draft_requests,
             _draft_tactical_declarations,
+            _draft_taunt_declarations,
         )
 
         self._waiting_companion()
@@ -205,8 +206,9 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
             {str(self.player.key): "defend"},
         )
 
-        # A taunt entry (owned by the later taunt change) still fails loudly
-        # rather than silently consuming the actor's action.
+        # A taunt entry is a round-start declaration too: the declaring actor
+        # consumes its action (no ordinary request) and the declaration is
+        # projected for activation by run_round.
         taunt_record = replace(
             record,
             draft_entries={
@@ -216,8 +218,12 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
                 }
             },
         )
-        with self.assertRaises(ValueError):
-            _draft_requests(taunt_record, battlefield)
+        self.assertNotIn(self.player.pk, _draft_requests(taunt_record, battlefield))
+        self.assertEqual(
+            _draft_taunt_declarations(taunt_record, battlefield),
+            {str(self.player.key): str(self.monster.key)},
+        )
+        self.assertEqual(_draft_tactical_declarations(taunt_record, battlefield), {})
 
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")

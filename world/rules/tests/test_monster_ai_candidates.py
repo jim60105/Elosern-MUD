@@ -43,7 +43,7 @@ from world.rules.action import (
     plan_effect_audiences,
 )
 from world.rules.buffs import BUFF_DEFINITIONS, apply_buff
-from world.rules.combat import Battlefield, BattlefieldActionContext
+from world.rules.combat import Battlefield, BattlefieldActionContext, RoundTactical
 from world.rules.combat_modifiers import evaluate_combat_modifiers_no_create
 from world.rules.combat_session import engage, read_session, reconstruct_battlefield
 from world.rules.monster_ai import (
@@ -214,6 +214,22 @@ DISPLACER = next(
     for key, definition in BUFF_DEFINITIONS.items()
     if definition.marker == "positional"
 )
+#: A live debuff-polarity buff key, resolved from the live rulebook by
+#: predicate (never a shipped literal; same precedent as DISPLACER above).
+DEBUFF_KEY = next(
+    key
+    for key, definition in BUFF_DEFINITIONS.items()
+    if definition.polarity == "debuff"
+)
+#: A non-damage hostile SINGLE skill: it mounts a debuff on its chosen target,
+#: so the authoritative typed-effect classification reads it hostile exactly as
+#: a damage strike is.
+SINGLE_DEBUFF = synth_damage_skill(
+    "t_cand_single_debuff",
+    "候選單體弱化",
+    effects=[f"buff_apply:{DEBUFF_KEY}"],
+    cost={"mp": 2},
+)
 
 
 def _candidate_rows() -> dict[str, object]:
@@ -237,6 +253,7 @@ def _candidate_rows() -> dict[str, object]:
             RESISTIBLE,
             CATALOG_RESISTIBLE,
             SCOPED,
+            SINGLE_DEBUFF,
         )
     }
 
@@ -1204,6 +1221,175 @@ class CandidateRestrictionTests(EvenniaTestCase):
         return int(
             ObjectDB.objects.get(id=entity.pk)
             .attributes.get("traits", default={}, category="traits")["hp"]["current"]
+        )
+
+
+class TauntConstraintTests(EvenniaTestCase):
+    """An active Taunt winner narrows hostile single-target candidates.
+
+    The winner is recorded on the round context at round start; candidate
+    generation reads it and constrains every enemy single-target *hostile*
+    action to the winner when it is ordinarily legal, leaving the mandatory
+    restrictions, the other target shapes and a suppressed winner's ordinary
+    candidates untouched.
+    """
+
+    def setUp(self):
+        _scope(self)
+        _suppress_innate_skills(self)
+        super().setUp()
+        self.room = create_object(Room, key="taunt arena")
+        self.monster = _monster("t_cand_taunted")
+        self.monster.location = self.room
+        self.monster.traits.mp.base = 60
+        self.monster.traits.mp.current = 60
+
+    def _participant(self, key, hp=100):
+        entity = _player(key)
+        entity.location = self.room
+        entity.traits.hp.base = hp
+        entity.traits.hp.current = hp
+        return entity
+
+    def _field(self, *opponents):
+        roster = {str(self.monster.key): self.monster}
+        for entity in opponents:
+            roster[str(entity.key)] = entity
+        return Battlefield(
+            {
+                "monsters": frozenset({str(self.monster.key)}),
+                "party": frozenset(str(entity.key) for entity in opponents),
+            },
+            roster,
+        )
+
+    def _taunted(self, field, winner):
+        """Record one active Taunt winner for the acting monster this round."""
+        field.tactical = RoundTactical(
+            {}, {str(self.monster.key): str(winner.key)}
+        )
+        return field
+
+    def _enumerate(self, opponents, field, **kwargs):
+        context = BattlefieldActionContext(field)
+        reads = DecisionReads()
+        snapshot = build_decision_snapshot(
+            self.monster,
+            context,
+            scope=DecisionScope(SCOPE, ROUND, 0),
+            participants=tuple(opponents),
+            reads=reads,
+        )
+        return enumerate_candidates(
+            snapshot,
+            actor=self.monster,
+            context=context,
+            roster=roster_index((self.monster, *opponents)),
+            reads=reads,
+            **kwargs,
+        )
+
+    def _own(self, *keys):
+        self.monster.db.skills = {"active": list(keys), "passive": []}
+
+    def test_the_winner_examination_is_charged_to_the_candidate_budget(self):
+        self._own(MAGIC.key, STRIKE.key)
+        taunter = self._participant("t_cand_taunter")
+        other = self._participant("t_cand_other")
+        field = self._taunted(self._field(taunter, other), taunter)
+        result = self._enumerate((taunter, other), field, budget=1)
+        # The narrowing's gate probe is charged exactly like any other
+        # examination, so the bound still holds with an active taunt.
+        self.assertLessEqual(result.examined, 1)
+
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
+    def test_an_active_winner_narrows_a_hostile_damage_single_to_itself(self):
+        self._own(MAGIC.key)
+        taunter = self._participant("t_cand_taunter")
+        other = self._participant("t_cand_other")
+        field = self._taunted(self._field(taunter, other), taunter)
+        result = self._enumerate((taunter, other), field)
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(taunter),)],
+        )
+
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
+    def test_a_non_damage_hostile_single_is_constrained_too(self):
+        self._own(SINGLE_DEBUFF.key)
+        taunter = self._participant("t_cand_taunter")
+        other = self._participant("t_cand_other")
+        field = self._taunted(self._field(taunter, other), taunter)
+        result = self._enumerate((taunter, other), field)
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(taunter),)],
+        )
+
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
+    def test_a_suppressed_winner_is_removed_without_promoting_a_loser(self):
+        self._own(MAGIC.key)
+        winner = self._participant("t_cand_winner")
+        loser = self._participant("t_cand_loser")
+        other = self._participant("t_cand_other")
+        field = self._taunted(self._field(winner, loser, other), winner)
+        self.assertEqual(
+            [
+                plan.target_ids
+                for plan in self._enumerate((winner, loser, other), field).plans
+            ],
+            [(stable_identity(winner),)],
+        )
+        # The winner is knocked out before the enemy's decision: the ordinary
+        # legal candidates return and no losing declaration takes over.
+        field.knocked_out.add(str(winner.key))
+        self.assertEqual(
+            _targets_by_skill(self._enumerate((winner, loser, other), field))[
+                MAGIC.key
+            ],
+            {stable_identity(loser), stable_identity(other)},
+        )
+
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
+    def test_a_mandatory_seal_exclusion_grants_no_exception(self):
+        self._own(STRIKE.key)
+        taunter = self._participant("t_cand_taunter")
+        bearer = self._participant("t_cand_bearer")
+        apply_buff(bearer, SEAL_BUFF_KEY)
+        field = self._taunted(self._field(taunter, bearer), taunter)
+        result = self._enumerate((taunter, bearer), field)
+        # The seal narrows the strike to its bearer, so the taunter is excluded
+        # and the authoritative restriction stands.
+        self.assertEqual(
+            [plan.target_ids for plan in result.plans],
+            [(stable_identity(bearer),)],
+        )
+
+    @covers_requirement(
+        "monster-ai-legal-candidates::taunt-constrains-legal-single-hostile-target-generation-before-estimation"
+    )
+    def test_a_winner_that_fails_the_shared_gates_grants_no_narrowing(self):
+        self._own(GUARDED.key)
+        winner = self._participant("t_cand_winner")
+        sealed = self._participant("t_cand_sealed")
+        apply_buff(sealed, SEAL_BUFF_KEY)
+        field = self._taunted(self._field(winner, sealed), winner)
+        # The winner fails the action's own per-target gate, so it is not legal
+        # for it: the gate-passing peer stays available rather than the enemy
+        # losing the action to a plan only the winner could submit.
+        self.assertEqual(
+            _targets_by_skill(self._enumerate((winner, sealed), field))[
+                GUARDED.key
+            ],
+            {stable_identity(sealed)},
         )
 
 
