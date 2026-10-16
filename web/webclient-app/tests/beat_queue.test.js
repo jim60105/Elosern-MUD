@@ -182,6 +182,26 @@ describe("planRound (design D3)", () => {
     expect(planRound({ panel: null, roster: [], statusHp: null, playerKey: null, level: "full", startSeq: 1, terminal: false })).toBeNull();
   });
 
+  // webclient-combat-defeated-foes (design D4/D5): the round stands every
+  // pre-round foe that has not fled — a fallen one in its look — and maps
+  // each beat key to its participant, so a defeat beat fells that figure and
+  // keeps it on the stage.
+  it("stands every pre-round foe that has not fled, and records who already lies fallen", () => {
+    const roster = [
+      ...ROSTER,
+      { ...ROSTER[0], identity: 4, token: "e2", portrait_ref: "4", state: "knocked_out", hp_current: 0 },
+      { ...ROSTER[0], identity: 5, token: "e3", portrait_ref: "5", state: "fled" },
+      { ...ROSTER[1], identity: 43, token: "a2", portrait_ref: null, state: "knocked_out", hp_current: 0 },
+    ];
+    const planned = plan(undefined, { roster });
+    expect(planned.foes.map((row) => row.identity)).toEqual([3, 4]);
+    expect(planned.fallenAtStart).toEqual({ 4: "defeated", 43: "down" });
+    expect(planned.keyIdentity["3"]).toEqual({ identity: "3", team: "foes" });
+    expect(planned.keyIdentity["42"]).toEqual({ identity: "42", team: "party" });
+    // A participant with no beat key is never a beat's target.
+    expect(Object.values(planned.keyIdentity).map((who) => who.identity)).not.toContain("43");
+  });
+
   it("keeps the plan pure: repeated calls agree", () => {
     expect(plan()).toEqual(plan());
   });

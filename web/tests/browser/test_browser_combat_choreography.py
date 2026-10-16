@@ -153,11 +153,16 @@ _PLAY_ROUND = """async ([env, kind, lines]) => {
 _GESTURE_OF = """(sel) => {
   const actor = document.querySelector(sel);
   if (!actor) return null;
-  const beat = actor.querySelector(':scope > .stage-actor__beat');
+  const fall = actor.querySelector(':scope > .stage-actor__fall');
+  const beat = actor.querySelector(':scope > .stage-actor__fall > .stage-actor__beat');
   const float = actor.querySelector(':scope > .stage-actor__float');
   const cs = beat ? getComputedStyle(beat) : null;
   const fs = float ? getComputedStyle(float) : null;
+  const fc = fall ? getComputedStyle(fall) : null;
   return {
+    fallen: fall ? fall.getAttribute('data-fallen') : null,
+    fallDuration: fc ? fc.transitionDuration : null,
+    seal: !!actor.querySelector(':scope > [data-testid="stage-actor-seal"]'),
     beat: beat ? beat.getAttribute('data-beat') : null,
     name: cs ? cs.animationName : null,
     duration: cs ? cs.animationDuration : null,
@@ -334,10 +339,10 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(hit["float"]["name"], "elosern-beat-float")
         self.assertEqual(hit["float"]["duration"], "0.6s")
         self.assertEqual(hit["float"]["hidden"], "true")
-        # The foe's gauge follows the displayed value (18 of 30).
+        # The foe's plate stroke follows the displayed value (18 of 30).
         width = page.evaluate(
-            "(ref) => document.querySelector(`[data-testid=\"foe-slot\"][data-portrait-ref=\"${ref}\"]"
-            " .foe-lineup__fill`).style.width",
+            "(ref) => document.querySelector(`[data-anchor=\"plates\"] [data-testid=\"figure-plate\"][data-identity=\"${ref}\"]"
+            " .figure-plate__fill`).style.width",
             FOE_A,
         )
         self.assertEqual(width, "60%")
@@ -359,7 +364,9 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
     )
     def test_beat_gestures_reduced(self):
         """At `reduced` nothing steps, shakes, or brightens, no number shows,
-        and a defeated foe only fades within 150ms on its own beat."""
+        and a defeated foe takes its defeated look on its own beat without
+        travel, its tone fading within 150ms, and keeps its slot
+        (webclient-combat-defeated-foes)."""
         page = self._page("reduced")
         self._enter_combat(page, [_foe(FOE_A, 30), _foe(FOE_B, 30)])
         self._play(
@@ -380,19 +387,22 @@ class CombatChoreographyBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(hit["duration"], "0s")
         self.assertIsNotNone(hit["float"], hit)
         self.assertEqual(hit["float"]["opacity"], 0.0, "no number shows at reduced")
-        # The committed roster already lost the foe; it still stands until its
-        # own defeat beat, which only fades it.
+        # The committed roster already has the foe defeated; it stands in its
+        # pre-round look until its own defeat beat, which lays it down without
+        # travel: the pose takes no time, the tone fades within 150ms.
+        self.assertIsNone(hit["fallen"], "the foe stands until its defeat beat")
         defeat = self._wait_gesture(page, _foe_actor(FOE_A), "defeat")
-        self.assertEqual(defeat["name"], "elosern-beat-defeat")
-        self.assertEqual(defeat["duration"], "0.15s")
+        self.assertEqual(defeat["fallen"], "defeated")
+        self.assertEqual(defeat["fallDuration"], "0s, 0.15s, 0.15s")
         self.assertIn(defeat["transform"], ("none", "matrix(1, 0, 0, 1, 0, 0)"))
-        # Once the round ends only the committed foe stands.
+        self.assertTrue(defeat["seal"])
+        # Once the round ends both foes keep their slots, the defeated one fallen.
         wait_for_store_state(page, lambda s: (s.get("beatPlayback") or {}).get("phase") == "done")
-        page.wait_for_function(
-            "(ref) => { const slots = [...document.querySelectorAll('[data-testid=\"foe-slot\"]')];"
-            " return slots.length === 1 && slots[0].getAttribute('data-portrait-ref') === ref; }",
-            arg=FOE_B,
+        looks = page.evaluate(
+            "() => [...document.querySelectorAll('[data-testid=\"foe-slot\"]')]"
+            ".map((s) => [s.getAttribute('data-portrait-ref'), s.getAttribute('data-fallen')])"
         )
+        self.assertEqual(looks, [[FOE_A, "defeated"], [FOE_B, None]])
 
     @covers_requirement(
         "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",

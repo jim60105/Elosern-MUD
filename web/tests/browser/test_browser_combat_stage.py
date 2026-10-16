@@ -23,6 +23,7 @@ from ._journey_support import (
     _interact_target,
     _participant,
 )
+from .test_browser_combat_choreography import _PLAY_ROUND, _SWALLOW_ACTIONS, _beat, _beats_panel
 from .test_browser_mode_transitions import _START_SCROLL_SAMPLER, _STOP_SCROLL_SAMPLER
 
 REFERENCE = (1451, 790)
@@ -42,7 +43,15 @@ _FOE_NAMES = (
 _COMPANION_NAMES = ("蕾娜", "幽", "艾德蒙", "雪莉")
 
 
-def _foes(count: int, defeated: tuple[int, ...] = (), names: tuple[str, ...] = _FOE_NAMES) -> list:
+def _foe_state(identity: int, defeated: tuple[int, ...], fled: tuple[int, ...]) -> str:
+    if identity in defeated:
+        return "defeated"
+    return "fled" if identity in fled else "active"
+
+
+def _foes(
+    count: int, defeated: tuple[int, ...] = (), names: tuple[str, ...] = _FOE_NAMES, fled: tuple[int, ...] = ()
+) -> list:
     """``count`` foes in presenter order, identities 11.., each with a catalog ref."""
     return [
         _participant(
@@ -50,7 +59,7 @@ def _foes(count: int, defeated: tuple[int, ...] = (), names: tuple[str, ...] = _
             "e%d" % (i + 1),
             names[i],
             "foes",
-            "defeated" if (11 + i) in defeated else "active",
+            _foe_state(11 + i, defeated, fled),
             0 if (11 + i) in defeated else 20 + 10 * (i % 5),
             60,
             str(11 + i),
@@ -80,17 +89,33 @@ def _party_panel(companions: int) -> dict:
     }
 
 
-def _combat_panels(count: int, defeated: tuple[int, ...] = (), companions: int = 0, names=_FOE_NAMES) -> dict:
+def _combat_panels(
+    count: int,
+    defeated: tuple[int, ...] = (),
+    companions: int = 0,
+    names=_FOE_NAMES,
+    fled: tuple[int, ...] = (),
+    downed: tuple[int, ...] = (),
+) -> dict:
     panel = _combat_panel()
     # The player alone from the shared fixture (its knocked-out ally is no
     # drawn figure), then the drawn companions: the session stays within its
     # 16-participant bound at the largest case.
     party = [p for p in panel["participants"] if p["team"] == "party" and p["state"] == "active"]
     party += [
-        _participant(101 + i, "a%d" % (i + 3), _COMPANION_NAMES[i], "party", "active", 90 + i, 120, None)
+        _participant(
+            101 + i,
+            "a%d" % (i + 3),
+            _COMPANION_NAMES[i],
+            "party",
+            "knocked_out" if (101 + i) in downed else "active",
+            0 if (101 + i) in downed else 90 + i,
+            120,
+            None,
+        )
         for i in range(companions)
     ]
-    panel["participants"] = party + _foes(count, defeated, names)
+    panel["participants"] = party + _foes(count, defeated, names, fled)
     # The shared skills target the fixture's own foe identities; this stage
     # needs no skill frame.
     panel["skills"] = []
@@ -168,6 +193,7 @@ _INSTALL_READER = """() => {
       party: [...document.querySelectorAll('[data-anchor="actor-left"] [data-testid="companion-figure"]')].map((slot) => ({
         identity: slot.getAttribute('data-identity'),
         controlled: slot.getAttribute('data-controlled') === 'true',
+        fallen: slot.getAttribute('data-fallen'),
         rank: slot.getAttribute('data-rank'),
         box: box(slot.querySelector('[data-testid="stage-actor"]')),
       })),
@@ -179,6 +205,8 @@ _INSTALL_READER = """() => {
           side: el.getAttribute('data-side'),
           form: el.getAttribute('data-form'),
           label: el.getAttribute('aria-label'),
+          fallen: el.getAttribute('data-fallen'),
+          fallenText: el.querySelector('[data-testid="figure-plate-fallen"]')?.textContent ?? null,
           token: el.querySelector('[data-testid="figure-plate-token"]')?.textContent ?? null,
         })),
       // Descendants in the tab order: the plates and their glyphs are
@@ -211,6 +239,8 @@ _INSTALL_READER = """() => {
           transform: getComputedStyle(slot).transform,
           duration: getComputedStyle(slot).transitionDuration,
           dimmed: slot.querySelector('[data-testid="stage-actor"]').getAttribute('data-speaking') !== 'true',
+          fallen: slot.getAttribute('data-fallen'),
+          seal: !!slot.querySelector('[data-testid="stage-actor-seal"]'),
           img: !!slot.querySelector('img'),
         })),
       })),
@@ -245,17 +275,17 @@ _LUNGE_PEAK = """() => {
     return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
   });
   for (const actor of actors) {
-    const beat = actor.querySelector(':scope > .stage-actor__beat');
+    const beat = actor.querySelector(':scope > .stage-actor__fall > .stage-actor__beat');
     beat.setAttribute('data-beat', 'lunge');
     beat.style.animationDelay = `-${step * 0.45}ms`;
     beat.style.animationPlayState = 'paused';
   }
   actors.forEach((actor, index) => {
-    const r = actor.querySelector(':scope > .stage-actor__beat').getBoundingClientRect();
+    const r = actor.querySelector(':scope > .stage-actor__fall > .stage-actor__beat').getBoundingClientRect();
     out.push({ side: actor.getAttribute('data-side'), left: r.left, right: r.right, rest: rest[index] });
   });
   for (const actor of actors) {
-    const beat = actor.querySelector(':scope > .stage-actor__beat');
+    const beat = actor.querySelector(':scope > .stage-actor__fall > .stage-actor__beat');
     beat.removeAttribute('data-beat');
     beat.style.animationDelay = '';
     beat.style.animationPlayState = '';
@@ -650,12 +680,120 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement(
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
+        "webclient-contextual-hud::combat-figures-carry-glance-plates",
+        "webclient-contextual-hud::combat-beats-are-choreographed-on-the-stage-at-the-motion-level",
+    )
+    def test_fallen_figures_keep_their_slot_and_read_as_fallen(self):
+        """webclient-combat-defeated-foes task 2.1: with three foes and a
+        knocked-out companion at `full`, a playing round defeats the middle
+        foe. It collapses in its slot on its defeat beat (its untransformed box
+        unchanged ±1px, the formation's scale unchanged), carries the seal and
+        a 已擊破 plate; the companion kneels with a 倒地 plate; at `reduced`
+        the fall wrapper's pose takes no transition time."""
+        page = self._page(REFERENCE, motion_level=None, companions=1)
+        self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), "full")
+        page.evaluate(_SWALLOW_ACTIONS)
+        self._commit(page, "combat", _combat_panels(3, companions=1, downed=(101,)))
+        self._wait(
+            page, "s.rows.length === 1 && !s.rows[0].entering && s.rows[0].opacity === 1 && s.plates.length === 4"
+        )
+        wait_for_store_state(page, lambda st: st["dispatch"]["inFlight"] is None and not st["dispatch"]["beatLocked"])
+        before = self._read(page)
+        heights = {round(box["height"]) for box in self._figures(before)}
+        self.assertEqual(len(heights), 1, heights)
+        self.assertEqual([x["fallen"] for x in before["rows"][0]["slots"]], [None, None, None])
+        companion = next(x for x in before["party"] if x["identity"] == "101")
+        self.assertEqual(companion["fallen"], "down")
+        ally_plate = next(p for p in before["plates"] if p["identity"] == "101")
+        self.assertEqual(ally_plate["fallen"], "down")
+        self.assertEqual(ally_plate["fallenText"], "▼倒地")
+        self.assertTrue(ally_plate["label"].endswith("倒地"), ally_plate["label"])
+
+        # The round: a hit, then the defeat of foe 12. The completing
+        # publication already commits it defeated; it falls on its own beat.
+        lines = ["勇者擊中了史萊姆，造成 30 點傷害。", "史萊姆倒下了。"]
+        panels = {
+            **_combat_panels(3, defeated=(12,), companions=1, downed=(101,)),
+            "combat_beats": _beats_panel(
+                "s-9/7",
+                [
+                    _beat(0, 0, "damage", "1", "12", 30, 0, lines[0]),
+                    _beat(1, 0, "target_defeated", "1", "12", text=lines[1]),
+                ],
+            ),
+        }
+        page.evaluate(
+            _PLAY_ROUND,
+            [snapshot_envelope("", 0, panels, mode="combat"), "ui_update", [*lines, "行動完成，繼續戰鬥。"]],
+        )
+        self.assertIsNone(self._read(page)["rows"][0]["slots"][1]["fallen"], "it stands until its beat")
+        # On its beat the collapse eases over the defeat token on the exit curve.
+        fall = '[data-testid="foe-slot"][data-portrait-ref="12"] [data-testid="stage-actor-fall"]'
+        page.wait_for_function(
+            "(sel) => document.querySelector(sel)?.getAttribute('data-fallen') === 'defeated'",
+            arg=fall,
+            timeout=15000,
+            polling="raf",
+        )
+        timing = page.evaluate(
+            "(sel) => { const cs = getComputedStyle(document.querySelector(sel));"
+            " return { property: cs.transitionProperty, duration: cs.transitionDuration,"
+            " easing: cs.transitionTimingFunction }; }",
+            fall,
+        )
+        self.assertEqual(timing["property"], "transform, filter, opacity")
+        self.assertEqual(timing["duration"], "0.35s, 0.35s, 0.35s")
+        self.assertIn("cubic-bezier(0.4, 0, 1, 1)", timing["easing"])
+        wait_for_store_state(page, lambda st: (st.get("beatPlayback") or {}).get("phase") == "done")
+        page.wait_for_function(
+            "(sel) => getComputedStyle(document.querySelector(sel)).opacity === '0.8'", arg=fall, timeout=5000
+        )
+
+        after = self._read(page)
+        slots = after["rows"][0]["slots"]
+        self.assertEqual([x["ref"] for x in slots], ["11", "12", "13"])
+        self.assertEqual([x["fallen"] for x in slots], [None, "defeated", None])
+        self.assertTrue(slots[1]["seal"])
+        self.assertFalse(slots[0]["seal"] or slots[2]["seal"])
+        for was, now in zip(before["rows"][0]["slots"], slots):
+            for edge in ("left", "top", "width", "height"):
+                self.assertAlmostEqual(was["box"][edge], now["box"][edge], delta=1, msg=edge)
+        self.assertEqual({round(box["height"]) for box in self._figures(after)}, heights)
+        # The collapsed figure stays inside its slot, its feet on the floor.
+        posed = page.evaluate(
+            "(sel) => { const r = document.querySelector(sel).getBoundingClientRect();"
+            " return { top: r.top, bottom: r.bottom, left: r.left, right: r.right }; }",
+            fall,
+        )
+        slot_box = slots[1]["box"]
+        self.assertAlmostEqual(posed["bottom"], slot_box["bottom"], delta=1)
+        self.assertAlmostEqual(posed["top"], slot_box["top"] + 0.2 * slot_box["height"], delta=1)
+        self.assertGreaterEqual(posed["left"], slot_box["left"] - 1)
+        self.assertLessEqual(posed["right"], slot_box["right"] + 1)
+        foe_plate = next(p for p in after["plates"] if p["identity"] == "12")
+        self.assertEqual(foe_plate["fallen"], "defeated")
+        self.assertEqual(foe_plate["fallenText"], "✕已擊破")
+        self.assertTrue(foe_plate["label"].endswith("已擊破"), foe_plate["label"])
+        self.assertEqual(next(x for x in after["party"] if x["identity"] == "101")["fallen"], "down")
+
+        # Reduced: the pose takes no time; only the tone fades, within 150ms.
+        page.evaluate("() => window.__elosernBridge.store.setMotionLevel('reduced')")
+        page.wait_for_function("() => document.documentElement.dataset.motion === 'reduced'")
+        reduced = page.evaluate("(sel) => getComputedStyle(document.querySelector(sel)).transitionDuration", fall)
+        self.assertEqual(reduced, "0s, 0.15s, 0.15s")
+        page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::a-leaving-element-is-out-of-reach-while-it-animates-out",
     )
     def test_foes_enter_and_leave_full(self):
         """A live entry fades the row in over 350ms while its foes slide in; a
-        defeat leaves an inert slot while the other steps forward; leaving
-        combat fades an inert row; no stage ancestor ever scrolls sideways."""
+        flee leaves an inert slot while the other steps forward; leaving
+        combat fades an inert row; no stage ancestor ever scrolls sideways.
+
+        Migrated by webclient-combat-defeated-foes: a defeated foe now keeps its
+        slot, so the leaving foe flees."""
         page = self._page(REFERENCE, motion_level=None)
         self.assertEqual(page.evaluate("document.documentElement.dataset.motion"), "full")
 
@@ -671,13 +809,13 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         two_foe_edge = self._read(page)["captionRight"]
         self.assertNotEqual(two_foe_edge, "")
 
-        s = self._commit(page, "combat", _combat_panels(2, defeated=(11,)))
+        s = self._commit(page, "combat", _combat_panels(2, fled=(11,)))
         slots = s["rows"][0]["slots"]
         leaving = [x for x in slots if x["leaving"]]
         self.assertEqual(len(leaving), 1)
         self.assertEqual(leaving[0]["ref"], "11")
         self.assertTrue(leaving[0]["inert"])
-        # The caption keeps the two-foe room until the fallen foe has faded.
+        # The caption keeps the two-foe room until the fled foe has faded.
         self.assertEqual(s["captionRight"], two_foe_edge)
         self._wait(page, "s.rows[0].slots.length === 1")
         self._wait(page, f"s.captionRight !== '{two_foe_edge}'")
@@ -713,7 +851,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_foes_reduced_only_fade(self):
-        """At reduced the row fades within 150ms and nothing moves."""
+        """At reduced the row fades within 150ms and nothing moves (the leaving
+        foe flees: a defeated one keeps its slot, webclient-combat-defeated-foes)."""
         page = self._page(REFERENCE, motion_level="reduced")
         s = self._commit(page, "combat", _combat_panels(2))
         row = s["rows"][0]
@@ -722,7 +861,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             self.assertLessEqual(float(duration.rstrip("s")), 0.15)
         self.assertTrue(all(_identity(x["transform"]) for x in row["slots"]))
         self._wait(page, "s.rows.length === 1 && !s.rows[0].entering")
-        s = self._commit(page, "combat", _combat_panels(2, defeated=(11,)))
+        s = self._commit(page, "combat", _combat_panels(2, fled=(11,)))
         for slot in s["rows"][0]["slots"]:
             for duration in slot["duration"].split(", "):
                 self.assertLessEqual(float(duration.rstrip("s")), 0.15)
@@ -735,14 +874,20 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
 
     @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_foes_off_is_instant(self):
-        """At off the row and its foes are present or absent in the commit's frame."""
+        """At off the row and its foes are present or absent in the commit's
+        frame: a fled foe is gone and a defeated one lies fallen in its slot at
+        once (webclient-combat-defeated-foes)."""
         page = self._page(REFERENCE)
         s = self._commit(page, "combat", _combat_panels(2))
         self.assertEqual(len(s["rows"]), 1)
         self.assertFalse(s["rows"][0]["entering"])
         self.assertEqual(s["rows"][0]["opacity"], 1)
-        s = self._commit(page, "combat", _combat_panels(2, defeated=(11,)))
+        s = self._commit(page, "combat", _combat_panels(2, fled=(11,)))
         self.assertEqual([x["ref"] for x in s["rows"][0]["slots"]], ["12"])
+        s = self._commit(page, "combat", _combat_panels(2, defeated=(12,)))
+        self.assertEqual([x["ref"] for x in s["rows"][0]["slots"]], ["11", "12"])
+        self.assertEqual([x["fallen"] for x in s["rows"][0]["slots"]], [None, "defeated"])
+        self.assertTrue(s["rows"][0]["slots"][1]["seal"])
         s = self._commit(page, "exploration", _exploration_panels())
         self.assertEqual(s["rows"], [])
         page.close()
