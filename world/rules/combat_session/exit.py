@@ -245,6 +245,7 @@ class _ExitSnapshots:
     party: tuple[Any, Any, Any]
     exam_host: Any
     battlefield: Battlefield | None
+    skip_safety: tuple[tuple[str, Any], ...]
 
     def restore(self, actor: Any, action_context: Any) -> None:
         """Reinstate every snapshotted surface, in the round path's order."""
@@ -254,6 +255,17 @@ class _ExitSnapshots:
         _restore_round_touched(actor, self.touched, self.extra, *self.party)
         _restore_exam_host(self.exam_host)
         actor.ndb.action_context = action_context
+        if self.skip_safety:
+            # An unreconstructable battlefield has no roster to re-register
+            # from, so the registry entries themselves are restored: a
+            # rolled-back live session must keep blocking time skips.
+            from world.rules.skip_safety import _BATTLEFIELDS
+
+            for key, battlefield in self.skip_safety:
+                if battlefield is None:
+                    _BATTLEFIELDS.pop(key, None)
+                else:
+                    _BATTLEFIELDS[key] = battlefield
         if self.battlefield is not None:
             register_active_battlefield(self.battlefield)
 
@@ -265,22 +277,44 @@ def _snapshot_exit_surfaces(
 ) -> _ExitSnapshots:
     """Snapshot every in-process surface the exit unit may touch.
 
-    An unreconstructable battlefield cannot carry a roster, so the clock stage
-    registry is empty and only the actor's own surfaces are snapshotted — the
-    settlement then regenerates nothing but the actor, exactly as the direct
-    forfeit path does.
+    An unreconstructable battlefield cannot carry a roster, so the settlement
+    regenerates nothing but the actor (exactly as the direct forfeit path
+    does): the clock stage registry is built for the actor alone and the
+    skip-safety registry entries of the actor and the record's participants are
+    snapshotted directly, since there is no battlefield object to re-register
+    from.
     """
     from world.rules.action import _attribute_snapshot, _snapshot_touched
-    from world.rules.clock import _snapshot_clock_tick, read_world_clock
+    from world.rules.clock import (
+        AdvanceSource,
+        WorldClock,
+        _snapshot_clock_tick,
+        build_advance_snapshot_registry,
+        read_world_clock,
+    )
     from world.rules.combat_session.snapshot import _ROUND_ENTITY_SURFACES
+    from world.rules.combat_session.settlement import _ROUND_SECONDS
+    from world.rules.skip_safety import _BATTLEFIELDS
 
     if battlefield is None:
         clock = read_world_clock()
         clock_snapshot = (
             clock,
             _snapshot_clock_tick(clock) if clock is not None else None,
-            {},
-            (),
+            build_advance_snapshot_registry(
+                clock if clock is not None else WorldClock(),
+                record.rounds_elapsed * _ROUND_SECONDS,
+                AdvanceSource.COMBAT,
+                (commander,),
+            ),
+            (commander,),
+        )
+        participant_keys = (
+            str(commander.pk),
+            *(str(dbref) for dbref in (*record.player_ids, *record.enemy_ids)),
+        )
+        skip_safety = tuple(
+            (key, _BATTLEFIELDS.get(key)) for key in participant_keys
         )
         extra: dict[str, tuple[bool, Any]] = {
             "active_combat": _attribute_snapshot(commander, "active_combat"),
@@ -304,6 +338,7 @@ def _snapshot_exit_surfaces(
             party=([], {}, {}),
             exam_host=_snapshot_exam_host(record),
             battlefield=None,
+            skip_safety=skip_safety,
         )
     touched, extra = _snapshot_round_touched(commander, battlefield, record)
     return _ExitSnapshots(
@@ -313,6 +348,7 @@ def _snapshot_exit_surfaces(
         party=_snapshot_party_surfaces(commander, battlefield),
         exam_host=_snapshot_exam_host(record),
         battlefield=battlefield,
+        skip_safety=(),
     )
 
 
