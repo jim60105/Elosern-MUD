@@ -10,13 +10,14 @@ unconscious ally. Today a defeated foe fades out of the line-up.
 ## What Changes
 
 - **Defeated foe** (`knocked_out` or `defeated`): the figure keeps its formation slot and shows:
-  - a collapse (lowered 12% and compressed to 80% about its base; no rotation, so it stays in its slot);
+  - a collapse (compressed to 80% of its height about its base, so its head drops by a fifth while its feet stay
+    planted; no rotation, so it stays in its slot);
   - `grayscale(1)` brightness 0.45 at 0.8 opacity, silhouette intact;
   - a CSS/SVG **broken-seal** mark over the chest;
   - plate text `✕ 已擊破` with an empty dashed stroke;
   - accessible name ending in 已擊破.
 - **Downed ally** (`knocked_out` companion), the sibling treatment:
-  - a kneel (lowered 8%, compressed to 92%, no rotation);
+  - a kneel (compressed to 92% about its base, so its head drops by 8%; no rotation);
   - `grayscale(0.6)` brightness 0.7;
   - no seal;
   - plate text `▼ 倒地`.

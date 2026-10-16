@@ -12,7 +12,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { nextTick } from "vue";
 import FoeLineup from "../../components/FoeLineup.vue";
 import { fixtureDigest, artworkDescriptor, artworkResource } from "../../stories/fixtures/art_panels.js";
-import { FOE_STAGE_MAX, activeFoes, foeStageLimit } from "../../components/foe-lineup.js";
+import { FOE_STAGE_MAX, drawnFoes, fallenLook, foeStageLimit } from "../../components/foe-lineup.js";
 
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 
@@ -185,6 +185,38 @@ describe("FoeLineup", () => {
     expect(wrapper.emitted("select")).toBeUndefined();
   });
 
+  // webclient-combat-defeated-foes (design D1/D5): a knocked-out or
+  // defeated foe keeps its slot in its defeated look; the displayed map wins
+  // over a row's own state while a round plays.
+  describe("fallen foes", () => {
+    const slots = () => wrapper.findAll('[data-testid="foe-slot"]');
+
+    it("keeps knocked-out and defeated foes in their slots, collapsed, at the formation's boxes", () => {
+      const foes = [foe(1), foe(2, { state: "knocked_out" }), foe(3, { state: "defeated", hp_current: 0 })];
+      wrapper = mount(FoeLineup, { props: { foes, artPanel: ART, formation: formationSide(3) } });
+      expect(slots().map((s) => s.attributes("data-fallen") ?? null)).toEqual([null, "defeated", "defeated"]);
+      expect(slots().map((s) => s.element.style.left)).toEqual(["1200px", "1110px", "1020px"]);
+      expect(slots()[2].get('[data-testid="stage-actor"]').attributes("data-fallen")).toBe("defeated");
+      expect(slots()[2].find('[data-testid="stage-actor-seal"]').exists()).toBe(true);
+      expect(slots()[0].find('[data-testid="stage-actor-seal"]').exists()).toBe(false);
+    });
+
+    it("reads the displayed looks while a round plays, and lands them at once while hydrating", async () => {
+      const round = { key: "r:1", step: 1, foes: [foe(1), foe(2)], defeated: [], fallen: {}, gestures: {} };
+      wrapper = mount(FoeLineup, {
+        props: { foes: [foe(1, { state: "defeated" }), foe(2)], stage: round, fallen: {}, artPanel: ART },
+      });
+      // The committed roster already lost foe 1; it stands until its beat.
+      expect(slots()[0].attributes("data-fallen")).toBeUndefined();
+      await wrapper.setProps({ fallen: { 1: "defeated" } });
+      expect(slots()[0].attributes("data-fallen")).toBe("defeated");
+      const fall = slots()[0].get('[data-testid="stage-actor-fall"]');
+      expect(fall.attributes("data-fall-instant")).toBeUndefined();
+      await wrapper.setProps({ fallInstant: true });
+      expect(fall.attributes("data-fall-instant")).toBe("true");
+    });
+  });
+
   // webclient-combat-beat-choreography (design D5): while a round plays, the
   // row stands the round's pre-round foes and follows the displayed hit
   // points; each foe plays its own beat gesture.
@@ -201,7 +233,7 @@ describe("FoeLineup", () => {
       // The defeat beat plays on it while it still stands.
       await wrapper.setProps({ stage: stage([foe(1), foe(2)], { 1: { gesture: "defeat", amount: null } }) });
       expect(slots()[0].attributes("data-beat")).toBe("defeat");
-      expect(slots()[0].get('[data-testid="stage-actor"] > .stage-actor__beat').attributes("data-beat")).toBe(
+      expect(slots()[0].get('[data-testid="stage-actor"] > .stage-actor__fall > .stage-actor__beat').attributes("data-beat")).toBe(
         "defeat",
       );
       // The round ends: the committed foes take over.
@@ -377,7 +409,7 @@ describe("the line-up selection", () => {
     expect(foeStageLimit(0)).toBe(15);
   });
 
-  it("selects the active foes in presenter order", () => {
+  it("selects the foes that have not fled in presenter order: the fallen keep their slot", () => {
     const participants = [
       foe(1),
       { ...foe(2), team: "party" },
@@ -386,7 +418,16 @@ describe("the line-up selection", () => {
       foe(5, { state: "knocked_out" }),
       foe(6),
     ];
-    expect(activeFoes(participants).map((p) => p.identity)).toEqual([1, 6]);
-    expect(activeFoes(null)).toEqual([]);
+    expect(drawnFoes(participants).map((p) => p.identity)).toEqual([1, 3, 5, 6]);
+    expect(drawnFoes(null)).toEqual([]);
+  });
+
+  it("maps a participant's state to its fallen look", () => {
+    expect(fallenLook("foes", "knocked_out")).toBe("defeated");
+    expect(fallenLook("foes", "defeated")).toBe("defeated");
+    expect(fallenLook("party", "knocked_out")).toBe("down");
+    expect(fallenLook("foes", "active")).toBeNull();
+    expect(fallenLook("foes", "fled")).toBeNull();
+    expect(fallenLook("party", "active")).toBeNull();
   });
 });

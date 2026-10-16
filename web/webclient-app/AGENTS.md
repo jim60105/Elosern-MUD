@@ -13,9 +13,12 @@ prototypes; the real app differs too much for a prototype to be useful).
   enemies stand opposite in dialogue and combat.
 - In combat both sides stand in one shared-scale formation around a clear
   dead centre (`components/combat-formation.js`, applied by AppClient): the
-  party may leave its single row, every active foe stands, and each figure
-  but the controlled one carries a glance plate (`FigurePlate.vue`, the
-  stage's `plates` layer). The place card and the participant roster are not
+  party may leave its single row, every foe that has not fled stands, and
+  each figure but the controlled one carries a glance plate (`FigurePlate.vue`,
+  the stage's `plates` layer). A knocked-out or defeated foe keeps its slot
+  collapsed under a broken seal (`✕ 已擊破`) and a knocked-out ally kneels
+  (`▼ 倒地`); both differ from the listener dim by shape and text
+  (StageActor's `fallen`). The place card and the participant roster are not
   shown in combat; the controlled figure's values stay in the vitals dock.
 - Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
   condition; always shown in combat.

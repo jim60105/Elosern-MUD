@@ -170,7 +170,7 @@ describe("StageActor", () => {
 
   // webclient-combat-beat-choreography (design D4): the combat beat gestures.
   describe("beat gestures", () => {
-    const beat = () => wrapper.get('[data-testid="stage-actor"] > .stage-actor__beat');
+    const beat = () => wrapper.get('[data-testid="stage-actor"] > .stage-actor__fall > .stage-actor__beat');
 
     it("renders the rest state with no gesture", () => {
       wrapper = mount(StageActor, { props: { artwork: HOST_ENTRY, panel: PANEL, side: "right" } });

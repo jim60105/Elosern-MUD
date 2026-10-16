@@ -5,11 +5,11 @@ A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slo
 
 #### Scenario: A defeated foe has its own look
 - **WHEN** a foe is `knocked_out` or `defeated` at rest
-- **THEN** its figure is collapsed about its base (lowered by 12% and compressed to 80% of its height, never rotated, so its transformed box stays inside its slot), fully desaturated and darkened (`grayscale(1)`, brightness 0.45) at 0.8 opacity with its silhouette intact, a broken-seal mark (a seal ring split by a crack, drawn in CSS/SVG from the seal tokens, `aria-hidden`) stands over its chest, its plate's readout is replaced by `✕ 已擊破` with an empty dashed stroke, and its accessible name ends with 已擊破
+- **THEN** its figure is collapsed about its base (compressed to 80% of its height with its feet planted, so its head is lowered by 20% of its height, never rotated or translated, so its transformed box stays inside its slot), fully desaturated and darkened (`grayscale(1)`, brightness 0.45) at 0.8 opacity with its silhouette intact, a broken-seal mark (a seal ring split by a crack, drawn in CSS/SVG from the seal tokens, `aria-hidden`) stands over its chest, its plate's readout is replaced by `✕ 已擊破` with an empty dashed stroke, and its accessible name ends with 已擊破
 
 #### Scenario: An ally that is down has a sibling look
 - **WHEN** a companion is `knocked_out` at rest
-- **THEN** its figure kneels (lowered by 8% of its height and compressed to 92% of its height about its base, without rotation), half desaturated and dimmed (`grayscale(0.6)`, brightness 0.7) at full opacity, carries no seal mark, its plate's readout is replaced by `▼ 倒地` with an empty dashed stroke, and its accessible name ends with 倒地
+- **THEN** its figure kneels (compressed to 92% of its height about its base with its feet planted, so its head is lowered by 8% of its height, without rotation), half desaturated and dimmed (`grayscale(0.6)`, brightness 0.7) at full opacity, carries no seal mark, its plate's readout is replaced by `▼ 倒地` with an empty dashed stroke, and its accessible name ends with 倒地
 
 #### Scenario: Fallen looks never read as a dim
 - **WHEN** a defeated foe, a down companion and a listener-dimmed figure in dialogue render side by side in stories and in the live client

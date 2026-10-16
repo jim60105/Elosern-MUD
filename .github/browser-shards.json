@@ -443,6 +443,7 @@
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_enter_and_leave_full",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_reload_in_combat_plays_no_entrance",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_reduced_only_fade",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_fallen_figures_keep_their_slot_and_read_as_fallen",
         "web.tests.browser.test_browser_drawer_content.DrawerContentBrowserTest.test_empty_quest_guidance_gives_way_to_the_unavailable_reason"
       ]
     },

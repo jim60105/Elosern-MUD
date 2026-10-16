@@ -126,6 +126,18 @@ export const FormationFiveFoes = {
   args: { foes: foeParticipants(5), artPanel: ART_PANEL, motionLevel: "full" },
 };
 
+// Fallen foes keep their slots (webclient-combat-defeated-foes D1/D5): the
+// second and fourth of five lie collapsed under the broken seal while the
+// others stand, at the formation's boxes and scale.
+export const FormationSomeDefeated = {
+  render: renderFormation,
+  args: {
+    foes: foeParticipants(5, { 32: { state: "defeated", hp_current: 0 }, 34: { state: "knocked_out", hp_current: 0 } }),
+    artPanel: ART_PANEL,
+    motionLevel: "full",
+  },
+};
+
 // Fifteen foes, the participant cap beside a solo player: two ranks, the
 // back rank up-stage and half a step toward the centre.
 export const FormationFifteenFoes = {

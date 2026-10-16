@@ -13,6 +13,7 @@
 // No Vue, no DOM, no side effects: the store applies the reducer, the message
 // window pages the blocks.
 import { paginate } from "./message_pages.js";
+import { fallenLook } from "../components/foe-lineup.js";
 
 // `known` is the design's identity test: the key is the player's own catalog
 // key or one of the roster's `portrait_ref`s (the combat panel's
@@ -101,12 +102,37 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
   }
 
   // The foes that stand on the stage while the round plays
-  // (webclient-combat-beat-choreography D3): the pre-round active foes, in
-  // presenter order. The committed roster may already have lost a foe the
-  // round defeats; it stays on the stage until its own defeat beat.
-  const foes = (Array.isArray(roster) ? roster : []).filter(
-    (row) => row && row.team === "foes" && row.state === "active",
-  );
+  // (webclient-combat-beat-choreography D3, webclient-combat-defeated-foes
+  // D5): the pre-round foes that have not fled, in presenter order. A foe the
+  // round defeats keeps standing in its pre-round look until its own defeat
+  // beat collapses it, and keeps its slot after.
+  const rows = Array.isArray(roster) ? roster.filter((row) => row && typeof row === "object") : [];
+  const foes = rows.filter((row) => row.team === "foes" && row.state !== "fled");
+
+  // The pre-round fallen looks (webclient-combat-defeated-foes D1/D4), keyed
+  // by the participant's identity, and each beat key's participant, so a
+  // defeat beat can name the figure it fells.
+  const fallenAtStart = {};
+  const keyIdentity = {};
+  for (const row of rows) {
+    if (row.identity == null) {
+      continue;
+    }
+    const look = fallenLook(row.team, row.state);
+    if (look) {
+      fallenAtStart[String(row.identity)] = look;
+    }
+    // A row's `portrait_ref` is the same decimal key as its identity (C12
+    // D6), so beat keys never collide between participants.
+    if (row.portrait_ref != null) {
+      keyIdentity[String(row.portrait_ref)] = { identity: String(row.identity), team: row.team };
+    }
+  }
+  // The player's own key is the status actor identity: a defeat beat that
+  // names it kneels the player even when its row carries no reference.
+  if (playerKey != null && !keyIdentity[String(playerKey)]) {
+    keyIdentity[String(playerKey)] = { identity: String(playerKey), team: "party" };
+  }
 
   // Bounded decorative retention: capture only the pre-round active foes'
   // catalog entries from the previous committed art panel, keyed by portrait_ref.
@@ -130,6 +156,8 @@ export function planRound({ panel, roster, statusHp, playerKey, level, startSeq,
     playerKey: playerKey == null ? null : String(playerKey),
     foes,
     foeCatalog,
+    fallenAtStart,
+    keyIdentity,
     // `off` never waits, so it never plays by itself (D2's 0ms token, D4's
     // start-at-done rule).
     auto: level !== "off",
@@ -249,12 +277,16 @@ function foeKey(row) {
 // once the round has ended by itself, by a skip, or by a flush), so every
 // surface returns to the committed state.
 //
-// - `foes`: the plan's pre-round active foes minus every foe whose defeat
-//   beat has played. A foe's defeat beat plays in its step's act and pause
-//   phases while the foe still stands (with the `defeat` gesture); it leaves
-//   the list at the next step. A leaving line-up slot is never patched
-//   again, so the gesture must render before the slot leaves: the slot then
-//   leaves already faded.
+// - `foes`: the plan's pre-round foes that have not fled, every one for the
+//   whole round: a defeated foe keeps its slot (webclient-combat-defeated-foes
+//   D5).
+// - `fallen`: identity -> "defeated" | "down", the looks the stage shows: the
+//   pre-round fallen participants, plus every participant a defeat beat has
+//   named — from that beat's act phase on, so the collapse plays as the
+//   beat's gesture (D4). A party member a beat fells (the player included)
+//   goes down; it plays no gesture.
+// - `defeated`: the beat keys whose defeat beat has reached its act phase,
+//   in order.
 // - `gestures`: key -> `{gesture, amount}` for the current step, in its act
 //   and pause phases (the rising number runs on into the pause), for the
 //   stage actors that stand on the stage only: the player and the foes the
@@ -267,15 +299,19 @@ export function stageFor(state) {
   }
   const { plan, index } = state;
   const steps = plan.steps;
-  const rosterKeys = new Set((plan.foes || []).map(foeKey).filter((key) => key !== null));
+  const keyIdentity = plan.keyIdentity || {};
+  const fallen = { ...(plan.fallenAtStart || {}) };
   const defeated = [];
-  for (let i = 0; i < index && i < steps.length; i += 1) {
+  const reached = state.phase === "act" || state.phase === "pause" ? index + 1 : index;
+  for (let i = 0; i < reached && i < steps.length; i += 1) {
     const step = steps[i];
-    if (step.kind === "target_defeated" && rosterKeys.has(step.target) && !defeated.includes(step.target)) {
+    const who = step.kind === "target_defeated" && step.target !== null ? keyIdentity[step.target] : null;
+    if (who && !defeated.includes(step.target)) {
       defeated.push(step.target);
+      fallen[who.identity] = fallenLook(who.team, "defeated");
     }
   }
-  const foes = (plan.foes || []).filter((row) => !defeated.includes(foeKey(row)));
+  const foes = plan.foes || [];
   const onStage = new Set(
     foes
       .slice(0, STAGE_FOES)
@@ -308,6 +344,7 @@ export function stageFor(state) {
     foes,
     foeCatalog: plan.foeCatalog || {},
     defeated,
+    fallen,
     gestures,
   };
 }

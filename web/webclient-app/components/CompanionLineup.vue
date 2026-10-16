@@ -20,7 +20,17 @@ const props = defineProps({
   // Whether a re-formed line glides (false on a resize, a reconnect, and
   // below `full`).
   glide: { type: Boolean, default: true },
+  // The displayed fallen looks in combat, identity -> "down" (AppClient: the
+  // playing round's stage, else the committed states;
+  // webclient-combat-defeated-foes D1/D3), or null outside combat. The
+  // controlled figure kneels too; its values stay in the vitals dock.
+  fallen: { type: Object, default: null },
+  // A change of look lands in the commit's frame (a reload or a reconnect).
+  fallInstant: { type: Boolean, default: false },
 });
+function fallenFor(slot) {
+  return (slot.identity != null && props.fallen?.[String(slot.identity)]) || null;
+}
 const shown = computed(() => props.slots.slice(0, COMPANION_LINEUP_MAX));
 const geometry = computed(() => companionSlots(shown.value.length));
 const lineupStyle = computed(() => ({
@@ -56,7 +66,7 @@ function slotStyle(index) {
       v-for="(slot, index) in shown" :key="index"
       class="companion-lineup__slot" data-testid="companion-figure"
       :data-slot="index" :data-identity="slot.identity"
-      :data-controlled="String(slot.isControlled)" :data-rank="formation?.figures?.[index]?.rank ?? null" :style="slotStyle(index)"
+      :data-controlled="String(slot.isControlled)" :data-fallen="fallenFor(slot)" :data-rank="formation?.figures?.[index]?.rank ?? null" :style="slotStyle(index)"
     >
       <div class="formation-figure" :data-glide-key="`party:${slot.identity ?? `slot-${index}`}`">
       <StageActor
@@ -66,6 +76,7 @@ function slotStyle(index) {
         :gesture="slot.isControlled ? gesture : null"
         :gesture-key="slot.isControlled ? gestureKey : null"
         :float-amount="slot.isControlled ? floatAmount : null"
+        :fallen="fallenFor(slot)" :fall-instant="fallInstant"
       />
       </div>
     </div>

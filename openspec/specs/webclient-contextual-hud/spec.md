@@ -151,7 +151,7 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
 | controlled character and companion standing portraits (`actor-left`) | visible | visible (in the combat formation) | visible (listeners dimmed while the host speaks; the party line stays) | hidden |
 | dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
-| foe line-up (`actor-right`, every active foe up to 15, in the combat formation) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
+| foe line-up (`actor-right`, every foe that has not fled, up to 15, in the combat formation; fallen foes in their defeated look) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
 | figure plates (`plates` layer, one per drawn non-controlled combat figure) | only while a round that ended the fight still plays (held, inert) | visible | not rendered | not rendered |
 | action dock (band command region) | visible | visible | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
@@ -2758,10 +2758,10 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 
 #### Scenario: Each beat kind plays its gesture
 - **WHEN** a beat's page is fully shown
-- **THEN** the first beat of each action: the acting stage actor steps up to 12px × S toward the stage's centre and back within 240ms — never further than the clear space before the next head of its rank, so no head is covered at the step's peak — staying inside its 16px × S gutter beside the command card; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor fades and drops out of the line-up — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
+- **THEN** the first beat of each action: the acting stage actor steps 12px × S toward the stage's centre and back within 240ms, staying inside its 16px × S gutter beside the command card; `damage`: the target's stage actor shakes 6px from side to side for 180ms with a brief flash, a decorative number naming the damage rises from it and fades over 600ms, and its displayed hit points move to the beat's `hp_after` as the gesture starts, in the vitals or on the figure's plate, with the trailing bar following; `target_defeated`: a foe's stage actor collapses into the defeated look that "Fallen combat figures read as defeated or down at a glance" defines and keeps its slot — the player's stage actor never leaves the stage; `roll` and `other`: no gesture
 
 #### Scenario: Pauses and actorless beats follow the gesture
-- **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the line-up's maximum)
+- **WHEN** a gesture finishes, or a beat names a participant with no stage actor (a party member other than the player, or a foe beyond the third)
 - **THEN** the next beat's pause starts when the gesture has played, and an actorless beat plays no gesture
 
 #### Scenario: Choreography is decorative
@@ -2774,7 +2774,7 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 
 #### Scenario: Reduced and off release the stage
 - **WHEN** beats play at `reduced`, and at `off`
-- **THEN** at `reduced` no step, shake, flash, rise, or drop moves or brightens anything, a defeated foe only fades within 150ms, and the pauses are kept; at `off` no round plays by itself, so no gesture and no stage hold occur
+- **THEN** at `reduced` no step, shake, flash, rise, or drop moves or brightens anything, a defeated foe takes its defeated look without travel, its tone and mark fading within 150ms, and the pauses are kept; at `off` no round plays by itself, so no gesture and no stage hold occur
 
 #### Scenario: The actor steps and the target reacts
 - **WHEN** the effective level is `full` and a playing round shows the player's roll beat and then its
@@ -2789,8 +2789,8 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 
 #### Scenario: A defeated foe drops out on its own beat
 - **WHEN** the effective level is `full` and a playing round's defeat beat names a foe on the stage
-- **THEN** that foe stays on the stage until the defeat beat plays, then fades and drops out and is inert
-  while it leaves
+- **THEN** that foe stays as it was until the defeat beat plays, then collapses into its defeated look in
+  its slot and stays on the stage
 
 #### Scenario: The round that ends the fight plays in front of the combat stage
 - **WHEN** the effective level is `reduced` and an accepted attack defeats the last foe, committing mode
@@ -2805,8 +2805,8 @@ While a combat round plays by itself, as `webclient-combat-menu` "A combat round
 
 #### Scenario: Reduced keeps the rhythm without motion
 - **WHEN** the effective level is `reduced` and a round with a roll, a damage, and a defeat beat plays
-- **THEN** no stage actor translates, shakes, or brightens, no number rises, the defeated foe only fades
-  within 150ms, and each beat still follows the 400ms pause
+- **THEN** no stage actor translates, shakes, or brightens, no number rises, the defeated foe takes its look
+  without travel within 150ms, and each beat still follows the 400ms pause
 
 #### Scenario: Off plays no gesture and holds nothing
 - **WHEN** the effective level is `off` and an accepted attack defeats the last foe
@@ -3275,10 +3275,10 @@ The client SHALL compute every combat figure box, plate slot and marker slot fro
 - **THEN** it returns scale 0.84 with `full` slots and one rank per side for one party figure against one to three foes; 0.72 with `full` slots for five party figures against one to five foes, and 0.66 against six; 0.60 with one foe rank for one to five party figures against seven foes; 0.50 with two foe ranks and `full` slots for one party figure against eight to fourteen foes; and 0.50 with two foe ranks and `compact` slots for one party figure against fifteen foes
 
 ### Requirement: Combat figures stand in a shared-scale formation
-While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every active foe (up to 16 minus the party count, in presenter order) at the boxes that "Combat formation geometry is one pure shared-scale function" returns for the live stage geometry. Every figure on both sides SHALL be drawn at the same scale at every moment, and exploration and dialogue SHALL keep their existing standing positions.
+While the committed mode is `combat`, or while a round that ended the fight still plays, the stage SHALL place the controlled figure, every drawn companion and every foe that has not fled, fallen ones included (up to 16 minus the party count, in presenter order), at the boxes that "Combat formation geometry is one pure shared-scale function" returns. Every figure on both sides SHALL be drawn at one scale at every moment; exploration and dialogue SHALL keep their standing positions.
 
 #### Scenario: Every active foe stands
-- **WHEN** a combat snapshot commits one, three, five, eight and fifteen active foes with a solo player at 1451x790
+- **WHEN** a combat snapshot commits one, three, five, eight and fifteen foes that have not fled, some of them knocked out or defeated, with a solo player at 1451x790
 - **THEN** exactly that many foe stage actors render, in presenter order, at the formation's boxes (±1px), and no foe is left to another surface
 
 #### Scenario: Both sides are drawn at one scale
@@ -3310,11 +3310,11 @@ While the committed mode is `combat`, or while a round that ended the fight stil
 - **THEN** its figures are hidden from assistive technology, carry no focusable element, and intercept no pointer events outside the interactions other requirements define
 
 ### Requirement: Combat figures carry glance plates
-While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot in the stage's `plates` layer: the name, a thin hit-point stroke, a tabular readout and a line for condition glyphs; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the card, the vitals dock, the command-line row, the top band or any head, and nothing SHALL cover it.
+While the formation is shown, each drawn combat figure other than the controlled figure SHALL carry one plate in its formation plate slot, in the stage's `plates` layer, showing at a glance the participant's name, a thin hit-point stroke and a tabular hit-point readout, with a third line reserved for condition glyphs; the controlled figure's vitals stay in the vitals dock. A plate SHALL NOT overlap another plate, the command card, the vitals dock or the top band.
 
 #### Scenario: A full plate reads name, stroke and numbers
 - **WHEN** a companion at 42 of 120 hit points and a foe at 18 of 30 stand in a formation with `full` plate slots
-- **THEN** each 112px × S by 52px × S plate shows on its first line the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), on its second line a 4px × S tapered stroke filled to the current fraction followed by the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding in tabular figures, and keeps its third line for condition glyphs
+- **THEN** each 112px × S by 52px × S plate shows on its first line the display name in the serif small text (ellipsized within the plate, the full name kept in the DOM and in its accessible name), on its second line a 4px × S tapered stroke filled to the current fraction followed by the readout `42` / `120` and `18` / `30` with the current value bright and `/ maximum` receding in tabular figures, and keeps its third line empty for condition glyphs
 
 #### Scenario: A compact plate keeps the stroke and the number
 - **WHEN** the formation returns `compact` plate slots
@@ -3338,11 +3338,15 @@ While the formation is shown, each drawn combat figure other than the controlled
 
 #### Scenario: The plates layer is outside the portrait anchors
 - **WHEN** the formation renders
-- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer holds only the plates, its only keyboard entry is the plates group that "Figure plates show conditions at a glance and their details on demand" defines, and outside combat it renders nothing and is no tab stop
+- **THEN** the plates render in the stage's `plates` layer above the portrait anchors and below the HUD islands, the band and the command card, the layer holds only the plates, carries no focusable element in this requirement, and outside combat renders nothing
 
 #### Scenario: Repeated names carry their session token
 - **WHEN** three foes share the display name 哥布林 and a fourth is named 狼
 - **THEN** each 哥布林 plate shows its session token after the name (`哥布林 e1`, `哥布林 e2`, `哥布林 e3`) and the 狼 plate shows no token; a token is shown only while two drawn participants share a name
+
+#### Scenario: Fallen figures show their state on the plate
+- **WHEN** a foe is defeated and a companion is down
+- **THEN** their plates keep their names and show `✕ 已擊破` and `▼ 倒地` in place of the readout, with an empty dashed stroke, in both plate forms (the compact form keeps the glyph and the word)
 
 ### Requirement: Figure plates show conditions at a glance and their details on demand
 Each combat figure plate SHALL show the participant's committed conditions (`context_actions` v6 `conditions`) as glyph-only icons whose shape and hue follow the vitals dock's severity glyphs, and SHALL show a condition's name only on demand, in a tooltip that no plate shows at rest. A plate SHALL mark low hit points with text and colour together, and the plates SHALL form one keyboard group.
@@ -3386,3 +3390,30 @@ Each combat figure plate SHALL show the participant's committed conditions (`con
 #### Scenario: Motion follows the motion level
 - **WHEN** a glyph appears or a tooltip opens at `full`, at `reduced`, and at `off`
 - **THEN** feedback uses the fast motion token at `full`, fades without travel at `reduced`, and appears in one frame at `off`
+
+### Requirement: Fallen combat figures read as defeated or down at a glance
+A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slot in a dedicated defeated treatment, and a party figure whose state is `knocked_out` SHALL stay in a sibling down treatment. Each treatment SHALL combine a shape channel, a text channel on the plate and a tone change, and SHALL differ from the listener dim and from each other.
+
+#### Scenario: A defeated foe has its own look
+- **WHEN** a foe is `knocked_out` or `defeated` at rest
+- **THEN** its figure is collapsed about its base (compressed to 80% of its height with its feet planted, so its head is lowered by 20% of its height, never rotated or translated, so its transformed box stays inside its slot), fully desaturated and darkened (`grayscale(1)`, brightness 0.45) at 0.8 opacity with its silhouette intact, a broken-seal mark (a seal ring split by a crack, drawn in CSS/SVG from the seal tokens, `aria-hidden`) stands over its chest, its plate's readout is replaced by `✕ 已擊破` with an empty dashed stroke, and its accessible name ends with 已擊破
+
+#### Scenario: An ally that is down has a sibling look
+- **WHEN** a companion is `knocked_out` at rest
+- **THEN** its figure kneels (compressed to 92% of its height about its base with its feet planted, so its head is lowered by 8% of its height, without rotation), half desaturated and dimmed (`grayscale(0.6)`, brightness 0.7) at full opacity, carries no seal mark, its plate's readout is replaced by `▼ 倒地` with an empty dashed stroke, and its accessible name ends with 倒地
+
+#### Scenario: Fallen looks never read as a dim
+- **WHEN** a defeated foe, a down companion and a listener-dimmed figure in dialogue render side by side in stories and in the live client
+- **THEN** the dimmed figure keeps its colour, pose and opacity and carries no mark or fallen text, while the defeated foe alone has the collapse, the seal and 已擊破 and the down companion alone has the kneel and 倒地, so every pair differs by shape and text, not by brightness alone
+
+#### Scenario: Every art state takes the treatment
+- **WHEN** a defeated foe has a finished portrait, a placeholder silhouette with its initial, and failed art with its failure marker
+- **THEN** each takes the same collapse, tone, opacity and seal mark on its figure wrapper, the placeholder initial and the failure marker stay legible, and no new bitmap is used
+
+#### Scenario: Falling plays with the beat and the motion level
+- **WHEN** a playing round's defeat beat names a foe at `full`, at `reduced`, and at `off`, and when the client reloads or reconnects with a defeated foe on the stage
+- **THEN** at `full` the foe collapses into its defeated look over the beat-defeat duration on the exit easing and the seal mark fades in after it; at `reduced` the pose applies without travel and only the tone and the mark fade within 150ms; at `off`, and on a reload or reconnect, the defeated look renders at rest in the commit's frame; a companion going down follows the same timings with its own look
+
+#### Scenario: Fallen figures keep their slot
+- **WHEN** one of three foes is defeated, and later one flees
+- **THEN** the defeated foe keeps its slot and the formation does not re-form; the fled foe fades where it stands and the formation re-forms for the remaining drawn figures

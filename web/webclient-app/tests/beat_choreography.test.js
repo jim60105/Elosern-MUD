@@ -119,10 +119,16 @@ function at(index, phase, options = {}) {
 const refs = (stage) => stage.foes.map((row) => row.portrait_ref);
 
 describe("stageFor (design D3)", () => {
-  it("stands the pre-round active foes, in presenter order", () => {
+  it("stands the pre-round foes that have not fled, in presenter order, the fallen in their look", () => {
     const stage = stageFor(at(0, "text"));
-    expect(refs(stage)).toEqual(["3", "4", "6", "7", "8"]);
+    // Foe 5 was defeated before the round: it keeps its slot, already fallen
+    // (webclient-combat-defeated-foes D5).
+    expect(refs(stage)).toEqual(["3", "4", "5", "6", "7", "8"]);
     expect(stage.defeated).toEqual([]);
+    expect(stage.fallen).toEqual({ 5: "defeated" });
+    // A fled foe leaves the round's line-up.
+    const fled = stageFor(at(0, "text", { roster: [foe(3), foe(4, 30, "fled"), ...ROSTER.slice(6)] }));
+    expect(refs(fled)).toEqual(["3"]);
     expect(stage.key).toBe(`${ROUND}:0`);
     expect(stage.step).toBe(0);
   });
@@ -155,25 +161,44 @@ describe("stageFor (design D3)", () => {
     expect(second.key).not.toBe(first.key);
   });
 
-  it("drops a foe on its own defeat beat, and it leaves at the next step", () => {
-    // Before and during its defeat beat the foe stands; the beat plays
-    // `defeat` on it.
-    expect(refs(stageFor(at(3, "text")))).toContain("3");
+  it("fells a foe on its own defeat beat, and it keeps its slot for the rest of the round", () => {
+    // Before its defeat beat the foe stands in its pre-round look.
+    const typing = stageFor(at(3, "text"));
+    expect(refs(typing)).toContain("3");
+    expect(typing.fallen["3"]).toBeUndefined();
+    // The beat's act phase plays `defeat` and the defeated look together, so
+    // the collapse is the beat's gesture (webclient-combat-defeated-foes D4).
     const acting = stageFor(at(3, "act"));
     expect(acting.gestures).toEqual({ "3": { gesture: "defeat", amount: null } });
-    expect(refs(acting)).toContain("3");
-    expect(refs(stageFor(at(3, "pause")))).toContain("3");
-    // From the next step it is gone, and the next foe steps up.
+    expect(acting.fallen["3"]).toBe("defeated");
+    expect(acting.defeated).toEqual(["3"]);
+    expect(stageFor(at(3, "pause")).fallen["3"]).toBe("defeated");
+    // From the next step it still stands in its slot, fallen; nobody re-forms.
     const after = stageFor(at(4, "text"));
     expect(after.defeated).toEqual(["3"]);
-    expect(refs(after)).toEqual(["4", "6", "7", "8"]);
+    expect(after.fallen).toEqual({ 3: "defeated", 5: "defeated" });
+    expect(refs(after)).toEqual(["3", "4", "5", "6", "7", "8"]);
   });
 
-  it("never plays defeat on the player", () => {
+  it("never plays defeat on the player, who goes down instead", () => {
     const beats = [beat(0, 0, "damage", "4", PLAYER, { amount: 80, hp_after: 0 }), beat(1, 0, "target_defeated", "4", PLAYER)];
     expect(stageFor(at(1, "act", { beats })).gestures).toEqual({});
-    // The player is no foe, so it never joins the defeated list either.
-    expect(stageFor(at(1, "pause", { beats })).defeated).toEqual([]);
+    // The player kneels from its defeat beat on (keyed by its identity).
+    expect(stageFor(at(0, "act", { beats })).fallen["42"]).toBeUndefined();
+    expect(stageFor(at(1, "pause", { beats })).fallen["42"]).toBe("down");
+  });
+
+  it("kneels the player on its defeat beat even when its row carries no reference", () => {
+    const roster = ROSTER.map((row) => (row.identity === 42 ? { ...row, portrait_ref: null } : row));
+    const beats = [beat(0, 0, "damage", "4", PLAYER, { amount: 80, hp_after: 0 }), beat(1, 0, "target_defeated", "4", PLAYER)];
+    expect(stageFor(at(1, "act", { beats, roster })).fallen["42"]).toBe("down");
+  });
+
+  it("starts a round with an ally already down, and fells an ally on its beat", () => {
+    const roster = ROSTER.map((row) => (row.identity === 43 ? { ...row, state: "knocked_out", hp_current: 0 } : row));
+    expect(stageFor(at(0, "text", { roster })).fallen).toEqual({ 5: "defeated", 43: "down" });
+    const beats = [beat(0, 0, "damage", "4", ALLY, { amount: 60, hp_after: 0 }), beat(1, 0, "target_defeated", "4", ALLY)];
+    expect(stageFor(at(1, "act", { beats })).fallen["43"]).toBe("down");
   });
 
   it("animates every standing foe, but nobody without a stage actor: an ally, or a foe beyond the maximum", () => {

@@ -236,6 +236,55 @@ describe("FigurePlate conditions and alarm", () => {
   });
 });
 
+describe("fallen plates (webclient-combat-defeated-foes D1)", () => {
+  let wrapper;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+
+  it("replaces a defeated foe's numbers with ✕ 已擊破 over an empty dashed stroke, in both forms", async () => {
+    wrapper = mount(FigurePlate, {
+      props: { name: "哥布林", token: "e1", side: "foes", hpCurrent: 0, hpMaximum: 24, box: BOX, fallen: "defeated", conditions: [POISON] },
+    });
+    expect(wrapper.attributes("data-fallen")).toBe("defeated");
+    expect(wrapper.get('[data-testid="figure-plate-fallen"]').text()).toBe("✕已擊破");
+    expect(wrapper.get(".figure-plate__fallen-glyph").text()).toBe("✕");
+    expect(wrapper.find('[data-testid="figure-plate-readout"]').exists()).toBe(false);
+    expect(wrapper.get(".figure-plate__fill").attributes("style")).toContain("width: 0%");
+    // The name stays; no alarm and no condition glyph on a defeated foe.
+    expect(wrapper.get(".figure-plate__name-text").text()).toBe("哥布林");
+    expect(wrapper.find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="figure-plate-glyphs"]').findAll(".chip")).toHaveLength(0);
+    expect(wrapper.attributes("aria-label")).toBe("哥布林 e1，敵方，生命 0/24，已擊破");
+    // Compact: the stroke spans its line, the glyph and the word stand on the glyph line.
+    await wrapper.setProps({ form: "compact" });
+    const fallen = wrapper.get('[data-testid="figure-plate-fallen"]');
+    expect(fallen.text()).toBe("✕已擊破");
+    expect(wrapper.get('[data-testid="figure-plate-glyphs"]').find('[data-testid="figure-plate-fallen"]').exists()).toBe(true);
+    expect(wrapper.find('[data-testid="figure-plate-readout"]').exists()).toBe(false);
+    expect(wrapper.find('[data-testid="figure-plate-stroke"]').exists()).toBe(true);
+  });
+
+  it("states a downed ally as ▼ 倒地 and keeps its conditions", () => {
+    wrapper = mount(FigurePlate, {
+      props: { name: "蕾娜", token: "a2", side: "party", hpCurrent: 0, hpMaximum: 120, box: BOX, fallen: "down", conditions: [POISON] },
+    });
+    expect(wrapper.attributes("data-fallen")).toBe("down");
+    expect(wrapper.get('[data-testid="figure-plate-fallen"]').text()).toBe("▼倒地");
+    expect(wrapper.find('[data-testid="figure-plate-danger"]').exists()).toBe(false);
+    expect(wrapper.attributes("aria-label")).toBe("蕾娜 a2，我方，生命 0/120，狀態：中毒，倒地");
+  });
+
+  it("ends the accessible name with the fallen word", () => {
+    const base = { name: "狼", token: "e4", side: "foes", current: 2, maximum: 20, conditions: [POISON] };
+    expect(plateLabel({ ...base, fallen: "defeated" })).toBe("狼 e4，敵方，生命 2/20，已擊破");
+    expect(plateLabel({ ...base, side: "party", fallen: "down" })).toBe("狼 e4，我方，生命 2/20，狀態：中毒，倒地");
+    // A standing figure keeps its alarm and conditions.
+    expect(plateLabel(base)).toBe("狼 e4，敵方，生命 2/20，危險，狀態：中毒");
+  });
+});
+
 describe("the plate helpers", () => {
   it("fills the stroke from the numbers, clamped, and empty without a maximum", () => {
     expect(plateHpPercent(18, 30)).toBe(60);
@@ -403,6 +452,50 @@ describe("the plates layer in the client", () => {
     await nextTick();
     await nextTick();
     expect(document.querySelector('[data-testid="figure-plate__condition-tooltip"]')).toBeNull();
+  });
+
+  it("states a defeated foe and a downed companion on their plates, and kneels the companion's figure", async () => {
+    const slots = PARTY_PANEL_FULL_SAMPLE.slots.slice(0, 1);
+    const participants = [
+      { ...foeRow(201, "e1", "哥布林", 0), state: "defeated", conditions: [POISON] },
+      { ...foeRow(202, "e2", "狼", 3), state: "knocked_out" },
+      foeRow(203, "e3", "史萊姆", 20),
+      { identity: slots[0].identity, token: "a2", display_name: slots[0].display_name, team: "party", state: "knocked_out", hp_current: 0, hp_maximum: 120, portrait_ref: null, conditions: [POISON] },
+    ];
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: {
+        status: fx.statusPanel(),
+        exploration: fx.explorationPanel(),
+        party: { ...PARTY_PANEL_FULL_SAMPLE, slots },
+        context_actions: fx.combatActions({ participants }),
+        art: ART_PANEL_SAMPLE,
+      },
+    })], {});
+    await nextTick();
+    await nextTick();
+    const plate = (identity) => wrapper.get(`[data-anchor="plates"] [data-testid="figure-plate"][data-identity="${identity}"]`);
+    expect(plate(201).attributes("data-fallen")).toBe("defeated");
+    expect(plate(202).attributes("data-fallen")).toBe("defeated");
+    expect(plate(203).attributes("data-fallen")).toBeUndefined();
+    expect(plate(slots[0].identity).attributes("data-fallen")).toBe("down");
+    expect(plate(201).attributes("aria-label")).toBe("哥布林 e1，敵方，生命 0/24，已擊破");
+    expect(plate(slots[0].identity).attributes("aria-label")).toBe(
+      `${slots[0].display_name} a2，我方，生命 0/120，狀態：中毒，倒地`,
+    );
+    // Every figure keeps its slot: three foes stand.
+    expect(wrapper.findAll('[data-testid="foe-slot"]').map((s) => s.attributes("data-fallen") ?? null)).toEqual([
+      "defeated", "defeated", null,
+    ]);
+    const companion = wrapper.get(`[data-testid="companion-figure"][data-identity="${slots[0].identity}"]`);
+    expect(companion.attributes("data-fallen")).toBe("down");
+    expect(companion.find('[data-testid="stage-actor-seal"]').exists()).toBe(false);
+    expect(wrapper.get('[data-testid="companion-figure"][data-controlled="true"]').attributes("data-fallen")).toBeUndefined();
+    // Outside combat nobody kneels.
+    store.receive(1, "ui_update", [fx.update({ revision: 2, mode: "exploration", panels: { context_actions: fx.explorationActions() } })], {});
+    await nextTick();
+    await nextTick();
+    expect(wrapper.get(`[data-testid="companion-figure"][data-identity="${slots[0].identity}"]`).attributes("data-fallen")).toBeUndefined();
   });
 
   it("gives the player's own figure a plate while a companion is possessed, and none to the possessed one", async () => {

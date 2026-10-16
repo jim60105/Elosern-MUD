@@ -1,5 +1,6 @@
-// The foe line-up's selection (OpenSpec changes webclient-combat-foes-on-stage
-// and webclient-combat-formation). Every active foe stands on the stage, in
+// The foe line-up's selection (OpenSpec changes webclient-combat-foes-on-stage,
+// webclient-combat-formation and webclient-combat-defeated-foes). Every foe
+// that has not fled stands on the stage, in
 // presenter order, at the box the combat formation engine
 // (combat-formation.js) gives it; the depth table and the three-foe cap of the
 // first line-up are retired. Pure: no Vue import.
@@ -15,11 +16,25 @@ export function foeStageLimit(partyCount) {
   return Math.max(0, Math.min(FOE_STAGE_MAX, SESSION_PARTICIPANT_MAX - party));
 }
 
-// The committed combat participants that stand on the stage: the opposing
-// side's active members, in presenter order.
-export function activeFoes(participants) {
+// The committed combat participants that stand on the stage
+// (webclient-combat-defeated-foes design D5): the opposing side's members that
+// have not fled, in presenter order. A knocked-out or defeated foe keeps its
+// slot in its defeated look, so a defeat never re-forms the line; a fled foe
+// leaves it.
+export function drawnFoes(participants) {
   if (!Array.isArray(participants)) {
     return [];
   }
-  return participants.filter((p) => p && p.team === "foes" && p.state === "active");
+  return participants.filter((p) => p && p.team === "foes" && p.state !== "fled");
+}
+
+// The fallen look a participant's state takes on the stage (design D1): a
+// knocked-out or defeated foe is "defeated", a knocked-out (or defeated)
+// party member is "down", and every other state stands (null).
+export const FALLEN_STATES = Object.freeze(["knocked_out", "defeated"]);
+export function fallenLook(team, state) {
+  if (!FALLEN_STATES.includes(state)) {
+    return null;
+  }
+  return team === "foes" ? "defeated" : "down";
 }
