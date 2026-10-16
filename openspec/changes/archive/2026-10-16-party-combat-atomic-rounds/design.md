@@ -30,3 +30,60 @@ Pre-release clean cutover. Implement affected code/callers/fixtures/annotations 
 ## Verification and documentation ownership
 
 Use synthetic fixtures for behavioral expectations and the existing real-data calibration boundary for authored roster evidence. Added/moved Evennia test modules and browser methods must have exactly one shard owner. Use canonical `<capability>.<requirement-slug>` IDs from project traceability tooling, migrating all affected annotations. Update existing affected docs and both player command documents for command syntax/context changes. Focused implementation checks include `uv run --locked python -m tools.contract_gate`; changed logging also requires observability lint and focused event tests. Complete managed browser and traceability-evidence runs stay CI-owned.
+
+## Implementation boundary and focused evidence
+
+`confirm_actor_command` holds the shared reentrant combat writer across a
+durable edit transaction and a separate durable round transaction. Caller-owned
+transactions are rejected before admission, since savepoint completion cannot
+establish durable admission. Technical failure retains the admitted draft and
+its incremented `draft_version`; retry uses that current version.
+
+The complete-draft provider supplies selected skills and own-inventory items.
+The existing opening provider remains a separate boundary owned by
+`party-combat-opening-routing`. Tactical resolution belongs to the later
+defend/dodge and taunt changes; draft storage alone does not implement tactics.
+Session exit implementations must acquire the shared writer before reading
+revision state and retain it through restoration.
+
+Draft membership is derived from authoritative commandability, not eligibility
+alone: `_commandable_required_actors` keeps only participants the commander may
+actually command (bound, co-located, able to act, authorized) and filters
+`FORBIDDEN_ACTOR` only, so a companion that left the party, moved away or was
+dismissed stops being required instead of becoming a hole no submission can
+fill; every other authorization reason still propagates. The preflight's set is
+also what `confirmed_actors` stores, so a changed roster pauses collection only
+until the next explicit confirmation re-derives it. The complete-draft
+re-preflight's stale and incomplete early returns carry the `outcome` key every
+caller renders. A tactical entry can still pass completeness and then abort
+inside `_draft_requests` (no tactical resolver exists yet); the later
+defend/dodge/taunt changes own that gap, and no filler or replacement test may
+complete a draft with a tactical entry.
+
+Testing seams added here: `complete_party_draft` confirms the remaining
+required allies' innate `basic_attack` so a migrated test reaches a resolved
+round, and `fail_on_round_persist` lets draft-admission writes through while
+failing the round body's own write, so an injected fault lands inside the round
+transaction rather than inside the edit transaction.
+
+Audit boundary: every session mutation entry point in
+`world/rules/combat_session/` (persist, draft increment, clear, engage/engage
+group, both submission facades, confirmation, settlement, forfeit, restoration)
+holds the shared writer. The manual-campaign evidence harness writes the
+documented scenario identity directly to the durable record immediately after
+`engage_group`; that seam is deliberately outside the writer because it runs on
+its own single-threaded scratch database as an evidence operation, not as a
+production entry point.
+
+Focused verification on 2026-10-16 passed the modules this change touches and
+the ones its cutover affects: session persistence, session recovery, session
+flow, item combat turns, initiative/action counts, party combat, combat round
+records, combat commands, friendly fire, sexual-coercion turn cost, rules
+observability, monster-AI selection, the manual-campaign reports, terrain and
+positional markers, party offline loop, dialogue memory and climax settlement.
+Real outer-commit fault injection retains the accepted draft and restores HP
+caches; the injected faults were re-pointed at the round body's own write after
+draft admission started writing first, restoring the rollback evidence several
+tests had silently lost. Competing connections commit one revision. A fresh
+interpreter reads the terminal receipt directly from the committed SQLite file;
+a subsequent retry runs no round and advances no additional time.

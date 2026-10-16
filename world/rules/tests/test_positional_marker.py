@@ -42,6 +42,7 @@ from world.rules.tests._combat_session_helpers import (
     _monster,
     _player,
     _race_key,
+    complete_party_draft,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -618,7 +619,9 @@ class PositionalMarkerLifecycleAndSynergyTests(BattlefieldIsolation, EvenniaTest
                 return_value=(int(comp_pos.pk), int(comp_ground.pk)),
             ),
         ):
-            submit_player_action(self.player, _T_CAST, [self.monster])
+            complete_party_draft(
+                self.player, self.monster, submit_player_action(self.player, _T_CAST, [self.monster])
+            )
 
         # Both markers extinguished, control buffs persist
         self.assertNotIn("t_displaced_hazard", entity_active_buffs(comp_pos))

@@ -34,6 +34,7 @@ from world.rules.tests._combat_session_helpers import (
     _monster,
     _player,
     _race_key,
+    complete_party_draft,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -255,7 +256,9 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
                 return_value=(int(companion.pk),),
             ),
         ):
-            submit_player_action(self.player, _T_CAST, [self.monster])
+            complete_party_draft(
+                self.player, self.monster, submit_player_action(self.player, _T_CAST, [self.monster])
+            )
 
         # Companion's ground marker was swept on knockout
         self.assertNotIn("t_ground_hazard", entity_active_buffs(companion))

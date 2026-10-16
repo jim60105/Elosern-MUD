@@ -65,6 +65,7 @@ from world.rules.surfaces import read_counter_trait
 from world.rules.tests._combat_session_helpers import (
     _monster_tier_key,
     _race_key,
+    complete_party_draft,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -284,7 +285,9 @@ class OfflinePartyQuestLoopTests(BattlefieldIsolation, EvenniaCommandTestMixin, 
         session = read_session(self.char1)
         self.assertIn(int(self.companion.pk), session.player_ids)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
-            outcome = submit_player_action(self.char1, _T_CAST, [monster])
+            outcome = complete_party_draft(
+                self.char1, monster, submit_player_action(self.char1, _T_CAST, [monster])
+            )
         self.assertEqual(outcome["outcome"], "victory")
         self.assertIsNone(read_session(self.char1))
         completed = [r for r in read_records(self.char1) if r.quest_id == quest_id]

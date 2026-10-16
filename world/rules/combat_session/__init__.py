@@ -3,8 +3,10 @@
 One JSON-safe ``CombatSessionRecord`` lives under
 ``PlayerCharacter.db.active_combat`` and stores participant dbrefs plus
 fled/knockout identity and the accumulated round count -- never live objects.
-``engage`` creates a session and waits for player input; each preflight-valid
-player action drives exactly one ordinary round -- compression is reachable
+``engage`` creates a session and waits for player input; each commander
+confirmation admits one selection into the persistent session draft, and only
+the complete draft's final valid confirmation drives exactly one ordinary
+round -- compression is reachable
 only through ``submit_opening_action``, the sole sanctioned requester -- and
 the accumulated round time settles exactly once at a terminal outcome through
 ``settle_combat_result``.

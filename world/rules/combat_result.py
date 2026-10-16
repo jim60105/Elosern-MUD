@@ -27,6 +27,8 @@ def settle_to_messages(result: dict[str, Any]) -> tuple[tuple[str, ...], str]:
     produces no fabricated combat prose. The terminal announcement uses the
     stable shared mapping.
     """
+    if result["outcome"] == "draft":
+        return (), "指令已確認，等待其他成員。"
     if result["outcome"] == "rejected":
         reason = result.get("reason")
         message = (
@@ -93,6 +95,13 @@ def settle_to_oob_result(result: dict[str, Any]) -> dict[str, Any]:
     into the read-only presentation context and ``_normalize_result`` drops it,
     so no result envelope ever carries a round record.
     """
+    if result["outcome"] == "draft":
+        return {
+            "outcome": "success",
+            "code": "draft",
+            "message": settle_to_messages(result)[1],
+            "affected_panels": AFFECTED_PANELS,
+        }
     if result["outcome"] == "rejected":
         reason = result.get("reason")
         code = reason.value if isinstance(reason, RejectReason) else "rejected"

@@ -55,6 +55,7 @@ from ._combat_session_helpers import (
     _race_key,
     _monster,
     _player,
+    fail_on_round_persist,
     live_item_effect_profiles,
     live_item_registry,
     open_synthetic_scope,
@@ -280,9 +281,10 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             replace(read_session(self.player), knocked_out_ids=(self.player.pk,)),
         )
         result = submit_player_item_use(self.player, _TONIC_KEY)
-        # A player already knocked out settles as defeat; the skipped turn
-        # must still leave the potion untouched and emit no item-use event.
-        self.assertEqual(result["outcome"], "defeat")
+        # An empty eligible set pauses collection without acting or upkeep.
+        self.assertTrue(result["empty_required"])
+        self.assertFalse(result["is_complete"])
+        self.assertEqual(read_session(self.player).rounds_elapsed, 0)
         self.assertEqual(
             self.player.db.inventory.count(_TONIC_KEY), 1
         )
@@ -356,7 +358,7 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally"
+        "player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round"
     )
     def test_player_overwhelming_verdict_item_use_never_compresses(self):
         # combat-session-opening-dispatch 5.2: an item submission under a
@@ -403,15 +405,15 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         hp_before = int(self.player.traits.hp.current)
         engage(self.player, self.monster)
 
-        def boom(*args, **kwargs):
-            raise RuntimeError("persist boom")
-
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),
             patch("world.rules.combat.damage.roll_d100", return_value=1),
             patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch("world.rules.combat_session.rounds._persist", side_effect=boom),
+            patch(
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist("persist boom"),
+            ),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_item_use(self.player, _TONIC_KEY)
@@ -578,6 +580,8 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
             if registry_key_for_object(obj) == _MANA_KEY
         )
         engage(self.player, self.monster)
+        from world.rules.combat_session import BASIC_ATTACK_KEY, submit_player_action
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         # Touch the companion's handler pre-use so its in-process cache is
         # live across the settlement: a restore that skipped the per-target
         # cache drop would roll back stored sexual state while a stale
@@ -643,6 +647,8 @@ class SessionItemMultiTargetRollbackTests(BattlefieldIsolation, EvenniaTest):
         second.traits.hp.current = 60
         self.player.db.inventory = [_MANA_KEY, _MANA_KEY]
         engage_group(self.player, [self.monster, second])
+        from world.rules.combat_session import BASIC_ATTACK_KEY, submit_player_action
+        submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster], commanded_actor=self.companion)
         clock = WorldClock()
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),

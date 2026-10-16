@@ -189,7 +189,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertLess(companion.traits.hp.current, companion.traits.hp.max)
         self.assertIsNone(self.player.db.active_combat)
 
-    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
     def test_both_openings_forward_the_same_policy_kwargs(self):
         # 5.4: the round and overwhelm entries receive the identical
         # simulated/nonlethal/journal/notification policy.
@@ -224,6 +224,10 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat_session.rounds.run_round", side_effect=record_round),
         ):
             submit_player_action(self.player, _T_CAST, [build()])
+            from world.rules.combat_session import BASIC_ATTACK_KEY, reconstruct_battlefield
+            field = reconstruct_battlefield(self.player, read_session(self.player))
+            foe = next(entity for entity in field.roster.values() if entity.pk not in read_session(self.player).player_ids)
+            submit_player_action(self.player, BASIC_ATTACK_KEY, [foe], commanded_actor=companion)
         self.player.db.active_combat = None
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=44),

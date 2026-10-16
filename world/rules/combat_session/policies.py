@@ -1,6 +1,8 @@
 """Deterministic action providers for one persistent session's rounds.
 
-Supplies the queued player request and the deterministic enemy/basic-attack
+Supplies the exploration opening's single queued request
+(:func:`_round_provider`), the complete draft's per-actor selections
+(:func:`_party_round_provider`), and the deterministic enemy/basic-attack
 policies consumed by ``run_round()`` and ``resolve_overwhelm()``, each built
 with the session's combat context.
 """
@@ -95,7 +97,12 @@ def _enemy_policy(
 
 
 def _round_provider(actor: Any, request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
-    """Supply the queued player request exactly once and deterministic enemy policies."""
+    """Supply one queued opening request exactly once and deterministic enemy policies.
+
+    The single-request provider serving the exploration opening
+    (``submit_opening_action()``); the complete-draft ordinary round uses
+    :func:`_party_round_provider` instead.
+    """
     used = False
 
     def provider(entity, field):
@@ -107,6 +114,48 @@ def _round_provider(actor: Any, request: "combat.RoundRequest", battlefield: Bat
             return request
         return _enemy_policy(entity, field, record)
 
+    return provider
+
+
+def _party_round_provider(
+    requests_by_actor_id: dict[int, "combat.RoundRequest"],
+    battlefield: Battlefield,
+    record: CombatSessionRecord,
+):
+    """Supply each eligible allied actor's selected request exactly once and deterministic enemy policies.
+
+    Interactive allied action slots are capped at 1 selected command slot per round;
+    subsequent requests for the same allied actor return None.
+    """
+    used_allies: set[int] = set()
+
+    def provider(entity, field):
+        pk = getattr(entity, "pk", None)
+        if pk is not None:
+            try:
+                pk_int = int(pk)
+            except (TypeError, ValueError):
+                pk_int = None
+        else:
+            pk_int = None
+
+        if pk_int is not None and pk_int in record.player_ids:
+            # Interactive ally
+            if pk_int in used_allies:
+                return None
+            used_allies.add(pk_int)
+            return requests_by_actor_id.get(pk_int)
+
+        # Enemy combatant
+        return _enemy_policy(entity, field, record)
+
+    def is_interactive_ally(entity) -> bool:
+        pk = getattr(entity, "pk", None)
+        if pk is None:
+            return False
+        return int(pk) in record.player_ids
+
+    provider.is_interactive_ally = is_interactive_ally
     return provider
 
 

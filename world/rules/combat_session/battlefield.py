@@ -125,10 +125,15 @@ def get_required_combat_actors(
     record: CombatSessionRecord,
     battlefield: Battlefield,
 ) -> tuple[int, ...]:
-    """Return the tuple of actor dbrefs currently required to submit round commands.
+    """Return the actor dbrefs currently ELIGIBLE to submit round commands.
 
     Evaluates all participants in ``record.player_ids`` in deterministic sorted order
     and checks whether each is currently eligible to act via ``is_actor_eligible_to_act``.
+    This is the eligibility half only: it is a ``commander``-free predicate, so it
+    cannot see whether the commander may actually command a participant (party
+    binding and co-location live in ``authorize_combat_actor``). Draft completeness
+    needs both halves; use ``_commandable_required_actors`` for that, or an actor
+    nobody may command becomes a hole no submission can fill.
     """
     required: list[int] = []
     for pk in sorted(record.player_ids):
@@ -172,6 +177,36 @@ def authorize_combat_actor(
         if not is_actor_eligible_to_act(actor, record, battlefield):
             raise CombatSessionError(SessionReason.FORBIDDEN_ACTOR)
     return actor
+
+
+def _commandable_required_actors(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> tuple[int, ...]:
+    """Return the required actors ``commander`` may currently command.
+
+    The authoritative required set for draft completeness: participants the
+    commander cannot command are excluded, so a companion that left the party,
+    moved away or was dismissed never becomes a hole no submission can fill.
+    Only ``FORBIDDEN_ACTOR`` is filtered: every other authorization reason
+    (``UNKNOWN_SESSION_ID`` and the ``CombatSessionError``s raised inside
+    eligibility) reports a broken session invariant and propagates.
+
+    ``get_required_combat_actors`` already only reports pks whose roster
+    entity it resolved, so the entity here is always the live participant.
+    """
+    commandable: list[int] = []
+    for pk in get_required_combat_actors(record, battlefield):
+        entity = next((e for e in battlefield.roster.values() if getattr(e, "pk", None) == pk), None)
+        try:
+            authorize_combat_actor(commander, entity, record, battlefield)
+        except CombatSessionError as error:
+            if error.args[0] is not SessionReason.FORBIDDEN_ACTOR:
+                raise
+            continue
+        commandable.append(pk)
+    return tuple(commandable)
 
 
 def _session_policy(

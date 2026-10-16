@@ -287,15 +287,15 @@ def resolve_item_use(
     try:
         with transaction.atomic():
             settled = _apply_plan(plan, journal)
+            event_log = _item_used_event_log(
+                plan,
+                str(request.actor.key),
+                time_cost_seconds=0,
+                settled=settled,
+            )
     except Exception:
         journal.restore()
         raise
-    event_log = _item_used_event_log(
-        plan,
-        str(request.actor.key),
-        time_cost_seconds=0,
-        settled=settled,
-    )
     return ItemUseResult(
         outcome="success",
         event_log=event_log,

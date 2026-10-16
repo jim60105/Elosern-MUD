@@ -188,17 +188,15 @@ A successful out-of-combat item use SHALL compose its complete item plan and the
 - **THEN** HP, inventory, contained mirror, clock tick, due-event state, and in-process caches all equal their pre-use values
 
 ### Requirement: Combat item use occupies one initiative-ordered round
-An active combat session SHALL admit a preflight-valid `ItemUseRequest` as the player's selected
-action. Ordinary and compressed round providers SHALL supply that request exactly once at the
-player's first initiative position. A preflight rejection SHALL start no round. If an earlier
-initiative action invalidates a preflight-valid item request, the already-started round SHALL
-remain consumed. The number of targets an item reaches SHALL NOT affect the number of rounds it
-consumes.
+An active combat session SHALL admit a preflight-valid `ItemUseRequest` as a commanded allied actor's selected
+action in a complete draft; interactive ordinary-round providers SHALL supply it once at that actor's
+initiative position. A preflight rejection SHALL start no round. If an earlier initiative action
+invalidates a preflight-valid request, the started round SHALL stay consumed without retarget or item
+consumption. An item's target count SHALL NOT change the rounds it consumes.
 
 #### Scenario: Valid potion use runs one combat round
-- **WHEN** an injured player in active combat submits a preflight-valid healing potion use
-- **THEN** the potion request resolves at the player's initiative position, every other eligible
-  participant receives at most one ordinary action, and the session round count increases exactly once
+- **WHEN** an injured commanded ally has a preflight-valid healing potion selection and the complete party draft passes preflight
+- **THEN** the potion request resolves at that actor's initiative position, other eligible allies receive only their single selected commands and enemies retain their ordinary configured action slots, and the session round count increases exactly once
 
 #### Scenario: Full HP preserves the combat turn
 - **WHEN** a full-HP player attempts to use a healing potion during active combat
@@ -217,9 +215,8 @@ consumes.
   caches roll back together, for the actor and for every entity the item touched
 
 #### Scenario: Player-direction overwhelm uses the item once
-- **WHEN** the player's team is overwhelming and the injured player selects a valid healing potion
-- **THEN** the potion resolves on the first compressed player turn, later compressed player turns use
-  basic attack, and exactly one commanded item identity is emitted
+- **WHEN** the player's team is overwhelming and an injured ally selects a valid healing potion
+- **THEN** the potion waits for the complete draft, resolves once at its actor's ordinary initiative position, and no compressed automatic basic attacks replace selected allied commands
 
 #### Scenario: A four-target item still consumes one round
 - **WHEN** a player in active combat uses an item whose effects reach four combatants
@@ -236,8 +233,8 @@ consumes.
 - **THEN** it dispatches only to the deterministic item resolver
 
 #### Scenario: Other participants keep ordinary policy actions
-- **WHEN** a round provider supplies the player's item request
-- **THEN** it supplies ordinary policy actions for other capable participants
+- **WHEN** a round provider supplies the selected actor's item request
+- **THEN** other capable allies receive only their selected commands and capable enemies retain ordinary policy actions
 
 #### Scenario: Combat rollback covers every item surface on every touched entity
 - **WHEN** a combat item use must be rolled back

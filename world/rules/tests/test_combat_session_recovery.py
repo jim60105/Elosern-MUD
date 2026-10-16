@@ -32,7 +32,7 @@ from world.skills.registry import SkillCategory
 from world.tests.synthetic_data import SYNTH_SKILLS
 
 from ._combat_session_helpers import BattlefieldIsolation, _monster, _player
-from ._combat_session_helpers import open_synthetic_scope, synth_innate_overlay
+from ._combat_session_helpers import fail_on_round_persist, open_synthetic_scope, synth_innate_overlay
 from .combat_fixtures import grant_lineage
 
 _T_CAST = SYNTH_SKILLS["t_ember_burst"].key
@@ -294,7 +294,7 @@ class SettlementRecoveryTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.clock.get_world_clock", return_value=clock),
             patch(
                 "world.rules.combat_session.rounds._persist",
-                side_effect=RuntimeError("terminated"),
+                side_effect=fail_on_round_persist("terminated"),
             ),
         ):
             with self.assertRaises(RuntimeError):
@@ -590,7 +590,7 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
 
     @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
     @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
-    @covers_requirement("player-combat-session::one-submission-inside-an-active-session-is-one-ordinary-round-by-default-and-structurally")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_player_overwhelming_in_session_submission_never_dispatches(self):
         # combat-session-opening-dispatch: with compression stripped from the
         # in-session entries, a player-overwhelming verdict no longer reaches

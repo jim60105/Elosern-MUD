@@ -31,10 +31,15 @@ from world.rules.skip_safety import (
 )
 
 
+from world.rules.combat_session.writer import serialized_combat_write
+
+
+@serialized_combat_write
 def _persist(actor: Any, record: CombatSessionRecord) -> None:
     actor.db.active_combat = to_storage(record)
 
 
+@serialized_combat_write
 def _persist_draft_increment(commander: Any) -> None:
     """Reload the uncached durable record and increment draft_version without dropping latest commands."""
     from dataclasses import replace
@@ -63,6 +68,7 @@ def _terminal_session_id(actor: Any, record: CombatSessionRecord | None) -> str 
     return None
 
 
+@serialized_combat_write
 def clear_session(
     actor: Any,
     battlefield: Battlefield | None = None,
@@ -140,6 +146,7 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
     return engage_group(actor, [target])
 
 
+@serialized_combat_write
 def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
     """Create one persistent hostile session against several present monsters.
 

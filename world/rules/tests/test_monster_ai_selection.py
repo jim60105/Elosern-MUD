@@ -114,6 +114,7 @@ from ._combat_session_helpers import (
     SYNTH_GLOW_ELEMENT,
     _monster,
     _player,
+    fail_on_round_persist,
     open_synthetic_scope,
     synth_damage_skill,
     synth_innate_overlay,
@@ -1396,7 +1397,7 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
             patch(
                 "world.rules.combat_session.rounds._persist",
-                side_effect=RuntimeError("terminated"),
+                side_effect=fail_on_round_persist("terminated"),
             ),
         ):
             with self.assertRaises(RuntimeError):

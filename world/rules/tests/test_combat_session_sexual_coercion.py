@@ -53,6 +53,8 @@ from world.tests.synthetic_data import SYNTH_SKILLS
 from ._combat_session_helpers import (
     _monster_tier_key,
     _race_key,
+    complete_party_draft,
+    fail_on_round_persist,
     open_synthetic_scope,
     synth_damage_skill,
     synth_innate_overlay,
@@ -561,7 +563,7 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
     """The scan inside the round's shared outer transaction (submit_player_action)."""
 
     def _run_hit_with_resist_log(self, skill_key, targets, resist_log):
-        """Run a real round whose logs carry one synthetic resist entry."""
+        """Run one real round whose logs carry one synthetic resist entry."""
         from world.rules.combat_session import run_round as real_run_round
 
         def run_with_resist(battlefield, provider, **kwargs):
@@ -575,7 +577,11 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
-            return submit_player_action(self.player, skill_key, targets)
+            return complete_party_draft(
+                self.player,
+                self.monster,
+                submit_player_action(self.player, skill_key, targets),
+            )
 
     @covers_requirement("sexual-resist-turn-cost::the-coercion-scan-runs-inside-the-round-s-shared-outer-transaction-symmetric-with-friendly-fire")
     def test_forced_penalty_commits_atomically_with_the_round(self):
@@ -599,15 +605,12 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
         engage(self.player, self.monster)
         relations_before = target.db.relations_data
         raw_before = self._raw_relations(target)
-        from world.rules.combat_session import _persist, run_round as real_run_round
+        from world.rules.combat_session import run_round as real_run_round
 
         def run_with_resist(battlefield, provider, **kwargs):
             logs = list(real_run_round(battlefield, provider, **kwargs))
             logs.append(self._forced_log(target))
             return logs
-
-        def failing_persist(actor, record):
-            raise RuntimeError("injected settlement persist failure")
 
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
@@ -615,12 +618,24 @@ class SexualCoercionIntegrationTests(SexualCoercionBase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch(
-                "world.rules.combat_session.rounds._persist", side_effect=failing_persist
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist(),
             ) as persist,
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, _T_STRIKE, [self.monster])
-        persist.assert_called_once()
+                complete_party_draft(
+                    self.player,
+                    self.monster,
+                    submit_player_action(self.player, _T_STRIKE, [self.monster]),
+                )
+        # Every draft-admission write went through (each still carried its
+        # admitted entry); the round body's write -- the one with the draft
+        # consumed -- is the call the injection failed.
+        persisted = [call.args[1] for call in persist.call_args_list]
+        self.assertGreaterEqual(len(persisted), 2)
+        for admitted in persisted[:-1]:
+            self.assertTrue(admitted.draft_entries)
+        self.assertEqual(persisted[-1].draft_entries, {})
         # In-process idmapper surface restored to the pre-round value.
         target.attributes.reset_cache()
         self.assertEqual(target.db.relations_data, relations_before)
@@ -701,7 +716,11 @@ class SnapshotWideningTests(SexualCoercionBase):
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
         ):
-            return submit_player_action(self.player, skill_key, targets)
+            return complete_party_draft(
+                self.player,
+                self.monster,
+                submit_player_action(self.player, skill_key, targets),
+            )
 
     @covers_requirement("sexual-resist-turn-cost::the-relations-snapshot-covers-every-roster-npc-not-only-party-companions")
     def test_non_companion_npc_penalty_survives_a_successful_round(self):
@@ -735,15 +754,15 @@ class SnapshotWideningTests(SexualCoercionBase):
             logs.append(self._forced_log(stranger))
             return logs
 
-        def failing_persist(actor, record):
-            raise RuntimeError("injected settlement persist failure")
-
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
+            patch(
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist(),
+            ),
         ):
             with self.assertRaises(RuntimeError):
                 submit_player_action(self.player, _T_STRIKE, [self.monster])
@@ -770,18 +789,22 @@ class SnapshotWideningTests(SexualCoercionBase):
             logs.append(self._forced_log(companion))
             return logs
 
-        def failing_persist(actor, record):
-            raise RuntimeError("injected settlement persist failure")
-
         with (
             patch("world.rules.combat_session.rounds.run_round", side_effect=run_with_resist),
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch("world.rules.combat_session.rounds._persist", side_effect=failing_persist),
+            patch(
+                "world.rules.combat_session.rounds._persist",
+                side_effect=fail_on_round_persist(),
+            ),
         ):
             with self.assertRaises(RuntimeError):
-                submit_player_action(self.player, _T_STRIKE, [self.monster])
+                complete_party_draft(
+                    self.player,
+                    self.monster,
+                    submit_player_action(self.player, _T_STRIKE, [self.monster]),
+                )
         companion.attributes.reset_cache()
         self.assertEqual(companion.db.relations_data, relations_before)
         self.assertEqual(companion.relations.affinity_for(self.player), 10)
