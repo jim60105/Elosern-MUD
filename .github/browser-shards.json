@@ -286,6 +286,8 @@
         "web.tests.browser.test_browser_synth_journey.SynthJourneySmokeTest.test_shop_stock_rows_resolve_synthetic_keys_end_to_end",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_command_card_stands_at_dead_centre",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage",
+        "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_formation_shares_one_scale_and_keeps_the_centre_clear",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_off_is_instant",
         "web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_every_active_foe_stands",
