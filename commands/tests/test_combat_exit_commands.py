@@ -56,6 +56,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         return "\n".join(self.sent)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
     def test_a_bare_forfeit_returns_the_prompt_and_mutates_nothing(self):
         from world.rules.combat_session import engage
 
@@ -73,6 +74,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(is_in_active_session(self.player))
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
     def test_the_prompted_token_settles_while_a_forged_token_does_not(self):
         from world.rules.combat_session import engage
 
@@ -98,6 +100,7 @@ class CombatExitCommandTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertFalse(is_in_active_session(self.player))
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
     def test_in_session_flee_reaches_the_party_boundary_without_escaping(self):
         from world.rules.combat_session import engage
 

@@ -589,6 +589,7 @@ class ExamCombatTests(ExamHostFixture, EvenniaTestCase):
         "guild-rank-exams::exam-settlement-is-idempotent-and-promotes-only-a-passing-candidate",
         "player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes",
     )
+    @covers_requirement("player-combat-session::confirmed-surrender-enters-existing-defeat-or-exam-fail-without-an-extra-round")
     def test_confirmed_surrender_fails_once_and_its_retry_settles_nothing(self):
         from world.rules.clock import get_world_clock
         from world.rules.combat_session import (
