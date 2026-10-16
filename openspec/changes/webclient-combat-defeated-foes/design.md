@@ -16,8 +16,8 @@
 | State | Shape | Tone | Text (plate) | Mark |
 |---|---|---|---|---|
 | Listener / unselectable dim | none | brightness 0.6, colour kept | none | none |
-| Defeated foe | collapse: `translateY(12%) scaleY(.8)` about the base (no rotation, so the box never widens past its slot) | `grayscale(1) brightness(.45)`, opacity .8 | `✕ 已擊破`, empty dashed stroke | broken seal over the chest |
-| Downed ally | kneel: `translateY(8%) scaleY(.92)` about the base, no rotation | `grayscale(.6) brightness(.7)`, opacity 1 | `▼ 倒地`, empty dashed stroke | none |
+| Defeated foe | collapse: `scaleY(.8)` about the base (`transform-origin: 50% 100%`): the head drops 20%, the feet stay planted, and with no rotation and no translation the box stays inside its slot | `grayscale(1) brightness(.45)`, opacity .8 | `✕ 已擊破`, empty dashed stroke | broken seal over the chest |
+| Downed ally | kneel: `scaleY(.92)` about the base: the head drops 8%, no rotation | `grayscale(.6) brightness(.7)`, opacity 1 | `▼ 倒地`, empty dashed stroke | none |
 
 The defeated look is darker and lower in opacity than any dim. The seal and the collapse are the shape channel, and
 已擊破/倒地 the text channel.
@@ -55,6 +55,10 @@ keeps its slot. A flee removes the figure (fade) and re-forms.
 
 - [A rotated slump would push the box past its slot] → rejected: an 8° rotation moves a 440px figure's top by about
   61px (sin 8° × h); both poses are vertical only, and a Vitest checks the transformed box stays inside the slot.
+- [A sink below the floor (`translateY` about the base) would leave the slot] → rejected: lowering by 12% about the
+  base puts the feet 12% below the slot's floor, into the plates and the band. Both poses are a pure `scaleY` about
+  the base, so the feet stay planted, and a Vitest checks the transformed box's top lies inside the slot and its bottom
+  on the slot's floor.
 - [Fallen foes keep the shared scale small] → accepted: they keep their slots so nothing reflows mid-fight; a lone
   survivor among fallen foes stays at the scale the full line-up needed.
 
