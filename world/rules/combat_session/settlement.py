@@ -475,7 +475,15 @@ def _settle_with_restore(
 
 @serialized_combat_write
 def forfeit(actor: Any) -> dict[str, Any]:
-    """Settle accumulated time, record defeat/exam FAIL, and clean up."""
+    """Settle accumulated time, record defeat/exam FAIL, and clean up.
+
+    Internal, test-only defeat seam: package code reaches this settlement
+    through the confirmed party exit only
+    (:func:`world.rules.combat_session.exit.confirm_party_exit`), so no
+    player-facing route can perform an unconfirmed forfeit. Never re-export it
+    as a public route — that is exactly the bypass
+    ``party-combat-confirmed-surrender`` removed.
+    """
     record = read_session(actor)
     if record is None:
         raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)

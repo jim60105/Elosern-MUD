@@ -97,7 +97,7 @@ class CmdCombatForfeit(Command):
 
     def func(self) -> None:
         args = self.args.strip()
-        if args.partition(" ")[0] == "confirm":
+        if args.partition(" ")[0].lower() == "confirm":
             self._confirm(args.partition(" ")[2].strip())
             return
         if args:

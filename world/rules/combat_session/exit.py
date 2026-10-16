@@ -368,12 +368,23 @@ def _revision_already_consumed(
     receipt: dict[str, Any] | None,
     record: CombatSessionRecord,
 ) -> bool:
-    """Whether a live record's revision was already consumed by its session id.
+    """Whether this session id already consumed the live record's revision.
 
-    The session id is ``mode:pk:tick``, so a settlement that advanced no time
-    leaves a later engagement in the same tick with the same id and the same
-    initial revision. The durable receipt of the earlier instance is what
-    distinguishes that replay from a first confirmation.
+    The session id is ``mode:pk:tick`` and a settlement that advances no time
+    leaves the tick unchanged, so a later engagement in the same tick can share
+    this id and the same initial revision. A durable receipt on that exact pair
+    therefore means a previous instance of this session id already spent the
+    revision, and the replay is refused.
+
+    The guard is deliberately blunt: it cannot tell a replayed token from a
+    genuine first confirmation of such a same-tick twin, so a player who
+    surrenders an engagement that settled zero accumulated seconds and
+    re-engages in the same tick is refused (as ``stale_round_revision``) until
+    a round advances the revision. Making the session identity unambiguous
+    needs a per-session nonce in the record, which is a schema change this
+    slice deliberately does not make; the window is narrow (zero accumulated
+    seconds and a zero-second aftermath recovery) and self-limiting (one round
+    restores the ability to surrender).
     """
     if receipt is None:
         return False
@@ -397,6 +408,13 @@ def _settled_receipt_result(
     spent, and its outcome is returned unchanged. Any other absent session —
     including another operation's or another revision's receipt — is simply no
     active session.
+
+    This is the boundary's own contract: the entry points that must first read
+    a live record to name the session and revision (the text command and this
+    slice's browser adapter) report ``no_active_session`` before reaching it,
+    so the replay is reachable today through the confirmation API and by the
+    token-carrying route the party-exit client ships
+    (``webclient-party-exit-confirmation``).
     """
     receipt = read_last_combat_receipt(commander)
     if (

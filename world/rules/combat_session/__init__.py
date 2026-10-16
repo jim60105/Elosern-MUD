@@ -182,7 +182,6 @@ __all__ = [
     "confirm_party_exit",
     "engage",
     "engage_group",
-    "forfeit",
     "from_storage",
     "get_world_clock",
     "is_actor_eligible_to_act",
