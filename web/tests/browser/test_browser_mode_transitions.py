@@ -92,10 +92,14 @@ _INSTALL_READER = """() => {
     const stage = q('[data-testid="elosern-stage"]');
     const command = q('[data-anchor="band-command"]');
     const commandStyle = getComputedStyle(command);
-    const dockChild = command.firstElementChild;
+    // The dock, wherever it stands: the band's command region, or in combat
+    // the centred command card in the `choices` anchor
+    // (webclient-combat-command-card-centred).
+    const dock = q('#action-dock');
     const flash = q('[data-testid="stage-flash"]');
     const veil = q('[data-testid="stage-combat-veil"]');
     const anims = (el) => (el ? el.getAnimations().map((a) => ({ name: a.animationName || null, duration: a.effect.getTiming().duration })) : []);
+    const timed = (el) => (el ? el.getAnimations().map((a) => ({ name: a.animationName || null, duration: a.effect.getTiming().duration, delay: a.effect.getTiming().delay })) : []);
     const hosts = [...document.querySelectorAll('[data-anchor="actor-right"] [data-testid="stage-actor"]')];
     const rows = [...document.querySelectorAll('[data-anchor="choices"] [role="menuitem"]')];
     const active = document.activeElement;
@@ -113,7 +117,11 @@ _INSTALL_READER = """() => {
         duration: commandStyle.transitionDuration,
         property: commandStyle.transitionProperty,
       },
-      dockAnimations: anims(dockChild),
+      dockAnimations: timed(dock),
+      dockInChoices: !!(dock && dock.closest('[data-anchor="choices"]')),
+      dockInBand: !!(dock && dock.closest('[data-anchor="band-command"]')),
+      dockOpacity: dock ? Number(getComputedStyle(dock).opacity) : null,
+      activeIsBody: !active || active === document.body,
       flash: {
         hidden: flash.getAttribute('aria-hidden'),
         pointer: getComputedStyle(flash).pointerEvents,
@@ -316,9 +324,16 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode",
     )
     def test_combat_enter_and_leave_full(self):
-        """Entering combat flashes once (120ms), fades the veil in, and flips
-        the panel in; leaving plays no flash and flips it back; a second entry
-        flashes again. Every layer is decorative and pointer-transparent."""
+        """Entering combat flashes once (120ms), fades the veil in, and fades
+        the command card in at the stage centre once the flash has played
+        (250ms after a 120ms delay) with focus kept off the body; leaving plays
+        no flash and flips the dock back in the band; a second entry flashes
+        again. Every layer is decorative and pointer-transparent.
+
+        The entry assertion once named the band's flip-in (it detected a
+        panel that changed without its turn-over); the dock now leaves the
+        band, so it names the card's entrance, which detects the same missing
+        or mistimed entrance (webclient-combat-command-card-centred)."""
         page = self._page(None)
         combat = {"context_actions": _combat_panel()}
         state = self._commit(page, "combat", combat)
@@ -330,7 +345,10 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["veil"]["pointer"], "none")
         self.assertEqual(state["veil"]["duration"], "0.35s")
         self.assertLess(state["veil"]["opacity"], 1)
-        self.assertIn("elosern-panel-flip-in", [a["name"] for a in state["dockAnimations"]])
+        self.assertIn({"name": "elosern-combat-card-in", "duration": 250, "delay": 120}, state["dockAnimations"])
+        self.assertTrue(state["dockInChoices"])
+        self.assertFalse(state["dockInBand"])
+        self.assertFalse(state["activeIsBody"], "the move into the card drops focus to the body")
         # Nothing decorative intercepts a click on the stage.
         hit = page.evaluate(
             "() => { const el = document.elementFromPoint(960, 400); return el ? (el.dataset.testid || el.className) : null; }"
@@ -342,6 +360,8 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["modeChange"], "combat-exploration")
         self.assertEqual(state["flash"]["animations"], [])
         self.assertIn("elosern-panel-flip-out", [a["name"] for a in state["dockAnimations"]])
+        self.assertTrue(state["dockInBand"])
+        self.assertFalse(state["dockInChoices"])
         self._wait(page, "s.veil.opacity === 0")
 
         state = self._commit(page, "combat", combat)
@@ -385,6 +405,7 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertEqual(state["flash"]["animations"], [])
         self.assertEqual(state["veil"]["opacity"], 1)
         self.assertEqual(state["dockAnimations"], [])
+        self.assertTrue(state["dockInChoices"])
 
         self._commit(page, "exploration", _exploration_panels())
         self._enter_dialogue(page)
@@ -433,6 +454,11 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(all(a["duration"] == 0 for a in state["flash"]["animations"]))
         self.assertEqual(state["flash"]["opacity"], 0)
         self.assertEqual(state["veil"]["duration"], "0.15s")
+        # The card only fades, within 150ms and with no delay.
+        card = [a for a in state["dockAnimations"] if a["name"] == "elosern-combat-card-in"]
+        self.assertEqual(len(card), 1, state["dockAnimations"])
+        self.assertLessEqual(card[0]["duration"], 150)
+        self.assertEqual(card[0]["delay"], 0)
         page.close()
 
     @covers_requirement(
@@ -474,6 +500,10 @@ class ModeTransitionsBrowserTest(BrowserAcceptanceTest):
         state = self._commit(page, "combat", {"context_actions": _combat_panel()})
         self.assertEqual(state["veil"]["opacity"], 1)
         self.assertEqual(state["flash"]["opacity"], 0)
+        # The card stands at rest in the commit's frame.
+        self.assertTrue(state["dockInChoices"])
+        self.assertEqual(state["dockOpacity"], 1)
+        self.assertTrue(all(a["duration"] == 0 for a in state["dockAnimations"]), state["dockAnimations"])
         state = self._commit(page, "exploration", _exploration_panels())
         self.assertEqual(state["veil"]["opacity"], 0)
         page.close()

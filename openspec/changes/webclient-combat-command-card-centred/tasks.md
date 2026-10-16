@@ -74,7 +74,7 @@ pitfall in `web/webclient-app/AGENTS.md` (grep `styles/app-shell.css` for `.elos
 Build the bundle once first: `pnpm run build`. Each bullet is one short command with output captured to a scratch
 file.
 
-- [ ] 3.1 Add `test_combat_command_card_stands_at_dead_centre` to
+- [x] 3.1 Add `test_combat_command_card_stands_at_dead_centre` to
   `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest` (reuse `_combat_panels(count)`, the
   `_COMMIT_AND_READ` pattern and `_party_panel(n)` from `test_browser_shell_surfaces.py`; read `#action-dock`, the
   `choices` anchor, every `companion-figure`, every foe slot, every `figure-plate`, the `vitals`/command-line
@@ -90,13 +90,13 @@ file.
   `CombatStageBrowserTest.test_foes_stand_opposite_the_player`. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_combat_command_card_stands_at_dead_centre web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_foes_stand_opposite_the_player`
   and verify both pass.
-- [ ] 3.2 Update `web/tests/browser/test_browser_combat_menu.py`
+- [x] 3.2 Update `web/tests/browser/test_browser_combat_menu.py`
   `CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports`: the dock lies inside
   `[data-anchor="choices"]` (not `anchor-band-command`) and inside the viewport; keep the plate/formation assertions
   `webclient-combat-formation` migrated there and the confirm-control assertions. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_dock_and_figure_plate_geometry_at_both_desktop_viewports web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_focus_stays_on_action_dock_in_combat web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_crumb_absent_at_depth_one_present_at_depth_two_and_back_pops_one_level web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_pointer_root_row_click_activates_once`
   and verify all pass.
-- [ ] 3.3 Update `web/tests/browser/test_browser_mode_transitions.py`: the reader takes the dock animations from
+- [x] 3.3 Update `web/tests/browser/test_browser_mode_transitions.py`: the reader takes the dock animations from
   `#action-dock` (wherever it stands) and reports whether it is inside the `choices` anchor and the active element;
   `test_combat_enter_and_leave_full` expects `elosern-combat-card-in` (250ms, 120ms delay) on entry with the dock in
   the anchor and focus not on `body`, and `elosern-panel-flip-out` on leaving with the dock back in `band-command`;
@@ -104,12 +104,12 @@ file.
   entrance ≤150ms with 0s delay; `test_mode_transitions_off` expects the card at rest. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_combat_enter_and_leave_full web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_reload_in_combat_plays_nothing web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_reduced web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_mode_transitions_off web.tests.browser.test_browser_mode_transitions.ModeTransitionsBrowserTest.test_no_stage_ancestor_scrolls_horizontally_full`
   and verify all pass.
-- [ ] 3.4 Update `web/tests/browser/test_browser_contextual_hud_stage.py`
+- [x] 3.4 Update `web/tests/browser/test_browser_contextual_hud_stage.py`
   `ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes`: the combat states assert the band
   box unchanged, the message region spanning the band and `band-command` `display:none`. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_band_height_is_fixed_across_frames_and_modes web.tests.browser.test_browser_contextual_hud_stage.ContextualHudBrowserTest.test_surface_visibility_gated_by_committed_game_mode`
   and verify both pass.
-- [ ] 3.5 Run the unchanged behaviour guards (update only comments that say "list left, detail right"):
+- [x] 3.5 Run the unchanged behaviour guards (update only comments that say "list left, detail right"):
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_action_dock_fills_the_band_command_region_across_modes web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_combat_dock_root_vertical_list_truthful_skills_count web.tests.browser.test_browser_contextual_hud_dock.ContextualHudBrowserTest.test_digit_keys_pick_the_rows_of_the_current_frame`,
   then
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_command_window_scrolls_its_rows_and_details_the_current_frame web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_combat_skills_bounded_master_detail web.tests.browser.test_browser_contextual_hud_combat.ContextualHudBrowserTest.test_destructive_combat_confirmation_two_step_panel`,
@@ -117,7 +117,10 @@ file.
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_combat_dock_renders_mockup_grid_and_detail_at_both_viewports web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_master_scale_step_casts_at_the_chosen_magnitude web.tests.browser.test_browser_combat_scales.CombatMenuBrowserTest.test_area_space_selects_once_even_when_held`,
   then
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_beats.CombatBeatsBrowserTest.test_round_plays_and_skips_reduced`,
-  and verify every method passes.
+  and verify every method passes. (Local run: every method passes except
+  `test_master_scale_step_casts_at_the_chosen_magnitude` and `test_round_plays_and_skips_reduced`, which fail
+  identically against master's own build: the synthetic party's companion leaves the round a draft
+  「指令已確認，等待其他成員。」, so no round resolves locally. Their dock assertions before the cast pass.)
 
 ## 4. Storybook (≈1 h)
 
