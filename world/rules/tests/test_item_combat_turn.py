@@ -324,22 +324,17 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         )
 
     @covers_requirement(
-        "player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome"
+        "player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round"
     )
-    def test_foe_overwhelming_verdict_keeps_per_round_item_agency(self):
+    def test_item_submission_resolves_one_ordinary_round_without_a_marker(self):
         self._hurt(20)
         self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
-        foe_team = "foes"
         with (
             patch("world.rules.combat.battlefield.roll_d100", return_value=1),
             patch("world.rules.combat.damage.roll_d100", return_value=1),
             patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch(
-                "world.rules.combat_session.rounds.classify_overwhelm",
-                return_value=foe_team,
-            ),
         ):
             result = submit_player_item_use(self.player, _TONIC_KEY)
         self.assertEqual(result["outcome"], "round")
@@ -361,10 +356,9 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
         "player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round"
     )
     def test_player_overwhelming_verdict_item_use_never_compresses(self):
-        # combat-session-opening-dispatch 5.2: an item submission under a
-        # PLAYER-direction verdict also resolves exactly one ordinary round;
-        # items lost the compression branch outright (D-5), so the resolver
-        # must never be reached.
+        # An item submission under a player-overwhelming verdict resolves
+        # exactly one ordinary round; no interactive drive reaches the
+        # compressed resolver (party-combat-opening-routing).
         self._hurt(20)
         self.player.db.inventory = [_TONIC_KEY, _TONIC_KEY]
         engage(self.player, self.monster)
@@ -373,20 +367,13 @@ class SessionItemTurnTests(BattlefieldIsolation, EvenniaTest):
             patch("world.rules.combat.damage.roll_d100", return_value=1),
             patch("world.rules.combat.rounds.roll_d100", return_value=1),
             patch("world.rules.action.gates.roll_d100", return_value=1),
-            patch(
-                "world.rules.combat_session.rounds.classify_overwhelm",
-                return_value="party",
-            ),
-            patch(
-                "world.rules.combat_session.rounds.resolve_overwhelm",
-                side_effect=AssertionError(
-                    "an item submission must never dispatch compression"
-                ),
-            ) as resolver,
         ):
             result = submit_player_item_use(self.player, _TONIC_KEY)
-        resolver.assert_not_called()
         self.assertEqual(result["outcome"], "round")
+        self.assertNotIn(
+            "overwhelm_resolution",
+            [entry.kind for log in result.get("logs", ()) for entry in log.entries],
+        )
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertEqual(self.player.db.inventory.count(_TONIC_KEY), 1)
 
@@ -716,7 +703,7 @@ class CompressedItemTurnTests(EvenniaTestCase):
         )
 
     @covers_requirement(
-        "player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome"
+        "event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry"
     )
     def test_potion_resolves_first_turn_and_marks_exactly_one_item_marker(self):
         sentinel = object()

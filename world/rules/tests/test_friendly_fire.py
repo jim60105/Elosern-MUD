@@ -563,17 +563,15 @@ class SnapshotFriendlyFireTests(FriendlyFireBase):
         self.assertEqual(msg.call_count, 0)
 
 
-class OverwhelmCompressionTests(FriendlyFireBase):
-    """Task 3.4 supplement under the opening seam: overwhelm compression
-    resolves all raw rounds before the single friendly-fire scan; the
-    compressed logs keep the player's own action damage, so the same per-hit
-    penalty and auto-leave contracts hold through the compression.
-    (combat-session-opening-dispatch: compression is reachable only via
-    ``submit_opening_action()``, so the test opens through that seam.)"""
+class OpeningFriendlyFireTests(FriendlyFireBase):
+    """Task 3.4 supplement under the opening seam: the exploration opening
+    seeds the initiating entry, waits for the companion's command, and the
+    one ordinary round that follows applies the same per-hit penalty and
+    auto-leave contracts through its single friendly-fire scan."""
 
     @covers_requirement("affinity-friendly-fire::player-combat-actions-that-damage-companion-npcs-apply-a-per-hit-affinity-penalty")
     @covers_requirement("affinity-friendly-fire::the-scan-penalties-and-auto-leave-commit-atomically-with-the-round")
-    def test_overwhelm_compression_applies_penalty_and_auto_leave(self):
+    def test_opening_round_applies_penalty_and_auto_leave(self):
         companion = _companion(self.player, "壓縮誤傷")
         _grant_affinity(companion, self.player, 70)
         self._equip(_T_AREA)
@@ -589,10 +587,18 @@ class OverwhelmCompressionTests(FriendlyFireBase):
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
             patch("world.rules.action.gates.roll_d100", return_value=100),
         ):
-            result = submit_opening_action(
+            seeded = submit_opening_action(
                 self.player, _T_AREA, [companion, self.monster]
             )
-        self.assertEqual(result["outcome"], "victory")
+            # The mandated companion still has to choose before any round runs.
+            self.assertEqual(seeded["outcome"], "draft")
+            result = submit_player_action(
+                self.player,
+                BASIC_ATTACK_KEY,
+                [self.monster],
+                commanded_actor=companion,
+            )
+        self.assertIn(result["outcome"], ("round", "victory"))
         self.assertEqual(companion.relations.affinity_for(self.player), 69)
         self.assertNotIn(int(companion.pk), party_ids(self.player))
         self.assertEqual(

@@ -1325,11 +1325,11 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
         self.assertLess(_committed(self.monster, "hp"), 300)
 
     @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
-    def test_the_session_opening_compression_numbers_its_internal_rounds(self):
-        # The end-to-end session overwhelm path: the sole production requester
-        # of compression resolves each internal round under the session's own
-        # identity, numbered from the record's committed rounds, in the
-        # overwhelm context mode.
+    def test_the_session_opening_round_numbers_its_decisions_from_the_session(self):
+        # The end-to-end session opening path: the one ordinary round it
+        # resolves provisions its decisions under the session's own identity,
+        # numbered from the record's committed rounds, in the normal context
+        # mode (no interactive entry compresses).
         engage(self.player, self.monster)
         session_id = read_session(self.player).session_id
         recorded = []
@@ -1346,38 +1346,21 @@ class UtilityAdapterTests(SyntheticTuningMixin, EvenniaTestCase):
             )
             return real(scope)
 
-        verdicts = []
-
-        def verdict(battlefield):
-            # The opening's own dispatch judgement, the compression's initial
-            # verdict and its first-round verdict all decide for the party;
-            # the second round's verdict ends the compression, so exactly two
-            # internal rounds are resolved.
-            verdicts.append(1)
-            return "party" if len(verdicts) < 4 else "foes"
-
         with (
             patch("world.rules.combat.rounds.decision_scope", recording),
-            patch("world.rules.combat_session.rounds.classify_overwhelm", verdict),
-            patch(
-                "world.rules.combat_session.rounds.commanded_damage_reaches_enemy",
-                return_value=True,
-            ),
-            patch("world.rules.overwhelm.classify_overwhelm", verdict),
-            patch("world.rules.overwhelm.combat.is_battle_over", return_value=False),
             patch("world.rules.combat.rounds.roll_d100", return_value=95),
             patch("world.rules.combat.damage.roll_d100", return_value=95),
             patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
         ):
             submit_opening_action(self.player, PLAYER_HIT.key, [self.monster])
-        compressed = [item for item in recorded if item[3] == "overwhelm"]
-        self.assertTrue(compressed)
-        self.assertEqual({item[0] for item in compressed}, {session_id})
-        self.assertEqual({item[1] for item in compressed}, {1, 2})
-        # These fixtures grant one action per turn, so each compressed round
-        # resolves the actor's first slot; the multi-slot numbering is pinned
-        # by ExecutionScopeTests, which provisions several slots explicitly.
-        self.assertEqual({item[2] for item in compressed}, {0})
+        self.assertTrue(recorded)
+        self.assertEqual({item[0] for item in recorded}, {session_id})
+        self.assertEqual({item[1] for item in recorded}, {1})
+        self.assertEqual({item[3] for item in recorded}, {"normal"})
+        # These fixtures grant one action per turn, so the round resolved the
+        # actor's first slot; the multi-slot numbering is pinned by
+        # ExecutionScopeTests, which provisions several slots explicitly.
+        self.assertEqual({item[2] for item in recorded}, {0})
 
     @covers_requirement("monster-ai-utility-selection::production-adapters-preserve-decision-semantics")
     def test_a_fault_after_the_utility_action_rolls_back_everything(self):
