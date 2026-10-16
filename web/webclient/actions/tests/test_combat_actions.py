@@ -287,15 +287,22 @@ class CombatAdapterTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertTrue(narrative.strip())
 
     @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
-    def test_flee_accepts_no_target_and_runs(self):
+    def test_flee_reaches_the_party_exit_boundary_and_never_escapes_alone(self):
+        # An allied personal flee no longer exists (§6): the row reaches the
+        # party-scoped confirmation boundary (whose dispatch lands with
+        # party-combat-retreat-resolution) and performs no individual escape,
+        # so the session is still exactly where it was.
         engage(self.player, self.monster)
         from unittest.mock import patch
 
         with patch("world.rules.disengage.roll_d100", return_value=100):
             result = _flee_adapter(self.player, {})
-        self.assertEqual(result["outcome"], "success")
-        self.assertEqual(result["code"], "fled")
-        self.assertIsNone(self.player.db.active_combat)
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertEqual(result["code"], "party_exit_unavailable")
+        self.assertIsNotNone(self.player.db.active_combat)
+        # No individual escape was recorded either: the durable fled set is
+        # untouched and the session is still settled by nobody.
+        self.assertEqual(read_session(self.player).fled_ids, ())
 
     @covers_requirement("webclient-combat-menu::production-combat-actions-are-narrow-and-server-authoritative")
     def test_stale_forfeit_rejects(self):
