@@ -20,5 +20,11 @@ initiative:
   # Invented tuning: a ten-point agility gap dominates all d100 jitter.
   agility_weight: 10
 
+tactics:
+  # Round-start Defend/Dodge declarations (party-combat-defend-dodge). Invented
+  # initial calibration values pending the later combat-balance pass.
+  defend_reduction: 0.35
+  dodge_threshold_bonus: 25
+
 round:
   seconds: 6

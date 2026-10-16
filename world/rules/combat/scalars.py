@@ -51,15 +51,23 @@ def hit_margin(
     attacker_agility: float,
     attacker_accuracy: float,
     defender_agility: float,
+    defender_dodging: bool = False,
 ) -> float:
     """Return one strike's margin over the defender's to-hit threshold.
 
     The threshold is the rulebook's defender constant plus the defender's
     adjusted agility; the attack score is the raw roll plus the attacker's
-    adjusted agility plus the attacker's accuracy bundle bonus.
+    adjusted agility plus the attacker's accuracy bundle bonus. When the
+    defender declared Dodge for the active round, the rulebook's
+    ``tactics.dodge_threshold_bonus`` is added to that threshold, so the
+    returned margin (and the solid-hit band it drives) shrinks by the same
+    constant. Dodge never rolls dice, reduces landed damage, or reorders
+    initiative.
     """
     attack_score = raw_roll + attacker_agility + attacker_accuracy
     threshold = COMBAT_YAML["to_hit"]["defender_constant"] + defender_agility
+    if defender_dodging:
+        threshold += float(COMBAT_YAML["tactics"]["dodge_threshold_bonus"])
     return attack_score - threshold
 
 
@@ -88,6 +96,7 @@ def strike_amount(
     matched_multiplier: float = 1.0,
     scale: float = 1.0,
     weapon_multiplier: float = 1.0,
+    defending: bool = False,
 ) -> int:
     """Return one landing strike's staged damage amount.
 
@@ -99,6 +108,13 @@ def strike_amount(
     unscaled amount is then scaled by the authored cast magnitude, and the
     rulebook floor is re-applied so even a fractional cast lands its minimum
     hit -- the floor itself is never scaled.
+
+    When the recipient declared Defend for the active round, the final scaled
+    amount is reduced by the rulebook's ``tactics.defend_reduction`` after
+    ordinary mitigation, the rider and the authored scale, floored, and the
+    rulebook floor re-applied -- ``max(floor(scaled * (1 - reduction)),
+    floor)``. Defend is skipped only by an explicitly defense-bypassing
+    occurrence or a damaging upkeep tick, never by low or zero defense.
     """
     floor = int(COMBAT_YAML["damage"]["floor"])
     k = float(COMBAT_YAML["damage"]["mitigation_k"])
@@ -107,7 +123,11 @@ def strike_amount(
     )
     defense_used = max(0.0, float(defense))
     base_amount = int(max(attack_part * k / (k + defense_used) + rider, floor))
-    return int(max(scaled_magnitude(base_amount, scale), floor))
+    scaled = int(max(scaled_magnitude(base_amount, scale), floor))
+    if defending:
+        reduction = float(COMBAT_YAML["tactics"]["defend_reduction"])
+        return int(max(math_floor(scaled * (1.0 - reduction)), floor))
+    return scaled
 
 
 def heal_amount(

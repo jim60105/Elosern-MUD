@@ -95,12 +95,17 @@ def _to_hit(
     attacker: Any,
     defender: Any,
     raw_roll: int,
+    defender_dodging: bool = False,
 ) -> tuple[bool, float]:
     """Return one strike's ``(landed, margin)`` pair.
 
     The two agility terms come from the live adjusted-agility path and the
     attacker's accuracy bundle bonus, and the margin itself is the shared
-    scalar expression settlement and estimation both read.
+    scalar expression settlement and estimation both read. ``defender_dodging``
+    is the defender's own active-round Dodge declaration: it raises the
+    defender-side threshold inside the shared expression, so a raw-100 strike
+    against a dodging defender can still miss (the critical rule never
+    overrides a landing requirement).
     """
     attacker_mods = evaluate_combat_modifiers(attacker)
     defender_mods = evaluate_combat_modifiers(defender)
@@ -109,6 +114,7 @@ def _to_hit(
         attacker_agility=adjusted_agility(attacker, attacker_mods),
         attacker_accuracy=attacker_mods.get("accuracy", 0),
         defender_agility=adjusted_agility(defender, defender_mods),
+        defender_dodging=defender_dodging,
     )
     return strike_lands(margin), margin
 
@@ -188,6 +194,7 @@ def _handle_damage(
     session_nonlethal = bool(event_context.get("nonlethal", False))
     nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
     battlefield = event_context.get("battlefield")
+    tactical = getattr(battlefield, "tactical", None) if battlefield is not None else None
     now = event_context.get("now") if event_context is not None else None
     if school == "physical":
         from world.rules.equipment_effects import equipment_weapon_multiplier
@@ -212,6 +219,11 @@ def _handle_damage(
     for target in targets:
         key = str(target.key)
         protected = session_nonlethal or key in nonlethal_keys
+        # The recipient's own active-round declarations drive both effects: a
+        # Dodge raises this recipient's to-hit threshold, a Defend reduces this
+        # recipient's damage. AREA resolves each recipient here separately.
+        defender_dodging = tactical is not None and tactical.is_dodging(key)
+        defender_defending = tactical is not None and tactical.is_defending(key)
         marked: list[str] = []
         extra = (
             damage_policy is not None
@@ -227,7 +239,7 @@ def _handle_damage(
 
         for _ in range(total_strikes):
             raw_roll = roll_d100()
-            hit, margin = _to_hit(actor, target, raw_roll)
+            hit, margin = _to_hit(actor, target, raw_roll, defender_dodging)
             hit_evidence_items = (DamageHitEvidence(target=target, hit=hit),)
             amount = 0
             if hit:
@@ -236,17 +248,18 @@ def _handle_damage(
                 if damage_policy is not None:
                     matched = matches_target_predicate(target, damage_policy.predicate)
                     matched_mult = damage_policy.attack_multiplier if matched else 1.0
-                    defense = (
-                        0
-                        if (
-                            damage_policy.unconditional_defense_bypass
-                            or (damage_policy.bypass_defense and (matched or not damage_policy.predicate))
+                    bypassing = bool(
+                        damage_policy.unconditional_defense_bypass
+                        or (
+                            damage_policy.bypass_defense
+                            and (matched or not damage_policy.predicate)
                         )
-                        else _adjusted_defense(target)
                     )
+                    defense = 0 if bypassing else _adjusted_defense(target)
                     max_hp_frac = damage_policy.max_hp_fraction
                 else:
                     matched_mult = 1.0
+                    bypassing = False
                     defense = _adjusted_defense(target)
                     max_hp_frac = 0.0
                 amount = strike_amount(
@@ -257,6 +270,7 @@ def _handle_damage(
                     rider=damage_rider(_max_hp(target), max_hp_frac),
                     matched_multiplier=matched_mult,
                     scale=scale,
+                    defending=defender_defending and not bypassing,
                     weapon_multiplier=weapon_multiplier,
                 )
 

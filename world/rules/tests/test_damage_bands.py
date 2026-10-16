@@ -293,6 +293,10 @@ class DamageBandTests(unittest.TestCase):
                 "floor": 1,
                 "mitigation_k": 40,
             },
+            "tactics": {
+                "defend_reduction": 0.35,
+                "dodge_threshold_bonus": 25,
+            },
         }
         # Valid passes
         self.assertEqual(validate_combat_rulebook(valid_base)["damage"]["mitigation_k"], 40)
