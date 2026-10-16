@@ -1,7 +1,8 @@
-"""Field-combat initiation: turn one exploration cast into a combat's opening move.
+"""Field-combat initiation: turn one exploration cast into a combat's opening seed.
 
 Single purpose (field-combat-initiation D-2): classify the cast's target,
-open the session, and play the cast as the fight's first action. This
+open the session, and seed the cast as the initiating actor's draft entry,
+which the ordinary party-command path then resolves. This
 exploration-side routing deliberately does not live in
 the ``world/rules/combat_session`` package; the
 dependency direction is one-way — ``combat_initiation`` imports
@@ -34,7 +35,6 @@ from world.rules.combat_session import (
     session_id_for,
     submit_opening_action,
 )
-from world.rules.overwhelm import classify_overwhelm, commanded_damage_reaches_enemy
 from world.rules.skip_safety import unregister_participants
 from world.skills.registry import SKILL_REGISTRY, TargetSpec
 
@@ -260,17 +260,20 @@ def initiate_field_combat(
     target: Any,
     scale: float = 1.0,
 ) -> dict[str, Any]:
-    """Open combat with one skill as the player's first action.
+    """Open combat with one skill as the player's opening draft selection.
 
-    Returns the same shape as ``submit_player_action()`` — a rejection, an
-    ordinary round, or a terminal outcome — so the command layer and a
-    future webclient adapter share ``combat_result.settle_to_messages()``.
+    Returns the same shape as ``submit_player_action()`` — a rejection, a
+    waiting draft, an ordinary round, or a terminal outcome — so the command
+    layer and the webclient adapter share ``combat_result.settle_to_messages()``.
 
-    Two-part routing (D-1): whether combat starts is decided by the target
-    (a living co-located hostile ``Monster``); whether the encounter is
-    settled in one shot is decided inside ``submit_opening_action()`` from
-    the skill's damage. A rejection at any gate costs nothing: no session,
-    no resource, no roll, no world time.
+    Routing by target alone: combat starts when the target is a living
+    co-located hostile ``Monster``, whatever the skill does. The named skill
+    is persisted as the initiating actor's draft entry together with the
+    encounter's opening-order policy, and the fight then follows ordinary
+    party-command semantics: no action and no world time before every
+    required actor has confirmed, and never a compressed settlement. A
+    rejection at any gate costs nothing: no session, no resource, no roll,
+    no world time.
     """
     preview = _prepare_opening(actor, skill_key, target, scale=scale)
     if not preview.enabled:
@@ -280,20 +283,6 @@ def initiate_field_combat(
             "detail": preview.detail,
         }
     targets = list(preview.targets)
-    battlefield = preview.battlefield
-    # Freeze the dispatch BEFORE anything executes (D-9): the same
-    # two-part judgement submit_opening_action() applies, computed over the
-    # pre-action candidate battlefield and the concrete target keys.
-    # Recomputing it after the action would read post-damage HP and could
-    # name the wrong dispatch; classify_overwhelm() is state-sensitive.
-    opening = "round"
-    if (
-        classify_overwhelm(battlefield) == battlefield.team_of(str(actor.key))
-        and commanded_damage_reaches_enemy(
-            battlefield, str(actor.key), skill_key, [str(t.key) for t in targets]
-        )
-    ):
-        opening = "overwhelm"
     clock = read_world_clock()
     boundary = {
         "char": str(actor.pk),
@@ -301,7 +290,10 @@ def initiate_field_combat(
         "tick": clock.tick if clock is not None else None,
         "skill": skill_key,
         "enemy_count": len(targets),
-        "opening": opening,
+        # Filled in from the committed outcome below, before the callback is
+        # staged: the seed either waits for remaining actors ("draft") or,
+        # when it completed a solo draft, ran one ordinary round ("round").
+        "opening": "round",
     }
 
     # The submission body's own _snapshot_round_touched() cannot cover
@@ -321,7 +313,12 @@ def initiate_field_combat(
             # inside it (the round-boundary event, the terminal
             # settlement's post-commit work) fires on THIS outer commit —
             # exactly as that body's own on_commit comment states.
-            engaged = engage_group(actor, targets)
+            # Engagement persists the encounter's opening-order policy with
+            # the session, so the initiating actor keeps the first action of
+            # the first complete round while companions still have to choose.
+            engaged = engage_group(
+                actor, targets, opening_first_actor=str(actor.key)
+            )
             engaged_record = engaged["record"]
             result = submit_opening_action(actor, skill_key, targets, scale=scale)
             if result.get("outcome") == "rejected":
@@ -335,8 +332,13 @@ def initiate_field_combat(
             else:
                 # Staged only after the action actually executed, so a
                 # rolled back or divergent initiation leaves no record.
-                # Every value was snapshotted above at staging time; the
-                # callback itself performs no computation (D-9).
+                # The dispatch actually taken is read from the committed
+                # outcome -- a waiting seed or one resolved ordinary round --
+                # so the value is settled here, at staging time; the callback
+                # itself performs no computation (D-9).
+                boundary["opening"] = (
+                    "draft" if result.get("outcome") == "draft" else "round"
+                )
                 transaction.on_commit(
                     lambda boundary=boundary: log_info(
                         "field_combat_initiated", context=boundary

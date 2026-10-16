@@ -3,12 +3,13 @@
 Active-session submissions edit one persistent party draft. Its final valid
 confirmation commits admission before resolving one ordinary round. Effects,
 metadata, draft consumption and terminal settlement share the round transaction.
-The exploration opening remains the sole compression entry until its owning
-opening-routing change replaces that separate boundary.
+The exploration opening is one such submission: it seeds the initiating actor's
+entry and waits for every remaining required actor, so no entry point
+compresses an interactive encounter.
 """
 
 from dataclasses import replace
-from typing import Any, Literal
+from typing import Any
 
 from world.observability import log_info
 from world.rules import combat
@@ -25,12 +26,11 @@ from world.rules.combat_session.battlefield import (
     reconstruct_battlefield,
 )
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
-from world.rules.combat_session.writer import serialized_combat_write
-from world.rules.combat_session.policies import (
-    _overwhelm_provider,
-    _round_provider,
-    _party_round_provider,
+from world.rules.combat_session.writer import (
+    durable_combat_atomic,
+    serialized_combat_write,
 )
+from world.rules.combat_session.policies import _party_round_provider
 from world.rules.combat_session.lifecycle import _persist
 from world.rules.combat_session.records import (
     CombatSessionRecord,
@@ -54,11 +54,6 @@ from world.rules.combat_session.snapshot import (
 from django.db import transaction
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
-from world.rules.overwhelm import (
-    classify_overwhelm,
-    commanded_damage_reaches_enemy,
-    resolve_overwhelm,
-)
 from world.rules.progression import (
     restore_practice_dedupe,
     snapshot_practice_dedupe,
@@ -142,10 +137,9 @@ def submit_player_action(
     returns ``outcome="draft"`` with per-member reselection progress and
     resolves nothing; that final confirmation resolves exactly one ordinary
     round and never compresses -- whatever ``classify_overwhelm()`` decides
-    for the session. Compression is reachable only by opening a fight from
-    exploration through ``submit_opening_action()``
-    (combat-session-opening-dispatch D-1/D-2). A rejection returns before
-    initiative and consumes no round or world time.
+    for the session. No interactive entry point compresses
+    (party-combat-opening-routing). A rejection returns before initiative and
+    consumes no round or world time.
     """
     record, battlefield, request, rejection = _preflight_skill_submission(
         submit_player_action, actor, skill_key, targets_or_shorthand, scale=scale, commanded_actor=commanded_actor
@@ -251,61 +245,54 @@ def submit_opening_action(
     targets: list[Any],
     scale: float = 1.0,
 ) -> dict[str, Any]:
-    """Open the fight's first action: the sole production requester of compression.
+    """Seed the exploration opening's selection as the initiating draft entry.
 
-    Its production consumer is ``field-combat-initiation``'s routing; the
-    seam ships callerless until then (combat-session-opening-dispatch D-7).
+    The canonical opening path ``field-combat-initiation``'s routing drives.
     Runs the identical session read, reconstruction,
     ``revalidate_submission()`` and ``ActionResolver.preflight()`` as
-    ``submit_player_action()``, then owns the two-part dispatch judgement
-    (D-2): select ``opening="overwhelm"`` if and only if
-    ``classify_overwhelm()`` decides for the actor's team **and**
-    ``overwhelm.commanded_damage_reaches_enemy()`` reports the submitted
-    skill damages a member of the opposing team; every other case selects
-    ``opening="round"``. Both selections pass ``first_actor`` equal to the
-    actor's roster key (D-3): the player who chose to start the fight acts
-    before any other combatant in the opening round.
+    ``submit_player_action()``, then admits the selection into the same
+    persistent party draft and, only when that admission leaves no required
+    actor unconfirmed, resolves exactly one ordinary round. A multi-actor
+    opening therefore returns ``outcome="draft"`` with per-member progress,
+    running no action and consuming no round or world time while companions
+    still have to choose; no interactive opening ever compresses.
+    ``opening_first_actor`` is already durable on the session (written by
+    ``engage_group()``), so the initiating actor keeps the first action of
+    that first complete round without any caller-supplied override.
 
     Skills only -- no item request may reach this entry. Only a concrete
-    list of participant objects is accepted: an approved AREA shorthand
-    (``all-enemies``/``all-allies``/``all``) is rejected before initiative
-    even though ``submit_player_action()`` accepts one, because
-    ``commanded_damage_reaches_enemy()`` reads concrete roster keys and a
-    shorthand reaching it would silently answer ``False`` and disable
-    one-shot settlement with no diagnostic. Off-roster targets reject
-    exactly as ``submit_player_action()`` does.
+    list of participant objects is accepted: the AREA line-up is expanded by
+    the initiation before it seeds, so an approved shorthand
+    (``all-enemies``/``all-allies``/``all``) is a caller error and is
+    rejected before initiative. Off-roster targets reject exactly as
+    ``submit_player_action()`` does.
     """
     if isinstance(targets, str):
-        # Rejected before any initiative or dispatch, but only after the
-        # session-presence check so a caller with no session still gets
-        # NO_ACTIVE_SESSION, exactly as submit_player_action reports it.
+        # Rejected before any admission, but only after the session-presence
+        # check so a caller with no session still gets NO_ACTIVE_SESSION,
+        # exactly as submit_player_action reports it.
         if read_session(actor) is None:
             raise CombatSessionError(SessionReason.NO_ACTIVE_SESSION)
         raise TypeError(
             "submit_opening_action requires a concrete target list; the "
-            f"shorthand {targets!r} cannot be resolved to roster keys for the "
-            "compression predicate"
+            f"shorthand {targets!r} cannot seed an opening entry"
         )
     record, battlefield, request, rejection = _preflight_skill_submission(
         submit_opening_action, actor, skill_key, targets, scale=scale
     )
     if rejection is not None:
         return rejection
-    target_keys = [str(target.key) for target in targets]
-    compress = classify_overwhelm(battlefield) == battlefield.team_of(
-        str(actor.key)
-    ) and commanded_damage_reaches_enemy(
-        battlefield, str(actor.key), skill_key, target_keys
-    )
-    return _submit_request(
+    return confirm_actor_command(
         actor,
-        record,
-        battlefield,
-        request,
-        opening="overwhelm" if compress else "round",
-        first_actor=str(actor.key),
-        commanded_kind="skill",
-        commanded_key=skill_key,
+        record.session_id,
+        record.round_revision,
+        record.draft_version,
+        int(actor.pk),
+        {"kind": "skill", "payload": {
+            "skill_key": skill_key,
+            "targets_or_shorthand": [int(target.pk) for target in targets],
+            "scale": scale,
+        }},
     )
 
 
@@ -321,13 +308,12 @@ def submit_player_item_use(
     The facade revalidates the request through the shared item preflight
     with combat allowed, and only then admits the entry under the same
     session/revision/draft-version CAS as ``submit_player_action``, exactly
-    like a skill selection (combat-session-opening-dispatch D-5: a
-    consumable is not an attack, so item selections lose the compression
-    branch outright rather than gaining the opening gate). A rejection
-    returns before initiative and consumes no round or world time; the item
-    is consumed exactly once when the complete draft's final confirmation
-    resolves the round, on the commander's turn, and its journal is merged
-    into the session's outer rollback safety net.
+    like a skill selection: a consumable is an ordinary selection and no
+    interactive dispatch compresses. A rejection returns before initiative
+    and consumes no round or world time; the item is consumed exactly once
+    when the complete draft's final confirmation resolves the round, on the
+    commander's turn, and its journal is merged into the session's outer
+    rollback safety net.
 
     ``target`` is the player's one explicit choice (add-item-effect-targeting
     design D1): the session's battlefield context resolves it — and every
@@ -529,11 +515,7 @@ def confirm_actor_command(
         return result
     record = read_session_uncached(commander)
     battlefield = reconstruct_battlefield(commander, record)
-    return _submit_request(
-        commander, record, battlefield, None,
-        commanded_kind="draft", commanded_key="",
-        complete_draft=True,
-    )
+    return _submit_request(commander, record, battlefield)
 
 
 def _admit_actor_command(
@@ -547,7 +529,7 @@ def _admit_actor_command(
     """Admit or replace one actor's command in the persistent session draft under deterministic CAS."""
     combat_snapshot = attribute_snapshot(commander, "active_combat")
     try:
-        with transaction.atomic(durable=True):
+        with durable_combat_atomic():
             record = read_session_uncached(commander)
             if record is None:
                 receipt = read_last_combat_receipt(commander)
@@ -756,41 +738,31 @@ def _submit_request(
     actor: Any,
     record: CombatSessionRecord,
     battlefield: Battlefield,
-    request: "combat.RoundRequest",
-    *,
-    opening: Literal["round", "overwhelm"] = "round",
-    first_actor: str | None = None,
-    commanded_kind: str,
-    commanded_key: str,
-    complete_draft: bool = False,
 ) -> dict[str, Any]:
-    """Run the shared round/overwhelm/settlement body for one request.
+    """Run the completed draft's one ordinary round and its settlement.
 
-    The request is a member of the closed round-request union;
-    ``commanded_kind``/``commanded_key`` carry the selected action's identity
-    into overwhelm compression for log marking only. Item journals produced
-    inside the outer transaction are collected through the sink so the
-    except-path restoration covers the actually-deleted mirrors
+    The single entry every complete party draft resolves through, whether the
+    completing confirmation was an in-session command or the exploration
+    opening's seed. This body never chooses a dispatch: it resolves exactly
+    one ``run_round()`` and never compresses, whatever ``classify_overwhelm()``
+    decides (party-combat-opening-routing).
+
+    The encounter's durable opening-order policy supplies the round's
+    ``first_actor``: the initiating actor acts before every other combatant in
+    the first complete round, and the persisted value is cleared in the same
+    unit, so later rounds always use ordinary initiative. Item journals
+    produced inside the outer transaction are collected through the sink so
+    the except-path restoration covers the actually-deleted mirrors
     (fix-combat-settlement-recovery D1 extended by add-inventory-item-actions
     D2).
 
-    ``opening`` (combat-session-opening-dispatch D-1) is the caller's
-    dispatch decision, never this body's: the default ``"round"`` means one
-    ordinary ``run_round()``, and the only sanctioned way to request the
-    ``"overwhelm"`` compression is ``submit_opening_action()``. This body
-    never consults ``classify_overwhelm()`` to choose; ``first_actor`` is
-    forwarded to whichever entry the opening selects.
-
-    The ``"round"`` path also attaches the frozen
-    :class:`~world.rules.combat_beats.RoundRecord` of that round as
-    ``result["round_record"]`` (round and terminal results alike): the roster
-    identities, every participant's stored HP before the round and at its
-    committed end, the round's own event logs, and the round number. The
-    ``"overwhelm"`` opening is not one ordinary round and attaches nothing.
-    The slot is internal: the presentation layer reads it into the read
-    context and the result normalizer drops it before any send.
+    The frozen :class:`~world.rules.combat_beats.RoundRecord` of that round
+    rides ``result["round_record"]`` (round and terminal results alike): the
+    roster identities, every participant's stored HP before the round and at
+    its committed end, the round's own event logs, and the round number. The
+    slot is internal: the presentation layer reads it into the read context
+    and the result normalizer drops it before any send.
     """
-    acting_entity = getattr(request, "actor", actor)
     from world.rules.combat_session.snapshot import _snapshot_round_clock, _restore_round_clock
 
     clock_before = _snapshot_round_clock(record, battlefield)
@@ -810,31 +782,35 @@ def _submit_request(
     hp_before = _stored_trait_value(actor.traits.hp)
     opponent = _primary_opponent_id(battlefield, record)
     try:
-        with transaction.atomic(durable=complete_draft):
-            if complete_draft:
-                current = read_session_uncached(actor)
-                if current is None or (
-                    current.session_id, current.round_revision
-                ) != (record.session_id, record.round_revision):
-                    # A concurrent writer consumed this revision between
-                    # admission and resolution. Report it in the facade's
-                    # result shape: every caller renders ``outcome``.
-                    return {
-                        "ok": False,
-                        "outcome": "rejected",
-                        "reason": "stale_round_revision",
-                    }
-                record = current
-                preflight = preflight_draft_entries(actor, record, battlefield)
-                if not preflight["is_complete"]:
-                    return {
-                        "ok": False,
-                        "outcome": "draft",
-                        "reason": "draft_incomplete",
-                        "progress": preflight,
-                    }
-                requests = _draft_requests(record, battlefield)
-                tactical_declarations = _draft_tactical_declarations(record, battlefield)
+        with durable_combat_atomic():
+            current = read_session_uncached(actor)
+            if current is None or (
+                current.session_id, current.round_revision
+            ) != (record.session_id, record.round_revision):
+                # A concurrent writer consumed this revision between
+                # admission and resolution. Report it in the facade's
+                # result shape: every caller renders ``outcome``.
+                return {
+                    "ok": False,
+                    "outcome": "rejected",
+                    "reason": "stale_round_revision",
+                }
+            record = current
+            preflight = preflight_draft_entries(actor, record, battlefield)
+            if not preflight["is_complete"]:
+                return {
+                    "ok": False,
+                    "outcome": "draft",
+                    "reason": "draft_incomplete",
+                    "progress": preflight,
+                }
+            requests = _draft_requests(record, battlefield)
+            tactical_declarations = _draft_tactical_declarations(record, battlefield)
+            # The encounter's durable opening-order policy, consumed here: the
+            # initiating actor acts first in this first complete round, and
+            # the persisted value is cleared below in the same unit, so no
+            # later round inherits an override.
+            first_actor = record.opening_first_actor
             # Shared outer transaction (fix-combat-settlement-recovery D1):
             # round effects, friendly-fire and coercion penalties, session
             # metadata, and the terminal settlement commit (or roll back) as
@@ -842,102 +818,67 @@ def _submit_request(
             # durable state.
             # Later combat changes that edit this seam (roster-and-overwhelm,
             # friendly-fire reachability) must keep edits inside this block.
-            # Compression is opt-in (combat-session-opening-dispatch D-1/D-2):
-            # only ``submit_opening_action()`` may pass ``opening =
-            # "overwhelm"``, and only after its own two-part player-direction
-            # plus damage-reaches-enemy judgement. Every in-session
-            # completion takes the default ``"round"`` -- one ordinary round
-            # per completed draft, whatever the verdict, so the player always
-            # keeps per-round agency. The session's simulated/nonlethal
-            # policy threads into both entries so upkeep-settled ticks honor
-            # the same credit rules as direct damage (fix-dot-kill-credit D4).
-            # Both entries carry the encounter's real decision identity
-            # (monster-ai-attack-selection): the durable session id and the
-            # actual round number this resolution consumes, counted from the
-            # record's committed rounds. The ordinary path settles exactly one
-            # round; overload compression numbers each internal round from the
-            # same base, so no two real rounds share a decision scope.
+            # Every completed draft resolves exactly one ordinary round,
+            # whatever the verdict, so the player always keeps per-round
+            # agency and no interactive entry compresses
+            # (party-combat-opening-routing). The session's simulated/
+            # nonlethal policy threads into resolution so upkeep-settled ticks
+            # honor the same credit rules as direct damage
+            # (fix-dot-kill-credit D4). The round carries the encounter's real
+            # decision identity (monster-ai-attack-selection): the durable
+            # session id and the actual round number this resolution consumes,
+            # counted from the record's committed rounds.
             scope_base = ExecutionScopeBase(
                 session_id=record.session_id,
                 round_index=record.rounds_elapsed + 1,
             )
-            if opening == "overwhelm":
-                provider = _overwhelm_provider(acting_entity, request, battlefield, record)
-                result = resolve_overwhelm(
-                    battlefield,
-                    provider,
-                    max_rounds=12,
-                    commanded_actor=str(acting_entity.key),
-                    commanded_action_kind=commanded_kind,
-                    commanded_action_key=commanded_key,
-                    simulated=simulated,
-                    nonlethal_keys=nonlethal_keys,
-                    journal_sink=item_journals,
-                    notifications_sink=grant_notifications,
-                    first_actor=first_actor,
-                    decision_scope_base=scope_base,
+            # The round also records its own beats inputs (combat-beats-panel
+            # D1): the roster identities and every participant's stored HP
+            # before the round.
+            round_identities, round_hp_before = capture_round_hp(battlefield)
+            provider = _party_round_provider(requests, battlefield, record)
+            logs = run_round(
+                battlefield,
+                provider,
+                simulated=simulated,
+                nonlethal_keys=nonlethal_keys,
+                journal_sink=item_journals,
+                notifications_sink=grant_notifications,
+                first_actor=first_actor,
+                decision_scope_base=scope_base,
+                tactical_declarations=tactical_declarations,
+            )
+            # Boundary event for the committed ordinary round: the on_commit
+            # callback fires once the OUTERMOST transaction commits and is
+            # discarded if this unit rolls back, so a rolled-back round never
+            # leaves a boundary line behind. Every value is snapshotted NOW,
+            # at the round's durable boundary: a nested caller's later work
+            # must not shift the tick/HP this line describes, and the callback
+            # itself does zero computation so it can never raise after a
+            # commit.
+            boundary = {
+                "char": str(actor.pk),
+                "opponent": opponent,
+                "tick": _current_tick(),
+                "hp_before": hp_before,
+                "hp_after": _stored_trait_value(actor.traits.hp),
+            }
+            transaction.on_commit(
+                lambda boundary=boundary: log_info(
+                    "combat_round_settled", context=boundary
                 )
-                logs = result.event_logs
-                gained = result.rounds_elapsed
-            else:
-                # The default: one ordinary round. It also records its own
-                # beats inputs (combat-beats-panel D1): the roster identities
-                # and every participant's stored HP before the round. The
-                # overwhelm opening is not one ordinary round and records
-                # nothing.
-                round_identities, round_hp_before = capture_round_hp(battlefield)
-                provider = (
-                    _party_round_provider(requests, battlefield, record)
-                    if complete_draft
-                    else _round_provider(acting_entity, request, battlefield, record)
-                )
-                logs = run_round(
-                    battlefield,
-                    provider,
-                    simulated=simulated,
-                    nonlethal_keys=nonlethal_keys,
-                    journal_sink=item_journals,
-                    notifications_sink=grant_notifications,
-                    first_actor=first_actor,
-                    decision_scope_base=scope_base,
-                    tactical_declarations=tactical_declarations,
-                )
-                gained = 1
-                # Boundary event for a committed ordinary round only: the
-                # on_commit callback fires once the OUTERMOST transaction
-                # commits and is discarded if this unit rolls back, so a
-                # rolled-back round never leaves a boundary line behind. The
-                # event is bound to this ``opening == "round"`` path only
-                # (combat-session-opening-dispatch D-6): the compression
-                # opening is not one ordinary round.
-                # Every value is snapshotted NOW, at the round's durable
-                # boundary: a nested caller's later work must not shift the
-                # tick/HP this line describes, and the callback itself does
-                # zero computation so it can never raise after a commit.
-                boundary = {
-                    "char": str(actor.pk),
-                    "opponent": opponent,
-                    "tick": _current_tick(),
-                    "hp_before": hp_before,
-                    "hp_after": _stored_trait_value(actor.traits.hp),
-                }
-                transaction.on_commit(
-                    lambda boundary=boundary: log_info(
-                        "combat_round_settled", context=boundary
-                    )
-                )
+            )
 
             notifications = _scan_friendly_fire(actor, battlefield, logs)
             notifications += _scan_sexual_coercion(actor, battlefield, logs)
             notifications += tuple(grant_notifications)
 
-            if opening == "round":
-                # The committed end-of-round HP (combat-beats-panel D1): read
-                # after the scans and before ``_continue_or_settle``, so a
-                # terminal settlement's regeneration, exam restoration, and
-                # defeat aftermath can never move the values the beats are
-                # checked against.
-                _, round_hp_after = capture_round_hp(battlefield)
+            # The committed end-of-round HP (combat-beats-panel D1): read
+            # after the scans and before ``_continue_or_settle``, so a
+            # terminal settlement's regeneration, exam restoration, and
+            # defeat aftermath can never move the values the beats are
+            # checked against.
+            _, round_hp_after = capture_round_hp(battlefield)
 
             knocked = _knocked_out_ids(logs, battlefield)
             new_fled_ids = tuple(
@@ -961,13 +902,15 @@ def _submit_request(
                 base,
                 fled_ids=new_fled_ids,
                 knocked_out_ids=new_knocked_out_ids,
-                rounds_elapsed=base.rounds_elapsed + gained,
-                **({
-                    "round_revision": base.round_revision + 1,
-                    "draft_version": 0,
-                    "draft_entries": {},
-                    "confirmed_actors": (),
-                } if complete_draft else {}),
+                rounds_elapsed=base.rounds_elapsed + 1,
+                # One completed draft is consumed exactly once: the consumed
+                # revision, the emptied draft and the spent opening-order
+                # policy all land together with the round they belong to.
+                round_revision=base.round_revision + 1,
+                draft_version=0,
+                draft_entries={},
+                confirmed_actors=(),
+                opening_first_actor=None,
             )
             _persist(actor, new_record)
 
@@ -1008,30 +951,28 @@ def _submit_request(
                             )
 
             result = _continue_or_settle(
-                actor, new_record, battlefield, logs, notification_count=len(notifications), opening=opening
+                actor, new_record, battlefield, logs, notification_count=len(notifications)
             )
-            if complete_draft:
-                receipt = {
-                    "session_id": record.session_id,
-                    "round_revision": record.round_revision,
-                    "rounds_elapsed": new_record.rounds_elapsed,
-                    "outcome": result.get("outcome"),
-                }
-                write_last_combat_receipt(actor, receipt)
-                result["receipt"] = receipt
-                result["ok"] = True
-            if opening == "round":
-                # Internal slot only: the dispatcher reads it into the
-                # presentation context and ``_normalize_result`` drops it, so
-                # it never reaches the wire (combat-beats-panel D2).
-                result["round_record"] = RoundRecord(
-                    session_id=record.session_id,
-                    number=new_record.rounds_elapsed,
-                    logs=tuple(logs),
-                    identities=round_identities,
-                    hp_before=round_hp_before,
-                    hp_after=round_hp_after,
-                )
+            receipt = {
+                "session_id": record.session_id,
+                "round_revision": record.round_revision,
+                "rounds_elapsed": new_record.rounds_elapsed,
+                "outcome": result.get("outcome"),
+            }
+            write_last_combat_receipt(actor, receipt)
+            result["receipt"] = receipt
+            result["ok"] = True
+            # Internal slot only: the dispatcher reads it into the
+            # presentation context and ``_normalize_result`` drops it, so
+            # it never reaches the wire (combat-beats-panel D2).
+            result["round_record"] = RoundRecord(
+                session_id=record.session_id,
+                number=new_record.rounds_elapsed,
+                logs=tuple(logs),
+                identities=round_identities,
+                hp_before=round_hp_before,
+                hp_after=round_hp_after,
+            )
             # Mark every observation journal entry whose savepoint rolled back
             # as dead while the transaction is still open, so the commit-time
             # publication never resurrects failed work

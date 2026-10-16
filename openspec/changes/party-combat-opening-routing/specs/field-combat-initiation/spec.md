@@ -43,6 +43,27 @@ session and seed the named skill as the actor's opening draft entry, **whatever 
 - **THEN** the result has the same shape as `submit_player_action()`'s — a rejection, pending-draft progress, an ordinary
   round, or a terminal outcome — so callers share `world/rules/combat_result.py`'s rendering
 
+### Requirement: A SINGLE skill opens against the named monster and an AREA skill opens against every living hostile monster in the room
+`initiate_field_combat()` SHALL select the session's enemy line-up from the skill's `TargetSpec`: a
+`SINGLE` skill SHALL open against the named monster alone, and an `AREA` skill SHALL open against
+every living `Monster` in the actor's room, resolved into an explicit list of concrete targets in
+deterministic order. It SHALL NOT pass an AREA shorthand, because the engagement persists exactly
+that list as the session's `enemy_ids` and the opening's own seed path takes concrete participants.
+
+#### Scenario: An AREA opening engages the whole room
+- **WHEN** `initiate_field_combat()` is called with an `AREA` skill and one of three living monsters
+  in the room
+- **THEN** the persisted session's `enemy_ids` contains all three
+
+#### Scenario: A SINGLE opening engages one monster
+- **WHEN** `initiate_field_combat()` is called with a `SINGLE` skill in a room holding three living
+  monsters
+- **THEN** the persisted session's `enemy_ids` contains only the named monster
+
+#### Scenario: An AREA opening in a single-monster room is not special-cased
+- **WHEN** `initiate_field_combat()` is called with an `AREA` skill in a room holding one monster
+- **THEN** the session opens against that monster with no distinct code path
+
 ### Requirement: Session creation and the opening action share one failure boundary
 `initiate_field_combat()` SHALL run `engage_group()` and `submit_opening_action()` inside one
 `transaction.atomic()` it owns, so a failure in the opening action rolls back the session's creation

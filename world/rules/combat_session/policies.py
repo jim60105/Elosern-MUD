@@ -1,10 +1,11 @@
 """Deterministic action providers for one persistent session's rounds.
 
-Supplies the exploration opening's single queued request
-(:func:`_round_provider`), the complete draft's per-actor selections
-(:func:`_party_round_provider`), and the deterministic enemy/basic-attack
-policies consumed by ``run_round()`` and ``resolve_overwhelm()``, each built
-with the session's combat context.
+Supplies the complete draft's per-actor selections
+(:func:`_party_round_provider`) plus the deterministic enemy policy every
+non-player slot is provisioned from, each built with the session's combat
+context. The non-interactive overwhelm provider
+(:func:`_overwhelm_provider`) builds on the same two helpers and stays an
+independent mechanism ``resolve_overwhelm()`` consumers may drive.
 """
 
 from typing import Any
@@ -96,27 +97,6 @@ def _enemy_policy(
     )
 
 
-def _round_provider(actor: Any, request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
-    """Supply one queued opening request exactly once and deterministic enemy policies.
-
-    The single-request provider serving the exploration opening
-    (``submit_opening_action()``); the complete-draft ordinary round uses
-    :func:`_party_round_provider` instead.
-    """
-    used = False
-
-    def provider(entity, field):
-        nonlocal used
-        if entity.key == actor.key:
-            if used:
-                return None
-            used = True
-            return request
-        return _enemy_policy(entity, field, record)
-
-    return provider
-
-
 def _party_round_provider(
     requests_by_actor_id: dict[int, "combat.RoundRequest"],
     battlefield: Battlefield,
@@ -160,7 +140,13 @@ def _party_round_provider(
 
 
 def _overwhelm_provider(actor: Any, first_request: "combat.RoundRequest", battlefield: Battlefield, record: CombatSessionRecord):
-    """Supply the selected request once, then deterministic basic attacks."""
+    """Supply the selected request once, then deterministic basic attacks.
+
+    The ``resolve_overwhelm()`` consumer's provider. No interactive session
+    path builds it -- an interactive opening seeds the persistent draft and
+    every interactive round resolves through :func:`_party_round_provider`
+    (party-combat-opening-routing).
+    """
     used = False
 
     def provider(entity, field):

@@ -222,8 +222,14 @@ def _field_cast_adapter(actor: Any, payload: dict[str, Any], session: Any = None
         oob = settle_to_oob_result(result)
         oob["affected_panels"] = AFFECTED_CAST
         # The dispatcher schedules exploration options only when the opening
-        # ended the encounter at once (an internal flag, never wire data).
-        oob["field_combat_terminal"] = result.get("outcome") not in ("round", "continue")
+        # ended the encounter at once (an internal flag, never wire data). A
+        # waiting seed is not terminal: the fight stays open until every
+        # required actor has confirmed.
+        oob["field_combat_terminal"] = result.get("outcome") not in (
+            "round",
+            "continue",
+            "draft",
+        )
         return oob
     settlement = outcome.settlement
     if settlement.result.outcome != "success":

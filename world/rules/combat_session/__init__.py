@@ -6,9 +6,9 @@ fled/knockout identity and the accumulated round count -- never live objects.
 ``engage`` creates a session and waits for player input; each commander
 confirmation admits one selection into the persistent session draft, and only
 the complete draft's final valid confirmation drives exactly one ordinary
-round -- compression is reachable
-only through ``submit_opening_action``, the sole sanctioned requester -- and
-the accumulated round time settles exactly once at a terminal outcome through
+round -- no interactive entry point compresses, and ``submit_opening_action``
+is the field opening's own seed path into that same draft -- and the
+accumulated round time settles exactly once at a terminal outcome through
 ``settle_combat_result``.
 
 Package layers (dependency direction one-way, low to high):
@@ -60,7 +60,6 @@ from world.rules.combat_session.policies import (  # noqa: F401
     _basic_attack_request,
     _enemy_policy,
     _overwhelm_provider,
-    _round_provider,
 )
 from world.rules.combat_session.records import (  # noqa: F401
     CombatSessionRecord,
@@ -148,7 +147,6 @@ __all__ = [
     "_restore_exam_participants",
     "_restore_round_touched",
     "_round_cap",
-    "_round_provider",
     "_scan_friendly_fire",
     "_scan_sexual_coercion",
     "_session_policy",
