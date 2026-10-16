@@ -52,7 +52,7 @@ import FoeLineup from "./components/FoeLineup.vue";
 import { drawnFoes, fallenLook, foeStageLimit } from "./components/foe-lineup.js";
 import FigurePlate from "./components/FigurePlate.vue";
 import { plateHpCurrent, repeatedNames } from "./components/figure-plate.js";
-import { formationOrderFor, markersFor, positionKeyFor, targetingFor } from "./components/stage-targeting.js";
+import { formationOrderFor, markersFor, onStage, positionKeyFor, targetingFor } from "./components/stage-targeting.js";
 import { useCombatFormation } from "./composables/use-combat-formation.js";
 import { useFormationGlide } from "./composables/use-formation-glide.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
@@ -446,7 +446,8 @@ watch(
 // store's model of the current target frame (null outside it), the stage
 // order it reads (published from the very formation the stage draws), the
 // line-ups' lit/selectable sets, and the arrow markers in the plates layer.
-const stageTarget = computed(() => store.view.stageTarget || null);
+const controlledFigureId = computed(() => renderedLineup.value.find((slot) => slot.isControlled)?.identity ?? null);
+const stageTarget = computed(() => onStage(store.view.stageTarget || null, controlledFigureId.value));
 const drawnParty = computed(() => {
   const shape = formation.value;
   return shape ? renderedLineup.value.slice(0, shape.party.figures.length).map((slot) => slot.identity) : [];

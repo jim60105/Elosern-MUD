@@ -47,6 +47,14 @@ const renderLineup = (args) => ({
   setup() {
     const possessing = ref(!!args.possession);
     const speaking = ref(!!args.speaking);
+    // The stage target step (webclient-combat-stage-target-picking): the
+    // pointer lights the hovered candidate; every other figure takes the dim.
+    const lit = ref(args.targetable ? String(args.targetable[0]) : null);
+    const targeting = computed(() =>
+      args.targetable
+        ? { lit: new Set(lit.value ? [lit.value] : []), selectable: new Set(args.targetable.map(String)), selected: new Set() }
+        : null,
+    );
     const slots = computed(() => companionFigures({
       player: args.placeholders ? { ...player, artwork: null, hasReference: false } : player,
       companions: PARTY_PANEL_FULL_SAMPLE.slots.slice(0, args.companions).map((row) => ({
@@ -61,6 +69,8 @@ const renderLineup = (args) => ({
           slots: slots.value, dimmed: speaking.value, speakingIdentity: speaking.value ? 102 : null,
           motionLevel: args.motionLevel || "full",
           formation: args.formation ? formationFor(slots.value.length, args.formation).party : null,
+          targeting: targeting.value,
+          onTargetPointer: (identity) => { lit.value = String(identity); },
         }),
       }),
       ...(args.possession ? [h("button", {
@@ -86,3 +96,7 @@ export const CompanionSpeaks = { render: renderLineup, args: { companions: 4, sp
 // foe, and against eleven: the participant cap with a full party).
 export const FormationFullPartyOneFoe = { render: renderLineup, args: { companions: 4, formation: 1 } };
 export const FormationFullPartyElevenFoes = { render: renderLineup, args: { companions: 4, formation: 11 } };
+// The stage target step (webclient-combat-stage-target-picking D4): a party
+// skill whose candidates are the player and two companions; hover one to
+// light it, the rest take the listener dim.
+export const Targeting = { render: renderLineup, args: { companions: 4, formation: 3, targetable: [102, 1, 103] } };

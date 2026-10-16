@@ -325,7 +325,7 @@ describe("ActionDock stage target prompt", () => {
   it("renders the prompt per form and hides the row region, crumb and legend", async () => {
     wrapper = dock({ stageTarget: step({ scaleLabel: "威力 ×2" }) });
     expect(wrapper.get("#action-dock").classes()).toContain("action-dock--target");
-    expect(wrapper.get('[data-testid="target-prompt-action"]').text()).toBe("火球威力 ×2 ‧ 選擇目標");
+    expect(wrapper.get('[data-testid="target-prompt-action"]').text()).toBe("火球威力 ×2‧ 選擇目標");
     expect(wrapper.get(".target-prompt__esc").text()).toBe("Esc 返回");
     expect(wrapper.get('[data-testid="target-prompt-focus"]').text().replace(/\s+/g, "")).toBe("▸名7敵方");
     expect(wrapper.get(".action-dock__body").attributes("hidden")).toBeDefined();

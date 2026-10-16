@@ -25,6 +25,27 @@ export function formationOrderFor(formation, party, foes) {
   return entries.map((entry) => entry.id);
 }
 
+// The step as the stage draws it: a SELF position stands on the figure the
+// stage draws as the controlled one, whatever identity the status panel
+// names it by (the roster row and the status actor are the same character,
+// joined by the line-up's own `isControlled` slot, never by a guess).
+export function onStage(step, controlledId) {
+  if (!step || step.form !== "self" || controlledId === null || controlledId === undefined) {
+    return step;
+  }
+  const id = String(controlledId);
+  const positions = step.positions.map((p) => (p.kind === "self" ? { ...p, identities: [id] } : p));
+  const focused = positions.find((p) => p.key === step.focusKey) || null;
+  return {
+    ...step,
+    positions,
+    focused,
+    lit: focused ? [id] : [],
+    selectable: [id],
+    digits: Object.fromEntries(positions.filter((p) => p.digit !== null).map((p) => [id, p.digit])),
+  };
+}
+
 // The line-ups' `targeting` prop: null outside the step, else Sets of
 // String(identity).
 export function targetingFor(step) {

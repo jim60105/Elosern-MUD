@@ -118,7 +118,8 @@ export const PARTY_PARTICIPANTS = Object.freeze([
 const HOSTILE = Object.freeze({ hostile: true });
 
 export function combatSkills(participants) {
-  const foes = participants.filter((p) => p.team === "foes").map((p) => p.identity);
+  // A defeated foe is no server candidate; a knocked-out or fled one may be.
+  const foes = participants.filter((p) => p.team === "foes" && p.state !== "defeated").map((p) => p.identity);
   const allies = participants.filter((p) => p.team === "party" && p.identity !== 1).map((p) => p.identity);
   const skill = (key, label, description, cost, target_spec, targets, extra = {}) => ({
     key,
@@ -184,6 +185,29 @@ export function combatSkills(participants) {
               beneficial: true,
               enabled: false,
               disabled_reason: { code: "insufficient_mp", message: "魔力不足。" },
+            }),
+          ],
+        },
+      ],
+    },
+    // 強化 (webclient-combat-stage-target-picking): the stage target step's
+    // other forms — a SELF skill on the controlled figure, a SINGLE skill
+    // whose candidates are the party, and an AREA skill whose candidates are
+    // both sides and which carries the three approved shorthands.
+    {
+      category: "enhancement",
+      label: "強化",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            skill("rally", "鼓舞", "高聲鼓舞自己，提振接下來的攻勢。", { sp: 4 }, "self", [], { beneficial: true }),
+            skill("mend_light", "治癒之光", "以溫暖的光芒治癒一名同伴。", { mp: 9 }, "single", [1, ...allies], { beneficial: true }),
+            skill("chain_lightning", "連鎖雷擊", "讓雷光在多名目標之間跳躍。", { mp: 24 }, "area", [...allies, ...foes], {
+              ...HOSTILE,
+              element: "lightning",
+              shorthands: ["all-enemies", "all-allies", "all"],
             }),
           ],
         },

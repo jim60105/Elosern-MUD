@@ -106,7 +106,22 @@ const renderFormation = (args) => ({
         foeCount: args.foes.length,
       });
     });
-    return { args, formation };
+    // The stage target step (webclient-combat-stage-target-picking):
+    // `targetable` lists the candidates; the pointer walks the lit foe.
+    const lit = ref(args.targetable ? String(args.targetable[0]) : null);
+    const targeting = computed(() =>
+      args.targetable
+        ? { lit: new Set(lit.value ? [lit.value] : []), selectable: new Set(args.targetable.map(String)), selected: new Set() }
+        : null,
+    );
+    const onTarget = (identity) => {
+      lit.value = String(identity);
+    };
+    const lineupArgs = computed(() => {
+      const { targetable, ...rest } = args;
+      return rest;
+    });
+    return { args, formation, targeting, onTarget, lineupArgs };
   },
   template: `
     <div style="position:fixed;inset:0;overflow:clip;background:#0b0d10">
@@ -114,7 +129,7 @@ const renderFormation = (args) => ({
       <div style="position:absolute;inset:0;background:var(--stage-combat-veil)"></div>
       <div aria-hidden="true" :style="{ position: 'absolute', left: formation.gap.left + 'px', width: (formation.gap.right - formation.gap.left) + 'px', top: 'var(--header-h)', bottom: 'var(--band-h)', borderInline: '1px dashed rgba(228,200,142,.28)' }"></div>
       <div data-anchor="actor-right" style="position:absolute;inset:0;z-index:2;pointer-events:none">
-        <FoeLineup v-bind="args" :formation="formation.foes" />
+        <FoeLineup v-bind="lineupArgs" :formation="formation.foes" :targeting="targeting" @target-pointer="onTarget" />
       </div>
       <div style="position:absolute;left:0;right:0;bottom:0;height:var(--band-h);z-index:5;background:linear-gradient(0deg,#0c0a0e,#141019 70%,var(--panel));border-top:var(--line)"></div>
     </div>`,
@@ -143,6 +158,20 @@ export const FormationSomeDefeated = {
 export const FormationFifteenFoes = {
   render: renderFormation,
   args: { foes: foeParticipants(15), artPanel: ART_PANEL, motionLevel: "full" },
+};
+
+// The stage target step (webclient-combat-stage-target-picking D4): every
+// foe but the lit one takes the dialogue listener dim, the lit one carries
+// the gold ring (pulsing at `full`), the defeated foe keeps its fallen look,
+// and only the three candidates take the pointer — hover one to light it.
+export const Targeting = {
+  render: renderFormation,
+  args: {
+    foes: foeParticipants(5, { 34: { state: "defeated", hp_current: 0 } }),
+    artPanel: ART_PANEL,
+    motionLevel: "full",
+    targetable: [31, 32, 33],
+  },
 };
 
 // A pending catalog entry keeps its own placeholder card and label, with the

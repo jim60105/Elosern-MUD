@@ -222,7 +222,7 @@ function onPaneActivate(payload) {
         <span class="target-prompt__action" data-testid="target-prompt-action">
           <span class="target-prompt__skill">{{ step.label }}</span>
           <span v-if="step.scaleLabel" class="target-prompt__scale">{{ step.scaleLabel }}</span>
-          <span class="target-prompt__verb"> ‧ 選擇目標</span>
+          <span class="target-prompt__verb">‧ 選擇目標</span>
         </span>
         <span class="target-prompt__esc"><kbd>Esc</kbd> 返回</span>
       </p>
@@ -617,23 +617,34 @@ function onPaneActivate(payload) {
 .target-prompt__head {
   display: flex;
   align-items: baseline;
-  gap: calc(8px * var(--ui-scale));
+  gap: calc(4px * var(--ui-scale));
   min-width: 0;
   white-space: nowrap;
   border-bottom: 1px solid rgba(185, 154, 96, 0.18);
   padding-bottom: calc(2px * var(--ui-scale));
 }
 .target-prompt__action {
+  display: flex;
+  align-items: baseline;
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   color: var(--paper-500);
 }
+.target-prompt__verb,
+.target-prompt__scale {
+  flex: none;
+}
+.target-prompt__verb {
+  font-size: var(--text-xs);
+}
 .target-prompt__skill {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--f-serif);
   color: var(--gold-300);
-  letter-spacing: 0.06em;
 }
 .target-prompt__scale {
   margin-left: 0.4em;
