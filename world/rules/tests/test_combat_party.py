@@ -1,9 +1,10 @@
 """Companion joint-combat integration tests (party-combat).
 
 Covers the party-combat contract end to end: co-located living companions join
-the session's allied team on ``engage``, act once per round through the
-deterministic policy provider (never fleeing, never consuming the player's
-queued request), cannot die (per-entity nonlethal knockout floored at 1 HP and
+the session's allied team on ``engage``, act at most once per round from their
+own selected command through the complete draft's provider (never fleeing,
+never consuming the player's selected request), cannot die (per-entity
+nonlethal knockout floored at 1 HP and
 marked on the battlefield in the same commit), stay knocked out across rebuilds
 and re-engagements until clock-driven regen lifts HP above 1, are excluded from
 all target selection while knocked out, and settle player-centric terminal
@@ -37,7 +38,6 @@ from world.rules.clock import _settle_gauge_regen
 from world.rules.combat import Battlefield, _handle_damage, run_round
 from world.rules.combat_session import (
     _context_for,
-    _round_provider,
     BASIC_ATTACK_KEY,
     authorize_combat_actor,
     CombatSessionError,
@@ -49,6 +49,7 @@ from world.rules.combat_session import (
     submit_player_action,
     submit_player_item_use,
 )
+from world.rules.combat_session.policies import _party_round_provider
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.party import join_party, party_ids
@@ -208,7 +209,12 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         request = ActionRequest(
             self.player, _T_CAST, [monster_a], context
         )
-        provider = _round_provider(self.player, request, battlefield, record)
+        # The complete draft's provider: each participant is provisioned at
+        # most one slot per round, and an interactive ally without a selected
+        # command receives no request at all.
+        provider = _party_round_provider(
+            {int(self.player.pk): request}, battlefield, record
+        )
         calls: dict[str, int] = {}
 
         def counting(entity, field):
@@ -256,7 +262,9 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         request = ActionRequest(
             self.player, _T_CAST, [monster], context
         )
-        provider = _round_provider(self.player, request, battlefield, record)
+        provider = _party_round_provider(
+            {int(self.player.pk): request}, battlefield, record
+        )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
         targets = [entry.target for entry in _damage_entries(logs)]
@@ -288,7 +296,14 @@ class EngagePartyTests(BattlefieldIsolation, EvenniaTestCase):
         battlefield = reconstruct_battlefield(self.player, record)
         context = _context_for(battlefield, record)
         request = ActionRequest(self.player, _T_CAST, [monster], context)
-        provider = _round_provider(self.player, request, battlefield, record)
+        # Each interactive ally acts from its own selected command: the
+        # companion's commanded action is still never a flee request.
+        companion_request = ActionRequest(companion, BASIC_ATTACK_KEY, [monster], context)
+        provider = _party_round_provider(
+            {int(self.player.pk): request, int(companion.pk): companion_request},
+            battlefield,
+            record,
+        )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
         companion_damage = [
@@ -333,7 +348,9 @@ class KnockoutStateTests(BattlefieldIsolation, EvenniaTestCase):
         request = ActionRequest(
             self.player, _T_CAST, [self.monster], context
         )
-        provider = _round_provider(self.player, request, battlefield, record)
+        provider = _party_round_provider(
+            {int(self.player.pk): request}, battlefield, record
+        )
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             logs = run_round(battlefield, provider)
         from dataclasses import replace

@@ -54,13 +54,11 @@ from ._support import (
 
 
 class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
-    """overwhelm-log-attribution under the opening seam: the compressed log of
-    a player-overwhelming session opened through ``submit_opening_action()``
-    marks the player's commanded skill exactly once and keeps that attack's
-    own roll line, so the marker can never be misread as a different action.
-    (combat-session-opening-dispatch 5.7/5.12: compression is now reachable
-    only through the opening seam, so the attribution contract is driven
-    there.)"""
+    """overwhelm-log-attribution at the retained non-interactive boundary: the
+    compressed log of ``resolve_overwhelm()`` marks the commanded skill
+    exactly once and keeps that attack's own roll line, so the marker can
+    never be misread as a different action. No interactive entry point
+    compresses, so the contract is driven through the resolver itself."""
 
     def setUp(self):
         _open_scope(self)
@@ -76,18 +74,35 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster = _monster("attribution goblin", hp=100)
         self.monster.location = self.room
 
-    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
-    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
-    def test_compressed_opening_marks_commanded_skill_once_with_attributable_rolls(self):
+    @covers_requirement("event-log-compression::compress-event-logs-marks-the-player-s-commanded-action-with-a-commanded-action-entry")
+    def test_compressed_resolution_marks_commanded_skill_once_with_attributable_rolls(self):
+        from world.rules.combat_session import _context_for
+        from world.rules.combat_session.policies import _overwhelm_provider
+        from world.rules.overwhelm import resolve_overwhelm
+
         engage(self.player, self.monster)
+        record = read_session(self.player)
+        field = reconstruct_battlefield(self.player, record)
+        request = ActionRequest(
+            self.player, _T_CAST, [self.monster], _context_for(field, record)
+        )
+        provider = _overwhelm_provider(self.player, request, field, record)
         with patch("world.rules.combat.battlefield.roll_d100", return_value=44), patch("world.rules.combat.damage.roll_d100", return_value=44), patch("world.rules.combat.rounds.roll_d100", return_value=44):
-            result = submit_opening_action(self.player, _T_CAST, [self.monster])
-        self.assertEqual(result["outcome"], "victory")
+            resolved = resolve_overwhelm(
+                field,
+                provider,
+                commanded_actor=str(self.player.key),
+                commanded_action_kind="skill",
+                commanded_action_key=_T_CAST,
+                first_actor=str(self.player.key),
+            )
+        logs = resolved.event_logs
+        self.assertTrue(resolved.battle_over)
         # Exactly one first-round commanded_action marker, kind skill, the
         # submitted key's label, attached to the player's own cast log.
         markers = [
             entry
-            for log in result["logs"]
+            for log in logs
             for entry in log.entries
             if entry.kind == "commanded_action"
         ]
@@ -96,7 +111,7 @@ class CommandedActionAttributionTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(markers[0].data, {"skill": SYNTH_SKILLS[_T_CAST].label})
         opening_logs = [
             render_plain_text(log)
-            for log in result["logs"]
+            for log in logs
             if log.actor == str(self.player.key)
             and log.skill_key == _T_CAST
         ]
