@@ -482,6 +482,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
     @covers_requirement(
         "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode",
         "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size",
+        "webclient-contextual-hud::the-combat-command-card-stands-at-the-stage-s-dead-centre",
     )
     def test_combat_command_card_stands_at_dead_centre(self):
         """In combat the one ``#action-dock`` stands as a 264px*S card at the

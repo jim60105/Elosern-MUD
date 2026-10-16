@@ -26,8 +26,8 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 - **THEN** the scene backdrop fills the stage box, and the player portrait, the HUD islands, the bottom band, and the command line are layered above it in that order with no page-level scrollbar
 
 #### Scenario: Required surfaces never scroll out of view
-- **WHEN** the HUD islands hold more content than their anchor's height, or the dock frame or the narrative holds more content than its band region
-- **THEN** the island stack or the band region itself is bounded and scrolls internally, and no required surface is pushed below the visible viewport
+- **WHEN** the HUD islands hold more content than their anchor's height, or the dock frame or the narrative holds more content than its band region or the combat command card
+- **THEN** the island stack, the band region, or the card itself is bounded and scrolls internally, and no required surface is pushed below the visible viewport
 
 #### Scenario: Anchors do not overlap at the minimum viewport
 - **WHEN** the shell renders at the 1451x790 reference viewport with every mode-visible surface present
@@ -43,11 +43,11 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The bottom band keeps one height whatever it holds
 - **WHEN** the shell renders at 1451x790 and the player moves through the exploration root (the compass, the 建議 pill, and the readout), a person's verb card, the wait card, an empty pane host, the deepest combat frame, and a dialogue exchange with four picks
-- **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration and combat states, and in the dialogue state the message region spans the band's whole width at the same height
+- **THEN** the bottom band's rendered height is 220px (±1px) in every one of those states, the message region's and the command region's boxes are unchanged between the exploration states, and in the combat and dialogue states the message region spans the band's whole width at the same height while the command region is collapsed
 
 #### Scenario: The band splits two thirds and one third
 - **WHEN** the shell renders in exploration mode at 1451x790 and at 2560x1440
-- **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, in creation mode the command region spans the whole band, and in dialogue mode the message region spans the whole band while the command region is not rendered
+- **THEN** the message region spans the left two thirds of the band's width and the command region spans the remaining right third (each ±1px), both share the band's top and bottom edges, in creation mode the command region spans the whole band, and in dialogue and combat mode the message region spans the whole band while the command region is not rendered
 
 #### Scenario: The player portrait stands on the band
 - **WHEN** the shell renders in exploration mode at 1451x790 with a committed roster portrait for the current character
@@ -99,7 +99,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The band splits message and command regions per mode
 - **WHEN** the shell renders in exploration mode, in creation mode, and in dialogue mode
-- **THEN** the band is divided into the message region `band-message`, covering the left two thirds of the band's width, and the command region `band-command`, covering the remaining right third; in creation mode, where the message region is hidden, the command region spans the whole band, and in dialogue mode, where the command region is collapsed, the message region spans the whole band
+- **THEN** the band is divided into the message region `band-message`, covering the left two thirds of the band's width, and the command region `band-command`, covering the remaining right third; in creation mode, where the message region is hidden, the command region spans the whole band, and in dialogue and combat mode, where the command region is collapsed, the message region spans the whole band
 
 #### Scenario: Every surface avoids the band through the band-height token
 - **WHEN** the shell renders in exploration mode at the 1451x790 reference viewport
@@ -123,7 +123,7 @@ The WebClient SHALL render as a full-bleed stage filling the viewport, layered b
 
 #### Scenario: The choices anchor is bounded by the stage box
 - **WHEN** dialogue mode renders the choice content, taller than the available span allows
-- **THEN** the `choices` anchor renders only in dialogue mode, horizontally centred on the stage box, at most `min(560px, 40%)` of the stage width wide, above the portrait anchors, its content vertically centred in and bounded by the part of the stage box between the top band and the scene caption row that stands on the command-line row so it never meets the scene caption or the expanded command line, scrolling internally when its content is taller than that span allows, and it never grows into the top band, the command-line row, or the bottom band
+- **THEN** the `choices` anchor renders only in dialogue mode, while an exploration card is open, and in combat mode — where it holds the combat command card, whose horizontal placement, width, top-anchored placement and height "The combat command card stands at the stage's dead centre" sets — and otherwise it is horizontally centred on the stage box, at most `min(560px, 40%)` of the stage width wide; in every mode it stands above the portrait anchors, its content vertically centred in and bounded by the part of the stage box between the top band and the scene caption row that stands on the command-line row so it never meets the scene caption or the expanded command line, scrolling internally when its content is taller than that span allows, and it never grows into the top band, the command-line row, or the bottom band
 
 #### Scenario: Interactive anchors never overlap at or above the reference viewport
 - **WHEN** the shell renders at 1451x790, and at every larger viewport up to the chrome factor's cap
@@ -144,8 +144,9 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 | Surface | exploration | combat | dialogue | creation |
 |---|---|---|---|---|
 | place card (location, world time; `map` anchor, above the minimap) | visible | **hidden** (the formation needs the right column) | **hidden** | hidden |
-| message window (band message region) | visible | visible | visible (whole band width, paged, name plate) | hidden |
+| message window (band message region) | visible | visible (whole band width, paged) | visible (whole band width, paged, name plate) | hidden |
 | dialogue choice list (`choices` anchor, centred over the stage) | not rendered | not rendered | once the current response's last page is fully shown, while no action is in flight | not rendered |
+| combat command card (`choices` anchor; the action dock itself) | not rendered | visible | not rendered | not rendered |
 | vitals dock (condition icons + vitals bars; `vitals` anchor, lower-left) | by the vitals rule | visible | **hidden** | hidden |
 | minimap island | visible | **hidden** | **hidden** | hidden |
 | objective line (under the minimap) | visible | hidden | hidden | hidden |
@@ -153,12 +154,16 @@ The shell SHALL expose the committed mode on the stage root as `data-elosern-mod
 | dialogue host standing portrait (`actor-right`) | not rendered | not rendered | while the `dialogue` panel is available (dimmed while the player speaks) | not rendered |
 | foe line-up (`actor-right`, every foe that has not fled, up to 15, in the combat formation; fallen foes in their defeated look) | only while a round that ended the fight still plays (held, inert) | while at least one foe is active | not rendered | not rendered |
 | figure plates (`plates` layer, one per drawn non-controlled combat figure) | only while a round that ended the fight still plays (held, inert) | visible | not rendered | not rendered |
-| action dock (band command region) | visible | visible | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
+| action dock (band command region) | visible | **in the combat command card** (command region collapsed: `display:none`) | **hidden** (command region collapsed: inert at commit, slides out, then `visibility: hidden`) | visible (creation form, full band width) |
 | command-line toggle (⌨, message region's bottom-right) | visible | visible | visible | hidden |
 | log control (日誌, beside the command-line toggle) | visible | visible | visible | hidden |
 | command line (row on the message region's top edge) | while expanded | while expanded | while expanded | hidden |
 | scene backdrop | visible (exploration stage; the combat stage while a round that ended the fight still plays) | visible (combat stage) | visible (unchanged art) | visible |
 ```
+
+#### Scenario: Combat presents the dock as the centred card
+- **WHEN** the committed mode changes from exploration to combat, and later back to exploration
+- **THEN** in combat the band's command region is `display:none`, the message region spans the band, and the same `#action-dock` element renders as the combat command card in the `choices` anchor as "The combat command card stands at the stage's dead centre" defines; on the return the command region renders at the band's right third holding that element again, and the `choices` anchor holds no dock
 
 #### Scenario: The minimap disappears in combat
 - **WHEN** the committed mode changes from exploration to combat
@@ -1148,7 +1153,7 @@ In combat, opening Skills SHALL present the committed skill categories as a boun
 
 #### Scenario: The skill frame lists descriptors beside a detail region
 - **WHEN** a skill frame renders
-- **THEN** it lists that group's descriptors in the server's order, each row carrying the skill's label and its resource cost, beside a detail region naming the focused skill, its description, its cost, its target requirement and, when it is unavailable, its server-authored reason
+- **THEN** it lists that group's descriptors in the server's order, each row carrying the skill's label and its resource cost, with a detail region — a strip below the rows inside the combat command card — naming the focused skill, its description, its cost, its target requirement and, when it is unavailable, its server-authored reason
 
 #### Scenario: Server grouping is never reshaped
 - **WHEN** any skill level renders
@@ -2092,7 +2097,7 @@ The skill book, the bag and equipment, the shop, the quest board, the lore refer
 - **THEN** the top-right `map` anchor renders no reference panel, contributes no visible box and no tab stop, and no interactive stage anchor's rendered box intersects another's
 
 ### Requirement: The action dock fills the band's command region at a fixed size
-The action dock SHALL fill the bottom band's command region — the right third of the band, or the whole band in creation mode — at the band's fixed height, and SHALL NOT be a floating panel placed elsewhere on the stage. Its box SHALL be the command region's box in exploration, combat, and creation mode and for every frame, and no surface outside the band SHALL be positioned from the frame the dock currently carries.
+Outside combat the action dock SHALL fill the bottom band's command region (the right third, or the whole band in creation mode) at the band's fixed height, and SHALL NOT float elsewhere on the stage. In combat mode the dock SHALL instead stand as the combat command card defined by "The combat command card stands at the stage's dead centre". Its box SHALL be fixed for every frame, and no other surface SHALL be positioned from the frame the dock currently carries.
 
 #### Scenario: No frame moves or resizes the dock
 - **WHEN** the dock carries the exploration root (with or without a person's verb card or a room card open over the stage), the combat frames, the skill master-detail, the destructive confirmation, or an empty pane host
@@ -2104,14 +2109,14 @@ The action dock SHALL fill the bottom band's command region — the right third 
 
 #### Scenario: Fixed chrome surrounds one scrolling region
 - **WHEN** the dock's content column lays out
-- **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region
+- **THEN** it is laid out as fixed chrome — the combat root's vertical command list in combat mode and no bar in exploration mode, an optional breadcrumb line, and the shortcut-legend strip at the bottom in combat only — around one remaining region that holds the current frame's rows or chips, and that region is the surface's only scrolling area, so no dock content is ever pushed outside the command region or, in combat, the card
 
 #### Scenario: Popovers and wide frames stay inside the region
 - **WHEN** a person's verb card, the wait card, or the suggestions card renders, or a frame's content does not fit the region's width
-- **THEN** the card renders centred over the stage in the `choices` anchor, outside the command region, scrolling inside its own card when its rows exceed it, while the command region keeps its box, and the wide frame wraps or collapses its own columns inside the region, never overflowing it horizontally
+- **THEN** the card renders centred over the stage in the `choices` anchor, outside the command region, scrolling inside its own card when its rows exceed it, while the command region keeps its box, and the wide frame wraps or collapses its own columns inside the region or the combat card, never overflowing it horizontally
 
 #### Scenario: One dock element persists across every mode
-- **WHEN** the committed mode changes, including into or out of dialogue
+- **WHEN** the committed mode changes, including into or out of dialogue or combat
 - **THEN** the panel is the same single `#action-dock` element in every mode, carrying its existing tab index, its `data-mode` attribute and its role as the documented focus forwarding target, with the compass owning exploration-root focus and the active row container owning other dock frames, and it is not remounted
 
 #### Scenario: The presentation stays readable beyond colour
@@ -2123,31 +2128,32 @@ The action dock SHALL fill the bottom band's command region — the right third 
 - **THEN** the `#action-dock` element lies inside the band's command region, the region's left edge is at two thirds of the stage width and its right edge at the stage's right edge (each ±1px), and the dock covers neither the message region nor the command line
 
 #### Scenario: No frame resizes the command region
-- **WHEN** the dock moves at 1451x790 from the exploration root to a person's verb card over the stage, to the wait card, and, in combat, to the deepest skill target frame
-- **THEN** the command region's rendered box is identical (±1px) in all four states, the band's height is unchanged, and each card lies centred over the stage above the band
+- **WHEN** the dock moves at 1451x790 from the exploration root to a person's verb card over the stage and to the wait card, and later, in combat, from the combat root to the deepest skill target frame
+- **THEN** the command region's rendered box is identical (±1px) in the three exploration states, the combat command card's rendered box is identical (±1px) in every combat frame, the band's height is unchanged throughout, and each card lies over the stage above the band
 
 #### Scenario: An overflowing frame scrolls inside the panel
 - **WHEN** the current frame holds more rows than the dock's row region can display
 - **THEN** the row region scrolls internally, the dock's chrome (the combat root list, the breadcrumb,
-  and the combat-only legend strip) stays fixed, and no row or chip is rendered outside the command region
+  and the combat-only legend strip) stays fixed, and no row or chip is rendered outside the command region or, in combat, the card
 
 #### Scenario: One dock element persists across a mode change
 - **WHEN** the committed mode changes between exploration, dialogue, combat and creation
 - **THEN** exactly one `#action-dock` element exists at every point, its `data-mode` attribute
-  switches to the new mode, it is hidden with `display:none` exactly while the mode is dialogue, and
-  it is not removed and re-created
+  switches to the new mode, it is hidden with `display:none` exactly while the mode is dialogue, it stands
+  in the combat command card exactly while the mode is combat, and it is not removed and re-created
 
 #### Scenario: The panel stays inside its region at the minimum viewport
 - **WHEN** the shell renders at 1451x790 with the deepest combat frame open
-- **THEN** the dock's rendered box stays within the command region, no dock content overflows the
-  region horizontally, and the frame's confirm control is reachable by scrolling the row region
-  without being clipped
+- **THEN** the dock's rendered box is the combat command card's box inside the `choices` anchor, no dock
+  content overflows the card horizontally, and the frame's confirm control is reachable by scrolling
+  the row region without being clipped
 
 #### Scenario: The band's background matches the reference's shadowed gradient
 - **WHEN** the bottom band renders in any mode
 - **THEN** the band element paints a background gradient and a box-shadow, its top edge is the
-  seam's fine gold line drawn by the band's own decoration, and the `#action-dock` content column
-  itself paints no background, border, or shadow
+  seam's fine gold line drawn by the band's own decoration, and outside combat the `#action-dock`
+  content column itself paints no background, border, or shadow (in combat it paints the shared card
+  frame of the combat command card)
 
 ### Requirement: The place card names the current location and the world time
 The stage SHALL carry a place card as the first island of its `map` anchor, at the stage box's top-right corner directly below the top band and directly above the minimap island, while the committed mode is exploration, and SHALL NOT render it in combat, creation or settled dialogue mode. The card SHALL state the current location as its heading and the world date/time beneath it, and SHALL be the only surface on the stage or in the top band that states either value.
@@ -2277,7 +2283,7 @@ When a dock pane's row region uses a fixed column count for keyboard row/col geo
 - **THEN** its pane is the compass beside the 建議 pill and the readout, with no row region at all — the exploration root is not a fixed-column pane
 
 #### Scenario: A narrow command region keeps every row inside the pane
-- **WHEN** a combat skill, target, or scale pane renders in the command region at the 1451x790 reference viewport
+- **WHEN** a combat skill, target, or scale pane renders in the combat command card at the 1451x790 reference viewport with three foes standing
 - **THEN** every row lies inside the pane's right edge, the pane shows no horizontal overflow, and a long label wraps within its row
 
 #### Scenario: Rendered width never changes the keyboard cell mapping
@@ -2678,7 +2684,7 @@ The stage SHALL animate live mode changes, taking every duration, delay, and dis
 
 #### Scenario: Combat entry flashes; exit plays no flash
 - **WHEN** the mode changes exploration → combat, and combat → exploration
-- **THEN** entering: a white flash lasting the flash duration (120ms at `full`) plays once over the stage and under every island, the combat veil fades in, and the command region's content flips to the combat root; leaving: the veil fades out and the content flips back, and no flash plays
+- **THEN** entering: a white flash lasting the flash duration (120ms at `full`) plays once over the stage and under every island, the combat veil fades in, the command region collapses, and the combat command card comes in over the stage as the flash releases; leaving: the veil fades out, the command region returns and its content flips back to the exploration root, and no flash plays
 
 #### Scenario: Choice rows stagger in
 - **WHEN** the dialogue choice list appears, or rows are swapped in by `↦ 移動…` or by its return
@@ -2690,15 +2696,15 @@ The stage SHALL animate live mode changes, taking every duration, delay, and dis
 
 #### Scenario: Transitions never delay state, input, or scroll
 - **WHEN** any mode transition plays
-- **THEN** every leaving element is out of reach as "A leaving element is out of reach while it animates out" requires; no transition delays a committed value or the player's input beyond its own duration — the choice list takes focus and handles keys and pointer from its first frame, and the dock is focusable from the first frame of its return; and the mode change scrolls nothing — a surface that slides past the stage's edge is clipped without widening any ancestor's scrollable area, no focus move during a mode change scrolls an ancestor toward its target, and the stage never shifts sideways
+- **THEN** every leaving element is out of reach as "A leaving element is out of reach while it animates out" requires; no transition delays a committed value or the player's input beyond its own duration — the choice list takes focus and handles keys and pointer from its first frame, the combat command card's rows take keys and pointer from the commit's frame, and the dock is focusable from the first frame of its return; and the mode change scrolls nothing — a surface that slides past the stage's edge is clipped without widening any ancestor's scrollable area, no focus move during a mode change scrolls an ancestor toward its target, and the stage never shifts sideways
 
 #### Scenario: Decorations stay out of the tree and off the pointer
-- **WHEN** the flash, the veil, or the flip plays
+- **WHEN** the flash, the veil, the card's entrance, or the flip plays
 - **THEN** each is decorative, absent from the accessibility tree, and never intercepts a pointer
 
 #### Scenario: Reduced and off settle every mode change
 - **WHEN** a mode change plays at `reduced`, and at `off`
-- **THEN** at `reduced` the slides, the flip's rotation, and the rise move nothing, the fades last at most 150ms, the flash is not visible, and the stagger is zero; at `off` every mode change renders its final state in the commit's frame
+- **THEN** at `reduced` the slides, the flip's rotation, the card's rise, and the rows' rise move nothing, the fades last at most 150ms, the flash is not visible, and the stagger is zero; at `off` every mode change renders its final state in the commit's frame
 
 #### Scenario: Entering dialogue slides the panel out and the host in
 - **WHEN** the effective level is `full` at 1451x790 and the player opens a conversation
@@ -2724,13 +2730,14 @@ The stage SHALL animate live mode changes, taking every duration, delay, and dis
 - **WHEN** the effective level is `full` and a committed revision changes the mode from exploration to
   combat
 - **THEN** the flash layer plays one 120ms animation, the combat veil's opacity transitions from zero,
-  the command region's content plays the flip toward the combat root, and none of them is in the
-  accessibility tree or receives a click
+  the combat command card plays one entrance — a 250ms fade and a rise by the small shift, delayed by
+  the 120ms flash — while it already holds the dock's rows, the command region plays no flip, and none
+  of the decorations is in the accessibility tree or receives a click
 
 #### Scenario: Leaving combat plays no flash
 - **WHEN** the effective level is `full` and the mode changes from combat to exploration
-- **THEN** the veil fades out and the command region's content flips back, and the flash layer plays
-  no animation
+- **THEN** the veil fades out, the command region renders again and its content flips back, the combat
+  command card is gone at the commit, and the flash layer plays no animation
 
 #### Scenario: Choice rows stagger in without delaying input
 - **WHEN** the effective level is `full` and the dialogue choice list appears with five rows
@@ -2739,18 +2746,19 @@ The stage SHALL animate live mode changes, taking every duration, delay, and dis
 
 #### Scenario: A reconnect replays nothing
 - **WHEN** the client reconnects while the committed mode is combat or dialogue
-- **THEN** no flash, flip, slide, or stagger plays, and every surface renders its final state
+- **THEN** no flash, flip, slide, card entrance, or stagger plays, and every surface renders its final
+  state, the combat command card at rest
 
 #### Scenario: Reduced keeps short fades and drops every movement
 - **WHEN** the effective level is `reduced` and the player enters and leaves dialogue, then enters combat
-- **THEN** the command region, the host, the name plate, the veil, and the choice rows only fade, each
-  within 150ms, no slide, rotation, or rise moves anything, no flash is visible, and the rows appear
+- **THEN** the command region, the host, the name plate, the veil, the combat command card, and the
+  choice rows only fade, each within 150ms, the card with no delay, no slide, rotation, or rise moves anything, no flash is visible, and the rows appear
   together
 
 #### Scenario: Off renders every mode change at once
 - **WHEN** the effective level is `off` and the mode changes into and out of dialogue and combat
 - **THEN** in the commit's frame each surface holds its final state: the command region hidden or
-  shown, the host present or absent, the veil at its final opacity, the flash invisible, and every
+  shown, the combat command card present or absent at rest, the host present or absent, the veil at its final opacity, the flash invisible, and every
   choice row fully shown
 
 ### Requirement: Combat beats are choreographed on the stage at the motion level
@@ -2856,7 +2864,7 @@ Standing portraits SHALL retain their supplied image contours and align their fe
 - **THEN** the silhouette identity and state are not occluded by vitals or the command line and all HUD controls remain reachable
 
 ### Requirement: The bottom band separates material and focus without obscuring controls
-The fixed bottom band SHALL provide a continuous ink-and-gold reading surface with a decorative stage seam and aligned message-control and shortcut rows. Page text, command rows and cards SHALL never paint over these reserved controls. Only the active control SHALL carry the strongest focus treatment; the command field SHALL expose one clear focus frame.
+The fixed bottom band SHALL provide a continuous ink-and-gold reading surface with a decorative stage seam and an aligned message-control row; the shortcut legend stands at the foot of the dock that carries it (in combat, inside the combat command card). Page text, command rows and cards SHALL never paint over these reserved controls. Only the active control SHALL carry the strongest focus treatment; the command field SHALL expose one clear focus frame.
 
 #### Scenario: Popover text is isolated
 - **WHEN** a person's verb card opens over the stage with populated scene chips in the command panel
@@ -2864,7 +2872,7 @@ The fixed bottom band SHALL provide a continuous ink-and-gold reading surface wi
 
 #### Scenario: Dense command content is bounded
 - **WHEN** a frame contains more rows than fit
-- **THEN** its own row region scrolls while the legend and message controls remain visible on one baseline
+- **THEN** its own row region scrolls while the shortcut legend at the card's foot and the band's message controls remain visible and unmoved
 
 #### Scenario: Motion is reduced
 - **WHEN** the player changes command frames with reduced motion or off
@@ -2947,11 +2955,11 @@ Opening basic attack SINGLE targeting SHALL initially focus the first enabled op
 - **THEN** focus falls back without constructing a candidate or dispatching
 
 ### Requirement: Playback lock is visible without inventing progress
-While combat playback locks mutation controls, the command region SHALL communicate that it is waiting and expose the existing skip interaction clearly. A decorative activity line SHALL NOT imply a server completion percentage and SHALL be static at reduced/off.
+While combat playback locks mutation controls, the combat command card SHALL communicate that it is waiting and expose the existing skip interaction clearly. A decorative activity line SHALL NOT imply a server completion percentage and SHALL be static at reduced/off.
 
 #### Scenario: The cue appears only while playback locks the commands
 - **WHEN** a combat round starts playing by itself at `full` motion, and later at `off`
-- **THEN** the command region shows the waiting cue with a skip control while the round plays, and at `off`, where nothing locks, no cue appears
+- **THEN** the combat command card shows the waiting cue over its body with a skip control while the round plays, keeping its box, and at `off`, where nothing locks, no cue appears
 
 #### Scenario: Skip settles the lock
 - **WHEN** the player skips a locked playing round
@@ -3417,3 +3425,66 @@ A foe whose state is `knocked_out` or `defeated` SHALL stay in its formation slo
 #### Scenario: Fallen figures keep their slot
 - **WHEN** one of three foes is defeated, and later one flees
 - **THEN** the defeated foe keeps its slot and the formation does not re-form; the fled foe fades where it stands and the formation re-forms for the remaining drawn figures
+
+### Requirement: The combat command card stands at the stage's dead centre
+While the committed mode is `combat`, the client SHALL present the same `#action-dock` element as one 264px × S wide card in the stage's `choices` anchor, framed like the other choice cards, centred on the stage's horizontal centre in every combat state, inside the dead-centre gap the combat formation keeps clear; the band's command region SHALL collapse.
+
+#### Scenario: The card is at dead centre with a fixed width
+- **WHEN** combat renders at 1451x790 and at 1600x900 for parties of one, three and five figures against one, four, eight and the maximum (16 minus the party count) foes
+- **THEN** `#action-dock` lies inside the `choices` anchor, its horizontal centre is the stage's horizontal centre (±1px), its width is 264px × S (±1px: 264 and 291.1), and it is the same in every case
+
+#### Scenario: The card never covers the formation
+- **WHEN** combat renders any of those cases, including during the entry into combat and while a foe joins or leaves
+- **THEN** the card intersects no figure box (at rest or at the farthest point of a beat gesture), no figure plate and no marker slot, because every one of them stands outside the card's columns
+
+#### Scenario: The width and height follow the stated rules
+- **WHEN** combat renders at 1451x790 and at 1600x900
+- **THEN** the card's top is the `choices` anchor's top and its height is the smaller of 400px × S and the anchor's span (from the top band's inset to 8px × S above the scene caption row), so the card is 400px tall at 1451x790 (anchor 58–472 → 414px) and 441.1px at 1600x900
+
+#### Scenario: The card keeps the stage's other surfaces clear
+- **WHEN** combat renders at 1451x790 and at 1600x900 with the command line expanded
+- **THEN** the card lies inside the stage box below the top band and intersects no `vitals`, band, or command-line anchor, and the vitals dock stays visible
+
+#### Scenario: No frame resizes the card
+- **WHEN** the player moves at 1451x790 from the combat root through Skills, a category, a group, a skill frame, a master's 威力 scale step and the target step, and separately opens the Forfeit confirmation
+- **THEN** the card's rendered box is identical (±1px) in every frame, the row region scrolls inside the card keeping the focused row in view, and the detail strip and the shortcut legend stay at the card's foot
+
+#### Scenario: Every frame lays out in one narrow column
+- **WHEN** the combat root, a category, a group, a skill frame, a master's scale step, a SINGLE target frame, an AREA target frame and the Forfeit confirmation render in the 264px × S card
+- **THEN** the root, category, group, skill and SINGLE/SELF/NONE target frames render one row per line in a single column, the AREA token grid keeps its two columns and the scale step its one column per scale, every row and chip lies inside the card without horizontal overflow, a long label wraps within its row, and the keyboard cell mapping of every frame is unchanged
+
+#### Scenario: The detail folds into a strip below the rows
+- **WHEN** a frame with a detail renders in the card — the combat root, a category, a skill frame, or a master's scale step — and a disabled entry is focused
+- **THEN** the row region and the detail strip are direct children of the pane host, the strip lies entirely below the row region across the card's inner width at a fixed height of three text lines, its first line states the focused entry's cost and target requirement where it carries them, the remaining lines state its description or, for a disabled entry, its server-authored reason in place of the description, clipped with an ellipsis, and the strip's full text stays in the DOM and is the focused row's accessible description
+
+#### Scenario: The breadcrumb and the legend fit the narrow card
+- **WHEN** the card renders a frame three levels below the root, and the shortcut legend
+- **THEN** the breadcrumb is one line whose back control and current frame name stay visible while earlier crumbs ellipsize, and the legend keeps its text, wrapping at its separators onto at most two lines
+
+#### Scenario: The card wears the shared card frame
+- **WHEN** the card renders
+- **THEN** it paints the same frame as the dialogue choice list's card — the gold-edged ink panel, the crest on its top edge and the four corner brackets — its frame brightens while keyboard focus is within it, and the crest and brackets are absent from the accessibility tree and never intercept a pointer
+
+#### Scenario: The band collapses while the card stands
+- **WHEN** the committed mode changes from exploration to combat at 1451x790, and later back
+- **THEN** in combat the band's command region is `display:none` and the message region spans the band's whole width at the band's fixed height, its reading column keeping its measure; on the return the command region renders again at the band's right third holding the same `#action-dock` element
+
+#### Scenario: The dock moves, never remounts
+- **WHEN** the committed mode changes from exploration to combat, from combat to exploration, and from combat to dialogue
+- **THEN** exactly one `#action-dock` element exists at every point and it is the same node before and after each change, its `data-mode` follows the committed mode, and it is a descendant of the `choices` anchor exactly while the mode is combat
+
+#### Scenario: Focus survives the move
+- **WHEN** focus is on the exit compass or on the dock and the mode changes into combat, and later focus is inside the card and the mode changes back to exploration
+- **THEN** after the commit's render focus is on `#action-dock` or inside it in combat, and on the exit compass in exploration, never on the document body; focus the player put in the command field or an open drawer stays where it was
+
+#### Scenario: Keys and pointer behave as before
+- **WHEN** the card is shown and the player uses the arrow keys, Enter, Escape, the digits 1–9, the breadcrumb's back control, and pointer clicks on rows
+- **THEN** every key and activation routes through the same keyboard router and dispatch entry as in the band, emits byte-identical payloads, and the card adds no key handling of its own
+
+#### Scenario: The card enters with combat and never on a reconnect
+- **WHEN** the mode live-changes into combat at `full`, at `reduced`, and at `off`, and when the client reloads or reconnects in combat
+- **THEN** at `full` the card fades in over 250ms while rising by the small shift, starting once the 120ms flash has played; at `reduced` it only fades, within 150ms and with no delay; at `off`, and on a reload or reconnect, it renders at rest in the commit's frame; in every case its rows take keys and pointer from the commit's frame
+
+#### Scenario: Playback veils the card's body
+- **WHEN** a combat round plays by itself and locks the commands, and later the player activates 跳過演出
+- **THEN** the waiting cue with its skip control covers the card's body inside the card while the card keeps its box, and the skip ends the round through the existing skip path
