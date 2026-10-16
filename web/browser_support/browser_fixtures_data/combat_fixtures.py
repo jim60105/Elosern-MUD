@@ -9,6 +9,7 @@ from web.browser_support.browser_fixtures_data.mode import synth_mode_enabled
 from web.browser_support.browser_fixtures_data.shipped_seed import (
     SHIPPED_COMBAT_LADDER_SKILL,
     SHIPPED_COMBAT_MONSTERS,
+    SHIPPED_COMBAT_SELF_SKILL,
 )
 from web.browser_support.browser_fixtures_data.grafting import (
     SYNTH_INNATE_ATTACK_KEY,
@@ -89,6 +90,10 @@ def combat_journey_values() -> dict:
       scale rows render the ascending multiples of this value).
     - ``enhancement_key``: the owned active of the enhancement category's
       null-keyed sub-group (NONE-shape in shipped mode).
+    - ``self_key`` / ``self_category``: the granted, identity-eligible
+      SELF-shape active the SELF payload journey submits and the category it
+      lives in (the kit's self-buff under the synthetic install; the shipped
+      wind line's self-haste in shipped mode).
     - ``engage_target``: the first living combat monster in the start room
       (the journeys' ``engage`` argument).
     """
@@ -113,6 +118,8 @@ def combat_journey_values() -> dict:
             "spell_element_label": "火",
             "ladder_mp_cost": 14,
             "enhancement_key": "t_moss_veil",
+            "self_key": "t_moss_veil",
+            "self_category": "enhancement",
             "engage_target": SYNTH_COMBAT_MONSTERS[0][0],
         }
     return {
@@ -132,6 +139,8 @@ def combat_journey_values() -> dict:
         "spell_element_label": "火",
         "ladder_mp_cost": 14,
         "enhancement_key": SHIPPED_COMBAT_NONE_SKILL,
+        "self_key": SHIPPED_COMBAT_SELF_SKILL,
+        "self_category": "elemental_magic",
         "engage_target": SHIPPED_COMBAT_MONSTERS[0][0],
     }
 

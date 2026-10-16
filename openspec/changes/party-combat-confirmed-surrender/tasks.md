@@ -25,3 +25,7 @@ Total estimate: **6 hours**, including implementation, focused verification, doc
 ## 6. Integration gate (0.5h)
 
 - [ ] 6.1 Run focused exit/aftermath/exam/command tests plus tools.contract_gate and observability lint/focused boundary-event tests.
+
+## Annotation timing
+
+This change's own new requirement (the session/round/operation-bound party exit and its surrender settlement) has no identifier in `openspec/specs/` until the archive step syncs the delta, and `tools.spec_traceability check` rejects unknown identifiers. The new tests therefore annotate only the existing main-spec requirements they genuinely establish (`player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes`, `...::combat-time-settles-once-at-terminal-session-outcome`, `...::round-revisions-execute-at-most-once-across-retries-and-stale-requests`); the added requirement's annotations must be attached during the archive sync, exactly as the sibling changes in this batch did.

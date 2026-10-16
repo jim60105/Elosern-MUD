@@ -41,7 +41,19 @@ SHIPPED_MONSTER_TIER_KEY = "floor"
 
 #: Combat fixture grant set: active skills, passive skills, and the
 #: skill-anchored freeform ladder rung (``use-driven-skill-lineage`` DC5).
-SHIPPED_COMBAT_ACTIVE_SKILLS = ("fire_ball", "wind_blade", "status_disguise", "concentration")
+#: The shipped SELF-shape active the combat-menu SELF journey drives. The
+#: allied flee row is not a session skill any more (party-combat-confirmed-
+#: surrender §6), so the journey needs a granted, identity-eligible SELF skill
+#: of its own; ``gale_step`` is the wind line's self-haste, granted after the
+#: ladder row so the wind sub-group keeps ``wind_blade`` first.
+SHIPPED_COMBAT_SELF_SKILL = "gale_step"
+SHIPPED_COMBAT_ACTIVE_SKILLS = (
+    "fire_ball",
+    "wind_blade",
+    "status_disguise",
+    "concentration",
+    SHIPPED_COMBAT_SELF_SKILL,
+)
 SHIPPED_COMBAT_PASSIVE_SKILLS = ("defense_instinct", "wind_mastery")
 SHIPPED_COMBAT_LADDER_SKILL = "wind_blade"
 SHIPPED_COMBAT_LADDER_LEVEL = 10
