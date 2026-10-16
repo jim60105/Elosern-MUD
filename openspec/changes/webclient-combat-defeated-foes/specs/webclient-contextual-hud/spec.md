@@ -79,6 +79,14 @@ While the formation is shown, each drawn combat figure other than the controlled
 - **WHEN** combat renders for every party count 1–5 against foe counts 1, 3, 7, 8 and 16 minus the party count at 1451x790 and 1600x900
 - **THEN** every plate lies inside its slot (±1px), no two plates intersect, and no plate intersects the command card's column, the vitals dock or the top band
 
+#### Scenario: No head is ever covered and no plate is covered
+- **WHEN** combat renders for every party count 1–5 against foe counts 1, 4, 8 and 16 minus the party count at 1451x790 and 1600x900, in one rank and in two
+- **THEN** no plate (and no target-marker slot) intersects any standing figure's head — the central 30% of its box's width and the top 22% of its height — in the front rank or the back rank; no front-rank figure reaches a back-rank head; the heads of one rank never overlap; a figure's lower body MAY be covered; and the plates layer paints above every figure, so no figure covers a plate
+
+#### Scenario: A two-rank side's front plates stand on the floor line
+- **WHEN** a side stands in two ranks
+- **THEN** each back-rank plate stands above its figure's head, and each front-rank plate stands on the side's floor line over its own figure's lower body — 8px × S above the command-line row and, for the party, 8px × S above the vitals dock — so no front-rank plate lies across a back-rank face
+
 #### Scenario: Plates follow playback
 - **WHEN** a combat round plays damage beats on a foe and on a companion
 - **THEN** each plate's stroke and readout show the displayed value the beat publishes (`displayHp`) and settle to the committed value when the round ends, so the plate never shows a later value than the beat's page
