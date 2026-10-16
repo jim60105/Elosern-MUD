@@ -290,3 +290,88 @@ describe("DockMenu strip id", () => {
     own.unmount();
   });
 });
+
+// webclient-combat-stage-target-picking (design D3): in the stage target step
+// the card collapses to the target prompt — the action with 選擇目標 and Esc
+// 返回, the focused position's summary, and the AREA chips — with the row
+// region mounted but hidden, the breadcrumb and legend gone, and a polite live
+// region carrying the announcement; chips emit the pointer entry and hand DOM
+// focus back to #action-dock.
+describe("ActionDock stage target prompt", () => {
+  let wrapper;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+    document.body.replaceChildren();
+  });
+  const member = (id, side, digit, extra = {}) => ({ key: `target-${id}`, kind: "member", identities: [String(id)], side, digit, offStage: false, label: `名${id}`, ...extra });
+  function step(extra = {}) {
+    const positions = extra.positions || [member(7, "foes", 1), member(8, "party", 2)];
+    const focused = positions.find((p) => p.key === (extra.focusKey ?? positions[0].key)) || null;
+    return {
+      form: "single", skillKey: "t_x", label: "火球", scaleLabel: null, positions,
+      focusKey: focused ? focused.key : null, focused, lit: focused ? focused.identities : [],
+      selectable: ["7", "8"], selectedIds: [], shorthand: null, choiceCount: 0, digits: {}, announce: "目標：名7，敵方",
+      ...extra, ...(extra.focusKey !== undefined ? { focused } : {}),
+    };
+  }
+  const dock = (props) =>
+    mount(ActionDock, {
+      attachTo: document.body,
+      props: { mode: "combat", rootItems: COMBAT_ROOT_ITEMS, view: { dockTrail: [], dockDepth: 2 }, card: true, ...props },
+      slots: { default: () => h("div", { "data-testid": "dock-menu" }, [h("button", { "data-testid": "row" }, "row")]) },
+    });
+
+  it("renders the prompt per form and hides the row region, crumb and legend", async () => {
+    wrapper = dock({ stageTarget: step({ scaleLabel: "威力 ×2" }) });
+    expect(wrapper.get("#action-dock").classes()).toContain("action-dock--target");
+    expect(wrapper.get('[data-testid="target-prompt-action"]').text()).toBe("火球威力 ×2 ‧ 選擇目標");
+    expect(wrapper.get(".target-prompt__esc").text()).toBe("Esc 返回");
+    expect(wrapper.get('[data-testid="target-prompt-focus"]').text().replace(/\s+/g, "")).toBe("▸名7敵方");
+    expect(wrapper.get(".action-dock__body").attributes("hidden")).toBeDefined();
+    expect(wrapper.find('[data-testid="dock-menu"]').exists()).toBe(true); // mounted, hidden
+    expect(wrapper.find('[data-testid="action-dock-description"]').exists()).toBe(false);
+    expect(wrapper.find(".dock-crumb").exists()).toBe(false);
+    expect(wrapper.find('[data-testid="target-prompt-chips"]').exists()).toBe(false);
+    const live = wrapper.get('[data-testid="target-announce"]');
+    expect(live.attributes("role")).toBe("status");
+    expect(live.attributes("aria-live")).toBe("polite");
+    expect(live.text()).toBe("目標：名7，敵方");
+    // SELF and an off-stage member.
+    await wrapper.setProps({ stageTarget: step({ form: "self", positions: [{ key: "self-confirm", kind: "self", identities: ["42"], side: "party", digit: 1, offStage: false, label: "自己" }], focusKey: "self-confirm", announce: "目標：自己" }) });
+    expect(wrapper.get('[data-testid="target-prompt-focus"]').text().replace(/\s+/g, "")).toBe("▸自己我方");
+    await wrapper.setProps({ stageTarget: step({ positions: [member(9, "foes", 1, { offStage: true, label: "逃兵" })], focusKey: "target-9" }) });
+    expect(wrapper.get('[data-testid="target-prompt-focus"]').text().replace(/\s+/g, "")).toBe("▸逃兵敵方場外");
+    // The step ends: the rows, the crumb and the legend return; the live region stays.
+    await wrapper.setProps({ stageTarget: null });
+    expect(wrapper.get(".action-dock__body").attributes("hidden")).toBeUndefined();
+    expect(wrapper.find('[data-testid="action-dock-description"]').exists()).toBe(true);
+    expect(wrapper.get('[data-testid="target-announce"]').text()).toBe("");
+  });
+
+  it("AREA chips emit the pointer entry and hand DOM focus back to the card", async () => {
+    const positions = [
+      member(7, "foes", 1),
+      { key: "shorthand-all-enemies", kind: "group", shorthand: "all-enemies", identities: ["7"], side: "foes", digit: 2, offStage: false, label: "全體敵人" },
+      { key: "area-confirm", kind: "confirm", identities: ["7"], side: null, digit: 3, offStage: false, label: "施展" },
+    ];
+    wrapper = dock({ stageTarget: step({ form: "area", positions, focusKey: "area-confirm", selectedIds: ["7"], choiceCount: 1, announce: "施展：已選 1 名" }) });
+    const chips = wrapper.findAll('[data-testid="target-prompt-chip"]');
+    expect(chips.map((c) => c.text())).toEqual(["全體敵人", "施展（1）"]);
+    expect(chips[1].attributes("data-focused")).toBe("true");
+    expect(chips.every((c) => c.attributes("tabindex") === "-1")).toBe(true);
+    expect(wrapper.get('[data-testid="target-prompt-focus"]').text().replace(/\s+/g, "")).toBe("▸施展已選1名");
+    chips[0].element.focus();
+    await chips[0].trigger("click");
+    expect(wrapper.emitted("target-pointer")).toEqual([["shorthand-all-enemies", "activate"]]);
+    expect(document.activeElement).toBe(wrapper.get("#action-dock").element);
+  });
+
+  it("moves DOM focus out of the rows into the card when the step starts", async () => {
+    wrapper = dock({ stageTarget: null });
+    wrapper.get('[data-testid="row"]').element.focus();
+    await wrapper.setProps({ stageTarget: step() });
+    await nextTick();
+    expect(document.activeElement).toBe(wrapper.get("#action-dock").element);
+  });
+});

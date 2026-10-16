@@ -241,6 +241,7 @@ export function stageTargetModel({
     form,
     skillKey: skill.key,
     label: skill.label || "",
+    scaleLabel: scaleLabelOf(skill),
     positions,
     focusKey: focused ? focused.key : null,
     focused,
@@ -252,6 +253,14 @@ export function stageTargetModel({
     digits,
     announce: announceFor(focused, { selected, shorthand, chosenGroup, choice }),
   });
+}
+
+// The chosen 威力 label of a master's freeform skill (the scale step's own
+// chip label), or null for a skill that carries no scales.
+function scaleLabelOf(skill) {
+  const scales = Array.isArray(skill.freeformScales) ? skill.freeformScales : [];
+  const chosen = scales.find((entry) => entry && entry.scale === skill.scale);
+  return chosen && chosen.label != null ? `威力 ×${chosen.label}` : null;
 }
 
 // The polite announcement (spec "The focused target is announced"): it names

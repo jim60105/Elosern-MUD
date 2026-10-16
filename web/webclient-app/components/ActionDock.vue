@@ -42,7 +42,16 @@
 // breadcrumb, the row region, the detail strip below it (its frames read the
 // provided `"strip"` variant), and the shortcut legend wrapping at its
 // separators. The playback cue still veils the body inside the card.
-import { computed, provide } from "vue";
+//
+// The stage target step (webclient-combat-stage-target-picking D3,
+// `stageTarget`): while the current frame's targets are picked on the stage
+// figures, the card collapses to a target prompt — the action with 選擇目標
+// and `Esc 返回`, the focused position's summary, and (AREA) one chip per
+// group and the confirm chip. The row region stays mounted but `hidden`, so
+// the router's state and the rows' focus bookkeeping are unchanged; DOM focus
+// that was inside it moves to `#action-dock`. A polite live region inside the
+// card, mounted in every card state, announces the focused target.
+import { computed, nextTick, provide, ref, watch } from "vue";
 import DockBreadcrumb from "./DockBreadcrumb.vue";
 import { DOCK_DETAIL_VARIANT } from "./dock-panes.js";
 // The card frame's rules are ChoiceCard's global (unscoped) styles; importing
@@ -70,14 +79,83 @@ const props = defineProps({
   // The narrow combat command card presentation (design D5): AppClient
   // passes `store.view.mode === 'combat'`.
   card: { type: Boolean, default: false },
+  // The stage target step (`store.view.stageTarget`), or null.
+  stageTarget: { type: Object, default: null },
 });
+
+const SIDE_LABELS = { foes: "敵方", party: "我方" };
+const dockRef = ref(null);
+const step = computed(() => (props.card ? props.stageTarget : null));
+// The focused position's summary (line 2 of the prompt), as parts so the
+// side and the state read as small tags beside the name.
+const summary = computed(() => {
+  const s = step.value;
+  const p = s && s.focused;
+  if (!p) return { name: "以方向鍵選擇目標", tags: [] };
+  if (p.kind === "self") return { name: "自己", tags: [{ text: "我方", tone: "party" }] };
+  if (p.kind === "member") {
+    const tags = [{ text: SIDE_LABELS[p.side], tone: p.side }];
+    if (p.offStage) tags.push({ text: "場外", tone: "muted" });
+    if (s.selectedIds.includes(p.identities[0])) tags.push({ text: "已選", tone: "chosen" });
+    return { name: p.label, tags };
+  }
+  if (p.kind === "group") return { name: p.label, tags: [{ text: `共 ${p.identities.length} 名`, tone: p.side || "muted" }] };
+  if (s.selectedIds.length > 0) return { name: "施展", tags: [{ text: `已選 ${s.selectedIds.length} 名`, tone: "chosen" }] };
+  if (s.shorthand) {
+    const group = s.positions.find((q) => q.kind === "group" && q.key === `shorthand-${s.shorthand}`);
+    return { name: "施展", tags: [{ text: `${group ? group.label : s.shorthand}，共 ${s.choiceCount} 名`, tone: "chosen" }] };
+  }
+  return { name: "施展", tags: [{ text: "尚未選擇目標", tone: "muted" }] };
+});
+// The AREA chips: one per group position, then the confirm chip.
+const chips = computed(() => {
+  const s = step.value;
+  if (!s || s.form !== "area") return [];
+  return s.positions
+    .filter((p) => p.kind === "group" || p.kind === "confirm")
+    .map((p) => ({
+      key: p.key,
+      kind: p.kind,
+      label: p.kind === "confirm" ? `施展（${s.choiceCount}）` : p.label,
+      focused: s.focusKey === p.key,
+      chosen: p.kind === "group" ? s.shorthand === p.key.slice("shorthand-".length) : false,
+      empty: p.kind === "confirm" && s.choiceCount === 0,
+    }));
+});
+// The live region's text: only the focus and the selection change it.
+const announce = computed(() => (step.value ? step.value.announce : ""));
+
+function onChip(key) {
+  emit("target-pointer", key, "activate");
+  // A chip never keeps DOM focus: `bridge.js` leaves Enter on a focused
+  // button to the button, so the next Enter must reach the router.
+  dockRef.value?.focus({ preventScroll: true });
+}
+
+// Entering the step hides the row region; DOM focus inside it would fall to
+// the document body, so it moves to the card itself.
+watch(
+  () => !!step.value,
+  async (active) => {
+    if (!active || !dockRef.value) return;
+    const focused = typeof document === "undefined" ? null : document.activeElement;
+    if (focused && focused !== dockRef.value && dockRef.value.contains(focused)) {
+      dockRef.value.focus({ preventScroll: true });
+    }
+    await nextTick();
+    const after = typeof document === "undefined" ? null : document.activeElement;
+    if (after === document.body && focused && dockRef.value.contains(focused)) {
+      dockRef.value.focus({ preventScroll: true });
+    }
+  },
+);
 
 provide(
   DOCK_DETAIL_VARIANT,
   computed(() => (props.card ? "strip" : "pane")),
 );
 
-const emit = defineEmits(["action", "back", "skip"]);
+const emit = defineEmits(["action", "back", "skip", "target-pointer"]);
 
 // Creation mode renders the panel with no bar and no crumb (task 4.8):
 // exactly one `#action-dock` persists across every mode change. Every other
@@ -89,7 +167,7 @@ const trail = computed(() => (props.view && props.view.dockTrail) || []);
 const depth = computed(() => (props.view && props.view.dockDepth) || 1);
 // Every submenu frame keeps the breadcrumb; a person's verbs are the stage's
 // verb card (exploration-presence-rail), never a dock frame.
-const showCrumb = computed(() => showChrome.value);
+const showCrumb = computed(() => showChrome.value && !step.value);
 
 
 function onBack() {
@@ -111,8 +189,10 @@ function onPaneActivate(payload) {
 <template>
   <section
     id="action-dock"
+    ref="dockRef"
     class="action-dock"
-    :class="{ 'action-dock--card choice-card choice-card--still': card }"
+    :class="{ 'action-dock--card choice-card choice-card--still': card, 'action-dock--target': !!step }"
+    :data-target-step="step ? step.form : null"
     :tabindex="tabStop ? 0 : -1"
     :data-mode="mode"
     data-testid="action-dock"
@@ -136,7 +216,48 @@ function onPaneActivate(payload) {
          the active menu frame (the exploration root pane, a combat or
          skill-use frame, or a confirm frame); the named `overlay` slot renders after
          it and covers exactly the pane's visible box. -->
-    <div class="action-dock__body" :class="{ 'action-dock__body--playback': playback }">
+    <!-- The target prompt (stage target step, design D3). -->
+    <div v-if="step" class="target-prompt" data-testid="target-prompt" :data-form="step.form">
+      <p class="target-prompt__head">
+        <span class="target-prompt__action" data-testid="target-prompt-action">
+          <span class="target-prompt__skill">{{ step.label }}</span>
+          <span v-if="step.scaleLabel" class="target-prompt__scale">{{ step.scaleLabel }}</span>
+          <span class="target-prompt__verb"> ‧ 選擇目標</span>
+        </span>
+        <span class="target-prompt__esc"><kbd>Esc</kbd> 返回</span>
+      </p>
+      <p class="target-prompt__focus" data-testid="target-prompt-focus">
+        <span class="target-prompt__glyph" aria-hidden="true">▸</span>
+        <span class="target-prompt__name">{{ summary.name }}</span>
+        <span
+          v-for="tag in summary.tags"
+          :key="tag.text"
+          class="target-prompt__tag"
+          :data-tone="tag.tone"
+        >{{ tag.text }}</span>
+      </p>
+      <div v-if="chips.length" class="target-prompt__chips" data-testid="target-prompt-chips">
+        <button
+          v-for="chip in chips"
+          :key="chip.key"
+          type="button"
+          tabindex="-1"
+          class="target-prompt__chip"
+          data-testid="target-prompt-chip"
+          :data-key="chip.key"
+          :data-kind="chip.kind"
+          :data-focused="chip.focused ? 'true' : null"
+          :data-chosen="chip.chosen ? 'true' : null"
+          :data-empty="chip.empty ? 'true' : null"
+          @mousedown.prevent
+          @click="onChip(chip.key)"
+        >{{ chip.label }}</button>
+      </div>
+    </div>
+    <!-- The step's live region: mounted in every card state so the first
+         focus is announced; it changes only with the focus or the selection. -->
+    <p v-if="card" class="action-dock__announce" role="status" aria-live="polite" data-testid="target-announce">{{ announce }}</p>
+    <div class="action-dock__body" :class="{ 'action-dock__body--playback': playback }" :hidden="!!step || null">
       <!-- The waiting cue (webclient-combat-command-window): it veils the
            body, so the rows never move when playback starts or ends. The button is a real control, so its own Enter / Space never
            reach the dock's key routing. -->
@@ -170,7 +291,7 @@ function onPaneActivate(payload) {
          exploration, whose bindings the help overlay lists:
          exploration-exit-compass). -->
     <p
-      v-if="mode !== 'creation' && mode !== 'exploration'"
+      v-if="mode !== 'creation' && mode !== 'exploration' && !step"
       class="action-dock__legend"
       data-testid="action-dock-description"
     >
@@ -183,6 +304,19 @@ function onPaneActivate(payload) {
 </template>
 
 <style scoped>
+/* The visually hidden live region (the card's step announcement). */
+.action-dock__announce {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* The content column (the draft's `.dock`): centred, bounded width, and the
    vertical layout only. The band chrome (gradient, top border, shadow) lives
    on HudFrame's `.stage-band`, which spans the whole stage; this column
@@ -456,6 +590,168 @@ function onPaneActivate(payload) {
   flex: none;
   letter-spacing: 0.06em;
 }
+/* The stage target step (design D3): the card collapses to the prompt at
+   the same centre, width and top (HudFrame lets the host shrink to it, at
+   most 136px·S). Every line is --text-sm on a 22px·S line; long text
+   ellipsizes; AREA chips are 28px·S tall and wrap onto at most two rows. */
+.action-dock.action-dock--card.action-dock--target {
+  height: auto;
+  gap: calc(4px * var(--ui-scale));
+  padding-bottom: calc(10px * var(--ui-scale));
+}
+.action-dock__body[hidden] {
+  display: none;
+}
+.target-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: calc(4px * var(--ui-scale));
+  min-width: 0;
+  font-family: var(--f-sans);
+  font-size: var(--text-sm);
+  line-height: calc(22px * var(--ui-scale));
+}
+.target-prompt p {
+  margin: 0;
+}
+.target-prompt__head {
+  display: flex;
+  align-items: baseline;
+  gap: calc(8px * var(--ui-scale));
+  min-width: 0;
+  white-space: nowrap;
+  border-bottom: 1px solid rgba(185, 154, 96, 0.18);
+  padding-bottom: calc(2px * var(--ui-scale));
+}
+.target-prompt__action {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--paper-500);
+}
+.target-prompt__skill {
+  font-family: var(--f-serif);
+  color: var(--gold-300);
+  letter-spacing: 0.06em;
+}
+.target-prompt__scale {
+  margin-left: 0.4em;
+  color: var(--gold-400);
+  font-size: var(--text-xs);
+}
+.target-prompt__esc {
+  flex: none;
+  color: var(--paper-500);
+  font-size: var(--text-xs);
+}
+.target-prompt__esc kbd {
+  font-family: var(--f-mono);
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0 calc(4px * var(--ui-scale));
+  color: var(--paper-300);
+}
+.target-prompt__focus {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.target-prompt__glyph {
+  flex: none;
+  color: var(--gold-400);
+}
+.target-prompt__name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--paper-50);
+  font-weight: 500;
+}
+.target-prompt__tag {
+  flex: none;
+  padding: 0 calc(6px * var(--ui-scale));
+  border-radius: var(--radius-pill);
+  border: 1px solid currentColor;
+  font-size: var(--text-xs);
+  line-height: calc(18px * var(--ui-scale));
+  color: var(--paper-500);
+}
+.target-prompt__tag[data-tone="foes"] {
+  color: #f0a59a;
+  background: rgba(150, 40, 36, 0.22);
+}
+.target-prompt__tag[data-tone="party"] {
+  color: #a9c8f0;
+  background: rgba(46, 82, 140, 0.22);
+}
+.target-prompt__tag[data-tone="chosen"] {
+  color: #bfe7c9;
+  background: rgba(47, 107, 70, 0.28);
+}
+.target-prompt__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: calc(4px * var(--ui-scale));
+  max-height: calc(60px * var(--ui-scale));
+  overflow: hidden;
+}
+.target-prompt__chip {
+  flex: 1 1 auto;
+  box-sizing: border-box;
+  height: calc(28px * var(--ui-scale));
+  padding: 0 calc(8px * var(--ui-scale));
+  border: 1px solid rgba(185, 154, 96, 0.45);
+  border-radius: var(--radius-sm);
+  background: rgba(16, 12, 9, 0.55);
+  color: var(--paper-200);
+  font: var(--text-xs) / 1 var(--f-sans);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--motion-fast) var(--ease-standard),
+    border-color var(--motion-fast) var(--ease-standard),
+    color var(--motion-fast) var(--ease-standard);
+}
+.target-prompt__chip:hover {
+  border-color: var(--gold-400);
+  color: var(--paper-50);
+}
+.target-prompt__chip[data-chosen="true"] {
+  border-color: #8fd1a2;
+  color: #dff5e5;
+}
+.target-prompt__chip[data-chosen="true"]::before {
+  content: "✓ ";
+}
+.target-prompt__chip[data-kind="confirm"] {
+  border-color: var(--gold-500);
+  color: var(--gold-300);
+  background: rgba(185, 154, 96, 0.12);
+}
+.target-prompt__chip[data-kind="confirm"][data-empty="true"] {
+  border-style: dashed;
+  color: var(--paper-500);
+  background: transparent;
+}
+.target-prompt__chip[data-focused="true"] {
+  border-color: var(--gold-300);
+  background: linear-gradient(180deg, rgba(240, 212, 142, 0.32), rgba(185, 154, 96, 0.18));
+  color: var(--paper-50);
+  box-shadow: 0 0 0 1px rgba(238, 221, 180, 0.35), 0 0 calc(10px * var(--ui-scale)) rgba(228, 200, 142, 0.35);
+}
+.target-prompt__chip[data-focused="true"]::after {
+  content: " ◂";
+  color: var(--gold-300);
+}
+
 /* The waiting cue stacks into one centred column in the narrow card. */
 .action-dock--card .action-dock__playback {
   grid-template-columns: auto;

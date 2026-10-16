@@ -411,6 +411,54 @@ describe("the plates layer in the client", () => {
     expect(wrapper.get('[data-anchor="plates"]').findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert)).toHaveLength(0);
   });
 
+  // webclient-combat-stage-target-picking: in the stage target step the plates
+  // are never dimmed (they carry the hit points the choice depends on); the
+  // arrow markers stand at the candidates' marker slots in stage order with
+  // the server-order digits; the focused one is the filled arrow.
+  it("keeps the plates undimmed in a stage target step and marks the candidates above them", async () => {
+    const attack = {
+      key: "basic_attack", label: "普通攻擊", description: "合成描述。", cost: {}, target_spec: "single", element: null,
+      enabled: true, disabled_reason: null, targets: [201, 202, 203], shorthands: [], hostile: true, beneficial: false,
+    };
+    const participants = [foeRow(201, "e1", "哥布林", 24), foeRow(202, "e2", "狼", 20), foeRow(203, "e3", "蝙蝠", 12), foeRow(204, "e4", "史萊姆", 8)];
+    store.receive(1, "ui_snapshot", [fx.snapshot({
+      presentation_epoch: fx.EPOCH_A, revision: 1, mode: "combat",
+      panels: {
+        status: fx.statusPanel(), exploration: fx.explorationPanel(), art: ART_PANEL_SAMPLE,
+        context_actions: fx.combatActions({ participants, skills: [{ category: "martial_arts", label: "武技", groups: [{ group: null, label: null, skills: [attack] }] }] }),
+      },
+    })], {});
+    await nextTick();
+    await nextTick();
+    expect(wrapper.findAll('[data-testid="stage-target-marker"]')).toHaveLength(0);
+    store.focusItemByKey("attack");
+    store.focusPress("Enter");
+    await nextTick();
+    await nextTick();
+    const markers = wrapper.findAll('[data-testid="stage-target-marker"]');
+    expect(markers.map((m) => m.attributes("data-identity")).sort()).toEqual(["201", "202", "203"]);
+    // Left to right on the stage equals the step's member order.
+    const byLeft = [...markers].sort((a, b) => parseFloat(a.element.style.left) - parseFloat(b.element.style.left));
+    expect(byLeft.map((m) => `target-${m.attributes("data-identity")}`)).toEqual(store.view.stageTarget.positions.map((p) => p.key));
+    expect(markers.find((m) => m.attributes("data-identity") === "201").attributes("data-state")).toBe("focus");
+    expect(markers.find((m) => m.attributes("data-identity") === "202").attributes("data-state")).toBe("selectable");
+    expect(markers.find((m) => m.attributes("data-identity") === "202").text()).toBe("2");
+    // The plates take no dim and no speaking state.
+    for (const plate of wrapper.findAll('[data-anchor="plates"] [data-testid="figure-plate"]')) {
+      expect(plate.attributes("data-speaking")).toBeUndefined();
+      expect(plate.element.style.filter || "").toBe("");
+    }
+    // The non-candidate foe is dimmed and carries no hit area; Escape ends the step.
+    const slot = wrapper.get('[data-testid="foe-slot"][data-identity="204"]');
+    expect(slot.get('[data-testid="stage-actor"]').attributes("data-speaking")).toBe("false");
+    expect(slot.find('[data-testid="stage-target-hit"]').exists()).toBe(false);
+    store.focusEscape();
+    await nextTick();
+    expect(wrapper.findAll('[data-testid="stage-target-marker"]')).toHaveLength(0);
+    expect(wrapper.findAll('[data-testid="stage-target-hit"]')).toHaveLength(0);
+    expect(wrapper.get('[data-testid="foe-slot"][data-identity="204"] [data-testid="stage-actor"]').attributes("data-speaking")).toBe("true");
+  });
+
   it("passes each participant's conditions and stage x to its plate, and closes a plate tooltip when a round starts", async () => {
     const participants = [
       { ...foeRow(201, "e1", "哥布林", 24), conditions: [POISON] },
