@@ -39,6 +39,7 @@ from world.rules.combat import (
     COMBAT_YAML,
     Battlefield,
     BattlefieldActionContext,
+    RoundTactical,
     _restored_amount,
     _roll_multiplier,
     _to_hit,
@@ -969,6 +970,40 @@ class ScaleGateAndPoolTests(unittest.TestCase):
             roster=roster,
             reads=reads,
         )
+
+    def _declared(self, verb):
+        """Estimate the plain strike with one round-start declaration active."""
+        snapshot, reads, roster, context = _shaped(self.actor, (self.enemy,))
+        context.battlefield.tactical = RoundTactical({self.enemy.key: verb})
+        return estimate_plan(
+            _hand(STRIKE, (self.enemy,), ((self.enemy,),)),
+            snapshot=snapshot,
+            actor=self.actor,
+            context=context,
+            roster=roster,
+            reads=reads,
+        )
+
+    @covers_requirement("combat-resolution::defend-reduces-eligible-final-scaled-direct-damage")
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
+    def test_round_start_declarations_drive_the_estimated_strike(self):
+        # Same probe matchup as the scale test: no declaration is 13.32.
+        baseline = self._plan(STRIKE, (self.enemy,), ((self.enemy,),))
+        self.assertAlmostEqual(_recipient(baseline, self.enemy).damage, 13.32)
+
+        # Defend floors every landed face at 65%: 24 -> 15, 36 -> 23 and the
+        # raw-100 critical 48 -> 31, so (40*15 + 9*23 + 31) / 100 = 8.38, the
+        # exact settlement arithmetic for the same defender.
+        defend = self._declared("defend")
+        self.assertAlmostEqual(_recipient(defend, self.enemy).damage, 8.38)
+
+        # Dodge raises the threshold to 76: only faces 76..100 land, every
+        # solid band disappears, and the raw-100 critical (48) survives above
+        # the 24 base hit: (24*24 + 48) / 100 = 6.24.
+        dodge = self._declared("dodge")
+        self.assertAlmostEqual(_recipient(dodge, self.enemy).damage, 6.24)
 
     @covers_requirement("monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement")
     def test_a_non_default_scale_scales_the_effects_and_their_cost(self):

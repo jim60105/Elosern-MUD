@@ -141,6 +141,54 @@ class SessionPersistenceTests(BattlefieldIsolation, EvenniaTestCase):
         join_party(companion, self.player)
         return companion
 
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
+    def test_round_start_declaration_is_projected_and_skips_the_ordinary_request(self):
+        from dataclasses import replace
+
+        from world.rules.combat_session import confirm_actor_command, reconstruct_battlefield
+        from world.rules.combat_session.rounds import (
+            _draft_requests,
+            _draft_tactical_declarations,
+        )
+
+        self._waiting_companion()
+        engage(self.player, self.monster)
+        session_id = read_session(self.player).session_id
+        command = {
+            "kind": "tactical",
+            "payload": {"tactical_key": "defend", "target_id": None},
+        }
+        result = confirm_actor_command(self.player, session_id, 0, 0, self.player.pk, command)
+        self.assertTrue(result["ok"], result)
+        self.assertFalse(result["is_complete"])
+
+        record = read_session(self.player)
+        battlefield = reconstruct_battlefield(self.player, record)
+        # The declaring actor consumes its selected action: it receives no
+        # ordinary round request, and its declaration is projected for
+        # activation by run_round.
+        self.assertNotIn(self.player.pk, _draft_requests(record, battlefield))
+        self.assertEqual(
+            _draft_tactical_declarations(record, battlefield),
+            {str(self.player.key): "defend"},
+        )
+
+        # A taunt entry (owned by the later taunt change) still fails loudly
+        # rather than silently consuming the actor's action.
+        taunt_record = replace(
+            record,
+            draft_entries={
+                self.player.pk: {
+                    "kind": "tactical",
+                    "payload": {"tactical_key": "taunt", "target_id": int(self.monster.pk)},
+                }
+            },
+        )
+        with self.assertRaises(ValueError):
+            _draft_requests(taunt_record, battlefield)
+
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
     def test_final_confirmation_commits_once_and_clears_draft(self):
