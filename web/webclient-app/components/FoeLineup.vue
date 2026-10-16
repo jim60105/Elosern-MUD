@@ -2,7 +2,7 @@
 // FoeLineup (OpenSpec changes webclient-combat-foes-on-stage and
 // webclient-combat-formation, design D1/D3/D4): the combat foes standing
 // opposite the party.
-// - Every active foe up to the line-up's maximum (`max`, 16 minus the drawn
+// - Every foe that has not fled up to the line-up's maximum (`max`, 16 minus the drawn
 //   party, never above FOE_STAGE_MAX), in presenter order, as one
 //   `StageActor` each (`side="right"`, never dimmed).
 // - In combat the `actor-right` anchor spans the stage, so each slot stands
@@ -22,23 +22,26 @@
 //   not carry is a local failure while an unadmitted one is expected absence.
 // - Each slot exposes `data-portrait-ref`, the art-catalog key the combat
 //   beats name, so the beat presentation can address a foe.
-// - A foe joining or leaving the active set inside combat enters or fades
-//   (`TransitionGroup name="foe"`); the leaving slot is inert from the commit
-//   on and fades where it stands.
+// - A knocked-out or defeated foe keeps its slot in its defeated look
+//   (webclient-combat-defeated-foes D1/D5; StageActor's `fallen`), so a
+//   defeat never re-forms the line. A foe joining or fleeing inside combat
+//   enters or fades (`TransitionGroup name="foe"`); the leaving slot is inert
+//   from the commit on and fades where it stands.
 // - While a combat round plays (webclient-combat-beat-choreography D5), the
-//   row stands the round's pre-round foes (`stage.foes`), so a foe the round
-//   defeats stays until its own defeat beat; each foe plays its beat gesture
+//   row stands the round's pre-round foes (`stage.foes`); a foe the round
+//   defeats stands in its pre-round look until its own defeat beat collapses
+//   it (`fallen`, from the stage); each foe plays its beat gesture
 //   (`stage.gestures`).
 // Decorative art: no focusable element, no pointer events, hidden from
 // assistive technology (the plates carry each foe's accessible reading).
 import { computed } from "vue";
 import StageActor from "./StageActor.vue";
-import { FOE_STAGE_MAX } from "./foe-lineup.js";
+import { FOE_STAGE_MAX, fallenLook } from "./foe-lineup.js";
 import { inertWhileLeaving } from "../lib/transition_hooks.js";
 
 const props = defineProps({
-  // The committed combat participants to stand on the stage: the active
-  // foes, in presenter order (AppClient filters them).
+  // The committed combat participants to stand on the stage: the foes that
+  // have not fled, in presenter order (AppClient filters them).
   foes: { type: Array, default: () => [] },
   // The committed `art` panel; its `portrait_catalog` resolves each foe.
   artPanel: { type: Object, default: null },
@@ -57,6 +60,12 @@ const props = defineProps({
   // Whether a re-formed line glides (false on a resize, a reconnect, and
   // below `full`).
   glide: { type: Boolean, default: true },
+  // The displayed fallen looks, identity -> "defeated" | "down" (AppClient:
+  // the playing round's stage, else the committed states), or null, when
+  // each foe's own `state` decides (stories, standalone use).
+  fallen: { type: Object, default: null },
+  // A change of look lands in the commit's frame (a reload or a reconnect).
+  fallInstant: { type: Boolean, default: false },
 });
 
 // `settled` fires when a foe that left the row has finished fading (at `off`,
@@ -119,6 +128,14 @@ function slotStyle(index) {
   };
 }
 
+// The foe's fallen look: the displayed map's entry, else its own state.
+function fallenFor(participant) {
+  if (props.fallen) {
+    return props.fallen[String(participant.identity)] ?? null;
+  }
+  return fallenLook("foes", participant.state);
+}
+
 // The foe's beat gesture for the current step, or null.
 function gestureFor(participant) {
   const ref = participant.portrait_ref;
@@ -150,6 +167,7 @@ function gestureFor(participant) {
         :data-rank="formation?.figures?.[i]?.rank ?? null"
         :data-portrait-ref="p.portrait_ref ?? ''"
         :data-beat="gestureFor(p)?.gesture ?? null"
+        :data-fallen="fallenFor(p)"
         :style="slotStyle(i)"
       >
         <div class="formation-figure" :data-glide-key="`foe:${p.identity}`">
@@ -164,6 +182,8 @@ function gestureFor(participant) {
             :gesture="gestureFor(p)?.gesture ?? null"
             :gesture-key="stage?.key ?? null"
             :float-amount="gestureFor(p)?.amount ?? null"
+            :fallen="fallenFor(p)"
+            :fall-instant="fallInstant"
           />
         </div>
       </div>
@@ -241,8 +261,8 @@ function gestureFor(participant) {
 }
 
 /* Membership inside combat (design D3): a joining foe slides in from the
-   right as it fades in; a leaving foe (defeated, fled) fades where it stands
-   while the others glide into their new places. */
+   right as it fades in; a fleeing foe fades where it stands while the others
+   glide into their new places (a defeated foe keeps its slot). */
 .foe-lineup > .foe-enter-active {
   transition:
     opacity var(--motion-actor) var(--ease-standard),

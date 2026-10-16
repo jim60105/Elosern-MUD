@@ -51,15 +51,33 @@ export function bySeverity(conditions) {
     .map((entry) => entry.condition);
 }
 
-// "<name> <token>，<我方|敵方>，生命 <cur>/<max>[，危險][，狀態：<a>、<b>]": the
-// session token is always part of the accessible name, even where the plate
-// does not show it; 危險 joins when low, the conditions' shared labels last.
-export function plateLabel({ name, token, side, current, maximum, conditions = [] }) {
+// The fallen readout (webclient-combat-defeated-foes design D1): the glyph
+// and the word a fallen figure's plate shows in place of its numbers.
+export const FALLEN_READOUT = Object.freeze({
+  defeated: Object.freeze({ glyph: "✕", word: "已擊破" }),
+  down: Object.freeze({ glyph: "▼", word: "倒地" }),
+});
+
+// The conditions a plate shows: none on a defeated foe (out of the fight,
+// its conditions no longer bear on a decision), every one otherwise.
+export function plateConditions(conditions, fallen) {
+  return fallen === "defeated" || !Array.isArray(conditions) ? [] : conditions;
+}
+
+// "<name> <token>，<我方|敵方>，生命 <cur>/<max>[，危險][，狀態：<a>、<b>][，已擊破|倒地]":
+// the session token is always part of the accessible name, even where the
+// plate does not show it; 危險 joins when low (never on a fallen figure,
+// whose word says more), the conditions' shared labels next (none on a
+// defeated foe), and a fallen figure's word last.
+export function plateLabel({ name, token, side, current, maximum, conditions = [], fallen = null }) {
   const who = [name, token].filter((part) => typeof part === "string" && part.length > 0).join(" ");
   const hp = typeof current === "number" && typeof maximum === "number" ? `${current}/${maximum}` : "--";
   const parts = [who, SIDE_LABEL[side] ?? SIDE_LABEL.foes, `生命 ${hp}`];
-  if (isLowPlateHp(current, maximum)) parts.push("危險");
-  if (Array.isArray(conditions) && conditions.length > 0) parts.push(`狀態：${conditions.map(conditionLabel).join("、")}`);
+  const readout = FALLEN_READOUT[fallen] ?? null;
+  if (!readout && isLowPlateHp(current, maximum)) parts.push("危險");
+  const shown = plateConditions(conditions, fallen);
+  if (shown.length > 0) parts.push(`狀態：${shown.map(conditionLabel).join("、")}`);
+  if (readout) parts.push(readout.word);
   return parts.join("，");
 }
 

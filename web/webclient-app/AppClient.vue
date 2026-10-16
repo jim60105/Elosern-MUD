@@ -49,7 +49,7 @@ import DesktopNavigation from "./components/DesktopNavigation.vue";
 import ReferenceArtwork from "./components/ReferenceArtwork.vue";
 import StageActor from "./components/StageActor.vue";
 import FoeLineup from "./components/FoeLineup.vue";
-import { activeFoes, foeStageLimit } from "./components/foe-lineup.js";
+import { drawnFoes, fallenLook, foeStageLimit } from "./components/foe-lineup.js";
 import FigurePlate from "./components/FigurePlate.vue";
 import { plateHpCurrent, repeatedNames } from "./components/figure-plate.js";
 import { useCombatFormation } from "./composables/use-combat-formation.js";
@@ -268,11 +268,12 @@ const playerDisplayHp = computed(() => {
   return typeof value === "number" ? value : null;
 });
 // The foe line-up (webclient-combat-foes-on-stage D1/D3): the committed
-// combat panel's active foes, in presenter order, stand in `actor-right`
-// while the mode is combat. It enters and leaves on the same live-only rule
-// as the host (`hostTransitionCss`).
+// combat panel's foes that have not fled (webclient-combat-defeated-foes D5:
+// a knocked-out or defeated foe keeps its slot), in presenter order, stand in
+// `actor-right` while the mode is combat. It enters and leaves on the same
+// live-only rule as the host (`hostTransitionCss`).
 const combatFoes = computed(() =>
-  contextActionsPanel.value?.kind === "combat" ? activeFoes(contextActionsPanel.value.participants) : [],
+  contextActionsPanel.value?.kind === "combat" ? drawnFoes(contextActionsPanel.value.participants) : [],
 );
 // While a combat round plays by itself (webclient-combat-beat-choreography
 // D5/D6), the line-up stands the round's pre-round foes until each one's own
@@ -346,6 +347,24 @@ function participantFor(identity) {
   const key = String(identity);
   return combatParticipants.value.find((p) => String(p.identity) === key) ?? null;
 }
+// The fallen looks the stage shows (webclient-combat-defeated-foes D1/D4),
+// identity -> "defeated" | "down", only while the formation stands: the
+// playing round's own looks (a foe falls on its defeat beat), else the
+// committed participants' states. The line-ups, the controlled figure and
+// the plates all read this one map.
+const fallenMap = computed(() => {
+  if (!formationActive.value) return {};
+  if (beatStage.value) return beatStage.value.fallen || {};
+  const map = {};
+  for (const row of combatParticipants.value) {
+    const look = row && row.identity != null ? fallenLook(row.team, row.state) : null;
+    if (look) map[String(row.identity)] = look;
+  }
+  return map;
+});
+function fallenOf(identity) {
+  return identity == null ? null : fallenMap.value[String(identity)] ?? null;
+}
 const actingIdentity = computed(() => {
   const gestures = beatStage.value?.gestures;
   if (!gestures) return null;
@@ -374,6 +393,7 @@ const plateEntries = computed(() => {
       hpMaximum: row?.hp_maximum ?? null,
       conditions: row?.conditions ?? [],
       plate: shape.party.figures[index].plate,
+      fallen: fallenOf(slot.identity),
       target: false,
       acting: false,
     });
@@ -393,6 +413,7 @@ const plateEntries = computed(() => {
       hpMaximum: row.hp_maximum ?? null,
       conditions: row.conditions ?? [],
       plate: shape.foes.figures[index].plate,
+      fallen: fallenOf(p.identity),
       target: focusedCombatTarget.value != null && String(focusedCombatTarget.value) === String(p.identity),
       acting: actingIdentity.value != null && p.portrait_ref != null && String(p.portrait_ref) === actingIdentity.value,
     });
@@ -569,6 +590,8 @@ const rootStyle = computed(() => {
             :float-amount="playerGesture?.amount ?? null"
             :formation="formation?.party ?? null"
             :glide="formationGlide"
+            :fallen="fallenMap"
+            :fall-instant="modeHydrating"
           />
         </template>
         <!-- The opposite side of the stage (webclient-dialogue-stage-actors
@@ -621,6 +644,8 @@ const rootStyle = computed(() => {
               :max="foeLimit"
               :formation="formation?.foes ?? null"
               :glide="formationGlide"
+              :fallen="fallenMap"
+              :fall-instant="modeHydrating"
               :inert="beatHold || null"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
@@ -657,6 +682,7 @@ const rootStyle = computed(() => {
               :acting="entry.acting"
               :conditions="entry.conditions"
               :stage-x="entry.plate.left + entry.plate.width / 2"
+              :fallen="entry.fallen"
             />
           </TransitionGroup>
         </template>

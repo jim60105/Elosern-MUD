@@ -216,9 +216,10 @@
   /* The combat beat gestures (webclient-combat-beat-choreography design D1,
      AVG stage design §10.2): the acting figure's step toward the centre and
      back, the target's shake and flash, the damage number's rise, and a
-     defeated foe's fade and drop. The beat queue also reads them from script
+     defeated foe's collapse into its fallen look
+     (webclient-combat-defeated-foes). The beat queue also reads them from script
      (`lib/motion_tokens.js`) to wait for the step's gesture before the beat
-     pause. `reduced` keeps only the defeat fade (150ms); `off` plays none. */
+     pause. `reduced` keeps only the fallen look's fade (150ms); `off` plays none. */
   --motion-beat-step: 240ms;
   --motion-beat-hit: 180ms;
   --motion-beat-float: 600ms;
@@ -269,6 +270,19 @@
      the side that is not speaking renders at this brightness. A static
      state; the motion layer owns any transition into it. */
   --actor-dim: 0.6;
+  /* The fallen looks (webclient-combat-defeated-foes design D1/D2): a pose
+     (a pure compression about the figure's base), a tone and an opacity per
+     look, and the broken seal's size (of the figure's width) and its centre
+     (down the collapsed figure, from its lowered head). Each look differs
+     from the listener dim by shape and text, never by brightness alone. */
+  --fall-defeated-squash: 0.8;
+  --fall-defeated-tone: grayscale(1) brightness(0.45);
+  --fall-defeated-opacity: 0.8;
+  --fall-down-squash: 0.92;
+  --fall-down-tone: grayscale(0.6) brightness(0.7);
+  --fall-down-opacity: 1;
+  --fall-seal-size: 28%;
+  --fall-seal-chest: 0.42;
   /* The standing portraits' geometry (webclient-dialogue-stage-actors): the
      anchor height (`min(62vh, 680px)`, clamped to the stage box — the stage
      fills the viewport) and each side's inset. The inset is 6% of the stage
@@ -527,15 +541,6 @@
   100% {
     opacity: 0;
     transform: translate(var(--float-x, -50%), calc(-1 * var(--motion-beat-rise) * var(--motion-travel))) scale(1);
-  }
-}
-
-/* The defeat: the figure fades and sinks out of the line-up (fill-mode
-   forwards, so it stays gone until its slot leaves). */
-@keyframes elosern-beat-defeat {
-  to {
-    opacity: 0;
-    transform: translateY(calc(var(--motion-shift-lg) * var(--motion-travel)));
   }
 }
 

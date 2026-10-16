@@ -35,7 +35,14 @@
 // pointer events.
 import { computed, inject } from "vue";
 import ConditionChips from "./ConditionChips.vue";
-import { bySeverity, isLowPlateHp, plateHpPercent, plateLabel } from "./figure-plate.js";
+import {
+  FALLEN_READOUT,
+  bySeverity,
+  isLowPlateHp,
+  plateConditions,
+  plateHpPercent,
+  plateLabel,
+} from "./figure-plate.js";
 
 const props = defineProps({
   name: { type: String, default: "" },
@@ -60,6 +67,14 @@ const props = defineProps({
   closeSignal: { type: Number, default: 0 },
   // The slot's centre x in stage pixels: the plates group's stage order.
   stageX: { type: Number, default: null },
+  // The figure's fallen look (webclient-combat-defeated-foes D1): the plate
+  // keeps the name and states `✕ 已擊破` / `▼ 倒地` over an empty dashed
+  // stroke in place of the numbers.
+  fallen: {
+    type: String,
+    default: null,
+    validator: (value) => value === null || value === "defeated" || value === "down",
+  },
 });
 
 const compact = computed(() => props.form === "compact");
@@ -68,14 +83,16 @@ const compact = computed(() => props.form === "compact");
 // patched — still closes its tooltip.
 const providedClose = inject("plateTooltipClose", null);
 const closeAll = computed(() => props.closeSignal + (providedClose?.value ?? 0));
+const fallenReadout = computed(() => FALLEN_READOUT[props.fallen] ?? null);
 const percent = computed(() => plateHpPercent(props.hpCurrent, props.hpMaximum));
-const strokeWidth = computed(() => `${percent.value ?? 0}%`);
-const low = computed(() => isLowPlateHp(props.hpCurrent, props.hpMaximum));
+// A fallen plate's stroke is empty: the dashed outline alone.
+const strokeWidth = computed(() => (fallenReadout.value ? "0%" : `${percent.value ?? 0}%`));
+const low = computed(() => !fallenReadout.value && isLowPlateHp(props.hpCurrent, props.hpMaximum));
 // The glyph line's boxes (design D2): four on a full plate, two on a compact
 // one, one fewer when the 危險 tag takes the line's start (two and one). The
 // conditions show most severe first; when more than the boxes, the last box
 // is the `+N` — or, with a single box, the `+N` folds into the glyph.
-const shownConditions = computed(() => bySeverity(props.conditions));
+const shownConditions = computed(() => bySeverity(plateConditions(props.conditions, props.fallen)));
 const glyphBoxes = computed(() => (compact.value ? 2 : 4) - (low.value ? (compact.value ? 1 : 2) : 0));
 const glyphFold = computed(() => glyphBoxes.value === 1 && shownConditions.value.length > 1);
 const glyphCap = computed(() =>
@@ -89,6 +106,7 @@ const label = computed(() =>
     current: props.hpCurrent,
     maximum: props.hpMaximum,
     conditions: props.conditions,
+    fallen: props.fallen,
   }),
 );
 const style = computed(() =>
@@ -118,6 +136,7 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
     :data-target="target ? 'true' : null"
     :data-acting="acting ? 'true' : null"
     :data-low-hp="low ? 'true' : null"
+    :data-fallen="fallen"
     :data-stage-x="stageX"
     :style="style"
   >
@@ -135,12 +154,30 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
         <span class="figure-plate__trail" :style="{ width: strokeWidth }"></span>
         <span class="figure-plate__fill" :style="{ width: strokeWidth }"></span>
       </span>
-      <span class="figure-plate__readout" data-testid="figure-plate-readout" aria-hidden="true"
+      <span
+        v-if="fallenReadout && !compact"
+        class="figure-plate__fallen"
+        data-testid="figure-plate-fallen"
+        aria-hidden="true"
+        ><span class="figure-plate__fallen-glyph">{{ fallenReadout.glyph }}</span
+        ><span class="figure-plate__fallen-word">{{ fallenReadout.word }}</span></span
+      >
+      <span v-else-if="!fallenReadout" class="figure-plate__readout" data-testid="figure-plate-readout" aria-hidden="true"
         ><span class="figure-plate__current" :class="{ 'figure-plate__current--low': low }">{{ current }}</span
         ><span v-if="!compact" class="figure-plate__maximum">/{{ maximum }}</span></span
       >
     </div>
     <div class="figure-plate__glyphs" data-testid="figure-plate-glyphs">
+      <!-- A compact plate has no room beside its stroke: the glyph and the
+           word take the glyph line, which a fallen figure's plate frees. -->
+      <span
+        v-if="fallenReadout && compact"
+        class="figure-plate__fallen"
+        data-testid="figure-plate-fallen"
+        aria-hidden="true"
+        ><span class="figure-plate__fallen-glyph">{{ fallenReadout.glyph }}</span
+        ><span class="figure-plate__fallen-word">{{ fallenReadout.word }}</span></span
+      >
       <span v-if="low" class="figure-plate__danger" data-testid="figure-plate-danger" aria-hidden="true">危險</span>
       <ConditionChips
         :conditions="shownConditions"
@@ -356,6 +393,58 @@ const maximum = computed(() => (typeof props.hpMaximum === "number" ? String(pro
 }
 .figure-plate[data-form="compact"] .figure-plate__glyphs > .figure-plate__danger {
   margin-bottom: 0;
+}
+
+/* The fallen plate (webclient-combat-defeated-foes design D1): the name
+   stays, the stroke empties to a dashed outline (no fill, no point), and the
+   glyph and the word replace the numbers — the defeated foe's in the seal
+   red and receding paper, the downed ally's in the brass of a call to aid.
+   Text, glyph and stroke carry the state together, never a colour alone. */
+.figure-plate[data-fallen] .figure-plate__stroke {
+  box-sizing: border-box;
+  min-width: calc(30px * var(--ui-scale));
+  background: none;
+  border: 1px dashed rgba(231, 224, 209, 0.5);
+  clip-path: none;
+}
+.figure-plate[data-fallen] .figure-plate__trail,
+.figure-plate[data-fallen] .figure-plate__fill {
+  display: none;
+}
+.figure-plate[data-fallen="defeated"] .figure-plate__name {
+  color: var(--paper-300);
+}
+.figure-plate__fallen {
+  flex: none;
+  display: inline-flex;
+  align-items: baseline;
+  gap: calc(3px * var(--ui-scale));
+  font: 600 var(--text-xs)/1 var(--f-sans);
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.85);
+}
+.figure-plate__fallen-glyph {
+  font-size: 0.82em;
+}
+.figure-plate[data-fallen="defeated"] .figure-plate__fallen-glyph {
+  color: var(--seal-400);
+}
+.figure-plate[data-fallen="defeated"] .figure-plate__fallen-word {
+  color: var(--paper-300);
+}
+.figure-plate[data-fallen="down"] .figure-plate__fallen-glyph,
+.figure-plate[data-fallen="down"] .figure-plate__fallen-word {
+  color: var(--gold-400);
+}
+/* Compact: the stroke spans the first line; the glyph and the word stand on
+   the glyph line, centred under it. */
+.figure-plate[data-form="compact"][data-fallen] .figure-plate__glyphs {
+  justify-content: center;
+  align-items: center;
+}
+.figure-plate[data-form="compact"] .figure-plate__fallen {
+  gap: calc(2px * var(--ui-scale));
 }
 
 /* Keyboard focus (the plates group): the global gold double ring; a

@@ -192,3 +192,20 @@ describe("companion standing lineup", () => {
     wrapper.unmount();
   });
 });
+
+// webclient-combat-defeated-foes (design D1/D3): a knocked-out party member
+// kneels in its slot in combat, the controlled figure included; the map is
+// keyed by identity and absent outside combat.
+describe("downed party figures", () => {
+  it("kneels the figures the fallen map names, and nobody without one", async () => {
+    const wrapper = mount(CompanionLineup, { props: { slots: figures(), fallen: { 3: "down", 1: "down" } } });
+    const looks = () => wrapper.findAll('[data-testid="companion-figure"]').map((f) => f.attributes("data-fallen") ?? null);
+    expect(looks()).toEqual(["down", null, "down", null, null]);
+    const actor = wrapper.get('[data-testid="companion-figure"][data-identity="3"] [data-testid="stage-actor"]');
+    expect(actor.attributes("data-fallen")).toBe("down");
+    expect(wrapper.find('[data-testid="stage-actor-seal"]').exists()).toBe(false);
+    await wrapper.setProps({ fallen: null });
+    expect(looks()).toEqual([null, null, null, null, null]);
+    wrapper.unmount();
+  });
+});

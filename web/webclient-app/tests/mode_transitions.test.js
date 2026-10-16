@@ -180,10 +180,12 @@ describe("AppClient live mode changes", () => {
   const hosts = () => wrapper.findAll('[data-anchor="actor-right"] > [data-testid="stage-actor"]');
   const lineups = () => wrapper.findAll('[data-anchor="actor-right"] > [data-testid="foe-lineup"]');
   const clientRoot = () => wrapper.get('[data-testid="elosern-client-root"]').element;
-  const twoFoes = (defeatFirst = false) => ({
+  // `first`: the first foe's state — "active", "fled" (it leaves the line)
+  // or "defeated" (it keeps its slot; webclient-combat-defeated-foes D5).
+  const twoFoes = (first = "active") => ({
     context_actions: fx.combatActions({
       participants: [
-        { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: defeatFirst ? "defeated" : "active", hp_current: defeatFirst ? 0 : 40, hp_maximum: 60, portrait_ref: null, conditions: [] },
+        { identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes", state: first, hp_current: first === "defeated" ? 0 : 40, hp_maximum: 60, portrait_ref: null, conditions: [] },
         { identity: 9, token: "e2", display_name: "盜賊頭目", team: "foes", state: "active", hp_current: 90, hp_maximum: 90, portrait_ref: null, conditions: [] },
         { identity: 8, token: "a1", display_name: "同行劍士", team: "party", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
       ],
@@ -330,7 +332,31 @@ describe("AppClient live mode changes", () => {
     expect(clientRoot().style.getPropertyValue("--caption-left")).toBe("");
   });
 
-  it("a foe defeated inside combat leaves the row inert while the other steps forward", async () => {
+  it("a foe defeated inside combat keeps its slot in its defeated look, and nothing re-forms", async () => {
+    store.setMotionLevel("full");
+    await nextTick();
+    commit("combat", twoFoes());
+    await nextTick();
+    await nextTick();
+    const edge = clientRoot().style.getPropertyValue("--caption-right");
+    const before = lineups()[0].findAll('[data-testid="foe-slot"]').map((s) => s.element.style.left);
+    commit("combat", twoFoes("defeated"));
+    await nextTick();
+    const slots = lineups()[0].findAll('[data-testid="foe-slot"]');
+    expect(slots.map((s) => s.element.style.left)).toEqual(before);
+    expect(slots.filter((s) => s.element.inert)).toHaveLength(0);
+    expect(lineups()[0].attributes("data-count")).toBe("2");
+    expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(edge);
+    expect(slots[0].attributes("data-fallen")).toBe("defeated");
+    expect(slots[0].find('[data-testid="stage-actor-seal"]').exists()).toBe(true);
+    expect(slots[1].attributes("data-fallen")).toBeUndefined();
+    // Its plate stays and states the defeat.
+    const plate = wrapper.find('[data-testid="figure-plate"][data-identity="7"]');
+    expect(plate.attributes("data-fallen")).toBe("defeated");
+    expect(plate.attributes("aria-label").endsWith("已擊破")).toBe(true);
+  });
+
+  it("a foe fleeing inside combat leaves the row inert while the other steps forward", async () => {
     store.setMotionLevel("full");
     await nextTick();
     commit("combat", twoFoes());
@@ -338,9 +364,9 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     const heldEdge = clientRoot().style.getPropertyValue("--caption-right");
     expect(heldEdge).not.toBe("");
-    commit("combat", twoFoes(true));
+    commit("combat", twoFoes("fled"));
     await nextTick();
-    // The caption keeps the two-foe room until the fallen foe has faded.
+    // The caption keeps the two-foe room until the fled foe has faded.
     expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(heldEdge);
     const slots = lineups()[0].findAll('[data-testid="foe-slot"]');
     const leaving = slots.filter((s) => s.element.inert);
@@ -351,7 +377,7 @@ describe("AppClient live mode changes", () => {
     // The other foe steps to the one-foe formation's box.
     expect(staying[0].element.style.left).toBe(`${expectedFormation(1, 1).foes.figures[0].box.left}px`);
     expect(lineups()[0].attributes("data-count")).toBe("1");
-    // The fallen foe's plate leaves with it; the standing foe keeps its own.
+    // The fled foe's plate leaves with it; the standing foe keeps its own.
     const plates = wrapper.findAll('[data-testid="figure-plate"]').filter((p) => !p.element.inert);
     expect(plates.map((p) => p.attributes("data-identity"))).toEqual(["9"]);
   });
@@ -382,8 +408,8 @@ describe("AppClient live mode changes", () => {
     await nextTick();
     const edge = (foes) => `${STAGE.width - Math.min(...expectedFormation(1, foes).foes.figures.map((f) => f.box.left)) + 16}px`;
     expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(edge(2));
-    // A fallen foe leaves at once, and so does the room it held.
-    commit("combat", twoFoes(true));
+    // A fled foe leaves at once, and so does the room it held.
+    commit("combat", twoFoes("fled"));
     await nextTick();
     expect(clientRoot().style.getPropertyValue("--caption-right")).toBe(edge(1));
     commit("combat", twoFoes());
