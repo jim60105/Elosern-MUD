@@ -16,6 +16,7 @@ import {
   connectionStatusFor,
   readPanel,
 } from "./shared.js";
+import { stageTargetModel } from "./stage_targets.js";
 
 // The player's own dialogue speech actions (webclient-dialogue-stage-actors
 // D3): while one of them is in flight the player is the speaker.
@@ -39,6 +40,54 @@ export function applyView(ctx) {
     const key = currentItem && currentItem.key;
     return typeof key === "string" && Object.hasOwn(combat.skillByKey, key) ? combat.skillByKey[key] : null;
   }
+
+  // The stage target step (webclient-combat-stage-target-picking D1): the
+  // pure model of the current target frame, computed fresh from the router,
+  // the one combat model and the committed panels — null outside combat, in
+  // every other frame and while a round plays by itself. The arrow claim in
+  // `focusPress` reads it at key time, so it never trails a router move.
+  ctx.formationOrder = null;
+  ctx.stageTargetNow = function stageTargetNow() {
+    const rs = ctx.reducer.getState();
+    if (rs.mode !== "combat" || ctx.router.depth() === 0) {
+      return null;
+    }
+    const panel = rs.panels && rs.panels.context_actions;
+    if (!panel || panel.kind !== "combat") {
+      return null;
+    }
+    const descriptor = ctx.router.currentDescriptor();
+    const skillKey = descriptor && descriptor.params ? descriptor.params.skillKey : null;
+    const combat = ctx.frameResolver.combatModel();
+    if (!combat || typeof skillKey !== "string" || !Object.hasOwn(combat.skillByKey, skillKey)) {
+      return null;
+    }
+    const item = ctx.router.currentItem();
+    const status = rs.panels.status;
+    return stageTargetModel({
+      source: descriptor.source,
+      menu: ctx.router.currentMenu(),
+      skill: combat.skillByKey[skillKey],
+      participants: Array.isArray(panel.participants) ? panel.participants : [],
+      formationOrder: ctx.formationOrder,
+      controlledIdentity: status && status.actor ? status.actor.identity : null,
+      focusKey: item ? (item.key !== undefined ? item.key : item.label) : null,
+      locked: ctx.beatLocked(),
+    });
+  };
+  // The drawn identities in stage order (AppClient publishes them from the
+  // formation it draws); only the order of the step's positions reads it.
+  ctx.setStageFormation = function setStageFormation(order) {
+    const next = Array.isArray(order) ? order.map(String) : null;
+    const same =
+      next === ctx.formationOrder ||
+      (next && ctx.formationOrder && next.join(",") === ctx.formationOrder.join(","));
+    if (same) {
+      return;
+    }
+    ctx.formationOrder = next;
+    ctx.publishView();
+  };
 
   function explorationExitsView() {
     const { rows, currentNode } = ctx.frameResolver.explorationExits();
@@ -296,6 +345,10 @@ export function applyView(ctx) {
         combatNow && combatNow.focusSkillKey && combatNow.skillByKey[combatNow.focusSkillKey]
           ? combatNow.skillByKey[combatNow.focusSkillKey].selected
           : [],
+      // The stage target step (webclient-combat-stage-target-picking D1):
+      // null, or the positions, the lit set, the markers' digits and the
+      // announcement the stage, the plates layer and the card render.
+      stageTarget: mounted ? ctx.stageTargetNow() : null,
       // H3 (task 6.5): the focused skill model for the master-detail pane —
       // the `SkillDetailPane` renders this committed model, never inventing
       // a `戰鬥外` badge (design D14).

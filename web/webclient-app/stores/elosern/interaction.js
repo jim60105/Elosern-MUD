@@ -5,6 +5,7 @@
 
 import KeyboardRouter from "../../lib/keyboard_router.js";
 import { dialogueViewModel } from "../dialogue-view.js";
+import { ARROW_KEYS, arrowTarget } from "./stage_targets.js";
 
 const FRAMELESS_DRAWER_NAMES = new Set(["inventory", "quest", "shop"]);
 
@@ -118,6 +119,21 @@ export function applyInteraction(ctx) {
     // arrows, Enter, Space, Escape) before they reach the bridge.
     if (ctx.reducer.getState().mode === "dialogue") {
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
+    }
+    // The stage target step (webclient-combat-stage-target-picking D2): the
+    // arrow keys walk the step's positions in stage order through the
+    // router's own focus-by-key, so item order, the digits and Enter / Space
+    // / Escape keep their meaning. Claimed only while the step stands; every
+    // other frame's arrows reach the router unchanged.
+    if (ARROW_KEYS.includes(key)) {
+      const step = ctx.stageTargetNow();
+      if (step) {
+        const next = arrowTarget(step, key);
+        if (next !== null) {
+          ctx.router.focusItemByKey(next);
+        }
+        return true;
+      }
     }
     if (isDigit) {
       // The presence rail owns the exploration root's digits

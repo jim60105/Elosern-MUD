@@ -87,9 +87,11 @@ describe("combat command window (store)", () => {
     expect(store.view.combatMenu.items.map((item) => item.key)).toEqual([`target-${ALLY}`, `target-${FOE}`]);
     expect(store.view.focus.key).toBe(`target-${FOE}`);
     expect(sender.sent.actions).toHaveLength(0);
-    // The ally stays reachable and selectable by an explicit move.
-    expect(store.focusPress("ArrowRight")).toBe(false);
-    expect(store.focusPress("ArrowUp")).toBe(true);
+    // The ally stays reachable and selectable by an explicit move: the
+    // target frame is chosen on the stage (webclient-combat-stage-target-
+    // picking), where the arrows walk the stage order — the ally stands left
+    // of the foe, so the previous position is the ally.
+    expect(store.focusPress("ArrowLeft")).toBe(true);
     expect(store.view.focus.key).toBe(`target-${ALLY}`);
     expect(sender.sent.actions).toHaveLength(0);
   });
