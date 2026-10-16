@@ -11,6 +11,7 @@ import { nextTick } from "vue";
 import { createPinia, setActivePinia } from "pinia";
 import FigurePlate from "../../components/FigurePlate.vue";
 import AppClient from "../../AppClient.vue";
+import CombatMenu from "../../lib/combat_menu.js";
 import { combatFormation } from "../../components/combat-formation.js";
 import { bySeverity, isLowPlateHp, plateHpCurrent, plateHpPercent, plateLabel, repeatedNames } from "../../components/figure-plate.js";
 import { useElosernStore } from "../../stores/elosern.js";
@@ -417,7 +418,7 @@ describe("the plates layer in the client", () => {
   // the server-order digits; the focused one is the filled arrow.
   it("keeps the plates undimmed in a stage target step and marks the candidates above them", async () => {
     const attack = {
-      key: "basic_attack", label: "普通攻擊", description: "合成描述。", cost: {}, target_spec: "single", element: null,
+      key: CombatMenu.BASIC_ATTACK_KEY, label: "普通攻擊", description: "合成描述。", cost: {}, target_spec: "single", element: null,
       enabled: true, disabled_reason: null, targets: [201, 202, 203], shorthands: [], hostile: true, beneficial: false,
     };
     const participants = [foeRow(201, "e1", "哥布林", 24), foeRow(202, "e2", "狼", 20), foeRow(203, "e3", "蝙蝠", 12), foeRow(204, "e4", "史萊姆", 8)];

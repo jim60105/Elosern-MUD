@@ -15,6 +15,7 @@ import re
 from playwright.sync_api import expect
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_view import BASIC_ATTACK_KEY
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import focus_action_dock, snapshot_envelope, wait_for_store_state
@@ -456,7 +457,7 @@ def _stage_skills(foes: list, allies: list) -> list:
                     None,
                     None,
                     [
-                        _skill("basic_attack", "普通攻擊", "以武器攻擊一名目標。", {}, "single", None, True, allies[:1] + foes, []),
+                        _skill(BASIC_ATTACK_KEY, "普通攻擊", "以武器攻擊一名目標。", {}, "single", None, True, allies[:1] + foes, []),
                         _skill(
                             "t_storm", "雷暴", "雷光落在多名目標身上。", {"mp": 20}, "area", "lightning", True,
                             allies + foes, ["all-enemies", "all-allies", "all"],
@@ -1098,7 +1099,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         """Open ``skill``'s target frame from the combat root through the
         router (attack, or 技能 → the one category → the skill)."""
         page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
-        path = ["attack"] if skill == "basic_attack" else ["skills", "skill-cat-0", skill]
+        path = ["attack"] if skill == BASIC_ATTACK_KEY else ["skills", "skill-cat-0", skill]
         for key in path:
             self.assertTrue(page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('{key}')"), key)
             page.evaluate("() => window.__elosernBridge.store.focusPress('Enter', false)")
@@ -1149,7 +1150,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 self.assertFalse(rest["markers"] or rest["prompt"], size)
                 self.assertEqual(rest["pointerTakers"], [], f"no pointer target outside the step at {size}")
 
-                step = self._open_step(page, "basic_attack")
+                step = self._open_step(page, BASIC_ATTACK_KEY)
                 card = step["card"]
                 self.assertTrue(step["prompt"], size)
                 for edge in ("left", "width", "top"):
@@ -1186,16 +1187,16 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 page.keyboard.press("Enter")
                 page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
                 self._wait_released(page)
-                self._open_step(page, "basic_attack")
+                self._open_step(page, BASIC_ATTACK_KEY)
                 identity = left_key.removeprefix("target-")
                 page.locator(f'[data-testid="stage-target-hit"][data-identity="{identity}"]').click()
                 page.wait_for_function("() => window.__stpSent.length === 2", timeout=5000)
                 sent = self._sent(page)
                 self.assertEqual(sent[0], sent[1], size)
-                self.assertEqual(sent[0], {"skill_key": "basic_attack", "target_ids": [int(identity)]}, size)
+                self.assertEqual(sent[0], {"skill_key": BASIC_ATTACK_KEY, "target_ids": [int(identity)]}, size)
                 self._wait_released(page)
                 # Escape restores every figure and removes every marker.
-                self._open_step(page, "basic_attack")
+                self._open_step(page, BASIC_ATTACK_KEY)
                 page.keyboard.press("Escape")
                 page.evaluate("() => new Promise((r) => requestAnimationFrame(r))")
                 after = page.evaluate(_READ_STEP)
