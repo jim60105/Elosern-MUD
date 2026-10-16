@@ -149,7 +149,7 @@ file.
 
 ## 6. Gates (≈0.5 h)
 
-- [ ] 6.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
+- [x] 6.1 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
   and, with a file containing `MUD_TEST_SETTINGS=1` passed as `--env-file=<file>`,
   `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract`;
   then `openspec validate webclient-combat-command-card-centred --strict`. Verify all pass.
