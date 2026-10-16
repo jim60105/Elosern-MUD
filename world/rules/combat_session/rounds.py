@@ -8,6 +8,7 @@ entry and waits for every remaining required actor, so no entry point
 compresses an interactive encounter.
 """
 
+from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -23,6 +24,7 @@ from world.rules.combat_session.battlefield import (
     _context_for,
     _session_policy,
     authorize_combat_actor,
+    get_required_combat_actors,
     reconstruct_battlefield,
 )
 from world.rules.combat_session.errors import CombatSessionError, SessionReason
@@ -43,7 +45,10 @@ from world.rules.combat_session.scans import (
     _scan_friendly_fire,
     _scan_sexual_coercion,
 )
-from world.rules.combat_session.settlement import _continue_or_settle
+from world.rules.combat_session.settlement import (
+    _continue_or_settle,
+    _settle_with_restore,
+)
 from world.rules.combat_session.snapshot import (
     _restore_exam_host,
     _restore_round_touched,
@@ -51,7 +56,8 @@ from world.rules.combat_session.snapshot import (
     _snapshot_party_surfaces,
     _snapshot_round_touched,
 )
-from world.rules.disengage import FLEE_SKILL_KEY
+from world.rules.disengage import FLEE_SKILL_KEY, party_retreat_attempt
+from world.rules.event_log import EventEntry, EventLog
 from django.db import transaction
 from world.rules.surfaces import attribute_snapshot, restore_attribute_best_effort
 from world.rules.items import ItemUseRequest, preflight_item_use
@@ -838,6 +844,136 @@ def _draft_taunt_declarations(
     return declarations
 
 
+def _sweep_removed_markers(
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    new_fled_ids: tuple[int, ...],
+    new_knocked_out_ids: tuple[int, ...],
+) -> None:
+    """Sweep the markers of every member this round removed from the fight.
+
+    A member removed by fleeing or by a knockout loses its ground and
+    positional markers in the very round that removed it, exactly as
+    ``clear_session`` sweeps a terminal outcome's whole roster.
+    """
+    from world.rules.buffs import remove_ground_markers, remove_positional_markers
+
+    for reason, previous, current in (
+        ("fled", record.fled_ids, new_fled_ids),
+        ("knocked_out", record.knocked_out_ids, new_knocked_out_ids),
+    ):
+        newly = set(current) - set(previous)
+        if not newly:
+            continue
+        for entity in battlefield.roster.values():
+            if int(entity.pk) not in newly:
+                continue
+            removed = remove_ground_markers(entity) + remove_positional_markers(entity)
+            if not removed:
+                continue
+            boundary = {
+                "char": str(entity.pk),
+                "count": removed,
+                "reason": reason,
+            }
+            transaction.on_commit(
+                lambda b=boundary: log_info("combat_marker_swept", context=b)
+            )
+
+
+def _finalize_resolved_round(
+    actor: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    logs: list[Any],
+    *,
+    hp_before: int,
+    round_identities: Any,
+    round_hp_before: Any,
+    grants: Sequence[str] = (),
+) -> tuple[dict[str, Any], tuple[str, ...]]:
+    """Persist one resolved round's outcome and settle it exactly once.
+
+    The single finalization every committed round reaches — the completed
+    draft's ordinary round and the confirmed retreat's elapsed round alike —
+    so a new post-round scan, marker sweep or durable field can never land in
+    one caller and not the other. It emits the round's boundary event, runs
+    the friendly-fire and sexual-coercion scans, composes the durable record
+    from the LIVE record plus this round's fled/knocked-out/time/revision
+    deltas (the consumed draft and the spent opening-order policy clear with
+    them), sweeps the markers of every newly removed member, and reaches
+    exactly one settlement through :func:`_continue_or_settle`. Returns the
+    settlement result and the notification lines the caller delivers only
+    after its own durable unit commits.
+    """
+    boundary = {
+        "char": str(actor.pk),
+        "opponent": _primary_opponent_id(battlefield, record),
+        "tick": _current_tick(),
+        "hp_before": hp_before,
+        "hp_after": _stored_trait_value(actor.traits.hp),
+    }
+    transaction.on_commit(
+        lambda boundary=boundary: log_info("combat_round_settled", context=boundary)
+    )
+    notifications = _scan_friendly_fire(actor, battlefield, logs)
+    notifications += _scan_sexual_coercion(actor, battlefield, logs)
+    notifications += tuple(grants)
+    # The committed end-of-round HP (combat-beats-panel D1): read after the
+    # scans and before ``_continue_or_settle``, so a terminal settlement's
+    # regeneration, exam restoration, and defeat aftermath can never move the
+    # values the beats are checked against.
+    _, round_hp_after = capture_round_hp(battlefield)
+    knocked = _knocked_out_ids(logs, battlefield)
+    new_fled_ids = tuple(
+        sorted(
+            int(battlefield.roster[key].pk)
+            for key in battlefield.fled
+            if key in battlefield.roster
+        )
+    )
+    new_knocked_out_ids = tuple(sorted(set(record.knocked_out_ids) | set(knocked)))
+    current = read_session(actor)
+    base = current if current is not None else record
+    new_record = replace(
+        base,
+        fled_ids=new_fled_ids,
+        knocked_out_ids=new_knocked_out_ids,
+        rounds_elapsed=base.rounds_elapsed + 1,
+        # One committed round is consumed exactly once: the consumed revision,
+        # the emptied draft and the spent opening-order policy all land
+        # together with the round they belong to.
+        round_revision=base.round_revision + 1,
+        draft_version=0,
+        draft_entries={},
+        confirmed_actors=(),
+        opening_first_actor=None,
+    )
+    _persist(actor, new_record)
+    _sweep_removed_markers(record, battlefield, new_fled_ids, new_knocked_out_ids)
+    result = _continue_or_settle(
+        actor, new_record, battlefield, logs, notification_count=len(notifications)
+    )
+    # Internal slot only: the dispatcher reads it into the presentation
+    # context and ``_normalize_result`` drops it, so it never reaches the wire
+    # (combat-beats-panel D2).
+    result["round_record"] = RoundRecord(
+        session_id=record.session_id,
+        number=new_record.rounds_elapsed,
+        logs=tuple(logs),
+        identities=round_identities,
+        hp_before=round_hp_before,
+        hp_after=round_hp_after,
+    )
+    # Mark every observation journal entry whose savepoint rolled back as dead
+    # while the transaction is still open, so the commit-time publication
+    # never resurrects failed work (monster-ai-observation-lifecycle).
+    from world.rules.combat_session.observations import reconcile_session_memory
+
+    reconcile_session_memory(record.session_id)
+    return result, notifications
+
+
 def _submit_request(
     actor: Any,
     record: CombatSessionRecord,
@@ -887,7 +1023,6 @@ def _submit_request(
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     dedupe_before = snapshot_practice_dedupe()
     hp_before = _stored_trait_value(actor.traits.hp)
-    opponent = _primary_opponent_id(battlefield, record)
     try:
         with durable_combat_atomic(nested=nested):
             current = read_session_uncached(actor)
@@ -957,140 +1092,25 @@ def _submit_request(
                 tactical_declarations=tactical_declarations,
                 taunt_declarations=taunt_declarations,
             )
-            # Boundary event for the committed ordinary round: the on_commit
-            # callback fires once the OUTERMOST transaction commits and is
-            # discarded if this unit rolls back, so a rolled-back round never
-            # leaves a boundary line behind. Every value is snapshotted NOW,
-            # at the round's durable boundary: a nested caller's later work
-            # must not shift the tick/HP this line describes, and the callback
-            # itself does zero computation so it can never raise after a
-            # commit.
-            boundary = {
-                "char": str(actor.pk),
-                "opponent": opponent,
-                "tick": _current_tick(),
-                "hp_before": hp_before,
-                "hp_after": _stored_trait_value(actor.traits.hp),
-            }
-            transaction.on_commit(
-                lambda boundary=boundary: log_info(
-                    "combat_round_settled", context=boundary
-                )
-            )
-
-            notifications = _scan_friendly_fire(actor, battlefield, logs)
-            notifications += _scan_sexual_coercion(actor, battlefield, logs)
-            notifications += tuple(grant_notifications)
-
-            # The committed end-of-round HP (combat-beats-panel D1): read
-            # after the scans and before ``_continue_or_settle``, so a
-            # terminal settlement's regeneration, exam restoration, and
-            # defeat aftermath can never move the values the beats are
-            # checked against.
-            _, round_hp_after = capture_round_hp(battlefield)
-
-            knocked = _knocked_out_ids(logs, battlefield)
-            new_fled_ids = tuple(
-                sorted(
-                    int(battlefield.roster[key].pk)
-                    for key in battlefield.fled
-                    if key in battlefield.roster
-                )
-            )
-            new_knocked_out_ids = tuple(sorted(set(record.knocked_out_ids) | set(knocked)))
-            # Compose the round-end record from the LIVE durable record, not
-            # the pre-round snapshot: mid-round writers (the martyrdom-vow
-            # session_stamp effect, church design §5.8) commit their own
-            # active_combat rewrite inside this same atomic unit, and a
-            # replace() over the stale pre-round record would silently wipe
-            # those fields. The live read is the single writer's current
-            # state; the round deltas (fled/knocked-out/elapsed) land on it.
-            current = read_session(actor)
-            base = current if current is not None else record
-            new_record = replace(
-                base,
-                fled_ids=new_fled_ids,
-                knocked_out_ids=new_knocked_out_ids,
-                rounds_elapsed=base.rounds_elapsed + 1,
-                # One completed draft is consumed exactly once: the consumed
-                # revision, the emptied draft and the spent opening-order
-                # policy all land together with the round they belong to.
-                round_revision=base.round_revision + 1,
-                draft_version=0,
-                draft_entries={},
-                confirmed_actors=(),
-                opening_first_actor=None,
-            )
-            _persist(actor, new_record)
-
-            from world.rules.buffs import remove_ground_markers, remove_positional_markers
-
-            newly_fled_pks = set(new_fled_ids) - set(record.fled_ids)
-            if newly_fled_pks:
-                for entity in battlefield.roster.values():
-                    if int(entity.pk) in newly_fled_pks:
-                        removed = remove_ground_markers(entity) + remove_positional_markers(entity)
-                        if removed:
-                            boundary = {
-                                "char": str(entity.pk),
-                                "count": removed,
-                                "reason": "fled",
-                            }
-                            transaction.on_commit(
-                                lambda b=boundary: log_info(
-                                    "combat_marker_swept", context=b
-                                )
-                            )
-
-            newly_knocked_pks = set(new_knocked_out_ids) - set(record.knocked_out_ids)
-            if newly_knocked_pks:
-                for entity in battlefield.roster.values():
-                    if int(entity.pk) in newly_knocked_pks:
-                        removed = remove_ground_markers(entity) + remove_positional_markers(entity)
-                        if removed:
-                            boundary = {
-                                "char": str(entity.pk),
-                                "count": removed,
-                                "reason": "knocked_out",
-                            }
-                            transaction.on_commit(
-                                lambda b=boundary: log_info(
-                                    "combat_marker_swept", context=b
-                                )
-                            )
-
-            result = _continue_or_settle(
-                actor, new_record, battlefield, logs, notification_count=len(notifications)
+            result, notifications = _finalize_resolved_round(
+                actor,
+                record,
+                battlefield,
+                logs,
+                hp_before=hp_before,
+                round_identities=round_identities,
+                round_hp_before=round_hp_before,
+                grants=grant_notifications,
             )
             receipt = {
                 "session_id": record.session_id,
                 "round_revision": record.round_revision,
-                "rounds_elapsed": new_record.rounds_elapsed,
+                "rounds_elapsed": result.get("rounds_elapsed"),
                 "outcome": result.get("outcome"),
             }
             write_last_combat_receipt(actor, receipt)
             result["receipt"] = receipt
             result["ok"] = True
-            # Internal slot only: the dispatcher reads it into the
-            # presentation context and ``_normalize_result`` drops it, so
-            # it never reaches the wire (combat-beats-panel D2).
-            result["round_record"] = RoundRecord(
-                session_id=record.session_id,
-                number=new_record.rounds_elapsed,
-                logs=tuple(logs),
-                identities=round_identities,
-                hp_before=round_hp_before,
-                hp_after=round_hp_after,
-            )
-            # Mark every observation journal entry whose savepoint rolled back
-            # as dead while the transaction is still open, so the commit-time
-            # publication never resurrects failed work
-            # (monster-ai-observation-lifecycle).
-            from world.rules.combat_session.observations import (
-                reconcile_session_memory,
-            )
-
-            reconcile_session_memory(record.session_id)
     except Exception:
         # A defeat settled inside this transaction armed its undo; run it
         # BEFORE the round restore below so the pre-round values win (the
@@ -1137,3 +1157,251 @@ def _submit_request(
     for line in notifications:
         actor.msg(line)
     return result
+
+
+def _eligible_allied_actors(
+    record: CombatSessionRecord, battlefield: Battlefield
+) -> list[Any]:
+    """Return the session's currently able-to-act allied members.
+
+    ``get_required_combat_actors`` is the session's own eligibility predicate
+    — present, not fled, not knocked out, alive, unblocked and not
+    action-forbidden — so the retreat's agility minimum and its
+    no-acting-ally branch agree with draft collection instead of re-deriving
+    a competing definition. A knocked-out companion is not among them, which
+    is exactly why being carried out never lowers the minimum.
+    """
+    entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
+    return [
+        entities[pk]
+        for pk in get_required_combat_actors(record, battlefield)
+        if pk in entities
+    ]
+
+
+def _party_retreat_outcome(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+) -> tuple[bool | None, dict[str, float | int | None]]:
+    """Roll the confirmed retreat once, or report that no allied member can act.
+
+    A commander absent from the battlefield's teams can be shown no
+    able-bodied party either, so it takes the same no-acting-ally branch as an
+    empty eligible set.
+    """
+    party_team = battlefield.team_of(str(commander.key))
+    if party_team is None:
+        return None, {
+            "roll": None,
+            "allied_agility": None,
+            "pursuer_agility": None,
+        }
+    return party_retreat_attempt(
+        battlefield, party_team, _eligible_allied_actors(record, battlefield)
+    )
+
+
+def _party_retreat_event_log(
+    commander: Any, verdict: str, detail: dict[str, float | int | None]
+) -> EventLog:
+    """Return the round's own record of one party retreat attempt.
+
+    The verdict and every term of the contest ride the entry's ``data``, so a
+    replay can re-derive the outcome from the committed record; both retreat
+    outcomes prepend this entry to the round's logs, which is what puts the
+    attempt — and, for a contested attempt, its single roll — into the
+    durable round record and the ordinary text output.
+    """
+    entry = EventEntry(
+        kind="party_retreat",
+        actor=str(commander.key),
+        target=None,
+        data={
+            "outcome": verdict,
+            "roll": detail["roll"],
+            "allied_agility": detail["allied_agility"],
+            "pursuer_agility": detail["pursuer_agility"],
+        },
+        text_template=(
+            "整隊脫離了戰鬥。"
+            if verdict == "escaped"
+            else "整隊嘗試脫離戰鬥，但失敗了。"
+        ),
+    )
+    return EventLog(str(commander.key), "", (), (entry,), 0)
+
+
+def _deliver_after_commit(commander: Any, notifications: tuple[str, ...]) -> None:
+    """Deliver one retreat round's staged lines once the exit unit commits.
+
+    The writer never notifies, and a rolled-back exit must not either, so the
+    lines ride the outermost transaction's commit exactly as the ordinary
+    round's boundary events do.
+    """
+    if not notifications:
+        return
+
+    def deliver() -> None:
+        for line in notifications:
+            commander.msg(line)
+
+    transaction.on_commit(deliver)
+
+
+def _ordinary_party_defeat(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> dict[str, Any]:
+    """Settle a retreat that cannot roll through the ordinary defeat path.
+
+    The approved no-acting-ally branch: no allied member is able to act — or
+    the participants are unreconstructable, which shows the party no
+    able-bodied member either — so the party enters the same hostile-defeat or
+    guild-exam-FAIL settlement the confirmed surrender reaches, with the
+    pending draft discarded atomically with the terminal outcome and no extra
+    round, enemy action or time added.
+    """
+    return _settle_with_restore(
+        commander,
+        record,
+        battlefield,
+        "defeat" if record.mode == "hostile" else "exam_failed",
+        nested_round=True,
+        discard_draft=True,
+    )
+
+
+def _escaped_party_retreat(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    detail: dict[str, float | int | None],
+) -> dict[str, Any]:
+    """Remove the whole present party and settle the one elapsed round once.
+
+    Every present member of the commander's team leaves, knocked-out
+    companions included, and no entity is moved to an invented destination.
+    No enemy action runs: the round is only counted, so its one added six
+    seconds settle through the ordinary terminal boundary, where the departed
+    party — now fled — is outside the regeneration scope and therefore gains
+    no healing or revival. Because the commander itself is among the fled,
+    :func:`_continue_or_settle` derives the terminal ``fled`` outcome rather
+    than a further round, so no subset of the party can be left in combat.
+    """
+    round_identities, round_hp_before = capture_round_hp(battlefield)
+    party_team = battlefield.team_of(str(commander.key))
+    for key in battlefield.teams.get(party_team, frozenset()):
+        if key in battlefield.roster:
+            battlefield.fled.add(key)
+    logs = [_party_retreat_event_log(commander, "escaped", detail)]
+    result, notifications = _finalize_resolved_round(
+        commander,
+        record,
+        battlefield,
+        logs,
+        hp_before=_stored_trait_value(commander.traits.hp),
+        round_identities=round_identities,
+        round_hp_before=round_hp_before,
+    )
+    _deliver_after_commit(commander, notifications)
+    return result
+
+
+def _failed_party_retreat(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield,
+    detail: dict[str, float | int | None],
+) -> dict[str, Any]:
+    """Consume every allied opportunity and run one ordinary enemy round.
+
+    The provider is the ordinary party provider with an EMPTY selection
+    mapping: every interactive ally is still provisioned its one slot per
+    round and answers with no request, so every action opportunity is
+    consumed without resolving anything — no resource is spent, no pending
+    draft entry executes and no MP or SP moves. No Defend/Dodge/Taunt
+    declaration is passed either, so the attempt protects nobody. Every enemy
+    then acts through its own deterministic policy under ordinary initiative
+    and the round settles ordinary upkeep once, which leaves the party in
+    combat with a fresh, empty next-round draft (or a terminal outcome, if
+    that round decided one).
+
+    Item journals are collected through the sink and restored here on any
+    failure of this body, which is the local owner of the writes it stages;
+    the exit unit's own rollback covers every other in-process surface.
+    """
+    item_journals: list[Any] = []
+    grants: list[str] = []
+    simulated, nonlethal_keys = _session_policy(battlefield, record)
+    scope_base = ExecutionScopeBase(
+        session_id=record.session_id,
+        round_index=record.rounds_elapsed + 1,
+    )
+    round_identities, round_hp_before = capture_round_hp(battlefield)
+    hp_before = _stored_trait_value(commander.traits.hp)
+    try:
+        round_logs = run_round(
+            battlefield,
+            _party_round_provider({}, battlefield, record),
+            simulated=simulated,
+            nonlethal_keys=nonlethal_keys,
+            journal_sink=item_journals,
+            notifications_sink=grants,
+            # The encounter's opening-order policy belongs to its first
+            # complete round, and this is that round when the party retreats
+            # immediately; the named actor is an ally that takes no action
+            # here, so honouring it can never reorder the enemies' own slots.
+            first_actor=record.opening_first_actor,
+            decision_scope_base=scope_base,
+        )
+        logs = [_party_retreat_event_log(commander, "failed", detail), *round_logs]
+        result, notifications = _finalize_resolved_round(
+            commander,
+            record,
+            battlefield,
+            logs,
+            hp_before=hp_before,
+            round_identities=round_identities,
+            round_hp_before=round_hp_before,
+            grants=grants,
+        )
+    except Exception:
+        for journal in item_journals:
+            journal.restore()
+        raise
+    _deliver_after_commit(commander, notifications)
+    return result
+
+
+def resolve_party_retreat(
+    commander: Any,
+    record: CombatSessionRecord,
+    battlefield: Battlefield | None,
+) -> dict[str, Any]:
+    """Resolve one confirmed party retreat at the round boundary (§6.1).
+
+    The ``PARTY_EXIT_RETREAT`` handler of
+    :func:`~world.rules.combat_session.exit.confirm_party_exit`, and the whole
+    of the retreat operation's behavior. It replaces the party's pending
+    personal commands with one attempt that decides before any ordinary
+    action: no ally can act means the ordinary defeat path, no pursuer at all
+    means an escape no roll can refuse, and otherwise one d100 plus the
+    slowest able ally's adjusted agility against the flee constant plus the
+    fastest pursuer's. The caller has already verified the confirmation token
+    and this session/revision inside the exit's serialized durable unit, so a
+    success and a failure are both all-party outcomes that settle their
+    elapsed time exactly once through the exit's own operation receipt.
+
+    A guild-examination session reaches the same escape, which the existing
+    examination settlement records as a FAIL — the party left the simulated
+    battle without passing it.
+    """
+    if battlefield is not None:
+        success, detail = _party_retreat_outcome(commander, record, battlefield)
+        if success is True:
+            return _escaped_party_retreat(commander, record, battlefield, detail)
+        if success is False:
+            return _failed_party_retreat(commander, record, battlefield, detail)
+    return _ordinary_party_defeat(commander, record, battlefield)

@@ -1,5 +1,6 @@
 """Universal combat disengagement resolved through the action pipeline."""
 
+from collections.abc import Iterable
 from typing import Any
 
 from world.rules import combat
@@ -51,6 +52,24 @@ def _adjusted_agility(entity: Any) -> float:
     return adjusted_agility(entity, evaluate_combat_modifiers(entity))
 
 
+def _eligible_agilities(
+    battlefield: combat.Battlefield,
+    keys: Iterable[str],
+) -> list[float]:
+    """Return the adjusted agility of every named, able-to-act roster member.
+
+    The single shared eligibility predicate (``Battlefield.is_eligible``:
+    present, not fled, not knocked out, stored HP above zero) decides which
+    names count, so no consumer re-derives its own filter. Only the agility
+    bundle enters through :func:`_adjusted_agility`; accuracy never does.
+    """
+    return [
+        _adjusted_agility(battlefield.roster[key])
+        for key in keys
+        if key in battlefield.roster and battlefield.is_eligible(key)
+    ]
+
+
 def _fastest_pursuer_agility(
     battlefield: combat.Battlefield,
     actor: Any,
@@ -62,17 +81,13 @@ def _fastest_pursuer_agility(
     an automatic success (party-combat D-2).
     """
     actor_team = battlefield.team_of(str(actor.key))
-    values = [
-        _adjusted_agility(battlefield.roster[key])
+    opposing = [
+        key
         for team, members in battlefield.teams.items()
         if team != actor_team
         for key in members
-        if key in battlefield.roster
-        and key not in battlefield.fled
-        and not battlefield.is_knocked_out(key)
-        and combat._stored_hp(battlefield.roster[key]) > 0
     ]
-    return max(values, default=None)
+    return max(_eligible_agilities(battlefield, opposing), default=None)
 
 
 def _attempt_flee(
@@ -95,6 +110,64 @@ def _attempt_flee(
     return success, {
         "roll": raw_roll,
         "actor_agility": actor_agility,
+        "pursuer_agility": pursuer_agility,
+    }
+
+
+def party_retreat_attempt(
+    battlefield: combat.Battlefield,
+    party_team: str,
+    allied_actors: Iterable[Any],
+) -> tuple[bool | None, dict[str, float | int | None]]:
+    """Roll the whole-party retreat contest once; no state is mutated.
+
+    ``allied_actors`` is the allied party's currently able-to-act members in
+    the caller's deterministic order, and ``party_team`` is that party's
+    battlefield team. Whom the caller counts as able to act is the session's
+    own eligibility policy (it excludes a blocked or action-forbidden member,
+    which the battlefield alone cannot see), so the contest's agility minimum
+    and the caller's no-acting-ally branch always agree; the party's own
+    knocked-out companions are carried out but never move the minimum.
+
+    Returns ``(None, detail)`` when no allied member can act, ``(True, detail)``
+    with no roll at all when no living pursuer remains, and otherwise the one
+    d100 contest ``roll + minimum allied adjusted agility >= defender_constant
+    + maximum pursuer adjusted agility`` — the same adjusted-agility query and
+    the same constant the individual flee uses, and never accuracy or a Dodge
+    threshold bonus. ``detail`` carries the roll and both terms for the
+    caller's deterministic record.
+    """
+    allied = [_adjusted_agility(actor) for actor in allied_actors]
+    if not allied:
+        return None, {
+            "roll": None,
+            "allied_agility": None,
+            "pursuer_agility": None,
+        }
+    opposing = [
+        key
+        for team, members in battlefield.teams.items()
+        if team != party_team
+        for key in members
+    ]
+    pursuer_agility = max(
+        _eligible_agilities(battlefield, opposing), default=None
+    )
+    allied_agility = min(allied)
+    if pursuer_agility is None:
+        return True, {
+            "roll": None,
+            "allied_agility": allied_agility,
+            "pursuer_agility": None,
+        }
+    raw_roll = roll_d100()
+    success = (
+        raw_roll + allied_agility
+        >= combat.COMBAT_YAML["to_hit"]["defender_constant"] + pursuer_agility
+    )
+    return success, {
+        "roll": raw_roll,
+        "allied_agility": allied_agility,
         "pursuer_agility": pursuer_agility,
     }
 

@@ -39,13 +39,17 @@ from world.rules.combat import Battlefield, _handle_damage, run_round
 from world.rules.combat_session import (
     _context_for,
     BASIC_ATTACK_KEY,
+    PARTY_EXIT_RETREAT,
     authorize_combat_actor,
     CombatSessionError,
     SessionReason,
+    confirm_party_exit,
     engage,
+    engage_group,
     forfeit,
     read_session,
     reconstruct_battlefield,
+    request_party_exit,
     submit_player_action,
     submit_player_item_use,
 )
@@ -53,7 +57,11 @@ from world.rules.combat_session.policies import _party_round_provider
 from world.rules.disengage import FLEE_SKILL_KEY
 from world.rules.monster_behaviour import monster_behaviour_policy
 from world.rules.party import join_party, party_ids
-from world.rules.skip_safety import SkipRejectReason, _BATTLEFIELDS
+from world.rules.skip_safety import (
+    SkipRejectReason,
+    _BATTLEFIELDS,
+    evaluate_skip_safety,
+)
 from world.rules.targeting import expand_target_shorthand
 
 from .combat_fixtures import FakeEntity
@@ -1029,6 +1037,664 @@ class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["outcome"], "round")
         self.assertGreater(companion.traits.hp.current, 50)
         self.assertEqual(companion.db.inventory.count("t_ember_spray"), 0)
+
+
+class PartyRetreatTests(BattlefieldIsolation, EvenniaTestCase):
+    """Tasks 1.1-4.1: the confirmed party retreat's one contest and its round.
+
+    The bounds established here: the contest uses the SLOWEST able ally against
+    the FASTEST living pursuer and ignores accuracy; no pursuer escapes without
+    a roll and no able ally takes the ordinary defeat path; a success carries
+    the whole present party — knocked-out companions included and excluded from
+    the minimum — with no enemy action and one elapsed round settled exactly
+    once; a failure consumes every allied opportunity, runs one ordinary enemy
+    round with no draft action and no tactical benefit, costs no resource and
+    leaves a fresh empty next-round draft; and a failure after the round's own
+    writes rolls the whole unit back for a safe retry, while a replay or a
+    round that already spent the revision cannot retreat twice.
+    """
+
+    def setUp(self):
+        open_synthetic_scope(
+            self, *_SCOPE_LOGICALS, extra=synth_innate_overlay()
+        )
+        super().setUp()
+        from world.quests.catalog import register_catalog
+
+        register_catalog()
+        self.room = create_object(Room, key="retreat arena")
+        self.player = _player(key="retreat player")
+        self.player.location = self.room
+        self.monster = _monster("retreat goblin", hp=500, atk=10, agility=15)
+        self.monster.location = self.room
+
+    def _retreat_prompt(self):
+        record = read_session(self.player)
+        return request_party_exit(
+            self.player,
+            record.session_id,
+            record.round_revision,
+            PARTY_EXIT_RETREAT,
+        )
+
+    def _confirm(self, prompt):
+        return confirm_party_exit(
+            self.player,
+            prompt["session_id"],
+            prompt["round_revision"],
+            prompt["operation"],
+            prompt["confirmation_token"],
+        )
+
+    def _hours(self):
+        from world.rules.combat_session import settlement as settlement_module
+
+        real = settlement_module.settle_combat_result
+        seen: list[int] = []
+
+        def counting(result, entities):
+            seen.append(result.total_seconds)
+            return real(result, entities)
+
+        return seen, counting
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_the_contest_uses_the_slowest_able_ally_against_the_fastest_pursuer(self):
+        from world.rules.disengage import _adjusted_agility
+
+        self.player.traits.agility.base = 20
+        companion = _companion(self.player, "慢速同伴", hp=200, agility=10)
+        fast = _monster("快速追兵", hp=500, agility=12)
+        fast.location = self.room
+        engage_group(self.player, [self.monster, fast])
+        # The premise the fixed dice below are read against: the able allys
+        # adjusted agilities are 10 and 20, and the living pursuers' maximum
+        # is self.monster's 15 (not the slower 12 of the second pursuer).
+        self.assertEqual(_adjusted_agility(companion), 10)
+        self.assertEqual(_adjusted_agility(self.player), 20)
+        self.assertEqual(_adjusted_agility(self.monster), 15)
+        self.assertEqual(_adjusted_agility(fast), 12)
+
+        # 54 + 10 = 64 fails against 51 + 15 = 66. Were the faster ally used
+        # (74) or the slower pursuer compared against (63), it would succeed:
+        # this single outcome pins both the minimum and the maximum.
+        self.player.traits.hp.base = 1000
+        self.player.traits.hp.current = 1000
+        prompt = self._retreat_prompt()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=54),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+        ):
+            failed = self._confirm(prompt)
+        self.assertEqual(failed["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
+
+        # 56 + 10 = 66 meets the boundary exactly, per §6.1's own example.
+        prompt = self._retreat_prompt()
+        with patch("world.rules.disengage.roll_d100", return_value=56):
+            escaped = self._confirm(prompt)
+        self.assertEqual(escaped["outcome"], "fled")
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_accuracy_never_moves_the_contest(self):
+        # The Dodge threshold bonus is a round-start declaration, and the
+        # failed-retreat test below establishes that no declaration is even
+        # projected on this path; this one pins accuracy's own independence.
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+        from world.rules.disengage import _adjusted_agility
+
+        self.player.traits.agility.base = 20
+        companion = _companion(self.player, "準確同伴", hp=200, agility=10)
+        engage(self.player, self.monster)
+
+        def with_accuracy(entity):
+            bundle = dict(evaluate_combat_modifiers(entity))
+            bundle["accuracy"] = "+900%"
+            return bundle
+
+        with patch(
+            "world.rules.disengage.evaluate_combat_modifiers",
+            side_effect=with_accuracy,
+        ):
+            self.assertEqual(_adjusted_agility(companion), 10)
+            self.assertEqual(_adjusted_agility(self.player), 20)
+            # 55 + 10 = 65 still misses 66: not one accuracy point entered it.
+            prompt = self._retreat_prompt()
+            with patch("world.rules.disengage.roll_d100", return_value=55):
+                result = self._confirm(prompt)
+        self.assertEqual(result["outcome"], "round")
+        self.assertTrue(is_active_session(self.player))
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_success_carries_the_knocked_out_companion_and_settles_one_round_once(self):
+        self.player.traits.agility.base = 20
+        self.player.traits.hp.base = 100
+        self.player.traits.hp.current = 50
+        # Above the nonlethal floor so engagement collects it at all; the
+        # knockout mark below is what takes it out of action.
+        companion = _companion(self.player, "倒地同伴", hp=2, agility=1)
+        self.assertEqual(party_ids(self.player), [companion.pk])
+        engage(self.player, self.monster)
+        # The companion is out of action and would drag the minimum to 1 if it
+        # were still counted; it must be carried instead. The durable record is
+        # the source every entry point rebuilds from, so the mark lives there.
+        from dataclasses import replace
+
+        from world.rules.combat_session.lifecycle import _persist
+
+        record = read_session(self.player)
+        self.assertIn(int(companion.pk), record.player_ids)
+        _persist(
+            self.player,
+            replace(
+                record,
+                knocked_out_ids=(int(companion.pk),),
+            ),
+        )
+        companion.traits.hp.current = 1
+        self.monster.traits.hp.current = 400
+
+        prompt = self._retreat_prompt()
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=56),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+            patch("world.rules.combat_session.rounds.run_round") as run,
+        ):
+            result = self._confirm(prompt)
+
+        # No enemy action ran at all, and exactly one elapsed round settled.
+        run.assert_not_called()
+        self.assertEqual(settled, [6])
+        self.assertEqual(result["outcome"], "fled")
+        self.assertEqual(result["rounds_elapsed"], 1)
+        self.assertEqual(result["receipt"]["operation"], PARTY_EXIT_RETREAT)
+        kinds = [
+            entry.kind for log in result["logs"] for entry in log.entries
+        ]
+        self.assertIn("party_retreat", kinds)
+        # The whole party left, and the carried companion gained nothing: no
+        # healing, no revival, and nobody was relocated.
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertFalse(is_active_session(self.player))
+        self.assertFalse(is_active_session(companion))
+        # No subset stayed in combat, and every participant was released from
+        # the registration that blocks time skips.
+        self.assertNotEqual(
+            evaluate_skip_safety(self.player), SkipRejectReason.IN_COMBAT
+        )
+        for entity in (self.player, companion, self.monster):
+            self.assertNotIn(str(entity.pk), _BATTLEFIELDS)
+        self.assertEqual(self.player.traits.hp.current, 50)
+        # Carried, not regenerated: the settlement's scope excludes the whole
+        # departed party, so the companion stays on the nonlethal floor.
+        self.assertEqual(companion.traits.hp.current, 1)
+        self.assertGreater(self.monster.traits.hp.current, 0)
+        self.assertEqual(self.player.location, self.room)
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_failed_retreat_consumes_every_opportunity_and_runs_one_enemy_round(self):
+        self.player.traits.agility.base = 20
+        self.player.traits.hp.base = 1000
+        self.player.traits.hp.current = 1000
+        companion = _companion(self.player, "指令同伴", hp=200, agility=10)
+        companion.traits.mp.base = 50
+        companion.traits.mp.current = 50
+        grant_lineage(companion, [_T_CAST])
+        engage(self.player, self.monster)
+        # A pending draft of personal commands whose one admitted entry is a
+        # casting that costs MP: the last member's confirmation is what would
+        # auto-submit the round, so the retreat is confirmed with that
+        # selection still unspent and its resource untouched.
+        admitted = submit_player_action(
+            self.player,
+            _T_CAST,
+            [self.monster],
+            commanded_actor=companion,
+        )
+        self.assertEqual(admitted["outcome"], "draft", admitted)
+        record = read_session(self.player)
+        draft_before = dict(record.draft_entries)
+        self.assertEqual(len(draft_before), 1)
+        party_hp_before = (
+            self.player.traits.hp.current + companion.traits.hp.current
+        )
+
+        prompt = self._retreat_prompt()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.rounds._draft_tactical_declarations"
+            ) as tactical,
+            patch(
+                "world.rules.combat_session.rounds._draft_taunt_declarations"
+            ) as taunt,
+            patch(
+                "world.rules.combat_session.rounds._draft_requests"
+            ) as requests,
+        ):
+            result = self._confirm(prompt)
+
+        # The party stayed, the round counted, and a fresh empty draft waits.
+        self.assertEqual(result["outcome"], "round")
+        current = read_session(self.player)
+        self.assertEqual((current.rounds_elapsed, current.round_revision), (1, 1))
+        self.assertEqual(current.draft_entries, {})
+        self.assertEqual(current.confirmed_actors, ())
+        self.assertTrue(is_active_session(self.player))
+        # No old draft entry executed, no declaration was even projected, and
+        # the attempt spent no MP or SP.
+        self.assertEqual(self.monster.traits.hp.current, 500)
+        tactical.assert_not_called()
+        taunt.assert_not_called()
+        requests.assert_not_called()
+        # The admitted casting never resolved, so its cost was never charged.
+        self.assertEqual(companion.traits.mp.current, 50)
+        # The enemies did act under ordinary rules.
+        self.assertLess(
+            self.player.traits.hp.current + companion.traits.hp.current,
+            party_hp_before,
+        )
+        kinds = [entry.kind for log in result["logs"] for entry in log.entries]
+        self.assertIn("party_retreat", kinds)
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_failed_retreat_still_honors_an_enemys_own_capability(self):
+        # "Eligible enemies act under normal rules": an enemy the ordinary
+        # round's own action gate locks takes no action, logs the existing skip
+        # event, and the round still counts and still performs its upkeep.
+        from world.rules.combat_modifiers import evaluate_combat_modifiers
+
+        self.player.traits.hp.base = 1000
+        self.player.traits.hp.current = 1000
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        prompt = self._retreat_prompt()
+
+        def locked_enemy(entity):
+            if entity is self.monster:
+                return {"actions_per_turn": 0}
+            return evaluate_combat_modifiers(entity)
+
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=1),
+            patch(
+                "world.rules.combat.rounds.evaluate_combat_modifiers",
+                side_effect=locked_enemy,
+            ),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            result = self._confirm(prompt)
+        self.assertEqual(result["outcome"], "round")
+        current = read_session(self.player)
+        self.assertEqual(current.round_revision, record.round_revision + 1)
+        self.assertEqual(current.draft_entries, {})
+        kinds = [entry.kind for log in result["logs"] for entry in log.entries]
+        self.assertIn("action_skipped", kinds)
+        self.assertIn("party_retreat", kinds)
+        # The locked enemy dealt no damage, but its round still elapsed and its
+        # upkeep still ran, so the party's total time is unchanged for now
+        # (nothing settles until a terminal outcome).
+        self.assertEqual(self.player.traits.hp.current, 1000)
+        self.assertEqual(settled, [])
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_party_with_no_pursuer_left_escapes_without_a_roll(self):
+        self.player.traits.agility.base = 20
+        companion = _companion(self.player, "同行者", hp=200, agility=10)
+        engage(self.player, self.monster)
+        # The last living pursuer falls before the retreat is confirmed (no
+        # round settles between the two, so the session is still active).
+        self.monster.traits.hp.current = 0
+        prompt = self._retreat_prompt()
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100") as roll,
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            result = self._confirm(prompt)
+        roll.assert_not_called()
+        self.assertEqual(result["outcome"], "fled")
+        self.assertEqual(settled, [6])
+        self.assertFalse(is_active_session(self.player))
+        self.assertFalse(is_active_session(companion))
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_failed_escape_write_rolls_the_party_back_into_combat(self):
+        from world.rules.clock import get_world_clock
+
+        self.player.traits.agility.base = 20
+        companion = _companion(self.player, "同退同伴", hp=200, agility=10)
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        tick_before = get_world_clock().tick
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=56),
+            patch(
+                "world.rules.combat_session.exit.write_last_combat_receipt",
+                side_effect=RuntimeError("receipt write failed"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "receipt write failed"):
+                self._confirm(prompt)
+        # No subset left combat: the whole party is still in the session, the
+        # fled marks were rolled back, and the clock did not move.
+        self.assertTrue(is_active_session(self.player))
+        self.assertEqual(get_world_clock().tick, tick_before)
+        self.assertEqual(
+            evaluate_skip_safety(self.player), SkipRejectReason.IN_COMBAT
+        )
+        for entity in (self.player, companion, self.monster):
+            self.assertIn(str(entity.pk), _BATTLEFIELDS)
+        record = read_session(self.player)
+        self.assertEqual(record.fled_ids, ())
+        self.assertEqual((record.rounds_elapsed, record.round_revision), (0, 0))
+
+        # The later valid retry completes and takes the whole party out.
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=56),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            result = self._confirm(prompt)
+        self.assertEqual(settled, [6])
+        self.assertEqual(result["outcome"], "fled")
+        self.assertFalse(is_active_session(self.player))
+        self.assertFalse(is_active_session(companion))
+        for entity in (self.player, companion, self.monster):
+            self.assertNotIn(str(entity.pk), _BATTLEFIELDS)
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_no_able_allied_member_takes_the_ordinary_defeat_path(self):
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        with (
+            patch(
+                "world.rules.combat_session.rounds.get_required_combat_actors",
+                return_value=(),
+            ),
+            patch("world.rules.disengage.roll_d100") as roll,
+            patch("world.rules.combat_session.rounds.run_round") as run,
+        ):
+            result = self._confirm(prompt)
+        # No roll, no round, no enemy action: the approved defeat branch.
+        roll.assert_not_called()
+        run.assert_not_called()
+        self.assertEqual(result["outcome"], "defeat")
+        self.assertEqual(result["receipt"]["outcome"], "defeat")
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertFalse(is_active_session(self.player))
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_an_unreconstructable_battlefield_takes_the_same_defeat_path(self):
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        self.monster.delete()
+        with patch("world.rules.combat_session.rounds.run_round") as run:
+            result = self._confirm(prompt)
+        run.assert_not_called()
+        self.assertEqual(result["outcome"], "defeat")
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    def test_a_failed_retreat_the_enemy_round_decides_settles_terminal_once(self):
+        # The pursuers defeat the party inside the failed retreat's own round:
+        # the ordinary enemy round is what ends the session, and the whole
+        # party's accumulated time still settles exactly once, from the round
+        # boundary rather than from a second settlement of its own.
+        self.player.traits.hp.base = 1
+        self.player.traits.hp.current = 1
+        self.monster.traits.atk_phys.base = 100
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            result = self._confirm(prompt)
+        self.assertEqual(result["outcome"], "defeat")
+        # One elapsed round's six seconds settle once, and only once.
+        self.assertEqual(settled, [6])
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertFalse(is_active_session(self.player))
+
+    @covers_requirement("player-combat-session::combat-time-settles-once-at-terminal-session-outcome")
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
+    def test_a_replayed_confirmation_settles_once(self):
+        self.player.traits.agility.base = 20
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        _, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=56),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            first = self._confirm(prompt)
+        self.assertEqual(first["outcome"], "fled")
+
+        from world.rules.clock import get_world_clock
+
+        tick_after = get_world_clock().tick
+        with patch(
+            "world.rules.combat_session.settlement.settle_combat_result"
+        ) as settle:
+            replay = self._confirm(prompt)
+        settle.assert_not_called()
+        self.assertTrue(replay["idempotent"])
+        self.assertEqual(replay["receipt"], first["receipt"])
+        self.assertEqual(get_world_clock().tick, tick_after)
+        self.assertIsNone(self.player.db.active_combat)
+
+    @covers_requirement("player-combat-session::round-revisions-execute-at-most-once-across-retries-and-stale-requests")
+    def test_a_round_that_spent_the_revision_refuses_the_stale_retreat(self):
+        engage(self.player, self.monster)
+        prompt = self._retreat_prompt()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+        ):
+            resolved = submit_player_action(
+                self.player, BASIC_ATTACK_KEY, [self.monster]
+            )
+        self.assertEqual(resolved["outcome"], "round")
+        self.assertEqual(read_session(self.player).round_revision, 1)
+        for revision in (prompt["round_revision"], 1):
+            with self.subTest(revision=revision):
+                with self.assertRaises(CombatSessionError) as ctx:
+                    confirm_party_exit(
+                        self.player,
+                        prompt["session_id"],
+                        revision,
+                        PARTY_EXIT_RETREAT,
+                        prompt["confirmation_token"],
+                    )
+                self.assertEqual(
+                    ctx.exception.args[0], SessionReason.STALE_ROUND_REVISION
+                )
+                self.assertTrue(is_active_session(self.player))
+        self.assertEqual(read_session(self.player).round_revision, 1)
+
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_a_failure_after_the_round_rolls_every_touched_surface_back(self):
+        from world.rules.clock import get_world_clock
+
+        self.player.traits.agility.base = 20
+        self.player.traits.hp.base = 1000
+        self.player.traits.hp.current = 1000
+        companion = _companion(self.player, "回溯同伴", hp=200, agility=10)
+        engage(self.player, self.monster)
+        admitted = submit_player_action(
+            self.player, BASIC_ATTACK_KEY, [self.monster]
+        )
+        self.assertEqual(admitted["outcome"], "draft", admitted)
+        record = read_session(self.player)
+        draft = dict(record.draft_entries)
+        player_hp = self.player.traits.hp.current
+        companion_hp = companion.traits.hp.current
+        tick_before = get_world_clock().tick
+
+        prompt = self._retreat_prompt()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=1),
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch(
+                "world.rules.combat_session.exit.write_last_combat_receipt",
+                side_effect=RuntimeError("receipt write failed"),
+            ),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "receipt write failed"):
+                self._confirm(prompt)
+
+        # Every durable and in-process surface survived the rolled-back unit,
+        # including the failed round's HP writes.
+        current = read_session(self.player)
+        self.assertIsNotNone(current)
+        self.assertEqual(current.draft_entries, draft)
+        self.assertEqual(
+            (current.rounds_elapsed, current.round_revision),
+            (record.rounds_elapsed, record.round_revision),
+        )
+        self.assertEqual(self.player.traits.hp.current, player_hp)
+        self.assertEqual(companion.traits.hp.current, companion_hp)
+        self.assertEqual(self.monster.traits.hp.current, 500)
+        self.assertEqual(get_world_clock().tick, tick_before)
+        self.assertTrue(is_active_session(self.player))
+        self.assertEqual(
+            evaluate_skip_safety(self.player), SkipRejectReason.IN_COMBAT
+        )
+
+        # The later valid retry completes once, and the retreat's own round
+        # settles the accumulated time exactly once.
+        settled, counting = self._hours()
+        with (
+            patch("world.rules.disengage.roll_d100", return_value=56),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result",
+                side_effect=counting,
+            ),
+        ):
+            result = self._confirm(prompt)
+        self.assertEqual(settled, [6])
+        self.assertEqual(result["outcome"], "fled")
+        self.assertIsNone(self.player.db.active_combat)
+
+
+class PartyRetreatContestTests(EvenniaTestCase):
+    """Task 1.1: the contest's own roll-free branches, at the helper boundary."""
+
+    def _field(self, allies, foes):
+        roster = {entity.key: entity for entity in (*allies, *foes)}
+        return Battlefield(
+            teams={
+                "party": frozenset(entity.key for entity in allies),
+                "foes": frozenset(entity.key for entity in foes),
+            },
+            roster=roster,
+        )
+
+    def test_no_pursuer_escapes_without_drawing_a_roll(self):
+        from world.rules.disengage import party_retreat_attempt
+
+        ally = FakeEntity("ally", agility=3)
+        fled = FakeEntity("fled foe", agility=90)
+        knocked = FakeEntity("knocked foe", agility=90, hp=0)
+        field = self._field([ally], [fled, knocked])
+        field.fled.add("fled foe")
+        field.knocked_out.add("knocked foe")
+        with patch("world.rules.disengage.roll_d100") as roll:
+            success, detail = party_retreat_attempt(field, "party", [ally])
+        roll.assert_not_called()
+        self.assertTrue(success)
+        self.assertIsNone(detail["roll"])
+        self.assertEqual(detail["allied_agility"], 3)
+        self.assertIsNone(detail["pursuer_agility"])
+
+    def test_no_acting_ally_reports_the_defeat_branch_without_a_roll(self):
+        from world.rules.disengage import party_retreat_attempt
+
+        foe = FakeEntity("foe", agility=90)
+        field = self._field([], [foe])
+        with patch("world.rules.disengage.roll_d100") as roll:
+            success, detail = party_retreat_attempt(field, "party", [])
+        roll.assert_not_called()
+        self.assertIsNone(success)
+        self.assertIsNone(detail["allied_agility"])
+
+    def test_one_roll_compares_the_slowest_ally_and_the_fastest_pursuer(self):
+        # Saturation gaps, not the boundary arithmetic: each arm offers the
+        # same fixed roll to two calls whose ally set (or pursuer set) differs
+        # in exactly the extreme that must decide it, so the outcome flips
+        # whatever the shipped constant is. Nothing here restates that constant
+        # or its formula.
+        from world.rules.disengage import party_retreat_attempt
+
+        slow = FakeEntity("slow", agility=1)
+        fast = FakeEntity("fast", agility=200)
+        pursuer = FakeEntity("pursuer", agility=100)
+        # The slowest ally can never reach this hill of a pursuer while the
+        # fastest alone cannot miss it: the attempt that has both able allies
+        # available must use the slower one and fail.
+        field = self._field([slow, fast], [pursuer])
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            both, detail = party_retreat_attempt(
+                field, "party", [slow, fast]
+            )
+            alone, _ = party_retreat_attempt(field, "party", [fast])
+        self.assertFalse(both)
+        self.assertTrue(alone)
+        self.assertEqual(detail["allied_agility"], 1)
+        self.assertEqual(detail["pursuer_agility"], 100)
+        self.assertEqual(detail["roll"], 100)
+
+        # The same for the pursuer side: one puny pursuer cannot stop the
+        # party, and adding a fearsome one must be the term the contest uses.
+        weak = FakeEntity("weak", agility=1)
+        fearsome = FakeEntity("fearsome", agility=200)
+        ally = FakeEntity("ally", agility=50)
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            escaped, weak_detail = party_retreat_attempt(
+                self._field([ally], [weak]), "party", [ally]
+            )
+            missed, fearsome_detail = party_retreat_attempt(
+                self._field([ally], [weak, fearsome]), "party", [ally]
+            )
+        self.assertTrue(escaped)
+        self.assertFalse(missed)
+        self.assertEqual(weak_detail["pursuer_agility"], 1)
+        self.assertEqual(fearsome_detail["pursuer_agility"], 200)
 
 
 if __name__ == "__main__":

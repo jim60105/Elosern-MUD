@@ -474,16 +474,23 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertIsNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
-    def test_retreat_confirmation_reaches_no_settlement(self):
+    def test_an_operation_without_a_dispatch_rejects_before_any_write(self):
+        # Both operations now have their own resolution, so the boundary's
+        # ``party_exit_unavailable`` answer is what an operation the vocabulary
+        # knows but dispatches nowhere still gets: verified first, refused
+        # before any session read, write or settlement.
         engage(self.player, self.monster)
         record = read_session(self.player)
         prompt = request_party_exit(
             self.player, record.session_id, record.round_revision,
             PARTY_EXIT_RETREAT,
         )
-        with patch(
-            "world.rules.combat_session.settlement.settle_combat_result"
-        ) as settle:
+        with (
+            patch("world.rules.combat_session.exit._OPERATION_HANDLERS", {}),
+            patch(
+                "world.rules.combat_session.settlement.settle_combat_result"
+            ) as settle,
+        ):
             with self.assertRaises(CombatSessionError) as ctx:
                 confirm_party_exit(
                     self.player,
@@ -497,6 +504,7 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         )
         settle.assert_not_called()
         self.assertTrue(is_in_active_session(self.player))
+        self.assertEqual(read_session(self.player).round_revision, record.round_revision)
         self.assertEqual(get_world_clock().tick, 0)
         self.assertIsNone(read_last_combat_receipt(self.player))
 
