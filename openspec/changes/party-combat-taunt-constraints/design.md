@@ -32,8 +32,16 @@ Recorded at apply time, so a later reader does not have to re-derive it.
   the winner's identity. A winner excluded at (1) or rejected at (2) grants no
   exception and the ordinary candidates stand, so the enemy never loses a
   legal action to a plan only the winner could submit. The Monster legacy body
-  keeps the seal *preference* it already had and narrows only when the winner
-  is that preference's own selected bearer, so the two decision modes agree.
+  keeps the seal *preference* it already had and narrows only from its own
+  candidate list (the seal preference and the positional-marker filter, which
+  is exactly the legality that body already models), and only when the winner
+  is that preference's own selected bearer; it does not add a shared-gate
+  probe it never had. The utility producer additionally requires the winner's
+  plan to pass the shared settlement gates, and the delegated
+  ``default_attack_policy`` narrows from its own strike candidates the same
+  way. Neither invents legality: a winner the ordinary restriction or the
+  shared gates exclude is never forced, and a narrowed target rejected at
+  settlement still loses the action without any redirect.
 - **Classifier ownership.** ``world.skills.effects.polarity.skill_target_polarity``
   (owned by ``webclient-combat-panel-v6``) is the authoritative typed-effect
   hostility classifier and the only one Taunt reads: the constraint applies to

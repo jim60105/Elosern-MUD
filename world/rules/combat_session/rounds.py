@@ -780,7 +780,10 @@ def _draft_taunt_declarations(
     taunter, so the mapping direction is taunter -> enemy; the winning taunter
     per enemy is resolved later from the round's initiative sequence, not here.
     An entry whose actor or enemy is no longer on the roster contributes
-    nothing: the enemy is then simply unrestricted.
+    nothing: the enemy is then simply unrestricted. Eligibility itself is
+    already enforced by the immediately preceding :func:`preflight_draft_entries`
+    in the round builder, which rejects an ineligible taunt target before any
+    declaration is projected; this helper only binds identities.
     """
     keys_by_actor = {
         int(entity.pk): str(entity.key) for entity in battlefield.roster.values()

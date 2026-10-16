@@ -486,7 +486,11 @@ def enumerate_candidates(
         classification (:func:`skill_target_polarity`), not a skill name or
         school, so a non-damage hostile effect is constrained exactly as a
         damage strike is. A narrowed plan is the same proposal the family ring
-        would examine, so the examination is shared and never paid twice.
+        would examine, so the examination is shared and never paid twice; it is
+        still charged through ``admit`` exactly like the mandatory-filter
+        capability probe, so the examined set can never exceed the authored
+        budget. An unaffordable or gate-rejected winner leaves the ordinary
+        candidates in place.
         """
         if taunter is None or skill.target_spec is not TargetSpec.SINGLE:
             return base
@@ -500,7 +504,7 @@ def enumerate_candidates(
         proposal = _single_proposal(
             skill, taunter, actor, context, reader, magnitude
         )
-        if not isinstance(outcome(proposal), Candidate):
+        if not admit(proposal) or not isinstance(outcome(proposal), Candidate):
             return base
         return (taunter,)
 

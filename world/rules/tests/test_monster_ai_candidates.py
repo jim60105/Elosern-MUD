@@ -1270,7 +1270,7 @@ class TauntConstraintTests(EvenniaTestCase):
         )
         return field
 
-    def _enumerate(self, opponents, field):
+    def _enumerate(self, opponents, field, **kwargs):
         context = BattlefieldActionContext(field)
         reads = DecisionReads()
         snapshot = build_decision_snapshot(
@@ -1286,10 +1286,21 @@ class TauntConstraintTests(EvenniaTestCase):
             context=context,
             roster=roster_index((self.monster, *opponents)),
             reads=reads,
+            **kwargs,
         )
 
     def _own(self, *keys):
         self.monster.db.skills = {"active": list(keys), "passive": []}
+
+    def test_the_winner_examination_is_charged_to_the_candidate_budget(self):
+        self._own(MAGIC.key, STRIKE.key)
+        taunter = self._participant("t_cand_taunter")
+        other = self._participant("t_cand_other")
+        field = self._taunted(self._field(taunter, other), taunter)
+        result = self._enumerate((taunter, other), field, budget=1)
+        # The narrowing's gate probe is charged exactly like any other
+        # examination, so the bound still holds with an active taunt.
+        self.assertLessEqual(result.examined, 1)
 
     def test_an_active_winner_narrows_a_hostile_damage_single_to_itself(self):
         self._own(MAGIC.key)

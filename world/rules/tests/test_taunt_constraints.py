@@ -350,6 +350,11 @@ class TauntSessionTests(EvenniaTestCase):
         self.companion = create_object(NPC, key="taunt companion", location=self.room)
         self.companion.race = self.player.race
         self.companion.apply_race_baseline()
+        # The companion is the strictly weakest ally, so an unconstrained
+        # lowest-HP enemy decision deterministically prefers it: the taunt
+        # assertion below cannot pass by tie-break luck.
+        self.companion.traits.hp.base = 10
+        self.companion.traits.hp.current = 10
         join_party(self.companion, self.player)
 
     def test_a_taunt_declaration_constrains_the_enemy_and_spends_no_resource(self):
@@ -372,6 +377,7 @@ class TauntSessionTests(EvenniaTestCase):
 
         companion_hp = self.companion.traits.hp.current
         player_hp = self.player.traits.hp.current
+        self.assertLess(companion_hp, player_hp)
         with patch("world.rules.combat.damage.roll_d100", return_value=100):
             complete_party_draft(self.player, self.monster, admitted)
         self.assertEqual(read_session(self.player).rounds_elapsed, 1)
