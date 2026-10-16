@@ -393,7 +393,7 @@ class OnHitCounterDamageBehaviorTests(EvenniaTest):
         to_hit_results = [(False, -10.0), (True, 10.0)]
         with (
             patch("world.rules.combat.damage.has_action_evidence", return_value=True),
-            patch("world.rules.combat.damage._to_hit", side_effect=lambda a, t, r: to_hit_results.pop(0)),
+            patch("world.rules.combat.damage._to_hit", side_effect=lambda a, t, r, **kwargs: to_hit_results.pop(0)),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.damage.dispatch_outcome_reaction", side_effect=counting_dispatch),
         ):

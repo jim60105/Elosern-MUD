@@ -24,6 +24,7 @@ from world.rules.combat.battlefield import (  # noqa: F401
     Battlefield,
     BattlefieldActionContext,
     BattleResult,
+    RoundTactical,
     RoundRequest,
     _MAX_ACTIONS_PER_TURN,
     _adjusted_attack,

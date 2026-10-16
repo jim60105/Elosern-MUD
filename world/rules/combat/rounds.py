@@ -6,6 +6,7 @@ inside the same outer transaction. ``run_battle`` drives the loop to a
 terminal predicate or the round cap.
 """
 
+from collections.abc import Mapping
 from typing import Any
 
 from world.rules.action import ActionRequest, ActionResolver, _stored_trait_value
@@ -16,6 +17,7 @@ from world.rules.combat.battlefield import (
     Battlefield,
     BattlefieldActionContext,
     BattleResult,
+    RoundTactical,
     _MAX_ACTIONS_PER_TURN,
     _stored_hp,
     is_battle_over,
@@ -181,6 +183,55 @@ def _end_of_round_upkeep(
 
 
 def run_round(
+    battlefield: Battlefield,
+    action_provider: ActionProvider,
+    *,
+    simulated: bool = False,
+    nonlethal_keys: frozenset[str] = frozenset(),
+    journal_sink: "list[object] | None" = None,
+    notifications_sink: "list[str] | None" = None,
+    first_actor: str | None = None,
+    decision_scope_base: ExecutionScopeBase | None = None,
+    tactical_declarations: Mapping[str, str] | None = None,
+) -> list[EventLog]:
+    """Resolve one round inside its round-start tactical scope.
+
+    The keyword-only ``tactical_declarations`` (party-combat-defend-dodge) is
+    the round's accepted allied Defend/Dodge declarations, keyed by roster key
+    (``"defend"`` or ``"dodge"``). ``run_round`` is the sole writer of the
+    round execution context: it activates the declarations on
+    ``battlefield.tactical`` before :func:`_resolve_round` rolls initiative,
+    so a slow defending actor is protected before its own initiative position,
+    and clears the context in a ``finally`` so no activated effect leaks past
+    the round (or survives a technically failed round) and none stacks across
+    rounds. The context is transient in-battle state, never a durable buff. An
+    omitted or empty mapping leaves ``battlefield.tactical`` unset, so
+    default-mode callers are byte-identical to the pre-parameter behaviour.
+
+    Every other contract (initiative order, ``first_actor`` reordering, the
+    closed request union, the shared resolver, upkeep settlement, the decision
+    scope, and the outer transaction boundary) lives on
+    :func:`_resolve_round`, the body this scope wraps.
+    """
+    battlefield.tactical = (
+        RoundTactical(dict(tactical_declarations)) if tactical_declarations else None
+    )
+    try:
+        return _resolve_round(
+            battlefield,
+            action_provider,
+            simulated=simulated,
+            nonlethal_keys=nonlethal_keys,
+            journal_sink=journal_sink,
+            notifications_sink=notifications_sink,
+            first_actor=first_actor,
+            decision_scope_base=decision_scope_base,
+        )
+    finally:
+        battlefield.tactical = None
+
+
+def _resolve_round(
     battlefield: Battlefield,
     action_provider: ActionProvider,
     *,

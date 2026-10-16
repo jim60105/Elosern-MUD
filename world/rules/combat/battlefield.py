@@ -36,6 +36,10 @@ def validate_combat_rulebook(data: Any) -> dict[str, Any]:
     Finite positive ``damage.mitigation_k`` is strictly required: boolean,
     non-numeric, non-finite (inf/nan), zero, and negative values raise
     ``CombatRulebookError``.
+
+    The round-start tactical constants are strictly required too: finite
+    ``tactics.defend_reduction`` within ``[0, 1)`` and finite non-negative
+    ``tactics.dodge_threshold_bonus`` are the only admitted values.
     """
     if not isinstance(data, dict):
         raise CombatRulebookError("combat rulebook must be a mapping")
@@ -53,6 +57,31 @@ def validate_combat_rulebook(data: Any) -> dict[str, Any]:
         raise CombatRulebookError(
             f"damage.mitigation_k must be a finite positive number, got {k!r}"
         )
+    tactics = data.get("tactics")
+    if not isinstance(tactics, dict):
+        raise CombatRulebookError("combat rulebook must declare a 'tactics' mapping")
+    reduction = tactics.get("defend_reduction")
+    if (
+        isinstance(reduction, bool)
+        or not isinstance(reduction, (int, float))
+        or not isfinite(float(reduction))
+        or not 0.0 <= float(reduction) < 1.0
+    ):
+        raise CombatRulebookError(
+            "tactics.defend_reduction must be a finite number in [0, 1), "
+            f"got {reduction!r}"
+        )
+    bonus = tactics.get("dodge_threshold_bonus")
+    if (
+        isinstance(bonus, bool)
+        or not isinstance(bonus, (int, float))
+        or not isfinite(float(bonus))
+        or float(bonus) < 0.0
+    ):
+        raise CombatRulebookError(
+            "tactics.dodge_threshold_bonus must be a finite non-negative number, "
+            f"got {bonus!r}"
+        )
     return data
 
 
@@ -68,6 +97,33 @@ COMBAT_YAML = load_combat_rulebook()
 _MAX_ACTIONS_PER_TURN: int = 3
 
 
+@dataclass(frozen=True)
+class RoundTactical:
+    """One round's activated round-start tactical declarations by roster key.
+
+    ``declarations`` maps an allied roster key to its selected tactical verb
+    (``"defend"`` or ``"dodge"``). The object is round-transient: it lives only
+    in the round execution context (``Battlefield.tactical``), is never a
+    durable buff, and expires when the round ends. It is the one channel
+    settlement's damage staging and the monster-AI estimator both read, so
+    ``is_defending``/``is_dodging`` cannot disagree between them.
+    """
+
+    declarations: dict[str, str]
+
+    def tactic_for(self, key: str) -> str | None:
+        """Return the activated tactical verb for one roster key, or ``None``."""
+        return self.declarations.get(key)
+
+    def is_defending(self, key: str) -> bool:
+        """Return whether one roster key declared Defend for the active round."""
+        return self.declarations.get(key) == "defend"
+
+    def is_dodging(self, key: str) -> bool:
+        """Return whether one roster key declared Dodge for the active round."""
+        return self.declarations.get(key) == "dodge"
+
+
 @dataclass
 class Battlefield:
     """A live, two-team combat roster.
@@ -77,12 +133,18 @@ class Battlefield:
     knocked out nonlethally at damage-commit time, so initiative, action
     provision, target selection, overwhelm classification, and terminal checks
     share one predicate instead of re-reading raw HP.
+
+    ``tactical`` is the round execution context for the active round's
+    round-start Defend/Dodge declarations (party-combat-defend-dodge). It is
+    transient in-battle state, set and cleared by ``run_round`` inside one
+    round; it is never a durable buff and never stacks across rounds.
     """
 
     teams: dict[str, frozenset[str]]
     roster: dict[str, Any]
     fled: set[str] = field(default_factory=set)
     knocked_out: set[str] = field(default_factory=set)
+    tactical: "RoundTactical | None" = None
 
     def __post_init__(self) -> None:
         if len(self.teams) != 2:

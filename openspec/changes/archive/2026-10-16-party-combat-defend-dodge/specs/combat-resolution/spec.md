@@ -3,11 +3,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: To-hit uses a recalibrated defender constant of 51, not the design doc's original 60
-`world/rules/rulebook/combat.yaml` SHALL declare `to_hit.defender_constant: 51`. With no active Dodge adjustment, a hit SHALL occur when
-`roll_d100() + attacker_effective_agility >= defender_constant + defender_effective_agility`, where both
-agility values are read through `SkillHandler.effective_value("agility")` (change 5), adjusted by any
-`agility` percentage modifier `evaluate_combat_modifiers()` (change 6) returns for that entity, plus any
-`accuracy` modifier the attacker's own bundle returns.
+`world/rules/rulebook/combat.yaml` SHALL declare `to_hit.defender_constant: 51`. With no active
+Dodge adjustment, a hit SHALL occur when `roll_d100() + attacker_effective_agility >=
+defender_constant + defender_effective_agility`, where both agility values come from
+`SkillHandler.effective_value("agility")` (change 5), adjusted by the entity's `agility`
+percentage modifier from `evaluate_combat_modifiers()` (change 6), plus the attacker bundle's
+`accuracy` modifier.
 
 #### Scenario: Exact agility parity yields a 50% hit chance
 - **WHEN** attacker and defender have identical effective agility (after modifiers) and 10,000

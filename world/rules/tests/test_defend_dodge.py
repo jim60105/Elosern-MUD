@@ -1,0 +1,356 @@
+"""Round-start Defend and Dodge: shared scalar arithmetic (party-combat-defend-dodge).
+
+Pure ``unittest.TestCase``: the scalar settlement/estimation boundary, the
+damage handler's per-recipient tactical application (including the bypass and
+zero-defense cases and per-recipient AREA resolution), and ``run_round``'s
+round execution context (activation before ordinary actions and expiry at
+round end). No database, no settings, no live skill resolution.
+
+Traceability ordering (``docs/development/spec-test-traceability.md``):
+``tools.spec_traceability`` resolves ids against the main specs under
+``openspec/specs/`` only, so the ids this change ADDS do not exist until
+``openspec archive`` syncs the delta and cannot be annotated now. The dodge
+tests therefore carry the MODIFIED to-hit requirement id
+(``combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60``),
+whose delta adds the Dodge scenario; the ADDED defend and round-start ids are
+annotated at archive time.
+"""
+
+import unittest
+from unittest.mock import patch
+
+from tools.spec_traceability import covers_requirement
+
+from world.rules.buffs import TickRecord
+from world.rules.combat import Battlefield, RoundTactical, run_round
+from world.rules.combat.battlefield import COMBAT_YAML, CombatRulebookError, validate_combat_rulebook
+from world.rules.combat.damage import _handle_damage
+from world.rules.combat.scalars import hit_margin, strike_amount, strike_lands
+from world.skills.effects import DamagePolicy, EffectPolicy, ResolvedEffect
+
+from .combat_fixtures import FakeEntity
+
+
+def _damage_residual(pending) -> int:
+    """Return the staged residual encoded in one pending damage description."""
+    return int(pending.description.rsplit("|", 1)[1])
+
+
+class DefendScalarTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
+    def test_defend_reduces_the_final_scaled_amount_after_scale_and_floors_it(self):
+        # Ordinary scaled damage 40 with reduction 0.35 -> 26 (the spec example).
+        self.assertEqual(
+            strike_amount(
+                attack=40.0, multiplier=1.0, coefficient=1.0, defense=0.0,
+                defending=True,
+            ),
+            26,
+        )
+        # The same strike with no declaration is unchanged.
+        self.assertEqual(
+            strike_amount(
+                attack=40.0, multiplier=1.0, coefficient=1.0, defense=0.0,
+            ),
+            40,
+        )
+        # The floor is applied to the reduced result, not scaled away.
+        self.assertEqual(
+            strike_amount(
+                attack=1.0, multiplier=1.0, coefficient=1.0, defense=0.0,
+                defending=True,
+            ),
+            1,
+        )
+
+
+class DodgeScalarTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
+    )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
+    def test_dodge_subtracts_the_rulebook_threshold_bonus_from_the_margin(self):
+        base = hit_margin(
+            60, attacker_agility=5.0, attacker_accuracy=2.0, defender_agility=8.0
+        )
+        dodging = hit_margin(
+            60,
+            attacker_agility=5.0,
+            attacker_accuracy=2.0,
+            defender_agility=8.0,
+            defender_dodging=True,
+        )
+        self.assertEqual(base - dodging, 25.0)
+        self.assertEqual(dodging, base - 25.0)
+
+    @covers_requirement(
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
+    )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
+    def test_a_raw_100_critical_still_requires_landing_through_dodge(self):
+        # defender agility 30: threshold 81, so raw 100 (margin 19) lands
+        # without dodge; the +25 dodge threshold (106) turns raw 100 into a
+        # miss, and the critical multiplier is never reached.
+        without = hit_margin(100, attacker_agility=0.0, attacker_accuracy=0.0, defender_agility=30.0)
+        with_dodge = hit_margin(
+            100, attacker_agility=0.0, attacker_accuracy=0.0, defender_agility=30.0,
+            defender_dodging=True,
+        )
+        self.assertTrue(strike_lands(without))
+        self.assertFalse(strike_lands(with_dodge))
+
+
+class DamageHandlerTacticalTests(unittest.TestCase):
+    def _strike(self, battlefield, targets, *, roll=60, event_context=None):
+        with patch("world.rules.combat.damage.roll_d100", return_value=roll):
+            return _handle_damage(
+                battlefield.roster["hero"],
+                targets,
+                "damage:dark:physical",
+                {"battlefield": battlefield} if event_context is None else event_context,
+                1.0,
+            )
+
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
+    def test_defend_is_the_recipients_declaration_and_bypass_is_exempt(self):
+        hero = FakeEntity("hero", atk_phys=40, agility=10, defense=0)
+        defended = FakeEntity("defended", hp=100, max_hp=100, defense=0, agility=10)
+        plain = FakeEntity("plain", hp=100, max_hp=100, defense=0, agility=10)
+        battlefield = Battlefield(
+            {"hero": frozenset({"hero"}), "foe": frozenset({"defended", "plain"})},
+            {"hero": hero, "defended": defended, "plain": plain},
+        )
+        battlefield.tactical = RoundTactical({"defended": "defend"})
+
+        pending = self._strike(battlefield, [defended, plain])
+        self.assertEqual(_damage_residual(pending[0]), 26)
+        self.assertEqual(_damage_residual(pending[1]), 40)
+
+        # An explicitly defense-bypassing occurrence skips Defend entirely,
+        # even against a declared defender with zero defense.
+        resolved = ResolvedEffect(
+            policy=EffectPolicy(damage=DamagePolicy(unconditional_defense_bypass=True))
+        )
+        bypassed = self._strike(
+            battlefield,
+            [defended],
+            event_context={"battlefield": battlefield, "resolved_effect": resolved},
+        )
+        self.assertEqual(_damage_residual(bypassed[0]), 40)
+
+    @covers_requirement(
+        "combat-resolution::to-hit-uses-a-recalibrated-defender-constant-of-51-not-the-design-doc-s-original-60"
+    )
+    @covers_requirement(
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins"
+    )
+    def test_dodge_is_applied_per_recipient_and_raw_100_never_overrides_it(self):
+        hero = FakeEntity("hero", atk_phys=40, agility=0, defense=0)
+        dodging = FakeEntity("dodging", hp=100, max_hp=100, defense=0, agility=30)
+        standing = FakeEntity("standing", hp=100, max_hp=100, defense=0, agility=30)
+        battlefield = Battlefield(
+            {"hero": frozenset({"hero"}), "foe": frozenset({"dodging", "standing"})},
+            {"hero": hero, "dodging": dodging, "standing": standing},
+        )
+        battlefield.tactical = RoundTactical({"dodging": "dodge"})
+
+        pending = self._strike(battlefield, [dodging, standing], roll=100)
+        # Raw 100 lands the standing recipient (margin 19) but the dodging
+        # recipient's +25 threshold saturated it to a miss: no invented roll,
+        # no critical, zero staged damage.
+        self.assertEqual(_damage_residual(pending[0]), 0)
+        self.assertEqual(_damage_residual(pending[1]), 80)
+
+
+class RoundTacticalScopeTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
+    def test_run_round_activates_declarations_for_the_whole_round_then_expires(self):
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+        seen: list[tuple[str, str | None]] = []
+
+        def provider(entity, field):
+            seen.append((str(entity.key), None if field.tactical is None else field.tactical.tactic_for("slow")))
+            return None
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, provider, tactical_declarations={"slow": "defend"})
+        # The declaration was active before the fast enemy's first turn.
+        self.assertEqual(seen[0], ("fast", "defend"))
+        self.assertIn(("slow", "defend"), seen)
+        # Round ended: the transient context expired and cannot stack.
+        self.assertIsNone(battlefield.tactical)
+
+        seen.clear()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, provider)
+        self.assertTrue(seen)
+        self.assertTrue(all(tactic is None for _key, tactic in seen))
+        self.assertIsNone(battlefield.tactical)
+
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
+    def test_run_round_clears_declarations_when_the_round_raises(self):
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+
+        def exploding_provider(entity, field):
+            raise RuntimeError("technical failure")
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            self.assertRaises(RuntimeError),
+        ):
+            run_round(battlefield, exploding_provider, tactical_declarations={"slow": "dodge"})
+        self.assertIsNone(battlefield.tactical)
+
+    def test_a_pre_set_round_context_is_not_an_input(self):
+        # run_round is the sole writer: a context left on the battlefield by a
+        # caller is neither read nor preserved, so a stale declaration can
+        # never bleed into a round that declares none.
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+        battlefield.tactical = RoundTactical({"slow": "defend"})
+        seen: list[object] = []
+
+        def provider(entity, field):
+            seen.append(field.tactical)
+            return None
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, provider)
+        self.assertTrue(seen)
+        self.assertTrue(all(tactic is None for tactic in seen))
+        self.assertIsNone(battlefield.tactical)
+
+
+class UpkeepExemptionTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage"
+    )
+    def test_defend_does_not_reduce_a_damaging_upkeep_tick(self):
+        # Damaging upkeep is applied by the buff tick itself, outside
+        # strike_amount, so a defending recipient takes the full tick.
+        slow = FakeEntity("slow", hp=100, agility=1)
+        fast = FakeEntity("fast", hp=100, agility=99)
+        battlefield = Battlefield(
+            {"ally": frozenset({"slow"}), "enemy": frozenset({"fast"})},
+            {"slow": slow, "fast": fast},
+        )
+        tick = TickRecord(definition_key="t_dot", source_pk=7, delta=-10, hp_before=100)
+
+        def fake_tick(entity, seconds):
+            if str(entity.key) == "slow":
+                entity.traits.hp.current = entity.traits.hp.current - 10
+                return (tick,)
+            return ()
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", side_effect=fake_tick),
+            patch("world.rules.combat.rounds.settle_upkeep", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch("world.rules.combat.rounds.climax_settlement_action", return_value=None),
+        ):
+            run_round(battlefield, lambda entity, field: None, tactical_declarations={"slow": "defend"})
+        # 10 lost, not floor(10 * 0.65) = 6: the Defend reduction never reaches
+        # the upkeep tick.
+        self.assertEqual(slow.traits.hp.current, 90)
+
+
+class EnemyUnavailableTests(unittest.TestCase):
+    @covers_requirement(
+        "combat-resolution::defend-and-dodge-consume-one-zero-resource-round-start-action"
+    )
+    def test_declarations_are_scoped_to_the_named_roster_key_only(self):
+        tactical = RoundTactical({"slow": "defend"})
+        self.assertTrue(tactical.is_defending("slow"))
+        self.assertFalse(tactical.is_defending("fast"))
+        self.assertFalse(tactical.is_dodging("fast"))
+        self.assertIsNone(tactical.tactic_for("fast"))
+
+
+class RoundStartConstantValidationTests(unittest.TestCase):
+    """The shipped round-start constants are bounded at the load boundary."""
+
+    @staticmethod
+    def _section_key() -> str:
+        """Return the round-start section key from its own required leaf.
+
+        Located by contract rather than by a literal shipped token, so this
+        behaviour test names no catalog content.
+        """
+        for key, value in COMBAT_YAML.items():
+            if isinstance(value, dict) and "defend_reduction" in value:
+                return key
+        raise AssertionError("the shipped combat rulebook declares no round-start section")
+
+    def test_round_start_constant_bounds_are_enforced_at_load(self):
+        key = self._section_key()
+        section = COMBAT_YAML[key]
+        # The shipped authored values themselves revalidate untouched.
+        self.assertIs(validate_combat_rulebook(COMBAT_YAML), COMBAT_YAML)
+        for bad in (1.0, 1.5, -0.1, float("nan"), float("inf"), True, "0.35", None):
+            with self.subTest(defend_reduction=bad):
+                with self.assertRaises(CombatRulebookError):
+                    validate_combat_rulebook(
+                        {**COMBAT_YAML, key: {**section, "defend_reduction": bad}}
+                    )
+        for bad in (-1, -0.5, float("nan"), float("inf"), True, "25", None):
+            with self.subTest(dodge_threshold_bonus=bad):
+                with self.assertRaises(CombatRulebookError):
+                    validate_combat_rulebook(
+                        {**COMBAT_YAML, key: {**section, "dodge_threshold_bonus": bad}}
+                    )
+        # The round-start section is required, not optional.
+        with self.assertRaises(CombatRulebookError):
+            validate_combat_rulebook(
+                {k: v for k, v in COMBAT_YAML.items() if k != key}
+            )
+
+
+if __name__ == "__main__":  # pragma: no cover
+    unittest.main()

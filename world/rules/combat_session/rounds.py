@@ -684,7 +684,16 @@ def _admit_actor_command(
 
 
 def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> dict[int, combat.RoundRequest]:
-    """Bind persisted selections to this round's authoritative roster."""
+    """Bind persisted selections to this round's authoritative roster.
+
+    A ``defend``/``dodge`` draft entry is a round-start tactical declaration,
+    not an ordinary action: it is activated through
+    ``run_round(tactical_declarations=...)`` and its actor consumes its
+    selected action by receiving no request here (the party provider returns
+    ``None`` for it), so this binding deliberately skips it. Every other
+    command kind without a resolver (currently ``taunt``, owned by the later
+    taunt change) still fails loudly rather than silently consuming an action.
+    """
     entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
     context = _context_for(battlefield, record)
     requests = {}
@@ -704,9 +713,43 @@ def _draft_requests(record: CombatSessionRecord, battlefield: Battlefield) -> di
                 actor=entity, item_key=payload["item_key"],
                 target=entities.get(payload.get("target_id")),
             )
+        elif (
+            entry["kind"] == "tactical"
+            and payload.get("tactical_key") in {"defend", "dodge"}
+        ):
+            # Round-start declaration: activated by run_round, not an action.
+            continue
         else:
             raise ValueError(f"No round resolver registered for command kind {entry['kind']}")
     return requests
+
+
+def _draft_tactical_declarations(
+    record: CombatSessionRecord, battlefield: Battlefield
+) -> dict[str, str]:
+    """Return the round's accepted allied Defend/Dodge declarations by roster key.
+
+    A pure projection of the persistent draft: each tactical entry whose key
+    is ``defend`` or ``dodge`` contributes the bound actor's roster key. Taunt
+    (owned by the later taunt change) is not a Defend/Dodge declaration and is
+    omitted here; it fails loudly in :func:`_draft_requests`.
+
+    Call-order invariant: the round builder runs :func:`_draft_requests` first,
+    which raises for an unresolvable tactical key (currently ``taunt``). A
+    caller that projects the declarations alone would instead silently drop
+    such an entry, so this helper is only ever used beside that check.
+    """
+    keys_by_actor = {
+        int(entity.pk): str(entity.key) for entity in battlefield.roster.values()
+    }
+    declarations: dict[str, str] = {}
+    for actor_id, entry in (record.draft_entries or {}).items():
+        if entry["kind"] != "tactical":
+            continue
+        tactical_key = entry["payload"].get("tactical_key")
+        if tactical_key in {"defend", "dodge"} and actor_id in keys_by_actor:
+            declarations[keys_by_actor[actor_id]] = tactical_key
+    return declarations
 
 
 def _submit_request(
@@ -761,6 +804,7 @@ def _submit_request(
     notifications: tuple[str, ...] = ()
     item_journals: list[Any] = []
     grant_notifications: list[str] = []
+    tactical_declarations: dict[str, str] | None = None
     simulated, nonlethal_keys = _session_policy(battlefield, record)
     dedupe_before = snapshot_practice_dedupe()
     hp_before = _stored_trait_value(actor.traits.hp)
@@ -790,6 +834,7 @@ def _submit_request(
                         "progress": preflight,
                     }
                 requests = _draft_requests(record, battlefield)
+                tactical_declarations = _draft_tactical_declarations(record, battlefield)
             # Shared outer transaction (fix-combat-settlement-recovery D1):
             # round effects, friendly-fire and coercion penalties, session
             # metadata, and the terminal settlement commit (or roll back) as
@@ -855,6 +900,7 @@ def _submit_request(
                     notifications_sink=grant_notifications,
                     first_actor=first_actor,
                     decision_scope_base=scope_base,
+                    tactical_declarations=tactical_declarations,
                 )
                 gained = 1
                 # Boundary event for a committed ordinary round only: the

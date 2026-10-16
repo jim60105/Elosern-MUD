@@ -67,6 +67,7 @@ from math import isfinite
 from typing import Any
 
 from world.rules.buffs import BUFF_DEFINITIONS
+from world.rules.combat.battlefield import RoundTactical
 from world.rules.combat_modifiers import (
     agility_with_bundle,
     attack_with_bundle,
@@ -880,6 +881,17 @@ class _Decision:
         event_context = getattr(context, "event_context", {}) or {}
         self.nonlethal = bool(event_context.get("nonlethal", False))
         self.nonlethal_keys = frozenset(event_context.get("nonlethal_keys", ()))
+        # The round's activated round-start Defend/Dodge declarations live in
+        # the round execution context (party-combat-defend-dodge). The shared
+        # ``hit_margin``/``strike_amount`` scalars are the settlement/estimation
+        # boundary, so the estimator reads the same context settlement reads
+        # and can never disagree with it. The tactical is round-transient and
+        # deliberately outside both the tuning fingerprint and the decision
+        # snapshot fingerprint: it is not authored tuning and not durable
+        # state, so a recorded decision with no active declaration stays
+        # byte-identical and ``AI_ALGORITHM_VERSION`` is unchanged.
+        tactical = getattr(getattr(context, "battlefield", None), "tactical", None)
+        self.tactical = tactical if isinstance(tactical, RoundTactical) else None
         self.pool = decision_pool(snapshot, actor, dict(roster), context)
         self.enemies = hostile_domain(snapshot, self.pool)
         self.allies = group_members(KIND_FRIENDLY, snapshot, self.pool)
@@ -1369,17 +1381,36 @@ class _Decision:
         damage_policy = policy.damage
         matched_multiplier = 1.0
         rider_fraction = 0.0
+        bypassing = False
         if damage_policy is not None:
             matched = matches_target_predicate(
                 participant.entity, damage_policy.predicate, readings=self.reads
             )
             matched_multiplier = damage_policy.attack_multiplier if matched else 1.0
             rider_fraction = damage_policy.max_hp_fraction
-            if damage_policy.unconditional_defense_bypass or (
-                damage_policy.bypass_defense
-                and (matched or not damage_policy.predicate)
-            ):
+            bypassing = bool(
+                damage_policy.unconditional_defense_bypass
+                or (
+                    damage_policy.bypass_defense
+                    and (matched or not damage_policy.predicate)
+                )
+            )
+            if bypassing:
                 defense = 0.0
+        # The recipient's own active-round declarations: Dodge raises its
+        # to-hit threshold (and shrinks the margin), Defend reduces the final
+        # staged damage. Both mirror settlement's damage handler exactly, and
+        # an explicitly defense-bypassing occurrence skips Defend just as it
+        # zeroes defense in settlement.
+        recipient_key = str(participant.entity.key)
+        # Dodge is deliberately bypass-independent (the design gives it no
+        # damage-bypass exemption); only Defend below honors ``bypassing``.
+        recipient_dodging = (
+            self.tactical is not None and self.tactical.is_dodging(recipient_key)
+        )
+        recipient_defending = (
+            self.tactical is not None and self.tactical.is_defending(recipient_key)
+        )
         rider = damage_rider(participant.max_hp, rider_fraction)
         coefficient = _finite(policy.coefficient, "coefficient")
         outcomes: dict[int, float] = {}
@@ -1389,6 +1420,7 @@ class _Decision:
                 attacker_agility=agility,
                 attacker_accuracy=accuracy,
                 defender_agility=defender_agility,
+                defender_dodging=recipient_dodging,
             )
             if not strike_lands(margin):
                 outcomes[0] = outcomes.get(0, 0.0) + _FACE_PROBABILITY
@@ -1402,6 +1434,7 @@ class _Decision:
                 matched_multiplier=matched_multiplier,
                 scale=scale,
                 weapon_multiplier=weapon_multiplier,
+                defending=recipient_defending and not bypassing,
             )
             outcomes[amount] = outcomes.get(amount, 0.0) + _FACE_PROBABILITY
         return outcomes
