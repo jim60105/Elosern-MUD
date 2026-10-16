@@ -140,6 +140,13 @@ function onCellClick(row) {
   onCellActivate(row.key, row);
 }
 
+// A 威力 row's label split into its prefix and its magnitude (`威力×2` →
+// `威力` + `×2`); any other label is all magnitude.
+function scaleParts(label) {
+  const text = String(label ?? "");
+  return text.startsWith("威力") ? { prefix: "威力", magnitude: text.slice(2) } : { prefix: "", magnitude: text };
+}
+
 // The fixed framed-grid geometry (the `.dock-menu` container's `:style`
 // carries the attribute the B2 gate reads); the row container applies the
 // same `grid-template-columns` so the fixed column count actually lays out
@@ -309,7 +316,10 @@ watch(
           tabindex="-1"
           @click="onCellClick(row)"
         >
-          <span>{{ row.item.label }}</span>
+          <!-- The label's 威力 prefix and its magnitude are two inline runs,
+               so the narrow card can set the magnitude apart while the
+               label's text stays one run. -->
+          <span class="dock-menu__scale-label"><span v-if="scaleParts(row.item.label).prefix" class="dock-menu__scale-prefix">{{ scaleParts(row.item.label).prefix }}</span><span class="dock-menu__scale-magnitude">{{ scaleParts(row.item.label).magnitude }}</span></span>
           <span v-if="row.item.description" class="dock-menu__scale-cost">{{ row.item.description }}</span>
         </button>
       </div>
@@ -879,8 +889,8 @@ watch(
   display: block;
   min-width: 0;
   box-sizing: border-box;
-  height: calc(3 * var(--strip-lh) + 10px * var(--ui-scale));
-  padding: calc(8px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(2px * var(--ui-scale));
+  height: calc(3 * var(--strip-lh) + 8px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(2px * var(--ui-scale));
   overflow: hidden;
   background: none;
   border: 0;

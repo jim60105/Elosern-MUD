@@ -401,8 +401,8 @@ function onPaneActivate(payload) {
   height: 100%;
   max-width: none;
   margin: 0;
-  padding: calc(12px * var(--ui-scale));
-  gap: calc(6px * var(--ui-scale));
+  padding: calc(12px * var(--ui-scale)) calc(12px * var(--ui-scale)) calc(8px * var(--ui-scale));
+  gap: calc(4px * var(--ui-scale));
 }
 /* Keyboard focus within the card brightens its frame, as the dialogue
    card's does (the base rule above clears the global ring). */
@@ -478,7 +478,7 @@ function onPaneActivate(payload) {
   height: auto;
   min-height: var(--band-strip-h);
   justify-content: center;
-  padding: calc(6px * var(--ui-scale)) 0 0;
+  padding: calc(4px * var(--ui-scale)) 0 0;
   border-top-color: rgba(185, 154, 96, 0.18);
   white-space: normal;
   text-align: center;

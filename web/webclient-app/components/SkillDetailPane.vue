@@ -59,7 +59,7 @@ const reason = computed(
 );
 
 // The scale whose cost the strip states: the focused 威力 row, else the
-// chosen scale.
+// chosen scale (the focused chip itself names the magnitude).
 const stripScale = computed(() => {
   if (!props.scales.length) {
     return null;
@@ -70,7 +70,7 @@ const stripScale = computed(() => {
 const stripCost = computed(() => {
   const entry = stripScale.value;
   if (entry && entry.mp_cost != null) {
-    return `威力×${entry.label || entry.scale} MP ${entry.mp_cost}`;
+    return `MP ${entry.mp_cost}`;
   }
   return costText.value;
 });
@@ -84,7 +84,7 @@ const scalesText = computed(() =>
 const stripTitle = computed(() =>
   [
     props.skill?.label,
-    stripCost.value,
+    stripScale.value ? `威力×${stripScale.value.label || stripScale.value.scale} ${stripCost.value}` : stripCost.value,
     targetText.value && `目標類型 ${targetText.value}`,
     elementText.value,
     reason.value || props.skill?.description,
@@ -262,8 +262,8 @@ function onScale(entry) {
   flex: none;
   min-width: 0;
   box-sizing: border-box;
-  height: calc(3 * var(--strip-lh) + 10px * var(--ui-scale));
-  padding: calc(8px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(2px * var(--ui-scale));
+  height: calc(3 * var(--strip-lh) + 8px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(2px * var(--ui-scale));
   overflow: hidden;
   background: none;
   border: 0;
@@ -306,8 +306,11 @@ function onScale(entry) {
   padding: 0 0.5em;
   color: var(--gold-600);
 }
-.skill-detail-pane--strip .skill-detail-pane__cost {
+.skill-detail-pane--strip .skill-detail-pane__cost,
+.skill-detail-pane--strip .skill-detail-pane__target {
   flex: none;
+}
+.skill-detail-pane--strip .skill-detail-pane__cost {
   color: var(--vit-mp);
 }
 .skill-detail-pane--strip .skill-detail-pane__target {

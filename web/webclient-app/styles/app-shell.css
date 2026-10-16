@@ -280,7 +280,7 @@ body {
 .action-dock.action-dock--card .dock-pane-host--bounded {
   flex-direction: column;
   align-items: stretch;
-  gap: calc(8px * var(--ui-scale));
+  gap: calc(6px * var(--ui-scale));
   height: 100%;
 }
 .action-dock.action-dock--card .dock-pane-host--bounded > .dock-menu {
@@ -299,8 +299,8 @@ body {
   overflow: hidden;
 }
 .action-dock.action-dock--card .dock-menu__command {
-  padding-left: calc(22px * var(--ui-scale));
-  padding-right: calc(8px * var(--ui-scale));
+  min-height: calc(30px * var(--ui-scale));
+  padding: 1px calc(8px * var(--ui-scale)) 1px calc(22px * var(--ui-scale));
   column-gap: calc(10px * var(--ui-scale));
 }
 .action-dock.action-dock--card .dock-menu__command-label {
@@ -320,6 +320,10 @@ body {
 .action-dock.action-dock--card .dock-menu__skill-name {
   flex: 1 1 auto;
   min-width: 0;
+  text-align: left;
+  font-family: var(--f-serif);
+  font-size: var(--text-base);
+  letter-spacing: 0.06em;
 }
 .action-dock.action-dock--card .dock-menu__skill-cost {
   flex: none;
@@ -349,7 +353,49 @@ body {
 }
 .action-dock.action-dock--card .dock-menu__scale {
   min-width: 0;
-  padding: calc(6px * var(--ui-scale)) 0;
+  padding: calc(6px * var(--ui-scale)) 0 calc(5px * var(--ui-scale));
+  gap: 0;
+  line-height: 1.25;
+}
+/* A chip reads 威力 over its magnitude, then the cost on one line. */
+.action-dock.action-dock--card .dock-menu__scale-prefix {
+  display: inline-block;
+  width: 100%;
+  font-family: var(--f-sans);
+  font-size: calc(var(--text-xs) * 0.85);
+  letter-spacing: 0.12em;
+  color: var(--paper-500);
+}
+.action-dock.action-dock--card .dock-menu__scale-magnitude {
+  font-size: var(--text-md);
+  color: var(--paper-100);
+}
+.action-dock.action-dock--card .dock-menu__scale--on .dock-menu__scale-prefix {
+  color: var(--gold-400);
+}
+.action-dock.action-dock--card .dock-menu__scale--on .dock-menu__scale-magnitude {
+  color: var(--paper-50);
+}
+.action-dock.action-dock--card .dock-menu__scale-cost {
+  margin-top: calc(3px * var(--ui-scale));
+  white-space: nowrap;
+  font-size: calc(var(--text-xs) * 0.85);
+  letter-spacing: 0;
+  color: var(--vit-mp);
+}
+/* The focused token carries the gold frame and a lifted ground; a token in
+   the AREA selection carries a ✓ before its name (shape, not colour alone). */
+.action-dock.action-dock--card .dock-menu__token[aria-selected="true"] {
+  border-color: var(--gold-400);
+  background: linear-gradient(180deg, rgba(185, 154, 96, 0.22), rgba(185, 154, 96, 0.06));
+  box-shadow: 0 0 0 1px rgba(228, 200, 142, 0.25), 0 0 calc(12px * var(--ui-scale)) calc(-4px * var(--ui-scale)) var(--gold-glow);
+}
+.action-dock.action-dock--card .dock-menu__token--pressed::before {
+  content: "✓";
+  margin-right: 0.3em;
+  color: var(--ok);
+  font-family: var(--f-sans);
+  font-weight: 700;
 }
 .action-dock.action-dock--card .dock-menu__confirm-buttons {
   display: grid;

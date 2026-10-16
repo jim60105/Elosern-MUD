@@ -105,12 +105,13 @@ describe("SkillDetailPane strip variant", () => {
       props: { skill: skill({ costText: "MP 6" }), variant: "strip", scales, scale: 1, focusKey: "scale-2" },
     });
     const strip = wrapper.get('[data-testid="combat-detail"]');
-    expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗威力×2 MP 12");
+    expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗MP 12");
     expect(strip.text()).toContain("威力×3 MP 18");
+    expect(strip.attributes("title")).toContain("威力×2 MP 12");
     // Off the step, the chosen scale's cost.
     wrapper.setProps({ focusKey: "skill-x" });
     return wrapper.vm.$nextTick().then(() => {
-      expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗威力×1 MP 6");
+      expect(strip.get(".skill-detail-pane__cost").text()).toBe("消耗MP 6");
     });
   });
 });
