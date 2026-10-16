@@ -10,22 +10,22 @@ Turn one exploration cast aimed at a living, co-located hostile monster into tha
 `world/rules/combat_initiation.py` SHALL provide `field_combat_target(actor, target)`, returning
 `target` when it is a living `Monster` in the actor's own room and `None` otherwise. It SHALL also
 provide `initiate_field_combat(actor, skill_key, target, scale=1.0)`, which SHALL open one combat
-session and resolve the named skill as the actor's first action, **whatever that skill does**.
+session and seed the named skill as the actor's opening draft entry, **whatever that skill does**.
 
 #### Scenario: A damaging skill aimed at a room monster opens combat
 - **WHEN** `initiate_field_combat()` is called for a damage-carrying skill and a living `Monster` in
   the actor's room
-- **THEN** a hostile session is persisted and the skill resolves as the actor's opening action
+- **THEN** a hostile session is persisted and the skill is saved as the actor's opening selection
 
 #### Scenario: A non-damaging skill aimed at a room monster also opens combat
 - **WHEN** `initiate_field_combat()` is called for a buff, a heal, a cleanse, a debuff-only skill, or
   a sexual act, aimed at a living `Monster` in the actor's room
-- **THEN** a hostile session is persisted, the skill resolves as the actor's opening action, and
-  exactly one ordinary round runs — the encounter is not settled in one shot
+- **THEN** a hostile session is persisted, the skill is saved as the actor's opening selection, and
+  exactly one ordinary round runs only once all required actors confirm; the encounter never compresses
 
 #### Scenario: Aiming a heal at a monster starts a fight, by design
 - **WHEN** `initiate_field_combat()` is called for a healing skill aimed at a room monster
-- **THEN** combat starts, the monster is healed by the opening action, and the round proceeds — this
+- **THEN** combat starts, the selected heal waits for a complete draft, then the monster is healed by the opening action and the round proceeds — this
   is the accepted consequence of the target being the discriminator, not a special case
 
 #### Scenario: A non-monster target is not a field-combat target
@@ -40,12 +40,11 @@ session and resolve the named skill as the actor's first action, **whatever that
 
 #### Scenario: Damage presence settles the encounter, never gates combat
 - **WHEN** whether the opening skill carries a `DamageEffect` is considered
-- **THEN** its presence or absence does not decide whether combat starts; it decides only whether the
-  encounter is then settled in one shot, which `submit_opening_action()` determines
+- **THEN** its presence or absence decides neither whether combat starts nor any compression; the opening selection seeds the same interactive draft
 
 #### Scenario: The initiation returns the shared submission result shape
 - **WHEN** `initiate_field_combat()` returns
-- **THEN** the result has the same shape as `submit_player_action()`'s — a rejection, an ordinary
+- **THEN** the result has the same shape as `submit_player_action()`'s — a rejection, pending-draft progress, an ordinary
   round, or a terminal outcome — so callers share `world/rules/combat_result.py`'s rendering
 
 ### Requirement: A damaging skill aimed at anything other than a co-located hostile monster is rejected at the entry
@@ -131,14 +130,13 @@ using a `BattlefieldActionContext` through `world/rules/action_preview.revalidat
 `initiate_field_combat()` SHALL select the session's enemy line-up from the skill's `TargetSpec`: a
 `SINGLE` skill SHALL open against the named monster alone, and an `AREA` skill SHALL open against
 every living `Monster` in the actor's room, resolved into an explicit list of concrete targets in
-deterministic order. It SHALL NOT pass an AREA shorthand, because
-`overwhelm.commanded_damage_reaches_enemy()` reads concrete roster keys.
+deterministic order. It SHALL NOT pass an AREA shorthand, because the engagement persists exactly
+that list as the session's `enemy_ids` and the opening's own seed path takes concrete participants.
 
 #### Scenario: An AREA opening engages the whole room
 - **WHEN** `initiate_field_combat()` is called with an `AREA` skill and one of three living monsters
   in the room
-- **THEN** the persisted session's `enemy_ids` contains all three, and the overwhelm verdict is
-  computed against the whole opposing team
+- **THEN** the persisted session's `enemy_ids` contains all three
 
 #### Scenario: A SINGLE opening engages one monster
 - **WHEN** `initiate_field_combat()` is called with a `SINGLE` skill in a room holding three living
@@ -178,7 +176,7 @@ be relied on to undo engagement, because engagement leaves state the rollback ca
 - **THEN** the dialogue session is retired exactly as ordinary engagement retires it
 
 #### Scenario: A field initiation that ends the fight still settles exactly once
-- **WHEN** a field initiation resolves a compressed encounter that ends the fight
+- **WHEN** a field initiation completes a valid solo draft whose ordinary opening round ends the fight
 - **THEN** the terminal settlement's effects commit, its post-commit work runs once on the outer
   commit, and its observability events are each logged exactly once
 
@@ -209,6 +207,10 @@ be relied on to undo engagement, because engagement leaves state the rollback ca
   at its own entry, which in this flow is already after engagement wrote those values, so its
   restoration would reinstate the engaged session rather than the pre-engagement absence
 
+#### Scenario: Multi-actor opening commits its draft without actions
+- **WHEN** engagement and the initiating entry commit while companions still need commands
+- **THEN** the session and seed persist together, no action effects or round time have run, and later round failures preserve this committed draft
+
 ### Requirement: The opening cast charges combat time, never command time
 A field-combat initiation SHALL NOT charge `AdvanceSource.COMMAND` world time for the opening cast.
 The action's time cost SHALL be accumulated by the session and charged once as combat time by the
@@ -228,7 +230,7 @@ double-bill it.
 ### Requirement: A committed field initiation emits one boundary event
 `initiate_field_combat()` SHALL emit one `field_combat_initiated` info event through the
 `world.observability` facade, with `char`, `room`, `tick`, `skill`, `enemy_count`, and `opening`
-(`"round"` or `"overwhelm"`) in its context. It SHALL be emitted via `transaction.on_commit` on the
+(`"draft"` for a waiting seed, or `"round"` when a complete solo draft resolves) in its context. It SHALL be emitted via `transaction.on_commit` on the
 outer transaction, so a rolled-back initiation leaves no record, and the callback SHALL perform no
 computation of its own.
 

@@ -90,7 +90,7 @@ The shared submission body SHALL persist the round's action effects (HP/resource
 
 #### Scenario: Upkeep effects commit inside the same unit
 - **WHEN** the upkeep settlement stages damaging-tick HP, defeat entries, or quest effects
-- **THEN** those upkeep-settled effects commit inside the same unit: the body forwards the session's `simulated` and companion `nonlethal_keys` policy into resolution for both the `opening="round"` and the `opening="overwhelm"` path, and an upkeep settlement failure rolls back the whole round
+- **THEN** those upkeep-settled effects commit inside the same unit: the body forwards the session's `simulated` and companion `nonlethal_keys` policy into its one ordinary resolution, and an upkeep settlement failure rolls back the whole round
 
 #### Scenario: Defeat aftermath commits in the one transaction
 - **WHEN** a hostile-defeat terminal outcome settles
@@ -103,68 +103,6 @@ The shared submission body SHALL persist the round's action effects (HP/resource
 #### Scenario: Accepted draft survives technical failure
 - **WHEN** a technical failure follows a participant, item mirror, session metadata or terminal-settlement write
 - **THEN** all durable and touched Evennia cache state returns to pre-round values and the accepted complete draft remains recoverable for retry
-
-### Requirement: Overwhelm waits for one player choice before compressed resolver-backed outcome
-At engagement the session SHALL record overwhelm classification but SHALL run no action before player input. Compression SHALL be reachable only through `submit_opening_action()`, and only when its two-part condition holds: `classify_overwhelm()` decides for the player's team **and** the submitted skill damages a member of the opposing team. A submission made inside an already-active session SHALL NEVER compress, whatever the verdict and whatever was submitted.
-
-#### Scenario: An opening damaging skill under a player-overwhelming verdict resolves compressed
-- **WHEN** compression is dispatched through `submit_opening_action()` for a damaging skill and a player-direction verdict
-- **THEN** only then does compression resolve through deterministic resolvers, emit ordinary defeat and quest effects, and settle its rounds
-
-#### Scenario: An in-session submission never compresses
-- **WHEN** the player submits a valid skill or a valid healing potion inside an already-active session whose verdict decides for the player's team
-- **THEN** exactly one ordinary round resolves, `resolve_overwhelm()` is not called, and the player chooses again next round
-
-#### Scenario: Engage alone never runs an overwhelming round
-- **WHEN** an overwhelming target is engaged but the player has not submitted an action
-- **THEN** neither team acts, no EventLog is emitted, and world time and round count remain unchanged
-
-#### Scenario: Compressed log marks the selected action kind and key
-- **WHEN** an overwhelming encounter compresses after a valid opening skill
-- **THEN** compressed EventLogs contain exactly one first-round `commanded_action` matching the player's key, the `skill` action kind, and the action key without changing rounds, HP mutations, or settlement
-
-#### Scenario: Foe-overwhelming encounter preserves item choice
-- **WHEN** the foe team is overwhelming and the player submits a preflight-valid skill or item
-- **THEN** exactly one ordinary round resolves, the player may choose a different skill, item, or flee next round, and compression is never invoked
-
-#### Scenario: Non-overwhelming encounter waits for another command
-- **WHEN** one round ends with both teams active and no player-direction overwhelm verdict
-- **THEN** the session persists and no additional round runs before the player's next action
-
-#### Scenario: Compressed turns follow the scripted sequence
-- **WHEN** compression is dispatched
-- **THEN** the selected request is used for the first simulated player turn, and subsequent compressed player turns use deterministic `basic_attack` against the lowest-HP living enemy
-
-#### Scenario: Compression stays inside the resolver boundaries
-- **WHEN** compressed turns resolve
-- **THEN** every turn remains a member of the closed deterministic request union and emits compressed EventLogs, and no path directly assigns HP, consumes inventory outside the item resolver, or bypasses quest planners
-
-#### Scenario: The dispatcher passes action identity for log fidelity only
-- **WHEN** the dispatcher hands the selected action to the resolver
-- **THEN** it passes the selected action's actor key, `action_kind` (`skill`), and `action_key` so the compressed log emits exactly one matching first-round `commanded_action` entry, and this identity plumbing affects only log identity, never round sequence, combat math, or settlement
-
-#### Scenario: A foe-overwhelming verdict stays informational
-- **WHEN** the verdict is foe-overwhelming
-- **THEN** it remains informational and plays one ordinary round per submission, preserving full skill, flee, and item choice
-
-#### Scenario: Undecided encounters pause for input
-- **WHEN** an encounter is undecided
-- **THEN** it pauses for player input between ordinary rounds
-
-### Requirement: Overwhelm compression is player-direction only
-`submit_opening_action()` SHALL invoke the overwhelm resolver only when `classify_overwhelm` returns the player's team and the submitted skill damages a member of the opposing team; any other verdict (contested or foe-overwhelming), and any non-damaging or non-enemy-directed skill, SHALL NOT trigger compression. No other production call site SHALL invoke the resolver.
-
-#### Scenario: Foe-overwhelming verdict never dispatches the resolver
-- **WHEN** the player submits a preflight-valid action in a session classified as foe-overwhelming
-- **THEN** the session runs one ordinary round and never calls the overwhelm resolver, for that round or any later round while the verdict holds
-
-#### Scenario: A player-direction verdict alone is not enough
-- **WHEN** `submit_opening_action()` runs for a non-damaging skill in a session classified for the player's team
-- **THEN** one ordinary round resolves and the overwhelm resolver is not called
-
-#### Scenario: The resolver has exactly one production call site
-- **WHEN** every production call site of `resolve_overwhelm()` is inspected
-- **THEN** the only one is inside `submit_opening_action()`'s dispatch
 
 ### Requirement: Startup restores valid sessions and terminates invalid references safely
 The deterministic startup sequence SHALL reconstruct valid persisted sessions and skip-safety
@@ -278,11 +216,11 @@ cleanup, with exam recovery settling FAIL.
 - **THEN** ordinary defeat aftermath and one accumulated-time settlement occur, without exam restoration or full-pool healing; only guild_exam mode restores the persistent host's normal outfit, capabilities and both full pools
 
 ### Requirement: Player combat submission accepts one explicit target value
-`submit_player_action(actor, skill_key, targets_or_shorthand)` SHALL accept only a concrete list of live participant objects or one of `all-enemies`, `all-allies`, and `all`. It SHALL reject any other scalar, a duplicate explicit participant, or a participant outside the current reconstructed session before initiative. Player-facing NONE and SELF SHALL require an empty list; the facade SHALL bind that empty SELF input to the actor and leave NONE empty.
+The commander/actor draft submission boundary SHALL accept only a concrete list of live participant objects or one of `all-enemies`, `all-allies`, and `all`. It SHALL reject any other scalar, a duplicate explicit participant, or a participant outside the current reconstructed session before initiative. Player-facing NONE and SELF SHALL require an empty list; the facade SHALL bind that empty SELF input to the actor and leave NONE empty.
 
 #### Scenario: Explicit AREA participants drive one round
 - **WHEN** a player submits an AREA skill with two distinct current enemy objects
-- **THEN** the facade builds one ActionRequest containing both canonical participants and drives exactly one ordinary round
+- **THEN** the facade builds one ActionRequest containing both canonical participants and saves the selected actor entry, resolving one ordinary round only when the complete draft is valid
 
 #### Scenario: Approved shorthand reaches ordinary targeting
 - **WHEN** a player submits an AREA skill with `all-enemies`
@@ -302,7 +240,7 @@ cleanup, with exam recovery settling FAIL.
 
 #### Scenario: The facade never owns compression
 - **WHEN** compression dispatch is needed
-- **THEN** it belongs to `submit_opening_action()` alone and the facade does not own it
+- **THEN** interactive dispatch never compresses and independent noninteractive overwhelm consumers retain their own boundary
 
 #### Scenario: No single-object compatibility overload exists
 - **WHEN** a caller attempts the old single-object call shape
@@ -393,69 +331,24 @@ safety registration, and dialogue-session clearing that single-target engagement
   target is not a living hostile `Monster` in the actor's room
 - **THEN** `engage_group()` rejects the whole request — persisting no session
 
-### Requirement: submit_opening_action is the sole compression dispatcher and always grants the player first strike
-`world/rules/combat_session.py` SHALL provide `submit_opening_action(actor, skill_key, targets, scale)`
-as the only production caller that may request compression. It SHALL select
-`opening="overwhelm"` if and only if `classify_overwhelm(battlefield)` returns the actor's team
-**and** `overwhelm.commanded_damage_reaches_enemy()` reports that the submitted skill damages a
-member of the opposing team; in every other case it SHALL select `opening="round"`.
+### Requirement: Interactive encounter openings seed a draft and never replace party choices with compression
+An encounter-starting selection SHALL seed the initiating actor entry and wait for remaining required actors. Interactive rounds, including overwhelming and solo encounters, SHALL preserve selected commands and SHALL NOT dispatch autonomous compressed basic attacks. Existing encounter-specific opening order SHALL remain explicit and ordinary entry order SHALL NOT change initiative.
 
-#### Scenario: An AREA shorthand is rejected before initiative
-- **WHEN** `submit_opening_action()` is called with `"all-enemies"` instead of a concrete list
-- **THEN** it rejects before initiative, no round runs, no resource is spent, and the rejection is a
-  diagnostic rather than a silent fall back to `opening="round"`
+#### Scenario: Overwhelming party opening
+- **WHEN** an exploration attack opens an encounter with companions under an overwhelming verdict
+- **THEN** the initiating choice is saved, no action runs until remaining commands confirm and no compressed automatic attacks replace them
 
-#### Scenario: An off-roster target is rejected before initiative
-- **WHEN** `submit_opening_action()` is called with a participant absent from the reconstructed
-  battlefield's roster
-- **THEN** it rejects before initiative, exactly as `submit_player_action()` does for the same input
+#### Scenario: Opening first actor
+- **WHEN** an encounter explicitly grants the initiator first action and that actor has low ordinary initiative
+- **THEN** the override applies only to its first complete round; later rounds use normal initiative regardless of command order
 
-#### Scenario: A damaging skill under a player-overwhelming verdict compresses
-- **WHEN** `submit_opening_action()` runs for a skill carrying a `DamageEffect` aimed at an enemy in
-  a session `classify_overwhelm()` decides for the player's team
-- **THEN** it selects `opening="overwhelm"` and the encounter resolves through `resolve_overwhelm()`
+#### Scenario: The opening seed takes concrete participants only
+- **WHEN** an approved AREA shorthand is handed to the opening seed path
+- **THEN** it is rejected before initiative rather than resolved through a compatibility branch, because the initiation already expanded that line-up into the session's concrete enemy identities
 
-#### Scenario: A non-damaging skill under the same verdict does not compress
-- **WHEN** `submit_opening_action()` runs for a buff, heal, cleanse, debuff-only, or sexual skill in
-  a session `classify_overwhelm()` decides for the player's team
-- **THEN** it selects `opening="round"` and exactly one ordinary round resolves
-
-#### Scenario: A damaging skill under a contested or foe-overwhelming verdict does not compress
-- **WHEN** `submit_opening_action()` runs for a damaging skill in a session whose
-  `classify_overwhelm()` returns `None` or the foe team
-- **THEN** it selects `opening="round"`, exactly one ordinary round resolves, and the player retains
-  full skill, item, and flee choice for the next round
-
-#### Scenario: The player acts first in the opening round under both selections
-- **WHEN** `submit_opening_action()` runs under a fixed seed for a battlefield in which ordinary
-  initiative would not place the player first, once with a damaging skill and a player-overwhelming
-  verdict and once with a non-damaging skill
-- **THEN** in both cases the player's action resolves before any other combatant's in the opening
-  round
-
-#### Scenario: The dispatcher always passes the actor's roster key as first_actor
-- **WHEN** either opening selection is dispatched
-- **THEN** `submit_opening_action()` passes `first_actor` equal to the actor's roster key for both
-  selections, so the opening action resolves before any other combatant acts
-
-#### Scenario: Only skills reach the dispatcher
-- **WHEN** casting traffic is routed
-- **THEN** `submit_opening_action()` accepts skills only and no item request reaches it
-
-#### Scenario: The opening entry rejects shorthand for correctness
-- **WHEN** `submit_opening_action()` is called with an approved AREA shorthand (`all-enemies`,
-  `all-allies`, `all`) instead of a concrete list of participant objects, even though
-  `submit_player_action()` accepts one
-- **THEN** it rejects before initiative, because this is a correctness requirement, not a
-  convenience: `commanded_damage_reaches_enemy()` reads concrete roster keys, so a shorthand
-  reaching it would fail to intersect the enemy team and return `False`, silently selecting
-  `opening="round"` and disabling one-shot settlement with no diagnostic, and rejecting the
-  shorthand makes that failure unreachable instead of invisible
-
-#### Scenario: Off-roster targets reject like the ordinary facade
-- **WHEN** `submit_opening_action()` is called with a target that is not a member of the
-  reconstructed battlefield's roster
-- **THEN** it rejects, matching `submit_player_action()`'s existing not-present rejection
+#### Scenario: An opening seed with absent companions runs nothing
+- **WHEN** an exploration opening seeds its selection while a required companion has not confirmed
+- **THEN** the session and the seed's draft entry are durable together, no action has run, no round time has passed, and later round failures preserve that committed draft
 
 ### Requirement: Commander may select only currently controllable allied actors
 The authenticated player SHALL remain commander while a chosen eligible party member is the action actor. Authorization SHALL derive from current session and bound party membership and existing ability-to-act rules. Enemy, absent, fled, defeated, knocked-out and action-forbidden members SHALL require no command and SHALL receive no automatic attack.

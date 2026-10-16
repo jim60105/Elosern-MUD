@@ -144,22 +144,20 @@ one round" language holds for this project's real calibrated stat bands.
 
 
 ### Requirement: The session never dispatches compression for the foe-overwhelming direction
-`world/rules/combat_session.py::submit_opening_action()` SHALL be the only production call site of
-`resolve_overwhelm()`. It SHALL invoke the resolver only when both conditions hold: the player's team
-is the overwhelming side per `classify_overwhelm()`, **and**
-`overwhelm.commanded_damage_reaches_enemy()` reports that the submitted skill damages a member of
-the opposing team. No submission made inside an already-active session SHALL reach the resolver by
-any path.
+No combat-session submission SHALL reach `resolve_overwhelm()` by any path. Every interactive
+encounter SHALL resolve its one completed round through `combat.run_round()` alone, whatever
+`classify_overwhelm()` decides and whatever the submitted action aims at, and the resolver SHALL
+remain an independent non-interactive mechanism that no session entry point calls.
 
 #### Scenario: Foe-overwhelming encounters never reach the resolver in production
 - **WHEN** every production call site of `resolve_overwhelm()` is inspected
-- **THEN** the only one is `submit_opening_action()`'s dispatch, it is gated on the player's team
-  being the overwhelming side, and no call site passes a foe-team verdict
+- **THEN** no combat-session entry point is among them, and no call site passes a foe-team verdict
 
 #### Scenario: The verdict alone does not reach the resolver
 - **WHEN** `submit_opening_action()` runs for a non-damaging skill in an encounter whose
   `classify_overwhelm()` decides for the player's team
-- **THEN** `resolve_overwhelm()` is not called and exactly one ordinary round resolves
+- **THEN** `resolve_overwhelm()` is not called, and the seed either waits for the remaining required
+  actors or resolves exactly one ordinary round
 
 #### Scenario: In-session submissions cannot reach the resolver
 - **WHEN** `submit_player_action()` and `submit_player_item_use()` are called for a session whose
@@ -169,7 +167,8 @@ any path.
 #### Scenario: Each unmet condition leaves the resolver uncalled
 - **WHEN** the encounter has a foe-overwhelming verdict, a contested verdict, a non-damaging skill,
   or a damaging skill aimed away from the opposing team
-- **THEN** each of these leaves `resolve_overwhelm()` uncalled
+- **THEN** each of these leaves `resolve_overwhelm()` uncalled, resolving through the ordinary round
+  path instead
 
 ### Requirement: resolve_overwhelm accepts a first-actor override that applies to round one only
 `world/rules/overwhelm.py`'s `resolve_overwhelm()` SHALL accept a keyword-only

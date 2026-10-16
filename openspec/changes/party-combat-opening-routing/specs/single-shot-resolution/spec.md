@@ -4,11 +4,9 @@
 
 ### Requirement: The session never dispatches compression for the foe-overwhelming direction
 No combat-session submission SHALL reach `resolve_overwhelm()` by any path. Every interactive
-encounter SHALL resolve its one completed round through `combat.run_round()` alone — whatever
-`classify_overwhelm()` decides and whatever the submitted action aims at — so a player-overwhelming,
-foe-overwhelming or contested encounter all face the same ordinary per-round round and no interactive
-entry point compresses. `world/rules/overwhelm.py`'s resolver SHALL remain an independent
-non-interactive mechanism that no session entry point calls.
+encounter SHALL resolve its one completed round through `combat.run_round()` alone, whatever
+`classify_overwhelm()` decides and whatever the submitted action aims at, and the resolver SHALL
+remain an independent non-interactive mechanism that no session entry point calls.
 
 #### Scenario: Foe-overwhelming encounters never reach the resolver in production
 - **WHEN** every production call site of `resolve_overwhelm()` is inspected
