@@ -203,8 +203,13 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         # logs without crashing the flow. The per-hit affinity-penalty
         # contract itself is pinned in test_friendly_fire.
         self.assertLess(companion.traits.hp.current, companion.traits.hp.max)
+        # The second foe survives this one ordinary round by design, so the
+        # session stays open with exactly one consumed round; the terminal
+        # settlement of a two-enemy session is covered by
+        # RoundSettlementSeamTests.test_one_session_flow_covers_all_seam_phases.
         session = read_session(self.player)
-        self.assertTrue(session is None or session.rounds_elapsed == 1)
+        self.assertIsNotNone(session)
+        self.assertEqual(session.rounds_elapsed, 1)
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
     def test_the_round_forwards_the_session_policy_kwargs(self):

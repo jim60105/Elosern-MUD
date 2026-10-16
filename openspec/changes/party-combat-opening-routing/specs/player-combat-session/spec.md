@@ -49,7 +49,7 @@ The commander/actor draft submission boundary SHALL accept only a concrete list 
 
 ### Requirement: A round and its settlement form one atomic persistence unit
 
-The shared submission body SHALL persist the round's action effects (HP/resources/knockouts/quest effects), the updated session metadata (round count, fled/knockout sets, the consumed opening-order policy), and any terminal settlement (exam outcome, clock advance, session clearing) together with draft consumption, round-revision admission and its durable completion receipt as a single durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state.
+The shared submission body SHALL persist the round's action effects, the updated session metadata (round count, fled/knockout sets, the consumed opening-order policy), and any terminal settlement (exam outcome, clock advance, session clearing) together with draft consumption, round-revision admission and its durable completion receipt as one durable transaction with snapshot/restore of all touched entities, so a process termination can never leave half-round durable state.
 
 #### Scenario: Termination mid-round leaves no half-committed round
 
@@ -88,6 +88,10 @@ An encounter-starting selection SHALL seed the initiating actor entry and wait f
 #### Scenario: The opening seed takes concrete participants only
 - **WHEN** an approved AREA shorthand is handed to the opening seed path
 - **THEN** it is rejected before initiative rather than resolved through a compatibility branch, because the initiation already expanded that line-up into the session's concrete enemy identities
+
+#### Scenario: An off-roster participant is rejected before initiative
+- **WHEN** the opening seed is handed a participant absent from the reconstructed session's roster
+- **THEN** it rejects with the ordinary not-present reason before initiative, exactly as the draft boundary does for the same input, persisting no round
 
 #### Scenario: An opening seed with absent companions runs nothing
 - **WHEN** an exploration opening seeds its selection while a required companion has not confirmed

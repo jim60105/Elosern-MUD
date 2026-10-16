@@ -415,7 +415,8 @@ class FieldCastActionTests(_SkillUseCase):
             result = self._act("explore.cast", payload)
         self.assertEqual(result["outcome"], "success", result)
         self.assertEqual(result["code"], "draft")
-        self.assertNotIn("field_combat_terminal", result)
+        # ``field_combat_terminal`` is internal wire-invisible state, so the
+        # waiting seed's evidence is the scheduler it never arms.
         schedule.assert_not_called()
         record = read_session(self.player)
         self.assertIsNotNone(record)
