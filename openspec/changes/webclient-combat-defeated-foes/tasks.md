@@ -37,9 +37,12 @@ Build once: `pnpm run build`.
   - the formation scale is unchanged;
   - at `reduced` the computed transition on the fall wrapper has no transform duration.
 
-  Register it in `.github/browser-shards.json`. Update `CombatBeatsBrowserTest` methods that asserted the defeated foe
-  leaves (find them with `grep -n "defeat" web/tests/browser/test_browser_combat_beats.py`); each now asserts the
-  defeated look. Run the new method and each updated method by full label, and verify they pass.
+  Register it in `.github/browser-shards.json`. Update the methods that asserted the defeated foe leaves: the
+  `CombatChoreographyBrowserTest` methods in `web/tests/browser/test_browser_combat_choreography.py` (find them with
+  `grep -n "defeat" web/tests/browser/test_browser_combat_choreography.py`) now assert the defeated look, and the
+  `CombatStageBrowserTest` membership methods (`test_foes_enter_and_leave_full`, `test_foes_reduced_only_fade`,
+  `test_foes_off_is_instant`) make the leaving foe flee instead. Run the new method and each updated method by full
+  label, and verify they pass.
 
 ## 3. Storybook (≈1 h)
 
