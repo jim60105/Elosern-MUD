@@ -31,9 +31,14 @@ _RECORD_FIELDS = frozenset(
 )
 # Optional fields: ``settled_tick`` is written only when the terminal
 # settlement committed; ``martyr_key`` carries the durable session-id stamps
-# of the martyrdom-vow casts made during this session (church design §5.8).
-# Older durable records without them stay valid, so neither is required.
-_OPTIONAL_RECORD_FIELDS = frozenset({"settled_tick", "martyr_key"})
+# of the martyrdom-vow casts made during this session (church design §5.8);
+# ``opening_first_actor`` is the encounter's explicit opening-order policy --
+# the roster key engagement granted the first action of the first complete
+# round (``None`` for every ordinary engagement). Older durable records
+# without them stay valid, so none is required.
+_OPTIONAL_RECORD_FIELDS = frozenset(
+    {"settled_tick", "martyr_key", "opening_first_actor"}
+)
 
 
 @dataclass(frozen=True)
@@ -55,6 +60,7 @@ class CombatSessionRecord:
     confirmed_actors: tuple[int, ...] = ()
     settled_tick: int | None = None
     martyr_key: tuple[str, ...] | None = None
+    opening_first_actor: str | None = None
 
 
 def _parse_id_list(values: Any, field: str) -> tuple[int, ...]:
@@ -244,6 +250,14 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
     draft_entries = _parse_draft_entries(data.get("draft_entries", {}))
     confirmed_actors = _parse_id_list(data.get("confirmed_actors", []), "confirmed_actors")
     martyr_key = _parse_stamp_list(data.get("martyr_key"), "martyr_key")
+    opening_first_actor = data.get("opening_first_actor")
+    if opening_first_actor is not None and (
+        not isinstance(opening_first_actor, str) or not opening_first_actor
+    ):
+        raise CombatSessionError(
+            SessionReason.MALFORMED_SESSION,
+            "opening_first_actor must be a non-empty string or None",
+        )
     record = CombatSessionRecord(
         session_id=session_id,
         mode=mode,
@@ -260,6 +274,7 @@ def from_storage(data: dict[str, Any]) -> CombatSessionRecord:
         confirmed_actors=confirmed_actors,
         settled_tick=settled_tick,
         martyr_key=martyr_key,
+        opening_first_actor=opening_first_actor,
     )
     _validate_participant_shape(record)
     return record
@@ -330,6 +345,7 @@ def to_storage(record: CombatSessionRecord) -> dict[str, Any]:
         "martyr_key": (
             None if record.martyr_key is None else list(record.martyr_key)
         ),
+        "opening_first_actor": record.opening_first_actor,
     }
 
 

@@ -393,6 +393,40 @@ class FieldCastActionTests(_SkillUseCase):
         self.assertEqual(envelope["panels"]["combat_beats"]["available"], True)
         self.assertNotIn("combat_round", result)
 
+    @covers_requirement("webclient-skillbook-casting::field-submissions-revalidate-and-preserve-deterministic-routing")
+    def test_waiting_seed_keeps_the_fight_open_without_terminal_options(self):
+        # A party opening seeds the initiating entry and waits: the browser
+        # route reports the draft, schedules no terminal options, and the
+        # fight is published as a live combat view with nothing spent yet.
+        from world.rules.party import join_party
+
+        companion = self._npc("seeded companion")
+        join_party(companion, self.player)
+        wolf = self._wolf("waiting wolf")
+        mp_before = self.player.traits.mp.value
+        payload = {"skill_key": _T_DAMAGE, "opening_target_id": wolf.pk}
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
+            patch("web.webclient.actions.dispatcher._schedule_terminal_combat_options") as schedule,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = self._act("explore.cast", payload)
+        self.assertEqual(result["outcome"], "success", result)
+        self.assertEqual(result["code"], "draft")
+        # ``field_combat_terminal`` is internal wire-invisible state, so the
+        # waiting seed's evidence is the scheduler it never arms.
+        schedule.assert_not_called()
+        record = read_session(self.player)
+        self.assertIsNotNone(record)
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(record.opening_first_actor, str(self.player.key))
+        self.assertEqual(self.player.traits.mp.value, mp_before)
+        kind, envelope = self._last_publication()
+        self.assertEqual(kind, "ui_snapshot")
+        self.assertEqual(envelope["mode"], "combat")
+
     def test_instant_terminal_opening_publishes_settled_exploration(self):
         for trait_key in ("atk_phys", "agility", "defense", "magic_power"):
             getattr(self.player.traits, trait_key).base = 200

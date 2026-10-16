@@ -613,6 +613,9 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
     "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
 )
     def test_committed_initiation_logs_one_matching_event(self):
+        # A solo opener completes the draft in the same call, so the fight
+        # resolves exactly one ordinary round even for a dominant attacker:
+        # the event reports the round dispatch, never a compression.
         player = _dominant_player("event opener")
         player.location = self.room
         grant_lineage(player, [_T_CAST])
@@ -634,8 +637,45 @@ class BoundaryEventTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(context["room"], str(self.room.pk))
         self.assertEqual(context["skill"], _T_CAST)
         self.assertEqual(context["enemy_count"], 1)
-        self.assertEqual(context["opening"], "overwhelm")
+        self.assertEqual(context["opening"], "round")
         self.assertIn("tick", context)
+
+    @covers_requirement(
+    "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"
+)
+    @covers_requirement(
+    "player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression"
+)
+    def test_waiting_seed_logs_the_draft_dispatch_and_runs_nothing(self):
+        player = _player("waiting opener")
+        player.location = self.room
+        companion = create_object(NPC, key="event companion", location=self.room)
+        companion.race = _race_key()
+        companion.apply_race_baseline()
+        join_party(companion, player)
+        monster = _monster("waiting wolf", hp=2000, atk=1)
+        monster.location = self.room
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=50),
+            patch("world.rules.combat.damage.roll_d100", return_value=50),
+            patch("world.rules.combat.rounds.roll_d100", return_value=50),
+            patch("world.rules.combat_initiation.log_info") as info,
+            self.captureOnCommitCallbacks(execute=True),
+        ):
+            result = initiate_field_combat(player, BASIC_ATTACK_KEY, monster)
+        self.assertEqual(result["outcome"], "draft")
+        record = read_session(player)
+        self.assertIsNotNone(record)
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(record.opening_first_actor, str(player.key))
+        self.assertEqual(
+            record.draft_entries[int(player.pk)]["payload"]["skill_key"],
+            BASIC_ATTACK_KEY,
+        )
+        self.assertEqual(monster.traits.hp.current, monster.traits.hp.base)
+        (event,) = self._events(info)
+        self.assertEqual(event[1]["context"]["opening"], "draft")
+        self.assertEqual(event[1]["context"]["enemy_count"], 1)
 
     @covers_requirement(
     "field-combat-initiation::a-committed-field-initiation-emits-one-boundary-event"

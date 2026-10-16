@@ -90,7 +90,7 @@ class EngageTests(BattlefieldIsolation, EvenniaTestCase):
             engage(self.player, second)
         self.assertEqual(ctx.exception.args[0], SessionReason.ALREADY_IN_COMBAT)
 
-    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    @covers_requirement("player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression")
     def test_engage_alone_never_runs_a_round(self):
         result = engage(self.player, self.monster)
         self.assertEqual(result["record"].rounds_elapsed, 0)
@@ -175,12 +175,12 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(result["record"].rounds_elapsed, 0)
         self.assertEqual(self.monster.traits.hp.current, 100)
 
-    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
+    @covers_requirement("player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression")
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_overwhelming_player_resolves_after_first_action(self):
-        # combat-session-opening-dispatch: an in-session submission under a
+        # An in-session submission under a
         # player-overwhelming verdict resolves exactly one ordinary round and
-        # never dispatches the compressed resolver. The synthetic cast kills the
+        # never compresses. The synthetic cast kills the
         # weak monster inside that single round, so the session still settles
         # as a victory -- but through one round, not compression.
         for key in ("atk_phys", "agility", "defense", "magic_power"):
@@ -192,15 +192,16 @@ class PlayerRoundTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch(
-                "world.rules.combat_session.rounds.resolve_overwhelm",
-                side_effect=AssertionError(
-                    "an in-session submission must never dispatch compression"
-                ),
-            ) as resolver,
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
-        resolver.assert_not_called()
         self.assertEqual(result["outcome"], "victory")
+        self.assertNotIn(
+            "overwhelm_resolution",
+            [
+                entry.kind
+                for log in result.get("logs", ())
+                for entry in log.entries
+            ],
+        )
         self.assertEqual(result["rounds_elapsed"], 1)
         self.assertIsNone(self.player.db.active_combat)

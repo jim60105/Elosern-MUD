@@ -46,7 +46,8 @@ from ..combat_fixtures import grant_lineage
 
 
 class SubmissionStructuralTests(unittest.TestCase):
-    """combat-session-opening-dispatch 5.3/5.8: structural tripwires."""
+    """Structural tripwires: no session entry point requests, judges or
+    dispatches compression any more."""
 
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_in_session_entries_never_request_or_judge_compression(self):
@@ -54,7 +55,11 @@ class SubmissionStructuralTests(unittest.TestCase):
 
         import world.rules.combat_session as session
 
-        for func in (session.submit_player_action, session.submit_player_item_use):
+        for func in (
+            session.submit_player_action,
+            session.submit_player_item_use,
+            session.submit_opening_action,
+        ):
             tree = _ast.parse(inspect.getsource(func))
             for node in _ast.walk(tree):
                 if isinstance(node, _ast.Call):
@@ -67,8 +72,8 @@ class SubmissionStructuralTests(unittest.TestCase):
                     name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
                     self.assertNotEqual(name, "classify_overwhelm", func.__name__)
 
-    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
-    def test_resolve_overwhelm_has_a_single_production_call_site(self):
+    @covers_requirement("single-shot-resolution::the-session-never-dispatches-compression-for-the-foe-overwhelming-direction")
+    def test_no_production_module_calls_the_compressed_resolver(self):
         import ast as _ast
 
         # One level deeper than the flat module: parents[4] is the repo root.
@@ -85,5 +90,7 @@ class SubmissionStructuralTests(unittest.TestCase):
                         name = callee.id if isinstance(callee, _ast.Name) else getattr(callee, "attr", "")
                         if name == "resolve_overwhelm":
                             callers.append(path)
-        session_dir = (root / "world" / "rules" / "combat_session").resolve()
-        self.assertEqual({p.resolve().parent for p in callers}, {session_dir})
+        # The resolver stays an independent non-interactive mechanism: no
+        # session entry point reaches it, so the interactive path can never
+        # compress for any verdict or target shape.
+        self.assertEqual(callers, [])

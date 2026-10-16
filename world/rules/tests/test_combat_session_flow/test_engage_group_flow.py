@@ -67,7 +67,7 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.hp.current = 2000
 
     @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
-    def test_engage_group_opens_one_session_and_resolves_to_victory(self):
+    def test_engage_group_opens_one_session_and_resolves_one_ordinary_round(self):
         m1 = _monster("m1", hp=100, atk=10)
         m2 = _monster("m2", hp=100, atk=10)
         m1.location = self.room
@@ -80,22 +80,26 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             sorted(str(k) for k in battlefield.teams["foes"]),
             sorted([m1.key, m2.key]),
         )
-        # The player dominates both floor-tier foes, so the opening's
-        # two-part judgement selects compression, and the round-1 cast
-        # plus the auto-attacks settle the whole session in one call.
+        # The player dominates both floor-tier foes, and still plays one
+        # ordinary round: the opening seed resolved the named monster's
+        # round with no compressed follow-up attacks.
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
             outcome = submit_opening_action(self.player, _T_CAST, [m1])
-        self.assertEqual(outcome["outcome"], "victory")
+        self.assertEqual(outcome["outcome"], "round")
+        self.assertEqual(read_session(self.player).rounds_elapsed, 1)
         self.assertGreaterEqual(
             len([
                 entry
                 for log in outcome["logs"]
                 for entry in log.entries
-                if entry.kind == "commanded_action"
+                if entry.kind == "damage"
             ]),
             1,
         )
-        self.assertIsNone(self.player.db.active_combat)
+        # The named monster fell to the opening round; the second foe is
+        # still standing, so the session stays open for the party's commands.
+        self.assertLessEqual(int(m1.traits.hp.current), 0)
+        self.assertIsNotNone(self.player.db.active_combat)
 
     @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
     def test_engage_group_rejections_leave_no_session(self):
@@ -122,7 +126,9 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             self.assertIsNone(read_session(self.player))
         self.assertEqual(get_world_clock().tick, 0)
 
-    @covers_requirement("player-combat-session::submit-opening-action-is-the-sole-compression-dispatcher-and-always-grants-the-player-first-strike")
+    @covers_requirement(
+    "player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression"
+)
     def test_opening_rejects_shorthand_and_off_roster_before_anything(self):
         m1 = _monster("opening foe", hp=100, atk=10)
         m1.location = self.room
@@ -140,9 +146,9 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(self.player.traits.mp.value, mp_before)
 
     @covers_requirement("player-combat-session::engage-group-opens-one-session-against-several-co-located-hostile-targets")
-    def test_two_enemy_session_exercises_scans_knockouts_and_settlement(self):
-        # 5.11: a two-enemy session through _primary_opponent_id(), the
-        # friendly-fire scan, nonlethal knockout, and terminal settlement.
+    def test_two_enemy_session_exercises_primary_opponent_and_scans(self):
+        # 5.11: a two-enemy session through _primary_opponent_id() and the
+        # friendly-fire scan, so any single-enemy assumption surfaces here.
         import world.rules.combat_session as session_mod
         import world.rules.combat_session.rounds as session_rounds
 
@@ -171,12 +177,22 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.action.gates.roll_d100", return_value=100),
             patch.object(session_rounds, "_primary_opponent_id", side_effect=spy),
         ):
-            result = submit_opening_action(self.player, SYNTH_SEAM_AREA_SKILL.key, [m1])
+            seeded = submit_opening_action(self.player, SYNTH_SEAM_AREA_SKILL.key, [m1])
+            # The mandated companion still has to choose: the seed resolves
+            # nothing until its command arrives.
+            self.assertEqual(seeded["outcome"], "draft")
+            self.assertEqual(seen, [])
+            result = submit_player_action(
+                self.player,
+                BASIC_ATTACK_KEY,
+                [m2],
+                commanded_actor=companion,
+            )
         self.assertGreaterEqual(len(seen), 1)
         self.assertEqual(
             seen[0], min(int(m1.pk), int(m2.pk))
         )
-        self.assertEqual(result["outcome"], "victory")
+        self.assertIn(result["outcome"], ("round", "victory"))
         # The AREA cast hit the companion through the two-enemy
         # roster and the nonlethal companion policy floored it at 1 HP; the
         # per-hit affinity penalty contract itself is pinned in
@@ -187,14 +203,20 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         # logs without crashing the flow. The per-hit affinity-penalty
         # contract itself is pinned in test_friendly_fire.
         self.assertLess(companion.traits.hp.current, companion.traits.hp.max)
-        self.assertIsNone(self.player.db.active_combat)
+        # The second foe survives this one ordinary round by design, so the
+        # session stays open with exactly one consumed round; the terminal
+        # settlement of a two-enemy session is covered by
+        # RoundSettlementSeamTests.test_one_session_flow_covers_all_seam_phases.
+        session = read_session(self.player)
+        self.assertIsNotNone(session)
+        self.assertEqual(session.rounds_elapsed, 1)
 
     @covers_requirement("player-combat-session::a-round-and-its-settlement-form-one-atomic-persistence-unit")
-    def test_both_openings_forward_the_same_policy_kwargs(self):
-        # 5.4: the round and overwhelm entries receive the identical
-        # simulated/nonlethal/journal/notification policy.
+    def test_the_round_forwards_the_session_policy_kwargs(self):
+        # 5.4: the round entry receives the session's simulated/nonlethal/
+        # journal/notification policy, and no second compressed entry needs
+        # the same policy any more.
         from world.rules.combat import run_round as real_run_round
-        from world.rules.overwhelm import resolve_overwhelm as real_resolve
 
         companion = create_object(NPC, key="政策護伴", location=self.room)
         companion.race = _race_key()
@@ -205,10 +227,6 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
         def record_round(field, provider, **kwargs):
             captured.setdefault("round", kwargs)
             return real_run_round(field, provider, **kwargs)
-
-        def record_resolve(field, provider, **kwargs):
-            captured.setdefault("overwhelm", kwargs)
-            return real_resolve(field, provider, **kwargs)
 
         def build():
             foe = _monster("政策敵", hp=300, atk=10)
@@ -228,29 +246,10 @@ class EngageGroupTests(BattlefieldIsolation, EvenniaTestCase):
             field = reconstruct_battlefield(self.player, read_session(self.player))
             foe = next(entity for entity in field.roster.values() if entity.pk not in read_session(self.player).player_ids)
             submit_player_action(self.player, BASIC_ATTACK_KEY, [foe], commanded_actor=companion)
-        self.player.db.active_combat = None
-        with (
-            patch("world.rules.combat.battlefield.roll_d100", return_value=44),
-            patch("world.rules.combat.damage.roll_d100", return_value=44),
-            patch("world.rules.combat.rounds.roll_d100", return_value=44),
-            patch("world.rules.action.gates.roll_d100", return_value=44),
-            patch(
-                "world.rules.combat_session.rounds.resolve_overwhelm",
-                side_effect=record_resolve,
-            ),
-        ):
-            submit_opening_action(self.player, _T_CAST, [build()])
-        self.assertEqual(
-            sorted(captured), ["overwhelm", "round"]
-        )
-        for key in ("simulated", "nonlethal_keys"):
-            self.assertEqual(
-                captured["round"][key], captured["overwhelm"][key], key
-            )
+        self.assertEqual(sorted(captured), ["round"])
         self.assertFalse(captured["round"]["simulated"])
         self.assertEqual(
             captured["round"]["nonlethal_keys"], {companion.key}
         )
         for key in ("journal_sink", "notifications_sink"):
             self.assertIsInstance(captured["round"][key], list, key)
-            self.assertIsInstance(captured["overwhelm"][key], list, key)

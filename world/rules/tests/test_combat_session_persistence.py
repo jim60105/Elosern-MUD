@@ -71,6 +71,30 @@ class CombatSessionRecordTests(unittest.TestCase):
         self.assertEqual(marked.settled_tick, 42)
         self.assertEqual(to_storage(marked)["settled_tick"], 42)
 
+    def test_opening_first_actor_is_optional_and_round_trips(self):
+        base = {
+            "session_id": "hostile:1:0",
+            "mode": "hostile",
+            "room_id": 5,
+            "player_ids": [1],
+            "enemy_ids": [2],
+            "fled_ids": [],
+            "knocked_out_ids": [],
+            "rounds_elapsed": 0,
+            "exam_id": None,
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
+        }
+        # An ordinary engagement grants no opening order (default None).
+        self.assertIsNone(from_storage(base).opening_first_actor)
+        seeded = from_storage({**base, "opening_first_actor": "ordered duelist"})
+        self.assertEqual(seeded.opening_first_actor, "ordered duelist")
+        self.assertEqual(
+            to_storage(seeded)["opening_first_actor"], "ordered duelist"
+        )
+
     def test_malformed_records_fail_closed(self):
         base = {
             "session_id": "hostile:1:0",
@@ -108,6 +132,8 @@ class CombatSessionRecordTests(unittest.TestCase):
             {"draft_entries": {99: {"kind": "tactical", "payload": {"tactical_key": "defend", "target_id": None}}}},
             {"confirmed_actors": [99]},
             {"confirmed_actors": "nope"},
+            {"opening_first_actor": ""},
+            {"opening_first_actor": 7},
         ]
         for mutation in bad_cases:
             data = {**base, **mutation}

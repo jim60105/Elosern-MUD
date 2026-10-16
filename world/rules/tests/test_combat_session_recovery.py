@@ -510,14 +510,13 @@ class UpkeepTickCreditTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIsNone(self.player.db.active_combat)
 
 class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
-    """fix-combat-session-roster-and-overwhelm D2: player-direction compression.
+    """fix-combat-session-roster-and-overwhelm D2: the verdict is informational.
 
-    A verdict in either direction is informational only: each in-session
-    player submission drives exactly one ordinary round and the compressed
-    resolver is never invoked, so the player keeps full per-round agency
-    (skill choice and flee) and no fight is an unavoidable compressed
-    defeat (combat-session-opening-dispatch strips compression from the
-    in-session entries for both directions).
+    A verdict in either direction is informational only: every session
+    submission drives exactly one ordinary round and no interactive entry
+    point compresses (party-combat-opening-routing removes the last one), so
+    the player keeps full per-round agency (skill choice and flee) and no
+    fight is an unavoidable compressed defeat.
     """
 
     def setUp(self):
@@ -538,8 +537,6 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         self.monster.traits.defense.base = 100
         self.monster.location = self.room
 
-    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
-    @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
     @covers_requirement("single-shot-resolution::the-session-never-dispatches-compression-for-the-foe-overwhelming-direction")
     def test_foe_overwhelming_plays_one_round_per_submission_never_compressed(self):
         self.player.traits.hp.base = 45
@@ -557,13 +554,6 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
         )
         clock = WorldClock()
         with (
-            patch(
-                "world.rules.combat_session.rounds.resolve_overwhelm",
-                side_effect=AssertionError(
-                    "the compressed resolver must never dispatch for a "
-                    "foe-overwhelming verdict"
-                ),
-            ) as resolver,
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
@@ -574,7 +564,6 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.clock.get_world_clock", return_value=clock),
         ):
             result = submit_player_action(self.player, _T_CAST, [self.monster])
-            resolver.assert_not_called()
             self.assertEqual(result["outcome"], "round")
             self.assertEqual(result["overwhelming_team"], "foes")
             self.assertEqual(read_session(self.player).rounds_elapsed, 1)
@@ -583,20 +572,17 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             # round, and the foe-overwhelming verdict still never compresses.
             with patch("world.rules.disengage.roll_d100", return_value=100):
                 result = submit_player_action(self.player, "flee", [])
-            resolver.assert_not_called()
         self.assertEqual(result["outcome"], "fled")
         self.assertEqual(clock.tick, 12)
         self.assertIsNone(self.player.db.active_combat)
 
-    @covers_requirement("player-combat-session::overwhelm-waits-for-one-player-choice-before-compressed-resolver-backed-outcome")
-    @covers_requirement("player-combat-session::overwhelm-compression-is-player-direction-only")
+    @covers_requirement("player-combat-session::interactive-encounter-openings-seed-a-draft-and-never-replace-party-choices-with-compression")
     @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
     def test_player_overwhelming_in_session_submission_never_dispatches(self):
-        # combat-session-opening-dispatch: with compression stripped from the
-        # in-session entries, a player-overwhelming verdict no longer reaches
-        # resolve_overwhelm() through submit_player_action(); the submission
-        # resolves exactly one ordinary round (the synthetic cast kills the weak
-        # monster inside it, so the session settles as victory in one round).
+        # No interactive entry compresses: a player-overwhelming verdict
+        # resolves exactly one ordinary round through submit_player_action()
+        # (the synthetic cast kills the weak monster inside it, so the
+        # session settles as victory in one round).
         weak = _monster("weak goblin", hp=100, atk=10)
         weak.location = self.room
         for key in ("atk_phys", "agility", "defense", "magic_power"):
@@ -614,17 +600,14 @@ class OverwhelmDirectionTests(BattlefieldIsolation, EvenniaTestCase):
             patch("world.rules.combat.battlefield.roll_d100", return_value=100),
             patch("world.rules.combat.damage.roll_d100", return_value=100),
             patch("world.rules.combat.rounds.roll_d100", return_value=100),
-            patch(
-                "world.rules.combat_session.rounds.resolve_overwhelm",
-                side_effect=AssertionError(
-                    "an in-session submission must never dispatch compression"
-                ),
-            ) as resolver,
             patch("world.rules.clock.get_world_clock", return_value=WorldClock()),
         ):
             result = submit_player_action(self.player, _T_CAST, [weak])
-        resolver.assert_not_called()
         self.assertEqual(result["outcome"], "victory")
+        self.assertNotIn(
+            "overwhelm_resolution",
+            [entry.kind for log in result.get("logs", ()) for entry in log.entries],
+        )
         self.assertEqual(result["rounds_elapsed"], 1)
         self.assertIsNone(self.player.db.active_combat)
 

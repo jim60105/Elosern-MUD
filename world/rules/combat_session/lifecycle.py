@@ -147,7 +147,12 @@ def engage(actor: Any, target: Any) -> dict[str, Any]:
 
 
 @serialized_combat_write
-def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
+def engage_group(
+    actor: Any,
+    targets: Any,
+    *,
+    opening_first_actor: str | None = None,
+) -> dict[str, Any]:
     """Create one persistent hostile session against several present monsters.
 
     Carries every step single-target engagement performed before this change
@@ -163,6 +168,12 @@ def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
     verdict is computed once over the complete multi-enemy roster and is
     never consulted for dispatch here (single-shot-resolution): engagement
     runs no action before the player chooses one.
+
+    ``opening_first_actor`` is the encounter's explicit opening-order policy
+    (``player-combat-session``): the roster key that acts first in the first
+    complete round, persisted with the session so it survives the waiting
+    seed and is consumed exactly once. ``engage()`` and every ordinary
+    engagement pass nothing, so ordinary entry order never changes initiative.
     """
     if not isinstance(actor, PlayerCharacter):
         raise CombatSessionError(SessionReason.NOT_A_PLAYER)
@@ -211,6 +222,7 @@ def engage_group(actor: Any, targets: Any) -> dict[str, Any]:
         knocked_out_ids=(),
         rounds_elapsed=0,
         exam_id=None,
+        opening_first_actor=opening_first_actor,
     )
     battlefield = reconstruct_battlefield(actor, record)
     _persist(actor, record)

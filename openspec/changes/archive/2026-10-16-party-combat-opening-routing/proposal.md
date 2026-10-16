@@ -20,10 +20,12 @@ None. Reuse existing capability ownership.
 
 - `player-combat-session`: amend the requirements owned by this bounded slice.
 - `field-combat-initiation`: amend the requirements owned by this bounded slice.
+- `single-shot-resolution`: amend the dispatch requirement whose only production call site this
+  slice removes.
 
 ## Impact
 
-Planned implementation/test surfaces: `world/rules/combat_initiation.py`, `world/rules/combat_session/rounds.py`, `world/rules/combat_session/policies.py`, `commands/action.py`, `web/webclient/actions/skill_use_actions.py`, `world/rules/tests/test_combat_initiation.py`, `docs/game/commands.md`, `docs/game/command-reference.md`.
+Planned implementation/test surfaces: `world/rules/combat_initiation.py`, `world/rules/combat_session/rounds.py`, `world/rules/combat_session/policies.py`, `world/rules/combat_session/records.py`, `world/rules/combat_session/lifecycle.py`, `world/rules/combat_session/writer.py`, `commands/action.py`, `web/webclient/actions/skill_use_actions.py`, `world/rules/tests/`, `docs/game/commands.md`, `docs/game/command-reference.md`.
 Canonical traceability annotations, affected test/fixture/shard ownership and existing documentation change with implementation. The assembled acceptance gate forbids missing companion item/tactical flow, real balance evidence or client/text parity.
 
 ## Effort
