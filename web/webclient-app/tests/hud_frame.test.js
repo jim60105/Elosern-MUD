@@ -388,9 +388,10 @@ describe("HudFrame mode × surface visibility matrix (H1)", () => {
     expect(anchor).toMatch(/left: calc\(50% - min\(280px \* var\(--ui-scale\), 20%\)\)/);
     expect(anchor).toMatch(/bottom: calc\(var\(--stage-caption-top\) \+ 8px \* var\(--ui-scale\)\)/);
     expect(anchor).toMatch(/z-index: 4/);
-    // Hidden outside dialogue unless an exploration card is open
-    // (exploration-presence-rail task 2.0).
-    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\):not\(\[data-card-open="true"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
+    // Hidden outside dialogue and combat unless an exploration card is open
+    // (exploration-presence-rail task 2.0; in combat it holds the command
+    // card, webclient-combat-command-card-centred).
+    expect(css).toMatch(/\.elosern-stage:not\(\[data-elosern-mode="dialogue"\]\):not\(\[data-elosern-mode="combat"\]\):not\(\[data-card-open="true"\]\) \[data-anchor="choices"\]\s*\{\s*display: none;/);
     const frame = mount(HudFrame, { props: { mode: "dialogue" }, slots: { choices: () => h("div", { class: "probe" }) } });
     expect(frame.get('[data-testid="anchor-choices"]').attributes("data-anchor")).toBe("choices");
     expect(frame.find('[data-anchor="choices"] .probe').exists()).toBe(true);
@@ -708,6 +709,139 @@ describe("the combat formation stage (webclient-combat-formation)", () => {
     const css = styleBlock("components/HudFrame.vue");
     expect(css).toContain('.elosern-stage .stage-metrics > [data-metric="--actor-h"] { height: var(--actor-h); }');
     expect(extractRule(css, ".elosern-stage .stage-metrics")).toContain("visibility: hidden;");
+    wrapper.unmount();
+  });
+});
+
+// webclient-combat-command-card-centred: in combat the one `#action-dock`
+// moves (never remounts) into a card host inside the `choices` anchor, the
+// anchor narrows to the formation's dead-centre gap, and the band's command
+// region collapses.
+describe("the combat command card (webclient-combat-command-card-centred)", () => {
+  afterEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function mountCardShell(mode, { attach = true, slots = {} } = {}) {
+    const host = document.createElement("div");
+    if (attach) {
+      document.body.appendChild(host);
+    }
+    const props = { mode };
+    return mount(AppShell, {
+      ...(attach ? { attachTo: host } : {}),
+      props,
+      slots: {
+        "action-dock": () =>
+          h(ActionDock, { mode: props.mode, card: props.mode === "combat" }, () =>
+            h("button", { type: "button", "data-testid": "probe-row" }, "row"),
+          ),
+        ...slots,
+      },
+    });
+  }
+
+  const dockOf = (wrapper) => wrapper.element.querySelector("#action-dock");
+  const inChoices = (node) => !!node.closest('[data-anchor="choices"]');
+  const inBand = (node) => !!node.closest('[data-anchor="band-command"]');
+
+  it("moves the same dock node into the choices anchor in combat and back, never remounting it", async () => {
+    // Role: the persistent-node contract. Detects a second dock (a remount in
+    // the card) or a dock left in the band while the card stands.
+    const wrapper = mountCardShell("exploration");
+    const dock = dockOf(wrapper);
+    expect(inBand(dock)).toBe(true);
+    dock.__tracked = true;
+    await wrapper.setProps({ mode: "combat" });
+    expect(wrapper.element.querySelectorAll("#action-dock")).toHaveLength(1);
+    expect(dockOf(wrapper)).toBe(dock);
+    expect(dock.__tracked).toBe(true);
+    expect(inChoices(dock)).toBe(true);
+    expect(inBand(dock)).toBe(false);
+    expect(dock.parentElement.classList.contains("stage-card-host")).toBe(true);
+    await wrapper.setProps({ mode: "exploration" });
+    expect(dockOf(wrapper)).toBe(dock);
+    expect(inBand(dock)).toBe(true);
+    // Combat → dialogue returns the same node to the band too.
+    for (const mode of ["combat", "dialogue", "combat", "exploration", "combat"]) {
+      await wrapper.setProps({ mode });
+      expect(wrapper.element.querySelectorAll("#action-dock")).toHaveLength(1);
+      expect(dockOf(wrapper)).toBe(dock);
+      expect(inChoices(dock)).toBe(mode === "combat");
+    }
+    wrapper.unmount();
+  });
+
+  it("mounts the dock straight into the card when the stage mounts in combat, attached or detached", async () => {
+    // Role: a reload directly into combat. Detects a Teleport target that only
+    // resolves through the document (a detached stage would lose the dock).
+    for (const attach of [true, false]) {
+      const wrapper = mountCardShell("combat", { attach });
+      const dock = dockOf(wrapper);
+      expect(dock).not.toBeNull();
+      expect(inChoices(dock)).toBe(true);
+      await wrapper.setProps({ mode: "exploration" });
+      expect(dockOf(wrapper)).toBe(dock);
+      expect(inBand(dock)).toBe(true);
+      wrapper.unmount();
+    }
+  });
+
+  it("gives every stage its own card host, so two stages never share one", () => {
+    const first = mountCardShell("combat");
+    const second = mountCardShell("combat");
+    for (const wrapper of [first, second]) {
+      const dock = dockOf(wrapper);
+      expect(wrapper.element.contains(dock)).toBe(true);
+      expect(wrapper.element.querySelectorAll(".stage-card-host")).toHaveLength(1);
+    }
+    first.unmount();
+    second.unmount();
+  });
+
+  it("narrows the choices anchor to the formation engine's card width at dead centre", () => {
+    // Role: the card and the formation engine share one geometry number.
+    // Detects either copy drifting (the card would cover a figure or the
+    // formation's gap would be too wide).
+    const css = styleBlock("components/HudFrame.vue");
+    const rule = extractRule(css, '.elosern-stage[data-elosern-mode="combat"] [data-anchor="choices"]');
+    expect(rule).toContain("width: calc(264px * var(--ui-scale));");
+    expect(rule).toContain("left: calc(50% - 132px * var(--ui-scale));");
+    expect(rule).toContain("justify-content: flex-start;");
+    const host = extractRule(css, '.elosern-stage[data-elosern-mode="combat"] .stage-card-host');
+    expect(host).toContain("height: min(calc(400px * var(--ui-scale)), 100%);");
+    const engine = readFileSync(join(APP_ROOT, "components/combat-formation.js"), "utf8");
+    const width = Number(engine.match(/export const CARD_WIDTH = (\d+);/)[1]);
+    expect(rule).toContain(`width: calc(${width}px * var(--ui-scale));`);
+    expect(rule).toContain(`left: calc(50% - ${width / 2}px * var(--ui-scale));`);
+  });
+
+  it("collapses the band's command region with display:none in combat, so the message region spans the band", () => {
+    const css = styleBlock("components/HudFrame.vue");
+    expect(extractRule(css, '.elosern-stage[data-elosern-mode="combat"] [data-anchor="band-command"]')).toContain("display: none;");
+    expect(extractRule(css, '.elosern-stage[data-elosern-mode="combat"] .stage-band')).toContain("grid-template-columns: minmax(0, 1fr);");
+  });
+
+  it("re-homes focus the move drops on the dock, and leaves the command field alone", async () => {
+    // Role: focus survives the move. Detects focus left on the body after the
+    // dock moved into the card.
+    const wrapper = mountCardShell("exploration");
+    const row = wrapper.element.querySelector('[data-testid="probe-row"]');
+    row.focus();
+    expect(document.activeElement).toBe(row);
+    await wrapper.setProps({ mode: "combat" });
+    await nextTick();
+    const dock = dockOf(wrapper);
+    expect(dock.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement).not.toBe(document.body);
+    // Focus in the command field stays where the player put it.
+    await wrapper.setProps({ mode: "exploration" });
+    const field = wrapper.element.querySelector("#inputfield");
+    await wrapper.vm.focusCommandField();
+    expect(document.activeElement).toBe(field);
+    await wrapper.setProps({ mode: "combat" });
+    await nextTick();
+    expect(document.activeElement).toBe(field);
     wrapper.unmount();
   });
 });

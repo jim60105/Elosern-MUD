@@ -437,27 +437,15 @@
   }
 }
 
-/* The command-panel turn-over (webclient-band-material-pass): the committed
-   menu wipes in from one side over a short horizontal travel while it fades
-   up (entering combat it wipes in left to right, leaving it right to left).
-   Both the travel and the wipe are multiplied by the travel token, so the
-   reduced level is a plain fade and `off` (a 0ms panel token) commits at
+/* The command-panel turn-over (webclient-band-material-pass): leaving combat
+   the exploration overview wipes in right to left over a short horizontal
+   travel while it fades up (entering combat the dock leaves the band for the
+   centred card, which has its own entrance — webclient-combat-command-card-
+   centred D6). The travel and the wipe are multiplied by the travel token, so
+   the reduced level is a plain fade and `off` (a 0ms panel token) commits at
    once. The clip keeps a generous negative inset on the non-wiping sides so
-   overhanging badges and focus rings are never cut while the wipe plays;
-   no fill mode, so nothing stays clipped once it ends. */
-@keyframes elosern-panel-flip-in {
-  from {
-    opacity: 0;
-    transform: translateX(calc(-1 * var(--motion-panel-shift) * var(--motion-travel)));
-    clip-path: inset(-24px calc(100% * var(--motion-travel) - 24px) -24px -24px);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-    clip-path: inset(-24px);
-  }
-}
-
+   overhanging badges and focus rings are never cut while the wipe plays; no
+   fill mode, so nothing stays clipped once it ends. */
 @keyframes elosern-panel-flip-out {
   from {
     opacity: 0;

@@ -107,3 +107,16 @@ export function badgeCount(surface, view) {
 export function badgeVisible(count) {
   return typeof count === "number" && count > 0;
 }
+
+// The detail presentation the dock asks its frames for
+// (webclient-combat-command-card-centred D5): ActionDock provides a computed
+// `"strip"` while it is the narrow combat card, else `"pane"`; DockMenu's
+// generic detail and SkillDetailPane inject it when no explicit `variant`
+// prop is given.
+export const DOCK_DETAIL_VARIANT = Symbol("dock-detail-variant");
+
+// The one detail strip's element id: the focused row's `aria-describedby`
+// points at it, so the strip's full text is that row's accessible
+// description. At most one strip renders at a time (the generic detail yields
+// to SkillDetailPane while a skill is focused).
+export const DOCK_DETAIL_STRIP_ID = "action-dock-detail-strip";

@@ -19,9 +19,13 @@ import {
 // their last producers), and the suggestions are the centred suggestions
 // card (the `cards` pane left with its frame).
 
-const renderMenu = (args) => ({
+// The narrow combat card's inner column (webclient-combat-command-card-
+// centred): a 264px host, as the card the stage stands at its dead centre.
+const renderNarrow = (args) => ({
   render: () =>
-    h("div", { style: "max-width: 720px;" }, [h(DockMenu, args)]),
+    h("div", { style: "width: 264px; box-sizing: border-box; padding: 12px; display: flex; flex-direction: column; gap: 6px;" }, [
+      h(DockMenu, args),
+    ]),
 });
 
 export default {
@@ -30,7 +34,7 @@ export default {
 };
 
 export const TargetFrame = {
-  render: renderMenu,
+  render: renderNarrow,
   args: {
     items: TARGET_ITEMS_SAMPLE,
     focusedKey: "target-e1",
@@ -39,7 +43,7 @@ export const TargetFrame = {
 };
 
 export const FixedGridFrame = {
-  render: renderMenu,
+  render: renderNarrow,
   args: {
     items: EXPLORATION_AFFORDANCES_SAMPLE,
     focusedKey: null,

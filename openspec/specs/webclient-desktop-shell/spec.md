@@ -43,8 +43,8 @@ never as a tab-title component strip.
 The stage SHALL give the message window and the action dock one fixed-height bottom band whose
 height comes from one shared band-height token: the narrative occupies the band's message region as
 the bounded message window on the left two thirds, the action dock fills the band's command region
-on the right third, and in dialogue mode the message window spans the whole band while the command
-region collapses.
+on the right third, and in combat and dialogue modes the message window spans the whole band while
+the command region collapses (in combat the dock stands as the centred combat command card).
 
 #### Scenario: Standard desktop viewport contains every required surface
 - **WHEN** the shell renders at 1451x790
@@ -92,14 +92,14 @@ region collapses.
 
 #### Scenario: The action dock fills the command region with its mode's root and one legend
 - **WHEN** the action dock is mounted in any mode
-- **THEN** it renders as one panel filling the band's command region with a shortcut-legend strip only outside exploration and creation, its exploration root renders as the exit compass beside the 建議 pill and the shared readout (people and objects stand on the stage's presence rail, and the room actions on the place card) and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame
+- **THEN** it renders as one panel — filling the band's command region outside combat, and as the combat command card centred over the stage in combat — with a shortcut-legend strip only outside exploration and creation, its exploration root renders as the exit compass beside the 建議 pill and the shared readout (people and objects stand on the stage's presence rail, and the room actions on the place card) and its combat root as a vertical command list with the focused row in a muted-gold fill, its current frame's rows or chips render with a shape-marked focused entry and dimmed but focusable disabled entries, and a breadcrumb with a back control appears below the root frame on every frame
 
 #### Scenario: A tall frame grows the band without touching the narrative
 - **WHEN** the dock carries a taller frame (a deep combat frame), or a person's verb card, the wait card, or the suggestions card is open over the stage, at 1451x790 or 2560x1440
-- **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region, the message window's box is unchanged, and neither surface clips the other
+- **THEN** the bottom band keeps its fixed height, the frame's rows scroll inside the command region or, in combat, inside the combat command card, the message window's box is unchanged within the mode, and neither surface clips the other
 
 #### Scenario: Pane content scrolls inside the band
-- **WHEN** the active frame's rows exceed the command region's height
+- **WHEN** the active frame's rows exceed the height of the command region or, in combat, of the combat command card
 - **THEN** the rows scroll within the pane host, the dock's chrome (the breadcrumb and the mode-appropriate legend strip) remains visible and fixed around the scrolling region, and the last row becomes reachable by scrolling
 
 #### Scenario: The dialogue caption stays bounded at the minimum viewport
@@ -108,7 +108,7 @@ region collapses.
 
 #### Scenario: Required surfaces stay visible through the supported viewport range
 - **WHEN** the shell renders at 1451x790 or any larger viewport up to the chrome factor's cap
-- **THEN** the brand, the top-meta pill, the place card, the action dock (in every playing mode except dialogue, where the command region collapses) and the command-line toggle are visible
+- **THEN** the brand, the top-meta pill, the place card (outside dialogue and combat, where the visibility matrix hides it), the action dock (in every playing mode except dialogue, where the command region collapses, and as the centred card in combat) and the command-line toggle are visible
 
 #### Scenario: Each HUD island follows its own contextual-HUD rule
 - **WHEN** the shell renders the HUD islands
@@ -160,11 +160,11 @@ region collapses.
 
 #### Scenario: Non-root frames show a breadcrumb and a detail pane
 - **WHEN** the dock is below its root frame
-- **THEN** it renders a breadcrumb naming the parent and current frames with a back control and renders each frame's rows in the form that frame calls for: navigation rows or the combat forms - beside a detail pane that names the focused item, its availability, and the next key action wherever the frame carries one
+- **THEN** it renders a breadcrumb naming the parent and current frames with a back control and renders each frame's rows in the form that frame calls for: navigation rows or the combat forms - with a detail pane (beside the rows in the band, below them in the combat command card) that names the focused item, its availability, and the next key action wherever the frame carries one
 
 #### Scenario: The band height never follows its contents
 - **WHEN** the dock carries the exploration root (with or without a person's verb card or a room card open over the stage), the combat frames, or an empty pane host, in any mode and under any narrative
-- **THEN** all of them render inside the same command-region box whose height comes from the shared band-height token, so the message window and the action dock never overlap and neither clips the other at a supported viewport
+- **THEN** outside combat all of them render inside the same command-region box whose height comes from the shared band-height token, in combat every frame renders inside the combat command card's fixed box above the band, so the message window and the action dock never overlap and neither clips the other at a supported viewport
 
 ### Requirement: Narrative output remains the authoritative text surface and is read page by page
 The shell SHALL route Evennia's existing narrative and command output to the retained narrative log
@@ -567,16 +567,17 @@ new line, and SHALL be styled distinctly from server output (`.inp`) wherever th
 
 ### Requirement: The action dock's row region and detail panes are direct children of its pane host
 The action dock's pane host SHALL lay out the active frame's focusable row region and any displayed
-detail pane as direct children of that host, side by side when a detail pane is displayed. The exploration root is the explicit exception, composing a compass beside a right column containing the 建議 pill and the readout. The
+detail pane as direct children of that host: side by side in the band, stacked as a strip below the rows in the combat card. The exploration root is the explicit exception, composing a compass beside a right column of the 建議 pill and the readout. The
 action dock's pane host SHALL be the only host of the dock's row region: no reference drawer body
 renders it.
 
 #### Scenario: A frame with a detail pane pairs direct children under the host
-- **WHEN** the active dock frame shows a detail pane beside the rows (a generic
+- **WHEN** the active dock frame shows a detail pane with the rows (a generic
   detail frame or the combat skill frame with its dedicated detail)
 - **THEN** the focusable row region and the visible detail pane are siblings
   whose parent is the pane host, no intermediate layout element wraps either
-  of them, and the pair renders side by side
+  of them, and the pair renders side by side in the band's command region and
+  stacked, the detail pane as a strip below the row region, in the combat command card
 
 #### Scenario: A frame without a detail pane renders the row region directly
 - **WHEN** the active dock frame renders without a detail pane (any full-width

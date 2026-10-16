@@ -7,8 +7,12 @@ prototypes; the real app differs too much for a prototype to be useful).
 
 - Target desktop 16:9 only.
 - Layout: full-bleed stage on top; bottom band = message window (2/3 width) plus
-  command panel (1/3, bottom-right). Keep the image area large; do not put a
-  narrative column and minimap side by side eating ~60% of the width.
+  command panel (1/3 width, at the band's right end) outside combat. In combat
+  the command menu is a narrow card at the stage's dead centre (the same
+  `#action-dock` moved into the `choices` anchor, in the gap the formation
+  keeps clear) and the message window spans the band. Keep the image area
+  large; do not put a narrative column and minimap side by side eating ~60% of
+  the width.
 - The player's own generated portrait stands on stage at all times; NPCs and
   enemies stand opposite in dialogue and combat.
 - In combat both sides stand in one shared-scale formation around a clear

@@ -846,6 +846,7 @@ const rootStyle = computed(() => {
           :tab-stop="!(store.view.mode === 'exploration' && explorationRootShown)"
           :view="store.view"
           :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
+          :card="store.view.mode === 'combat'"
           @action="onAction"
           @back="onDockBack"
           @skip="store.skipBeats"
@@ -946,6 +947,7 @@ const rootStyle = computed(() => {
               :selected="store.view.combatSelected"
               :scales="store.view.focusedSkill.freeformScales || []"
               :scale="store.view.focusedSkill.scale || 1"
+              :focus-key="store.view.focus.key"
               @choose-scale="(p) => store.chooseScale(p.scale)"
               @choose-shorthand="(p) => store.chooseShorthand(p.shorthand)"
             />

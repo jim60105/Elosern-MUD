@@ -266,6 +266,145 @@ body {
 .dock-pane-host--bounded > .skill-detail-pane {
   align-self: flex-start;
 }
+/* The combat command card (webclient-combat-command-card-centred D5): in
+   the narrow card the pane host is one column — the row region takes the
+   height left above the detail strip (never under three rows) and scrolls on
+   its own; the strip keeps a fixed three-line height across the card's inner
+   width. Every list frame is one column whose rows fill that width and wrap
+   long labels; the AREA token grid keeps its two columns and the 威力 step
+   one column per scale, each `minmax(0, 1fr)` (the inline template DockMenu
+   writes is `repeat(n, 1fr)`, which would let a long label overflow), and the
+   Forfeit pair keeps two. The router's cell geometry is unchanged.
+   Unprefixed, so Storybook and the live client agree; `.action-dock.action-dock--card`
+   outranks DockMenu's scoped rules. */
+.action-dock.action-dock--card .dock-pane-host--bounded {
+  flex-direction: column;
+  align-items: stretch;
+  gap: calc(6px * var(--ui-scale));
+  height: 100%;
+}
+.action-dock.action-dock--card .dock-pane-host--bounded > .dock-menu {
+  flex: 1 1 auto;
+  min-height: min(100%, calc(3 * 34px * var(--ui-scale)));
+  max-height: none;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.action-dock.action-dock--card .dock-pane-host--bounded > .dock-detail--strip,
+.action-dock.action-dock--card .dock-pane-host--bounded > .skill-detail-pane--strip {
+  flex: none;
+  align-self: stretch;
+  max-height: none;
+  overflow: hidden;
+}
+.action-dock.action-dock--card .dock-menu__command {
+  min-height: calc(30px * var(--ui-scale));
+  padding: 1px calc(8px * var(--ui-scale)) 1px calc(22px * var(--ui-scale));
+  column-gap: calc(10px * var(--ui-scale));
+}
+.action-dock.action-dock--card .dock-menu__command-label {
+  min-width: 0;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.action-dock.action-dock--card .dock-menu__skills {
+  overflow: visible;
+  padding-right: 0;
+}
+.action-dock.action-dock--card .dock-menu__skill {
+  flex-wrap: nowrap;
+  min-height: calc(34px * var(--ui-scale));
+  padding: calc(5px * var(--ui-scale)) calc(10px * var(--ui-scale));
+}
+.action-dock.action-dock--card .dock-menu__skill-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  font-family: var(--f-serif);
+  font-size: var(--text-base);
+  letter-spacing: 0.06em;
+}
+.action-dock.action-dock--card .dock-menu__skill-cost {
+  flex: none;
+  font-size: var(--text-sm);
+}
+.action-dock.action-dock--card .dock-menu__targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  gap: calc(6px * var(--ui-scale));
+}
+.action-dock.action-dock--card .dock-menu__token {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  min-height: calc(38px * var(--ui-scale));
+  padding: calc(4px * var(--ui-scale)) calc(6px * var(--ui-scale));
+  font-family: var(--f-serif);
+  overflow-wrap: anywhere;
+  text-align: center;
+}
+.action-dock.action-dock--card .dock-menu__scales {
+  display: grid;
+  grid-template-columns: none !important;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: calc(4px * var(--ui-scale));
+}
+.action-dock.action-dock--card .dock-menu__scale {
+  min-width: 0;
+  padding: calc(6px * var(--ui-scale)) 0 calc(5px * var(--ui-scale));
+  gap: 0;
+  line-height: 1.25;
+}
+/* A chip reads 威力 over its magnitude, then the cost on one line. */
+.action-dock.action-dock--card .dock-menu__scale-prefix {
+  display: inline-block;
+  width: 100%;
+  font-family: var(--f-sans);
+  font-size: calc(var(--text-xs) * 0.85);
+  letter-spacing: 0.12em;
+  color: var(--paper-500);
+}
+.action-dock.action-dock--card .dock-menu__scale-magnitude {
+  font-size: var(--text-md);
+  color: var(--paper-100);
+}
+.action-dock.action-dock--card .dock-menu__scale--on .dock-menu__scale-prefix {
+  color: var(--gold-400);
+}
+.action-dock.action-dock--card .dock-menu__scale--on .dock-menu__scale-magnitude {
+  color: var(--paper-50);
+}
+.action-dock.action-dock--card .dock-menu__scale-cost {
+  margin-top: calc(3px * var(--ui-scale));
+  white-space: nowrap;
+  font-size: calc(var(--text-xs) * 0.85);
+  letter-spacing: 0;
+  color: var(--vit-mp);
+}
+/* The focused token carries the gold frame and a lifted ground; a token in
+   the AREA selection carries a ✓ before its name (shape, not colour alone). */
+.action-dock.action-dock--card .dock-menu__token[aria-selected="true"] {
+  border-color: var(--gold-400);
+  background: linear-gradient(180deg, rgba(185, 154, 96, 0.22), rgba(185, 154, 96, 0.06));
+  box-shadow: 0 0 0 1px rgba(228, 200, 142, 0.25), 0 0 calc(12px * var(--ui-scale)) calc(-4px * var(--ui-scale)) var(--gold-glow);
+}
+.action-dock.action-dock--card .dock-menu__token--pressed::before {
+  content: "✓";
+  margin-right: 0.3em;
+  color: var(--ok);
+  font-family: var(--f-sans);
+  font-weight: 700;
+}
+.action-dock.action-dock--card .dock-menu__confirm-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.action-dock.action-dock--card .dock-menu__confirm-btn {
+  min-width: 0;
+  padding-inline: calc(8px * var(--ui-scale));
+}
 /* The command-line row sits on the message region's top edge (design D3):
    a tab-like strip that reads as part of the band beneath it — rounded top
    corners, a hairline gold top edge, and no seam against the band. */
@@ -284,11 +423,6 @@ body {
   overflow-x: hidden;
   scrollbar-width: thin;
 }
-.elosern-root .skill-detail-pane { border-radius: var(--radius-sm); padding: calc(14px * var(--ui-scale)) calc(18px * var(--ui-scale)); }
-.elosern-root .skill-detail-pane__name { font: var(--text-xl) var(--f-serif); }
-.elosern-root .skill-detail-pane__desc { font: var(--text-md)/1.8 var(--f-serif); color: var(--paper-300); }
-.elosern-root .skill-detail-pane__cost,
-.elosern-root .skill-detail-pane__target { font-size: var(--text-md); }
 .elosern-root .local-map { border-color: #bca57966; }
 .elosern-root .local-map:hover { border-color: var(--gold-500); }
 .elosern-root .hud { box-shadow: inset 0 1px 0 #ffffff06, 0 calc(4px * var(--ui-scale)) calc(10px * var(--ui-scale)) #0003; }

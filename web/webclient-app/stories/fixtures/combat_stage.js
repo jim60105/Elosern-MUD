@@ -157,7 +157,24 @@ export function combatSkills(participants) {
         {
           group: "fire",
           label: "火",
-          skills: [skill("firebolt", "火矢", "射出一道火焰箭矢。", { mp: 10 }, "single", foes, HOSTILE)],
+          skills: [
+            skill("firebolt", "火矢", "射出一道火焰箭矢。", { mp: 10 }, "single", foes, HOSTILE),
+            // A mastered skill (webclient-combat-command-card-centred): its
+            // 威力 step opens before the target frame.
+            skill("fireball", "火球", "凝聚火焰魔力，化作熾熱的火球擊向單一敵人。", { mp: 14 }, "single", foes, {
+              ...HOSTILE,
+              element: "fire",
+              freeform_scales: [
+                { scale: 0.25, label: "1/4", mp_cost: 4 },
+                { scale: 0.5, label: "1/2", mp_cost: 7 },
+                { scale: 1, label: "1", mp_cost: 14 },
+                { scale: 2, label: "2", mp_cost: 28 },
+                { scale: 4, label: "4", mp_cost: 56 },
+              ],
+            }),
+            // An AREA skill: its target frame is the two-column token grid.
+            skill("firestorm", "火風暴", "喚起席捲戰場的烈焰，灼燒選定的多名敵人。", { mp: 30 }, "area", foes, { ...HOSTILE, element: "fire" }),
+          ],
         },
         {
           group: "water",

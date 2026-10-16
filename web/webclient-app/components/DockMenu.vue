@@ -14,8 +14,15 @@
 // `data-item-key` identity (defined in exactly one place, task 5.2). The
 // detail pane keeps `exploration-detail` / `combat-detail` as the pane's
 // testid (task 5.8).
-import { computed, nextTick, watch } from "vue";
-import { classifyPane } from "./dock-panes.js";
+//
+// The `strip` detail (webclient-combat-command-card-centred D5): in the narrow
+// combat card the detail is a fixed three-line strip under the rows — a meta
+// line (a command's count or next key, an item's cost), then the description
+// or a disabled entry's reason clamped to two lines. Its full text stays in
+// the DOM and rides `title`; the focused row's `aria-describedby` names the
+// strip (the same id SkillDetailPane's strip carries; one strip renders).
+import { computed, inject, nextTick, watch } from "vue";
+import { classifyPane, DOCK_DETAIL_STRIP_ID, DOCK_DETAIL_VARIANT } from "./dock-panes.js";
 import { glyphAttrs, glyphPath } from "./dock-icons.js";
 import { actionIntentForItem, disabledReasonText, dockItemKeys } from "./dock-items.js";
 
@@ -32,7 +39,32 @@ const props = defineProps({
   hideGenericDetail: { type: Boolean, default: false },
   // The router's menu depth (kept for the hosts that pass it).
   depth: { type: Number, default: 1 },
+  // "pane" or "strip" (the combat card); when unset, the variant the hosting
+  // dock provides.
+  variant: { type: String, default: null },
 });
+
+const providedVariant = inject(DOCK_DETAIL_VARIANT, null);
+const isStrip = computed(() => (props.variant || providedVariant?.value || "pane") === "strip");
+// In the strip variant the focused row is described by the strip, whichever
+// component renders it (this detail, or SkillDetailPane while a skill is
+// focused).
+// The generic strip renders only while no SkillDetailPane strip stands in
+// for it (`hideGenericDetail`), so the strip id is never doubled.
+const genericStripShown = computed(
+  () =>
+    isStrip.value &&
+    !props.hideGenericDetail &&
+    ((props.showDetail && !!focusedRow.value) || !!props.detailMessage),
+);
+function describedBy(row) {
+  if (!isStrip.value || row.key !== props.focusedKey) {
+    return null;
+  }
+  // Either this component's strip or the skill pane's strip (the host
+  // renders SkillDetailPane exactly when it asks to hide this detail).
+  return genericStripShown.value || props.hideGenericDetail ? DOCK_DETAIL_STRIP_ID : null;
+}
 
 const emit = defineEmits(["activate", "focus-change"]);
 
@@ -59,6 +91,50 @@ const focusedRow = computed(
   () => rows.value.find((row) => row.key === props.focusedKey) ?? null,
 );
 
+// The strip's meta line: a command's count, its next key (or 無法使用); an
+// item's cost.
+const stripMeta = computed(() => {
+  const row = focusedRow.value;
+  if (!row) {
+    return null;
+  }
+  if (paneKind.value === "commands") {
+    if (row.item.enabled === false) {
+      return { text: "無法使用", tone: "off" };
+    }
+    if (row.item.count) {
+      return { text: `共 ${row.item.count} 項技能`, tone: "count" };
+    }
+    return { key: "Enter", text: actionHint(row.item), tone: "hint" };
+  }
+  if (row.item.cost_text) {
+    return { text: row.item.cost_text, tone: "cost" };
+  }
+  return null;
+});
+const stripBody = computed(() => {
+  const row = focusedRow.value;
+  if (props.detailMessage) {
+    return { text: props.detailMessage, reason: true };
+  }
+  if (!row) {
+    return null;
+  }
+  if (row.item.enabled === false) {
+    return { text: row.reason || "（無法使用）", reason: true };
+  }
+  return row.item.description ? { text: row.item.description, reason: false } : null;
+});
+const stripTitle = computed(() =>
+  [
+    focusedRow.value?.item.label,
+    stripMeta.value && (stripMeta.value.key ? `${stripMeta.value.key} ${stripMeta.value.text}` : stripMeta.value.text),
+    stripBody.value?.text,
+  ]
+    .filter(Boolean)
+    .join(" ‧ "),
+);
+
 function onCellFocus(key) {
   emit("focus-change", key);
 }
@@ -75,6 +151,13 @@ function onCellActivate(key, row) {
 function onCellClick(row) {
   onCellFocus(row.key);
   onCellActivate(row.key, row);
+}
+
+// A 威力 row's label split into its prefix and its magnitude (`威力×2` →
+// `威力` + `×2`); any other label is all magnitude.
+function scaleParts(label) {
+  const text = String(label ?? "");
+  return text.startsWith("威力") ? { prefix: "威力", magnitude: text.slice(2) } : { prefix: "", magnitude: text };
 }
 
 // The fixed framed-grid geometry (the `.dock-menu` container's `:style`
@@ -161,6 +244,7 @@ watch(
           }"
           :aria-disabled="row.item.enabled === false"
           :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
           tabindex="-1"
           @click="onCellClick(row)"
         >
@@ -194,6 +278,7 @@ watch(
           class="dock-menu__skill"
           :class="{ 'dock-menu__skill--on': row.key === focusedKey }"
           :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
           tabindex="-1"
           @click="onCellClick(row)"
         >
@@ -220,6 +305,7 @@ watch(
             }"
           :aria-pressed="row.item.selected"
           :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
           tabindex="-1"
           @click="onCellClick(row)"
         >
@@ -239,10 +325,14 @@ watch(
           class="dock-menu__scale"
           :class="{ 'dock-menu__scale--on': row.key === focusedKey }"
           :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
           tabindex="-1"
           @click="onCellClick(row)"
         >
-          <span>{{ row.item.label }}</span>
+          <!-- The label's 威力 prefix and its magnitude are two inline runs,
+               so the narrow card can set the magnitude apart while the
+               label's text stays one run. -->
+          <span class="dock-menu__scale-label"><span v-if="scaleParts(row.item.label).prefix" class="dock-menu__scale-prefix">{{ scaleParts(row.item.label).prefix }}</span><span class="dock-menu__scale-magnitude">{{ scaleParts(row.item.label).magnitude }}</span></span>
           <span v-if="row.item.description" class="dock-menu__scale-cost">{{ row.item.description }}</span>
         </button>
       </div>
@@ -261,6 +351,7 @@ watch(
             type="button"
             role="option"
             :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
             class="dock-menu__confirm-btn"
             :class="{
               'dock-menu__confirm-btn--primary': row.key.startsWith('confirm'),
@@ -291,6 +382,7 @@ watch(
           :aria-disabled="row.item.enabled === false"
           data-testid="dock-item"
           :data-item-key="row.key"
+          :aria-describedby="describedBy(row)"
           :data-team="row.item.team || null"
           tabindex="-1"
           @click="onCellClick(row)"
@@ -306,8 +398,30 @@ watch(
     <!-- The detail pane: names the focused skill/item (tasks 5.8/6.5).
          The scene overview (the exploration root) is not a DockMenu frame,
          so every pane kind here renders the aside by the same rule. -->
+    <div
+      v-if="genericStripShown"
+      :id="DOCK_DETAIL_STRIP_ID"
+      class="dock-detail dock-detail--strip"
+      :class="{ 'dock-detail--command': paneKind === 'commands' }"
+      :data-testid="props.detailTestId"
+      tabindex="-1"
+      :title="stripTitle"
+    >
+      <span v-if="focusedRow" class="visually-hidden" aria-hidden="true">{{ focusedRow.item.label }}</span>
+      <div class="dock-detail__meta" :data-tone="stripMeta ? stripMeta.tone : null">
+        <template v-if="stripMeta">
+          <kbd v-if="stripMeta.key">{{ stripMeta.key }}</kbd>
+          <span :class="stripMeta.tone === 'count' ? 'dock-detail__count' : null">{{ stripMeta.text }}</span>
+        </template>
+      </div>
+      <div
+        v-if="stripBody"
+        class="dock-detail__body"
+        :class="stripBody.reason ? 'dock-detail__disabled' : 'dock-detail__desc'"
+      >{{ stripBody.text }}</div>
+    </div>
     <aside
-      v-if="(props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage"
+      v-else-if="!isStrip && ((props.showDetail && focusedRow && !props.hideGenericDetail) || props.detailMessage)"
       class="dock-detail"
       :class="{ 'dock-detail--command': paneKind === 'commands' }"
       :data-testid="props.detailTestId"
@@ -775,5 +889,89 @@ watch(
   border-radius: var(--radius-sm);
   padding: 0 calc(4px * var(--ui-scale));
   color: var(--paper-300);
+}
+
+/* The strip (webclient-combat-command-card-centred D5): three lines of
+   `--text-sm` under a fine gold rule, fixed in height — the meta line, then
+   the description or reason clamped at two lines with an ellipsis. */
+.dock-detail.dock-detail--strip {
+  --strip-lh: calc(var(--text-sm) * 1.5);
+  position: relative;
+  flex: none;
+  display: block;
+  min-width: 0;
+  box-sizing: border-box;
+  height: calc(3 * var(--strip-lh) + 8px * var(--ui-scale));
+  padding: calc(6px * var(--ui-scale)) calc(4px * var(--ui-scale)) calc(2px * var(--ui-scale));
+  overflow: hidden;
+  background: none;
+  border: 0;
+  border-radius: 0;
+  font-size: var(--text-sm);
+  line-height: var(--strip-lh);
+}
+.dock-detail--strip::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(185, 154, 96, 0.5), rgba(185, 154, 96, 0.12) 70%, transparent);
+  pointer-events: none;
+}
+.dock-detail__meta {
+  display: flex;
+  align-items: center;
+  gap: calc(6px * var(--ui-scale));
+  height: var(--strip-lh);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  color: var(--paper-500);
+}
+.dock-detail__meta > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dock-detail--strip .dock-detail__count {
+  font-size: inherit;
+}
+.dock-detail__meta[data-tone="cost"] {
+  font-family: var(--f-num);
+  color: var(--vit-mp);
+  font-variant-numeric: tabular-nums lining-nums;
+}
+.dock-detail__meta[data-tone="off"] {
+  color: var(--paper-700);
+}
+.dock-detail__meta kbd {
+  font-family: var(--f-mono);
+  font-size: calc(var(--text-xs) * 0.9);
+  line-height: 1.3;
+  background: var(--ink-780);
+  border: 1px solid var(--ink-600);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0 calc(4px * var(--ui-scale));
+  color: var(--paper-300);
+}
+.dock-detail--strip .dock-detail__body {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin: 0;
+  font: var(--text-sm) / var(--strip-lh) var(--f-serif);
+}
+.dock-detail--strip .dock-detail__desc {
+  color: var(--paper-300);
+}
+.dock-detail--strip .dock-detail__disabled {
+  color: var(--warn);
 }
 </style>

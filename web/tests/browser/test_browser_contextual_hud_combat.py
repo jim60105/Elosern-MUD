@@ -196,7 +196,8 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         page.wait_for_timeout(150)
         self.assertEqual(_dock_depth(page), 3, "the single-group category opens the skill frame directly")
 
-        # The skill frame lists the group's descriptors beside the detail pane,
+        # The skill frame lists the group's descriptors over the detail strip
+        # (the combat card, webclient-combat-command-card-centred),
         # which names the focused skill, its cost, description and target spec.
         detail = page.locator('[data-testid="combat-detail"]')
         self.assertEqual(detail.count(), 1, "the single-group category opens the skill frame with the detail pane")

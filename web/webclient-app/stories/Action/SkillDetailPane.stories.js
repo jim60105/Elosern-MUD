@@ -93,3 +93,22 @@ export const TargetSpecs = {
     scale: null,
   },
 };
+
+// The combat card's strip (webclient-combat-command-card-centred): three lines
+// in the card's 238px inner width — the cost, target and element, then the
+// description clamped at two lines; the full text rides `title`.
+export const Strip = {
+  render: (args) => ({
+    render: () =>
+      h("div", { style: "background: var(--ink-900); padding: 12px; border-radius: 8px; width: 238px;" }, [
+        h(SkillDetailPane, args),
+      ]),
+  }),
+  args: {
+    skill: makeSkill({ description: "凝聚火焰魔力，化作一顆熾熱的火球，對單一敵人造成魔法傷害，並有機會使其灼燒。" }),
+    selected: [],
+    scales: makeSkill().freeformScales,
+    scale: 1,
+    variant: "strip",
+  },
+};

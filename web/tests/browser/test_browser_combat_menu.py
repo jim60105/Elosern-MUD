@@ -360,7 +360,11 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # H3 task 8.8, migrated by webclient-combat-formation: at both
         # 1451x790 and 2560x1440, the dock panel must stay inside its anchor
         # and the deepest combat frame's cast/confirm control must be
-        # reachable without clipping. The participant frame these assertions
+        # reachable without clipping. Migrated again by
+        # webclient-combat-command-card-centred: the dock's anchor in combat
+        # is the stage's `choices` anchor (the centred command card), not
+        # the band's command region; "inside its anchor and inside the
+        # viewport" still detects a dock pushed off its region or clipped. The participant frame these assertions
         # once placed in the `map` anchor is gone: its replacement, each
         # drawn figure's plate, sits in the `plates` layer (never a portrait
         # anchor) and intersects neither the dock, the message window, the
@@ -401,7 +405,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                         && (r.x + r.w) <= window.innerWidth
                         && (r.y + r.h) <= window.innerHeight);
                       const dock = rectOf('#action-dock');
-                      const anchor = rectOf('[data-testid="anchor-band-command"]');
+                      const anchor = rectOf('[data-testid="anchor-choices"]');
                       const caption = rectOf('[data-testid="message-window"]');
                       const commandLine = rectOf('[data-anchor="command-line"]');
                       const vitals = rectOf('[data-anchor="vitals"]');
@@ -418,6 +422,8 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                       const confirm = box(confirmEl);
                       return {
                         dockInsideAnchor: inside(dock, anchor),
+                        dockInChoices: !!document.querySelector('[data-anchor="choices"] #action-dock'),
+                        dockInViewport: withinViewport(dock),
                         confirmReachable: withinViewport(confirm),
                         plateCount: plates.length,
                         platesNoDock: plates.every((p) => noIntersect(p, dock)),
@@ -436,7 +442,9 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 )
                 self.assertTrue(geo["hasAnchor"], f"missing dock anchor at {viewport}")
                 self.assertTrue(geo["hasConfirm"], f"missing confirm control at {viewport}")
+                self.assertTrue(geo["dockInChoices"], f"the dock is not the centred card at {viewport}")
                 self.assertTrue(geo["dockInsideAnchor"], f"dock not inside anchor at {viewport}")
+                self.assertTrue(geo["dockInViewport"], f"the card leaves the viewport at {viewport}")
                 self.assertTrue(geo["confirmReachable"], f"confirm control clipped at {viewport}")
                 self.assertGreater(geo["plateCount"], 0, f"no figure plate at {viewport}")
                 self.assertFalse(geo["roster"], f"a participant roster renders at {viewport}")

@@ -245,7 +245,9 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             self._press(page, "Enter")  # open elemental_magic -> element group frame
             self._press_to(page, "ArrowDown", roles["ladder_group_index"])
             self._press(page, "Enter")  # open the ladder's group -> its skill frame
-            # The dock host carries the split: item list left, detail right —
+            # The dock host carries the split: in the combat card the item
+            # list above, the detail strip below it
+            # (webclient-combat-command-card-centred) —
             # as direct children of `.dock-pane-host`, with no anonymous layout
             # wrapper between the host and either child
             # (remove-redundant-dock-menu-layout).

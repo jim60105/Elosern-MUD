@@ -42,7 +42,11 @@
 // side-effect-free `restoreFocusHome` path — no second focus path; entering
 // dialogue collapses the command region and re-homes focus on the message
 // window, webclient-dialogue-stage-actors D5), and entering creation mode
-// collapses the command line.
+// collapses the command line. In combat the band's command region gives its
+// dock to the centred command card (webclient-combat-command-card-centred
+// D1): HudFrame moves the same `#action-dock` node into the `choices` anchor,
+// and focus the move drops is re-homed on the dock after the commit's render
+// (design D7).
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import ConnectOverlay from "./ConnectOverlay.vue";
 import CommandLine from "./CommandLine.vue";
@@ -411,6 +415,21 @@ watch(
       focusExplorationEntry();
     }
   },
+);
+
+// Entering combat moves the dock into the centred card
+// (webclient-combat-command-card-centred D7): moving a focused node blurs it,
+// so in the same flush, once the commit's render has moved it (a post-flush
+// watcher), focus that fell to the body returns to the dock. Focus the player
+// put in the command field, a drawer, or an overlay is not lost and stays.
+watch(
+  () => props.mode,
+  (nextMode, prevMode) => {
+    if (nextMode === "combat" && prevMode !== "combat" && focusIsLost(document.activeElement)) {
+      restoreFocusHome();
+    }
+  },
+  { flush: "post" },
 );
 
 // Entering exploration focuses the exit compass (exploration-exit-compass,

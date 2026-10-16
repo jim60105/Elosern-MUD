@@ -1091,6 +1091,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
               const cs = getComputedStyle(el);
               return [el.inert, cs.visibility, cs.position];
             })(),
+            commandDisplay: getComputedStyle(document.querySelector('[data-testid="anchor-band-command"]')).display,
           };
         }"""
         page = self.logged_in_page((1451, 790))
@@ -1179,6 +1180,19 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         # over the band's right third, `visibility: hidden` once its slide
         # ends (at once at the suite's `off` level), never a grid cell.
         self.assertEqual(dialogue["commandHidden"], [True, "hidden", "absolute"], "the command region is collapsed in dialogue")
+        # Combat (webclient-combat-command-card-centred): the dock is the
+        # centred card, so the band keeps its box, the command region is
+        # display:none, and the message region spans the band at the same
+        # height. These replace the combat states' band-region equality,
+        # which detected a band region that moved or resized; the band box
+        # and the spanning message region detect the same defect here.
+        for label in ("combat-root", "combat-deep"):
+            combat = states.pop(label)
+            for got, want in zip(combat["band"], baseline["band"]):
+                self.assertAlmostEqual(got, want, delta=1.0, msg=f"the band moved in the {label} state")
+            for got, want in zip(combat["message"], baseline["band"]):
+                self.assertAlmostEqual(got, want, delta=1.5, msg=f"the message region must span the band in {label}")
+            self.assertEqual(combat["commandDisplay"], "none", f"the command region shows in {label}")
         for label, state in states.items():
             for key in ("band", "message", "command"):
                 for got, want in zip(state[key], baseline[key]):

@@ -10,12 +10,19 @@ runner can only lengthen an in-flight window, never skip it.
 
 from __future__ import annotations
 
+import re
+
+from playwright.sync_api import expect
+
 from tools.spec_traceability import covers_requirement
 
 from .browser_base import BrowserAcceptanceTest
-from .browser_helpers import snapshot_envelope, wait_for_store_state
+from .browser_helpers import focus_action_dock, snapshot_envelope, wait_for_store_state
 from ._journey_support import (
     _SCENE_PNG_BYTES,
+    _skill,
+    _skill_category,
+    _skill_group,
     _art_panel,
     _combat_panel,
     _exploration_context_actions_panel,
@@ -302,6 +309,65 @@ def _intersects(a: dict, b: dict) -> bool:
     return a["left"] < b["right"] and b["left"] < a["right"] and a["top"] < b["bottom"] and b["top"] < a["bottom"]
 
 
+# The combat command card (webclient-combat-command-card-centred): the dock's
+# box, where it stands, the stage's other surfaces, and the band's regions.
+_READ_CARD = """() => {
+  const q = (sel) => document.querySelector(sel);
+  const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+  const dock = q('#action-dock');
+  const choices = q('[data-anchor="choices"]');
+  const menu = dock.querySelector('[data-testid="dock-menu"]');
+  return {
+    docks: document.querySelectorAll('#action-dock').length,
+    card: box(dock),
+    inChoices: !!dock.closest('[data-anchor="choices"]'),
+    inBand: !!dock.closest('[data-anchor="band-command"]'),
+    choices: box(choices),
+    vitals: box(q('[data-anchor="vitals"]')),
+    commandLine: box(q('[data-anchor="command-line"]')),
+    band: box(q('[data-testid="stage-band"]')),
+    message: box(q('[data-anchor="band-message"]')),
+    bandCommandDisplay: getComputedStyle(q('[data-anchor="band-command"]')).display,
+    paneKind: menu ? menu.getAttribute('data-pane-kind') : null,
+    menuOverflowX: menu ? menu.scrollWidth - menu.clientWidth : null,
+    cells: [...dock.querySelectorAll('.dock-menu__scale, .dock-menu__token')].map((el) => box(el)),
+    strip: box(dock.querySelector('#action-dock-detail-strip')),
+    legend: box(dock.querySelector('[data-testid="action-dock-description"]')),
+  };
+}"""
+
+# The card frames' skills: a mastered single-target skill with a five-step
+# 威力 ladder and an AREA skill (one single-group category, so the
+# category opens the skill frame directly).
+def _card_skills(foes: list) -> list:
+    return [
+        _skill_category(
+            "elemental_magic",
+            "元素魔法",
+            [
+                _skill_group(
+                    None,
+                    None,
+                    [
+                        dict(
+                            _skill("t_fireball", "火球", "凝聚火焰的攻擊技。", {"mp": 14}, "single", "fire", True, foes, []),
+                            freeform_scales=[
+                                {"scale": 0.25, "label": "1/4", "mp_cost": 4},
+                                {"scale": 0.5, "label": "1/2", "mp_cost": 7},
+                                {"scale": 1, "label": "1", "mp_cost": 14},
+                                {"scale": 2, "label": "2", "mp_cost": 28},
+                                {"scale": 4, "label": "4", "mp_cost": 56},
+                            ],
+                        ),
+                        _skill("t_firestorm", "火風暴", "席捲戰場的烈焰。", {"mp": 30}, "area", "fire", True, foes, []),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
 class CombatStageBrowserTest(BrowserAcceptanceTest):
     """The combat stage: the foe line-up and the shared-scale formation."""
 
@@ -412,6 +478,118 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             float(s["captionRight"].rstrip("px")), s["stage"]["width"] - leftmost + 16 * s["scale"], delta=1.0
         )
         page.close()
+
+    @covers_requirement(
+        "webclient-contextual-hud::surface-visibility-is-gated-by-the-committed-game-mode",
+        "webclient-contextual-hud::the-action-dock-fills-the-band-s-command-region-at-a-fixed-size",
+        "webclient-contextual-hud::the-combat-command-card-stands-at-the-stage-s-dead-centre",
+    )
+    def test_combat_command_card_stands_at_dead_centre(self):
+        """In combat the one ``#action-dock`` stands as a 264px*S card at the
+        stage's dead centre in the ``choices`` anchor, min(400px*S, the
+        anchor's span) tall, for parties of one, three and five figures
+        against one, four, eight and the most foes (16 minus the party), at
+        both formation viewports: it meets no figure (at rest or at a beat's
+        farthest step), no plate, no vitals or command-line anchor; the band's
+        command region is display:none and the message region spans the band;
+        the 威力 step's chips and the AREA tokens fit inside the card; and no
+        frame from the root to a skill frame resizes it.
+
+        The band-geometry assertions this replaces (the dock filling the
+        band's right third) detected a dock box that moved or resized; the
+        card-box equality across frames and the fixed centre and width detect
+        the same class of defect in the card."""
+        page = self._page(REFERENCE)
+        page.evaluate("() => document.querySelector('[data-testid=\"command-line-toggle\"]').click()")
+        for viewport in FORMATION_VIEWPORTS:
+            self._resize(page, viewport)
+            for party in (1, 3, 5):
+                for foes in (1, 4, 8, 16 - party):
+                    with self.subTest(viewport=viewport, party=party, foes=foes):
+                        size = "%dx%d/%d+%d" % (viewport[0], viewport[1], party, foes)
+                        self._commit(page, "combat", _combat_panels(foes, companions=party - 1))
+                        self._wait(
+                            page,
+                            f"s.party.length === {party} && s.rows.length === 1 && s.rows[0].slots.length === {foes}",
+                        )
+                        s = self._read(page)
+                        c = page.evaluate(_READ_CARD)
+                        scale = s["scale"]
+                        card = c["card"]
+                        centre = s["stage"]["left"] + s["stage"]["width"] / 2
+                        self.assertEqual(c["docks"], 1, size)
+                        self.assertTrue(c["inChoices"] and not c["inBand"], size)
+                        self.assertAlmostEqual((card["left"] + card["right"]) / 2, centre, delta=1.0, msg=size)
+                        self.assertAlmostEqual(card["width"], 264 * scale, delta=1.0, msg=size)
+                        span = c["choices"]["height"]
+                        self.assertAlmostEqual(card["top"], c["choices"]["top"], delta=1.0, msg=size)
+                        self.assertAlmostEqual(card["height"], min(400 * scale, span), delta=1.0, msg=size)
+                        for i, figure in enumerate(self._figures(s)):
+                            self.assertFalse(_intersects(card, figure), f"figure {i} meets the card at {size}")
+                        for plate in s["plates"]:
+                            self.assertFalse(_intersects(card, plate["box"]), f"plate {plate['identity']} at {size}")
+                        for peak in page.evaluate(_LUNGE_PEAK):
+                            self.assertTrue(
+                                peak["right"] <= card["left"] + 0.5 or peak["left"] >= card["right"] - 0.5,
+                                f"a {peak['side']} beat step enters the card's columns at {size}",
+                            )
+                        for name in ("vitals", "commandLine"):
+                            self.assertFalse(_intersects(card, c[name]), f"the card meets {name} at {size}")
+                        self.assertGreaterEqual(card["top"], s["stage"]["top"] + s["header"] - 1, size)
+                        self.assertLessEqual(card["bottom"], c["band"]["top"], size)
+                        self.assertEqual(c["bandCommandDisplay"], "none", size)
+                        self.assertAlmostEqual(c["message"]["width"], c["band"]["width"], delta=1.0, msg=size)
+            # The frames inside one card: root → Skills → the category's skill
+            # frame keep the card's box; the 威力 step and the AREA frame keep
+            # every chip and token inside it with no horizontal overflow.
+            self._commit(page, "combat", self._card_panels())
+            self._wait(page, "s.rows.length === 1")
+            page.wait_for_function(
+                "() => { const s = window.__elosernBridge.store.view;"
+                " return s.combatMenu && s.combatMenu.items.some((i) => i.key === 'skills'); }",
+                timeout=15000,
+            )
+            focus_action_dock(page)
+            boxes = [page.evaluate(_READ_CARD)["card"]]
+            for key in ("skills", "skill-cat-0"):
+                self.assertTrue(page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('{key}')"))
+                page.keyboard.press("Enter")
+                page.wait_for_timeout(120)
+                boxes.append(page.evaluate(_READ_CARD)["card"])
+            self.assertEqual(page.evaluate(_READ_CARD)["paneKind"], "skills")
+            for frame in boxes[1:]:
+                for edge in ("left", "top", "width", "height"):
+                    self.assertAlmostEqual(frame[edge], boxes[0][edge], delta=1.0, msg=f"{edge} at {viewport}")
+            for skill, kind in (("t_fireball", "scales"), ("t_firestorm", "targets")):
+                self.assertTrue(page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('{skill}')"))
+                # The focused row's accessible description is the strip's
+                # text (its cost and description), not a label.
+                expect(page.locator(f'#action-dock [data-item-key="{skill}"]')).to_have_accessible_description(
+                    re.compile("MP .*(凝聚火焰|席捲戰場)")
+                )
+                page.keyboard.press("Enter")
+                page.wait_for_timeout(120)
+                c = page.evaluate(_READ_CARD)
+                self.assertEqual(c["paneKind"], kind, viewport)
+                self.assertEqual(c["menuOverflowX"], 0, f"{kind} overflows at {viewport}")
+                self.assertGreaterEqual(len(c["cells"]), 4 if kind == "targets" else 5)
+                for cell in c["cells"]:
+                    self.assertGreaterEqual(cell["left"], c["card"]["left"] - 0.5, f"{kind} at {viewport}")
+                    self.assertLessEqual(cell["right"], c["card"]["right"] + 0.5, f"{kind} at {viewport}")
+                for edge in ("left", "top", "width", "height"):
+                    self.assertAlmostEqual(c["card"][edge], boxes[0][edge], delta=1.0, msg=f"{kind} {edge}")
+                self.assertLessEqual(c["strip"]["bottom"], c["legend"]["top"] + 0.5, kind)
+                page.keyboard.press("Escape")
+                page.wait_for_timeout(120)
+            self._commit(page, "exploration", _exploration_panels())
+            wait_for_store_state(page, lambda st: st.get("mode") == "exploration")
+        page.close()
+
+    def _card_panels(self) -> dict:
+        panels = _combat_panels(3)
+        panel = panels["context_actions"]
+        panel["skills"] = _card_skills([p["identity"] for p in panel["participants"] if p["team"] == "foes"])
+        return panels
 
     @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
     def test_every_active_foe_stands(self):
