@@ -492,6 +492,59 @@ class ConfirmedSurrenderTests(PartyExitFixture):
         self.assertEqual(get_world_clock().tick, 0)
         self.assertIsNone(read_last_combat_receipt(self.player))
 
+    @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
+    def test_an_unreconstructable_battlefield_still_restores_every_gate(self):
+        # A deleted participant makes the battlefield unreconstructable, so the
+        # settlement runs with no battlefield at all — the branch whose wider
+        # snapshot is the exit's own. A failure after that settlement body must
+        # still leave the durable session, the in-process session cache and the
+        # skip-safety registration exactly as they were.
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        engage(self.player, self.monster)
+        record = read_session(self.player)
+        self.monster.delete()
+        prompt = request_party_exit(
+            self.player, record.session_id, record.round_revision,
+            PARTY_EXIT_SURRENDER,
+        )
+        tick_before = get_world_clock().tick
+        receipt_before = read_last_combat_receipt(self.player)
+        self.assertIn(str(self.player.pk), _BATTLEFIELDS)
+        with patch(
+            "world.rules.combat_session.exit.write_last_combat_receipt",
+            side_effect=RuntimeError("receipt write failed"),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "receipt write failed"):
+                confirm_party_exit(
+                    self.player,
+                    prompt["session_id"],
+                    prompt["round_revision"],
+                    PARTY_EXIT_SURRENDER,
+                    prompt["confirmation_token"],
+                )
+        current = read_session(self.player)
+        self.assertIsNotNone(current)
+        self.assertEqual(current.round_revision, record.round_revision)
+        self.assertEqual(current.rounds_elapsed, record.rounds_elapsed)
+        self.assertTrue(is_in_active_session(self.player))
+        self.assertIn(str(self.player.pk), _BATTLEFIELDS)
+        self.assertEqual(read_last_combat_receipt(self.player), receipt_before)
+        self.assertEqual(get_world_clock().tick, tick_before)
+
+        # The later valid retry completes the surrender exactly once.
+        result = confirm_party_exit(
+            self.player,
+            prompt["session_id"],
+            prompt["round_revision"],
+            PARTY_EXIT_SURRENDER,
+            prompt["confirmation_token"],
+        )
+        self.assertEqual(result["outcome"], "defeat")
+        self.assertEqual(result["receipt"]["operation"], PARTY_EXIT_SURRENDER)
+        self.assertIsNone(self.player.db.active_combat)
+        self.assertNotIn(str(self.player.pk), _BATTLEFIELDS)
+
 
 class AlliedFleeRemovalTests(PartyExitFixture):
     @covers_requirement("player-combat-session::active-sessions-block-movement-and-define-pause-forfeit-and-recovery-outcomes")
