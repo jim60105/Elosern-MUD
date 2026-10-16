@@ -189,7 +189,9 @@ export function stageTargetModel({
         key: position.key,
         kind: "group",
         shorthand: position.shorthand,
-        identities: groupIdentities(position.shorthand, candidates, byId).map(idKey),
+        // A group's size and lit set are the candidates standing on the
+        // stage: a listed fled participant has no figure to light or count.
+        identities: groupIdentities(position.shorthand, candidates, byId).filter(drawn).map(idKey),
         side: position.shorthand === "all-enemies" ? "foes" : position.shorthand === "all-allies" ? "party" : null,
         digit: digitOf(index),
         offStage: false,

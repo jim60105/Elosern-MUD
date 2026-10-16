@@ -94,6 +94,17 @@ function skills({ attackTargets = [ALLY, FOE_A, FOE_B, FOE_C] } = {}) {
               disabled_reason: { code: "insufficient_mp", message: "魔力不足。" },
             }),
             skill("t_empty", "空擊", "single", []),
+            skill("t_bolt", "雷矢", "single", [FOE_A, FOE_B], {
+              cost: { mp: 8 },
+              freeform_scales: [
+                { scale: 0.25, label: "1/4", mp_cost: 2 },
+                { scale: 0.5, label: "1/2", mp_cost: 4 },
+                { scale: 1, label: "1", mp_cost: 8 },
+                { scale: 2, label: "2", mp_cost: 16 },
+                { scale: 4, label: "4", mp_cost: 32 },
+              ],
+            }),
+            skill("t_rally_all", "總動員", "area", [FOE_A, FLED], { shorthands: ["all-enemies"] }),
           ],
         },
       ],
@@ -385,6 +396,29 @@ describe("stage target step (store)", () => {
     expect(keys()).toEqual([`target-${ALLY}`, `target-${FOE_C}`, `target-${FOE_B}`, `target-${FOE_A}`]);
   });
 
+  it("a master's 威力 step is no step; its target frame is, naming the chosen 威力", () => {
+    enterCombat();
+    openSkill("t_bolt");
+    expect(store.router.currentDescriptor().source).toBe("combat.skill");
+    expect(step()).toBeNull(); // the scale chips keep the router's arrows
+    store.focusItemByKey("scale-2");
+    store.focusPress("Enter");
+    expect(store.router.currentDescriptor().source).toBe("combat.target");
+    expect(step().form).toBe("single");
+    expect(step().scaleLabel).toBe("威力 ×2");
+    expect(keys()).toEqual([`target-${FOE_B}`, `target-${FOE_A}`]);
+    store.focusPress("Enter");
+    expect(sender.sent.actions.at(-1).payload).toMatchObject({ skill_key: "t_bolt", scale: 2 });
+  });
+
+  it("a group counts and lights only the candidates standing on the stage", () => {
+    enterCombat();
+    openSkill("t_rally_all");
+    store.focusItemByKey("shorthand-all-enemies");
+    expect(step().lit).toEqual([String(FOE_A)]);
+    expect(step().announce).toBe("目標：全體敵人，共 1 名");
+  });
+
   it("an arrow from a focus that is no position goes to the first or last position", () => {
     const model = stageTargetModel({
       source: "combat.target",
@@ -431,6 +465,8 @@ describe("stage target step (store)", () => {
     const before = focus();
     expect(store.focusPress("ArrowRight")).toBe(false); // unclaimed: the router's no-op
     expect(focus()).toBe(before);
+    // The pointer is inert too: the figures' entry finds no step.
+    expect(store.stageTargetPointer(`target-${FOE_B}`, "activate")).toBe(false);
     store.skipBeats();
     expect(store.view.dispatch.beatLocked).toBe(false);
     // The frame is still current when the round ends: the step resumes.
