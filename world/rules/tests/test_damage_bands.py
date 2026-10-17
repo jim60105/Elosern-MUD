@@ -331,3 +331,62 @@ class DamageBandTests(unittest.TestCase):
                 bad = dict(valid_base, damage=dict(valid_base["damage"], mitigation_k=invalid))
                 with self.assertRaises(CombatRulebookError):
                     validate_combat_rulebook(bad)
+
+    @covers_requirement(
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor"
+    )
+    def test_weapon_factor_defend_and_below_threshold_arithmetic(self):
+        # Independent literal arithmetic for the equipment-growth evidence
+        # (docs/development/human-combat-calibration-evidence.md), evaluated
+        # directly on the scalar stage: expected values are fixed integers, so
+        # the placement is never re-derived by calling the calculator under
+        # test with its own formula.
+        #
+        # K = 40, rounded pre-mitigation attack 60 against defense 20 => 40,
+        # the same strike under Defend (35% reduction, floored) => 26, and the
+        # declared physical weapon factor 1.5 on the attack term => 60.
+        self.assertEqual(
+            strike_amount(
+                attack=60.0, multiplier=1.0, coefficient=1.0, defense=20.0
+            ),
+            40,
+        )
+        self.assertEqual(
+            strike_amount(
+                attack=60.0,
+                multiplier=1.0,
+                coefficient=1.0,
+                defense=20.0,
+                defending=True,
+            ),
+            26,
+        )
+        self.assertEqual(
+            strike_amount(
+                attack=60.0,
+                multiplier=1.0,
+                coefficient=1.0,
+                defense=20.0,
+                weapon_multiplier=1.5,
+            ),
+            60,
+        )
+        # Below the retired subtraction threshold: attack 20 against defense
+        # 30 is negative under subtraction, while ratio mitigation lands it
+        # and a whole-point upgrade in the attack term grows it by 3.
+        self.assertEqual(
+            strike_amount(
+                attack=20.0, multiplier=1.0, coefficient=1.0, defense=30.0
+            ),
+            11,
+        )
+        self.assertEqual(
+            strike_amount(
+                attack=20.0,
+                multiplier=1.0,
+                coefficient=1.0,
+                defense=30.0,
+                weapon_multiplier=1.25,
+            ),
+            14,
+        )

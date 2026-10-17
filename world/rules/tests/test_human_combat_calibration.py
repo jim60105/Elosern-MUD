@@ -29,9 +29,18 @@ from world.rules.character_creation import (
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
+    _handle_damage,
+    _heal_magnitude,
     _stored_hp,
     is_battle_over,
     run_round,
+)
+from world.lore.items import ITEM_REGISTRY
+from world.rules.equipment import add_item, normalized_equipment, toggle_equipment
+from world.rules.equipment_effects import (
+    EQUIPMENT_EFFECT_RULES,
+    equipment_adjustments,
+    equipment_weapon_multiplier,
 )
 from world.rules.combat_session.policies import (
     BASIC_ATTACK_KEY,
@@ -465,3 +474,206 @@ class HumanCombatCalibrationTests(EvenniaTest):
         self.assertEqual(list(hok.db.inventory or []), before_inv)
         after_bases = (hok.traits.hp.base, hok.traits.atk_phys.base, hok.traits.agility.base, hok.traits.defense.base)
         self.assertEqual(after_bases, before_bases)
+
+
+# The fixed landed base hit the equipment-growth evidence was measured with.
+_GROWTH_ROLL = 60
+# A shipped element, so the staged strike resolves through the real parser.
+_GROWTH_ELEMENT = "fire"
+
+
+class EquipmentGrowthCommittedReloadTests(EvenniaTest):
+    """Real construction, registered gear and committed reload growth evidence.
+
+    The equipment-growth slice's authored weapon factors are real shipped
+    data, so its evidence uses real Evennia construction, registered gear,
+    ordinary grant/equip rules and a committed re-read: ``_reread`` drops
+    Evennia's idmapper entries (forced, because an object holding NAttributes
+    refuses the soft flush) and fetches the object row again, so every number
+    below is observed on freshly loaded state instead of the handler edits
+    that wrote it. The actor's true stats stay below the defender's defense,
+    which the retired subtraction engine would have masked entirely, and all
+    probes use one fixed d100 roll. These are measurements, not balance
+    claims: encounter tuning belongs to its own change.
+    """
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="equipment_growth_room")
+
+    def _actor(self, key: str, **allocations: int) -> PlayerCharacter:
+        actor = create_object(PlayerCharacter, key=key, location=self.room)
+        # atk_phys 20 stays under the defender's defense 40: subtraction would
+        # have floored this matchup, ratio mitigation does not.
+        stats = {
+            "hp": 200,
+            "mp": 100,
+            "sp": 100,
+            "atk_phys": 20,
+            "agility": 10,
+            "defense": 40,
+            "magic_power": 30,
+            "guild_merit": 0,
+        }
+        stats.update(allocations)
+        actor._apply_trait_config(_trait_config(stats))
+        actor.db.inventory = []
+        actor.db.equipment = {
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        actor.db.skills = {"active": ["basic_swordplay"], "passive": []}
+        actor.db.skill_proficiency = {"basic_swordplay": 7.5}
+        actor.db.affinity_elements = [_GROWTH_ELEMENT]
+        return actor
+
+    def _reread(self, actor: PlayerCharacter) -> PlayerCharacter:
+        """Return a freshly loaded instance of one committed actor row."""
+        from evennia.objects.models import ObjectDB
+
+        pk = actor.pk
+        actor.save()
+        ObjectDB.flush_instance_cache(force=True)
+        fresh = PlayerCharacter.objects.get(pk=pk)
+        self.assertIsNot(fresh, actor)
+        return fresh
+
+    def _grant_and_equip(self, actor: PlayerCharacter, item_key: str) -> None:
+        """Grant through the ordinary inventory rule and equip it."""
+        add_item(actor, item_key)
+        self.assertEqual(toggle_equipment(actor, item_key).outcome, "success")
+
+    def _factor(self, item_key: str) -> float:
+        return EQUIPMENT_EFFECT_RULES[
+            ITEM_REGISTRY[item_key].modifier_key
+        ].weapon_damage_multiplier
+
+    def _staged(self, attacker, defender, school: str) -> int:
+        with patch("world.rules.combat.damage.roll_d100", return_value=_GROWTH_ROLL):
+            pending = _handle_damage(
+                attacker,
+                [defender],
+                f"damage:{_GROWTH_ELEMENT}:{school}",
+                {},
+                1.0,
+            )[0]
+        return int(pending.description.rsplit("|", 1)[1])
+
+    def _invariants(self, actor: PlayerCharacter) -> tuple:
+        traits = actor.traits
+        return (
+            tuple(
+                getattr(traits, name).base
+                for name in (
+                    "hp",
+                    "mp",
+                    "sp",
+                    "atk_phys",
+                    "magic_power",
+                    "agility",
+                    "defense",
+                )
+            ),
+            dict(actor.db.skill_proficiency or {}),
+            list(actor.db.affinity_elements or []),
+            dict(actor.db.skills or {}),
+        )
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    def test_real_weapon_upgrade_growth_survives_a_committed_reload(self):
+        attacker = self._actor("growth attacker")
+        defender = self._actor("growth defender", atk_phys=1)
+        before = self._invariants(self._reread(attacker))
+
+        unarmed_actor = self._reread(attacker)
+        unarmed = self._staged(unarmed_actor, defender, "physical")
+        self.assertEqual(equipment_weapon_multiplier(unarmed_actor), 1.0)
+
+        self._grant_and_equip(attacker, "plain_sword")
+        initial_actor = self._reread(attacker)
+        initial = self._staged(initial_actor, defender, "physical")
+        initial_factor = equipment_weapon_multiplier(initial_actor)
+
+        self._grant_and_equip(attacker, "military_s_sword")
+        selected_actor = self._reread(attacker)
+        selected = self._staged(selected_actor, defender, "physical")
+        selected_factor = equipment_weapon_multiplier(selected_actor)
+
+        # The committed re-read reports the authored declarations themselves
+        # (never a default, never an in-memory edit).
+        self.assertEqual(initial_factor, self._factor("plain_sword"))
+        self.assertEqual(selected_factor, self._factor("military_s_sword"))
+        self.assertGreater(selected_factor, initial_factor)
+        # Positive marginal growth below the old subtraction threshold: the
+        # adjusted attacks (20 / 20 + plain-sword flat / 20 + S-sword flat)
+        # all land at or below defense 40, yet each committed state hits for
+        # strictly more than the one before it.
+        self.assertGreater(unarmed, 0)
+        self.assertGreater(initial, unarmed)
+        self.assertGreater(selected, initial)
+        self.assertGreaterEqual(selected - initial, 1)
+
+        # Provenance: an in-memory detached copy of the mapping is not the
+        # committed state, so the next fresh read still reports the equipped
+        # upgrade. (The tampered copy is never assigned back to any storage.)
+        detached = dict(normalized_equipment(selected_actor))
+        detached["weapon_main"] = "iron_dagger"
+        self.assertEqual(detached["weapon_main"], "iron_dagger")
+        again = self._reread(attacker)
+        self.assertEqual(
+            normalized_equipment(again)["weapon_main"], "military_s_sword"
+        )
+        self.assertEqual(equipment_weapon_multiplier(again), selected_factor)
+
+        # No base-trait, proficiency, affinity or owned-skill drift from
+        # ordinary grant/equip/persistence.
+        self.assertEqual(self._invariants(again), before)
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    def test_real_armor_and_control_schools_stay_invariant_to_the_weapon_factor(self):
+        attacker = self._actor("control attacker")
+        defender = self._actor("control defender", atk_phys=1)
+        self._grant_and_equip(attacker, "military_s_sword")
+        armed = self._reread(attacker)
+        unarmed_actor = self._actor("control unarmed")
+        committed_unarmed = self._reread(unarmed_actor)
+
+        bare = self._staged(armed, self._reread(defender), "physical")
+        # Magic and healing never consume the physical factor: the same fixed
+        # roll and the same caster yield identical amounts with and without a
+        # nonneutral weapon (military_s_sword carries no magic_power).
+        self.assertEqual(
+            self._staged(armed, self._reread(defender), "magic"),
+            self._staged(committed_unarmed, self._reread(defender), "magic"),
+        )
+        self.assertEqual(_heal_magnitude(armed), _heal_magnitude(committed_unarmed))
+
+        # Positive defense reduces the successful hit monotonically across
+        # committed armor states, and armor contributes defense only: the
+        # armored defender's own weapon factor stays the neutral default.
+        self._grant_and_equip(defender, "leather_armor")
+        light = self._staged(armed, self._reread(defender), "physical")
+        self._grant_and_equip(defender, "military_s_armor")
+        heavy_defender = self._reread(defender)
+        heavy = self._staged(armed, heavy_defender, "physical")
+        self.assertLess(light, bare)
+        self.assertLess(heavy, light)
+        self.assertGreater(heavy, 0)
+        self.assertEqual(equipment_weapon_multiplier(heavy_defender), 1.0)
+        self.assertEqual(
+            dict(equipment_adjustments(heavy_defender))["defense"],
+            EQUIPMENT_EFFECT_RULES[
+                ITEM_REGISTRY["military_s_armor"].modifier_key
+            ].adjustments["defense"],
+        )
+        # The attacker's selected factor is untouched by the defender's armor.
+        self.assertEqual(
+            equipment_weapon_multiplier(self._reread(attacker)),
+            self._factor("military_s_sword"),
+        )
