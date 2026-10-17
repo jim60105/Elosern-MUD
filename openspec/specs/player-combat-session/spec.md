@@ -251,7 +251,7 @@ The commander/actor draft submission boundary SHALL accept only a concrete list 
 - **THEN** no single-object compatibility overload exists to accept it
 
 ### Requirement: Telnet combat discovery and target tokens have rule parity
-`combat actions` SHALL list every owned active skill in deterministic handler order and assign session-local target tokens from persisted participant order: `a1`, `a2`, and so on for `player_ids`, then `e1`, `e2`, and so on for `enemy_ids`. A token SHALL remain bound to the same dbref for the session lifetime and SHALL never be persisted separately.
+`combat actions [actor-token]` SHALL list the selected actor complete active skill, item and tactic choices with draft progress; skills SHALL retain deterministic handler order and it SHALL assign tokens using session-local target tokens from persisted participant order: `a1`, `a2`, and so on for `player_ids`, then `e1`, `e2`, and so on for `enemy_ids`. A token SHALL remain bound to the same dbref for the session lifetime and SHALL never be persisted separately.
 
 #### Scenario: Combat actions lists stable tokens and active skills
 - **WHEN** a Telnet player requests `combat actions` before and after one nonterminal round
@@ -276,6 +276,10 @@ The commander/actor draft submission boundary SHALL accept only a concrete list 
 #### Scenario: Comma input rejects malformed entries before initiative
 - **WHEN** comma input contains names, unknown or duplicate tokens, or shorthand/token mixtures
 - **THEN** it rejects before initiative
+
+#### Scenario: Actor and target are independent
+- **WHEN** combat command names a2 as actor and a1 or e1 as target
+- **THEN** only authorized a2 capabilities and costs are used, and SELF ignores target tokens and binds a2
 
 ### Requirement: Combat boundaries emit observability events
 
@@ -540,3 +544,14 @@ A failed retreat SHALL keep the entire party in combat, consume every allied act
 #### Scenario: Failure rollback
 - **WHEN** a technical failure occurs after enemy, upkeep or retreat metadata writes
 - **THEN** all round state and caches restore together and the accepted operation remains safe to retry without double time
+
+### Requirement: Text clients can complete and revise every party command kind
+Text clients SHALL offer actor-scoped skill including scale/targets, usable own item and Defend/Dodge/Taunt choices with the same server validation as browser commands. Each command SHALL confirm one draft entry, allow earlier-entry replacement and automatically resolve only the final valid selection. Progress and member-specific reasons SHALL remain discoverable.
+
+#### Scenario: Complete text round
+- **WHEN** a text player selects a companion skill, revises an earlier member choice and confirms the final item/tactical choice
+- **THEN** the same durable draft and complete-round provider execute without possession or autonomous missing commands
+
+#### Scenario: Commander cast and use
+- **WHEN** existing cast or use is entered during a multi-actor session
+- **THEN** it confirms the commander entry through the same facade and cannot execute an incomplete round

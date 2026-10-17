@@ -38,7 +38,9 @@ from commands.persona import (
 )
 from commands.combat import (
     CmdCombatActions,
+    CmdCombatCommand,
     CmdCombatForfeit,
+    CmdCombatRetreat,
     CmdEngage,
     CmdGuildExam,
 )
@@ -207,6 +209,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         self.add(CmdWaitUntil)
         self.add(CmdEngage)
         self.add(CmdCombatForfeit)
+        self.add(CmdCombatRetreat)
+        self.add(CmdCombatCommand)
         self.add(CmdCombatActions)
         self.add(CmdGuildExam)
         self.add(CmdGuildRegister)

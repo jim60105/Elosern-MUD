@@ -98,7 +98,22 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "combat forfeit、combat forfeit confirm <token>",
         "context": "戰鬥（需在進行中的戰鬥）",
     },
-    "combat actions": {"syntax": "combat actions", "context": "戰鬥（需在進行中的戰鬥）"},
+    "combat retreat": {
+        "syntax": "combat retreat、combat retreat confirm <token>",
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
+    "combat actions": {
+        "syntax": "combat actions [<actor-token>]",
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
+    "combat command": {
+        "syntax": (
+            "combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]、"
+            "combat command <actor-token> item <item_key>[=<target-token>]、"
+            "combat command <actor-token> defend/dodge/taunt[=<enemy-token>]"
+        ),
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
     "guild register": {
         "syntax": "guild register",
         "context": "公會（需當地公會服務人員）",
@@ -603,6 +618,7 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
+    @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
     def test_key_and_aliases_match_command_classes(self):
         for key, command in self.mounted.items():
             entry = self.entries[key]
@@ -616,6 +632,7 @@ class CommandDocsContractTests(unittest.TestCase):
     @covers_requirement("game-command-docs::the-command-reference-documents-the-title-commands")
     @covers_requirement("game-command-docs::the-command-reference-documents-the-lineage-command")
     @covers_requirement("game-command-docs::accurate-command-details")
+    @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
     def test_syntax_and_context_match_manifest(self):
         for key, expected in EXPECTED_COMMANDS.items():
             entry = self.entries[key]
@@ -846,6 +863,25 @@ class CommandDocsContractTests(unittest.TestCase):
             "系統與建造",
         ):
             self.assertIn(f"## {category}", self.overview)
+
+    @covers_requirement("game-command-docs::complete-command-reference")
+    @covers_requirement("game-command-docs::accurate-command-details")
+    @covers_requirement("game-command-docs::party-combat-command-references-document-actor-scope-drafts-and-exit-confirmations")
+    def test_overview_documents_party_command_syntax_and_no_possession(self):
+        # Both player documents carry the actor-scoped party syntax and the
+        # explicit exit confirmation, and both state that commanding a member
+        # needs no possession of it.
+        for document in (self.overview, self.reference):
+            for token in (
+                "combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]",
+                "combat command <actor-token> item <item_key>[=<target-token>]",
+                "combat command <actor-token> defend/dodge/taunt[=<enemy-token>]",
+                "combat retreat confirm <token>",
+                "combat actions [<actor-token>]",
+            ):
+                self.assertIn(token, document, f"{token!r} is undocumented")
+        self.assertIn("不需要附身", self.overview)
+        self.assertIn("不需要附身", self.reference)
 
     @covers_requirement("game-command-docs::docsify-navigation", "game-command-docs::drift-contract-test")
     def test_sidebar_links_both_pages(self):

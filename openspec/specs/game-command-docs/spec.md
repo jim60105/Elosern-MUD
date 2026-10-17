@@ -4,7 +4,6 @@ Define the player-facing game command reference under `docs/` and the repository
 
 ## Requirements
 
-
 ### Requirement: Complete command reference
 The documentation SHALL provide a player-facing reference of every in-game keyboard command under `docs/game/`, covering every project-authored command mounted on the `CharacterCmdSet` in `commands/default_cmdsets.py`, the `character` command mounted on the `CharacterCreationCmdSet` in `commands/character_creation.py`, and the project-owned XYZGrid cmdset.
 
@@ -385,7 +384,6 @@ and non-empty Traditional Chinese descriptions.
   context
 - **AND** `docs/game/commands.md` SHALL carry a `title` row in its character-growth category table
 
-
 ### Requirement: The command reference documents the lineage command
 `docs/game/command-reference.md` SHALL carry a canonical entry for `lineage`
 (no aliases) with syntax `lineage`, availability context in and out of combat,
@@ -437,3 +435,14 @@ Traditional Chinese description.
 - **THEN** the curated manifest in `tests/test_command_docs.py` SHALL carry the same key, aliases,
   syntax, and context
 - **AND** `docs/game/commands.md` SHALL carry a delivery row in the appropriate category table
+
+### Requirement: Party combat command references document actor scope drafts and exit confirmations
+Both player command documents SHALL describe combat command skill/item/tactic syntax, combat actions actor discovery, cast/use draft routing, automatic final selection, revisions and explicit party retreat/surrender confirmation with session/round-bound token. Keys, aliases and contexts SHALL match the mounted commands and curated manifest.
+
+#### Scenario: Documented runnable syntax
+- **WHEN** the reference lists combat command a2 skill skill_key@scale=targets, item item_key=target or defend/dodge/taunt forms
+- **THEN** each form maps to the mounted parser and actor-local server validation, and no separate whole-party submit is documented
+
+#### Scenario: Explicit exit text
+- **WHEN** a text player invokes combat retreat, combat forfeit or an allied flee/surrender alias
+- **THEN** a party consequence prompt requires confirm plus its token, other continuations cancel, and no documented command bypasses that confirmation

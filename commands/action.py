@@ -147,9 +147,9 @@ class CmdCast(Command):
             session_id=prompt["session_id"],
             round_number=session.rounds_elapsed + 1,
             confirmation_token=prompt["confirmation_token"],
-            # The confirmation entry point of this slice; the expanded text
-            # syntax names the retreat command in party-combat-text-commands.
-            confirm_command="combat forfeit",
+            # The party's escape is its own confirmed operation, so the prompt
+            # names the retreat entry point (party-combat-text-commands).
+            confirm_command="combat retreat",
         ):
             self.caller.msg(line)
 

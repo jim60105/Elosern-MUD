@@ -54,8 +54,10 @@
 | 指令 | 說明 |
 | --- | --- |
 | [`engage`](/game/command-reference?id=engage) | 與敵對魔物開戰。 |
-| [`combat forfeit`](/game/command-reference?id=combat-forfeit) | 取得整隊投降的確認提示，確認後才結束戰鬥；同一道確認也是整隊撤退（戰鬥中施放 `flee`）的確認入口。 |
-| [`combat actions`](/game/command-reference?id=combat-actions) | 列出戰鬥動作與目標。 |
+| [`combat forfeit`](/game/command-reference?id=combat-forfeit) | `combat forfeit` 取得整隊投降的確認提示，`combat forfeit confirm <token>` 才是確認；未確認前不改變戰況、不丟棄已選指令，也不推進時間。 |
+| [`combat retreat`](/game/command-reference?id=combat-retreat) | `combat retreat` 取得整隊撤退的確認提示，`combat retreat confirm <token>` 才嘗試脫離戰鬥；戰鬥中施放 `flee` 取得的是同一份提示。這兩個指令的 `confirm` 是同一個確認入口，token 綁定哪一種整隊操作就執行哪一種。 |
+| [`combat command`](/game/command-reference?id=combat-command) | `combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]`、`combat command <actor-token> item <item_key>[=<target-token>]`、`combat command <actor-token> defend/dodge/taunt[=<enemy-token>]`：以同伴代號（`a2` 等）確認該成員的指令，不需要附身該成員；再次輸入同一成員即改選並取代前一筆，最後一位成員確認後自動結算本回合。 |
+| [`combat actions`](/game/command-reference?id=combat-actions) | `combat actions [<actor-token>]` 列出指定成員（省略代號時是你）的技能、道具與戰術，以及本回合的指令進度；列出同伴的指令同樣不需要附身。 |
 
 ## 技能施放
 
@@ -117,7 +119,7 @@ NPC 可選擇回信，送達不代表必定收到回覆。回信寄出後另需�
 | [`buy`](/game/command-reference?id=buy) | 購買物品。 |
 | [`sell`](/game/command-reference?id=sell) | 販賣物品。 |
 | [`inventory`](/game/command-reference?id=inventory) | 查看錢包、背包與角色數值構成（與角色面板同源）。 |
-| [`使用`](/game/command-reference?id=使用) | 使用一件持有物品，可帶一個目標名稱；戰鬥中佔用一個回合。 |
+| [`使用`](/game/command-reference?id=使用) | 使用一件持有物品，可帶一個目標名稱；戰鬥中只確認你自己那筆指令，完整回合確認後才在結算時消耗道具與一個回合。同伴背包中的物品改用 `combat command <actor-token> item <item_key>`。 |
 | [`裝備`](/game/command-reference?id=裝備) | 裝備或卸下裝備；免費動作，飾品上限 5 件。 |
 | [`拿`](/game/command-reference?id=拿) | 撿起地上的物品，登錄物品會同步計入背包清單。 |
 | [`丟`](/game/command-reference?id=丟) | 丟棄背包中的物品，登錄物品的背包清單記錄會同步移除。 |
