@@ -467,7 +467,7 @@ describe("AppClient live mode changes", () => {
       ...twoFoes(),
     });
 
-    const requestId = store.dispatchAction("combat.flee", "flee");
+    const requestId = store.dispatchAction("combat.command", "flee");
     store.appendText("out", "你擲出了骰子。");
     store.appendText("out", "灰袍盜賊倒下了。");
 

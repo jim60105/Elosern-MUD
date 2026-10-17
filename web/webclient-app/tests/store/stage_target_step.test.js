@@ -234,7 +234,7 @@ describe("stage target step (store)", () => {
     expect(focus()).toBe(`target-${FOE_B}`);
     expect(store.focusPress("Enter")).toBe(true);
     expect(sender.sent.actions).toHaveLength(before + 1);
-    expect(sender.sent.actions.at(-1).action_id).toBe("combat.cast");
+    expect(sender.sent.actions.at(-1).action_id).toBe("combat.command");
     expect(JSON.stringify(sender.sent.actions.at(-1).payload)).toBe(JSON.stringify(expected));
     expect(expected).toEqual({ skill_key: ATTACK, target_ids: [FOE_B] });
   });
@@ -445,7 +445,7 @@ describe("stage target step (store)", () => {
     vi.useFakeTimers();
     enterCombat();
     openAttack();
-    const requestId = store.dispatchAction("combat.cast", { skill_key: ATTACK, target_ids: [FOE_A] });
+    const requestId = store.dispatchAction("combat.command", { skill_key: ATTACK, target_ids: [FOE_A] });
     store.appendText("out", "你擲出了骰子。");
     revision += 1;
     store.receive(1, "ui_update", [fx.update({

@@ -269,7 +269,7 @@ describe("cross-side question (store flow)", () => {
     expect(store.view.stageTarget.lit).toEqual([String(ALLY)]);
     const focusRequests = store.view.dockFocusRequest;
     const envelope = heldPayload();
-    expect(envelope.action_id).toBe("combat.cast");
+    expect(envelope.action_id).toBe("combat.command");
     expect(JSON.stringify(envelope.payload)).toBe(JSON.stringify({ skill_key: ATTACK, target_ids: [ALLY] }));
     expect(question()).toBeNull();
     expect(store.view.dockFocusRequest).toBe(focusRequests + 1);
@@ -545,7 +545,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey(`target-${ALLY}`);
     store.focusPress("Enter");
     // Another surface's request plays a round under the question.
-    const requestId = store.dispatchAction("combat.cast", { skill_key: ATTACK, target_ids: [FOE_A] });
+    const requestId = store.dispatchAction("combat.command", { skill_key: ATTACK, target_ids: [FOE_A] });
     store.appendText("out", "你擲出了骰子。");
     const focusRequests = store.view.dockFocusRequest;
     replace({}, "combat", {

@@ -300,115 +300,68 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       expected: "guild accept quest_mill_grain",
     },
     {
-      id: "combat: keyboard SINGLE-target cast (forwarded row descriptor)",
-      ids: ["combat.cast"],
+      // The guarded party combat actions are registered but have no client
+      // producer yet, so each is declared silent: dispatching one adds no echo
+      // line. The client producers and the typed combat spellings belong to
+      // the party-combat-text-commands slice of the same batch; pinning the
+      // silence here keeps a silent dispatch path from appearing unannounced.
+      id: "EXPECTED SILENCE: combat.actor_choices guarded actor query",
+      ids: ["combat.actor_choices"],
+      silence: true,
       prepare() {
         openExploration();
         enterCombat([SKILL_ATTACK]);
-        store.focusPress("Enter"); // root 攻擊 opens the target frame
-        store.focusConfirm("keyboard"); // keyboard confirm submits
+        store.dispatchAction("combat.actor_choices", {
+          session_id: "s-1",
+          round_revision: 0,
+          actor_id: 7,
+        });
       },
-      expected: "cast 攻擊=灰袍盜賊",
     },
     {
-      id: "combat: AREA cast with the approved shorthand",
-      ids: ["combat.cast"],
-      prepare() {
-        openExploration();
-        enterCombat([SKILL_FIRE]);
-        store.focusItemByKey("skills");
-        store.focusConfirm("pointer"); // the skills tab pushes the category frame
-        expect(store.focusItemByKey("skill-cat-0")).toBe(true);
-        store.focusConfirm("pointer"); // single-group category collapses to the group frame // single-group category collapses to the group frame
-        expect(store.focusItemByKey(SYNTH_SKILL.id)).toBe(true);
-        store.focusConfirm("pointer"); // opens the AREA target frame
-        expect(store.focusItemByKey("shorthand-all-enemies")).toBe(true);
-        store.focusConfirm("pointer"); // client-local shorthand choice
-        expect(store.focusItemByKey("area-confirm")).toBe(true);
-        store.focusConfirm("keyboard");
-      },
-      expected: `cast ${SYNTH_SKILL.label}=all-enemies`,
-    },
-    {
-      id: "combat: AREA cast on explicitly selected targets (D3b labels)",
-      ids: ["combat.cast"],
-      prepare() {
-        openExploration();
-        enterCombat([SKILL_FIRE]);
-        store.focusItemByKey("skills");
-        store.focusConfirm("pointer"); // the skills tab pushes the category frame
-        expect(store.focusItemByKey("skill-cat-0")).toBe(true);
-        store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey(SYNTH_SKILL.id)).toBe(true);
-        store.focusConfirm("pointer"); // opens the AREA target frame
-        expect(store.focusItemByKey("area-7")).toBe(true);
-        store.focusPress(" ");
-        expect(store.focusItemByKey("area-8")).toBe(true);
-        store.focusPress(" ");
-        expect(store.focusItemByKey("area-confirm")).toBe(true);
-        store.focusConfirm("keyboard");
-      },
-      expected: `cast ${SYNTH_SKILL.label}=灰袍盜賊、同行劍士`,
-    },
-    {
-      id: "combat: cast with a non-default freeform magnitude",
-      ids: ["combat.cast"],
-      prepare() {
-        openExploration();
-        enterCombat([SKILL_WIND]);
-        store.focusItemByKey("skills");
-        store.focusConfirm("pointer"); // the skills tab pushes the category frame
-        expect(store.focusItemByKey("skill-cat-0")).toBe(true);
-        store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey(T_WIND)).toBe(true);
-        store.focusConfirm("pointer"); // master skill stops at the 威力 step
-        expect(store.focusItemByKey("scale-2")).toBe(true);
-        store.focusConfirm("pointer"); // chosen scale applies, targets open
-        store.focusConfirm("keyboard"); // first target, keyboard submit
-      },
-      expected: `cast ${T_WIND_LABEL}（威力×2）=灰袍盜賊`,
-    },
-    {
-      id: "combat: cast with the DEFAULT magnitude shows no 威力 suffix",
-      ids: ["combat.cast"],
-      prepare() {
-        openExploration();
-        enterCombat([SKILL_WIND]);
-        store.focusItemByKey("skills");
-        store.focusConfirm("pointer"); // the skills tab pushes the category frame
-        expect(store.focusItemByKey("skill-cat-0")).toBe(true);
-        store.focusConfirm("pointer"); // single-group category collapses to the group frame
-        expect(store.focusItemByKey(T_WIND)).toBe(true);
-        store.focusConfirm("pointer"); // master skill stops at the 威力 step
-        expect(store.focusItemByKey("scale-1")).toBe(true);
-        store.focusConfirm("pointer");
-        store.focusConfirm("keyboard");
-      },
-      expected: `cast ${T_WIND_LABEL}=灰袍盜賊`,
-    },
-    {
-      id: "combat: flee row (button label forwarded, form (b))",
-      ids: ["combat.flee"],
+      id: "EXPECTED SILENCE: combat.command guarded party command",
+      ids: ["combat.command"],
+      silence: true,
       prepare() {
         openExploration();
         enterCombat([SKILL_ATTACK]);
-        expect(store.focusItemByKey("flee")).toBe(true);
-        store.focusConfirm("keyboard");
+        store.dispatchAction("combat.command", {
+          session_id: "s-1",
+          round_revision: 0,
+          draft_version: 0,
+          actor_id: 7,
+          command: { kind: "tactic", payload: { key: "defend" } },
+        });
       },
-      expected: "逃跑",
     },
     {
-      id: "combat: forfeit confirmation",
-      ids: ["combat.forfeit"],
+      id: "EXPECTED SILENCE: combat.exit_prompt party exit prompt",
+      ids: ["combat.exit_prompt"],
+      silence: true,
       prepare() {
         openExploration();
         enterCombat([SKILL_ATTACK]);
-        expect(store.focusItemByKey("forfeit")).toBe(true);
-        store.focusConfirm("pointer"); // pushes the confirm frame
-        expect(store.focusItemByKey("confirm-forfeit")).toBe(true);
-        store.focusConfirm("keyboard");
+        store.dispatchAction("combat.exit_prompt", {
+          session_id: "s-1",
+          round_revision: 0,
+          operation: "surrender",
+        });
       },
-      expected: "combat forfeit",
+    },
+    {
+      id: "EXPECTED SILENCE: combat.exit_confirm confirmed party exit",
+      ids: ["combat.exit_confirm"],
+      silence: true,
+      prepare() {
+        openExploration();
+        enterCombat([SKILL_ATTACK]);
+        store.dispatchAction("combat.exit_confirm", {
+          session_id: "s-1",
+          round_revision: 0,
+          operation: "surrender",
+          confirmation_token: "S-0-0123456789abcdef",
+        });
+      },
     },
     {
       id: "minimap move: unique edge label (AppClient-derived descriptor)",
@@ -696,17 +649,7 @@ describe("per-surface command echo (complete-ui-command-echo D6)", () => {
       },
       expected: ["character create", "character concept 流浪學者"],
     },
-    {
-      id: "suggestion-card cast intent (central fill: skill + target labels)",
-      ids: ["combat.cast"],
-      prepare() {
-        openExploration();
-        enterCombat([SKILL_ATTACK]);
-        // OptionCard intents carry only {action_id, payload}.
-        store.dispatchAction("combat.cast", { skill_key: SKILL_ATTACK.key, target_ids: [7] });
-      },
-      expected: "cast 攻擊=灰袍盜賊",
-    },
+
     {
       id: "EXPECTED SILENCE: options.dismiss presentation control",
       ids: ["options.dismiss"],

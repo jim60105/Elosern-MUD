@@ -356,6 +356,83 @@ function validateResultData(value) {
   return value;
 }
 
+// Party combat command transport: the guarded combat result codes. Only the
+// exit prompt may carry the bounded success data slot; every other combat
+// code stays data-free, so a missing, extra or oversized field rejects at the
+// result envelope itself. Mirror of
+// web.webclient.actions.combat_actions.validate_party_exit_prompt_data and
+// its ``DATA_CARRYING_CODES`` / ``_success_result`` guard.
+var PARTY_EXIT_PROMPT_FIELDS = [
+  "operation",
+  "confirmation_token",
+  "scope",
+  "consequence",
+];
+var PARTY_EXIT_PROMPT_CODE = "party_exit_prompt";
+var PARTY_EXIT_OPERATIONS = ["retreat", "surrender"];
+var PARTY_EXIT_SCOPE = "party";
+var PARTY_EXIT_MAX_TOKEN_CODE_POINTS = 128;
+var PARTY_EXIT_MAX_CONSEQUENCE_CODE_POINTS = 512;
+var URL_SAFE_TOKEN_RE = /^[A-Za-z0-9_-]+$/;
+var COMBAT_DATA_FREE_CODES = [
+  "actor_choices",
+  "draft_saved",
+  "needs_selection",
+  "already_committed",
+  "round_committed",
+  "combat_terminal",
+  "stale_command",
+];
+
+function validatePartyExitPromptData(value) {
+  requireExactFields(value, "party exit prompt data", PARTY_EXIT_PROMPT_FIELDS, []);
+  if (PARTY_EXIT_OPERATIONS.indexOf(value.operation) === -1) {
+    throw new Error("party exit prompt operation must be retreat or surrender");
+  }
+  var token = value.confirmation_token;
+  if (
+    typeof token !== "string" ||
+    !URL_SAFE_TOKEN_RE.test(token) ||
+    codePoints(token) > PARTY_EXIT_MAX_TOKEN_CODE_POINTS
+  ) {
+    throw new Error(
+      "party exit prompt confirmation_token must be 1.." +
+        PARTY_EXIT_MAX_TOKEN_CODE_POINTS +
+        " URL-safe ASCII characters"
+    );
+  }
+  if (value.scope !== PARTY_EXIT_SCOPE) {
+    throw new Error("party exit prompt scope must be 'party'");
+  }
+  var consequence = value.consequence;
+  var consequenceLength = codePoints(consequence);
+  if (
+    typeof consequence !== "string" ||
+    consequenceLength < 1 ||
+    consequenceLength > PARTY_EXIT_MAX_CONSEQUENCE_CODE_POINTS
+  ) {
+    throw new Error(
+      "party exit prompt consequence must be 1.." +
+        PARTY_EXIT_MAX_CONSEQUENCE_CODE_POINTS +
+        " code points"
+    );
+  }
+  return value;
+}
+
+function validateCombatResultData(code, hasData, data) {
+  if (code === PARTY_EXIT_PROMPT_CODE) {
+    if (!hasData) {
+      throw new Error("party_exit_prompt requires its exact data slot");
+    }
+    validatePartyExitPromptData(data);
+    return;
+  }
+  if (hasData && COMBAT_DATA_FREE_CODES.indexOf(code) !== -1) {
+    throw new Error("combat result " + code + " must not carry data");
+  }
+}
+
 function validateServerTime(value) {
   requireExactFields(
     value,
@@ -438,6 +515,8 @@ module.exports = {
   checkGlobalSafety: checkGlobalSafety,
   checkEnvelope: checkEnvelope,
   requireExactFields: requireExactFields,
+  validateCombatResultData: validateCombatResultData,
+  validatePartyExitPromptData: validatePartyExitPromptData,
   requireInt: requireInt,
   requireBool: requireBool,
   requireString: requireString,
