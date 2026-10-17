@@ -12,7 +12,7 @@ See proposal.md. `ShopPanel.vue` renders `services.shop` stock/sellable rows wit
 
 ## Decisions
 
-- **Shared selection**: the rail reads `party.viewed_member_id`; selecting dispatches `party.view_member {member_id, tab: "shop", item_key}` so `services.shop.member_id` and `item_holdings` follow.
+- **Shared selection**: the rail reads `party.viewed_member_id`; selecting dispatches `party.view_member {member_id, tab: "shop", skill_key: null, item_key}` so `services.shop.member_id` and `item_holdings` follow.
 - **Row facts** come from `viewed` (recipient) and the chips from `item_holdings` rows (other members); the comparison panel shows the recipient's delta changes only (server), never recomputed.
 - **Remaining purse** = header purse minus price × quantity, a display-only preview labelled as remaining; the server's result is authoritative.
 - **Stepper** bounds from the committed buy/sell descriptor quantity maximum.

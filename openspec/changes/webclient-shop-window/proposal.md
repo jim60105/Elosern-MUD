@@ -21,6 +21,7 @@ Design §4.3 and §7 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 - `webclient-contextual-hud`: the party purse requirement covers the shop window header and remainder.
 - `webclient-component-showcase`: the services surfaces requirement names `ShopWindow`.
+- `webclient-service-menus`: browser acceptance journeys use the shop window.
 
 ## Impact
 
@@ -32,14 +33,14 @@ Design §4.3 and §7 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 ## Batch: party member management
 
-Declared implementation order: **28 of 30**.
+Declared implementation order: **29 of 31**.
 
 - depends-on: webclient-party-lineage-tab
 - depends-on: services-shop-structured-rows
 
 ### Code and spec conflicts within the new batch
 
-- `webclient-party-bag-tab`: shared showcase requirement "The map, art, and services surfaces…" and the purse requirement (S; that first, edits preserved; strict validation shows an informational archive-order notice for the renamed purse requirement).
+- `webclient-party-bag-retire`: shared showcase requirement "The map, art, and services surfaces…" and the purse requirement (S; that first, edits preserved; strict validation shows an informational archive-order notice for the renamed purse requirement).
 - `services-shop-structured-rows`, `shop-party-recipient-seller`: last edited `ShopPanel.vue` (F; those first).
 - `webclient-party-window-member-tab` and later tabs: shared `AppClient.vue`, manifest (F; ordered).
 - `.github/browser-shards.json`: conditional manifest conflict.
