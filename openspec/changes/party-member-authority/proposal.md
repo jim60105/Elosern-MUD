@@ -35,7 +35,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **1 of 32**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
+Declared implementation order: **1 of 33**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
 
 No direct prerequisites.
 
