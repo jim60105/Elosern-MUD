@@ -2,7 +2,7 @@
 
 Every journey plays one synthetic combat round through the live client's own
 store: it commits a combat snapshot with its own participants and art
-catalog, dispatches the player's `combat.cast` (the outbound `ui_action` is
+catalog, dispatches the player's `combat.command` (the outbound `ui_action` is
 swallowed, so the server never sees it), appends the round's narrative lines,
 and commits the completing publication carrying the round's `combat_beats`
 panel and the action's result. The store binds and plays the round exactly as
@@ -128,7 +128,14 @@ _COMMIT = """async ([env]) => {
 # round that ends the fight) and the action's result, in the wire order.
 _PLAY_ROUND = """async ([env, kind, lines]) => {
   const store = window.__elosernBridge.store;
-  const requestId = store.dispatchAction('combat.cast', { skill_key: 'basic_attack', targets: [] });
+  const panel = store.view.panels.context_actions;
+  const requestId = store.dispatchAction('combat.command', {
+    session_id: panel.session.session_id,
+    round_revision: panel.session.round_revision,
+    draft_version: panel.draft.draft_version,
+    actor_id: panel.choices.actor_id,
+    command: { kind: 'skill', payload: { skill_key: 'basic_attack' } },
+  });
   if (requestId === null) throw new Error('the dispatch was refused');
   for (const line of lines) { store.appendText('out', line); }
   const view = store.view;

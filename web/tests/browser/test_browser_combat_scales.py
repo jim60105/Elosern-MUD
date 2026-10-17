@@ -392,9 +392,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], ladder)
-        self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], ladder)
+        self.assertEqual(inner["target_ids"], enemy_ids)
 
     @covers_requirement("webclient-combat-menu::the-combat-dock-offers-a-scale-choice-step-only-for-masters")
     def test_master_scale_step_casts_at_the_chosen_magnitude(self):
@@ -434,10 +435,11 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], ladder)
-        self.assertEqual(envelope["payload"]["scale"], 2)
-        self.assertEqual(envelope["payload"]["target_ids"], [target])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], ladder)
+        self.assertEqual(inner["scale"], 2)
+        self.assertEqual(inner["target_ids"], [target])
         # The scaled cast deducts the ladder's base cost doubled (the status
         # panel reflects the true resource pool after the round).
         deadline = time.monotonic() + 15

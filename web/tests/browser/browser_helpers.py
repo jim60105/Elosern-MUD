@@ -256,6 +256,31 @@ def store_state(page: Page) -> dict:
     return json.loads(raw) if raw is not None else {}
 
 
+def submit_combat_command(page: Page, command: dict, *, kind: str = "skill") -> None:
+    """Submit one guarded v7 ``combat.command`` from the committed panel.
+
+    Builds the exact envelope the shipped client builds: the committed
+    session/round/draft versions and the commanded actor outside the closed
+    ``{kind, payload}`` command union. Tests use this to exercise the
+    adapter's rejection paths through the real wire route instead of the
+    retired ``combat.cast``.
+    """
+    page.evaluate(
+        """([kind, command]) => {
+          const store = window.__elosernBridge.store;
+          const panel = store.view.panels.context_actions;
+          return Elosern.actions.submit('combat.command', {
+            session_id: panel.session.session_id,
+            round_revision: panel.session.round_revision,
+            draft_version: panel.draft.draft_version,
+            actor_id: panel.choices.actor_id,
+            command: { kind, payload: command },
+          });
+        }""",
+        [kind, command],
+    )
+
+
 def focus_action_dock(page: Page, timeout: int = 60000) -> None:
     """Robustly focus the ``#action-dock`` element, gated on deterministic state.
 

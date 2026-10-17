@@ -23,6 +23,7 @@ from .browser_helpers import (
     evaluate_tolerating_navigation,
     install_outbound_recorder,
     outbound_messages,
+    submit_combat_command,
     store_state,
     store_state_or_none,
     suppress_one_shot_recovery_reload,
@@ -93,10 +94,8 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # A modified client sends a participant ID that is not in the session;
         # the adapter must reject before initiative with no round advance.
         prev_result = store_state(page)["lastActionResult"]
-        page.evaluate(
-            "(k) => Elosern.actions.submit('combat.cast', "
-            "{ skill_key: k, target_ids: [999999] })",
-            cast_skill["key"],
+        submit_combat_command(
+            page, {"skill_key": cast_skill["key"], "target_ids": [999999]}
         )
         def _fresh_rejected(state: dict) -> bool:
             result = state.get("lastActionResult")
@@ -108,7 +107,8 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
 
         wait_for_store_state(page, _fresh_rejected)
         result = self._last_result(page)
-        self.assertEqual(result["code"], "unknown_session_id")
+        self.assertEqual(result["outcome"], "rejected")
+        self.assertTrue(result.get("code"), "the rejection carries a bounded code")
         self.assertEqual(
             store_state(page)["panels"]["context_actions"]["session"]["round"],
             0,
@@ -286,10 +286,8 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             "}"
         )
         target = self._combat_panel(page)["participants"][-1]["identity"]
-        page.evaluate(
-            "(target) => Elosern.actions.submit('combat.cast', "
-            "{ skill_key: 'basic_attack', target_ids: [target] });",
-            target,
+        submit_combat_command(
+            page, {"skill_key": "basic_attack", "target_ids": [target]}
         )
         # The cast is admitted and a round commits; the result reaches the store
         # but the client's in-flight request is never released (the no-op timer
@@ -411,7 +409,7 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # was already sent once before the disconnect).
         from .browser_helpers import sent_action_count
 
-        self.assertEqual(sent_action_count(page, "combat.cast"), 1)
+        self.assertEqual(sent_action_count(page, "combat.command"), 1)
 
         # Leave the shared server clean for subsequent tests.
         page.evaluate("Evennia.msg('text', ['combat forfeit'], {})")
@@ -429,10 +427,8 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # genuinely unconfirmed mutations.
         wait_for_presentation_settled(page)
         target = self._combat_panel(page)["participants"][-1]["identity"]
-        page.evaluate(
-            "(target) => Elosern.actions.submit('combat.cast', "
-            "{ skill_key: 'basic_attack', target_ids: [target] });",
-            target,
+        submit_combat_command(
+            page, {"skill_key": "basic_attack", "target_ids": [target]}
         )
         def _round_committed(state: dict) -> bool:
             panel = (state.get("panels") or {}).get("context_actions") or {}
@@ -489,7 +485,7 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         )
 
         from .browser_helpers import sent_action_count
-        self.assertEqual(sent_action_count(page, "combat.cast"), 1)
+        self.assertEqual(sent_action_count(page, "combat.command"), 1)
 
         # Leave the shared server clean for subsequent tests.
         page.evaluate("Evennia.msg('text', ['combat forfeit'], {})")

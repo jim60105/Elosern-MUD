@@ -271,10 +271,11 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], ladder)
-        self.assertEqual(envelope["payload"]["target_ids"], enemy_ids)
-        self.assertNotIn("target_shorthand", envelope["payload"])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], ladder)
+        self.assertEqual(inner["target_ids"], enemy_ids)
+        self.assertNotIn("target_shorthand", inner)
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_disabled_reason_is_visible_without_packet(self):
