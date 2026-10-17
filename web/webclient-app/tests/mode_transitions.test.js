@@ -21,6 +21,7 @@ import DialogueChoices from "../components/DialogueChoices.vue";
 import { nextModeChange } from "../composables/use-mode-change.js";
 import { dialogueViewModel } from "../stores/dialogue-view.js";
 import { useElosernStore } from "../stores/elosern.js";
+
 import {
   ART_PANEL_SAMPLE,
   fixtureDigest,
@@ -30,6 +31,12 @@ import {
 } from "../stories/fixtures.js";
 import * as fx from "./store/protocol_fixtures.js";
 import { observeLoad } from "./support/scene_layers.js";
+
+// Every journey here mounts the whole shell and drives real commits, so an
+// individual test can exceed Vitest's default budget on a shared runner (two
+// different journeys did, on two consecutive CI runs): the file carries the
+// same explicit headroom the project's other mount-heavy suites use.
+vi.setConfig({ testTimeout: 20000 });
 
 const DIALOGUE = {
   schema_version: 2,
@@ -222,9 +229,7 @@ describe("AppClient live mode changes", () => {
     commit("exploration");
     await nextTick();
     expect(stage().attributes("data-mode-change")).toBe("combat-exploration");
-    // Four shell mounts and their commits: the same explicit headroom the
-    // other mount-heavy suites carry keeps a loaded runner from timing it out.
-  }, 20000);
+  });
 
   it("the leaving host is inert while it animates out, and the dock is back in reach at once", async () => {
     store.setMotionLevel("full");

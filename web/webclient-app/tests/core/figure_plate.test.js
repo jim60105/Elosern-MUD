@@ -19,6 +19,12 @@ import { PARTY_PANEL_FULL_SAMPLE } from "../../stories/fixtures/party_panels.js"
 import { ART_PANEL_SAMPLE } from "../../stories/fixtures.js";
 import * as fx from "../store/protocol_fixtures.js";
 
+// Every journey here mounts the whole shell and drives real commits, so an
+// individual test can exceed Vitest's default budget on a shared runner: the
+// file carries the same explicit headroom the project's other mount-heavy
+// suites use.
+vi.setConfig({ testTimeout: 20000 });
+
 const APP_ROOT = join(process.cwd(), "web/webclient-app");
 const BOX = { left: 900, top: 180, width: 112, height: 52 };
 
@@ -458,10 +464,7 @@ describe("the plates layer in the client", () => {
     expect(wrapper.findAll('[data-testid="stage-target-marker"]')).toHaveLength(0);
     expect(wrapper.findAll('[data-testid="stage-target-hit"]')).toHaveLength(0);
     expect(wrapper.get('[data-testid="foe-slot"][data-identity="204"] [data-testid="stage-actor"]').attributes("data-speaking")).toBe("true");
-    // The journey mounts the whole shell and walks the target step, so it
-    // takes seconds on a shared runner: the same explicit headroom the other
-    // mount-heavy suites carry keeps the default budget from timing it out.
-  }, 20000);
+  });
 
   it("passes each participant's conditions and stage x to its plate, and closes a plate tooltip when a round starts", async () => {
     const participants = [
