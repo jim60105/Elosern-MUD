@@ -195,7 +195,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def _open_category(self, page, category: str) -> None:
         """Arrow to ``category`` in the category frame and Enter into it (a
         single-group category opens its skill frame directly)."""
-        names = [item["category"] for item in self._combat_panel(page)["skills"]]
+        names = [
+            item["category"]
+            for item in self._combat_panel(page)["choices"]["skills"]
+        ]
         self.assertIn(category, names)
         self._press_to(page, "ArrowDown", names.index(category))
         self._press(page, "Enter")
@@ -209,10 +212,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         single-column skill pane ignores the horizontal arrow between
         rows whose index math was trusted here before."""
         panel = self._combat_panel(page)
-        names = [item["category"] for item in panel["skills"]]
+        names = [item["category"] for item in panel["choices"]["skills"]]
         self.assertIn(category, names)
         category_index = names.index(category)
-        groups = panel["skills"][names.index(category)]["groups"]
+        groups = panel["choices"]["skills"][names.index(category)]["groups"]
         carrier_index = next(
             (
                 index
@@ -461,7 +464,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # in SkillCategory declaration order (both modes own exactly this
         # category set; movement is retired and flee is under martial_arts).
         self.assertEqual(
-            [category["category"] for category in panel["skills"]],
+            [category["category"] for category in panel["choices"]["skills"]],
             [
                 "elemental_magic",
                 "martial_arts",
@@ -470,7 +473,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "sexual_act",
             ],
         )
-        elemental = panel["skills"][0]
+        elemental = panel["choices"]["skills"][0]
         # Element sub-groups follow the live ELEMENT_REGISTRY declaration
         # order, not ownership order. The kit install registers its own
         # element before the borrowed shipped row, so the seam names the
@@ -488,7 +491,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             [roles["spell_key"], roles["prereq_key"]],
         )
         # A category without a group carries exactly one null-keyed sub-group.
-        enhancement = panel["skills"][2]
+        enhancement = panel["choices"]["skills"][2]
         self.assertEqual(enhancement["category"], "enhancement")
         self.assertEqual(len(enhancement["groups"]), 1)
         self.assertIsNone(enhancement["groups"][0]["group"])
@@ -507,7 +510,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         roles = self._roles()
         by_key = {
             skill["key"]: skill
-            for category in panel["skills"]
+            for category in panel["choices"]["skills"]
             for group in category["groups"]
             for skill in group["skills"]
         }

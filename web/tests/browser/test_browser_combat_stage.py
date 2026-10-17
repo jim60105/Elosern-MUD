@@ -126,7 +126,7 @@ def _combat_panels(
     panel["participants"] = party + _foes(count, defeated, names, fled)
     # The shared skills target the fixture's own foe identities; this stage
     # needs no skill frame.
-    panel["skills"] = []
+    panel["choices"]["skills"] = []
     refs = [p["portrait_ref"] for p in panel["participants"] if p["portrait_ref"] is not None]
     panels = {"context_actions": panel, "art": _art_panel(refs)}
     if companions:
@@ -474,7 +474,7 @@ def _stage_panels(count: int = 3, companions: int = 3, **kwargs) -> dict:
     panel = panels["context_actions"]
     foes = [p["identity"] for p in panel["participants"] if p["team"] == "foes" and p["state"] != "defeated"]
     allies = [p["identity"] for p in panel["participants"] if p["team"] == "party" and p["identity"] >= 101]
-    panel["skills"] = _stage_skills(foes, allies)
+    panel["choices"]["skills"] = _stage_skills(foes, allies)
     return panels
 
 
@@ -719,7 +719,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
     def _card_panels(self) -> dict:
         panels = _combat_panels(3)
         panel = panels["context_actions"]
-        panel["skills"] = _card_skills([p["identity"] for p in panel["participants"] if p["team"] == "foes"])
+        panel["choices"]["skills"] = _card_skills([p["identity"] for p in panel["participants"] if p["team"] == "foes"])
         return panels
 
     @covers_requirement("webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation")
@@ -1252,7 +1252,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page = self._page(REFERENCE, companions=3)
         page.evaluate(_CAPTURE_ACTIONS)
         panels = _stage_panels()
-        for category in panels["context_actions"]["skills"]:
+        for category in panels["context_actions"]["choices"]["skills"]:
             for group in category["groups"]:
                 for skill in group["skills"]:
                     if skill["key"] == BASIC_ATTACK_KEY:

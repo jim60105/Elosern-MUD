@@ -59,7 +59,7 @@ def _combat_panels(foes: list) -> dict:
     panel = _combat_panel()
     party = [p for p in panel["participants"] if p["team"] == "party"]
     panel["participants"] = party + foes
-    panel["skills"] = []
+    panel["choices"]["skills"] = []
     refs = [p["portrait_ref"] for p in panel["participants"] if p["portrait_ref"] is not None]
     return {
         "status": valid_status_panel("勇者", PLAYER),

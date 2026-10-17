@@ -232,7 +232,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         combat = _combat_panel()
         skill_count = sum(
             len(group.get("skills") or [])
-            for category in combat.get("skills") or []
+            for category in (combat.get("choices") or {}).get("skills") or []
             for group in category.get("groups") or []
         )
         self.assertGreater(skill_count, 0, "the combat fixture must carry skills")
