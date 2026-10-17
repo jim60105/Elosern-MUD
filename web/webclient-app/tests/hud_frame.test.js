@@ -665,10 +665,13 @@ describe("the combat formation stage (webclient-combat-formation)", () => {
     const order = [...stage.children].map((el) => el.getAttribute("data-testid") || el.className);
     expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("stage-flash"));
     expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("anchor-actor-right"));
-    // After the band in DOM order (webclient-combat-figure-plates D4), so
-    // Tab from the action dock reaches the plates group next; the paint
-    // order rests on the explicit z-indexes below, not on DOM order.
-    expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("stage-band"));
+    // The anchor follows the `choices` anchor in DOM order
+    // (webclient-combat-figure-plates D4): that anchor hosts the teleported
+    // combat command card (webclient-combat-command-card-centred D3), so Tab
+    // from the action dock inside the card reaches the plates group next; the
+    // paint order rests on the explicit z-indexes below, not on DOM order.
+    expect(order.indexOf("anchor-plates")).toBeGreaterThan(order.indexOf("anchor-choices"));
+    expect(order.indexOf("anchor-plates")).toBeLessThan(order.indexOf("stage-band"));
     expect(order.indexOf("anchor-plates")).toBeLessThan(order.indexOf("anchor-command-line"));
     const layer = wrapper.get('[data-testid="anchor-plates"]');
     expect(layer.attributes("data-anchor")).toBe("plates");
