@@ -166,13 +166,17 @@
   }
 
   // One basic-action row as the menu's subject model (its enabled state and
-  // reason are the committed capability facts verbatim).
+  // reason are the committed capability facts verbatim). 挑釁's shape is the
+  // client-side fact of the closed vocabulary: it names exactly one enemy,
+  // while 防禦 and 閃避 carry no target at all (`TACTIC_KEYS`), so the stage
+  // target step stands only for 挑釁.
   function tacticModel(row) {
     return {
       key: row.key,
       label: row.label,
       enabled: !!row.enabled,
       disabledReason: row.reason || null,
+      targetSpec: row.key === "taunt" ? "single" : "none",
       targets: (row.targets || []).slice(),
     };
   }
