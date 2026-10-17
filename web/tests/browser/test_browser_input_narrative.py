@@ -1228,9 +1228,9 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         )
         _wait_inp_line(page, 1, "cast 燼心爆=燼殼工蟲")
         # A mutation the catalog can resolve without any display descriptor
-        # still echoes exactly once at dispatch (forfeit needs no label).
-        page.evaluate("() => Elosern.actions.submit('combat.forfeit')")
-        _wait_inp_line(page, 2, "combat forfeit", exact=True)
+        # still echoes exactly once at dispatch (a daypart wait needs no label).
+        page.evaluate("() => Elosern.actions.submit('explore.wait', { daypart: 'dusk' })")
+        _wait_inp_line(page, 2, "wait until dusk", exact=True)
 
     def _wait_action_idle(self, page, timeout=20000):
         deadline = time.monotonic() + timeout / 1000

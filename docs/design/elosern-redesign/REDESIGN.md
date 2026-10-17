@@ -57,7 +57,7 @@
 - **技能**＝關鍵多層選單：`分類 → 群組(元素/性愛線) → 技能 → (威力 1/4..4) → 目標(代號/範圍)`
   - 每個技能 descriptor：cost、target_spec、enabled/reason_code/reason_message、valid_target_ids、shorthands、freeform_scales
   - 目標：party(aN) vs foes(eN)；SINGLE 單選 / AREA 空格多選 / `all-enemies/all-allies/all`
-  - 投降→`services-confirm` 二次確認 → `combat.forfeit`
+  - 撤退／投降→`services-confirm` 等級的二次確認卡（QuestionCard，預設「否」）→ `combat.exit_confirm`（伺服器綁定 token；`combat.flee`／`combat.forfeit` 已退役）
 - **參戰框架**：party＋foes，每人 token/姓名/HP條/state(active|fled|knocked_out|defeated)/threat
 
 **C. 角色 dock**（唯讀全表）：traits、主動/被動（分類分群）、裝備、偽裝「真值 vs 顯示」、公會、錢包、背景
@@ -137,7 +137,7 @@ Developer `art status/run/retry/requeue`；Builder `@teleport/@open/地圖`；Ev
 戰鬥dock:
   根[攻擊|技能|道具|防禦|逃跑|投降]
     └ 技能 → 分類 → 群組 → 技能 → [威力(僅master)] → 目標[token/範圍] → 提交 cast
-    └ 投降 → 二次確認 → combat.forfeit
+    └ 撤退／投降 → 伺服器確認提示 → 二次確認卡 → combat.exit_confirm
 Escape 一律回父層；子選單開啟不重建父選單；改動進行中抑制提交。
 ```
 

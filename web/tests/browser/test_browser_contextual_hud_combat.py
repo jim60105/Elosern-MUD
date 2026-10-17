@@ -211,56 +211,85 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         "webclient-contextual-hud::destructive-combat-confirmation-renders-as-an-explicit-two-step-panel"
     )
     def test_destructive_combat_confirmation_two_step_panel(self):
-        """Opening Forfeit renders an explicit two-step confirmation panel."""
+        """Opening Surrender renders the explicit two-step confirmation card."""
         page = self.logged_in_page()
         install_outbound_recorder(page)
         _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
         _wait_mode(page, "combat")
         focus_action_dock(page)
 
-        # The combat root is one vertical list; Forfeit is the last row.
+        # The combat root is one vertical list; Surrender is the last row.
         row_count = page.evaluate("document.querySelectorAll('#action-dock [data-item-key]').length")
         for _ in range(row_count - 1):
             _press(page, "ArrowDown")
-        _press(page, "Enter")  # open the Forfeit confirmation frame
+        _press(page, "Enter")  # request the server-bound prompt
         page.wait_for_timeout(150)
 
-        # The confirmation frame renders as an explicit warning panel with a
-        # cancel row and a confirm row; opening it submits nothing.
-        pane = page.locator('[data-testid="dock-menu"]')
-        pane_text = pane.inner_text()
-        self.assertIn("確認投降", pane_text, "the confirmation frame renders the confirm row")
-        self.assertIn("取消", pane_text, "the confirmation frame renders the cancel row")
-        self.assertEqual(sent_action_count(page), 0, "opening Forfeit submits no mutation")
-
-        # Escape closes exactly one level without submitting.
-        _press(page, "Escape")
-        page.wait_for_timeout(150)
-        self.assertEqual(_dock_depth(page), 1, "Escape pops exactly one level")
-        self.assertEqual(sent_action_count(page), 0, "leaving the confirmation submits nothing")
-
-        # Re-open Forfeit and activate the confirm row: exactly one
-        # combat.forfeit action is emitted carrying the current session id.
-        # After the first Escape the root frame's focus is already on the
-        # Forfeit tab (the parent focus is restored by the router), so a single
-        # Enter re-opens the confirmation frame.
-        _press(page, "Enter")
-        page.wait_for_timeout(150)
-        page.locator('[data-testid="dock-menu"] button[data-item-key="confirm-forfeit"]').click()
-        page.wait_for_timeout(200)
-        self.assertEqual(
-            sent_action_count(page, "combat.forfeit"),
-            1,
-            "activating the confirm row emits exactly one combat.forfeit",
-        )
-        sent = page.evaluate("window.__elosernSent || []")
-        forfeit = [
+        # Opening it submits exactly the read-only prompt request — never a
+        # confirmation — and the second step is the explicit question card.
+        actions = [
             args[0]
-            for cmd, args, _kw in sent
-            if cmd == "ui_action" and args and args[0].get("action_id") == "combat.forfeit"
+            for cmd, args, _kw in outbound_messages(page)
+            if cmd == "ui_action"
         ]
-        self.assertEqual(
-            forfeit[0]["payload"]["session_id"],
-            "browser-combat-0001",
-            "the forfeit action carries the current session identifier",
+        self.assertEqual([a["action_id"] for a in actions], ["combat.exit_prompt"])
+        self.assertEqual(actions[0]["payload"]["operation"], "surrender")
+        self.assertEqual(actions[0]["payload"]["session_id"], "browser-combat-0001")
+        self.assertNotIn("confirmation_token", actions[0]["payload"])
+
+        # The injected server prompt commits: the card states the whole
+        # party's scope and the server-authored consequence, with 否 focused,
+        # and the command dock beneath it is inert.
+        generation = store_state(page)["generation"]
+        page.evaluate(
+            """([generation, rid]) => {
+              const bridge = window.__elosernBridge;
+              const view = bridge.store.view;
+              bridge.store.receive(generation, 'ui_action_result', [{
+                protocol_version: 1,
+                presentation_epoch: view.epoch,
+                request_id: rid,
+                outcome: 'success',
+                code: 'party_exit_prompt',
+                message: '確認提示',
+                presentation_revision: view.revision,
+                data: {
+                  operation: 'surrender',
+                  confirmation_token: 'S-0-browsertoken9f8e7d6c',
+                  scope: 'party',
+                  consequence: '全隊退出戰鬥，並結算目前已累積的戰鬥時間。',
+                },
+              }], {});
+            }""",
+            [generation, actions[0]["request_id"]],
         )
+        card = page.locator('[data-testid="party-exit-question"]')
+        card.wait_for(state="visible", timeout=15000)
+        self.assertIn(
+            "確定要全隊投降？",
+            card.locator('[data-testid="question-card-question"]').inner_text(),
+        )
+        self.assertIn(
+            "全隊退出戰鬥",
+            card.locator('[data-testid="question-card-detail"]').inner_text(),
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => { const el = document.activeElement; "
+                "return el && el.closest('[data-testid=\"party-exit-question\"]') ? el.textContent.trim() : null; }"
+            ),
+            "否",
+            "the safe answer holds focus",
+        )
+        self.assertTrue(
+            page.evaluate("() => !!document.querySelector('#action-dock').closest('[inert]')"),
+            "the dock is inert beneath the card",
+        )
+
+        # Escape cancels exactly like 否: no confirmation is sent, the card
+        # closes, and combat continues at the row that opened it.
+        _press(page, "Escape")
+        card.wait_for(state="detached", timeout=15000)
+        self.assertEqual(sent_action_count(page, "combat.exit_confirm"), 0)
+        self.assertEqual(store_state(page)["focus"]["key"], "surrender")
+        self.assertEqual(_dock_depth(page), 1)

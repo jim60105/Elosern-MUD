@@ -3,11 +3,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
-In combat mode the action root SHALL preserve the root inventory of the client
-combat-menu resolver (the root list of `web/static/webclient/js/elosern/combat_menu.js`:
-Attack, Skills, Items, the client-local Bag drawer opener, Defend, Dodge, Taunt, Retreat, and the
-confirmed Surrender entry) and their existing availability/order. Dodge and Taunt SHALL join Defend as actor-scoped basic actions. Arrow keys SHALL navigate, Enter SHALL open or submit, Escape SHALL pop
-one level, and disabled entries SHALL send no packet.
+In combat mode the action root SHALL preserve the client combat-menu resolver's
+root list (`web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items,
+the client-local Bag drawer opener, Defend, Dodge, Taunt, Retreat, and the confirmed
+Surrender entry) and their existing availability/order. Dodge and Taunt SHALL join
+Defend as actor-scoped basic actions. Arrow keys SHALL navigate, Enter SHALL open or
+submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
 
 #### Scenario: Basic attack completes without typed input
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
@@ -17,9 +18,9 @@ one level, and disabled entries SHALL send no packet.
 - **WHEN** the selected actor has an eligible item, Defend, Dodge or Taunt choice
 - **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
-#### Scenario: Forfeit requires confirmation
+#### Scenario: Surrender requires confirmation
 - **WHEN** the player opens the Surrender entry but has not confirmed
-- **THEN** no mutation is sent, and Escape returns exactly one menu level without ending combat
+- **THEN** no mutation is sent, and No, the close control or Escape discards the prompt and returns to exactly the prior menu, actor and selection without ending combat
 
 #### Scenario: Skills opens a bounded master-detail
 - **WHEN** the player opens Skills in combat with skills owned across several categories
@@ -57,13 +58,13 @@ one level, and disabled entries SHALL send no packet.
 - **WHEN** a participant carries a `portrait_ref` present in the committed portrait catalog, and another carries `null`
 - **THEN** the first renders that catalog entry (including its placeholder card) and the second renders no portrait, and the browser constructs no subject key or URL
 
-#### Scenario: The forfeit confirmation is an explicit two-step panel
+#### Scenario: The surrender confirmation is an explicit two-step modal
 - **WHEN** the player opens the Surrender entry
-- **THEN** a warning panel renders with a cancel row and a confirm row, no mutation is sent, and only activating the confirm row emits one combat.exit_confirm carrying session_id, round_revision, operation and the server confirmation_token
+- **THEN** a warning card renders with No focused as the safe answer and a Yes answer, no mutation is sent, and only activating Yes emits one combat.exit_confirm carrying session_id, round_revision, operation and the server confirmation_token
 
-#### Scenario: The forfeit warning states the consequence
-- **WHEN** the forfeit confirmation screen renders
-- **THEN** it is an explicit warning panel stating what forfeiting does
+#### Scenario: The surrender warning states the consequence
+- **WHEN** the surrender confirmation screen renders
+- **THEN** it states the whole party's scope and the server-authored consequence verbatim
 
 #### Scenario: Each root action keeps its dedicated route
 - **WHEN** the player activates each entry of the preserved root inventory

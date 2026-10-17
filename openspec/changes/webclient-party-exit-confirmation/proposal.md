@@ -19,10 +19,11 @@ None. Reuse existing capability ownership.
 ### Modified Capabilities
 
 - `webclient-combat-menu`: amend the requirements owned by this bounded slice.
+- `webclient-frame-resolution`: deregister the retired client-local `combat.forfeit` confirmation frame, which the client cutover removes.
 
 ## Impact
 
-Planned implementation/test surfaces: `web/webclient-app/stores/elosern/frames.js`, `web/webclient-app/stores/elosern/combat.js`, `web/webclient-app/stores/elosern/interaction.js`, `web/webclient-app/stores/elosern/view.js`, `web/webclient-app/AppClient.vue`, `web/webclient-app/components/QuestionCard.vue`, `web/static/webclient/js/elosern/combat_menu.js`, `web/webclient-app/stories/Core/AppShell.stories.js`.
+Planned implementation/test surfaces: `web/webclient-app/stores/elosern/frames.js`, `web/webclient-app/stores/elosern/combat.js`, `web/webclient-app/stores/elosern/interaction.js`, `web/webclient-app/stores/elosern/view.js`, `web/webclient-app/stores/frame-resolvers.js`, `web/webclient-app/AppClient.vue`, `web/webclient-app/components/QuestionCard.vue`, `web/static/webclient/js/elosern/combat_menu.js`, `web/webclient-app/stories/Core/AppShell.stories.js`.
 Canonical traceability annotations, affected test/fixture/shard ownership and existing documentation change with implementation. The assembled acceptance gate forbids missing companion item/tactical flow, real balance evidence or client/text parity.
 
 ## Effort

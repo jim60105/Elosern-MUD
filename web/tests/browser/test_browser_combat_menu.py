@@ -308,52 +308,36 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
         # A deeper frame replaces the root list (webclient-combat-command-
         # window): no root row is rendered at depth 2. Escape returns to the
-        # root list, and a pointer click on its 逃跑 row focuses and confirms
+        # root list, and a pointer click on its 撤退 row focuses and activates
         # it through the ordinary confirmation path — exactly one deliberate
-        # activation, no stray `ui_action`.
-        flee = '#action-dock [data-testid="dock-menu"] [data-item-key="flee"]'
-        self.assertEqual(page.locator(flee).count(), 0, "no root row at depth 2")
+        # prompt request, no stray `ui_action` (webclient-party-exit-
+        # confirmation: the row never sends a mutation of its own).
+        retreat = '#action-dock [data-testid="dock-menu"] [data-item-key="retreat"]'
+        self.assertEqual(page.locator(retreat).count(), 0, "no root row at depth 2")
         self._press(page, "Escape")
-        page.wait_for_selector(flee, timeout=30000)
-        page.locator(flee).click()
+        page.wait_for_selector(retreat, timeout=30000)
+        page.locator(retreat).click()
 
-        # The root frame (depth 1) holds focus on the clicked row. The click
-        # focuses `flee` synchronously, but the confirmed `combat.flee` ends the
-        # session, so the store reverts to exploration (focus back to `move`) and
-        # the combat dock's flee row is replaced by the exploration dock. The
-        # focused-flee state (store focus + depth + DOM selected) is therefore
-        # transient: it exists only during the short window before the
-        # exploration snapshot arrives. Poll tightly (5ms) in a single evaluate
-        # that reads the store state and the DOM attribute together, so the
-        # transient state is observed before the mode revert overwrites it.
-        observed = None
-        deadline = time.monotonic() + 30
-        while time.monotonic() < deadline:
-            observed = page.evaluate(
-                """() => {
-                  const b = window.__elosernBridge;
-                  const v = b && b.store.view;
-                  const t = document.querySelector('#action-dock [data-item-key="flee"]');
-                  return {
-                    focusKey: v && v.focus && v.focus.key,
-                    depth: v && v.dockDepth,
-                    selected: t ? t.getAttribute('aria-selected') : null,
-                  };
-                }"""
-            )
-            if (
-                observed
-                and observed["focusKey"] == "flee"
-                and observed["depth"] == 1
-                and observed["selected"] == "true"
-            ):
-                break
-            page.wait_for_timeout(5)
-        self.assertEqual(observed["focusKey"], "flee", "the clicked row is focused")
-        self.assertEqual(observed["depth"], 1, "the router returned to the root frame")
+        # The root frame (depth 1) holds focus on the clicked row, and the
+        # click's one activation asked the server for the bound prompt.
+        page.wait_for_selector('[data-testid="party-exit-question"]', timeout=30000)
+        observed = page.evaluate(
+            """() => {
+              const b = window.__elosernBridge;
+              const v = b && b.store.view;
+              const t = document.querySelector('#action-dock [data-item-key="retreat"]');
+              return {
+                focusKey: v && v.focus && v.focus.key,
+                depth: v && v.dockDepth,
+                selected: t ? t.getAttribute('aria-selected') : null,
+              };
+            }"""
+        )
+        self.assertEqual(observed["focusKey"], "retreat", "the clicked row is focused")
+        self.assertEqual(observed["depth"], 1, "the router stayed at the root frame")
         self.assertEqual(observed["selected"], "true", "the clicked row is marked selected")
-        # Exactly one `combat.flee` ui_action was dispatched (no stray actions).
-        self.assertEqual(sent_action_count(page, "combat.flee"), 1)
+        self.assertEqual(sent_action_count(page, "combat.exit_prompt"), 1)
+        self.assertEqual(sent_action_count(page, "combat.exit_confirm"), 0)
 
     @covers_requirement("webclient-desktop-shell::required-desktop-surfaces-remain-visible-and-usable")
     @covers_requirement(

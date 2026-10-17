@@ -14,6 +14,7 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     wait_for_presentation_settled,
+    wait_for_store_state,
 )
 from .harness import ManagedServerTearDownMixin
 
@@ -311,72 +312,165 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page.wait_for_timeout(300)
         self.assertEqual(sent_action_count(page), 0)
 
-    def test_flee_flow_submits_empty_payload(self):
-        page = self.logged_in_page()
-        install_outbound_recorder(page)
-        self._engage(page)
-        self._press(page, "ArrowDown")  # skills (1)
-        self._press(page, "ArrowDown")  # items (2)
-        self._press(page, "ArrowDown")  # 背包 (3, client-local drawer row)
-        self._press(page, "ArrowDown")  # defend (4)
-        self._press(page, "ArrowDown")  # flee (5)
-        self.assertEqual(
-            store_state(page).get("focus", {}).get("key"),
-            "flee",
-            "the flee row is the focused root cell",
-        )
-        self._press(page, "Enter")
-
-        actions = self._ui_actions(page)
-        self.assertGreaterEqual(len(actions), 1, actions)
-        envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.flee")
-        self.assertEqual(envelope["payload"], {})
-
+    # The party-scope exit confirmation (webclient-party-exit-confirmation):
+    # 撤退 and 投降 are party-scope root rows. Activating one requests the
+    # server-bound prompt (a read-only query, no mutation) and the held answer
+    # is the one combat.exit_confirm; the card starts on 否 and states the
+    # whole party's scope and the server-authored consequence.
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
-    def test_forfeit_requires_confirmation(self):
+    def test_party_exit_prompt_confirm_sends_one_exit_confirm(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        session_id = self._combat_panel(page)["session"]["session_id"]
-        # The combat root is one vertical list (attack, skills, items, 背包,
-        # defend, flee, forfeit — webclient-combat-command-window). Focus
-        # reaches `forfeit` (index 6) by pressing ArrowDown six times.
-        self._press(page, "ArrowDown")  # skills (1)
-        self._press(page, "ArrowDown")  # items (2)
-        self._press(page, "ArrowDown")  # 背包 (3, client-local drawer row)
-        self._press(page, "ArrowDown")  # defend (4)
-        self._press(page, "ArrowDown")  # flee (5)
-        self._press(page, "ArrowDown")  # forfeit (6)
-        self.assertEqual(
-            store_state(page).get("focus", {}).get("key"),
-            "forfeit",
-            "the forfeit row is the focused root cell",
+        panel = self._combat_panel(page)
+        session_id = panel["session"]["session_id"]
+        revision = panel["session"]["round_revision"]
+        focus_action_dock(page)
+        self._walk_to(page, "retreat")
+        self.assertEqual(self._focus_key(page), "retreat")
+
+        # Opening 撤退 asks for the bound prompt: exactly one read-only
+        # combat.exit_prompt carrying the committed session/revision and the
+        # operation, and no confirmable mutation.
+        wait_for_presentation_settled(page)
+        before = store_state(page)["lastActionResult"]
+        self._press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId")
+            not in (None, (before or {}).get("requestId"))
+            and s.get("dispatch", {}).get("inFlight") is None,
+            timeout=20000,
         )
-        self._press(page, "Enter")  # open the secondary Forfeit menu
+        prompts = [
+            envelope
+            for _, args, _ in self._ui_actions(page)
+            for envelope in (args[0],)
+            if envelope["action_id"] == "combat.exit_prompt"
+        ]
+        self.assertEqual(len(prompts), 1, prompts)
         self.assertEqual(
-            sent_action_count(page), 0, "opening Forfeit must not mutate"
+            prompts[0]["payload"],
+            {"session_id": session_id, "round_revision": revision, "operation": "retreat"},
         )
-        # Escape cancels back to the root without ending combat.
-        self._press(page, "Escape")
-        self.assertEqual(sent_action_count(page), 0)
+        self.assertEqual(
+            sent_action_count(page, "combat.exit_confirm"),
+            0,
+            "requesting the prompt must send no confirmation",
+        )
+
+        # The card renders the whole party's scope and the server-authored
+        # consequence, with 否 focused as the safe answer.
+        card = page.locator('[data-testid="party-exit-question"]')
+        card.wait_for(state="visible", timeout=30000)
+        self.assertIn(
+            "確定要全隊撤退？",
+            card.locator('[data-testid="question-card-question"]').inner_text(),
+        )
+        consequence = card.locator('[data-testid="question-card-detail"]').inner_text()
+        self.assertIn("全隊", consequence, "the card states the party-wide consequence")
+        self.assertEqual(
+            page.evaluate(
+                "() => { const el = document.activeElement; "
+                "return el && el.closest('[data-testid=\"party-exit-question\"]') ? el.textContent.trim() : null; }"
+            ),
+            "否",
+            "the safe answer holds focus",
+        )
+        self.assertEqual(
+            page.evaluate(
+                "() => document.querySelector('[data-testid=\"party-exit-question\"]')"
+                ".closest('[data-testid=\"elosern-client-root\"]')"
+                ".getAttribute('data-party-exit-open')"
+            ),
+            "true",
+        )
+        self.assertTrue(
+            page.evaluate(
+                "() => !!document.querySelector('#action-dock').closest('[inert]')"
+            ),
+            "the dock stays inert behind the card",
+        )
+
+        # 是 sends exactly one confirmation carrying the held token.
+        card.locator('[data-testid="question-card-yes"]').click()
+        page.wait_for_selector('[data-testid="party-exit-question"]', state="detached", timeout=30000)
+        confirms = [
+            envelope
+            for _, args, _ in self._ui_actions(page)
+            for envelope in (args[0],)
+            if envelope["action_id"] == "combat.exit_confirm"
+        ]
+        self.assertEqual(len(confirms), 1, confirms)
+        self.assertEqual(confirms[0]["payload"]["session_id"], session_id)
+        self.assertEqual(confirms[0]["payload"]["operation"], "retreat")
+        self.assertTrue(
+            confirms[0]["payload"]["confirmation_token"],
+            "the confirmation carries the server-bound token",
+        )
+        # The stored Yes is never retried: the card is gone and no second
+        # confirmation follows.
+        page.wait_for_timeout(300)
+        self.assertEqual(sent_action_count(page, "combat.exit_confirm"), 1)
+
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads"
+    )
+    @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    def test_party_exit_cancel_keeps_the_draft_and_the_clock(self):
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        panel = self._combat_panel(page)
+        revision = panel["session"]["round_revision"]
+        draft = panel["draft"]
+        focus_action_dock(page)
+        self._walk_to(page, "surrender")
+        self.assertEqual(self._focus_key(page), "surrender")
+        before = store_state(page)["lastActionResult"]
+        self._press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId")
+            not in (None, (before or {}).get("requestId"))
+            and s.get("dispatch", {}).get("inFlight") is None,
+            timeout=20000,
+        )
+        card = page.locator('[data-testid="party-exit-question"]')
+        card.wait_for(state="visible", timeout=30000)
+        time_before = store_state(page)["serverTime"]
+
+        # 否 discards the prompt: nothing is confirmed, the focused row is
+        # restored, and the draft, the session and the clock are untouched.
+        card.locator('[data-testid="question-card-no"]').click()
+        page.wait_for_selector('[data-testid="party-exit-question"]', state="detached", timeout=30000)
+        self.assertEqual(sent_action_count(page, "combat.exit_confirm"), 0)
+        self.assertEqual(self._focus_key(page), "surrender")
         self.assertEqual(self._dock_mode(page), "combat")
-        # Reopen and confirm: exactly one combat.forfeit with the current ID.
-        self._press(page, "Enter")  # forfeit still focused in the root
-        self._press(page, "Enter")  # confirm-forfeit
-        actions = self._ui_actions(page)
-        self.assertEqual(len(actions), 1, actions)
-        envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.forfeit")
-        self.assertEqual(envelope["payload"]["session_id"], session_id)
-        # The confirmed forfeit ends the session; the panel reverts to the
-        # exploration available form.
-        page.wait_for_function(
-            "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null); "
-            "const p = s.panels && s.panels['context_actions']; "
-            "return p && p.available === true && p.kind === 'exploration'; }",
-            timeout=30000,
+        after = self._combat_panel(page)
+        self.assertEqual(after["session"]["round_revision"], revision)
+        self.assertEqual(after["draft"], draft)
+        self.assertEqual(store_state(page)["serverTime"], time_before)
+
+        # Escape answers the same way, and the card can be reopened after.
+        before = store_state(page)["lastActionResult"]
+        self._press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (s.get("lastActionResult") or {}).get("requestId")
+            not in (None, (before or {}).get("requestId"))
+            and s.get("dispatch", {}).get("inFlight") is None,
+            timeout=20000,
         )
+        card.wait_for(state="visible", timeout=30000)
+        self._press(page, "Escape")
+        page.wait_for_selector('[data-testid="party-exit-question"]', state="detached", timeout=30000)
+        self.assertEqual(sent_action_count(page, "combat.exit_confirm"), 0)
+        self.assertEqual(self._focus_key(page), "surrender")
+        self.assertEqual(self._combat_panel(page)["session"]["round_revision"], revision)
 
     @covers_requirement(
         "webclient-combat-menu::terminal-combat-outcomes-refresh-all-mode-relevant-panels"
@@ -403,16 +497,16 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertIsNotNone(services["inventory"])
         self.assertEqual(state["mode"], "combat")
 
-        session_id = self._combat_panel(page)["session"]["session_id"]
-        # Settle before submitting: a forfeit naming the pre-burst revision is
-        # rejected stale and the session never ends, so the exploration panels
-        # would never come back available.
+        # Settle before submitting: a confirmation naming the pre-burst
+        # revision is rejected stale and the session never ends, so the
+        # exploration panels would never come back available.
         wait_for_presentation_settled(page)
-        page.evaluate(
-            "(sessionId) => Elosern.actions.submit('combat.forfeit', "
-            "{ session_id: sessionId })",
-            session_id,
-        )
+        focus_action_dock(page)
+        self._walk_to(page, "surrender")
+        self._press(page, "Enter")
+        card = page.locator('[data-testid="party-exit-question"]')
+        card.wait_for(state="visible", timeout=30000)
+        card.locator('[data-testid="question-card-yes"]').click()
         # Poll until the full post-settlement end state holds: on a loaded
         # runner the context panel can flip to exploration availability
         # before the sibling panels of the same snapshot are observed, and

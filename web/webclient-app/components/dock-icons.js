@@ -33,8 +33,11 @@ export const GLYPHS = {
   skills: "M12 3l1.9 5.6L19.5 10l-5.6 1.9L12 17l-1.9-5.1L4.5 10l5.6-1.4L12 3Z",
   items: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
   defend: "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z",
-  flee: "M13 5l7 7-7 7M4 12h16",
-  forfeit: "M6 2h12l-5 8v6M9 2l1 7",
+  // The party-scope exit rows (webclient-party-exit-confirmation): the
+  // reference's flee arrow and forfeit flag drawings now key on the wire
+  // operations the rows request.
+  retreat: "M13 5l7 7-7 7M4 12h16",
+  surrender: "M6 2h12l-5 8v6M9 2l1 7",
   // Look-entity kinds (the look panel's entity.kind values).
   npc: "M12 2a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-7 22v-1c0-3.9 3.1-7 7-7s7 3.1 7 7v1H5z",
   monster: "M12 2l4 4 4-1 1 4 4 4-4 3 1 4-4 1-3 4-3-4-4-1 1-4-4-3-4-4 1-4 4-1 3-4 3 4z",
@@ -105,14 +108,14 @@ export const GLYPHS = {
 };
 
 // Per-key stroke attributes copied selectively from the reference: `move`
-// (cap+join), `interact` (join only), `attack`/`flee` (cap only); every
+// (cap+join), `interact` (join only), `attack`/`retreat` (cap only); every
 // other key keeps the SVG defaults (the star glyphs `suggestions`/`skills`
 // must NOT be rounded, so the reference omits the attributes there).
 const STROKE_ATTRS = {
   move: { "stroke-linecap": "round", "stroke-linejoin": "round" },
   interact: { "stroke-linejoin": "round" },
   attack: { "stroke-linecap": "round" },
-  flee: { "stroke-linecap": "round" },
+  retreat: { "stroke-linecap": "round" },
   // The close X must render with rounded caps, matching the reference.
   close: { "stroke-linecap": "round" },
   quill: { "stroke-linecap": "round", "stroke-linejoin": "round" },
