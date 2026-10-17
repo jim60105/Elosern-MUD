@@ -1,5 +1,10 @@
 # Spec Delta
 
+## RENAMED Requirements
+
+- FROM: `### Requirement: The skill book offers a bounded declared-practice sub-screen`
+- TO: `### Requirement: The skill book offers a practice booking control`
+
 ## MODIFIED Requirements
 
 ### Requirement: Reference surfaces render in a bounded workspace drawer with one modal contract
@@ -68,3 +73,42 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 #### Scenario: Book use transfers the modal focus owner
 - **WHEN** the player deliberately activates book use and its authoritative flow is ready
 - **THEN** the book closes, its scrim/trap retires, and focus moves to the sole dock-owned casting flow without a behind-drawer control becoming interactive
+
+### Requirement: The skill book offers a practice booking control
+The skill-book drawer SHALL offer a 修煉 booking affordance on each active skill row the committed `character` panel supports; activating it SHALL send one booking for the panel's member and SHALL open no sub-screen, duration control or title change.
+
+#### Scenario: The browser computes nothing about practice
+- **WHEN** the booking control renders and submits
+- **THEN** the browser computes nothing about eligibility or progression: every row state comes from the committed panel and activation submits exactly one `explore.practice {actor_id, skill}` through the shared dispatch lock
+
+#### Scenario: In-flight submissions lock the control
+- **WHEN** a submission is in flight or its declared presentation revision is pending
+- **THEN** the control is disabled
+
+#### Scenario: The result line is escaped and local
+- **WHEN** a server-authored result line (success summary or rejection message) arrives
+- **THEN** it renders as escaped text beside the booking control and nowhere else
+
+#### Scenario: Closing restores the book, not the footer
+- **WHEN** a booking completes
+- **THEN** the book body and title never changed, and no cast-syntax footer appears
+
+#### Scenario: Casting leaves practice intact
+- **WHEN** the player casts
+- **THEN** casting does not replace or bypass this practice workflow
+
+#### Scenario: Practice dispatches one server-trusted intent
+- **WHEN** the player activates 修煉 on an active skill row
+- **THEN** exactly one `ui_action` is submitted, `explore.practice` with the member's `actor_id` and that `skill`, no time passes, and the drawer controls stay locked until the result revision is adopted
+
+#### Scenario: The result line is the server's
+- **WHEN** a practice result arrives
+- **THEN** its Traditional Chinese booking summary or rejection message renders verbatim as escaped text, with no client-computed progression, elapsed-time, or eligibility claim
+
+#### Scenario: The practice screen is gated by committed data only
+- **WHEN** the `character` panel is unavailable or a row carries no practice support
+- **THEN** no 修煉 affordance renders for that row and no practice state is invented
+
+#### Scenario: Closing the practice screen restores the book
+- **WHEN** the player books practice and continues browsing
+- **THEN** the drawer keeps showing the skill book with its original title, no cast-syntax footer and no second drawer

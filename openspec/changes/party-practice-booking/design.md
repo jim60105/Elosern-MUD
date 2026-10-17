@@ -16,6 +16,7 @@ See proposal.md. `advance_skip(actor, seconds, practice_skill=None)` assigns `ac
 - **Skips stop clearing.** `advance_skip` without a clause leaves bookings untouched; with a clause it books the caller first (as today) and restores the caller's previous booking on failure. The clock's own rollback restores every settled member's booking because `practice_booking` is already a snapshotted settlement surface.
 - **Stale-booking protection is no longer needed**: the old clearing existed because a booking was only valid for the skip that recorded it; a standing booking is valid until settled, so a rollback restoring it is correct.
 - **`explore.practice`** keeps its action id (design §5 says practice booking gains an actor) and drops `seconds`; affected panels: `character` (booked flag arrives later) — publish the full snapshot for simplicity.
+- **Combat check** uses `party_in_combat(acting, member)`.
 - **Messages**: success 「{成員}將在下次休息時修煉「{技能}」。」; `booking_in_combat` 「戰鬥中無法排入修煉。」.
 
 ## Risks / Trade-offs

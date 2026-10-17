@@ -25,7 +25,7 @@ None.
 - `settlement-stage-order`: the practice-stage note matches standing bookings.
 - `webclient-exploration-menu`: `explore.practice` books for a member without advancing time.
 - `webclient-skillbook-casting`: SkillBook practice is a booking control.
-- `webclient-contextual-hud`: the reference-drawer scenario no longer describes a practice sub-screen.
+- `webclient-contextual-hud`: the reference-drawer scenario and the declared-practice sub-screen requirement (renamed to a booking control) no longer describe a duration sub-screen.
 
 ## Impact
 
@@ -39,7 +39,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **10 of 30**.
+Declared implementation order: **10 of 31**.
 
 - depends-on: party-rest-move-settlement
 - depends-on: companion-field-cast-actions
