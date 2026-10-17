@@ -160,7 +160,8 @@ describe("badgeCount (task 4.4)", () => {
       { name: "攻撃", groups: [{ skills: attackSkills }] },
       { name: "補助", groups: [{ skills: supportSkills }] },
     ];
-    const view = { panels: { context_actions: { kind: "combat", skills } } };
+    // v7 publishes the requested actor's catalog under `choices`.
+    const view = { panels: { context_actions: { kind: "combat", choices: { skills } } } };
     expect(badgeCount("skills", view)).toBe(3);
   });
 

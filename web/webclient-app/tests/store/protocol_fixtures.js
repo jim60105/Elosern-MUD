@@ -66,7 +66,7 @@ export function statusPanel(overrides = undefined) {
 export function explorationActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       affordances: [
@@ -142,7 +142,7 @@ export function explorationPanel(overrides = undefined) {
 }
 
 export function combatActions(overrides = undefined) {
-  return deepMerge(
+  const panel = deepMerge(
     {
       schema_version: 7,
       available: true,
@@ -190,6 +190,43 @@ export function combatActions(overrides = undefined) {
     },
     overrides,
   );
+  // Tests name the requested actor's grouped catalog directly (the node
+  // gate's readyPanel does the same): route a top-level `skills` override into
+  // the v7 `choices` object instead of inventing an unknown panel field.
+  if (panel.skills !== undefined) {
+    panel.choices = { ...panel.choices, skills: panel.skills };
+    delete panel.skills;
+  }
+  // A participants override must leave a self-consistent v7 panel: the actor
+  // summaries, the requested actor and the required draft actors are derived
+  // from the presented party (unless the test names them itself).
+  if (
+    overrides &&
+    overrides.participants !== undefined &&
+    overrides.actors === undefined &&
+    Array.isArray(panel.participants)
+  ) {
+    const partyIds = panel.participants
+      .filter((row) => row && row.team === "party")
+      .map((row) => row.identity);
+    panel.actors = partyIds.map((identity) => ({ identity, commandable: true, reason: null }));
+    // Derive only what the caller omitted: an explicit choices/draft override
+    // is the test's own authoritative state.
+    if (!(overrides.choices && Object.prototype.hasOwnProperty.call(overrides.choices, "actor_id"))) {
+      const actorId = partyIds.includes(panel.choices.actor_id) ? panel.choices.actor_id : partyIds[0];
+      panel.choices = { ...panel.choices, actor_id: actorId };
+    }
+    if (overrides.draft === undefined) {
+      panel.draft = {
+        ...panel.draft,
+        required_actor_ids: partyIds,
+        needs_selection_ids: partyIds,
+        entries: [],
+        reselection_reasons: [],
+      };
+    }
+  }
+  return panel;
 }
 
 export function localMapPanel(overrides = undefined) {

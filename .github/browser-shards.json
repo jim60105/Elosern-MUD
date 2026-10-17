@@ -5,6 +5,7 @@
       "name": "combat-0",
       "files_a": [
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_attack_flow_submits_basic_attack_once",
+        "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_actor_selector_chrome_returns_to_root_without_a_command",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_self_skill_submits_no_target_field",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_single_skill_target_flow",
         "web.tests.browser.test_browser_combat_menu.CombatMenuBrowserTest.test_skill_frame_refreshes_on_panel_update",

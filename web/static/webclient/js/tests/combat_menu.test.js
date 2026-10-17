@@ -268,7 +268,8 @@ test("NONE skill submits skill_key only", () => {
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, T_NONE);
   assert.equal(menu.items.length, 1);
-  assert.equal(menu.items[0].actionId, "combat.cast");
+  assert.equal(menu.items[0].actionId, "combat.command");
+  assert.equal(menu.items[0].commandKind, "skill");
   assert.deepEqual(menu.items[0].payload, { skill_key: T_NONE });
 });
 
@@ -277,7 +278,8 @@ test("SELF skill submits skill_key only without an actor field", () => {
   panel.choices.skills = nestedSkills(validSkill({ key: T_SELF, target_spec: "self", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, T_SELF);
-  assert.equal(menu.items[0].actionId, "combat.cast");
+  assert.equal(menu.items[0].actionId, "combat.command");
+  assert.equal(menu.items[0].commandKind, "skill");
   assert.deepEqual(menu.items[0].payload, { skill_key: T_SELF });
 });
 
@@ -550,4 +552,167 @@ test("rebuildForPanel preserves a still-valid scale choice and resets invalid", 
     skillByKey: combat.skillByKey,
   });
   assert.equal(rebuiltNarrow.skillByKey[T_B].scale, 1);
+});
+
+// ---------------------------------------------------------------------------
+// webclient-party-command-selection: the actor selector, the draft progress
+// line and the guarded combat.command envelope.
+// ---------------------------------------------------------------------------
+
+function actorPanel(overrides) {
+  return readyPanel(
+    Object.assign(
+      {
+        participants: [
+          validParticipant({ identity: 2, token: "e1", display_name: "哥布林", team: "foes" }),
+          validParticipant({ identity: 5, token: "a1", display_name: "同行劍士", team: "party" }),
+          validParticipant({ identity: 6, token: "a2", display_name: "見習法師", team: "party" }),
+        ],
+        actors: [
+          { identity: 5, commandable: true, reason: null },
+          { identity: 6, commandable: false, reason: { code: "fallen", message: "倒地中。" } },
+        ],
+        choices: { actor_id: 6, skills: nestedSkills(validSkill()), items: [], tactics: [] },
+        draft: {
+          round_revision: 0,
+          draft_version: 3,
+          required_actor_ids: [5, 6],
+          entries: [{ actor_id: 5, command: { kind: "skill", payload: { skill_key: T_A, target_ids: [2] } } }],
+          needs_selection_ids: [6],
+          reselection_reasons: [],
+        },
+      },
+      overrides
+    )
+  );
+}
+
+test("actor selector keeps the server's allied order with confirmed/needs-selection status", () => {
+  const combat = CombatMenu.buildMenus(actorPanel(), {});
+  const actor = combat.menus.actor;
+  assert.deepEqual(
+    actor.items.map((item) => item.key),
+    ["actor-5", "actor-6"]
+  );
+  assert.equal(actor.focusKey, "actor-6");
+  assert.equal(actor.items[0].label, "同行劍士");
+  assert.equal(actor.items[0].description, "已確認");
+  assert.equal(actor.items[0].actorStatus, "confirmed");
+  assert.equal(actor.items[0].current, false);
+  assert.equal(actor.items[1].description, "倒地中。");
+  assert.equal(actor.items[1].actorStatus, "needs-selection");
+  assert.equal(actor.items[1].enabled, false);
+  assert.equal(actor.items[1].disabledReason.code, "fallen");
+  assert.equal(actor.items[1].current, true);
+});
+
+test("a reselection reason joins the actor row by identity", () => {
+  const panel = actorPanel({
+    actors: [{ identity: 5, commandable: true, reason: null }],
+    choices: { actor_id: 5, skills: nestedSkills(validSkill()), items: [], tactics: [] },
+    draft: {
+      round_revision: 0,
+      draft_version: 4,
+      required_actor_ids: [5],
+      entries: [],
+      needs_selection_ids: [5],
+      reselection_reasons: [
+        { actor_id: 5, reason: { code: "target_invalid", message: "目標無效。" } },
+      ],
+    },
+  });
+  const actor = CombatMenu.buildMenus(panel, {}).menus.actor;
+  assert.equal(actor.items[0].description, "目標無效。");
+  assert.equal(actor.items[0].enabled, true);
+});
+
+test("same-name allied actors carry their session token in the selector", () => {
+  const panel = actorPanel({
+    participants: [
+      validParticipant({ identity: 5, token: "a1", display_name: "同行劍士", team: "party" }),
+      validParticipant({ identity: 6, token: "a2", display_name: "同行劍士", team: "party" }),
+    ],
+    actors: [
+      { identity: 5, commandable: true, reason: null },
+      { identity: 6, commandable: true, reason: null },
+    ],
+    choices: { actor_id: 5, skills: nestedSkills(validSkill()), items: [], tactics: [] },
+    draft: {
+      round_revision: 0,
+      draft_version: 0,
+      required_actor_ids: [5, 6],
+      entries: [],
+      needs_selection_ids: [5, 6],
+      reselection_reasons: [],
+    },
+  });
+  const actor = CombatMenu.buildMenus(panel, {}).menus.actor;
+  assert.deepEqual(
+    actor.items.map((item) => item.label),
+    ["同行劍士（a1）", "同行劍士（a2）"]
+  );
+  assert.equal(CombatMenu.progressLine(panel).actorLabel, "同行劍士（a1）");
+});
+
+test("the progress line reports the commanded actor and the draft counts", () => {
+  assert.deepEqual(CombatMenu.progressLine(actorPanel()), {
+    actorId: 6,
+    actorLabel: "見習法師",
+    confirmed: 1,
+    total: 2,
+    needsSelection: 1,
+  });
+  assert.equal(CombatMenu.progressLine({ session: {}, choices: null, draft: null }), null);
+});
+
+test("the guarded combat.command envelope carries the committed versions and commanded actor", () => {
+  const panel = actorPanel({ session: { session_id: "hostile:1:0", mode: "hostile", round: 0, round_revision: 2, state: "ready", reason: null } });
+  assert.deepEqual(
+    CombatMenu.commandEnvelope(panel, { kind: "skill", payload: { skill_key: T_A, target_ids: [2] } }),
+    {
+      session_id: "hostile:1:0",
+      round_revision: 2,
+      draft_version: 3,
+      actor_id: 6,
+      command: { kind: "skill", payload: { skill_key: T_A, target_ids: [2] } },
+    }
+  );
+  assert.equal(CombatMenu.commandEnvelope({ session: {}, draft: null, choices: {} }, { kind: "skill", payload: {} }), null);
+  assert.equal(CombatMenu.commandEnvelope(panel, { payload: {} }), null);
+});
+
+test("every TargetSpec keeps its exact inner skill payload inside the command", () => {
+  const specs = [
+    { spec: "none", targets: [], shorthands: [] },
+    { spec: "self", targets: [], shorthands: [] },
+    { spec: "single", targets: [2], shorthands: [] },
+    { spec: "area", targets: [2], shorthands: ["all-enemies"] },
+  ];
+  for (const { spec, targets, shorthands } of specs) {
+    const panel = readyPanel({
+      skills: nestedSkills(validSkill({ key: "probe_" + spec, target_spec: spec, targets, shorthands })),
+    });
+    const combat = CombatMenu.buildMenus(panel, {});
+    const menu = CombatMenu.openSkillTargets(combat, "probe_" + spec);
+    let inner;
+    if (spec === "area") {
+      CombatMenu.chooseShorthand(combat, "probe_area", "all-enemies");
+      inner = CombatMenu.areaPayload(combat.skillByKey["probe_area"]);
+    } else {
+      inner = menu.items[0].payload;
+    }
+    const envelope = CombatMenu.commandEnvelope(panel, { kind: "skill", payload: inner });
+    assert.equal(envelope.command.kind, "skill");
+    assert.deepEqual(envelope.command.payload, inner);
+    if (spec === "none" || spec === "self") {
+      assert.equal("target_ids" in inner, false);
+      assert.equal("target_shorthand" in inner, false);
+    }
+    if (spec === "single") {
+      assert.deepEqual(inner.target_ids, [2]);
+    }
+    if (spec === "area") {
+      assert.deepEqual(inner, { skill_key: "probe_area", target_shorthand: "all-enemies" });
+    }
+  }
 });

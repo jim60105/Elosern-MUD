@@ -250,10 +250,11 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], roles["none_key"])
-        self.assertNotIn("target_ids", envelope["payload"])
-        self.assertNotIn("target_shorthand", envelope["payload"])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], roles["none_key"])
+        self.assertNotIn("target_ids", inner)
+        self.assertNotIn("target_shorthand", inner)
         self.assertNotIn("actor", envelope["payload"])
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
@@ -284,10 +285,11 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], ladder)
-        self.assertEqual(envelope["payload"]["target_shorthand"], "all-enemies")
-        self.assertNotIn("target_ids", envelope["payload"])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], ladder)
+        self.assertEqual(inner["target_shorthand"], "all-enemies")
+        self.assertNotIn("target_ids", inner)
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
     def test_disabled_items_defend_send_no_packet(self):

@@ -480,9 +480,13 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], self._roles()["attack_key"])
-        self.assertEqual(envelope["payload"]["target_ids"], [target])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        command = envelope["payload"]["command"]
+        self.assertEqual(command["kind"], "skill")
+        self.assertEqual(command["payload"]["skill_key"], self._roles()["attack_key"])
+        self.assertEqual(command["payload"]["target_ids"], [target])
+        self.assertIsInstance(envelope["payload"]["actor_id"], int)
+        self.assertIsInstance(envelope["payload"]["draft_version"], int)
 
     @covers_requirement("webclient-combat-menu::combat-browser-acceptance-is-keyboard-only-and-desktop-bounded")
     def test_single_skill_target_flow(self):
@@ -508,9 +512,9 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], spell)
-        self.assertEqual(envelope["payload"]["target_ids"], [target])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        self.assertEqual(envelope["payload"]["command"]["payload"]["skill_key"], spell)
+        self.assertEqual(envelope["payload"]["command"]["payload"]["target_ids"], [target])
 
     @covers_requirement("webclient-frame-resolution::the-resolver-table-completes-with-the-combat-and-creation-families")
     def test_skill_frame_refreshes_on_panel_update(self):
@@ -573,7 +577,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(page.evaluate("() => window.__elosernBridge.router.depth()"), depth_before)
         # Resolution is read-side only: the injection dispatched nothing.
         self.assertEqual(len(self._ui_actions(page)), sent_before)
-        self.assertEqual(sent_action_count(page, "combat.cast"), 0)
+        self.assertEqual(sent_action_count(page, "combat.command"), 0)
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
     def test_self_skill_submits_no_target_field(self):
@@ -597,8 +601,54 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         actions = self._ui_actions(page)
         self.assertGreaterEqual(len(actions), 1, actions)
         envelope = actions[0][1][0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
-        self.assertEqual(envelope["payload"]["skill_key"], roles["self_key"])
-        self.assertNotIn("target_ids", envelope["payload"])
-        self.assertNotIn("target_shorthand", envelope["payload"])
+        self.assertEqual(envelope["action_id"], "combat.command")
+        inner = envelope["payload"]["command"]["payload"]
+        self.assertEqual(inner["skill_key"], roles["self_key"])
+        self.assertNotIn("target_ids", inner)
+        self.assertNotIn("target_shorthand", inner)
         self.assertNotIn("actor", envelope["payload"])
+
+    @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    @covers_requirement(
+        "webclient-combat-menu::one-command-card-switches-actors-and-renders-authoritative-draft-progress"
+    )
+    def test_actor_selector_chrome_returns_to_root_without_a_command(self):
+        """The commanded-actor card chrome (webclient-party-command-selection).
+
+        The compact line reports the committed draft progress; its 變更成員
+        control opens the actor frame inside the same centred card; selecting
+        the already-commanded member is one deliberate return to the root that
+        sends no command and issues no actor query. (The fixture engagement
+        has a single allied actor, so the switch path's read-only query is
+        proven by the synthetic multi-actor store suite.)
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+
+        panel = self._combat_panel(page)
+        actor_id = panel["choices"]["actor_id"]
+        change = page.locator('[data-testid="combat-actor-change"]')
+        change.wait_for(state="visible", timeout=15000)
+        line = page.locator('[data-testid="combat-actor-line"]')
+        self.assertIn(
+            "已確認", line.locator('[data-testid="combat-actor-progress"]').inner_text()
+        )
+
+        commands_before = sent_action_count(page, "combat.command")
+        queries_before = sent_action_count(page, "combat.actor_choices")
+        change.click()
+        row = page.locator(f'#action-dock [data-item-key="actor-{actor_id}"]')
+        row.wait_for(state="visible", timeout=15000)
+        row.click()
+        # The already-commanded member: back to exactly one root, no command
+        # and no actor query.
+        page.wait_for_function(
+            "() => { const s = window.__elosernBridge.store.view;"
+            " return s.dockSource === 'combat.root' && s.dockDepth === 1; }",
+            timeout=15000,
+        )
+        self.assertEqual(sent_action_count(page, "combat.command"), commands_before)
+        self.assertEqual(
+            sent_action_count(page, "combat.actor_choices"), queries_before
+        )

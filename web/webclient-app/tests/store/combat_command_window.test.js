@@ -101,8 +101,14 @@ describe("combat command window (store)", () => {
     store.focusPress("Enter");
     expect(store.focusPress("Enter")).toBe(true);
     expect(sender.sent.actions).toHaveLength(1);
-    expect(sender.sent.actions[0].action_id).toBe("combat.cast");
-    expect(sender.sent.actions[0].payload).toEqual({ skill_key: ATTACK, target_ids: [FOE] });
+    expect(sender.sent.actions[0].action_id).toBe("combat.command");
+    expect(sender.sent.actions[0].payload).toEqual({
+      session_id: "s-1",
+      round_revision: 0,
+      draft_version: 0,
+      actor_id: ALLY,
+      command: { kind: "skill", payload: { skill_key: ATTACK, target_ids: [FOE] } },
+    });
   });
 
   it("falls back to the first candidate when no opposing candidate is listed", () => {

@@ -81,6 +81,9 @@ const props = defineProps({
   card: { type: Boolean, default: false },
   // The stage target step (`store.view.stageTarget`), or null.
   stageTarget: { type: Object, default: null },
+  // The compact commanded-actor/draft-progress line (`store.view.combatProgress`):
+  // null outside a ready combat panel. (webclient-party-command-selection)
+  combatProgress: { type: Object, default: null },
 });
 
 const SIDE_LABELS = { foes: "敵方", party: "我方" };
@@ -155,7 +158,7 @@ provide(
   computed(() => (props.card ? "strip" : "pane")),
 );
 
-const emit = defineEmits(["action", "back", "skip", "target-pointer"]);
+const emit = defineEmits(["action", "back", "skip", "target-pointer", "open-actors"]);
 
 // Creation mode renders the panel with no bar and no crumb (task 4.8):
 // exactly one `#action-dock` persists across every mode change. Every other
@@ -204,6 +207,27 @@ function onPaneActivate(payload) {
          `action-dock-guidance`), rendered from the committed `guidancePrefix`. -->
     <div v-if="guidancePrefix" class="action-dock__guidance" data-testid="action-dock-guidance">
       {{ guidancePrefix }}
+    </div>
+    <!-- The commanded actor and the authoritative draft progress
+         (webclient-party-command-selection): one compact line in the card's
+         existing chrome; the 變更成員 control is a real button (never a root
+         list row) and opens the actor selector frame. -->
+    <div
+      v-if="card && !step && combatProgress && !(view && view.dockSource === 'combat.actor')"
+      class="action-dock__actor"
+      data-testid="combat-actor-line"
+    >
+      <span class="action-dock__actor-name" data-testid="combat-actor-name">{{ combatProgress.actorLabel }}</span>
+      <span class="action-dock__actor-progress" data-testid="combat-actor-progress">已確認 {{ combatProgress.confirmed }}/{{ combatProgress.total }}</span>
+      <button
+        type="button"
+        class="action-dock__actor-change"
+        data-testid="combat-actor-change"
+        :disabled="playback || !!$attrs.inert"
+        @keydown.enter.stop
+        @keydown.space.stop
+        @click="emit('open-actors')"
+      >變更成員</button>
     </div>
     <DockBreadcrumb
       v-if="showCrumb"
@@ -796,5 +820,59 @@ function onPaneActivate(payload) {
 }
 .action-dock__legend-seg {
   white-space: nowrap;
+}
+
+/* The commanded-actor/draft-progress line (webclient-party-command-selection):
+   one compact row in the card chrome. The card's outer box is unchanged; the
+   row region keeps its remaining flex space. */
+.action-dock__actor {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: calc(8px * var(--ui-scale));
+  min-width: 0;
+  padding: calc(2px * var(--ui-scale)) calc(16px * var(--ui-scale)) 0;
+  font-family: var(--f-sans);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--paper-500);
+}
+.action-dock__actor-name {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--paper-100);
+  font-weight: 600;
+}
+.action-dock__actor-progress {
+  flex: none;
+  color: var(--paper-500);
+}
+.action-dock__actor-change {
+  flex: none;
+  margin-left: auto;
+  padding: calc(2px * var(--ui-scale)) calc(10px * var(--ui-scale));
+  border: 1px solid rgba(228, 200, 142, 0.4);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--gold-300);
+  font-family: var(--f-sans);
+  font-size: var(--text-xs);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+.action-dock__actor-change:hover:not(:disabled) {
+  border-color: var(--gold-400);
+  color: var(--paper-50);
+}
+.action-dock__actor-change:focus-visible {
+  outline: 2px solid var(--gold-400);
+  outline-offset: 2px;
+}
+.action-dock__actor-change:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 </style>

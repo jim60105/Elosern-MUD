@@ -289,7 +289,7 @@ const focusedCombatTarget = computed(() => {
   if (store.view.dispatch.beatLocked) return null;
   const item = store.view.combatMenu?.items?.find((row) => row.key === store.view.focus.key);
   if (item?.actionId === "toggle-target") return item.payload?.identity ?? null;
-  return item?.actionId === "combat.cast" && item.payload?.target_ids?.length === 1
+  return item?.actionId === "combat.command" && item.commandKind === "skill" && item.payload?.target_ids?.length === 1
     ? item.payload.target_ids[0] : null;
 });
 const beatHold = computed(() => !!store.view.beatHold);
@@ -1004,8 +1004,10 @@ const rootStyle = computed(() => {
           :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
           :card="store.view.mode === 'combat'"
           :stage-target="store.view.mode === 'combat' ? stageTarget : null"
+          :combat-progress="store.view.mode === 'combat' ? store.view.combatProgress : null"
           :inert="crossSideOpen || null"
           @action="onAction"
+          @open-actors="store.openCombatActor()"
           @target-pointer="onTargetPosition"
           @back="onDockBack"
           @skip="store.skipBeats"

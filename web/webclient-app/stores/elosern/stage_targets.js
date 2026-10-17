@@ -8,7 +8,7 @@
 //
 // A position is `{ key, kind, identities, side, digit, offStage, label }`:
 // - `member` — one SINGLE `target-<id>` or AREA `area-<id>` item, on one figure;
-// - `self` — the SELF `self-confirm` item, on the controlled figure;
+// - `self` — the SELF `self-confirm` item, on the commanded actor's figure;
 // - `group` — one AREA `shorthand-<key>` item, lighting a whole side;
 // - `confirm` — the AREA `area-confirm` item, lighting the current choice.
 
@@ -91,16 +91,17 @@ function groupIdentities(shorthand, candidates, byId) {
 // current frame's resolved menu), `skill` (the CombatMenu skill model the
 // frame opened, with its `selected` / `shorthand`), `participants` (the
 // committed combat participants), `formationOrder` (the drawn identities in
-// stage order, left to right, or null), `controlledIdentity` (the controlled
-// figure's identity), `focusKey` (the frame's focused item key) and `locked`
-// (a combat round plays by itself).
+// stage order, left to right, or null), `actorIdentity` (the commanded
+// actor's identity — the SELF position stands on that figure, never on the
+// controlled portrait), `focusKey` (the frame's focused item key) and
+// `locked` (a combat round plays by itself).
 export function stageTargetModel({
   source,
   menu,
   skill,
   participants,
   formationOrder,
-  controlledIdentity,
+  actorIdentity,
   focusKey,
   locked,
 } = {}) {
@@ -118,7 +119,7 @@ export function stageTargetModel({
   if (raw.length === 0 || raw.some((entry) => entry.position === null)) {
     return null;
   }
-  if (form === "self" && (controlledIdentity === null || controlledIdentity === undefined)) {
+  if (form === "self" && (actorIdentity === null || actorIdentity === undefined)) {
     return null;
   }
 
@@ -173,7 +174,7 @@ export function stageTargetModel({
         serverIndex: index,
       });
     } else if (position.kind === "self") {
-      const id = idKey(controlledIdentity);
+      const id = idKey(actorIdentity);
       members.push({
         key: position.key,
         kind: "self",

@@ -194,3 +194,39 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 
 相關閘門：`pnpm test`（含 `tests/scene_retention.test.js`）、Node 閘門的
 `protocol_art.test.js`，以及受管理的 `UnifiedScenesBrowserTest` 兩個旅程。
+
+## 受指揮成員與草稿進度（webclient-party-command-selection）
+
+戰鬥指令卡現在以「受指揮成員」為單位，而不是以登入角色為單位。`combat_menu.js`
+的 `actorItems`／`progressLine`／`commandEnvelope` 把 v7 面板的
+`actors`／`choices`／`draft` 轉成三個事實：
+
+- **成員框架**（`combat.actor`，`menus.actor`）：依伺服器盟軍順序一列一名成員，
+  標籤取該成員的顯示名稱（同名者附帶 session token），說明文字依權威草稿顯示
+  「已確認」／「待選擇」，或伺服器撰寫的重選原因（`draft.reselection_reasons`）；
+  不可指揮的成員保留自身原因並停用。
+- **進度列**：卡片外框內的單行 `combat-actor-line`（`store.view.combatProgress`），
+  顯示受指揮成員與已確認／需求數量；其 `變更成員` 按鈕是卡片層級的控制項，
+  **不是**新的根清單列（根清單仍恰為 attack／skills／items／bag／defend／flee／forfeit）。
+  開啟成員框架時會把 DOM 焦點交還 dock，按鈕本身於框架掛載後消失。
+- **守門信封**：`combat.command` 的 `session_id`／`round_revision`／`draft_version`／
+  `actor_id` 在送出當下由已提交面板讀取（絕不沿用舊版本），技能本體維持原本
+  的內部酬載形狀（`{kind: "skill", payload: {...}}`）。
+
+流程規則：
+
+- 選擇成員只發一次唯讀 `combat.actor_choices {session_id, round_revision, actor_id}`，
+  待該成員的 `choices` 提交後才回到根目錄重新開始技能／分類／威力／目標流程；
+  不會樂觀顯示上一位成員的目錄。
+- 受指揮成員變更（切換、重連、伺服器改派預設成員）會丟棄未確認的技能／威力／
+  目標選擇並取消待答警告，但**不碰**伺服器已確認的草稿條目。
+- 非最終的接受結果（`draft_saved`）會觸發一次唯讀查詢，指向
+  `required_actor_ids ∩ needs_selection_ids ∩ commandable` 中第一個仍待指令的成員；
+  此查詢在視圖發布之後發出（信封帶到最新 epoch／revision），且是一次性關聯
+  （generation／session／requestId），重連或重複觀察結果都不會重播意圖。無論由成員框架
+  或自動前進所發起，成員切換都收斂為恰好一層根目錄。
+- SELF 的舞台位置綁定受指揮成員的人物（同伴亦然），跨陣營確認的目標集合與措辭
+  也以受指揮成員為準；玩家彼端的身分仍只用於生命值 dock 與控制員判斷。
+
+相關閘門：`pnpm test`（`tests/store/party_command_selection.test.js` 等）、Node 閘門的
+`combat_menu.test.js`，以及受管理的 `test_actor_selector_chrome_returns_to_root_without_a_command`。

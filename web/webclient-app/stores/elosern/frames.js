@@ -102,6 +102,9 @@ export function applyFrames(ctx) {
     ctx.resetRoomCard?.();
     // Nor the cross-side question: a root reset drops the held cast unsent.
     ctx.crossSideConfirm = null;
+    // Nor a pending actor query: a root reset abandons the local intent, so a
+    // late commit never yanks the dock back to the root unprompted.
+    ctx.pendingActorSelection = null;
     ctx.inStackMutation = true;
     try {
       router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });
@@ -124,6 +127,122 @@ export function applyFrames(ctx) {
     } finally {
       ctx.inStackMutation = false;
     }
+  };
+
+  // ---- The commanded actor and the guarded command envelope ----------------
+  // (webclient-party-command-selection)
+  //
+  // null, or the read-only choices query awaiting its committed panel
+  // `{actorId, requestId, generation, sessionId, roundRevision}`.
+  ctx.pendingActorSelection = null;
+  // null, or the one-shot record of the last combat.command this client
+  // dispatched `{requestId, generation, sessionId, roundRevision}`. It lets
+  // exactly one committed nonfinal draft save advance to the next missing
+  // member; it is never derived from restored draft entries, so a reconnect
+  // or a re-observed result can never replay an intent.
+  ctx.pendingCombatAdvance = null;
+  // The committed combat identity (`session:actor`) the held client-local
+  // selection belongs to; a change drops the unconfirmed selection.
+  ctx.lastCombatIdentity = null;
+
+  // The committed panel's commanded actor, or null.
+  function commandedActorId(panel) {
+    return panel && panel.choices && panel.choices.actor_id !== null && panel.choices.actor_id !== undefined
+      ? panel.choices.actor_id
+      : null;
+  }
+
+  // The open entry of the actor selector frame: one deliberate push of the
+  // `combat.actor` descriptor from the card chrome. Refused while a mutation
+  // is in flight, a round plays, or the cross-side question holds the dock.
+  ctx.openCombatActor = function openCombatActor() {
+    const rs = ctx.reducer.getState();
+    if (!committedCombat(rs) || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+      return false;
+    }
+    const item = ctx.router.depth() > 0 ? ctx.router.currentItem() : null;
+    ctx.pushFrame({ source: "combat.actor", params: {} }, item ? item.key : null);
+    // The 變更成員 control disappears once the frame mounts, so hand DOM
+    // focus to the dock (never the document body).
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return true;
+  };
+
+  // Activate one actor selector row: the already-commanded actor returns to
+  // the root in one deliberate transition; any other member asks the server
+  // for that member's canonical choices (one read-only query) and opens the
+  // same root flow once its panel commits.
+  ctx.selectCombatActor = function selectCombatActor(actorId) {
+    const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    if (!panel || actorId === null || actorId === undefined) {
+      return false;
+    }
+    if (String(actorId) === String(commandedActorId(panel))) {
+      ctx.resetFramesToRoot();
+      ctx.dockFocusRequest += 1;
+      ctx.publishView();
+      return true;
+    }
+    return ctx.requestCombatActor(actorId);
+  };
+
+  // One read-only `combat.actor_choices` query with the committed
+  // session/revision/actor. Returns false when the dispatch was refused.
+  ctx.requestCombatActor = function requestCombatActor(actorId) {
+    const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    if (!panel || !panel.session || actorId === null || actorId === undefined) {
+      return false;
+    }
+    const requestId = ctx.dispatchAction("combat.actor_choices", {
+      session_id: panel.session.session_id,
+      round_revision: panel.session.round_revision,
+      actor_id: actorId,
+    });
+    if (requestId === null || requestId === undefined) {
+      return false;
+    }
+    ctx.pendingActorSelection = {
+      actorId,
+      requestId,
+      generation: rs.generation,
+      sessionId: panel.session.session_id,
+      roundRevision: panel.session.round_revision,
+    };
+    return true;
+  };
+
+  // The guarded v7 `combat.command` payload for the committed panel, or null.
+  // Read at submit time, so the envelope never carries a stale version.
+  ctx.buildCombatCommand = function buildCombatCommand(command) {
+    return CombatMenu.commandEnvelope(committedCombat(ctx.reducer.getState()), command);
+  };
+
+  // Send one already-built envelope through the single dispatch entry and
+  // record the one-shot advance correlation for the committed result.
+  ctx.submitCombatEnvelope = function submitCombatEnvelope(envelope, display) {
+    if (!envelope) {
+      return null;
+    }
+    const rs = ctx.reducer.getState();
+    const requestId = ctx.dispatchAction("combat.command", envelope, display);
+    if (requestId === null || requestId === undefined) {
+      return null;
+    }
+    ctx.pendingCombatAdvance = {
+      requestId,
+      generation: rs.generation,
+      sessionId: envelope.session_id,
+      roundRevision: envelope.round_revision,
+    };
+    return requestId;
+  };
+
+  // One skill command: build the envelope from the committed panel, then send.
+  ctx.submitCombatCommand = function submitCombatCommand(command, display) {
+    return ctx.submitCombatEnvelope(ctx.buildCombatCommand(command), display);
   };
 
   ctx.onRouterEvent = function onRouterEvent(name, payload) {
@@ -236,6 +355,19 @@ export function applyFrames(ctx) {
     // model instance is the registry's (the declared selection home).
     const combat = ctx.frameResolver.combatModel();
     if (combat) {
+      // The actor selector (webclient-party-command-selection): activating a
+      // member row never dispatches a command — it either returns to the root
+      // (the already-commanded member) or asks for that member's canonical
+      // choices through one read-only query.
+      if (
+        name === "submit" &&
+        typeof item.key === "string" &&
+        item.key.startsWith("actor-") &&
+        item.actorId !== undefined
+      ) {
+        ctx.selectCombatActor(item.actorId);
+        return;
+      }
       if (name === "space") {
         if (item.actionId === "toggle-target" && item.payload && combat.focusSkillKey) {
           CombatMenu.toggleArea(combat, combat.focusSkillKey, item.payload.identity);
@@ -327,11 +459,12 @@ export function applyFrames(ctx) {
         if (skill && skill.targetSpec === "area") {
           const areaPayload = CombatMenu.areaPayload(skill);
           if (areaPayload) {
+            const command = { kind: "skill", payload: areaPayload };
             const display = ctx.castSubmitDisplay(skill, areaPayload, item.commandDisplay);
-            if (ctx.askCrossSide("area", item.key, "combat.cast", areaPayload, display)) {
+            if (ctx.askCrossSide("area", item.key, command, display)) {
               return;
             }
-            ctx.dispatchAction("combat.cast", areaPayload, display);
+            ctx.submitCombatCommand(command, display);
           }
           return;
         }
@@ -340,7 +473,7 @@ export function applyFrames(ctx) {
       // submission (no focus/selection mutation is ever sent); a deliberate
       // confirmation submits the OOB cast. Pointer activation performs the
       // identical confirmation the keyboard performs — exactly one
-      // `combat.cast` with the same action ID and payload
+      // `combat.command` with the same payload
       // (webclient-pointer-activation).
       if (
         typeof item.key === "string" &&
@@ -356,23 +489,43 @@ export function applyFrames(ctx) {
         const display = focusSkill
           ? ctx.castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
           : item.commandDisplay || null;
-        if (ctx.askCrossSide("single", item.key, "combat.cast", item.payload, display)) {
+        const command = { kind: "skill", payload: item.payload };
+        if (ctx.askCrossSide("single", item.key, command, display)) {
           return;
         }
-        ctx.dispatchAction("combat.cast", item.payload, display);
+        ctx.submitCombatCommand(command, display);
         ctx.publishView();
         return;
       }
-      // The SELF confirm (one actor target): the same cross-side check before
-      // the row's own dispatch below.
-      if (
-        item.key === "self-confirm" &&
-        item.actionId &&
-        ctx.askCrossSide("self", item.key, item.actionId, item.payload || {}, item.commandDisplay || null)
-      ) {
+      // The NONE and SELF confirms (no target field): the same cross-side
+      // check before the guarded command submission.
+      if (item.key === "none-confirm" || item.key === "self-confirm") {
+        const focusSkill = combat.focusSkillKey
+          ? combat.skillByKey[combat.focusSkillKey]
+          : null;
+        const inner = item.payload || {};
+        const command = { kind: item.commandKind === undefined ? "skill" : item.commandKind, payload: inner };
+        const display = focusSkill
+          ? ctx.castSubmitDisplay(focusSkill, inner, item.commandDisplay)
+          : item.commandDisplay || null;
+        if (ctx.askCrossSide(item.key === "self-confirm" ? "self" : "none", item.key, command, display)) {
+          return;
+        }
+        ctx.submitCombatCommand(command, display);
         return;
       }
-      // Real OOB action items (combat.cast / combat.flee / combat.forfeit).
+      // Any remaining guarded party command row (a producer missed above):
+      // wrap the inner payload once at this single submit boundary.
+      if (item.actionId === "combat.command") {
+        ctx.submitCombatCommand(
+          { kind: item.commandKind === undefined ? "skill" : item.commandKind, payload: item.payload || {} },
+          item.commandDisplay || null
+        );
+        return;
+      }
+      // Real OOB action items (flee / forfeit; items and tactics belong to
+      // webclient-party-items-tactics, exit confirmation to
+      // webclient-party-exit-confirmation).
       if (item.actionId) {
         ctx.dispatchAction(item.actionId, item.payload || {}, item.commandDisplay || null);
         return;
@@ -478,19 +631,17 @@ export function applyFrames(ctx) {
   };
 
   // ---- The cross-side question (webclient-combat-cross-side-confirm D2) ----
-  // null, or the cast held back at submission: `{ actionId, payload, display,
-  // question, sides, skillKey, form, frameSource, focusKey }`. Nothing is
-  // sent while it is set; 是 sends the stored payload verbatim.
+  // null, or the cast held back at submission: `{ envelope, display, question,
+  // sides, skillKey, form, frameSource, focusKey, actorId, sessionId,
+  // roundRevision, draftVersion }`. Nothing is sent while it is set; 是 sends
+  // the stored envelope verbatim (webclient-party-command-selection: the
+  // guarded command envelope, bound to the commanded actor and the committed
+  // versions, is the held unit).
   ctx.crossSideConfirm = null;
 
   function committedCombat(rs) {
     const panel = rs && rs.panels && rs.panels.context_actions;
     return panel && panel.kind === "combat" ? panel : null;
-  }
-
-  function actorIdentityOf(rs) {
-    const status = rs && rs.panels && rs.panels.status;
-    return status && status.actor ? status.actor.identity : null;
   }
 
   // Called at each target-step submission with the payload exactly as it
@@ -506,7 +657,10 @@ export function applyFrames(ctx) {
     const facts = skillFacts(panel, skillKey);
     const raw = committedSkill(panel, skillKey);
     const participants = Array.isArray(panel.participants) ? panel.participants : [];
-    const actor = actorIdentityOf(rs);
+    // The commanded actor, never the controlled portrait
+    // (webclient-party-command-selection): a companion's SELF reach and cross
+    // side are the companion's own.
+    const actor = commandedActorId(panel);
     const targets = targetSetFor({
       form,
       payload,
@@ -518,10 +672,19 @@ export function applyFrames(ctx) {
     return outcome ? { sides: outcome.sides, question: crossSideQuestion(outcome.sides, facts.label) } : null;
   }
 
-  ctx.askCrossSide = function askCrossSide(form, focusKey, actionId, payload, display) {
+  // `command` is the closed `{kind, payload}` union member (the inner skill
+  // payload). The held unit is the fully built envelope, so 是 sends exactly
+  // the versions and actor the question was worded for.
+  ctx.askCrossSide = function askCrossSide(form, focusKey, command, display) {
     const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    const payload = command ? command.payload : null;
     const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
-    if (!committedCombat(rs) || !ctx.frameResolver.combatModel() || skillKey === null) {
+    if (!panel || !ctx.frameResolver.combatModel() || skillKey === null) {
+      return false;
+    }
+    const envelope = CombatMenu.commandEnvelope(panel, command);
+    if (!envelope) {
       return false;
     }
     const outcome = evaluateCrossSide(rs, form, payload);
@@ -530,8 +693,7 @@ export function applyFrames(ctx) {
     }
     const descriptor = router.depth() > 0 ? router.currentDescriptor() : null;
     ctx.crossSideConfirm = {
-      actionId,
-      payload,
+      envelope,
       display,
       question: outcome.question,
       sides: outcome.sides,
@@ -539,6 +701,10 @@ export function applyFrames(ctx) {
       form,
       frameSource: descriptor ? descriptor.source : null,
       focusKey,
+      actorId: envelope.actor_id,
+      sessionId: envelope.session_id,
+      roundRevision: envelope.round_revision,
+      draftVersion: envelope.draft_version,
     };
     ctx.publishView();
     return true;
@@ -554,7 +720,9 @@ export function applyFrames(ctx) {
     if (router.isMutationInFlight() || router.isAwaitingRevision()) {
       return null;
     }
-    const requestId = ctx.dispatchAction(pending.actionId, pending.payload, pending.display);
+    // The same submission helper the direct path uses, so 是 also records the
+    // one-shot advance correlation for its own accepted nonfinal save.
+    const requestId = ctx.submitCombatEnvelope(pending.envelope, pending.display);
     if (requestId === null || requestId === undefined) {
       return null;
     }
@@ -609,13 +777,28 @@ export function applyFrames(ctx) {
       drop(true);
       return;
     }
+    // The held envelope is bound to the commanded actor and the committed
+    // versions (webclient-party-command-selection): a switch of the actor, the
+    // session, the round revision or the draft version cancels it without
+    // sending. Nothing is silently re-versioned.
+    if (
+      String(commandedActorId(panel)) !== String(pending.actorId) ||
+      !panel.session ||
+      panel.session.session_id !== pending.sessionId ||
+      panel.session.round_revision !== pending.roundRevision ||
+      !panel.draft ||
+      panel.draft.draft_version !== pending.draftVersion
+    ) {
+      drop(true);
+      return;
+    }
     const raw = committedSkill(panel, pending.skillKey);
     if (!raw || !raw.enabled) {
       drop(true);
       return;
     }
     const candidates = new Set((raw.targets || []).map(String));
-    const payload = pending.payload || {};
+    const payload = (pending.envelope && pending.envelope.command && pending.envelope.command.payload) || {};
     const ids = Array.isArray(payload.target_ids) ? payload.target_ids.map(String) : [];
     if (ids.some((id) => !candidates.has(id))) {
       drop(true);
@@ -634,12 +817,118 @@ export function applyFrames(ctx) {
     // The question re-reads the committed facts, teams and label: a cast
     // that no longer crosses sides needs no question, and one that crosses
     // differently is worded for what 是 would now send.
-    const outcome = evaluateCrossSide(rs, pending.form, pending.payload);
+    const outcome = evaluateCrossSide(rs, pending.form, payload);
     if (!outcome) {
       drop(true);
       return;
     }
     pending.sides = outcome.sides;
     pending.question = outcome.question;
+  };
+
+  // ---- The commanded-actor transition (webclient-party-command-selection) --
+  //
+  // Runs in the settle window, before the view is built, and never
+  // dispatches: it consumes a completed read-only choices query and, on any
+  // committed actor/session change, drops the unconfirmed client-local
+  // selection and the held warning. Confirmed server draft entries are never
+  // touched here — they are the server's.
+  ctx.settleCombatActorSelection = function settleCombatActorSelection(rs) {
+    if (ctx.inStackMutation) {
+      // A router mutation already owns this window; the outer publish's own
+      // settle pass re-enters and handles the transition there.
+      return;
+    }
+    const panel = committedCombat(rs);
+    const actorId = commandedActorId(panel);
+    const pending = ctx.pendingActorSelection;
+    if (pending) {
+      const settled =
+        !!panel &&
+        !!panel.choices &&
+        String(actorId) === String(pending.actorId) &&
+        rs.generation === pending.generation &&
+        panel.session &&
+        panel.session.session_id === pending.sessionId;
+      if (settled) {
+        ctx.pendingActorSelection = null;
+        ctx.frameResolver.resetCombatSelection();
+        // Return to exactly one root, whatever frame the query was issued
+        // from: an EXPLICIT switch starts in the actor frame, while the
+        // automatic advance starts in the submitted skill/target frame of the
+        // PREVIOUS actor. Keeping that frame would leave the new actor in a
+        // stale skill/scale/target step (the resolver still mounts it when
+        // both actors own the skill), so the plan never carries over.
+        if (router.depth() > 0) {
+          ctx.resetFramesToRoot();
+          ctx.dockFocusRequest += 1;
+        }
+      } else if (!ctx.inFlight) {
+        // Refused, rejected or superseded: drop the local intent.
+        ctx.pendingActorSelection = null;
+      }
+    }
+    // The committed combat identity: a change (an actor switch, a reconnect
+    // fallback, a restored default) drops every unconfirmed local selection.
+    const sessionId = panel && panel.session ? panel.session.session_id : null;
+    // The transport generation is part of the identity: a reconnect rebuilds
+    // the committed entries but never restores an unconfirmed local selection.
+    const identity = panel
+      ? String(rs.generation) + ":" + String(sessionId) + ":" + String(actorId)
+      : null;
+    if (identity !== ctx.lastCombatIdentity) {
+      ctx.frameResolver.resetCombatSelection();
+      ctx.crossSideConfirm = null;
+      ctx.pendingCombatAdvance = null;
+      ctx.lastCombatIdentity = identity;
+    }
+  };
+
+  // The one-shot advance after this client's own nonfinal draft save: query
+  // the first required member still needing a command, once, read-only. It
+  // runs after the view publication so the query's outer envelope carries the
+  // freshly committed epoch/revision, and it is driven solely by this
+  // client's own dispatch correlation — a restored or re-observed result, a
+  // reconnect or a typed round never schedules navigation.
+  ctx.autoAdvanceCombatActor = function autoAdvanceCombatActor(rs) {
+    const record = ctx.pendingCombatAdvance;
+    if (!record || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+      return;
+    }
+    const panel = committedCombat(rs);
+    if (!panel || !panel.session || !panel.draft || !panel.choices) {
+      ctx.pendingCombatAdvance = null;
+      return;
+    }
+    if (rs.mode !== "combat" || rs.generation !== record.generation || panel.session.session_id !== record.sessionId) {
+      ctx.pendingCombatAdvance = null;
+      return;
+    }
+    const result = rs.lastActionResult;
+    if (!result || result.requestId !== record.requestId) {
+      return;
+    }
+    ctx.pendingCombatAdvance = null;
+    if (result.code !== "draft_saved") {
+      // A terminal round, a needs-selection preflight, a stale command or a
+      // rejection: never advance, never replay.
+      return;
+    }
+    const needs = new Set((panel.draft.needs_selection_ids || []).map(String));
+    const commandable = new Set(
+      (panel.actors || []).filter((actor) => actor.commandable).map((actor) => String(actor.identity))
+    );
+    const next = (panel.draft.required_actor_ids || []).find(
+      (id) =>
+        needs.has(String(id)) &&
+        commandable.has(String(id)) &&
+        String(id) !== String(commandedActorId(panel))
+    );
+    if (next === undefined) {
+      return;
+    }
+    if (ctx.requestCombatActor(next)) {
+      ctx.publishView();
+    }
   };
 }

@@ -158,8 +158,8 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         # The root combat menu (attack/skills/items/defend/flee/forfeit) has no
         # target rows; opening the basic-attack skill renders the participant
         # target frame. Pointer activation uses the same router submit path as
-        # keyboard confirmation: clicking the target row emits exactly one
-        # ``combat.cast`` carrying that target id — the same action ID and
+        # keyboard confirmation: touching the target figure emits exactly one
+        # ``combat.command`` carrying that target id — the same action ID and
         # payload Enter on the same row emits (webclient-pointer-activation).
         self._click_row(page, "attack")
         try:
@@ -202,7 +202,7 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         target_keys = [k for k in target_keys if k in drawn]
         self.assertGreaterEqual(len(target_keys), 1, "no candidate carries a stage hit area")
-        cast_before = sent_action_count(page, "combat.cast")
+        cast_before = sent_action_count(page, "combat.command")
         page.locator(
             f'[data-testid="stage-target-hit"][data-identity="{target_keys[0].removeprefix("target-")}"]'
         ).click()
@@ -212,21 +212,21 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         wait_for_store_state(page, _last_target_set, timeout=15000)
         self.assertEqual(store_state(page)["lastTarget"], target_keys[0].removeprefix("target-"))
 
-        # The "identical path" proof: the pointer click on the target row
-        # dispatches exactly one combat.cast carrying the selected target id —
-        # the same submission keyboard confirmation performs.
+        # The "identical path" proof: the pointer click on the target figure
+        # dispatches exactly one combat.command carrying the selected target
+        # id — the same submission keyboard confirmation performs.
         deadline = time.monotonic() + 20
         while time.monotonic() < deadline:
-            if sent_action_count(page, "combat.cast") > cast_before:
+            if sent_action_count(page, "combat.command") > cast_before:
                 break
             page.wait_for_timeout(250)
-        self.assertEqual(sent_action_count(page, "combat.cast") - cast_before, 1)
+        self.assertEqual(sent_action_count(page, "combat.command") - cast_before, 1)
         casts = [
             m for m in outbound_messages(page)
-            if m[0] == "ui_action" and m[1] and m[1][0].get("action_id") == "combat.cast"
+            if m[0] == "ui_action" and m[1] and m[1][0].get("action_id") == "combat.command"
         ]
         self.assertEqual(
-            casts[-1][1][0]["payload"]["target_ids"],
+            casts[-1][1][0]["payload"]["command"]["payload"]["target_ids"],
             [int(target_keys[0].removeprefix("target-"))],
             "pointer activation must cast exactly the clicked target",
         )

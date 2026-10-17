@@ -453,6 +453,9 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(int(self.player.pk) in (after.draft_entries or {}), True)
         self.assertEqual(companion.pk in (after.draft_entries or {}), False)
 
+    @covers_requirement(
+        "webclient-combat-menu::one-command-card-switches-actors-and-renders-authoritative-draft-progress"
+    )
     def test_member_needing_reselection_reports_needs_selection(self):
         companion = self._companion()
         self._engage()
@@ -827,6 +830,9 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         attach_coordinator(session, build_production_registry())
         return session
 
+    @covers_requirement(
+        "webclient-combat-menu::one-command-card-switches-actors-and-renders-authoritative-draft-progress"
+    )
     def test_actor_query_selects_the_authorized_companion_only(self):
         companion = self._companion()
         self._engage()

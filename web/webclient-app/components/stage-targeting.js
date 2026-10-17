@@ -25,15 +25,27 @@ export function formationOrderFor(formation, party, foes) {
   return entries.map((entry) => entry.id);
 }
 
-// The step as the stage draws it: a SELF position stands on the figure the
-// stage draws as the controlled one, whatever identity the status panel
-// names it by (the roster row and the status actor are the same character,
-// joined by the line-up's own `isControlled` slot, never by a guess).
-export function onStage(step, controlledId) {
-  if (!step || step.form !== "self" || controlledId === null || controlledId === undefined) {
+// The step as the stage draws it: a SELF position stands on the commanded
+// actor's figure, which the store's model already names
+// (webclient-party-command-selection: a companion SELF stands on the
+// companion, never the controlled portrait). The line-up's controlled slot is
+// only a fallback for a model that carries no identity.
+export function onStage(step, fallbackSelfId) {
+  if (!step || step.form !== "self") {
     return step;
   }
-  const id = String(controlledId);
+  const selfPosition = step.positions.find((p) => p.kind === "self");
+  if (!selfPosition) {
+    return step;
+  }
+  const current = selfPosition.identities[0];
+  if (current !== null && current !== undefined) {
+    return step;
+  }
+  if (fallbackSelfId === null || fallbackSelfId === undefined) {
+    return step;
+  }
+  const id = String(fallbackSelfId);
   const positions = step.positions.map((p) => (p.kind === "self" ? { ...p, identities: [id] } : p));
   const focused = positions.find((p) => p.key === step.focusKey) || null;
   return {
@@ -60,7 +72,7 @@ export function targetingFor(step) {
 }
 
 // The position key a figure's identity stands for: its member item, or the
-// SELF confirm on the controlled figure.
+// SELF confirm on the commanded actor's figure.
 export function positionKeyFor(step, identity) {
   if (!step || identity === null || identity === undefined) {
     return null;

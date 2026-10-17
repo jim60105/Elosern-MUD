@@ -613,22 +613,36 @@ function combatFixturePanel(overrides = {}) {
       extra
     );
   return {
-    schema_version: 6,
+    schema_version: 7,
     available: true,
     kind: "combat",
-    session: { session_id: "hostile:1:0", mode: "hostile", round: 1, state: "ready", reason: null },
+    session: { session_id: "hostile:1:0", mode: "hostile", round: 1, round_revision: 0, state: "ready", reason: null },
     participants: [
       { identity: 7, token: "e1", display_name: "哥布林", team: "foes", state: "active", hp_current: 100, hp_maximum: 100, portrait_ref: null, conditions: [] },
     ],
-    root_actions: ["attack", "skills", "items", "defend", "flee"],
+    root_actions: ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
     secondary_actions: ["forfeit"],
-    skills: [
-      {
-        category: "elemental_magic",
-        label: "元素魔法",
-        groups: [{ group: "fire", label: T_GROUP_FIRE_LABEL, skills: [skill({}), skill({ key: T_B, label: T_B_LABEL, target_spec: "area", targets: [7], shorthands: ["all"] })] }],
-      },
-    ],
+    actors: [{ identity: 7, commandable: true, reason: null }],
+    choices: {
+      actor_id: 7,
+      skills: [
+        {
+          category: "elemental_magic",
+          label: "元素魔法",
+          groups: [{ group: "fire", label: T_GROUP_FIRE_LABEL, skills: [skill({}), skill({ key: T_B, label: T_B_LABEL, target_spec: "area", targets: [7], shorthands: ["all"] })] }],
+        },
+      ],
+      items: [],
+      tactics: [],
+    },
+    draft: {
+      round_revision: 0,
+      draft_version: 0,
+      required_actor_ids: [7],
+      entries: [],
+      needs_selection_ids: [7],
+      reselection_reasons: [],
+    },
     suggestions: { status: "unavailable" },
     ...overrides,
   };

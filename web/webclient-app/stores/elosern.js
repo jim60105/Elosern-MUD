@@ -233,6 +233,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // pointer entry of the figures, markers and prompt chips, and the stage
     // order AppClient publishes from the formation it draws.
     stageTargetPointer: ctx.stageTargetPointer,
+    // The commanded-actor selector (webclient-party-command-selection): the
+    // card chrome opens the actor frame; a member row asks for that actor's
+    // canonical choices (one read-only query) and opens its root flow.
+    openCombatActor: ctx.openCombatActor,
+    selectCombatActor: ctx.selectCombatActor,
     // The cross-side question's answers (webclient-combat-cross-side-
     // confirm): 是 sends the held cast once; 否 / ✕ / Escape return to the
     // target step.
