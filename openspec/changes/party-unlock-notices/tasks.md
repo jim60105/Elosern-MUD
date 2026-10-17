@@ -10,7 +10,7 @@ Total estimate: **6.5 hours**, including implementation, focused verification, d
 
 - [ ] 2.1 Add `world/rules/unlock_notices.py` (`deliver_unlocks`, `record_unlocks`, `mark_unlocks_seen`, `unlock_flags`) and the copied `PresentationContext.unlocks` snapshot; verify in `world/rules/tests/test_unlock_notices.py` marks on every account session, clear keeps the recent set, a new session has no marks, possession keeps marks, and an attribute snapshot proves nothing persistent was written.
 
-## 3. Delivery owners (2h)
+## 3. Delivery owners (2h; five call sites share one helper call each)
 
 - [ ] 3.1 Call `deliver_unlocks` after commit from `commands/action.py`, `skill_use_actions.py`, field item use (command and adapter), `rounds._deliver_after_commit`, and the skip command/adapter paths (rendering `practice_unlock` events in the summary); verify one line per unlock per path and no duplicate lines in combat.
 
