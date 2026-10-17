@@ -24,7 +24,7 @@ None.
 
 ## Impact
 
-- `web/webclient/actions/skill_use_actions.py`, `web/webclient/presentation/skill_use.py`, `web/webclient/presentation/skill_use_selection.py`, `world/rules/field_cast.py::preview_field_skill` (caster-relative), JS mirror and stores (`stores/elosern/skill_use.js`, `composables/use-skill-use.js`), fixtures under `web/webclient-app/stories/fixtures/` and protocol fixtures.
+- `web/webclient/actions/skill_use_actions.py`, `web/webclient/presentation/skill_use.py`, `web/webclient/presentation/skill_use_selection.py`, `world/rules/field_cast.py::preview_field_skill` (caster-relative, consuming the caster-aware `preview_field_opening` from `companion-field-combat-opening`), JS mirror and stores (`stores/elosern/skill_use.js`, `composables/use-skill-use.js`), fixtures under `web/webclient-app/stories/fixtures/` and protocol fixtures.
 - Tests: updated skill-use action/presenter tests, protocol parity test, Node/Vitest skill-use tests.
 
 ## Effort
@@ -33,9 +33,10 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **9 of 32**.
+Declared implementation order: **10 of 33**.
 
 - depends-on: companion-field-cast-rule
+- depends-on: companion-field-combat-opening
 
 ### Code and spec conflicts within the new batch
 
