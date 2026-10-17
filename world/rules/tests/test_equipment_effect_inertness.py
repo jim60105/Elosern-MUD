@@ -81,6 +81,12 @@ _ALLOWLIST = frozenset(
         # reads the resolved equipment adjustments so its reducing-only
         # ceilings are derived from the same effects the live kit uses.
         Path("world/rules/guild_exam_restrictions.py"),
+        # equipment-weapon-damage-factor (P7): the two gameplay readers of the
+        # live ``weapon_damage_multiplier`` field the change owns — the
+        # physical strike stage (the damage expression's weapon term) and the
+        # monster-AI damage projection that estimates against the same term.
+        Path("world/rules/combat/damage.py"),
+        Path("world/rules/monster_ai/snapshot.py"),
     }
 )
 _MODULE = "world.rules.equipment_effects"

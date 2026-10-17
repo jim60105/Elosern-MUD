@@ -37,6 +37,8 @@ MODULES = {
     "session_flow_commands": "world.rules.tests.test_combat_session_flow.test_attribution_seam_and_command_surface",
     "session_persistence": "world.rules.tests.test_combat_session_persistence",
     "session_recovery": "world.rules.tests.test_combat_session_recovery",
+    # The confirmed party retreat's own suite (the scenario map's flee entry).
+    "party_retreat": "world.rules.tests.test_combat_party",
     "exams": "world.rules.tests.test_guild_exams",
     "roster_contract": "world.rules.tests.test_npc_roster_validation",
     "economy": "world.rules.tests.test_shop_economy",
@@ -204,7 +206,12 @@ SCENARIO_TO_TEST = {
         "session_flow_rounds", "PlayerRoundTests", "test_one_request_drives_one_complete_round"
     ),
     "Flee closes the same session": ref(
-        "session_flow_rounds", "PlayerRoundTests", "test_flee_closes_the_same_session"
+        # The scenario's own WHEN is the confirmed party retreat succeeding:
+        # the allied personal flee it once named is gone (§6), so the mapping
+        # points at the retreat suite's one-round escape.
+        "party_retreat",
+        "PartyRetreatTests",
+        "test_a_success_carries_the_knocked_out_companion_and_settles_one_round_once",
     ),
     "Overwhelming player resolves a reachable hunt": ref(
         "session_flow_rounds", "PlayerRoundTests", "test_overwhelming_player_resolves_after_first_action"

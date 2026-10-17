@@ -22,9 +22,12 @@ from world.rules.buffs import (
     tick_buffs,
 )
 from world.rules.combat_session import (
+    PARTY_EXIT_RETREAT,
+    confirm_party_exit,
     engage,
     is_in_active_session,
     read_session,
+    request_party_exit,
     submit_player_action,
 )
 from world.rules.party import join_party
@@ -223,8 +226,24 @@ class TerrainMarkerLifecycleTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertIn("t_ground_hazard", entity_active_buffs(self.player))
         self.assertIn("t_control_buff", entity_active_buffs(self.player))
 
+        # The allied escape is the confirmed party retreat (§6), never a
+        # personal flee submission: the prompt binds the session/revision and
+        # the confirmation resolves the one retreat attempt.
+        record = read_session(self.player)
+        prompt = request_party_exit(
+            self.player,
+            record.session_id,
+            record.round_revision,
+            PARTY_EXIT_RETREAT,
+        )
         with patch("world.rules.disengage.roll_d100", return_value=100):
-            result = submit_player_action(self.player, "flee", [])
+            result = confirm_party_exit(
+                self.player,
+                prompt["session_id"],
+                prompt["round_revision"],
+                prompt["operation"],
+                prompt["confirmation_token"],
+            )
         self.assertEqual(result["outcome"], "fled")
 
         # Ground marker was swept at flee settlement

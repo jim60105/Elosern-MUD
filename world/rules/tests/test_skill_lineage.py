@@ -139,11 +139,22 @@ def _entity(
         race=race,
         pk=None,
         key="stub",
-        skills=SimpleNamespace(owned_keys=lambda: set(owned)),
+        # ``conferred_grants`` rides the same accessor: the rule-table
+        # conditions read it beside ``owned_keys``, and a stub that answers for
+        # one must answer for both.
+        skills=SimpleNamespace(
+            owned_keys=lambda: set(owned), conferred_grants=lambda: ()
+        ),
+        # The no-create condition context reads the stored buff cache through
+        # the Attributes handler; a stub without it fails the read.
+        attributes=SimpleNamespace(get=lambda *args, **kwargs: None),
         db=SimpleNamespace(
             skill_proficiency=dict(proficiency or {}),
             affinity_elements=list(affinity),
             skills={"active": list(owned), "passive": []},
+            # The no-create modifier bundle reads the worn-kit storage; a stub
+            # without it fails the read.
+            equipment={},
         ),
     )
 

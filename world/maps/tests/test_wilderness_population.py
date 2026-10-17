@@ -624,9 +624,11 @@ class StartupSessionRestoreOrderTests(BattlefieldIsolation, EvenniaTest):
         # Session restoration settles the committed victory, not a defeat.
         settled: dict[str, str] = {}
 
-        def spy(actor, record, battlefield, outcome, logs=()):
+        def spy(actor, record, battlefield, outcome, logs=(), **kwargs):
             settled["outcome"] = outcome
-            return settle_session(actor, record, battlefield, outcome, logs)
+            return settle_session(
+                actor, record, battlefield, outcome, logs, **kwargs
+            )
 
         with patch("world.rules.combat_session.settlement.settle_session", side_effect=spy):
             restore_persisted_sessions()
