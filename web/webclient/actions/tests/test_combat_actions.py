@@ -43,6 +43,7 @@ from web.webclient.actions.combat_actions import (
 )
 from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.coordinator import attach_coordinator
+from web.webclient.presentation.context import PresentationContext
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_beats import RoundRecord
 from world.rules.combat_session import (
@@ -140,7 +141,7 @@ class CombatPayloadValidationTests(EvenniaTestCase):
         bad = (
             {"session_id": "x", "round_revision": 1},
             {"session_id": "x", "round_revision": 1, "actor_id": 7, "extra": 1},
-            {"session_id": "x", "round_revision": 0, "actor_id": 7},
+            {"session_id": "x", "round_revision": -1, "actor_id": 7},
             {"session_id": "x", "round_revision": True, "actor_id": 7},
             {"session_id": "x", "round_revision": 1, "actor_id": 0},
             {"session_id": "", "round_revision": 1, "actor_id": 7},
@@ -151,6 +152,13 @@ class CombatPayloadValidationTests(EvenniaTestCase):
             with self.subTest(payload=payload):
                 with self.assertRaises(CombatActionError):
                     validate_actor_choices_payload(payload)
+        # A first round's revision is zero, so it stays a legal reference.
+        self.assertEqual(
+            validate_actor_choices_payload(
+                {"session_id": "x", "round_revision": 0, "actor_id": 7}
+            )["round_revision"],
+            0,
+        )
 
     def test_command_payload_is_exact(self):
         validated = validate_command_payload(_command())
@@ -592,6 +600,72 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(companion.pk not in (self._record().draft_entries or {}))
 
     # -- actor choices ---------------------------------------------------
+
+    def test_item_command_commits_the_round_and_consumes_once(self):
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 20
+        self.player.db.inventory = ["t_ember_spray"]
+        self._engage()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=1),
+            patch("world.rules.combat.damage.roll_d100", return_value=1),
+            patch("world.rules.combat.rounds.roll_d100", return_value=1),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _command_adapter(
+                self.player,
+                self._command_payload(
+                    {"kind": "item", "payload": {"item_key": "t_ember_spray"}}
+                ),
+            )
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED, result)
+        self.assertEqual(self.player.db.inventory, [])
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        self.assertEqual(
+            round_record.round_id, f"{self._record().session_id}/1"
+        )
+
+    @covers_requirement(
+        "webclient-combat-beats::beat-hp-is-projected-on-the-server-and-checked-against-the-round-s-recorded-hp"
+    )
+    def test_item_heal_with_foe_damage_makes_the_round_beats_unavailable(self):
+        # The item heals the actor while the foe damages it in the same round:
+        # the round has an HP change with no damage entry, so the projection
+        # cannot be checked against the recorded HP and the panel is
+        # unavailable while the text output stays authoritative.
+        self.player.traits.hp.current = int(self.player.traits.hp.max) - 20
+        self.player.db.inventory = ["t_ember_spray"]
+        self._engage()
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=100),
+            patch("world.rules.combat.damage.roll_d100", return_value=100),
+            patch("world.rules.combat.rounds.roll_d100", return_value=100),
+            patch("world.rules.action.gates.roll_d100", return_value=1),
+        ):
+            result = _command_adapter(
+                self.player,
+                self._command_payload(
+                    {"kind": "item", "payload": {"item_key": "t_ember_spray"}}
+                ),
+            )
+        self.assertEqual(result["code"], CODE_ROUND_COMMITTED, result)
+        round_record = result["combat_round"]
+        self.assertIsInstance(round_record, RoundRecord)
+        with patch("web.webclient.presentation.combat_beats.log_warn") as warn:
+            payload = build_production_registry().render(
+                "combat_beats",
+                PresentationContext(
+                    actor=self.player,
+                    protocol_version=1,
+                    combat_round=round_record,
+                ),
+            )
+        self.assertFalse(payload["available"])
+        self.assertEqual(payload["reason"]["code"], "presentation_unavailable")
+        self.assertNotIn("beats", payload)
+        # The heal is the unmodeled HP mover: the bounded reason is the HP
+        # mismatch, never a bound.
+        self.assertEqual(warn.call_args.kwargs["context"]["reason"], "hp_mismatch")
 
     def _session(self):
         from types import SimpleNamespace

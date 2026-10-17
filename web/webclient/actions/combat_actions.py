@@ -351,7 +351,7 @@ def validate_actor_choices_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": _validate_session_id(payload["session_id"]),
         "round_revision": _validate_revision(
-            payload["round_revision"], "round_revision", minimum=1
+            payload["round_revision"], "round_revision", minimum=0
         ),
         "actor_id": _validate_actor_id(payload["actor_id"]),
     }
@@ -367,7 +367,7 @@ def validate_command_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": _validate_session_id(payload["session_id"]),
         "round_revision": _validate_revision(
-            payload["round_revision"], "round_revision", minimum=1
+            payload["round_revision"], "round_revision", minimum=0
         ),
         "draft_version": _validate_revision(
             payload["draft_version"], "draft_version", minimum=0
@@ -387,7 +387,7 @@ def validate_exit_prompt_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": _validate_session_id(payload["session_id"]),
         "round_revision": _validate_revision(
-            payload["round_revision"], "round_revision", minimum=1
+            payload["round_revision"], "round_revision", minimum=0
         ),
         "operation": _validate_operation(payload["operation"]),
     }
@@ -403,7 +403,7 @@ def validate_exit_confirm_payload(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "session_id": _validate_session_id(payload["session_id"]),
         "round_revision": _validate_revision(
-            payload["round_revision"], "round_revision", minimum=1
+            payload["round_revision"], "round_revision", minimum=0
         ),
         "operation": _validate_operation(payload["operation"]),
         "confirmation_token": _validate_confirmation_token(
