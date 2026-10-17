@@ -70,7 +70,13 @@ class PublishPanelUpdateTests(EvenniaTestCase):
         updates = self.session._update_envelopes()
         self.assertEqual(len(updates), 1)
         self.assertEqual(updates[0]["presentation_epoch"], epoch)
-        self.assertEqual(updates[0]["panels"]["context_actions"]["schema_version"], 6)
+        # Taken from the registry that rendered the panel (which sources it
+        # from ``CONTEXT_ACTIONS_SCHEMA_VERSION``), so the assertion pins the
+        # pushed payload to the registered contract instead of a stale literal.
+        self.assertEqual(
+            updates[0]["panels"]["context_actions"]["schema_version"],
+            self.registry.spec("context_actions").schema_version,
+        )
         self.assertEqual(coordinator.revision, 1)
 
     def test_mismatched_epoch_publishes_nothing_and_bumps_no_revision(self):

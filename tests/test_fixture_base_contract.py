@@ -31,7 +31,7 @@ DOWNGRADED_SAMPLE = {
         "LivingEntityTests": {"EvenniaTestCase"},
     },
     "web/webclient/actions/tests/test_combat_actions.py": {
-        "CombatAdapterTests": {"BattlefieldIsolation", "EvenniaTestCase"},
+        "CombatCommandAdapterTests": {"BattlefieldIsolation", "EvenniaTestCase"},
     },
     "web/webclient/presentation/tests/test_art_push.py": {
         "ArtPushBoundaryTests": {"EvenniaTestCase"},

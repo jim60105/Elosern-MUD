@@ -34,6 +34,11 @@ from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 from web.webclient.actions.dispatcher import handle_ui_action
+from web.webclient.actions.combat_actions import (
+    AFFECTED_PANELS,
+    _command_adapter,
+    _exit_confirm_adapter,
+)
 from web.webclient.actions.registry import build_production_action_registry
 from web.webclient.presentation import watchers
 from web.webclient.presentation.affordances import MAX_DISPLAY_NAME_CODE_POINTS
@@ -74,7 +79,7 @@ from world.rules.action import stored_gauge_pair
 from world.rules.affinity import AffinitySource, apply_affinity_change
 from world.rules.affinity_config import get_config
 from world.rules.art_view import portrait_catalog_key
-from world.rules.combat_session import engage
+from world.rules.combat_session import engage, read_session
 from world.rules.npc_identity import npc_display_name
 from world.rules.party import join_party
 from world.rules.tests._combat_session_helpers import (
@@ -1332,10 +1337,28 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
         "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
     )
     def test_combat_partial_publishers_name_the_party_panel(self):
-        for action_id in ("combat.cast", "combat.flee", "combat.forfeit"):
+        """The round-committing combat actions publish the party panel with it.
+
+        The v7 party-combat contract moved the settlement's publication set out
+        of the static ``ActionSpec`` and into the adapter's own result: the two
+        ids whose adapter can commit a round -- ``combat.command`` (the
+        command union's completing confirmation) and ``combat.exit_confirm``
+        (the exit half; ``combat.exit_prompt`` runs no action) -- funnel
+        through the shared settlement result, whose affected-panel set has to
+        name the party panel so a wounded companion's row is republished with
+        the round. Neither spec declares it statically (``combat.command``
+        declares only the combat menu it also edits, the exit specs declare
+        the empty result-decided set).
+        """
+        round_committing = (
+            ("combat.command", _command_adapter),
+            ("combat.exit_confirm", _exit_confirm_adapter),
+        )
+        for action_id, adapter in round_committing:
             with self.subTest(action_id):
                 spec = self.action_registry.spec(action_id)
-                self.assertIn("party", spec.affected_panels)
+                self.assertIs(spec.adapter, adapter)
+        self.assertIn("party", AFFECTED_PANELS)
 
     @covers_requirement(
         "webclient-party-panel::party-presentation-stays-current-across-membership-and-combat-changes"
@@ -1362,17 +1385,59 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
         # re-render the same number, the pushed row has to visibly move off
         # the priming snapshot and track the post-settlement stored gauge.
         self.companion.traits.hp.current = 45
-        envelope = {
-            "protocol_version": 1,
-            "presentation_epoch": coordinator.epoch,
-            "request_id": "r1",
-            "base_revision": coordinator.revision,
-            "action_id": "combat.cast",
-            "payload": {"skill_key": "t_cinder_cleave", "target_ids": [int(self.monster.pk)]},
-        }
+
+        def _command_envelope(request_id, actor_id, command):
+            """One v7 guarded command: the session/round/draft revisions
+            authorize exactly this actor's draft entry, and the closed command
+            union carries that member's choice."""
+            record = read_session(self.player)
+            return {
+                "protocol_version": 1,
+                "presentation_epoch": coordinator.epoch,
+                "request_id": request_id,
+                "base_revision": coordinator.revision,
+                "action_id": "combat.command",
+                "payload": {
+                    "session_id": record.session_id,
+                    "round_revision": record.round_revision,
+                    "draft_version": record.draft_version,
+                    "actor_id": actor_id,
+                    "command": command,
+                },
+            }
+
         with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch("world.rules.combat.damage.roll_d100", return_value=100), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+            # The joined companion is a battle participant, so the v7 draft
+            # needs both members: the commander's cast is admitted first (a
+            # draft edit, no round yet), the companion's tactic is the
+            # completing confirmation that resolves the one ordinary round.
             handle_ui_action(
-                session, self.player, envelope, self.action_registry, self.registry
+                session,
+                self.player,
+                _command_envelope(
+                    "r1",
+                    self.player.pk,
+                    {
+                        "kind": "skill",
+                        "payload": {
+                            "skill_key": "t_cinder_cleave",
+                            "target_ids": [int(self.monster.pk)],
+                        },
+                    },
+                ),
+                self.action_registry,
+                self.registry,
+            )
+            handle_ui_action(
+                session,
+                self.player,
+                _command_envelope(
+                    "r2",
+                    self.companion.pk,
+                    {"kind": "tactic", "payload": {"key": "defend"}},
+                ),
+                self.action_registry,
+                self.registry,
             )
         party_payloads = [
             call[name][0][0]["panels"]["party"]
@@ -1381,7 +1446,7 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
             if name in call and "party" in call[name][0][0]["panels"]
         ]
         self.assertGreaterEqual(
-            len(party_payloads), 2, "the cast must publish party with the round"
+            len(party_payloads), 2, "the round must publish party with the cast"
         )
         committed = next(
             row
@@ -1398,7 +1463,11 @@ class PartyCombatJoinTests(BattlefieldIsolation, EvenniaTest):
         results = [
             call["ui_action_result"][0][0] for call in session.sent if "ui_action_result" in call
         ]
-        self.assertEqual(results[-1]["outcome"], "success")
+        # The completing confirmation really committed the round (not a
+        # draft edit or an admission rejection): its published set is what
+        # carries the party panel above.
+        self.assertEqual(results[-1]["outcome"], "success", results[-1])
+        self.assertEqual(results[-1]["code"], "round_committed", results[-1])
 
     @covers_requirement(
         "webclient-party-panel::party-tokens-are-joined-not-duplicated"

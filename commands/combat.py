@@ -304,7 +304,7 @@ class _PartyExitCommand(Command):
     key = ""
     locks = "cmd:all()"
     help_category = "Combat"
-    #: The party operation a bare invocation requests.
+    #: The party operation a bare invocation asks the boundary for.
     operation: str = ""
 
     def func(self) -> None:
