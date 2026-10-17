@@ -19,6 +19,7 @@ Design §3.2, §6 and §6.1 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 ### Modified Capabilities
 
+- `webclient-contextual-hud`: removes the party drawer follow-rules requirement; party guidance wording uses 羈絆.
 - `webclient-party-panel`: the possession-controls requirement moves to the 成員 tab (renamed).
 - `persona-editing`: the persona sections move to the 成員 tab (renamed).
 - `webclient-component-showcase`: the deferred-surface scenario names the party window.
@@ -33,7 +34,7 @@ Design §3.2, §6 and §6.1 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 ## Batch: party member management
 
-Declared implementation order: **22 of 30**.
+Declared implementation order: **22 of 31**.
 
 - depends-on: webclient-window-primitives
 - depends-on: party-member-panel

@@ -13,7 +13,7 @@ See proposal.md. `AppClient.vue` mounts `PartyDrawer` for `store.view.hudDrawer 
 ## Decisions
 
 - **Mount** the window under the existing `party` drawer key so current openers keep working; the shell owns `activeTab` and a session memory module mirroring `quest-drawer-memory.js` (keyed by generation/epoch scope).
-- **Selection** is server-truth: the rail's selected entry is `party.viewed_member_id`; a click dispatches `party.view_member {member_id, tab, item_key: null}` and the UI waits for the update (pending state on the entry, no optimistic switch). A changed `viewed_member_id` resets local item and quantity state.
+- **Selection** is server-truth: the rail's selected entry is `party.viewed_member_id`; a click dispatches `party.view_member {member_id, tab, skill_key: null, item_key: null}` and the UI waits for the update (pending state on the entry, no optimistic switch). A changed `viewed_member_id` resets local item and quantity state.
 - **Descriptors only**: every action button reads the `party_member` descriptors; 請其離隊 reuses the quest drawer's two-step confirmation pattern; 人物卡 opens `NpcPersonaEditor` with the descriptor params.
 - **Empty slot** reads the `explore.party_invite` affordance already in the exploration panel; with none present it shows the committed unavailable text.
 - **Unimplemented tabs** render their panel's committed unavailable reason or the existing panel data via a placeholder slot until their change lands; no rule prose.
