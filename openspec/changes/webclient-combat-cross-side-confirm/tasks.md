@@ -53,8 +53,8 @@ Build once: `pnpm run build`.
 
 ## 4. Documentation and gates (≈0.5 h)
 
-- [ ] 4.1 Add the cross-side question to `web/webclient-app/AGENTS.md`'s combat section.
-- [ ] 4.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
+- [x] 4.1 Add the cross-side question to `web/webclient-app/AGENTS.md`'s combat section.
+- [x] 4.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
   `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract`,
   and `openspec validate webclient-combat-cross-side-confirm --strict`. Verify all pass.
 
