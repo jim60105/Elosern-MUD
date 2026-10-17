@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **8 of 30**.
+Declared implementation order: **8 of 31**.
 
 - depends-on: companion-field-cast-rule
 
