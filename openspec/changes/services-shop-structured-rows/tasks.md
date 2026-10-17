@@ -12,4 +12,4 @@ Total estimate: **6.5 hours**, including implementation, focused verification, d
 
 ## 3. Transitional client and integration (2h)
 
-- [ ] 3.1 Update `ShopPanel.vue` to the v7 rows and verify Vitest ShopPanel and QuestDrawer; annotate canonical IDs for the two modified `webclient-service-menus` requirements; run `uv run --locked python -m tools.contract_gate` and `openspec validate services-shop-structured-rows --strict`.
+- [ ] 3.1 Update `ShopPanel.vue` to the v7 rows and to send `services.shop.member_id` as recipient/seller and verify Vitest ShopPanel and QuestDrawer; annotate canonical IDs for the two modified `webclient-service-menus` requirements; run `uv run --locked python -m tools.contract_gate` and `openspec validate services-shop-structured-rows --strict`.

@@ -158,3 +158,29 @@ otherwise carrying a stable disabled reason.
 - **WHEN** any stock or sellable row ships
 - **THEN** it exposes no effect amount, condition threshold, consumable flag, slot choice, target, drag, or drop
   action, and its only member reference is the panel's `member_id`
+
+### Requirement: Reconnect rebuilds services without replaying intent
+WebSocket loss SHALL preserve the last rendered services view under the foundation offline overlay and lock every
+service mutation. After reconnect, the first valid new-epoch snapshot SHALL rebuild host, player summary, guild,
+and shop sections from canonical persistence even when its revision is lower than the retired epoch.
+
+#### Scenario: Reconnect restores a shop view
+- **WHEN** the transport disconnects while the shop surface holds a typed but unsubmitted quantity and reconnects without another game action
+- **THEN** the shop surface closes on the transport loss, the unsubmitted quantity is discarded, the new snapshot renders the current stock, purse and the viewed member's sellable rows the next time the shop surface opens, with every quantity entry back at its row action's own lower bound, and no automatic replacement purchase is sent
+
+#### Scenario: Disconnect after submit never retries
+- **WHEN** transport closes after sending `guild.quest_turnin` but before its result is observed
+- **THEN** reconnect synchronizes canonical quest, wallet, merit, and claims state, shows the uncertain-result notice, and sends no automatic replacement turn-in
+
+#### Scenario: Old-epoch packets are discarded
+- **WHEN** a packet from the retired epoch arrives after reconnect
+- **THEN** the browser discards it
+
+#### Scenario: Stale selections are never restored as authority
+- **WHEN** reconnect completes with an unsubmitted selection pending from before transport loss
+- **THEN** the browser does not restore the unsubmitted selection as authority and does not resubmit an uncertain
+  prior mutation
+
+#### Scenario: Unconfirmed submissions get the approved notice
+- **WHEN** an action was submitted but unconfirmed before transport loss
+- **THEN** it is treated as unconfirmed with the approved notice and never retried
