@@ -15,7 +15,7 @@ encounter-level reference and are not re-measured here; encounter tuning belongs
 `party-combat-encounter-calibration`.
 
 | Tier / Variant | Human Reference / Policy | Monster Defeats | Retreats | Losses | All Standing | Median Rounds | Notes |
-|---|---|---:|---:|---:|---:|---:|---|
+|---|---|---:|---:|---:|---:|---|---|
 | **F** / Grain pecker | F 224-pt creation build (plains kit: 7/5/9) | 4/4 | 0 | 0 | 4/4 | ~15 | Stand-and-fight, 0 rejects |
 | **E** / Shore walker | E restricted senior (military E pair, limit ring) | 4/4 | 0 | 0 | 4/4 | ~8 | Stand-and-fight, 0 rejects |
 | **D** / Wood stalker | 3× D restricted party | 4/4 | 0 | 0 | 4/4 | ~5 | Party clear, all standing |
@@ -108,3 +108,86 @@ magnitude measured 30 in both states. Externally attributed physical damage, mul
 and critical composition, and main/off-hand precedence with the nonweapon-main-hand
 exception keep their existing independent coverage in `world/rules/tests/test_damage_bands.py`
 and `world/rules/tests/test_equipment_combat_wiring.py`.
+
+## Combined damage factor budget matrix
+
+`party-combat-factor-budget-calibration` (change 18 of the party-combat batch) records
+the finite combined damage factor budget before any selected encounter tuning. The
+bounded set is exactly 30 cases: the 12 listed factor combinations run with the actor
+sides exchanged (player attacker and enemy attacker, 24 base cases) plus six invariant
+controls added once. Encounter outcome selection stays with
+`party-combat-encounter-calibration`; nothing here is a balance claim.
+
+Fixed inputs unless a case says otherwise: rounded attack 60, mitigation K 40, defense 20,
+both sides' agility 10, and one fixed d100 face (80, a landing base hit; 100 for the
+critical controls). The default strike is therefore `round(60) x 40 / (40 + 20) = 40`.
+Every expected amount is an independently hand-derived literal evaluated in
+`world/rules/tests/test_human_combat_calibration.py::CombatFactorBudgetTests`, against
+real `PlayerCharacter`/`Monster` actors with `roll_d100` and the combat modifier bundle
+patched to the fixed literals; no expected value is obtained by calling the calculator
+under test. The matrix's synthetic weapon rows declare `adjustments={}`, so they isolate
+the `weapon_multiplier` term alone; weapon gear-stat composition (the flat `atk_phys` and
+`agility` bundles) is measured by the parity probe's real authored weapons below.
+
+| # | Case (both directions observed) | Inputs that change | Outcome |
+|---|---|---|---|
+| 1 | physical basic | coefficient 1, weapon 1 | 40 |
+| 2 | physical weapon factor | `weapon_multiplier` 1.5 | 60 (counterfactual 40) |
+| 3 | magic neutral control | weapon 1.5 declared, magic school | 40 (factor never consumed) |
+| 4 | explicit bypass | `unconditional_defense_bypass`, defense 60 | 60 (counterfactual 24) |
+| 5 | matched conditional | predicate matched, `attack_multiplier` 2 | 80 (counterfactual 40) |
+| 6 | max-HP rider | `max_hp_fraction` 0.1 on HP 100 | 50 (counterfactual 40) |
+| 7 | authored scale + rider | scale 0.5 with the rider | 25 (counterfactual 20) |
+| 8 | compound A | coefficient 2 x critical 2 x weapon 1.5 x two strikes | 240 per strike, 480 total |
+| 9 | Defend ordering | weapon 1.5, scale 0.5, Defend | 19 (counterfactual 30) |
+| 10 | Dodge | defender agility 20, declared Dodge | 0 (counterfactual 40) |
+| 11 | raw-100 miss | fixed face 100, defender agility 60 | 0 (critical never lands) |
+| 12 | compound B | predicate 2 x coefficient 2 x weapon 1.5 x critical 2 x rider 0.1 x scale 2 x two strikes | 980 per strike, 1960 total |
+
+Compound budgets, each per-strike magnitude expressed against case 1's 40:
+
+- Case 8: coefficient 2 x critical 2 x weapon 1.5 = 6x, so 240 per strike and 480 over
+  the two strikes the policy declares.
+- Case 12: coefficient 2 x critical 2 x matched conditional 2 x weapon 1.5 = 12x
+  (480), then the 10-point rider is added before the authored scale
+  (`(480 + 10) x 2 = 980` per strike, 1960 over the two strikes). The rider rides
+  pre-scale, so it contributes 20 to the scaled strike, not 10.
+
+Case 9 pins the ordering: the authored scale is applied before the 0.35 Defend reduction
+(`floor(30 x 0.65) = 19`); the reverse composition (`floor(60 x 0.65) = 39`, then the 0.5
+scale) records 20, and the test asserts both literals so a reordering cannot pass.
+
+The six invariant controls, added once: an unchecked recipient receives no Dodge roll
+while another roster key's declaration is active; per-recipient AREA Dodge differs by
+declaration (the declared dodger misses on the same face that lands on its neighbour); a
+damaging upkeep tick ignores Defend (a declared defender still takes the full 10);
+explicit bypass ignores Defend; the nonlethal projection follows the final direct amount;
+and literal base traits, `skill_proficiency`, `affinity_elements` and strike count are
+unchanged across the whole matrix.
+
+### Estimator-versus-settlement parity
+
+Backend: Evennia test runner on SQLite (`server/db/evennia-test.sqlite3`); Python
+3.13.14; measured revision `d5862c29` (re-verified unchanged at the branch tip); no seed
+(fixed faces, no live services). The parity probe equips the authored `plain_sword` and
+`military_s_sword` through the ordinary `add_item`/`toggle_equipment` rules and compares
+the two paths on the same fixed matchup (monster attack 40 base, target hp 500 /
+defense 10 / agility 20, defender threshold 71, retention 0.8):
+
+| State | Adjusted attack | Factor | Settled average over 100 faces | Estimator projection |
+|---|---|---:|---:|---:|
+| unarmed | 40 | 1.0 | 13.12 | 13.12 |
+| authored initial `plain_sword` | 42 (+2 atk) | 1.05 | 14.35 | 14.35 |
+| authored selected `military_s_sword` | 52 (+12 atk, +4 agility) | 1.25 | 24.18 | 24.18 |
+
+The selected row's solid band shifts with the weapon's +4 agility (adjusted agility 14,
+margin `roll - 57`), so faces 57..96 land 52, 97..99 land 78 and the raw-100 critical
+lands 104: `(40 x 52 + 3 x 78 + 104) / 100 = 24.18`. The estimator's own read path
+(`DecisionReads.weapon_multiplier`) reports exactly the declaration the settlement read
+path (`equipment_weapon_multiplier`) consumes, so the factor has one authored source and
+no duplicated balance constant; the analytic all-face projection and the settled average
+agree in every state.
+
+Shard ownership: the extended module
+`world/rules/tests/test_human_combat_calibration.py` keeps its single existing entry in
+`.github/evennia-shards.json`; no module was added, moved or renamed.
