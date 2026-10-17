@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **31 of 32**.
+Declared implementation order: **32 of 33**.
 
 - depends-on: webclient-shop-window
 
