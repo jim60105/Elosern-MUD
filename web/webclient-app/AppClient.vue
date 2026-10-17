@@ -464,10 +464,18 @@ const targetMarkers = computed(() =>
 );
 function onTargetFigure(identity, action) {
   const key = positionKeyFor(stageTarget.value, identity);
-  if (key) store.stageTargetPointer(key, action);
+  if (key) onTargetPosition(key, action);
 }
 function onTargetPosition(key, action) {
+  // A pointer resting on a figure when the cross-side question closes enters
+  // its hit area without moving; that is no hover, so the step keeps the
+  // focused position the question returned to until the pointer moves.
+  if (action === "hover" && hoverHeld) return;
   store.stageTargetPointer(key, action);
+}
+let hoverHeld = false;
+function releaseHover() {
+  hoverHeld = false;
 }
 
 // The cross-side question (webclient-combat-cross-side-confirm D2/D3): a
@@ -493,6 +501,10 @@ const crossSideLocked = computed(
 // question never leaves focus on the document body.
 watch(crossSideOpen, async (open, was) => {
   if (open || !was) return;
+  if (typeof window !== "undefined") {
+    hoverHeld = true;
+    window.addEventListener("pointermove", releaseHover, { once: true, capture: true });
+  }
   await nextTick();
   await nextTick();
   const active = typeof document === "undefined" ? null : document.activeElement;
