@@ -90,9 +90,14 @@ def _suggestions_ready(card_labels: list) -> dict:
 
 
 def _exploration_context_actions_panel(suggestions: dict) -> dict:
-    """A schema-valid ``context_actions`` exploration form with a suggestions envelope."""
+    """A schema-valid ``context_actions`` exploration form with a suggestions envelope.
+
+    The panel's registered schema version is the live client mirror's
+    ``CONTEXT_ACTIONS_SCHEMA_VERSION`` (7 since the v7 party-combat protocol
+    cutover), so an injected exploration form carries that exact version.
+    """
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "exploration",
         "affordances": [],

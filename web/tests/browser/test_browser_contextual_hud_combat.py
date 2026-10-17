@@ -123,14 +123,21 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
 
         # Walk to the last row: it is scrolled into view inside the list,
         # above the unchanged legend strip, and the page itself never scrolls.
+        # The root is the current client list (attack, skills, items, bag,
+        # defend, dodge, taunt, retreat, surrender), so the last row is the
+        # party surrender entry.
+        row_count = page.evaluate(
+            "document.querySelectorAll('#action-dock [data-testid=\"dock-menu\"] "
+            "[data-item-key]').length"
+        )
         legend_before = page.locator('[data-testid="action-dock-description"]').bounding_box()
-        for _ in range(6):
+        for _ in range(row_count - 1):
             _press(page, "ArrowDown")
-        self.assertEqual(focus_key(), "forfeit")
+        self.assertEqual(focus_key(), "surrender")
         geometry = page.evaluate(
             """() => {
               const list = document.querySelector('#action-dock [data-testid="dock-menu"]');
-              const row = list.querySelector('[data-item-key="forfeit"]').getBoundingClientRect();
+              const row = list.querySelector('[data-item-key="surrender"]').getBoundingClientRect();
               const box = list.getBoundingClientRect();
               const legend = document.querySelector('[data-testid="action-dock-description"]').getBoundingClientRect();
               return { rowTop: row.top, rowBottom: row.bottom, listTop: box.top, listBottom: box.bottom,

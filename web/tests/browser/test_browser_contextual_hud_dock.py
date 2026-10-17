@@ -258,7 +258,17 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
         keys = [rows.nth(i).get_attribute("data-item-key") for i in range(rows.count())]
         self.assertEqual(
             keys,
-            ["attack", "skills", "items", "bag", "defend", "flee", "forfeit"],
+            [
+                "attack",
+                "skills",
+                "items",
+                "bag",
+                "defend",
+                "dodge",
+                "taunt",
+                "retreat",
+                "surrender",
+            ],
             "the root list renders the resolver's items in order",
         )
         # One column: every row shares the list's left edge and stacks below
