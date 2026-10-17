@@ -1030,6 +1030,7 @@ class CombatFactorBudgetTests(EvenniaTest):
         return [int(item.description.rsplit("|", 1)[1]) for item in pending]
 
     @covers_requirement(
+        "human-combat-calibration::combined-ratio-weapon-and-tactical-calibration-covers-both-combat-sides",
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
         "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
         "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a",
@@ -1080,6 +1081,7 @@ class CombatFactorBudgetTests(EvenniaTest):
         )
 
     @covers_requirement(
+        "human-combat-calibration::combined-ratio-weapon-and-tactical-calibration-covers-both-combat-sides",
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
         "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage",
         "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins",
@@ -1266,6 +1268,7 @@ class CombatFactorBudgetTests(EvenniaTest):
         )
 
     @covers_requirement(
+        "human-combat-calibration::combined-ratio-weapon-and-tactical-calibration-covers-both-combat-sides",
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
         "monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement",
         "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
