@@ -344,9 +344,9 @@ test("a missing descriptor label stays silent rather than fabricating a name", (
   );
   assert.strictEqual(Echo.commandLine("explore.engage", {}, {}), null);
   assert.strictEqual(
-    Echo.commandLine("combat.flee", {}, {}),
+    Echo.commandLine("explore.move", {}, {}),
     null,
-    "a flee echo without a server label must not invent one"
+    "an exit echo without a server label must not invent one"
   );
 });
 

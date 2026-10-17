@@ -10,10 +10,10 @@
  *
  * The catalog is pure client presentation: it never submits, never replays,
  * never alters dispatch payloads, and never touches the transport. Command
- * spellings are pinned against `commands/*.py` by the Node suite; the three
- * actions without a typed command (`combat.flee`, exit traversal,
- * `creation.reset`) emit a bounded action label of the activating control as
- * an action description (the server exit label where the panel carries one,
+ * spellings are pinned against `commands/*.py` by the Node suite; the actions
+ * without a typed command (exit traversal, `creation.reset`, and the guarded
+ * party combat actions) emit a bounded action label of the activating control
+ * as an action description (the server exit label where the panel carries one,
  * a verbatim-pinned client-owned control label otherwise) and never invent a
  * command. Declared silent presentation controls (`options.dismiss`) return
  * `null` by declaration.

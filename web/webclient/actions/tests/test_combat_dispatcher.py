@@ -15,8 +15,6 @@ from tools.spec_traceability import covers_requirement
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
 from typeclasses.npcs import NPC
 from typeclasses.rooms import Room
 
@@ -28,36 +26,17 @@ from web.webclient.presentation.ingress import build_presentation_context
 from web.webclient.presentation.protocol import validate_ui_action_result
 from web.webclient.presentation.registry import build_production_registry
 from world.rules.combat_session import BASIC_ATTACK_KEY, engage, read_session
-from world.rules.monster_behaviour import BEHAVIOUR_PROFILES
 from world.rules.party import join_party
 from world.rules.tests._combat_session_helpers import (
+    _monster,
+    _player,
     open_synthetic_scope,
     synth_innate_overlay,
 )
 from world.rules.tests.combat_fixtures import BattlefieldIsolation, grant_lineage
-from world.lore.monsters import MONSTER_TIER_REGISTRY
 from world.tests.synthetic_data import SYNTH_SKILLS
 
 _T_SINGLE = SYNTH_SKILLS["t_ember_burst"].key
-
-
-def _player(key="dispatch player"):
-    player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
-    player.apply_race_baseline()
-    player.traits.magic_power.base = 30
-    return player
-
-
-def _monster(key="dispatch goblin", hp=100):
-    monster = create_object(Monster, key=key)
-    monster.threat_tier = next(iter(MONSTER_TIER_REGISTRY))
-    monster.behaviour_tree = next(iter(BEHAVIOUR_PROFILES))
-    monster.apply_monster_tier("floor")
-    monster.traits.hp.base = hp
-    monster.traits.hp.current = hp
-    monster.traits.atk_phys.base = 10
-    return monster
 
 
 class _FakeSession:
@@ -84,9 +63,9 @@ class CombatDispatchIntegrationTests(BattlefieldIsolation, EvenniaTestCase):
         )
         super().setUp()
         self.room = create_object(Room, key="dispatch arena")
-        self.player = _player()
+        self.player = _player("dispatch player")
         self.player.location = self.room
-        self.monster = _monster()
+        self.monster = _monster("dispatch goblin")
         self.monster.location = self.room
         grant_lineage(self.player, [_T_SINGLE])
         self.action_registry = build_production_action_registry()

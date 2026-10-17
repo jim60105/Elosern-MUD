@@ -16,8 +16,6 @@ from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTestCase
 
 from typeclasses.npcs import NPC
-from typeclasses.characters import PlayerCharacter
-from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
 
 from web.webclient.actions.combat_actions import (
@@ -55,6 +53,8 @@ from world.rules.combat_session import (
 )
 from world.rules.party import join_party
 from world.rules.tests._combat_session_helpers import (
+    _monster,
+    _player,
     open_synthetic_scope,
     synth_innate_overlay,
 )
@@ -68,39 +68,6 @@ _T_NONE = SYNTH_SKILLS["t_cinder_breath"].key
 _T_AREA = SYNTH_SKILLS["t_glowmire_bloom"].key
 
 _ALL_SKILLS = (_T_SINGLE, _T_SELF, _T_NONE, _T_AREA)
-
-
-def _player(key="transport player"):
-    """One combat-ready player: race baseline and the fixture's magic power."""
-    player = create_object(PlayerCharacter, key=key)
-    player.race = "human"
-    player.apply_race_baseline()
-    player.traits.magic_power.base = 30
-    return player
-
-
-def _monster(key="transport goblin", hp=100, atk=10):
-    """One combat-ready monster: an authored tier and behaviour, real traits."""
-    monster = create_object(Monster, key=key)
-    monster.threat_tier = next(iter(_live_monster_tiers()))
-    monster.behaviour_tree = next(iter(_live_behaviour_archetypes()))
-    monster.apply_monster_tier("floor")
-    monster.traits.hp.base = hp
-    monster.traits.hp.current = hp
-    monster.traits.atk_phys.base = atk
-    return monster
-
-
-def _live_monster_tiers():
-    from world.lore.monsters import MONSTER_TIER_REGISTRY
-
-    return MONSTER_TIER_REGISTRY
-
-
-def _live_behaviour_archetypes():
-    from world.rules.monster_behaviour import BEHAVIOUR_PROFILES
-
-    return BEHAVIOUR_PROFILES
 
 
 def _command(**overrides):
@@ -381,9 +348,9 @@ class CombatCommandAdapterTests(BattlefieldIsolation, EvenniaTestCase):
         )
         super().setUp()
         self.room = create_object(Room, key="transport arena")
-        self.player = _player()
+        self.player = _player("transport player")
         self.player.location = self.room
-        self.monster = _monster()
+        self.monster = _monster("transport goblin")
         self.monster.location = self.room
         grant_lineage(self.player, list(_ALL_SKILLS))
 

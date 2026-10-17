@@ -9,11 +9,11 @@ bounded schema before returning it to the presentation registry.
 
 Availability is exactly "this publication carries the completing action's
 round record": the dispatcher's completion publication for an admitted
-``combat.cast``, ``combat.flee``, or in-session ``inventory.use`` that settled
-an ordinary round supplies it, and every other publication (a reconnect or
-``ui_sync`` snapshot, a text-command refresh, a forfeit, a rejected or stale
-completion, a push, a round opened by the overwhelm opening or by a typed
-command) builds its context without one and therefore renders the common
+``combat.command`` or confirmed ``combat.exit_confirm`` that settled a round
+supplies it, and every other publication (a reconnect or ``ui_sync`` snapshot,
+a text-command refresh, a draft edit or actor query, an exit prompt, a rejected
+or stale completion, a push, a round opened by the overwhelm opening or by a
+typed command) builds its context without one and therefore renders the common
 unavailable form.
 
 The panel is read-only: it reads its frozen context and never mutates traits,
