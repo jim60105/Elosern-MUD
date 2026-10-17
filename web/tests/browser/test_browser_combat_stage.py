@@ -1254,7 +1254,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             for group in category["groups"]:
                 for skill in group["skills"]:
                     if skill["key"] == BASIC_ATTACK_KEY:
-                        skill.update(label="基本攻擊", hostile=True)
+                        skill.update(label="合成攻擊", hostile=True)
         self._commit(page, "combat", panels)
         self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 3")
         page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
@@ -1274,9 +1274,9 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         question.wait_for(state="visible", timeout=5000)
         expect(question).to_have_attribute("role", "dialog")
         expect(question).to_have_attribute("aria-modal", "true")
-        expect(question.locator('[data-testid="question-card-question"]')).to_have_text("確定要對友方使用〈基本攻擊〉？")
+        expect(question.locator('[data-testid="question-card-question"]')).to_have_text("確定要對友方使用〈合成攻擊〉？")
         label_id = question.get_attribute("aria-labelledby")
-        self.assertEqual(page.evaluate(f"() => document.getElementById('{label_id}').textContent"), "確定要對友方使用〈基本攻擊〉？")
+        self.assertEqual(page.evaluate(f"() => document.getElementById('{label_id}').textContent"), "確定要對友方使用〈合成攻擊〉？")
         page.wait_for_function(
             "() => document.activeElement && document.activeElement.dataset.testid === 'question-card-no'", timeout=5000
         )

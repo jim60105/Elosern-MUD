@@ -37,7 +37,7 @@ Build once: `pnpm run build`.
 
 - [x] 2.1 Add `test_cross_side_cast_asks_first` to `web/tests/browser/test_browser_combat_stage.py`
   `CombatStageBrowserTest`: Attack → a companion → Enter opens `[data-testid="cross-side-question"]` with role
-  `dialog`, the text `確定要對友方使用〈基本攻擊〉？` and focus on 否, no `combat.cast` sent, every figure's
+  `dialog`, the text `確定要對友方使用〈<fixture label>〉？` (the fixture relabels Attack with a synthetic name, which the test-data lint requires) and focus on 否, no `combat.cast` sent, every figure's
   `data-speaking` unchanged from the step; Escape returns to the step with focus on `#action-dock` and the same
   marker focused; Enter again then 是 sends exactly one `combat.cast` with that companion's `target_ids`; with the question open a click on a foe's
   `stage-target-hit` sends nothing; after 是 the active element is `#action-dock`; Attack on a foe sends at once with no

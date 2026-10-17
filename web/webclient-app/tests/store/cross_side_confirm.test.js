@@ -78,16 +78,16 @@ function skills({ attackTargets = [ALLY, FOE_A, FOE_B], disableAttack = false, s
           group: null,
           label: null,
           skills: [
-            skill(ATTACK, "基本攻擊", "single", attackTargets, HARM, disableAttack
+            skill(ATTACK, "合成攻擊", "single", attackTargets, HARM, disableAttack
               ? { enabled: false, disabled_reason: { code: "unavailable", message: "暫時無法使用。" } }
               : {}),
-            skill("x_heal", "治癒術", "single", EVERYONE, HELP),
+            skill("x_heal", "合成治癒", "single", EVERYONE, HELP),
             skill("x_ward", "守護祝福", "single", EVERYONE, HELP),
             skill("x_drain", "汲取", "single", EVERYONE, HARM),
             skill("x_curse", "自縛", "self", [], HARM),
             skill("x_rally", "鼓舞", "self", [], HELP),
             skill("x_storm", "雷暴", "area", stormTargets, HARM, AREA_SHORTHANDS),
-            skill("x_bloom", "群體治癒", "area", [PLAYER, ALLY, FOE_A], HELP, AREA_SHORTHANDS),
+            skill("x_bloom", "合成群療", "area", [PLAYER, ALLY, FOE_A], HELP, AREA_SHORTHANDS),
             skill("x_tide", "潮汐逆轉", "area", [ALLY, FOE_A], BOTH, AREA_SHORTHANDS),
             skill("x_push", "推移", "single", [FOE_A], NEITHER),
             skill("x_nova", "新星", "none", [], HARM),
@@ -157,9 +157,9 @@ describe("cross-side predicate (pure)", () => {
   });
 
   it("words the four questions exactly", () => {
-    expect(crossSideQuestion("ally", "基本攻擊")).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(crossSideQuestion("ally", "合成攻擊")).toBe("確定要對友方使用〈合成攻擊〉？");
     expect(crossSideQuestion("self", "汲取")).toBe("確定要對自己使用〈汲取〉？");
-    expect(crossSideQuestion("foe", "治癒術")).toBe("確定要對敵方使用〈治癒術〉？");
+    expect(crossSideQuestion("foe", "合成治癒")).toBe("確定要對敵方使用〈合成治癒〉？");
     expect(crossSideQuestion("both", "潮汐逆轉")).toBe("確定要對友方與敵方使用〈潮汐逆轉〉？");
   });
 
@@ -262,7 +262,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey(`target-${ALLY}`);
     expect(store.focusPress("Enter")).toBe(true);
     expect(sent()).toHaveLength(0);
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
     expect(store.view.crossSideConfirm.sides).toBe("ally");
     // The step stays exactly as it was.
     expect(store.view.stageTarget.focusKey).toBe(`target-${ALLY}`);
@@ -280,11 +280,11 @@ describe("cross-side question (store flow)", () => {
     openAttack();
     expect(store.focusPress("1")).toBe(true); // server order: the ally first
     expect(sent()).toHaveLength(0);
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
     store.cancelCrossSide();
     expect(store.stageTargetPointer(`target-${ALLY}`, "activate")).toBe(true);
     expect(sent()).toHaveLength(0);
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
   });
 
   it("否 returns to the step with the same focus; Enter asks again", () => {
@@ -301,7 +301,7 @@ describe("cross-side question (store flow)", () => {
     expect(store.view.dockFocusRequest).toBe(focusRequests + 1);
     // Nothing was sent, so the same row's Enter is not a suppressed repeat.
     store.focusPress("Enter");
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
     // One Escape that reaches the dock closes the question like 否; the next
     // pops the target frame as before.
     expect(store.focusPress("Escape")).toBe(true);
@@ -325,7 +325,7 @@ describe("cross-side question (store flow)", () => {
     expect(store.focusConfirm("pointer")).toBe(true); // the router's own confirm emits…
     expect(sent()).toHaveLength(0); // …but the held submit ignores it
     expect(focus()).toBe(`target-${ALLY}`);
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
   });
 
   it("a hostile SELF skill and a hostile SINGLE on the actor ask with 自己", () => {
@@ -343,7 +343,7 @@ describe("cross-side question (store flow)", () => {
   });
 
   it("a heal and a buff on a foe ask with 敵方", () => {
-    for (const [key, label] of [["x_heal", "治癒術"], ["x_ward", "守護祝福"]]) {
+    for (const [key, label] of [["x_heal", "合成治癒"], ["x_ward", "守護祝福"]]) {
       enterCombat();
       openSkill(key);
       store.focusItemByKey(`target-${FOE_B}`);
@@ -475,7 +475,7 @@ describe("cross-side question (store flow)", () => {
     store.focusItemByKey(`target-${ALLY}`);
     store.focusPress("Enter");
     replace({}); // the same candidates: a resync
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
     const focusRequests = store.view.dockFocusRequest;
     replace({ attackTargets: [FOE_A, FOE_B] });
     expect(question()).toBeNull();
@@ -550,7 +550,7 @@ describe("cross-side question (store flow)", () => {
     expect(sent()).toHaveLength(1);
     expect(store.confirmCrossSide()).toBeNull();
     expect(sent()).toHaveLength(1);
-    expect(question()).toBe("確定要對友方使用〈基本攻擊〉？");
+    expect(question()).toBe("確定要對友方使用〈合成攻擊〉？");
     // 否 still answers.
     expect(store.cancelCrossSide()).toBe(true);
   });
