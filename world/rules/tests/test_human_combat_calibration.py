@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from typing import Any
 from unittest.mock import patch
 
+from django.test import TransactionTestCase
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
 
@@ -482,20 +483,34 @@ _GROWTH_ROLL = 60
 _GROWTH_ELEMENT = "fire"
 
 
-class EquipmentGrowthCommittedReloadTests(EvenniaTest):
+class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
     """Real construction, registered gear and committed reload growth evidence.
 
     The equipment-growth slice's authored weapon factors are real shipped
     data, so its evidence uses real Evennia construction, registered gear,
-    ordinary grant/equip rules and a committed re-read: ``_reread`` drops
-    Evennia's idmapper entries (forced, because an object holding NAttributes
-    refuses the soft flush) and fetches the object row again, so every number
-    below is observed on freshly loaded state instead of the handler edits
-    that wrote it. The actor's true stats stay below the defender's defense,
-    which the retired subtraction engine would have masked entirely, and all
-    probes use one fixed d100 roll. These are measurements, not balance
-    claims: encounter tuning belongs to its own change.
+    ordinary grant/equip rules and a committed re-read. The base is Django's
+    ``TransactionTestCase`` (the same choice ``DurableRoundAdmissionTests``
+    makes) because this probe exists to observe committed state: ``TestCase``
+    would enclose it in an atomic block whose rollback hides whether the reads
+    came from storage at all. ``_reread`` force-evicts both idmapper caches --
+    ``ObjectDB`` (an NAttribute-holding object refuses the soft flush) and
+    ``Attribute``, where equipment, inventory and traits actually live -- and
+    fetches the object row again, so every number below is observed on a
+    freshly loaded instance instead of the writer's own handler state. The
+    actor's true stats stay below the defender's defense, which the retired
+    subtraction engine would have masked entirely, and all probes use one
+    fixed d100 roll. These are measurements, not balance claims: encounter
+    tuning belongs to its own change.
     """
+
+    # The published evidence numbers (docs/development/human-combat-calibration-evidence.md).
+    # They are asserted as literals so a settlement regression that stopped
+    # consuming the factor could not pass on ordering alone, and so any
+    # authored retune forces the published record to be re-measured with it.
+    PUBLISHED_HITS = {"unarmed": 10, "initial": 11, "selected": 20}
+    PUBLISHED_ARMOR_HITS = {"bare": 20, "light": 19, "heavy": 17}
+    PUBLISHED_MAGIC_HIT = 15
+    PUBLISHED_HEAL = 30
 
     def setUp(self):
         super().setUp()
@@ -532,11 +547,12 @@ class EquipmentGrowthCommittedReloadTests(EvenniaTest):
     def _reread(self, actor: PlayerCharacter) -> PlayerCharacter:
         """Return a freshly loaded instance of one committed actor row."""
         from evennia.objects.models import ObjectDB
+        from evennia.typeclasses.attributes import Attribute
 
-        pk = actor.pk
         actor.save()
-        ObjectDB.flush_instance_cache(force=True)
-        fresh = PlayerCharacter.objects.get(pk=pk)
+        for model in (ObjectDB, Attribute):
+            model.flush_instance_cache(force=True)
+        fresh = PlayerCharacter.objects.get(pk=actor.pk)
         self.assertIsNot(fresh, actor)
         return fresh
 
@@ -611,23 +627,23 @@ class EquipmentGrowthCommittedReloadTests(EvenniaTest):
         # Positive marginal growth below the old subtraction threshold: the
         # adjusted attacks (20 / 20 + plain-sword flat / 20 + S-sword flat)
         # all land at or below defense 40, yet each committed state hits for
-        # strictly more than the one before it.
-        self.assertGreater(unarmed, 0)
-        self.assertGreater(initial, unarmed)
-        self.assertGreater(selected, initial)
-        self.assertGreaterEqual(selected - initial, 1)
+        # strictly more than the one before it, at the published amounts.
+        self.assertEqual(
+            {"unarmed": unarmed, "initial": initial, "selected": selected},
+            self.PUBLISHED_HITS,
+        )
 
-        # Provenance: an in-memory detached copy of the mapping is not the
-        # committed state, so the next fresh read still reports the equipped
-        # upgrade. (The tampered copy is never assigned back to any storage.)
-        detached = dict(normalized_equipment(selected_actor))
-        detached["weapon_main"] = "iron_dagger"
-        self.assertEqual(detached["weapon_main"], "iron_dagger")
+        # Durable provenance: a value held only in the writer's process (an
+        # ndb entry, like any ordinary instance attribute) never reaches
+        # committed storage, while the equipped upgrade is still reported by
+        # the next freshly loaded instance.
+        attacker.ndb.uncommitted_weapon = "plain_sword"
         again = self._reread(attacker)
         self.assertEqual(
             normalized_equipment(again)["weapon_main"], "military_s_sword"
         )
         self.assertEqual(equipment_weapon_multiplier(again), selected_factor)
+        self.assertIsNone(again.ndb.uncommitted_weapon)
 
         # No base-trait, proficiency, affinity or owned-skill drift from
         # ordinary grant/equip/persistence.
@@ -647,12 +663,18 @@ class EquipmentGrowthCommittedReloadTests(EvenniaTest):
         bare = self._staged(armed, self._reread(defender), "physical")
         # Magic and healing never consume the physical factor: the same fixed
         # roll and the same caster yield identical amounts with and without a
-        # nonneutral weapon (military_s_sword carries no magic_power).
-        self.assertEqual(
-            self._staged(armed, self._reread(defender), "magic"),
-            self._staged(committed_unarmed, self._reread(defender), "magic"),
+        # nonneutral weapon (military_s_sword carries no magic_power), at the
+        # published amounts.
+        armed_magic = self._staged(armed, self._reread(defender), "magic")
+        unarmed_magic = self._staged(
+            committed_unarmed, self._reread(defender), "magic"
         )
-        self.assertEqual(_heal_magnitude(armed), _heal_magnitude(committed_unarmed))
+        self.assertEqual(armed_magic, unarmed_magic)
+        self.assertEqual(armed_magic, self.PUBLISHED_MAGIC_HIT)
+        self.assertEqual(_heal_magnitude(armed), self.PUBLISHED_HEAL)
+        self.assertEqual(
+            _heal_magnitude(committed_unarmed), self.PUBLISHED_HEAL
+        )
 
         # Positive defense reduces the successful hit monotonically across
         # committed armor states, and armor contributes defense only: the
@@ -662,8 +684,10 @@ class EquipmentGrowthCommittedReloadTests(EvenniaTest):
         self._grant_and_equip(defender, "military_s_armor")
         heavy_defender = self._reread(defender)
         heavy = self._staged(armed, heavy_defender, "physical")
-        self.assertLess(light, bare)
-        self.assertLess(heavy, light)
+        self.assertEqual(
+            {"bare": bare, "light": light, "heavy": heavy},
+            self.PUBLISHED_ARMOR_HITS,
+        )
         self.assertGreater(heavy, 0)
         self.assertEqual(equipment_weapon_multiplier(heavy_defender), 1.0)
         self.assertEqual(
