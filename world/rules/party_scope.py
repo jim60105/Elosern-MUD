@@ -105,11 +105,15 @@ def _answers_to(entity: Any, token: str) -> bool:
 
 
 def _knocked_out(member: Any) -> bool:
-    """Whether ``member``'s stored HP is at or below the nonlethal floor."""
-    from world.rules.action import stored_gauge_pair
+    """Whether ``member``'s stored HP is at or below the nonlethal floor.
 
-    current, _maximum = stored_gauge_pair(member, "hp")
-    return current <= NONLETHAL_HP_FLOOR
+    The unrounded stored value is compared, exactly as ``combat_companions``
+    decides engagement: the integer ``stored_gauge_pair`` presentation would
+    round 1.5 HP down to the floor and bar a companion the combat rules admit.
+    """
+    from world.rules.action import _stored_trait_value
+
+    return _stored_trait_value(member.traits.hp) <= NONLETHAL_HP_FLOOR
 
 
 def _possession_holds(acting: Any, owner: Any) -> bool:

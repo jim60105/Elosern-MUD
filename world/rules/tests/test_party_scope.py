@@ -201,6 +201,37 @@ class CommanderResolutionTests(PartyScopeTestCase):
                 REASON_NOT_PARTY_MEMBER,
             )
 
+    def test_stale_flag_rejection_writes_nothing(self):
+        npc = create_object(NPC, key="殘旗三", location=self.room1)
+        npc.db.possessed_by = self.char1.pk
+        entities = (self.char1, npc)
+        before = [_attribute_rows(entity) for entity in entities]
+
+        _rejected(
+            self, lambda: resolve_commander(npc), REASON_NOT_PARTY_MEMBER
+        )
+
+        self.assertEqual(
+            [_attribute_rows(entity) for entity in entities], before
+        )
+
+    def test_foreign_session_rejection_writes_nothing(self):
+        companion = self._companion("艾拉")
+        enter_possession(self.char1, companion)
+        entities = (self.char1, companion)
+        before = [_attribute_rows(entity) for entity in entities]
+
+        with patch.object(self.session, "account", self.account2):
+            _rejected(
+                self,
+                lambda: resolve_commander(companion),
+                REASON_NOT_PARTY_MEMBER,
+            )
+
+        self.assertEqual(
+            [_attribute_rows(entity) for entity in entities], before
+        )
+
 
 class MemberAuthorizationTests(PartyScopeTestCase):
     """A named member is re-derived from the roster, never substituted."""
@@ -297,6 +328,16 @@ class MemberAuthorizationTests(PartyScopeTestCase):
         )
         self.assertIs(
             authorize_member(self.char1, companion.pk, PURPOSE_ORGANIZE),
+            companion,
+        )
+
+    def test_hp_above_the_floor_is_admitted_for_acting(self):
+        # The floor compares the unrounded stored value: 1.5 HP is above the
+        # nonlethal floor even though the integer presentation pair reads 1.
+        companion = self._companion("邊緣者", hp=1.5)
+
+        self.assertIs(
+            authorize_member(self.char1, companion.pk, PURPOSE_ACT),
             companion,
         )
 
@@ -465,6 +506,34 @@ class MemberTokenTests(PartyScopeTestCase):
             self,
             lambda: authorize_member(self.char1, companion.pk, PURPOSE_ORGANIZE),
             REASON_MEMBER_NOT_PRESENT,
+        )
+
+    def test_token_rejections_write_nothing(self):
+        first = self._companion("艾拉")
+        create_object(NPC, key="路人", location=self.room1)
+        entities = (self.char1, first)
+
+        for token in ("路人", "不存在"):
+            before = [_attribute_rows(entity) for entity in entities]
+            _rejected(
+                self,
+                lambda token=token: resolve_member_token(self.char1, token),
+                REASON_NOT_PARTY_MEMBER,
+            )
+            self.assertEqual(
+                [_attribute_rows(entity) for entity in entities], before
+            )
+
+        self._companion("雙胞胎")
+        self._companion("雙胞胎")
+        before = [_attribute_rows(entity) for entity in entities]
+        _rejected(
+            self,
+            lambda: resolve_member_token(self.char1, "雙胞胎"),
+            REASON_NOT_PARTY_MEMBER,
+        )
+        self.assertEqual(
+            [_attribute_rows(entity) for entity in entities], before
         )
 
 
