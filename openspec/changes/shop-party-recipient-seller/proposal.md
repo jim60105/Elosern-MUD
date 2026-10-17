@@ -20,7 +20,7 @@ None.
 ### Modified Capabilities
 
 - `shop-economy`: recipient/seller/purse requirements, possession refusal retained, text syntax.
-- `webclient-service-menus`: the service-action allowlist admits `recipient_id` and `seller_id`.
+- `webclient-service-menus`: the service-action allowlist admits `recipient_id` and `seller_id`; the browser acceptance buy scenario carries the recipient.
 
 ## Impact
 
@@ -34,7 +34,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **11 of 30**.
+Declared implementation order: **11 of 31**.
 
 - depends-on: party-member-authority
 - depends-on: party-practice-booking
