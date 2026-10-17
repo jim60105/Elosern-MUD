@@ -349,6 +349,16 @@ export function applyView(ctx) {
       // null, or the positions, the lit set, the markers' digits and the
       // announcement the stage, the plates layer and the card render.
       stageTarget: mounted ? ctx.stageTargetNow() : null,
+      // The cross-side question (webclient-combat-cross-side-confirm D2):
+      // null, or the held cast's question; the stage target step above stays
+      // exactly as it was, so the dim, the lit set and the markers hold.
+      crossSideConfirm: ctx.crossSideConfirm
+        ? {
+            question: ctx.crossSideConfirm.question,
+            sides: ctx.crossSideConfirm.sides,
+            skillKey: ctx.crossSideConfirm.skillKey,
+          }
+        : null,
       // H3 (task 6.5): the focused skill model for the master-detail pane —
       // the `SkillDetailPane` renders this committed model, never inventing
       // a `戰鬥外` badge (design D14).
@@ -441,6 +451,7 @@ export function applyView(ctx) {
     ctx.rebuildCreationDock(prev, rs);
     ctx.syncRouterGates();
     ctx.settleFrameStack(rs);
+    ctx.settleCrossSide(rs);
     ctx.settlePresence(rs);
     ctx.settleRoomCard(rs);
     ctx.syncHudDrawer(prev, rs);

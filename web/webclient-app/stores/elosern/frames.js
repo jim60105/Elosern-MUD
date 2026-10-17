@@ -16,6 +16,7 @@
 import KeyboardRouter from "../../lib/keyboard_router.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import { actionIntentForItem } from "../../components/dock-items.js";
+import { crossSide, crossSideQuestion, skillFacts, targetSetFor } from "./cross_side.js";
 
 // The committed exploration room identity (webclient-scene-overview-swap D2):
 // the exploration panel's own stable movement key — `look.room.identity`. It
@@ -99,6 +100,8 @@ export function applyFrames(ctx) {
     // card open.
     ctx.resetPresence?.();
     ctx.resetRoomCard?.();
+    // Nor the cross-side question: a root reset drops the held cast unsent.
+    ctx.crossSideConfirm = null;
     ctx.inStackMutation = true;
     try {
       router.resetFrame(ctx.rootDescriptorFor(ctx.reducer.getState()), { openerKey: null });
@@ -195,6 +198,11 @@ export function applyFrames(ctx) {
     }
     const item = payload && payload.item;
     if (!item) {
+      return;
+    }
+    // The cross-side question is open (webclient-combat-cross-side-confirm
+    // D2): the router behind the dialog never activates anything.
+    if (ctx.crossSideConfirm) {
       return;
     }
     // Activation reads the RAW committed row (the focus projection strips the
@@ -319,11 +327,11 @@ export function applyFrames(ctx) {
         if (skill && skill.targetSpec === "area") {
           const areaPayload = CombatMenu.areaPayload(skill);
           if (areaPayload) {
-            ctx.dispatchAction(
-              "combat.cast",
-              areaPayload,
-              ctx.castSubmitDisplay(skill, areaPayload, item.commandDisplay)
-            );
+            const display = ctx.castSubmitDisplay(skill, areaPayload, item.commandDisplay);
+            if (ctx.askCrossSide("area", item.key, "combat.cast", areaPayload, display)) {
+              return;
+            }
+            ctx.dispatchAction("combat.cast", areaPayload, display);
           }
           return;
         }
@@ -345,14 +353,23 @@ export function applyFrames(ctx) {
         const focusSkill = combat.focusSkillKey
           ? combat.skillByKey[combat.focusSkillKey]
           : null;
-        ctx.dispatchAction(
-          "combat.cast",
-          item.payload,
-          focusSkill
-            ? ctx.castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
-            : item.commandDisplay || null
-        );
+        const display = focusSkill
+          ? ctx.castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
+          : item.commandDisplay || null;
+        if (ctx.askCrossSide("single", item.key, "combat.cast", item.payload, display)) {
+          return;
+        }
+        ctx.dispatchAction("combat.cast", item.payload, display);
         ctx.publishView();
+        return;
+      }
+      // The SELF confirm (one actor target): the same cross-side check before
+      // the row's own dispatch below.
+      if (
+        item.key === "self-confirm" &&
+        item.actionId &&
+        ctx.askCrossSide("self", item.key, item.actionId, item.payload || {}, item.commandDisplay || null)
+      ) {
         return;
       }
       // Real OOB action items (combat.cast / combat.flee / combat.forfeit).
@@ -460,4 +477,155 @@ export function applyFrames(ctx) {
     }
   };
 
+  // ---- The cross-side question (webclient-combat-cross-side-confirm D2) ----
+  // null, or the cast held back at submission: `{ actionId, payload, display,
+  // question, sides, skillKey, form, frameSource, focusKey }`. Nothing is
+  // sent while it is set; 是 sends the stored payload verbatim.
+  ctx.crossSideConfirm = null;
+
+  function committedCombat(rs) {
+    const panel = rs && rs.panels && rs.panels.context_actions;
+    return panel && panel.kind === "combat" ? panel : null;
+  }
+
+  function actorIdentityOf(rs) {
+    const status = rs && rs.panels && rs.panels.status;
+    return status && status.actor ? status.actor.identity : null;
+  }
+
+  // Called at each target-step submission with the payload exactly as it
+  // would be sent. Returns true when the cast is held for the question.
+  ctx.askCrossSide = function askCrossSide(form, focusKey, actionId, payload, display) {
+    const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    const combat = ctx.frameResolver.combatModel();
+    const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
+    if (!panel || !combat || skillKey === null) {
+      return false;
+    }
+    const facts = skillFacts(panel, skillKey);
+    const skill = Object.hasOwn(combat.skillByKey, skillKey) ? combat.skillByKey[skillKey] : null;
+    const participants = Array.isArray(panel.participants) ? panel.participants : [];
+    const actor = actorIdentityOf(rs);
+    const targets = targetSetFor({
+      form,
+      payload,
+      candidates: skill ? skill.targets : [],
+      participants,
+      actorIdentity: actor,
+    });
+    const outcome = crossSide(facts, targets, participants, actor);
+    if (!outcome) {
+      return false;
+    }
+    const descriptor = router.depth() > 0 ? router.currentDescriptor() : null;
+    ctx.crossSideConfirm = {
+      actionId,
+      payload,
+      display,
+      question: crossSideQuestion(outcome.sides, (skill && skill.label) || facts.label),
+      sides: outcome.sides,
+      skillKey,
+      form,
+      frameSource: descriptor ? descriptor.source : null,
+      focusKey,
+    };
+    ctx.publishView();
+    return true;
+  };
+
+  // 是: send the held cast through the single dispatch entry (its in-flight
+  // lock and echo). A lock keeps the question open and sends nothing.
+  ctx.confirmCrossSide = function confirmCrossSide() {
+    const pending = ctx.crossSideConfirm;
+    if (!pending) {
+      return null;
+    }
+    if (router.isMutationInFlight() || router.isAwaitingRevision()) {
+      return null;
+    }
+    const requestId = ctx.dispatchAction(pending.actionId, pending.payload, pending.display);
+    if (requestId === null || requestId === undefined) {
+      return null;
+    }
+    ctx.crossSideConfirm = null;
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return requestId;
+  };
+
+  // 否 / ✕ / Escape: back to the target step with the same focused position;
+  // the AREA selection lives in the model and is untouched. Nothing was
+  // sent, so the router's held-Enter guard for that row is released.
+  ctx.cancelCrossSide = function cancelCrossSide() {
+    const pending = ctx.crossSideConfirm;
+    if (!pending) {
+      return false;
+    }
+    ctx.crossSideConfirm = null;
+    if (router.depth() > 0 && pending.focusKey) {
+      router.focusItemByKey(pending.focusKey);
+    }
+    router.clearRepeatGuard();
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return true;
+  };
+
+  // The commit-time invalidation (run in every publish after the frame
+  // stack settles): a mode other than combat, a playing round, or a
+  // committed panel that no longer backs the held cast (the skill gone or
+  // disabled, a chosen target or the shorthand no longer a candidate, the
+  // target frame gone) closes the question without sending. An unrelated
+  // replacement keeps it.
+  ctx.settleCrossSide = function settleCrossSide(rs) {
+    const pending = ctx.crossSideConfirm;
+    if (!pending) {
+      return;
+    }
+    const drop = (focusDock) => {
+      ctx.crossSideConfirm = null;
+      if (focusDock) {
+        ctx.dockFocusRequest += 1;
+      }
+    };
+    if (rs.mode !== "combat") {
+      // The shell's own mode-change focus path takes the new mode's home.
+      drop(false);
+      return;
+    }
+    const panel = committedCombat(rs);
+    if (!panel || ctx.beatLocked()) {
+      drop(true);
+      return;
+    }
+    let raw = null;
+    for (const category of panel.skills || []) {
+      for (const group of (category && category.groups) || []) {
+        for (const skill of (group && group.skills) || []) {
+          if (skill && skill.key === pending.skillKey) raw = skill;
+        }
+      }
+    }
+    if (!raw || !raw.enabled) {
+      drop(true);
+      return;
+    }
+    const candidates = new Set((raw.targets || []).map(String));
+    const payload = pending.payload || {};
+    const ids = Array.isArray(payload.target_ids) ? payload.target_ids.map(String) : [];
+    if (ids.some((id) => !candidates.has(id))) {
+      drop(true);
+      return;
+    }
+    if (typeof payload.target_shorthand === "string" && !(raw.shorthands || []).includes(payload.target_shorthand)) {
+      drop(true);
+      return;
+    }
+    const descriptor = router.depth() > 0 ? router.currentDescriptor() : null;
+    const params = (descriptor && descriptor.params) || {};
+    if (!descriptor || descriptor.source !== pending.frameSource || params.skillKey !== pending.skillKey) {
+      drop(true);
+    }
+  };
 }

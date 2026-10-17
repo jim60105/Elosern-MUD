@@ -8,9 +8,9 @@ scratch file; no loops over browser files; Evennia commands use a `MUD_TEST_SETT
 
 ## 1. Client predicate and flow (≈2.5 h)
 
-- [ ] 1.1 Create `web/webclient-app/stores/elosern/cross_side.js` (design D1) with the target-set expansion for
+- [x] 1.1 Create `web/webclient-app/stores/elosern/cross_side.js` (design D1) with the target-set expansion for
   SINGLE, SELF, AREA explicit and the three shorthands.
-- [ ] 1.2 `stores/elosern/frames.js`: intercept the `target-*`, `self-confirm` and `area-confirm` submissions
+- [x] 1.2 `stores/elosern/frames.js`: intercept the `target-*`, `self-confirm` and `area-confirm` submissions
   (design D2); add `confirmCrossSide` / `cancelCrossSide` and the invalidation on a `context_actions` replacement,
   playback lock and mode change. `stores/elosern/view.js`: publish `crossSideConfirm`. `stores/elosern/interaction.js`:
   claim no dock key while it is set.
