@@ -20,6 +20,7 @@ None.
 ### Modified Capabilities
 
 - `webclient-skillbook-casting`: read model v2 with caster identity; preview payload and selection carry the caster; cast payload carries the caster.
+- `webclient-oob-protocol`: the presenter-registration requirement records `skill_use` v2 and the caster in the copied selection.
 
 ## Impact
 
@@ -42,6 +43,7 @@ Declared implementation order: **8 of 30**.
 - `webclient-party-skill-tab`: consumes `skill_use` v2 and removes `SkillBook.vue` edited here; shared spec `webclient-skillbook-casting` (F; ordered).
 - `party-practice-booking`: shared client file `components/SkillBook.vue` practice wiring (F; this change first).
 - Protocol fixtures and parity contract files shared with every protocol change (F, conditional; ordered).
+- `webclient-oob-protocol` requirement "Presenter registration and execution are isolated and read-only": also re-modified by `party-member-panel`, `party-inventory-panel` and `item-holdings-panel` for additive registration (S; ordered, each preserving this version text).
 
 ### Active change coordination
 
