@@ -274,6 +274,62 @@ def _acting_sessions(entity: Any) -> list[Any]:
     return sessions
 
 
+#: Logout-restore Attributes Evennia writes on puppet and on the last-session
+#: unpuppet. The companion must keep no stale restore target once its occupied
+#: room has been restored by this writer.
+_LOGOUT_LOCATION_ATTRIBUTES = ("prelogout_location", "prelog_location")
+
+
+def _snapshot_logout_attributes(entity: Any) -> dict[str, Any]:
+    """Capture presence and value of the logout-location Attributes.
+
+    Presence is tracked separately from value so compensation can restore a
+    present-but-``None`` Attribute exactly instead of dropping it.
+    """
+    attributes = getattr(entity, "attributes", None)
+    captured: dict[str, Any] = {}
+    if attributes is None:
+        return captured
+    for key in _LOGOUT_LOCATION_ATTRIBUTES:
+        if attributes.has(key):
+            captured[key] = attributes.get(key)
+    return captured
+
+
+def _restore_logout_attributes(entity: Any, captured: Mapping[str, Any]) -> None:
+    """Re-establish the exact logout-location Attribute presence and values."""
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return
+    for key in _LOGOUT_LOCATION_ATTRIBUTES:
+        if key in captured:
+            attributes.add(key, captured[key])
+        else:
+            attributes.remove(key)
+
+
+def _clear_logout_location_residuals(entity: Any) -> None:
+    """Drop the logout-location restore targets left by the unpuppet hook."""
+    attributes = getattr(entity, "attributes", None)
+    if attributes is None:
+        return
+    for key in _LOGOUT_LOCATION_ATTRIBUTES:
+        attributes.remove(key)
+
+
+def _restore_occupied_location(npc: Any, location: Any) -> None:
+    """Return a stashed companion to its snapshotted occupied room.
+
+    A direct location assignment reverses the framework's last-session stash
+    and keeps Evennia's contents cache in step; ``move_to`` would add an
+    unrelated world traversal and its movement hooks. Only a non-null snapshot
+    is a restoration source.
+    """
+    if location is None or getattr(npc, "location", None) is location:
+        return
+    npc.location = location
+
+
 # ---------------------------------------------------------------------------
 # Seam implementations for companion-possession-transition
 # ---------------------------------------------------------------------------
@@ -408,8 +464,15 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
             _strip_puppet_lock(npc, account)
         return
 
+    # Evennia's last-session unpuppet stashes the character (``location = None``)
+    # and records a logout restore target. Snapshot the occupied room before any
+    # unpuppet so the deterministic writer can reverse that bookkeeping.
+    occupied_location = getattr(npc, "location", None)
+
     if account is None:
         _strip_puppet_lock(npc, None)
+        if occupied_location is not None:
+            _clear_logout_location_residuals(npc)
         return
 
     sessions = _acting_sessions(npc)
@@ -445,6 +508,9 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
                 },
                 exc=exc,
             )
+        finally:
+            # A hook that stashes and then raises must not skip room restoration.
+            _restore_occupied_location(npc, occupied_location)
 
         try:
             account.puppet_object(session, player)
@@ -479,6 +545,8 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
         synchronize_session(session, player)
 
     _strip_puppet_lock(npc, account)
+    if occupied_location is not None:
+        _clear_logout_location_residuals(npc)
 
 
 # ---------------------------------------------------------------------------
@@ -738,6 +806,7 @@ def release_possession(
             "char": str(getattr(player, "pk", "?")),
             "npc": str(getattr(resolved_npc, "pk", "?")),
             "reason": str(reason),
+            "room": str(getattr(getattr(resolved_npc, "location", None), "pk", "?")),
         },
     )
 
@@ -769,6 +838,8 @@ def snapshot_party_control(player: Any, npc: Any) -> dict[str, Any]:
         "lock_before": deepcopy(npc.db.possession_lock_before),
         "account": _resolve_account(player, npc),
         "sessions": tuple(_acting_sessions(npc)),
+        "location": getattr(npc, "location", None),
+        "logout_attributes": _snapshot_logout_attributes(npc),
     }
 
 
@@ -787,23 +858,31 @@ def restore_party_control(player: Any, npc: Any, snapshot: dict[str, Any]) -> No
         npc.locks.remove("puppet")
     if snapshot["player"] is None or snapshot["npc"] != player.pk:
         return
+    # The handback ran: reverse the framework stash before any recovery puppet,
+    # then re-establish the exact logout metadata after the puppet hooks (which
+    # write ``prelogout_location`` again).
+    _restore_occupied_location(npc, snapshot["location"])
     _mount_cmdset(npc)
     account = snapshot["account"]
     if account is None:
+        _restore_logout_attributes(npc, snapshot["logout_attributes"])
         return
     from web.webclient.actions.dispatcher import retire_sequence
     from web.webclient.presentation.ingress import reset_client_sequence, synchronize_session
 
-    for session in snapshot["sessions"]:
-        retire_sequence(session)
-        reset_client_sequence(session)
-        if account.get_puppet(session) is not npc:
-            account.puppet_object(session, npc)
-        if account.get_puppet(session) is not npc:
-            raise PossessionWriteError(
-                REASON_RELEASE_REFUSED, "Cannot restore possessed companion after rollback"
-            )
-        synchronize_session(session, npc)
+    try:
+        for session in snapshot["sessions"]:
+            retire_sequence(session)
+            reset_client_sequence(session)
+            if account.get_puppet(session) is not npc:
+                account.puppet_object(session, npc)
+            if account.get_puppet(session) is not npc:
+                raise PossessionWriteError(
+                    REASON_RELEASE_REFUSED, "Cannot restore possessed companion after rollback"
+                )
+            synchronize_session(session, npc)
+    finally:
+        _restore_logout_attributes(npc, snapshot["logout_attributes"])
 
 
 def purge_possession_on_delete(npc: Any) -> None:
