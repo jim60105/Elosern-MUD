@@ -23,6 +23,7 @@ Design §2 and §4.6 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 - `movement-cost-charging`: `charge_movement` passes the travelling party instead of the traverser alone.
 - `time-skip-commands`: the rest/skip advance passes the present party scope.
 - `world-clock`: the documented call-site scopes change for the skip commands.
+- `settlement-stage-order`: the practice-stage note no longer claims single-entity SKIP scopes.
 
 ## Impact
 
@@ -43,7 +44,7 @@ Declared implementation order: **2 of 30**.
 ### Code and spec conflicts within the new batch
 
 - `party-field-settlement-scope`: shared specs `world-clock`, `party-time-settlement` (S, ordered: this change first); no shared code file.
-- `party-practice-booking`: shared files `world/rules/time_skip.py`, `commands/skip.py`; shared spec `time-skip-commands` (F, ordered: this change first; the later change re-modifies the same rest requirement preserving this scope text).
+- `party-practice-booking`: shared files `world/rules/time_skip.py`, `commands/skip.py`; shared specs `time-skip-commands`, `settlement-stage-order` (F, ordered: this change first; the later change re-modifies the same rest requirement preserving this scope text).
 - `party-unlock-notices`: shared file `world/rules/clock.py` only if the practice stage sink is touched (D via practice booking).
 - `.github/evennia-shards.json`: conditional manifest conflict.
 
