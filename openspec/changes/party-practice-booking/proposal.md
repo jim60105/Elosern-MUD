@@ -25,6 +25,7 @@ None.
 - `settlement-stage-order`: the practice-stage note matches standing bookings.
 - `webclient-exploration-menu`: `explore.practice` books for a member without advancing time.
 - `webclient-skillbook-casting`: SkillBook practice is a booking control.
+- `webclient-contextual-hud`: the reference-drawer scenario no longer describes a practice sub-screen.
 
 ## Impact
 
@@ -51,7 +52,7 @@ Declared implementation order: **10 of 30**.
 - `companion-field-item-use`: both command docs (F; that change first).
 - `party-unlock-notices`: shared file `world/rules/clock.py` practice stage (F; this change first).
 - `character-skill-growth-fields`: reads the booking for the `booked` row flag (D).
-- `webclient-party-skill-tab`: removes `SkillBook.vue` (F; ordered).
+- `webclient-party-skill-tab`: removes `SkillBook.vue` (F; ordered) and re-modifies the `webclient-contextual-hud` reference-drawer requirement (S; ordered).
 
 ### Active change coordination
 
