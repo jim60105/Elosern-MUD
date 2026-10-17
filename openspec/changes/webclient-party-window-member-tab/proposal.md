@@ -34,7 +34,7 @@ Design §3.2, §6 and §6.1 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 ## Batch: party member management
 
-Declared implementation order: **23 of 32**.
+Declared implementation order: **24 of 33**.
 
 - depends-on: webclient-window-primitives
 - depends-on: party-member-panel
