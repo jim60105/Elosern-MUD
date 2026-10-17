@@ -2049,6 +2049,9 @@ class EncounterCalibrationTests(EvenniaTest):
     @covers_requirement(
         "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
     )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
+    )
     def test_eight_encounter_cells_run_explicit_draft_commands_over_four_seeds(self):
         self._assert_recorded_evidence(self._run_all_cells())
 
@@ -2057,6 +2060,9 @@ class EncounterCalibrationTests(EvenniaTest):
     )
     @covers_requirement(
         "human-combat-calibration::combined-ratio-weapon-and-tactical-calibration-covers-both-combat-sides"
+    )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
     )
     def test_selected_values_reproduce_the_measured_encounter_outcomes(self):
         # The tuning evaluation found no observed combined result that required
@@ -2099,6 +2105,9 @@ class EncounterCalibrationTests(EvenniaTest):
 
     @covers_requirement(
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
     )
     def test_an_ally_without_a_submitted_command_never_auto_attacks(self):
         # No autonomous allied fallback: with a companion's command missing the
