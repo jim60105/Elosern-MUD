@@ -14,6 +14,7 @@ See proposal.md. `use_item(actor, item_key, target=None)` (exploration facade) r
 
 - **Wrapper** `use_member_item` authorizes then calls `use_item(member, ...)`; target tokens are resolved relative to the member's room by the adapter's existing `_resolve_inventory_target` (now passed the member).
 - **Text combat routing**: `使用 ... = <成員>` in a session builds the same actor item command `combat command <token> item <key>[=<target>]` builds and submits it through the same facade (`submit_player_item_use` is generalized to take the actor or the existing actor-command facade is reused; the implementation chooses the existing facade, never a second resolution path).
+- **Combat check** uses `party_in_combat(acting, user)` so the field path is refused whenever the acting figure or the user is in a session.
 - **Order of parsing**: the `= <成員>` suffix is split first (`rhs`), then the existing `item [target]` parse runs on the left side.
 
 ## Risks / Trade-offs

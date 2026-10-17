@@ -36,7 +36,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **9 of 30**.
+Declared implementation order: **9 of 31**.
 
 - depends-on: party-field-settlement-scope
 - depends-on: party-member-equipment
@@ -49,7 +49,7 @@ Declared implementation order: **9 of 30**.
 - `party-member-equipment`: shared files `service_actions.py`, `commands/items.py`, `intents.js`, `InventoryPanel.vue`; shared spec `inventory-item-actions` (F; that change first; this delta preserves its toggle wording).
 - `companion-field-cast-rule`: shared spec `companion-field-actions` (S; that change creates it) and both command docs (F).
 - `party-inventory-panel`: consumes the use descriptor shape (D).
-- `webclient-party-bag-tab`: removes `InventoryPanel.vue` (F; ordered).
+- `webclient-party-bag-retire`: removes `InventoryPanel.vue` (F; ordered).
 - `.github/evennia-shards.json`: conditional manifest conflict.
 
 ### Active change coordination
