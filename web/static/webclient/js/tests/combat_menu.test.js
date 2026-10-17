@@ -159,27 +159,285 @@ function readyPanel(overrides) {
   return Object.assign(base, opts);
 }
 
-test("root menu preserves stable action order and disables placeholders", () => {
+test("root menu preserves stable action order with no placeholder rows", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
   const root = combat.menus.root.items;
   assert.deepEqual(
     root.map((item) => item.key),
-    ["attack", "skills", "items", "bag", "defend", "flee", "forfeit"]
+    ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"]
   );
+  // The commanded actor's committed capability decides the items row: an
+  // actor with no usable stock carries the capability reason, never a
+  // not_implemented placeholder.
   assert.equal(root[2].enabled, false);
-  assert.equal(root[2].disabledReason.code, "not_implemented");
+  assert.equal(root[2].disabledReason.code, "no_usable_item");
   // The client-local 背包 row: enabled, never dispatches, opens the bag.
   assert.equal(root[3].key, "bag");
   assert.equal(root[3].enabled, true);
   assert.equal(root[3].actionId, null);
   assert.equal(root[3].openDrawer, "inventory");
-  assert.equal(root[4].enabled, false);
-  assert.equal(root[5].actionId, "combat.flee");
-  assert.deepEqual(root[5].payload, {});
+  // Defend / Dodge / Taunt join as actor-scoped basic actions: a tactic the
+  // committed choices do not offer stays visible, disabled, and never
+  // dispatches.
+  assert.deepEqual(
+    root.slice(4, 7).map((item) => [item.key, item.enabled, item.actionId]),
+    [
+      ["defend", false, null],
+      ["dodge", false, null],
+      ["taunt", false, null],
+    ]
+  );
+  root.slice(4, 7).forEach((item) => {
+    assert.equal(item.command, true);
+    assert.equal(item.disabledReason.code, "unavailable");
+    assert.ok(item.description && !/\d/.test(item.description), item.description);
+  });
+  assert.equal(root[7].actionId, "combat.flee");
+  assert.deepEqual(root[7].payload, {});
   // Forfeit opens the confirmation secondary menu; it never submits directly.
-  assert.equal(root[6].key, "forfeit");
-  assert.equal(root[6].enabled, true);
-  assert.equal(root[6].actionId, null);
+  assert.equal(root[8].key, "forfeit");
+  assert.equal(root[8].enabled, true);
+  assert.equal(root[8].actionId, null);
+});
+
+// The committed actor-local item stock (webclient-party-items-tactics): the
+// 道具 frame lists the actor's own rows with quantity, effect summary and the
+// committed disabled reason; an eligible row opens that item's flow and a
+// disabled one never submits.
+function itemChoice(overrides) {
+  return Object.assign(
+    {
+      item_key: "t_tonic",
+      label: "合成藥水",
+      summary: "恢復少量體力。",
+      quantity: 2,
+      enabled: true,
+      reason: null,
+      target_spec: "self",
+      targets: [],
+      hostile: false,
+      beneficial: true,
+    },
+    overrides
+  );
+}
+
+function tacticChoice(overrides) {
+  return Object.assign(
+    {
+      key: "defend",
+      label: "防禦",
+      enabled: true,
+      reason: null,
+      targets: [],
+    },
+    overrides
+  );
+}
+
+test("the 道具 frame lists the actor's own stock with quantity and summary", () => {
+  const panel = readyPanel({
+    choices: {
+      actor_id: 2,
+      skills: nestedSkills(validSkill()),
+      items: [
+        itemChoice(),
+        itemChoice({
+          item_key: "t_salve",
+          label: "合成藥膏",
+          summary: "恢復體力。",
+          quantity: 1,
+          enabled: false,
+          reason: { code: "hp_full", message: "體力已滿。" },
+          target_spec: "single",
+          targets: [2],
+        }),
+      ],
+      tactics: [],
+    },
+  });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const root = combat.menus.root.items;
+  assert.equal(root[2].enabled, true, "an actor holding stock can open 道具");
+
+  const menu = combat.menus.items;
+  assert.deepEqual(
+    menu.items.map((item) => item.key),
+    ["item-t_tonic", "item-t_salve"]
+  );
+  assert.equal(menu.items[0].label, "合成藥水 ×2");
+  assert.equal(menu.items[0].description, "恢復少量體力。");
+  assert.equal(menu.items[0].enabled, true);
+  assert.equal(menu.items[0].actionId, "open-item");
+  assert.deepEqual(menu.items[0].payload, { itemKey: "t_tonic" });
+  assert.equal(menu.items[0].command, true, "the frame stays one vertical list");
+  // A committed disabled reason is carried verbatim and the row never opens.
+  assert.equal(menu.items[1].label, "合成藥膏 ×1");
+  assert.equal(menu.items[1].enabled, false);
+  assert.equal(menu.items[1].actionId, null);
+  assert.equal(menu.items[1].disabledReason.code, "hp_full");
+  assert.equal(menu.items[1].description, "恢復體力。");
+});
+
+test("an item's NONE and SELF flow sends the item key and no target field", () => {
+  const panel = readyPanel({
+    choices: {
+      actor_id: 2,
+      skills: nestedSkills(validSkill()),
+      items: [itemChoice(), itemChoice({ item_key: "t_draught", label: "合成飲劑", target_spec: "none", beneficial: false })],
+      tactics: [],
+    },
+  });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const self = CombatMenu.openItem(combat, "t_tonic");
+  assert.equal(self.items.length, 1);
+  assert.equal(self.items[0].key, "self-confirm");
+  assert.equal(self.items[0].commandKind, "item");
+  assert.deepEqual(self.items[0].payload, { item_key: "t_tonic" });
+
+  const none = CombatMenu.openItem(combat, "t_draught");
+  assert.equal(none.items[0].key, "none-confirm");
+  assert.equal(none.items[0].commandKind, "item");
+  assert.deepEqual(none.items[0].payload, { item_key: "t_draught" });
+
+  // The guarded envelope keeps the committed versions and commanded actor.
+  const envelope = CombatMenu.commandEnvelope(panel, {
+    kind: "item",
+    payload: self.items[0].payload,
+  });
+  assert.deepEqual(envelope, {
+    session_id: "hostile:1:0",
+    round_revision: 0,
+    draft_version: 0,
+    actor_id: 2,
+    command: { kind: "item", payload: { item_key: "t_tonic" } },
+  });
+});
+
+test("a SINGLE item submits exactly one scalar target_id per server candidate", () => {
+  const panel = readyPanel({
+    participants: [
+      validParticipant(),
+      validParticipant({ identity: 3, token: "e2", display_name: "同行劍士", team: "party" }),
+    ],
+    actors: [{ identity: 2, commandable: true, reason: null }],
+    choices: {
+      actor_id: 2,
+      skills: nestedSkills(validSkill()),
+      items: [
+        itemChoice({
+          item_key: "t_bomb",
+          label: "合成炸彈",
+          target_spec: "single",
+          targets: [3],
+          hostile: false,
+          beneficial: false,
+        }),
+      ],
+      tactics: [],
+    },
+  });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const menu = CombatMenu.openItem(combat, "t_bomb");
+  assert.deepEqual(
+    menu.items.map((item) => item.key),
+    ["target-3"]
+  );
+  assert.equal(menu.items[0].commandKind, "item");
+  assert.deepEqual(menu.items[0].payload, { item_key: "t_bomb", target_id: 3 });
+  assert.equal(menu.items[0].team, "party");
+});
+
+test("an item with no committed candidate never offers a submitting row", () => {
+  const panel = readyPanel({
+    choices: {
+      actor_id: 2,
+      skills: nestedSkills(validSkill()),
+      items: [itemChoice({ item_key: "t_bomb", target_spec: "single", targets: [] })],
+      tactics: [],
+    },
+  });
+  const menu = CombatMenu.openItem(CombatMenu.buildMenus(panel, {}), "t_bomb");
+  assert.equal(menu.items[0].key, "item-disabled");
+  assert.equal(menu.items[0].enabled, false);
+  assert.equal(menu.items[0].actionId, null);
+  assert.equal(menu.items[0].disabledReason.code, "no_target");
+});
+
+test("basic actions confirm their round choice and Taunt targets a listed enemy", () => {
+  const panel = readyPanel({
+    participants: [
+      validParticipant({ identity: 7, token: "e1", display_name: "灰袍盜賊", team: "foes" }),
+      validParticipant(),
+    ],
+    choices: {
+      actor_id: 2,
+      skills: nestedSkills(validSkill()),
+      items: [],
+      tactics: [
+        tacticChoice({ key: "defend" }),
+        tacticChoice({ key: "dodge", label: "閃避" }),
+        tacticChoice({ key: "taunt", label: "挑釁", targets: [7] }),
+      ],
+    },
+  });
+  const combat = CombatMenu.buildMenus(panel, {});
+  const root = combat.menus.root.items;
+  assert.deepEqual(
+    root.slice(4, 7).map((item) => [item.key, item.enabled, item.label]),
+    [
+      ["defend", true, "防禦"],
+      ["dodge", true, "閃避"],
+      ["taunt", true, "挑釁"],
+    ]
+  );
+
+  const defend = CombatMenu.tacticMenu(combat, "defend");
+  assert.equal(defend.items.length, 1);
+  assert.equal(defend.items[0].key, "tactic-confirm");
+  assert.deepEqual(defend.items[0].payload, { key: "defend" });
+  assert.equal(defend.items[0].commandKind, "tactic", "the wire kind is 'tactic'");
+  assert.equal("target_id" in defend.items[0].payload, false);
+
+  const taunt = CombatMenu.tacticMenu(combat, "taunt");
+  assert.deepEqual(
+    taunt.items.map((item) => item.key),
+    ["target-7"]
+  );
+  assert.deepEqual(taunt.items[0].payload, { key: "taunt", target_id: 7 });
+  assert.equal(taunt.items[0].commandKind, "tactic");
+
+  // An unavailable tactic keeps its committed reason and offers no submit.
+  const sealed = CombatMenu.buildMenus(
+    readyPanel({
+      choices: {
+        actor_id: 2,
+        skills: nestedSkills(validSkill()),
+        items: [],
+        tactics: [
+          tacticChoice({
+            key: "dodge",
+            enabled: false,
+            reason: { code: "dodge_disabled", message: "無法閃避。" },
+          }),
+        ],
+      },
+    }),
+    {}
+  );
+  assert.equal(sealed.menus.root.items[5].enabled, false);
+  assert.equal(sealed.menus.root.items[5].disabledReason.code, "dodge_disabled");
+  const dodge = CombatMenu.tacticMenu(sealed, "dodge");
+  assert.equal(dodge.items[0].key, "tactic-disabled");
+  assert.equal(dodge.items[0].enabled, false);
+  assert.equal(dodge.items[0].description, "無法閃避。");
+});
+
+test("an unknown item or basic action never resolves a frame", () => {
+  const combat = CombatMenu.buildMenus(readyPanel(), {});
+  assert.equal(CombatMenu.openItem(combat, "t_absent"), null);
+  assert.equal(CombatMenu.tacticMenu(combat, "absent"), null);
+  assert.equal(CombatMenu.tacticMenu(combat, "defend"), null, "no committed tactic row resolves");
 });
 
 test("forfeit confirmation menu requires explicit confirm to send", () => {
