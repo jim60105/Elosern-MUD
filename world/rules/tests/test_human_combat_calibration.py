@@ -1717,6 +1717,10 @@ def _deterministic_enemy_policy(entity, battlefield, *, context=None, scale=1.0,
     The enemy keeps its ordinary policy boundary: it picks a legal basic
     attack against the lowest-HP living ally. Only the cell that owns the real
     flee policy keeps ``monster_behaviour_policy``.
+
+    ``_enemy_policy`` also passes the authored cast ``scale`` and the recorded
+    AI ``decision``; a plain basic attack consumes neither, so both are
+    accepted and deliberately unused here.
     """
     enemy_keys = next(
         (
@@ -1806,13 +1810,21 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
     counters = {"rounds": 0, "simulated": 0, "draft": 0}
     battlefield: Battlefield | None = None
     last_round = None
+    # A fleeing monster may settle the session inside the very round it fled,
+    # which clears the durable record. The round's own battlefield is the one
+    # authority that still carries this round's ``fled`` membership, so it is
+    # read here rather than from a pre-round reconstruction.
+    monster_fled = False
 
     def observing_run_round(field, provider, **kwargs):
+        nonlocal monster_fled
         if kwargs.get("simulated") is True:
             counters["simulated"] += 1
         if callable(getattr(provider, "is_interactive_ally", None)):
             counters["draft"] += 1
-        return real_run_round(field, provider, **kwargs)
+        logs = real_run_round(field, provider, **kwargs)
+        monster_fled = monster_fled or str(monster.key) in field.fled
+        return logs
 
     simulated_policy = lambda battlefield, record: (True, frozenset())  # noqa: E731
     # A stand-and-fight cell supplies its enemy's deterministic basic attack
@@ -1908,7 +1920,7 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
 
     living_allies = [hp for hp in final_hps if hp > 0]
     monster_defeated = final_monster_hp <= 0
-    monster_retreated = str(monster.key) in battlefield.fled
+    monster_retreated = monster_fled or str(monster.key) in battlefield.fled
     ally_loss = not living_allies
     all_standing = len(living_allies) == len(allies)
     unfinished = not (monster_defeated or monster_retreated or ally_loss)
@@ -1996,6 +2008,10 @@ class EncounterCalibrationTests(EvenniaTest):
                     ),
                     1,
                     "defeat, retreat, loss and unfinished are distinct outcomes",
+                )
+                self.assertFalse(
+                    outcome.unfinished,
+                    "the measured cells all reach a terminal outcome",
                 )
                 real_policy_cell = next(
                     cell for cell in ENCOUNTER_CELLS if cell.label == outcome.cell
@@ -2130,5 +2146,7 @@ class EncounterCalibrationTests(EvenniaTest):
         self.assertEqual(
             companion.traits.hp.current, int(companion.traits.hp.max)
         )
+
+
 
 

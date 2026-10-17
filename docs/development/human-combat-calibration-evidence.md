@@ -226,11 +226,13 @@ permitted attack from its own chain (`true_sword_saint`, `blade_saint_arts`,
 `thousand_blade_art`, `tendon_sever`, `flowing_strikes`, `basic_swordplay`, default
 `basic_attack`). The three-member D party additionally declares `defend` (member 0,
 round 2), `dodge` (member 1, round 3) and `taunt` (member 2, round 4) as round-start
-tactical entries, gives its supporter an own-skill turn every third round and offers its
-own-inventory `healing_potion` on rounds 2 and 5 to the party's most wounded living
-member. Each selection is checked against the same public preflight the facade enforces,
-so an invalid action is never silently replaced; every trial records its rejections and
-all 32 trials recorded zero.
+tactical entries, makes member 1's attack selection explicit on its non-tactical third
+rounds (behaviourally the same chain fall-through the other members use, since its
+round-3 slot is its own Dodge declaration), and offers member 2's own-inventory
+`healing_potion` on rounds 2 and 5 to the party's most wounded living member. Each
+selection is checked against the same public preflight the facade enforces, so an
+invalid action is never silently replaced; every trial records its rejections and all 32
+trials recorded zero.
 
 The 32 trials run twice: a baseline pass and the same 32-trial selected-value pass. The
 selected-value pass records the balance values it consumes through their real consumer
@@ -248,7 +250,7 @@ the same values:
 | `damage.mitigation_k` | 40 | **40 (kept)** | Every cell resolved within its bound; no cell unfinished, all rejections zero |
 | `tactics.defend_reduction` | 0.35 | **0.35 (kept)** | The D party's round-2 Defend resolved with no rejected selection |
 | `tactics.dodge_threshold_bonus` | 25 | **25 (kept)** | The D party's round-3 Dodge resolved with no rejected selection |
-| realistic weapon factors in force | `1.05` common / `1.10` uncommon / `1.15` rare / `1.25` legendary | **kept** | Measured per cell: F/E `plain_sword` 1.05, D/C `military_d_sword`/`military_c_sword` 1.10, B `military_b_sword` 1.15, S `military_s_sword` 1.25 |
+| realistic weapon factors in force | `1.05` common / `1.10` uncommon / `1.15` rare / `1.25` legendary | **kept** | Measured per cell: F `plain_sword` 1.05, E `military_e_sword` 1.05, D/C `military_d_sword`/`military_c_sword` 1.10, B `military_b_sword` 1.15, S `military_s_sword` 1.25 |
 
 The finite surface also admits at most the two existing physical skill definitions the
 preceding factor-budget evidence used as its conditional and multi-strike probe cases.
@@ -278,7 +280,7 @@ pass reproduced every count, HP and rejection exactly.
 | C restricted senior vs C ordinary (real policy) | 8 / 6 / 13 / 6 | 7.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 85 / 48 / 88 / 85 |
 | B restricted senior vs B ordinary | 2 / 2 / 3 / 2 | 2.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 132 / 132 / 106 / 132 |
 | B restricted senior vs high-lower probe | 11 / 5 / 12 / 10 | 10.5 | 2/4 | 0 | 2/4 | 2/4 | 0 | 0 | 34 / 59 / 0 / 0 |
-| B restricted senior vs high-upper probe | 12 / 5 / 11 / 7 | 9.5 | 0/4 | 0 | 4/4 | 0/4 | 0 | 0 | 0 / 0 / 0 / 0 |
+| B restricted senior vs high-upper probe | 12 / 5 / 11 / 7 | 9.0 | 0/4 | 0 | 4/4 | 0/4 | 0 | 0 | 0 / 0 / 0 / 0 |
 | S restricted senior vs high-upper probe | 2 / 2 / 5 / 2 | 2.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 200 / 200 / 183 / 200 |
 
 The B-vs-high-upper losses leave the probe at 391 / 583 / 489 / 502 of its 700 HP, so the
@@ -286,6 +288,12 @@ upper-tier cell remains a real boundary rather than a defeat that never damages 
 opponent. The high-upper probe is a calibration-only, unshipped reference: the S cell's
 sampled 4/4 result promises neither universal S-tier victory nor any all-standing
 A-tier party safety, and no calamity cell is measured here.
+
+The harness bound is 200 rounds, as the calibration boundary requires; the engine's own
+session cap (`combat.yaml` declares no `max_rounds`, so the shipped default of 100
+applies) is lower, so a trial that neither side could finish would settle as that cap
+and be reported as `unfinished`. No measured cell is unfinished: every trial reached a
+terminal outcome, and the longest is the 13-round C trial.
 
 ### Diagnosis: measured divergences from the historical projected table
 
