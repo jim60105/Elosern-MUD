@@ -231,12 +231,12 @@ The combat presenter, Telnet action listing, and combat adapters SHALL consume t
 - **THEN** current domain validation rejects or filters it according to target rules without trusting the earlier descriptor
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
-In combat mode the action root SHALL preserve the client combat-menu resolver's root
-list (`web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items, the client-local
-Bag drawer opener, Defend, Dodge, Taunt, Flee, the confirmed Forfeit entry) and its
-availability/order. Dodge and Taunt SHALL join Defend as actor-scoped basic actions. Arrow keys
-SHALL navigate, Enter SHALL open or submit, Escape SHALL pop one level, and disabled entries
-SHALL send no packet.
+In combat mode the action root SHALL preserve the client combat-menu resolver's
+root list (`web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items,
+the client-local Bag drawer opener, Defend, Dodge, Taunt, Retreat, and the confirmed
+Surrender entry) and their existing availability/order. Dodge and Taunt SHALL join
+Defend as actor-scoped basic actions. Arrow keys SHALL navigate, Enter SHALL open or
+submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
 
 #### Scenario: Basic attack completes without typed input
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
@@ -247,8 +247,8 @@ SHALL send no packet.
 - **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
 #### Scenario: Forfeit requires confirmation
-- **WHEN** the player opens the Forfeit entry but has not confirmed
-- **THEN** no mutation is sent, and Escape returns exactly one menu level without ending combat
+- **WHEN** the player opens the Surrender entry but has not confirmed
+- **THEN** no mutation is sent, and No, the close control or Escape discards the prompt and returns to exactly the prior menu, actor and selection without ending combat
 
 #### Scenario: Skills opens a bounded master-detail
 - **WHEN** the player opens Skills in combat with skills owned across several categories
@@ -287,17 +287,17 @@ SHALL send no packet.
 - **THEN** the first renders that catalog entry (including its placeholder card) and the second renders no portrait, and the browser constructs no subject key or URL
 
 #### Scenario: The forfeit confirmation is an explicit two-step panel
-- **WHEN** the player opens the Forfeit entry
-- **THEN** a warning panel renders with a cancel row and a confirm row, no mutation is sent, and only activating the confirm row emits one `combat.forfeit` carrying the current session identifier
+- **WHEN** the player opens the Surrender entry
+- **THEN** a warning card renders with No focused as the safe answer and a Yes answer, no mutation is sent, and only activating Yes emits one combat.exit_confirm carrying session_id, round_revision, operation and the server confirmation_token
 
 #### Scenario: The forfeit warning states the consequence
-- **WHEN** the forfeit confirmation screen renders
-- **THEN** it is an explicit warning panel stating what forfeiting does
+- **WHEN** the surrender confirmation screen renders
+- **THEN** it states the whole party's scope and the server-authored consequence verbatim
 
 #### Scenario: Each root action keeps its dedicated route
 - **WHEN** the player activates each entry of the preserved root inventory
 - **THEN** Attack selects targets for innate `basic_attack`; Skills opens the committed
-  skill categories as a bounded master-detail rather than one flat list; Items opens the selected actor inventory-use flow; Defend and Dodge confirm their round choice; Taunt selects one server-listed enemy; Bag inspection stays free; Flee and Forfeit open their mandatory party confirmation routes
+  skill categories as a bounded master-detail rather than one flat list; Items opens the selected actor inventory-use flow; Defend and Dodge confirm their round choice; Taunt selects one server-listed enemy; Bag inspection stays free; Retreat and Surrender open their mandatory party confirmation routes
 
 #### Scenario: The root is a wrapping single-column vertical list
 - **WHEN** the combat root (including the recovery root) renders with more than one row
@@ -977,3 +977,18 @@ Items SHALL present the commanded actor own usable stock and legal targets with 
 #### Scenario: Item warning
 - **WHEN** an item can harm an ally or benefit an enemy
 - **THEN** existing item review and actor-bound cross-side confirmation apply without dropping targets or server validation
+
+### Requirement: Browser party exits require a safe-default party consequence dialog
+Retreat and Surrender SHALL remain reachable independently of commanded member. The browser SHALL request a server session/round/operation-bound prompt, display whole-party consequences and require explicit Yes through the existing modal question card with initial No. Background commands SHALL be inert. Cancel SHALL preserve the draft and prior selection.
+
+#### Scenario: Cancel and focus
+- **WHEN** an exit dialog opens from an arbitrary member menu and the player presses No, close or Escape
+- **THEN** no exit confirmation is sent, every draft entry remains and focus returns to the prior actor/menu selection
+
+#### Scenario: Confirmed operation
+- **WHEN** the player activates Yes with a valid current token
+- **THEN** exactly one guarded party confirmation is sent and canonical retreat-failure, success or surrender state replaces the view
+
+#### Scenario: Invalidation and replay
+- **WHEN** session/round/epoch changes, disconnect occurs or the token becomes stale
+- **THEN** pending confirmation is canceled without auto-retry and no personal flee or retired action route can mutate

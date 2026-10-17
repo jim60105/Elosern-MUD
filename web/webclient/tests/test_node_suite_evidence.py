@@ -1469,6 +1469,9 @@ class PartyExitEvidenceTest(unittest.TestCase):
     @covers_requirement(
         "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads",
     )
+    @covers_requirement(
+        "webclient-combat-menu::browser-party-exits-require-a-safe-default-party-consequence-dialog",
+    )
     def test_party_exit_confirmation_node_and_vitest_evidence_passes(self):
         node = subprocess.run(
             [

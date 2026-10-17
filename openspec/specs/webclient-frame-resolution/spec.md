@@ -298,12 +298,17 @@ A row activation SHALL dispatch the server-authored action identifier and payloa
 
 ### Requirement: The resolver table completes with the combat and creation families
 
-The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: the combat family — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`, `combat.forfeit` `{}`; the creation family — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}`, `creation.confirm` `{kind, presetKey?}`.
+The resolver table SHALL additionally implement, and produce the menus the migrated push sites produce today: the combat family — `combat.root` `{}`, `combat.categories` `{}`, `combat.category` `{categoryIndex}`, `combat.group` `{categoryIndex, groupIndex}`, `combat.skill` `{skillKey}`, `combat.target` `{skillKey}`; the creation family — `creation.root` `{}`, `creation.presets` `{}`, `creation.form` `{view: "custom" | "concept"}`, `creation.confirm` `{kind, presetKey?}`.
 
 #### Scenario: Every completed-table source resolves from a live snapshot
 
 - **WHEN** each combat and creation source is resolved against a committed snapshot of its owning mode with valid params
 - **THEN** each returns the menu its migrated push site produced, with the same row keys, server-authored payloads, and titles
+
+#### Scenario: The retired party-exit frame never resolves
+
+- **WHEN** a `combat.forfeit` descriptor reaches resolve after the party-scope exit cutover
+- **THEN** it is an unregistered source and resolves to the shared unresolvable marker, and no live dock frame ever holds that descriptor
 
 #### Scenario: No services descriptor is registered
 
