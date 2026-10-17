@@ -125,7 +125,9 @@ Every expected amount is an independently hand-derived literal evaluated in
 `world/rules/tests/test_human_combat_calibration.py::CombatFactorBudgetTests`, against
 real `PlayerCharacter`/`Monster` actors with `roll_d100` and the combat modifier bundle
 patched to the fixed literals; no expected value is obtained by calling the calculator
-under test.
+under test. The matrix's synthetic weapon rows declare `adjustments={}`, so they isolate
+the `weapon_multiplier` term alone; weapon gear-stat composition (the flat `atk_phys` and
+`agility` bundles) is measured by the parity probe's real authored weapons below.
 
 | # | Case (both directions observed) | Inputs that change | Outcome |
 |---|---|---|---|
@@ -142,11 +144,18 @@ under test.
 | 11 | raw-100 miss | fixed face 100, defender agility 60 | 0 (critical never lands) |
 | 12 | compound B | predicate 2 x coefficient 2 x weapon 1.5 x critical 2 x rider 0.1 x scale 2 x two strikes | 980 per strike, 1960 total |
 
-Compound budgets: case 8 composes a 2 x 2 x 1.5 = 6x factor over two existing strikes
-(240 = 6 x the case-1 40, 480 total); case 12 composes a 2 x 2 x 1.5 x 2 = 24x factor
-plus the 10-point rider over two strikes (980 per strike, 1960 total). Case 9 pins the
-ordering: the authored scale is applied before the 0.35 Defend reduction
-(floor(30 x 0.65) = 19; reducing before scaling would read 20).
+Compound budgets, each per-strike magnitude expressed against case 1's 40:
+
+- Case 8: coefficient 2 x critical 2 x weapon 1.5 = 6x, so 240 per strike and 480 over
+  the two strikes the policy declares.
+- Case 12: coefficient 2 x critical 2 x matched conditional 2 x weapon 1.5 = 12x
+  (480), then the 10-point rider is added before the authored scale
+  (`(480 + 10) x 2 = 980` per strike, 1960 over the two strikes). The rider rides
+  pre-scale, so it contributes 20 to the scaled strike, not 10.
+
+Case 9 pins the ordering: the authored scale is applied before the 0.35 Defend reduction
+(`floor(30 x 0.65) = 19`); the reverse composition (`floor(60 x 0.65) = 39`, then the 0.5
+scale) records 20, and the test asserts both literals so a reordering cannot pass.
 
 The six invariant controls, added once: an unchecked recipient receives no Dodge roll
 while another roster key's declaration is active; per-recipient AREA Dodge differs by
@@ -159,11 +168,11 @@ unchanged across the whole matrix.
 ### Estimator-versus-settlement parity
 
 Backend: Evennia test runner on SQLite (`server/db/evennia-test.sqlite3`); Python
-3.13.14; feature tip `d5862c29`; no seed (fixed faces, no live services). The parity
-probe equips the authored `plain_sword` and `military_s_sword` through the ordinary
-`add_item`/`toggle_equipment` rules and compares the two paths on the same fixed matchup
-(monster attack 40 base, target hp 500 / defense 10 / agility 20, defender threshold 71,
-retention 0.8):
+3.13.14; measured revision `d5862c29` (re-verified unchanged at the branch tip); no seed
+(fixed faces, no live services). The parity probe equips the authored `plain_sword` and
+`military_s_sword` through the ordinary `add_item`/`toggle_equipment` rules and compares
+the two paths on the same fixed matchup (monster attack 40 base, target hp 500 /
+defense 10 / agility 20, defender threshold 71, retention 0.8):
 
 | State | Adjusted attack | Factor | Settled average over 100 faces | Estimator projection |
 |---|---|---:|---:|---:|

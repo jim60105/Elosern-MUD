@@ -38,7 +38,11 @@ from world.rules.combat import (
     is_battle_over,
     run_round,
 )
-from world.rules.combat.scalars import crosses_knockout, nonlethal_projection
+from world.rules.combat.scalars import (
+    crosses_knockout,
+    nonlethal_projection,
+    strike_amount,
+)
 from world.rules.buffs import TickRecord
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment import add_item, normalized_equipment, toggle_equipment
@@ -961,11 +965,19 @@ class CombatFactorBudgetTests(EvenniaTest):
             defense=case.defense,
         )
         if case.predicate:
-            defender.db.combat_traits = list(case.predicate)
+            # The predicate fact is declared through the elemental affinity the
+            # vocabulary check reads, so the matched conditional case exercises
+            # the real fact path rather than a combat-trait label.
+            defender.db.affinity_elements = list(case.predicate)
         return attacker, defender
 
-    def _stage(self, attacker, defender, case: _FactorCase):
-        """Stage one case's strike and return the per-strike staged amounts."""
+    def _stage(self, attacker, defender, case: _FactorCase, *, battlefield=None):
+        """Stage one case's strike and return the per-strike staged amounts.
+
+        An explicit ``battlefield`` lets a control supply its own round-start
+        declarations through this one patched staging harness instead of a
+        second, untracked patching site.
+        """
         predicate = case.predicate
         matched = case.matched_multiplier
         bypass = case.bypass
@@ -985,7 +997,7 @@ class CombatFactorBudgetTests(EvenniaTest):
             event_context["resolved_effect"] = ResolvedEffect(
                 policy=EffectPolicy(coefficient=case.coefficient, damage=policy)
             )
-        if tactic is not None:
+        if battlefield is None and tactic is not None:
             battlefield = Battlefield(
                 {
                     "attackers": frozenset({str(attacker.key)}),
@@ -994,6 +1006,7 @@ class CombatFactorBudgetTests(EvenniaTest):
                 {str(attacker.key): attacker, str(defender.key): defender},
             )
             battlefield.tactical = RoundTactical({str(defender.key): tactic})
+        if battlefield is not None:
             event_context["battlefield"] = battlefield
         weapon = case.weapon
         weapon_scope = (
@@ -1040,6 +1053,9 @@ class CombatFactorBudgetTests(EvenniaTest):
                     self.assertEqual(len(amounts), case.expected_strikes)
                     self.assertEqual(set(amounts), {case.expected})
                     if case.counterfactual is not None:
+                        # The counterfactual is a whole second staging of the
+                        # same fixed inputs with one declaration replaced, not
+                        # a delta applied to the first result.
                         counterfactual = self._stage(
                             attacker,
                             defender,
@@ -1048,6 +1064,20 @@ class CombatFactorBudgetTests(EvenniaTest):
                         self.assertEqual(set(counterfactual), {case.counterfactual})
                     observed += 1
         self.assertEqual(observed, 24)
+        # Ordering discriminator for case 9: the reverse composition (Defend on
+        # the unscaled base -- floor(60 x 0.65) = 39 -- then the authored 0.5
+        # scale) records 20, so a scale/Defend reordering inside the shared
+        # scalar reads 20 here against case 9's asserted 19.
+        self.assertEqual(
+            strike_amount(
+                attack=39.0,
+                multiplier=1.0,
+                coefficient=1.0,
+                defense=0.0,
+                scale=0.5,
+            ),
+            20,
+        )
 
     @covers_requirement(
         "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
@@ -1064,24 +1094,19 @@ class CombatFactorBudgetTests(EvenniaTest):
 
         # 1. Unchecked direct damage receives no Dodge roll: a roster key that
         # never declared Dodge lands at the undodged literal even while another
-        # key's declaration is active in the same field.
+        # key's declaration is active in the same field. It runs through the
+        # shared staging harness with its own battlefield, so the fixed patching
+        # site is single-sourced.
         attacker, defender = self._pair(live_case, player_attacker=True)
         battlefield = Battlefield(
             {"a": frozenset({str(attacker.key)}), "d": frozenset({str(defender.key)})},
             {str(attacker.key): attacker, str(defender.key): defender},
         )
         battlefield.tactical = RoundTactical({"someone_else": "dodge"})
-        event_context = {"battlefield": battlefield}
-        with (
-            patch("world.rules.combat.damage.roll_d100", return_value=_FACTOR_BASE_ROLL),
-            patch(
-                "world.rules.combat.damage.evaluate_combat_modifiers", return_value={}
-            ),
-        ):
-            unchecked = _handle_damage(
-                attacker, [defender], "damage:none:physical", event_context, 1.0
-            )
-        self.assertEqual(int(unchecked[0].description.rsplit("|", 1)[1]), 40)
+        self.assertEqual(
+            set(self._stage(attacker, defender, live_case, battlefield=battlefield)),
+            {40},
+        )
 
         # 2. Per-recipient AREA Dodge differs by declaration: the same fixed
         # face lands on the undeclared recipient and misses on the declared one.
@@ -1203,15 +1228,17 @@ class CombatFactorBudgetTests(EvenniaTest):
 
         # 6. Literal base traits, proficiency access, practice affinity and
         # strike count remain unchanged across the whole matrix.
-        attacker, defender = self._pair(live_case, player_attacker=True)
-        before_attacker = self._literal_invariants(attacker)
-        before_defender = self._literal_invariants(defender)
         for case in FACTOR_CASES:
+            attacker, defender = self._pair(case, player_attacker=True)
+            before_attacker = self._literal_invariants(attacker)
+            before_defender = self._literal_invariants(defender)
             amounts = self._stage(attacker, defender, case)
             expected_strikes = 2 if case.extra_strikes else 1
             self.assertEqual(len(amounts), expected_strikes)
-        self.assertEqual(self._literal_invariants(attacker), before_attacker)
-        self.assertEqual(self._literal_invariants(defender), before_defender)
+            # Every case's own pair keeps its literal bases, its proficiency,
+            # its affinity facts and its owned skills across the staging.
+            self.assertEqual(self._literal_invariants(attacker), before_attacker)
+            self.assertEqual(self._literal_invariants(defender), before_defender)
 
     @staticmethod
     def _literal_invariants(entity) -> tuple:
