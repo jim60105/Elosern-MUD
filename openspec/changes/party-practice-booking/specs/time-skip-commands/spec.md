@@ -47,7 +47,7 @@ in-scope member's own standing practice booking; no skip path clears a booking i
 - **WHEN** the commander booked 艾拉's `healing_light` earlier and then issues `rest 2h` with no practice clause while 艾拉 is present
 - **THEN** the clock advances 7200 seconds, 艾拉's `healing_light` grows by two study hours, and 艾拉's booking is consumed
 
-#### Scenario: Plain rest without bookings grows nothing
+#### Scenario: Plain rest grows nothing
 - **WHEN** a safe actor with no standing booking in the present party issues `rest 8h` with no practice clause
 - **THEN** the clock advances 28800 seconds and no `skill_proficiency` value changes
 
@@ -72,3 +72,31 @@ in-scope member's own standing practice booking; no skip path clears a booking i
 #### Scenario: A rolled-back skip restores every booking
 - **WHEN** a SKIP advance raises after settlement started for a party with two standing bookings
 - **THEN** both bookings and both skills' proficiency equal their pre-advance values and the tick is unchanged
+
+#### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
+- **WHEN** a rolled-back advance has restored a standing `practice_booking` and the accepted
+  `explore.wait` adapter (or `sleep`/`wait until`) performs its SKIP advance
+- **THEN** the restored booking is still standing before the advance and is settled (consumed) by
+  that advance for its member, so no booking is cleared without being settled
+
+#### Scenario: A plain rest clears a stale rolled-back booking
+- **WHEN** a caller whose standing `practice_booking` was restored by an earlier rolled-back
+  advance issues `rest 8h` with no practice clause
+- **THEN** the clock advances 28800 seconds, the booking is settled by that advance (eight study
+  hours on the booked skill) and no booking remains after the command
+
+#### Scenario: An unlabeled duration or clause-less rest is explicit rest
+- **WHEN** a duration is unlabeled, or `rest` is issued without the practice clause
+- **THEN** the result is a clock advance that records no new booking and settles only the present
+  members' standing bookings
+
+#### Scenario: After the safety gate passes, the command owns the booking state outright
+- **WHEN** the safety gate has passed for a `rest` invocation
+- **THEN** an accepted clause records the caller's booking (replacing a previous one), a clause-less
+  rest records nothing, and a rejected clause leaves the caller's previous booking unchanged
+
+#### Scenario: Every accepted unlabeled skip clears stale bookings before advancing
+- **WHEN** `sleep`, `wait until`, or the `advance_skip()` helper behind the WebClient `explore.wait`
+  adapter performs an accepted unlabeled SKIP advance
+- **THEN** it clears no booking before the advance; every in-scope member's standing booking is
+  settled by the advance itself through the clock's practice stage
