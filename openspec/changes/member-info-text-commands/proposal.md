@@ -31,7 +31,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **18 of 32**.
+Declared implementation order: **19 of 33**.
 
 - depends-on: character-skill-growth-fields
 
