@@ -336,7 +336,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusPress("ArrowDown")).toBe(true);
       expect(store.view.focus.key).toBe("skills");
       expect(store.view.focus.label).toBe("技能");
-      for (const key of ["items", "bag", "defend", "flee", "forfeit"]) {
+      for (const key of ["items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"]) {
         expect(store.focusPress("ArrowDown")).toBe(true);
         expect(store.view.focus.key).toBe(key);
       }

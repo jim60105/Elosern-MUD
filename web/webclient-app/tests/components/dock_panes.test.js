@@ -23,7 +23,9 @@ describe("classifyPane (task 5.1)", () => {
       command: item.command,
       action_id: item.actionId || undefined,
     }));
-    expect(root).toHaveLength(7);
+    // Attack, Skills, Items, Bag, Defend, Dodge, Taunt, Flee, Forfeit
+    // (webclient-party-items-tactics).
+    expect(root).toHaveLength(9);
     expect(classifyPane({ items: root })).toBe("commands");
     const recovery = CombatMenu.rootItems({ session: { state: "recovery" } }).map((item) => ({ key: item.key, command: item.command }));
     expect(classifyPane({ items: recovery })).toBe("commands");

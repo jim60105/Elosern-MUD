@@ -355,7 +355,7 @@ describe("stage target step (store)", () => {
     expect(disabled.items.map((i) => i.key)).toEqual(["skill-disabled"]);
     expect(stageTargetModel({
       source: "combat.skill", menu: disabled,
-      skill: { key: "t_locked", enabled: false, targetSpec: "single", targets: [FOE_A] },
+      subject: { key: "t_locked", enabled: false, targetSpec: "single", targets: [FOE_A] },
       participants: roster(), formationOrder: STAGE_ORDER, controlledIdentity: "42",
       focusKey: "skill-disabled", locked: false,
     })).toBeNull();
@@ -425,7 +425,7 @@ describe("stage target step (store)", () => {
     const model = stageTargetModel({
       source: "combat.target",
       menu: { items: [{ key: `target-${FOE_A}`, payload: { target_ids: [FOE_A] } }, { key: `target-${FOE_B}`, payload: { target_ids: [FOE_B] } }] },
-      skill: { key: "t_x", enabled: true, targetSpec: "single", targets: [FOE_A, FOE_B] },
+      subject: { key: "t_x", enabled: true, targetSpec: "single", targets: [FOE_A, FOE_B] },
       participants: roster(),
       formationOrder: STAGE_ORDER,
       controlledIdentity: "42",

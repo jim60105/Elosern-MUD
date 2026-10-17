@@ -7,7 +7,10 @@
 // activation follows the row's committed action descriptor: inspect-only and
 // disabled rows dispatch nothing, an enabled `inventory.use` opens a labelled
 // confirmation, and an enabled `inventory.toggle_equip` emits immediately;
-// every intent is emitted to the parent, which owns the single dispatch.
+// every intent is emitted to the parent, which owns the single dispatch. In
+// combat the `use` intent is emitted without the local confirmation, because
+// the commanded actor's own item review/target step is the confirmation
+// (webclient-party-items-tactics).
 import { computed, nextTick, ref, watch } from "vue";
 import EquipmentDoll from "./EquipmentDoll.vue";
 import EmptyState from "./EmptyState.vue";
@@ -28,6 +31,11 @@ const props = defineProps({
   // `services.inventory.wallet` is deliberately never used, so head and
   // body can never disagree. Absent (null) renders no row — never a zero.
   wallet: { type: Number, required: false, default: null },
+  // True while the drawer is open in combat mode (webclient-party-items-
+  // tactics): an enabled `inventory.use` then belongs to the commanded actor,
+  // so the tile emits at once and the card's own item review/target step is
+  // the confirmation. Inspection and equipment toggles are unaffected.
+  combat: { type: Boolean, required: false, default: false },
 });
 
 // Row-action intents are published to the parent (AppClient), which owns the
@@ -189,8 +197,10 @@ function onTileBlur(event) {
 // pointer and keyboard route through the same handler): the tile first
 // selects itself, then follows its committed action descriptor. An absent
 // descriptor (inspect-only / unknown item) or a disabled action dispatches
-// nothing; an enabled `inventory.use` opens the labelled confirmation; an
-// enabled `inventory.toggle_equip` dispatches immediately without one.
+// nothing; an enabled `inventory.use` opens the labelled confirmation — or,
+// in combat, emits at once so the commanded actor's own target/review step is
+// the confirmation (webclient-party-items-tactics); an enabled
+// `inventory.toggle_equip` dispatches immediately without one.
 function onTileActivate(event) {
   const key = event.currentTarget.dataset.key;
   selectedKey.value = key;
@@ -205,6 +215,13 @@ function onTileActivate(event) {
       payload: { item_key: row.item_key },
     });
   } else if (action.action_id === "inventory.use") {
+    if (props.combat) {
+      emit("use", {
+        action_id: "inventory.use",
+        payload: { item_key: row.item_key },
+      });
+      return;
+    }
     openerEl = event.currentTarget;
     confirming.value = { itemKey: row.item_key, displayName: row.display_name };
   }

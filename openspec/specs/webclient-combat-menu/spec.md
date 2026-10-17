@@ -231,20 +231,20 @@ The combat presenter, Telnet action listing, and combat adapters SHALL consume t
 - **THEN** current domain validation rejects or filters it according to target rules without trusting the earlier descriptor
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
-In combat mode the action root SHALL preserve the root inventory of the client
-combat-menu resolver (the root list of `web/static/webclient/js/elosern/combat_menu.js`:
-Attack, Skills, Items, the client-local Bag drawer opener, Defend, Flee, and the
-confirmed Forfeit entry) and their existing availability/order. No new root action SHALL
-be introduced. Arrow keys SHALL navigate, Enter SHALL open or submit, Escape SHALL pop
-one level, and disabled entries SHALL send no packet.
+In combat mode the action root SHALL preserve the client combat-menu resolver's root
+list (`web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items, the client-local
+Bag drawer opener, Defend, Dodge, Taunt, Flee, the confirmed Forfeit entry) and its
+availability/order. Dodge and Taunt SHALL join Defend as actor-scoped basic actions. Arrow keys
+SHALL navigate, Enter SHALL open or submit, Escape SHALL pop one level, and disabled entries
+SHALL send no packet.
 
 #### Scenario: Basic attack completes without typed input
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
 - **THEN** the browser submits `combat.command` with the guarded selected actor and skill payload for `basic_attack` exactly once and the draft facade saves it and resolves only a complete valid round
 
 #### Scenario: Placeholder mechanics cannot be invoked
-- **WHEN** the player focuses Items or Defend and presses Enter
-- **THEN** its `not_implemented` explanation remains readable and no `ui_action` message is emitted
+- **WHEN** the selected actor has an eligible item, Defend, Dodge or Taunt choice
+- **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
 #### Scenario: Forfeit requires confirmation
 - **WHEN** the player opens the Forfeit entry but has not confirmed
@@ -297,10 +297,7 @@ one level, and disabled entries SHALL send no packet.
 #### Scenario: Each root action keeps its dedicated route
 - **WHEN** the player activates each entry of the preserved root inventory
 - **THEN** Attack selects targets for innate `basic_attack`; Skills opens the committed
-  skill categories as a bounded master-detail rather than one flat list; Items and
-  Defend remain focusable but disabled with code `not_implemented`; Flee invokes the
-  innate flee path; and Forfeit requires an explicit confirmation screen, retaining its
-  explicit confirmation route
+  skill categories as a bounded master-detail rather than one flat list; Items opens the selected actor inventory-use flow; Defend and Dodge confirm their round choice; Taunt selects one server-listed enemy; Bag inspection stays free; Flee and Forfeit open their mandatory party confirmation routes
 
 #### Scenario: The root is a wrapping single-column vertical list
 - **WHEN** the combat root (including the recovery root) renders with more than one row
@@ -965,3 +962,18 @@ The existing centered command card SHALL provide a keyboard/pointer actor select
 #### Scenario: Reconnect and invalidation
 - **WHEN** transport resets or final preflight returns some invalid members
 - **THEN** confirmed entries restore from the server, missing/invalid members remain identifiable and no intent is supplied or replayed automatically
+
+### Requirement: Actor item use and tactics reuse the complete existing selection flow
+Items SHALL present the commanded actor own usable stock and legal targets with effect summaries and disabled reasons. Defend/Dodge SHALL confirm a personal round choice; Taunt SHALL reuse stage single-enemy selection. All SHALL save guarded draft commands without optimistic effects, costs or consumption. No placeholder basic action SHALL remain.
+
+#### Scenario: Companion item and target
+- **WHEN** a companion alone holds a targeted usable item
+- **THEN** the shared menu shows its quantity and targets and sends that actor command; consumption waits for its valid resolved initiative action
+
+#### Scenario: Tactical choices
+- **WHEN** a player selects Defend, Dodge or Taunt for a companion
+- **THEN** its actual capability/targets determine enabled state, and the declaration remains inert until the complete round starts
+
+#### Scenario: Item warning
+- **WHEN** an item can harm an ally or benefit an enemy
+- **THEN** existing item review and actor-bound cross-side confirmation apply without dropping targets or server validation

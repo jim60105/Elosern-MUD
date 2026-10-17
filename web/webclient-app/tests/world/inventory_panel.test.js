@@ -442,6 +442,23 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
     return wrapper;
   }
 
+  function mountActionsInCombat() {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    wrapper = mount(InventoryPanel, {
+      attachTo: host,
+      props: {
+        services: servicesWithActions(),
+        character: CHARACTER_PANEL_SAMPLE,
+        wallet: CHARACTER_PANEL_SAMPLE.wallet,
+        // webclient-party-items-tactics: the commanded member's own review
+        // step is the confirmation, so the drawer must not open its local one.
+        combat: true,
+      },
+    });
+    return wrapper;
+  }
+
   function bodyByTestId(id) {
     return document.querySelector(`[data-testid="${id}"]`);
   }
@@ -465,6 +482,28 @@ describe("InventoryPanel row actions (add-inventory-item-actions)", () => {
       [{ action_id: "inventory.use", payload: { item_key: "potion_use" } }],
     ]);
     expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+  });
+
+  it("in combat an enabled use emits at once with no local confirmation", async () => {
+    const w = mountActionsInCombat();
+    const tile = w.get('[data-testid="inventory-panel__tile--potion_use"]');
+    await tile.trigger("click");
+    await nextTick();
+    // One intent, no dialog: the commanded actor's own item review/target
+    // step in the card is the confirmation.
+    expect(w.emitted("use")).toEqual([
+      [{ action_id: "inventory.use", payload: { item_key: "potion_use" } }],
+    ]);
+    expect(bodyByTestId("inventory-panel__confirm-dialog")).toBeNull();
+    // An equipped tile still toggles immediately and unchanged, and the
+    // disabled / inspect-only descriptors still dispatch nothing.
+    await w.get('[data-testid="inventory-panel__tile--sword_toggle"]').trigger("click");
+    expect(w.emitted("toggle-equip")).toEqual([
+      [{ action_id: "inventory.toggle_equip", payload: { item_key: "sword_toggle" } }],
+    ]);
+    await w.get('[data-testid="inventory-panel__tile--potion_full"]').trigger("click");
+    await w.get('[data-testid="inventory-panel__tile--mystery"]').trigger("click");
+    expect(w.emitted("use")).toHaveLength(1);
   });
 
   it("cancel, backdrop, and Escape dispatch nothing and restore focus to the originating tile", async () => {

@@ -1,10 +1,12 @@
 // The stage target step (webclient-combat-stage-target-picking, design D1):
-// one pure model of the target frame of an enabled SINGLE, SELF or AREA skill
-// while its targets are picked on the stage figures instead of in the card's
-// rows. It derives everything from the current frame's items (their keys and
-// payloads, never reordered), the opened skill's client-local selection, the
-// committed participants and the formation's stage order; it mutates
-// nothing, so the store, the components and Vitest all read the same answer.
+// one pure model of the target frame of an enabled SINGLE, SELF or AREA
+// target subject — a skill, an item's SINGLE targets or a basic action's
+// enemy candidates (webclient-party-items-tactics) — while its targets are
+// picked on the stage figures instead of in the card's rows. It derives
+// everything from the current frame's items (their keys and payloads, never
+// reordered), the opened subject's client-local selection, the committed
+// participants and the formation's stage order; it mutates nothing, so the
+// store, the components and Vitest all read the same answer.
 //
 // A position is `{ key, kind, identities, side, digit, offStage, label }`:
 // - `member` — one SINGLE `target-<id>` or AREA `area-<id>` item, on one figure;
@@ -12,8 +14,16 @@
 // - `group` — one AREA `shorthand-<key>` item, lighting a whole side;
 // - `confirm` — the AREA `area-confirm` item, lighting the current choice.
 
-// The frames that open one skill's target items (frame-resolvers.js).
-export const STAGE_TARGET_SOURCES = Object.freeze(["combat.skill", "combat.target"]);
+// The frames that open one target subject's items (frame-resolvers.js): a
+// skill's target frames, one item's target frame, and a basic action's frame
+// (webclient-party-items-tactics reuses the step for an item's SINGLE targets
+// and for 挑釁's enemy candidates).
+export const STAGE_TARGET_SOURCES = Object.freeze([
+  "combat.skill",
+  "combat.target",
+  "combat.item",
+  "combat.tactic",
+]);
 
 // The client display labels of the three approved AREA shorthands
 // (world/rules/targeting.py AREA_SHORTHANDS); the payload keeps the key.
@@ -40,7 +50,14 @@ function itemPosition(item, form) {
     return null;
   }
   if (form === "single" && key.startsWith("target-")) {
-    const ids = item.payload && Array.isArray(item.payload.target_ids) ? item.payload.target_ids : [];
+    // A skill row carries the array `target_ids`; an item's or a basic
+    // action's row carries the scalar `target_id`.
+    const payload = item.payload || {};
+    const ids = Array.isArray(payload.target_ids)
+      ? payload.target_ids
+      : payload.target_id === undefined || payload.target_id === null
+        ? []
+        : [payload.target_id];
     return ids.length === 1 ? { key, kind: "member", identity: ids[0] } : null;
   }
   if (form === "self" && key === "self-confirm") {
@@ -88,8 +105,9 @@ function groupIdentities(shorthand, candidates, byId) {
 // `stageTargetModel` — null outside a stage target step, else the step.
 //
 // Inputs: `source` (the current frame descriptor's source), `menu` (the
-// current frame's resolved menu), `skill` (the CombatMenu skill model the
-// frame opened, with its `selected` / `shorthand`), `participants` (the
+// current frame's resolved menu), `subject` (the opened target subject: a
+// CombatMenu skill model, or an item/tactic model carrying the same
+// `{key, label, enabled, targetSpec, targets}` shape), `participants` (the
 // committed combat participants), `formationOrder` (the drawn identities in
 // stage order, left to right, or null), `actorIdentity` (the commanded
 // actor's identity — the SELF position stands on that figure, never on the
@@ -98,7 +116,7 @@ function groupIdentities(shorthand, candidates, byId) {
 export function stageTargetModel({
   source,
   menu,
-  skill,
+  subject,
   participants,
   formationOrder,
   actorIdentity,
@@ -108,11 +126,11 @@ export function stageTargetModel({
   if (locked || !STAGE_TARGET_SOURCES.includes(source)) {
     return null;
   }
-  if (!skill || !skill.enabled || !FORMS.has(skill.targetSpec)) {
+  if (!subject || !subject.enabled || !FORMS.has(subject.targetSpec)) {
     return null;
   }
   const items = menu && Array.isArray(menu.items) ? menu.items : [];
-  const form = skill.targetSpec;
+  const form = subject.targetSpec;
   // Every item of the frame must be a target item of this form: a scale step
   // (`scale-*`), a NONE confirm or a disabled skill's row is no step.
   const raw = items.map((item, index) => ({ item, index, position: itemPosition(item, form) }));
@@ -139,9 +157,9 @@ export function stageTargetModel({
     const row = byId.get(idKey(identity));
     return !!row && row.state !== "fled";
   };
-  const candidates = Array.isArray(skill.targets) ? skill.targets : [];
-  const selected = form === "area" && Array.isArray(skill.selected) ? skill.selected.map(idKey) : [];
-  const shorthand = form === "area" && typeof skill.shorthand === "string" ? skill.shorthand : null;
+  const candidates = Array.isArray(subject.targets) ? subject.targets : [];
+  const selected = form === "area" && Array.isArray(subject.selected) ? subject.selected.map(idKey) : [];
+  const shorthand = form === "area" && typeof subject.shorthand === "string" ? subject.shorthand : null;
 
   // Display names shared by two or more candidates take the session token.
   const nameCounts = new Map();
@@ -242,9 +260,9 @@ export function stageTargetModel({
 
   return Object.freeze({
     form,
-    skillKey: skill.key,
-    label: skill.label || "",
-    scaleLabel: scaleLabelOf(skill),
+    subjectKey: subject.key,
+    label: subject.label || "",
+    scaleLabel: scaleLabelOf(subject),
     positions,
     focusKey: focused ? focused.key : null,
     focused,

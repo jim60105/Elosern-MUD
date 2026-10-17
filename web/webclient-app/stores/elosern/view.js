@@ -25,7 +25,6 @@ const DIALOGUE_SPEECH_ACTIONS = new Set(["explore.talk_scripted", "explore.talk_
 
 // The combat frames that name one opened skill in their descriptor.
 const SKILL_FRAME_SOURCES = new Set(["combat.skill", "combat.target"]);
-
 export function applyView(ctx) {
   // The skill the current combat frame is about: the opened skill on its
   // scale / target frames, the focused row on a skill list, else null.
@@ -60,14 +59,36 @@ export function applyView(ctx) {
     const descriptor = ctx.router.currentDescriptor();
     const skillKey = descriptor && descriptor.params ? descriptor.params.skillKey : null;
     const combat = ctx.frameResolver.combatModel();
-    if (!combat || typeof skillKey !== "string" || !Object.hasOwn(combat.skillByKey, skillKey)) {
+    if (!combat) {
+      return null;
+    }
+    // The opened target subject: an item's or a basic action's own model on
+    // their frames (webclient-party-items-tactics), the opened skill
+    // otherwise. An unknown key is the identity-loss degradation (no step;
+    // the frame keeps its own rows).
+    const params = (descriptor && descriptor.params) || {};
+    let subject = null;
+    if (descriptor && descriptor.source === "combat.item") {
+      subject =
+        typeof params.itemKey === "string" && Object.hasOwn(combat.itemByKey, params.itemKey)
+          ? combat.itemByKey[params.itemKey]
+          : null;
+    } else if (descriptor && descriptor.source === "combat.tactic") {
+      subject =
+        typeof params.key === "string" && Object.hasOwn(combat.tacticByKey, params.key)
+          ? combat.tacticByKey[params.key]
+          : null;
+    } else if (typeof skillKey === "string" && Object.hasOwn(combat.skillByKey, skillKey)) {
+      subject = combat.skillByKey[skillKey];
+    }
+    if (!subject) {
       return null;
     }
     const item = ctx.router.currentItem();
     return stageTargetModel({
       source: descriptor.source,
       menu: ctx.router.currentMenu(),
-      skill: combat.skillByKey[skillKey],
+      subject: subject,
       participants: Array.isArray(panel.participants) ? panel.participants : [],
       formationOrder: ctx.formationOrder,
       // The commanded actor (webclient-party-command-selection): a SELF step
@@ -361,7 +382,8 @@ export function applyView(ctx) {
         ? {
             question: ctx.crossSideConfirm.question,
             sides: ctx.crossSideConfirm.sides,
-            skillKey: ctx.crossSideConfirm.skillKey,
+            kind: ctx.crossSideConfirm.subjectKind,
+            key: ctx.crossSideConfirm.subjectKey,
           }
         : null,
       // The compact commanded-actor/draft-progress line the card chrome

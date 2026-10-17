@@ -26,13 +26,29 @@ prototypes; the real app differs too much for a prototype to be useful).
   shown in combat; the controlled figure's values stay in the vitals dock.
 - Combat targets are picked on the stage figures (the stage target step,
   `stores/elosern/stage_targets.js`, published as `view.stageTarget`): in the
-  target frame of an enabled SINGLE, SELF or AREA skill the card collapses to
-  a target prompt, every figure outside the focused position's lit set takes
-  the dialogue listener dim, each candidate carries a gold arrow marker above
-  its plate (`components/stage-targeting.js`) and a hit area over its figure.
-  The arrow keys walk the positions in stage order (left to right on the
-  formation); the digits still pick the frame's items in server order; Enter,
-  Space and Escape, the item order and every payload are the card rows'.
+  target frame of an enabled SINGLE, SELF or AREA skill — and, since
+  webclient-party-items-tactics, of a SINGLE item or 挑釁 — the card collapses
+  to a target prompt, every figure outside the focused position's lit set
+  takes the dialogue listener dim, each candidate carries a gold arrow marker
+  above its plate (`components/stage-targeting.js`) and a hit area over its
+  figure. The arrow keys walk the positions in stage order (left to right on
+  the formation); the digits still pick the frame's items in server order;
+  Enter, Space and Escape, the item order and every payload are the card rows'.
+  The step's subject is the opened skill, item or basic action (same
+  `{key,label,enabled,targetSpec,targets}` shape), never a second model.
+- The commanded member's own items and basic actions live in the card, never
+  in the bag: 道具 opens that member's committed stock (`item-<key>` rows
+  carrying quantity and effect summary, each with its own committed reason),
+  one item opens its review/SINGLE-target frame, Defend/Dodge confirm their
+  round choice and Taunt picks one server-listed enemy. Every row submits the
+  closed wire union through the guarded `combat.command` envelope
+  (`{kind:"item", payload:{item_key[, target_id]}}`,
+  `{kind:"tactic", payload:{key[, target_id]}}` — the literal wire kind is
+  `tactic`; the panel echoes admitted entries back as `tactical`). A hostile
+  item on an ally asks through the same actor-bound cross-side question. In
+  combat the bag's 使用 routes to that same flow (`store.useCombatItem`) and
+  never dispatches the actorless `inventory.use`; inspection and the commander's
+  equipment toggles stay free, and there is no companion equipment surface.
 - A cast across sides asks first (`stores/elosern/cross_side.js`, held in
   the store as `crossSideConfirm`, published as `view.crossSideConfirm`): a
   target-step submission whose skill is `hostile` and reaches a `party`

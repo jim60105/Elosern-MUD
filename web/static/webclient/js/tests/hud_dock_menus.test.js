@@ -341,7 +341,9 @@ test("root geometry: the combat root, categories, and groups are one column", ()
   const combat = CombatMenu.buildMenus(combatPanel(), {});
   const combatRoot = combat.menus.root;
   assert.equal(combatRoot.gridCols, 1);
-  assert.equal(combatRoot.items.length, 7);
+  // Attack, Skills, Items, Bag, Defend, Dodge, Taunt, Flee, Forfeit
+  // (webclient-party-items-tactics adds the two basic actions).
+  assert.equal(combatRoot.items.length, 9);
   assert.ok(combatRoot.items.every((item) => item.command === true));
   assert.equal(combat.menus.categories.gridCols, 1);
   assert.ok(combat.menus.categories.items.every((item) => item.command === true));

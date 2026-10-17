@@ -35,7 +35,22 @@ export function useIntentHandlers(store, dispatchIntent) {
   // Inventory row-action intents (add-inventory-item-actions, task 6.3): both
   // the confirmed item use and the direct equipment toggle route through the
   // single store dispatch entry — one deliberate activation, one dispatch.
+  // In combat the item use belongs to the commanded actor
+  // (webclient-party-items-tactics): the drawer's activation enters the same
+  // item review/target/combat.command flow the card's 道具 frame opens, so the
+  // actorless `inventory.use` is never dispatched there. Inspection and the
+  // commander's own equipment toggles stay free and unchanged.
   function onInventoryItemAction(intent) {
+    if (intent.action_id === "inventory.use" && store.view.mode === "combat") {
+      // The bag shows the controlled player's own items, which diverge from
+      // the commanded member's server stock whenever a companion is
+      // commanded; a refusal is a deliberate activation that reached nothing,
+      // so it gets the same visible feedback the busy-drop contract gives.
+      if (!store.useCombatItem(intent.payload && intent.payload.item_key)) {
+        store.pushToast({ title: "這件物品目前無法由這名成員使用。", tone: "info" });
+      }
+      return;
+    }
     dispatchIntent(intent.action_id, intent.payload);
   }
 

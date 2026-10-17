@@ -238,6 +238,10 @@ export const useElosernStore = defineStore("elosern", () => {
     // canonical choices (one read-only query) and opens its root flow.
     openCombatActor: ctx.openCombatActor,
     selectCombatActor: ctx.selectCombatActor,
+    // The in-combat item entry (webclient-party-items-tactics): a usable item
+    // chosen from the open bag enters the commanded actor's canonical
+    // review/target flow instead of the actorless `inventory.use`.
+    useCombatItem: ctx.useCombatItem,
     // The cross-side question's answers (webclient-combat-cross-side-
     // confirm): 是 sends the held cast once; 否 / ✕ / Escape return to the
     // target step.

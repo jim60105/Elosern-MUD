@@ -414,6 +414,33 @@ export function createFrameResolver(deps) {
       const combat = combatModel();
       return combat ? isolate(combat.menus.forfeit) : marker(null);
     },
+    // The commanded actor's own usable stock (webclient-party-items-tactics):
+    // one row per committed item choice.
+    "combat.items": () => {
+      const combat = combatModel();
+      return combat ? isolate(combat.menus.items) : marker(null);
+    },
+    // One item's target/review frame. A vanished key is the identity-loss
+    // degradation (the same rule a lost skill key follows), so an equipment
+    // change that drops the item pops the frame.
+    "combat.item": (params) => {
+      const combat = combatModel();
+      if (!combat) return marker(null);
+      const key = params && params.itemKey;
+      if (typeof key !== "string" || !Object.hasOwn(combat.itemByKey, key)) return marker(null);
+      const menu = CombatMenu.openItem(combat, key);
+      return menu ? isolate(menu) : marker(null);
+    },
+    // One basic action's confirm/target frame. Only the three committed
+    // tactic keys resolve; anything else degrades.
+    "combat.tactic": (params) => {
+      const combat = combatModel();
+      if (!combat) return marker(null);
+      const key = params && params.key;
+      if (key !== "defend" && key !== "dodge" && key !== "taunt") return marker(null);
+      const menu = CombatMenu.tacticMenu(combat, key);
+      return menu ? isolate(menu) : marker(null);
+    },
     "combat.category": (params) => {
       const combat = combatModel();
       if (!combat) return marker(null);

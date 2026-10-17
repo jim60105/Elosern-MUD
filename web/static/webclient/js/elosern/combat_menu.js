@@ -27,11 +27,18 @@
 })(typeof self !== "undefined" ? self : this, function () {
   "use strict";
 
-  var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
+  // The client-local root inventory (webclient-party-items-tactics): Attack,
+  // Skills, Items, the Bag drawer opener, the three basic actions, Flee and
+  // the confirmed Forfeit entry. Dodge and Taunt join Defend as actor-scoped
+  // basic actions; no placeholder row remains.
+  var ROOT_ACTIONS = ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"];
   var SECONDARY_ACTIONS = ["forfeit"];
   var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
   var PAGE_SIZE = 6;
   var BASIC_ATTACK_KEY = "basic_attack";
+  // The three basic actions' client display labels (the panel carries its own
+  // label; this is the fallback for a tactic the panel does not offer).
+  var TACTIC_LABELS = { defend: "防禦", dodge: "閃避", taunt: "挑釁" };
 
   // A frozen view of one skill with its stable selection state.
   function skillModel(skill, participantById) {
@@ -115,10 +122,122 @@
   var ROOT_COPY = {
     attack: "選擇一名目標，以普通攻擊出手。",
     skills: "從已習得的技能中選擇施展。",
+    items: "使用這名成員身上的道具。",
     bag: "開啟背包，查看攜帶的物品。",
+    defend: "這名成員這回合採取防禦。",
+    dodge: "這名成員這回合採取閃避。",
+    taunt: "挑釁一名敵人，把它的注意力引到這名成員身上。",
     flee: "嘗試脫離這場戰鬥。",
     forfeit: "放棄這場戰鬥；送出前需要再次確認。",
   };
+
+  // -------------------------------------------------------------------------
+  // The commanded actor's own items and basic actions
+  // (webclient-party-items-tactics).
+  // -------------------------------------------------------------------------
+
+  // The v7 panel's actor-local item and tactic choices: the commanded actor's
+  // own usable stock and capability, never the commander's global inventory
+  // and never a shared party bag.
+  function panelItems(panel) {
+    return (panel && panel.choices && panel.choices.items) || [];
+  }
+
+  function panelTactics(panel) {
+    return (panel && panel.choices && panel.choices.tactics) || [];
+  }
+
+  // One item choice as the menu's immutable subject model: the committed
+  // stock row (label, quantity, effect summary, target spec, legal targets
+  // and polarity) verbatim.
+  function itemModel(row) {
+    return {
+      key: row.item_key,
+      label: row.label,
+      summary: typeof row.summary === "string" ? row.summary : "",
+      quantity: row.quantity,
+      enabled: !!row.enabled,
+      disabledReason: row.reason || null,
+      targetSpec: row.target_spec,
+      targets: (row.targets || []).slice(),
+      hostile: !!row.hostile,
+      beneficial: !!row.beneficial,
+    };
+  }
+
+  // One basic-action row as the menu's subject model (its enabled state and
+  // reason are the committed capability facts verbatim). 挑釁's shape is the
+  // client-side fact of the closed vocabulary: it names exactly one enemy,
+  // while 防禦 and 閃避 carry no target at all (`TACTIC_KEYS`), so the stage
+  // target step stands only for 挑釁.
+  function tacticModel(row) {
+    return {
+      key: row.key,
+      label: row.label,
+      enabled: !!row.enabled,
+      disabledReason: row.reason || null,
+      targetSpec: row.key === "taunt" ? "single" : "none",
+      targets: (row.targets || []).slice(),
+    };
+  }
+
+  function findTactic(tactics, key) {
+    var found = null;
+    tactics.forEach(function (tactic) {
+      if (tactic.key === key) {
+        found = tactic;
+      }
+    });
+    return found;
+  }
+
+  // The commanded actor's committed basic-action rows as subject models.
+  function tacticModels(panel) {
+    return panelTactics(panel).map(tacticModel);
+  }
+
+  // The 道具 root row: it opens the commanded actor's own usable stock. An
+  // actor with none carries the capability reason (the frame would have no
+  // row to show, so the root row is where the fact must surface).
+  function itemsRootRow(items) {
+    var row = {
+      key: "items",
+      label: "道具",
+      enabled: items.length > 0,
+      actionId: null,
+      payload: null,
+      command: true,
+      description: ROOT_COPY.items,
+    };
+    if (items.length === 0) {
+      row.disabledReason = { code: "no_usable_item", message: "沒有可用的道具。" };
+    }
+    return row;
+  }
+
+  // One basic-action root row (防禦 / 閃避 / 挑釁): the committed tactic row's
+  // own enabled state and reason. A tactic the panel does not offer stays
+  // visible and unreachable instead of silently disappearing.
+  function tacticRootRow(key, tactics) {
+    var tactic = findTactic(tactics, key);
+    var row = {
+      key: key,
+      label: (tactic && tactic.label) || TACTIC_LABELS[key],
+      enabled: !!tactic && tactic.enabled,
+      actionId: null,
+      payload: null,
+      command: true,
+      description: ROOT_COPY[key],
+    };
+    if (!row.enabled) {
+      row.disabledReason =
+        (tactic && tactic.disabledReason) || {
+          code: "unavailable",
+          message: "目前無法採取這項戰術。",
+        };
+    }
+    return row;
+  }
 
   // Every root, category, and group row carries `command: true`: the dock
   // renders those frames as one vertical command list (a single column, so
@@ -144,9 +263,11 @@
     return [
       { key: "attack", label: "攻擊", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.attack },
       { key: "skills", label: "技能", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.skills },
-      { key: "items", label: "道具", enabled: false, actionId: null, payload: null, command: true, disabledReason: { code: "not_implemented", message: "道具功能尚未開放。" } },
+      itemsRootRow(panelItems(panel)),
       { key: "bag", label: "背包", enabled: true, actionId: null, payload: null, openDrawer: "inventory", command: true, description: ROOT_COPY.bag },
-      { key: "defend", label: "防禦", enabled: false, actionId: null, payload: null, command: true, disabledReason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
+      tacticRootRow("defend", tacticModels(panel)),
+      tacticRootRow("dodge", tacticModels(panel)),
+      tacticRootRow("taunt", tacticModels(panel)),
       { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" }, command: true, description: ROOT_COPY.flee },
       { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.forfeit },
     ];
@@ -609,6 +730,241 @@
   }
 
   // -------------------------------------------------------------------------
+  // Item and basic-action frames (webclient-party-items-tactics).
+  // -------------------------------------------------------------------------
+
+  // The disabled explanation row of an item/tactic frame: the same shape the
+  // skill frame's `skill-disabled` row uses (focusable, explanation readable,
+  // nothing submitted).
+  function disabledRow(key, label, reason) {
+    return {
+      key: key,
+      label: label,
+      description: reason ? reason.message : null,
+      enabled: false,
+      actionId: null,
+      payload: null,
+      disabledReason: reason || null,
+    };
+  }
+
+  // The 道具 frame's rows: one per committed actor-local item choice, carrying
+  // the item's current quantity, its effect summary (the detail pane's copy)
+  // and its own committed disabled reason. Every row is a command row, so the
+  // frame stays one vertical list.
+  function itemRows(panel) {
+    return panelItems(panel)
+      .map(itemModel)
+      .map(function (item) {
+        var row = {
+          key: "item-" + item.key,
+          label: item.label + " ×" + item.quantity,
+          description: item.summary !== "" ? item.summary : null,
+          enabled: item.enabled,
+          actionId: null,
+          payload: null,
+          command: true,
+        };
+        if (item.enabled) {
+          row.actionId = "open-item";
+          row.payload = { itemKey: item.key };
+        } else {
+          row.disabledReason = item.disabledReason;
+        }
+        return row;
+      });
+  }
+
+  // One confirmation/target row of an item's frame. The command is the closed
+  // v7 `{kind: "item", payload: {item_key[, target_id]}}` union member; the
+  // session/round/draft versions and the commanded actor are added to the
+  // envelope at submit time.
+  function itemCommandRow(item, key, label, targetFields) {
+    var payload = { item_key: item.key };
+    Object.keys(targetFields || {}).forEach(function (field) {
+      payload[field] = targetFields[field];
+    });
+    return {
+      key: key,
+      label: label,
+      enabled: true,
+      actionId: "combat.command",
+      commandKind: "item",
+      payload: payload,
+      commandDisplay: { itemLabel: item.label },
+    };
+  }
+
+  // Open one committed item's review/target frame: NONE submits no target
+  // field and SELF submits no target field (the server binds the commanded
+  // actor to the effect), SINGLE reuses the stage single-target step over the
+  // item's own server-listed legal targets. `null` for an unknown item (the
+  // resolver's identity-loss degradation).
+  function openItem(combat, itemKey) {
+    var item = combat.itemByKey ? combat.itemByKey[itemKey] : null;
+    if (!item) {
+      return null;
+    }
+    if (!item.enabled) {
+      return {
+        items: [disabledRow("item-disabled", item.label, item.disabledReason)],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: "道具",
+      };
+    }
+    if (item.targetSpec === "none") {
+      return {
+        items: [itemCommandRow(item, "none-confirm", "使用", {})],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: "道具",
+      };
+    }
+    if (item.targetSpec === "self") {
+      return {
+        items: [itemCommandRow(item, "self-confirm", "對自己使用", {})],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: "道具",
+      };
+    }
+    var valid = {};
+    item.targets.forEach(function (identity) {
+      valid[identity] = true;
+    });
+    var rows = [];
+    combat.participants.forEach(function (participant) {
+      if (!valid[participant.identity]) {
+        return;
+      }
+      rows.push({
+        key: "target-" + participant.identity,
+        label: participant.display_name,
+        description: participant.state === "active" ? null : participant.state,
+        team: participant.team || null,
+        enabled: true,
+        actionId: "combat.command",
+        commandKind: "item",
+        payload: { item_key: item.key, target_id: participant.identity },
+        commandDisplay: {
+          itemLabel: item.label,
+          targetLabel: participant.display_name,
+        },
+      });
+    });
+    if (rows.length === 0) {
+      return {
+        items: [
+          disabledRow(
+            "item-disabled",
+            item.label,
+            item.disabledReason || { code: "no_target", message: "沒有合法的目標。" }
+          ),
+        ],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: "道具",
+      };
+    }
+    return {
+      items: rows,
+      focusKey: null,
+      grid: true,
+      gridCols: 1,
+      title: "目標",
+    };
+  }
+
+  // Open one basic action's frame: 防禦 and 閃避 confirm the personal round
+  // choice (a zero-cost round action — nothing is charged, applied or
+  // consumed here), 挑釁 reuses the stage single-target step over the
+  // server-listed living enemies. The command is the closed v7
+  // `{kind: "tactic", payload: {key[, target_id]}}` union member: the panel
+  // echoes an admitted entry back in its own `tactical` draft spelling.
+  function tacticMenu(combat, key) {
+    var tactic = combat.tacticByKey ? combat.tacticByKey[key] : null;
+    if (!tactic) {
+      return null;
+    }
+    var title = tactic.label || TACTIC_LABELS[key] || "戰術";
+    if (!tactic.enabled) {
+      return {
+        items: [disabledRow("tactic-disabled", title, tactic.disabledReason)],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: title,
+      };
+    }
+    if (key !== "taunt") {
+      return {
+        items: [
+          {
+            key: "tactic-confirm",
+            label: "確認" + title,
+            enabled: true,
+            actionId: "combat.command",
+            commandKind: "tactic",
+            payload: { key: key },
+            commandDisplay: { tacticLabel: title },
+          },
+        ],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: title,
+      };
+    }
+    var rows = [];
+    combat.participants.forEach(function (participant) {
+      if (tactic.targets.indexOf(participant.identity) === -1) {
+        return;
+      }
+      rows.push({
+        key: "target-" + participant.identity,
+        label: participant.display_name,
+        description: participant.state === "active" ? null : participant.state,
+        team: participant.team || null,
+        enabled: true,
+        actionId: "combat.command",
+        commandKind: "tactic",
+        payload: { key: "taunt", target_id: participant.identity },
+        commandDisplay: {
+          tacticLabel: title,
+          targetLabel: participant.display_name,
+        },
+      });
+    });
+    if (rows.length === 0) {
+      return {
+        items: [
+          disabledRow(
+            "tactic-disabled",
+            title,
+            tactic.disabledReason || { code: "no_target", message: "沒有可挑釁的敵人。" }
+          ),
+        ],
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: title,
+      };
+    }
+    return {
+      items: rows,
+      focusKey: null,
+      grid: true,
+      gridCols: 1,
+      title: "目標",
+    };
+  }
+
+  // -------------------------------------------------------------------------
   // Menu builder.
   // -------------------------------------------------------------------------
 
@@ -664,11 +1020,30 @@
         gridCols: 2,
         title: "投降",
       },
+      // The 道具 frame (webclient-party-items-tactics): the commanded actor's
+      // own usable stock, one command row per committed item choice.
+      items: {
+        items: itemRows(panel),
+        focusKey: null,
+        grid: true,
+        gridCols: 1,
+        title: "道具",
+      },
     };
 
     var skillByKey = {};
     skills.forEach(function (skill) {
       skillByKey[skill.key] = skill;
+    });
+    var itemByKey = {};
+    panelItems(panel).forEach(function (row) {
+      var item = itemModel(row);
+      itemByKey[item.key] = item;
+    });
+    var tacticByKey = {};
+    panelTactics(panel).forEach(function (row) {
+      var tactic = tacticModel(row);
+      tacticByKey[tactic.key] = tactic;
     });
 
     return {
@@ -677,6 +1052,9 @@
       participants: participants,
       skills: skills,
       skillByKey: skillByKey,
+      items: panelItems(panel).map(itemModel),
+      itemByKey: itemByKey,
+      tacticByKey: tacticByKey,
       menus: menus,
       focusSkillKey: state.skillKey || null,
       page: state.page || 0,
@@ -875,6 +1253,8 @@
     openGroup: openGroup,
     openSkill: openSkill,
     openSkillTargets: openSkillTargets,
+    openItem: openItem,
+    tacticMenu: tacticMenu,
     initialTargetKey: initialTargetKey,
     chooseScale: chooseScale,
     scaleLabelFor: scaleLabelFor,

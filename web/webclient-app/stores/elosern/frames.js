@@ -16,7 +16,13 @@
 import KeyboardRouter from "../../lib/keyboard_router.js";
 import CombatMenu from "../../lib/combat_menu.js";
 import { actionIntentForItem } from "../../components/dock-items.js";
-import { committedSkill, crossSide, crossSideQuestion, skillFacts, targetSetFor } from "./cross_side.js";
+import {
+  committedSubject,
+  crossSide,
+  crossSideQuestion,
+  factsFor,
+  targetSetFor,
+} from "./cross_side.js";
 
 // The committed exploration room identity (webclient-scene-overview-swap D2):
 // the exploration panel's own stable movement key — `look.room.identity`. It
@@ -32,6 +38,17 @@ function explorationRoomIdentity(rs) {
 }
 
 export function applyFrames(ctx) {
+  // The single-target identities a combat row's payload names: a skill row
+  // carries the array `target_ids`, an item's or a basic action's row the
+  // scalar `target_id` (the closed v7 wire union).
+  function singleTargetIds(payload) {
+    const body = payload || {};
+    if (Array.isArray(body.target_ids)) {
+      return body.target_ids;
+    }
+    return body.target_id === undefined || body.target_id === null ? [] : [body.target_id];
+  }
+
   // D4: the imported keyboard router owns the focus state.
   const router = KeyboardRouter.createRouter({
     // The router is created before `onRouterEvent` is assigned (the original
@@ -245,6 +262,35 @@ export function applyFrames(ctx) {
     return ctx.submitCombatEnvelope(ctx.buildCombatCommand(command), display);
   };
 
+  // The in-combat drawer's item use (webclient-party-items-tactics): a usable
+  // item chosen from the bag is the commanded actor's own round choice, so it
+  // enters the canonical item review/target step — the same frame the 道具
+  // row opens — and never the actorless `inventory.use`. Refused for an item
+  // outside the actor's current usable stock or while a mutation, a played
+  // round or the cross-side question holds the dock.
+  ctx.useCombatItem = function useCombatItem(itemKey) {
+    const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    if (!panel || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+      return false;
+    }
+    const combat = ctx.frameResolver.combatModel();
+    if (!combat || typeof itemKey !== "string") {
+      return false;
+    }
+    const item = combat.itemByKey ? combat.itemByKey[itemKey] : null;
+    if (!item || !item.enabled) {
+      return false;
+    }
+    // The drawer yields to the card's own target/review step: one frame, the
+    // same one the 道具 row pushes, with the card's focus handoff.
+    ctx.closeHudDrawer();
+    ctx.pushFrame({ source: "combat.item", params: { itemKey: itemKey } }, null);
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return true;
+  };
+
   ctx.onRouterEvent = function onRouterEvent(name, payload) {
     if (name === "settle-pop") {
       ctx.settlePopSeen = true;
@@ -269,15 +315,11 @@ export function applyFrames(ctx) {
         // A combat target-row focus is a client-local selection (spec: focus
         // and selection remain client-local until submission); record the
         // selected identity without dispatching any OOB action.
-        if (
-          item &&
-          typeof item.key === "string" &&
-          item.key.startsWith("target-") &&
-          item.payload &&
-          Array.isArray(item.payload.target_ids) &&
-          item.payload.target_ids.length > 0
-        ) {
-          ctx.lastTarget = String(item.payload.target_ids[0]);
+        if (item && typeof item.key === "string" && item.key.startsWith("target-")) {
+          const ids = singleTargetIds(item.payload);
+          if (ids.length > 0) {
+            ctx.lastTarget = String(ids[0]);
+          }
         }
       }
       ctx.publishView();
@@ -446,6 +488,29 @@ export function applyFrames(ctx) {
         ctx.publishView();
         return;
       }
+      // The commanded actor's own items and basic actions
+      // (webclient-party-items-tactics): 道具 opens the committed stock, one
+      // item row opens that item's review/target frame, and 防禦 / 閃避 /
+      // 挑釁 open their confirm or enemy-target frame. No local row submits a
+      // command of its own.
+      if (item.key === "items") {
+        ctx.pushFrame({ source: "combat.items", params: {} }, item.key);
+        ctx.publishView();
+        return;
+      }
+      if (item.actionId === "open-item" && item.payload) {
+        ctx.pushFrame(
+          { source: "combat.item", params: { itemKey: item.payload.itemKey } },
+          item.key
+        );
+        ctx.publishView();
+        return;
+      }
+      if (item.key === "defend" || item.key === "dodge" || item.key === "taunt") {
+        ctx.pushFrame({ source: "combat.tactic", params: { key: item.key } }, item.key);
+        ctx.publishView();
+        return;
+      }
       // The client-local 背包 drawer row (add-inventory-item-actions, task
       // 6.3): activation opens the frameless inventory drawer without a
       // dispatch, an invented gameplay action, or a router frame.
@@ -461,7 +526,7 @@ export function applyFrames(ctx) {
           if (areaPayload) {
             const command = { kind: "skill", payload: areaPayload };
             const display = ctx.castSubmitDisplay(skill, areaPayload, item.commandDisplay);
-            if (ctx.askCrossSide("area", item.key, command, display)) {
+            if (ctx.askCrossSide("skill", "area", item.key, command, display)) {
               return;
             }
             ctx.submitCombatCommand(command, display);
@@ -474,23 +539,22 @@ export function applyFrames(ctx) {
       // confirmation submits the OOB cast. Pointer activation performs the
       // identical confirmation the keyboard performs — exactly one
       // `combat.command` with the same payload
-      // (webclient-pointer-activation).
-      if (
-        typeof item.key === "string" &&
-        item.key.startsWith("target-") &&
-        item.payload &&
-        Array.isArray(item.payload.target_ids) &&
-        item.payload.target_ids.length > 0
-      ) {
-        ctx.lastTarget = String(item.payload.target_ids[0]);
-        const focusSkill = combat.focusSkillKey
-          ? combat.skillByKey[combat.focusSkillKey]
-          : null;
+      // (webclient-pointer-activation). An item's and a basic action's
+      // SINGLE row carries the same command kind in `commandKind`
+      // (webclient-party-items-tactics), so one path covers all three kinds.
+      const singleIds = singleTargetIds(item.payload);
+      if (typeof item.key === "string" && item.key.startsWith("target-") && singleIds.length > 0) {
+        const kind = item.commandKind === undefined ? "skill" : item.commandKind;
+        ctx.lastTarget = String(singleIds[0]);
+        const focusSkill =
+          kind === "skill" && combat.focusSkillKey
+            ? combat.skillByKey[combat.focusSkillKey]
+            : null;
         const display = focusSkill
           ? ctx.castSubmitDisplay(focusSkill, item.payload, item.commandDisplay)
           : item.commandDisplay || null;
-        const command = { kind: "skill", payload: item.payload };
-        if (ctx.askCrossSide("single", item.key, command, display)) {
+        const command = { kind: kind, payload: item.payload };
+        if (ctx.askCrossSide(kind, "single", item.key, command, display)) {
           return;
         }
         ctx.submitCombatCommand(command, display);
@@ -498,17 +562,21 @@ export function applyFrames(ctx) {
         return;
       }
       // The NONE and SELF confirms (no target field): the same cross-side
-      // check before the guarded command submission.
+      // check before the guarded command submission. The stale focused skill
+      // is never used to label an item's submission: the row's own kind
+      // selects whether a skill descriptor takes part in the display.
       if (item.key === "none-confirm" || item.key === "self-confirm") {
-        const focusSkill = combat.focusSkillKey
-          ? combat.skillByKey[combat.focusSkillKey]
-          : null;
+        const kind = item.commandKind === undefined ? "skill" : item.commandKind;
+        const focusSkill =
+          kind === "skill" && combat.focusSkillKey
+            ? combat.skillByKey[combat.focusSkillKey]
+            : null;
         const inner = item.payload || {};
-        const command = { kind: item.commandKind === undefined ? "skill" : item.commandKind, payload: inner };
+        const command = { kind: kind, payload: inner };
         const display = focusSkill
           ? ctx.castSubmitDisplay(focusSkill, inner, item.commandDisplay)
           : item.commandDisplay || null;
-        if (ctx.askCrossSide(item.key === "self-confirm" ? "self" : "none", item.key, command, display)) {
+        if (ctx.askCrossSide(kind, item.key === "self-confirm" ? "self" : "none", item.key, command, display)) {
           return;
         }
         ctx.submitCombatCommand(command, display);
@@ -632,11 +700,13 @@ export function applyFrames(ctx) {
 
   // ---- The cross-side question (webclient-combat-cross-side-confirm D2) ----
   // null, or the cast held back at submission: `{ envelope, display, question,
-  // sides, skillKey, form, frameSource, focusKey, actorId, sessionId,
-  // roundRevision, draftVersion }`. Nothing is sent while it is set; 是 sends
-  // the stored envelope verbatim (webclient-party-command-selection: the
-  // guarded command envelope, bound to the commanded actor and the committed
-  // versions, is the held unit).
+  // sides, subjectKind, subjectKey, form, frameSource, focusKey, actorId,
+  // sessionId, roundRevision, draftVersion }`. The subject is a skill or an
+  // item (webclient-party-items-tactics); a basic action has no polar fact and
+  // never opens the question. Nothing is sent while it is set; 是 sends the
+  // stored envelope verbatim (webclient-party-command-selection: the guarded
+  // command envelope, bound to the commanded actor and the committed versions,
+  // is the held unit).
   ctx.crossSideConfirm = null;
 
   function committedCombat(rs) {
@@ -647,15 +717,17 @@ export function applyFrames(ctx) {
   // Called at each target-step submission with the payload exactly as it
   // would be sent. Returns true when the cast is held for the question.
   // The predicate over the committed state for one held (or about to be
-  // held) payload: null, or `{ sides, question }`.
-  function evaluateCrossSide(rs, form, payload) {
+  // held) payload: null, or `{ sides, question }`. `kind` is the submitted
+  // command's kind (`skill`, `item` or `tactic`); the facts, candidates and
+  // label come from that kind's committed descriptor.
+  function evaluateCrossSide(rs, kind, form, payload) {
     const panel = committedCombat(rs);
-    const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
-    if (!panel || skillKey === null) {
+    const key = subjectKeyOf(kind, payload);
+    if (!panel || key === null) {
       return null;
     }
-    const facts = skillFacts(panel, skillKey);
-    const raw = committedSkill(panel, skillKey);
+    const facts = factsFor(panel, kind, key);
+    const raw = committedSubject(panel, kind, key);
     const participants = Array.isArray(panel.participants) ? panel.participants : [];
     // The commanded actor, never the controlled portrait
     // (webclient-party-command-selection): a companion's SELF reach and cross
@@ -672,22 +744,32 @@ export function applyFrames(ctx) {
     return outcome ? { sides: outcome.sides, question: crossSideQuestion(outcome.sides, facts.label) } : null;
   }
 
-  // `command` is the closed `{kind, payload}` union member (the inner skill
-  // payload). The held unit is the fully built envelope, so 是 sends exactly
-  // the versions and actor the question was worded for.
-  ctx.askCrossSide = function askCrossSide(form, focusKey, command, display) {
+  // The subject key one command kind carries on the wire (`skill_key`,
+  // `item_key`, or a basic action's `key`), or null.
+  function subjectKeyOf(kind, payload) {
+    const body = payload || {};
+    if (kind === "item") return typeof body.item_key === "string" ? body.item_key : null;
+    if (kind === "tactic") return typeof body.key === "string" ? body.key : null;
+    return typeof body.skill_key === "string" ? body.skill_key : null;
+  }
+
+  // `kind` is the submitted command's kind and `command` the closed
+  // `{kind, payload}` union member. The held unit is the fully built
+  // envelope, so 是 sends exactly the versions and actor the question was
+  // worded for.
+  ctx.askCrossSide = function askCrossSide(kind, form, focusKey, command, display) {
     const rs = ctx.reducer.getState();
     const panel = committedCombat(rs);
     const payload = command ? command.payload : null;
-    const skillKey = payload && typeof payload.skill_key === "string" ? payload.skill_key : null;
-    if (!panel || !ctx.frameResolver.combatModel() || skillKey === null) {
+    const key = subjectKeyOf(kind, payload);
+    if (!panel || !ctx.frameResolver.combatModel() || key === null) {
       return false;
     }
     const envelope = CombatMenu.commandEnvelope(panel, command);
     if (!envelope) {
       return false;
     }
-    const outcome = evaluateCrossSide(rs, form, payload);
+    const outcome = evaluateCrossSide(rs, kind, form, payload);
     if (!outcome) {
       return false;
     }
@@ -697,7 +779,8 @@ export function applyFrames(ctx) {
       display,
       question: outcome.question,
       sides: outcome.sides,
-      skillKey,
+      subjectKind: kind,
+      subjectKey: key,
       form,
       frameSource: descriptor ? descriptor.source : null,
       focusKey,
@@ -792,14 +875,18 @@ export function applyFrames(ctx) {
       drop(true);
       return;
     }
-    const raw = committedSkill(panel, pending.skillKey);
+    const raw = committedSubject(panel, pending.subjectKind, pending.subjectKey);
     if (!raw || !raw.enabled) {
       drop(true);
       return;
     }
     const candidates = new Set((raw.targets || []).map(String));
     const payload = (pending.envelope && pending.envelope.command && pending.envelope.command.payload) || {};
-    const ids = Array.isArray(payload.target_ids) ? payload.target_ids.map(String) : [];
+    const ids = Array.isArray(payload.target_ids)
+      ? payload.target_ids.map(String)
+      : payload.target_id === undefined || payload.target_id === null
+        ? []
+        : [String(payload.target_id)];
     if (ids.some((id) => !candidates.has(id))) {
       drop(true);
       return;
@@ -810,14 +897,22 @@ export function applyFrames(ctx) {
     }
     const descriptor = router.depth() > 0 ? router.currentDescriptor() : null;
     const params = (descriptor && descriptor.params) || {};
-    if (!descriptor || descriptor.source !== pending.frameSource || params.skillKey !== pending.skillKey) {
+    // The frame's own subject parameter: a skill frame names `skillKey`, an
+    // item frame `itemKey`, a basic-action frame `key`.
+    const frameKey =
+      params.skillKey !== undefined
+        ? params.skillKey
+        : params.itemKey !== undefined
+          ? params.itemKey
+          : params.key;
+    if (!descriptor || descriptor.source !== pending.frameSource || frameKey !== pending.subjectKey) {
       drop(true);
       return;
     }
     // The question re-reads the committed facts, teams and label: a cast
     // that no longer crosses sides needs no question, and one that crosses
     // differently is worded for what 是 would now send.
-    const outcome = evaluateCrossSide(rs, pending.form, payload);
+    const outcome = evaluateCrossSide(rs, pending.subjectKind, pending.form, payload);
     if (!outcome) {
       drop(true);
       return;

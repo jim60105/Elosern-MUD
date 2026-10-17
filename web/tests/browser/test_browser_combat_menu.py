@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import time
 from tools.spec_traceability import covers_requirement
-from web.browser_support.browser_fixtures_data import combat_journey_values
+from web.browser_support.browser_fixtures_data import actor_command_choices, combat_journey_values
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import (
     focus_action_dock,
@@ -652,3 +652,100 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(
             sent_action_count(page, "combat.actor_choices"), queries_before
         )
+
+    def _inject_actor_stock(self, page, foe_id: int) -> None:
+        """Extend the committed combat panel with the commanded actor's own
+        stock and the three basic actions (webclient-party-items-tactics).
+
+        The live engagement's grant set carries no items, so the journey
+        commits the fixture's schema-valid ``choices`` fragment (one SELF item,
+        one item with its committed no-effect reason, and the three basic
+        actions with 挑釁 over the presented enemy). The client mirror validates
+        the injected panel, so the rows are the committed facts the menu reads.
+        """
+        panel = self._combat_panel(page)
+        panel["choices"].update(actor_command_choices(foe_id))
+        inject_update(page, {"context_actions": panel}, mode="combat")
+
+    def _last_command_payload(self, page) -> dict:
+        envelopes = [
+            args[0]
+            for cmd, args, _kwargs in self._ui_actions(page)
+            if cmd == "ui_action" and args and args[0].get("action_id") == "combat.command"
+        ]
+        self.assertTrue(envelopes, "no combat.command was sent")
+        return envelopes[-1]["payload"]["command"]
+
+    def _wait_unlocked(self, page) -> None:
+        # The single-writer lock releases on the committed result; the next
+        # deliberate activation waits for it rather than racing it.
+        page.wait_for_function(
+            "() => !window.__elosernBridge.store.view.dispatch.inFlight",
+            timeout=30000,
+        )
+
+    @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    @covers_requirement("webclient-combat-menu::actor-item-use-and-tactics-reuse-the-complete-existing-selection-flow")
+    def test_item_and_tactic_choices_send_the_actor_command(self):
+        """The commanded actor's own items and basic actions
+        (webclient-party-items-tactics).
+
+        Keyboard only: 道具 opens the actor's own stock (quantity and effect
+        summary, the unusable row's committed reason), one item's SELF review
+        submits exactly one guarded `combat.command` with the closed `item`
+        payload and no target field, and 防禦 confirms its round choice as the
+        closed `tactic` payload. The actorless `inventory.use` is never sent,
+        and the declared command is the only wire traffic.
+        """
+        page = self.logged_in_page()
+        install_outbound_recorder(page)
+        self._engage(page)
+        foes = self._foe_identities(page)
+        self.assertTrue(foes, "the fixture engagement lists an enemy")
+        self._inject_actor_stock(page, foes[0])
+        page.wait_for_selector('#action-dock [data-item-key="items"]', timeout=15000)
+
+        # 道具: the actor's own stock, with the committed quantity/summary and
+        # the unusable row's committed reason.
+        self._walk_to(page, "items")
+        self._press(page, "Enter")
+        self._walk_to(page, "item-trial_salve")
+        stock_text = page.locator(
+            '#action-dock [data-item-key="item-trial_salve"]'
+        ).inner_text()
+        self.assertIn("×2", stock_text)
+        # The unusable row stays visible, disabled, and explains itself.
+        self._walk_to(page, "item-trial_vial")
+        self.assertIn(
+            "目前沒有可用的效果",
+            page.locator('[data-testid="action-dock-description"]').inner_text(),
+        )
+        self._walk_to(page, "item-trial_salve")
+
+        # One item's SELF review, then the submit: exactly one guarded item
+        # command, no target field, and no actorless inventory.use.
+        self._press(page, "Enter")
+        self._press(page, "Enter")
+        self._wait_unlocked(page)
+        self.assertEqual(
+            self._last_command_payload(page),
+            {"kind": "item", "payload": {"item_key": "trial_salve"}},
+        )
+        self.assertEqual(sent_action_count(page, "inventory.use"), 0)
+
+        # Back to the root, re-commit the actor's stock (a resolved round
+        # republishes the panel), then 防禦: the confirm row declares the
+        # round choice as the closed `tactic` payload.
+        self._press(page, "Escape")
+        self._inject_actor_stock(page, foes[0])
+        page.wait_for_selector('#action-dock [data-item-key="defend"]', timeout=15000)
+        self._walk_to(page, "defend")
+        self._press(page, "Enter")
+        self._walk_to(page, "tactic-confirm")
+        self._press(page, "Enter")
+        self._wait_unlocked(page)
+        self.assertEqual(
+            self._last_command_payload(page),
+            {"kind": "tactic", "payload": {"key": "defend"}},
+        )
+        self.assertEqual(sent_action_count(page, "inventory.use"), 0)

@@ -3,11 +3,12 @@
 ## MODIFIED Requirements
 
 ### Requirement: The combat action dock follows the approved keyboard hierarchy
-In combat mode the action root SHALL preserve the root inventory of the client
-combat-menu resolver (the root list of `web/static/webclient/js/elosern/combat_menu.js`:
-Attack, Skills, Items, the client-local Bag drawer opener, Defend, Dodge, Taunt, Flee, and the
-confirmed Forfeit entry) and their existing availability/order. Dodge and Taunt SHALL join Defend as actor-scoped basic actions. Arrow keys SHALL navigate, Enter SHALL open or submit, Escape SHALL pop
-one level, and disabled entries SHALL send no packet.
+In combat mode the action root SHALL preserve the client combat-menu resolver's root
+list (`web/static/webclient/js/elosern/combat_menu.js`: Attack, Skills, Items, the client-local
+Bag drawer opener, Defend, Dodge, Taunt, Flee, the confirmed Forfeit entry) and its
+availability/order. Dodge and Taunt SHALL join Defend as actor-scoped basic actions. Arrow keys
+SHALL navigate, Enter SHALL open or submit, Escape SHALL pop one level, and disabled entries
+SHALL send no packet.
 
 #### Scenario: Basic attack completes without typed input
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
