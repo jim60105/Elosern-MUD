@@ -59,14 +59,20 @@ hand would block the off-hand fallback anyway).
 
 ### Committed reload growth probe
 
-Engine revision `7a079499`; backend: Evennia test runner on SQLite
+Engine revision `9979c2ab`; backend: Evennia test runner on SQLite
 (`server/db/evennia-test.sqlite3`); Python 3.13.14; deterministic: no seed, one fixed
 d100 roll of 60 (a landed base hit, multiplier 1.0) on every staged strike.
 Construction and setup: real `PlayerCharacter` objects, ordinary `add_item` grants,
-ordinary `toggle_equipment` equips, then `save()`, a **forced** idmapper eviction
-(`ObjectDB.flush_instance_cache(force=True)`, because an NAttribute-holding object refuses
-the soft flush) and a fresh fetch by primary key — every number is read from a newly
-loaded instance, never from the handler that wrote it. True stats: attacker
+ordinary `toggle_equipment` equips, then `save()`, a **forced** idmapper eviction of both
+`ObjectDB` (`flush_instance_cache(force=True)`; an NAttribute-holding object refuses the
+soft flush) and `Attribute` (equipment, inventory and traits live in Attribute rows with
+their own cache), and a fresh fetch by primary key — every number is read from a newly
+loaded instance, never from the handler that wrote it. The probe class runs under Django's
+`TransactionTestCase`, not `TestCase`: the latter's enclosing atomic block is rolled back,
+which would leave it unproven whether the reads came from committed storage at all. It
+also pins the numbers below as literals, so a settlement regression that stopped
+consuming the factor cannot pass on ordering alone, and any authored retune must
+re-measure this record. True stats: attacker
 `hp 200 / mp 100 / sp 100 / atk_phys 20 / agility 10 / defense 40 / magic_power 30`;
 defender the same shape with `atk_phys 1`. Adjusted attacks below include the weapon's
 flat `atk_phys`, and every adjusted attack (20 / 22 / 32) stays at or below the
@@ -79,10 +85,12 @@ defender's defense 40, where the retired subtraction engine dealt nothing at all
 | Selected upgrade | `military_s_sword` | 1.25 | 32 (20 + 12) | 20 |
 
 The marginal growth is strictly positive (10 → 11 → 20) and the selected factor is the
-loaded declaration itself; a detached in-memory copy of the equipment mapping never
-governs a later fresh read, and base traits, `skill_proficiency`, affinity elements and
-owned skills are unchanged across grant/equip/persist. A real armor progression on the
-defender measured monotonic reduction — no armor (defense 40) 20, `leather_armor`
+loaded declaration itself, while base traits, `skill_proficiency`, affinity elements and
+owned skills are unchanged across grant/equip/persist. State held only in the writer's
+process (an `ndb` entry) is absent from the next freshly loaded instance while the
+committed upgrade is still reported, so the record distinguishes committed storage from
+in-memory state. A real armor progression on the defender measured monotonic reduction —
+no armor (defense 40) 20, `leather_armor`
 (defense 44) 19, `military_s_armor` (defense 52) 17 — while the armored defender's own
 factor stays the neutral default (armor contributes defense, never a multiplier) and the
 attacker's selected factor is untouched by it.
@@ -95,7 +103,7 @@ strike is 40; the same strike under Defend records 26 (35% reduction, floored); 
 declared physical factor 1.5 on the attack term records 60; and below the retired
 subtraction threshold (attack 20, defense 30) the strike records 11, growing to 14 with a
 1.25 factor. Magic and healing never consume the physical factor: with the same fixed roll
-the staged magic strike measured 13 with and without `military_s_sword`, and the skill heal
+the staged magic strike measured 15 with and without `military_s_sword`, and the skill heal
 magnitude measured 30 in both states. Externally attributed physical damage, multi-strike
 and critical composition, and main/off-hand precedence with the nonweapon-main-hand
 exception keep their existing independent coverage in `world/rules/tests/test_damage_bands.py`
