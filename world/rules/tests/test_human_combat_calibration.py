@@ -1496,6 +1496,10 @@ class EncounterOutcome:
     #: consumer sources: ratio mitigation K, the Defend reduction, the Dodge
     #: threshold bonus, and each ally's worn weapon factor.
     balance_values: tuple[float, float, float, tuple[float, ...]]
+    #: Enemy decisions taken through the shipped ``monster_behaviour_policy``
+    #: and through the deterministic stand-and-fight policy, respectively.
+    real_enemy_decisions: int
+    deterministic_enemy_decisions: int
 
 
 def _build_encounter_monster(cell: EncounterCell, room: Room) -> Monster:
@@ -1811,6 +1815,32 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
         return real_run_round(field, provider, **kwargs)
 
     simulated_policy = lambda battlefield, record: (True, frozenset())  # noqa: E731
+    # A stand-and-fight cell supplies its enemy's deterministic basic attack
+    # exactly as the preceding probes did. The cell that owns the real flee
+    # policy resolves through the shipped ``monster_behaviour_policy`` itself,
+    # so its retreat outcome is a real policy outcome rather than a fixture
+    # choice -- and both paths are counted, so the recorded evidence says which
+    # one produced the round.
+    from world.rules.monster_behaviour import monster_behaviour_policy
+
+    enemy_decisions = {"real": 0, "deterministic": 0}
+
+    def real_enemy_policy(entity, battlefield, **kwargs):
+        enemy_decisions["real"] += 1
+        return monster_behaviour_policy(entity, battlefield, **kwargs)
+
+    def deterministic_enemy_policy(entity, battlefield, **kwargs):
+        enemy_decisions["deterministic"] += 1
+        return _deterministic_enemy_policy(
+            entity, battlefield, context=kwargs.get("context")
+        )
+
+    enemy_policy_patch = patch(
+        "world.rules.combat_session.policies.monster_behaviour_policy",
+        side_effect=(
+            real_enemy_policy if cell.real_enemy_policy else deterministic_enemy_policy
+        ),
+    )
     with (
         patch(
             "world.rules.combat_session.battlefield._session_policy",
@@ -1824,10 +1854,7 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
             "world.rules.combat_session.rounds.run_round",
             side_effect=observing_run_round,
         ),
-        patch(
-            "world.rules.combat_session.policies.monster_behaviour_policy",
-            side_effect=_deterministic_enemy_policy,
-        ),
+        enemy_policy_patch,
     ):
         for _ in range(CALIBRATION_MAX_ROUNDS):
             current = read_session(commander)
@@ -1908,6 +1935,8 @@ def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> Encounte
         draft_rounds=counters["draft"],
         growth_frozen=_invariant_snapshot(allies, monster) == before,
         balance_values=balance_values,
+        real_enemy_decisions=enemy_decisions["real"],
+        deterministic_enemy_decisions=enemy_decisions["deterministic"],
     )
 
 
@@ -1968,6 +1997,23 @@ class EncounterCalibrationTests(EvenniaTest):
                     1,
                     "defeat, retreat, loss and unfinished are distinct outcomes",
                 )
+                real_policy_cell = next(
+                    cell for cell in ENCOUNTER_CELLS if cell.label == outcome.cell
+                ).real_enemy_policy
+                if real_policy_cell:
+                    self.assertGreater(
+                        outcome.real_enemy_decisions,
+                        0,
+                        "the fleeing cell resolves through the shipped policy",
+                    )
+                    self.assertEqual(outcome.deterministic_enemy_decisions, 0)
+                else:
+                    self.assertEqual(outcome.real_enemy_decisions, 0)
+                    self.assertGreater(
+                        outcome.deterministic_enemy_decisions,
+                        0,
+                        "a stand-and-fight cell supplies its own enemy action",
+                    )
         for cell in ENCOUNTER_CELLS:
             rounds = sorted(
                 outcome.rounds for outcome in outcomes if outcome.cell == cell.label
@@ -2084,3 +2130,5 @@ class EncounterCalibrationTests(EvenniaTest):
         self.assertEqual(
             companion.traits.hp.current, int(companion.traits.hp.max)
         )
+
+
