@@ -609,6 +609,9 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertNotIn("actor", envelope["payload"])
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    @covers_requirement(
+        "webclient-combat-menu::one-command-card-switches-actors-and-renders-authoritative-draft-progress"
+    )
     def test_actor_selector_chrome_returns_to_root_without_a_command(self):
         """The commanded-actor card chrome (webclient-party-command-selection).
 

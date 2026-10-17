@@ -240,7 +240,7 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: Basic attack completes without typed input
 - **WHEN** a player uses only arrows and Enter to choose Attack and one valid enemy
-- **THEN** the browser submits `combat.cast` for `basic_attack` exactly once and the ordinary combat-session path resolves the result
+- **THEN** the browser submits `combat.command` with the guarded selected actor and skill payload for `basic_attack` exactly once and the draft facade saves it and resolves only a complete valid round
 
 #### Scenario: Placeholder mechanics cannot be invoked
 - **WHEN** the player focuses Items or Defend and presses Enter
@@ -264,7 +264,7 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: The master-detail changes no cast payload
 - **WHEN** the player reaches a target through the category and group frames and confirms a cast
-- **THEN** the emitted `combat.cast` payload is byte-identical to the payload the same skill, scale, and target produce without the master-detail
+- **THEN** the guarded combat.command envelope names the commanded actor; its skill payload is identical to the same skill, scale and target chosen without master-detail
 
 #### Scenario: The root list geometry matches its rendered order
 - **WHEN** the player presses the arrow keys on the combat root
@@ -767,11 +767,11 @@ listed in the same order the WebClient panel would list them.
 - **THEN** the `martial_arts` heading's skills are listed directly beneath it with no sub-heading line
 
 ### Requirement: Combat targets are picked on the stage figures
-While the current combat frame is the target frame of an enabled SINGLE, SELF or AREA skill (the stage target step), the client SHALL let the player choose targets on the stage figures instead of in the card's rows. The frame's items, their server order, the keyboard router, the digit picks, Escape, Space and every dispatch payload SHALL stay unchanged; the client SHALL only map the arrow keys and pointer onto the frame's existing items.
+While the current combat frame is the target frame of an enabled SINGLE, SELF or AREA skill (the stage target step), the client SHALL let the player choose targets on the stage figures instead of in the card's rows. The frame's items, their server order, the keyboard router, the digit picks, Escape, Space and skill target payload semantics SHALL stay unchanged inside the guarded v7 actor command envelope; the client SHALL only map the arrow keys and pointer onto the frame's existing items.
 
 #### Scenario: Each TargetSpec maps onto stage positions
 - **WHEN** the target frame of an enabled skill opens for each TargetSpec
-- **THEN** SINGLE has one position per server candidate (its `target-<id>` item); SELF has one position, its `self-confirm` item, on the controlled figure; AREA has one position per candidate (its `area-<id>` item), then one group position per approved shorthand the skill carries (its `shorthand-<key>` item), then the `area-confirm` position; NONE and a disabled skill's frame start no stage target step and render their rows in the card as before
+- **THEN** SINGLE has one position per server candidate (its `target-<id>` item); SELF has one position, its `self-confirm` item, on the commanded actor figure; AREA has one position per candidate (its `area-<id>` item), then one group position per approved shorthand the skill carries (its `shorthand-<key>` item), then the `area-confirm` position; NONE and a disabled skill's frame start no stage target step and render their rows in the card as before
 
 #### Scenario: Positions follow stage order
 - **WHEN** the stage target step builds its positions with a four-figure party and nine standing foes in two ranks, all of them candidates, and a fled participant the server still lists
@@ -783,7 +783,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 
 #### Scenario: Enter, Space, digits and Escape keep their meaning
 - **WHEN** the player presses Enter on a SINGLE position, Space and then Enter on an AREA member, Enter on an AREA group position, Enter on the AREA confirm position, a digit, and Escape
-- **THEN** Enter on the SINGLE position submits one `combat.cast` whose `target_ids` is that candidate; Space and Enter on the AREA member each toggle its selection; Enter on a group position chooses that shorthand; Enter on the confirm position submits the AREA payload; a digit N focuses and activates the frame's N-th item in the server's order; Escape pops exactly one frame and the stage leaves the step in that frame; every payload is byte-identical to the one the same choice produced from the card's rows
+- **THEN** Enter on the SINGLE position submits one `combat.command` whose `target_ids` is that candidate; Space and Enter on the AREA member each toggle its selection; Enter on a group position chooses that shorthand; Enter on the confirm position submits the AREA payload; a digit N focuses and activates the frame's N-th item in the server's order; Escape pops exactly one frame and the stage leaves the step in that frame; every payload is byte-identical to the one the same choice produced from the card's rows
 
 #### Scenario: The opening focus is unchanged
 - **WHEN** the player opens Attack, and separately a skill whose first server candidate is an ally
@@ -791,7 +791,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 
 #### Scenario: Pointer picks a figure
 - **WHEN** the player moves the pointer over a selectable foe's figure, then clicks it, and in an AREA step clicks a group chip and the confirm chip in the target prompt
-- **THEN** hovering focuses that foe's position, the click focuses it and activates it through the router's confirm with a pointer source, sending exactly one `combat.cast` for a SINGLE step and toggling the member for an AREA step, and the chips choose their shorthand and submit the AREA payload; after a chip click DOM focus is back on `#action-dock`, so a following Enter activates the focused position rather than the chip; a figure that is not a candidate takes no pointer
+- **THEN** hovering focuses that foe's position, the click focuses it and activates it through the router's confirm with a pointer source, sending exactly one `combat.command` for a SINGLE step and toggling the member for an AREA step, and the chips choose their shorthand and submit the AREA payload; after a chip click DOM focus is back on `#action-dock`, so a following Enter activates the focused position rather than the chip; a figure that is not a candidate takes no pointer
 
 #### Scenario: Whole-group positions light the group
 - **WHEN** an AREA skill carries the shorthands `all-enemies` and `all-allies` and the player moves onto the `all-enemies` position, then to `all-allies`, then presses Enter and moves to the confirm position
@@ -802,8 +802,12 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 - **THEN** both foes carry the selected mark while the focus is elsewhere, the confirm position's lit set is exactly those two foes, and confirming sends their identities in presenter order
 
 #### Scenario: A SELF skill lights the controlled figure
-- **WHEN** the target frame of an enabled SELF skill opens
+- **WHEN** the target frame of an enabled SELF skill opens while the commanded actor is the player's own controlled figure
 - **THEN** the only position is on the controlled figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
+
+#### Scenario: A SELF skill lights the commanded actor figure
+- **WHEN** the target frame of an enabled SELF skill opens while the commanded actor is a companion
+- **THEN** the only position is on that companion's stage figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
 
 #### Scenario: Knocked-out and unlisted participants
 - **WHEN** a revive-style SINGLE skill lists a knocked-out companion and a knocked-out foe as candidates while a defeated foe is not listed
@@ -818,7 +822,7 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 - **THEN** the arrow keys are not claimed, no position is lit or marked, and no figure carries the step's dim while the round plays; if the frame is still current when the round ends, the step resumes with its focus
 
 ### Requirement: A cast across sides asks for confirmation first
-Aiming a hostile skill at the player's own side, or a beneficial skill at the opposing side, SHALL stay allowed, and the client SHALL ask once for confirmation before sending it. The trigger SHALL use only the version-6 descriptor's `hostile` and `beneficial` facts and the chosen targets' committed `team`; the payload and server validation SHALL stay unchanged.
+Aiming a hostile skill at the player's own side, or a beneficial skill at the opposing side, SHALL stay allowed, and the client SHALL ask once for confirmation before sending it. The trigger SHALL use only the version-7 descriptor's `hostile` and `beneficial` facts and the chosen targets' committed `team`; the payload and server validation SHALL stay unchanged.
 
 #### Scenario: The trigger is a static predicate
 - **WHEN** the client evaluates a submission
@@ -830,10 +834,10 @@ Aiming a hostile skill at the player's own side, or a beneficial skill at the op
 
 #### Scenario: A harmful skill aimed at an ally asks first
 - **WHEN** the player confirms Attack on a companion in the stage target step, by Enter, by its digit, and by a pointer click on its figure
-- **THEN** no `combat.cast` is sent; a question card reading `確定要對友方使用〈基本攻擊〉？` opens centred in the stage's `choices` anchor with the focus on its safe answer 否; activating 是 sends exactly one `combat.cast` byte-identical to the payload the same choice sends without the question
+- **THEN** no `combat.command` is sent; a question card reading `確定要對友方使用〈基本攻擊〉？` opens centred in the stage's `choices` anchor with the focus on its safe answer 否; activating 是 sends exactly one `combat.command` byte-identical to the payload the same choice sends without the question
 
 #### Scenario: A harmful skill aimed at the actor asks first
-- **WHEN** the player confirms a hostile SELF skill, and a hostile SINGLE skill (a debuff, a drain or a sexual stimulus) on the controlled figure
+- **WHEN** the player confirms a hostile SELF skill, and a hostile SINGLE skill (a debuff, a drain or a sexual stimulus) on the commanded actor figure
 - **THEN** a question card reading `確定要對自己使用〈<skill label>〉？` opens before anything is sent
 
 #### Scenario: A restorative skill aimed at a foe asks first
@@ -849,8 +853,8 @@ Aiming a hostile skill at the player's own side, or a beneficial skill at the op
 - **THEN** the first asks naming 敵方, the second naming 友方, and the third once naming 友方與敵方
 
 #### Scenario: Same-side use never asks
-- **WHEN** the player confirms Attack on a foe, a healing skill on a companion, a skill whose descriptor carries `hostile: false` and `beneficial: false` (movement only) on a foe, a buff skill on a companion, a debuff skill on a foe, a NONE skill, Flee, and the Forfeit confirmation
-- **THEN** each sends exactly as before with no question card
+- **WHEN** the player confirms Attack on a foe, a healing skill on a companion, a skill whose descriptor carries `hostile: false` and `beneficial: false` (movement only) on a foe, a buff skill on a companion, a debuff skill on a foe, a NONE skill, the party exit prompt and its dedicated confirmation
+- **THEN** ordinary personal choices use the same cross-side predicate; party exits use their separate mandatory consequence confirmation
 
 #### Scenario: Cancelling returns to the target step
 - **WHEN** the question card is open and the player activates 否, activates its close control, or presses Escape
@@ -865,7 +869,7 @@ Aiming a hostile skill at the player's own side, or a beneficial skill at the op
 - **THEN** it is a modal dialog labelled by its question text, so assistive technology announces `確定要對友方使用〈基本攻擊〉？`, and its first focused control is 否
 
 #### Scenario: A change under the question cancels it
-- **WHEN** the question card is open and a committed `context_actions` replacement removes or disables the pending skill or drops one of its chosen targets (or the chosen shorthand) from the candidates, a combat round starts playing, or the committed mode leaves combat
+- **WHEN** the question card is open and a committed `context_actions` replacement removes or disables the pending skill or drops one of its chosen targets (or the chosen shorthand) from the candidates, the selected actor changes, session/round becomes stale, a combat round starts playing, or the committed mode leaves combat
 - **THEN** the question card closes without sending and DOM focus goes to the mode's focus home (`#action-dock` in combat), never the document body; on a replacement the target step returns with the existing selection repair; a replacement that leaves the pending skill, its targets and its shorthand valid keeps the question open; the server's validation still decides every sent cast
 
 #### Scenario: Confirming returns focus to the dock
@@ -942,3 +946,22 @@ Only success code party_exit_prompt SHALL carry exact operation,confirmation_tok
 #### Scenario: Draft result ordering
 - **WHEN** a command is saved, needs reselection or commits a round
 - **THEN** canonical panels publish first and codes draft_saved, needs_selection or round_committed distinguish outcomes; only a committed round carries beats
+
+### Requirement: One command card switches actors and renders authoritative draft progress
+The existing centered command card SHALL provide a keyboard/pointer actor selector, current actor identity and confirmed/required progress. It SHALL reuse the same skill/category/scale/target flow for every actor. Revisit SHALL permit replacement; accepted nonfinal selections SHALL move to a missing member and final selection SHALL rely on server automatic resolution.
+
+#### Scenario: Companion choice in shared card
+- **WHEN** the player switches from commander to a companion
+- **THEN** one read-only actor query loads its canonical choices in the same card without possession, geometry redesign or duplicated companion menu
+
+#### Scenario: Revisit and automatic final selection
+- **WHEN** an earlier confirmed actor is revisited and then the last required actor confirms
+- **THEN** earlier selection is replaced, remaining valid progress persists and no whole-party confirmation step appears
+
+#### Scenario: Actor versus target
+- **WHEN** the player opens companion SELF and then targets another party member with a SINGLE skill
+- **THEN** SELF marker and resources refer to the commanded companion; actor selection and target selection remain distinct
+
+#### Scenario: Reconnect and invalidation
+- **WHEN** transport resets or final preflight returns some invalid members
+- **THEN** confirmed entries restore from the server, missing/invalid members remain identifiable and no intent is supplied or replayed automatically
