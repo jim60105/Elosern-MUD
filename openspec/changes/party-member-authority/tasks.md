@@ -1,14 +1,15 @@
 # Tasks
 
-Total estimate: **4.5 hours**, including implementation, focused verification, documentation and integration. Prerequisites and conflicts are in proposal.md.
+Total estimate: **5 hours**, including implementation, focused verification, documentation and integration. Prerequisites and conflicts are in proposal.md.
 
 ## 1. Commander and member resolution (2h)
 
 - [ ] 1.1 Add `world/rules/party_scope.py` with `PartyScopeError`, the three codes, `PARTY_SCOPE_MESSAGES`, `resolve_commander`, and `authorize_member(commander, member_id, purpose, anchor)`; verify with `world/rules/tests/test_party_scope.py` cases for player commander, possessed commander, non-player non-possessed rejection, non-member NPC, deleted dbid, boolean/str ids, absent member, knocked-out `act` rejection and `organize` admission, and an unchanged attribute snapshot after every rejection.
 
-## 2. Scope and text token (1.5h)
+## 2. Scope, text token and guards (2h)
 
 - [ ] 2.1 Add `present_party_scope(acting)` and `resolve_member_token(acting, token)`; verify ordering (acting, commander, roster order), different-room exclusion, possession ordering, de-duplication, exact-name match, ambiguous and unknown tokens rejected without caller fallback.
+- [ ] 2.2 Add `party_in_combat(acting, *members)` and the live-puppet requirement in `resolve_commander`; verify a possessed figure in a session bars the request while the commander body is out of combat, and a flagged but unpuppeted NPC is rejected.
 
 ## 3. Integration (1h)
 

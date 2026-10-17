@@ -17,6 +17,8 @@ See proposal.md for motivation. Observed today: `world/rules/combat_session/batt
 - **Anchor.** The anchor is the acting character: the commander normally, the possessed companion while possessing. This keeps "present" meaning "in the room where the player is acting" and matches the design statement for the non-possessed case; see the batch gap note on possession.
 - **Ordered scope.** `present_party_scope(acting)` returns a de-duplicated tuple: acting character first, then the commander, then `live_companions(commander)` in roster order, each kept only when present in the anchor room. Deterministic ordering keeps clock settlement and snapshot registries reproducible.
 - **Text tokens.** `resolve_member_token(acting, token)` compares the stripped token against `npc_display_name` / character key of the commander and effective members (exact match). Zero or multiple matches reject with `not_party_member`; it never falls back to the caller.
+- **Combat activity.** `party_in_combat(acting, *members)` returns true when the acting character, the commander or any named member reads an active session (`is_in_active_session`); every combat-barred rule (transfer, booking, field item use) uses it so a possessed figure in a session cannot bypass the bar.
+- **Stale possession.** Commander resolution additionally requires `is_player_driven(acting)` (a live puppet session) so a leftover `possessed_by` cannot launder authority.
 - **Messages.** `PARTY_SCOPE_MESSAGES` maps each code to one fixed zh-TW line: `not_party_member` 「對方不是你的隊伍成員。」, `member_not_present` 「對方不在這裡。」, `member_cannot_act` 「對方目前無法行動。」.
 
 ## Risks / Trade-offs

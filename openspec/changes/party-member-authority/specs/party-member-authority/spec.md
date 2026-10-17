@@ -35,6 +35,10 @@ A member-scoped request SHALL require the named member to be located in the same
 - **WHEN** the commander names a companion that stayed behind in another room
 - **THEN** the request is rejected with `member_not_present`
 
+#### Scenario: Separated bodies under possession
+- **WHEN** the player possesses 艾拉 and has walked her into another room, leaving the commander's body and 卡恩 behind
+- **THEN** requests anchored on 艾拉 treat the commander and 卡恩 as `member_not_present`, while 艾拉 herself is present
+
 ### Requirement: Acting purposes exclude knocked-out members
 A request whose purpose is acting (item use, casting, practice booking) SHALL reject a companion whose stored HP is at or below the nonlethal floor with `member_cannot_act`. A request whose purpose is organizing (bag transfer, equipment toggle) SHALL admit that companion.
 
@@ -63,6 +67,20 @@ A text member token SHALL resolve by exact display name among the commander and 
 #### Scenario: An ambiguous token is rejected
 - **WHEN** two companions share the display name typed after `=`
 - **THEN** the command is rejected with `not_party_member` and nothing changes
+
+### Requirement: Combat activity is judged across the involved members
+A member-scoped rule that is barred in combat SHALL treat the request as in combat when the acting character, the commander, or any named member is in an active combat session.
+
+#### Scenario: A possessed figure in combat bars the request
+- **WHEN** the player possesses 艾拉, 艾拉 is in an active combat session and the commander's body is not
+- **THEN** a combat-barred request names 艾拉's session as active and is refused
+
+### Requirement: A stale possession flag grants no authority
+Commander resolution SHALL accept a possessed companion only while it is puppeted by a session of the owner's account; an NPC whose possession flag is set without such a session SHALL be rejected with `not_party_member`.
+
+#### Scenario: A flagged but unpuppeted NPC is refused
+- **WHEN** an NPC has `possessed_by` naming the player but no live session puppets it
+- **THEN** commander resolution rejects it with `not_party_member`
 
 ### Requirement: Membership rejections are stable and write nothing
 Each membership rejection SHALL carry its stable code and one fixed Traditional Chinese message, and SHALL leave every persistent attribute unchanged.

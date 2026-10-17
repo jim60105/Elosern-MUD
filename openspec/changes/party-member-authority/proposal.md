@@ -10,6 +10,7 @@ Every party-management mutation in the approved design (`docs/superpowers/specs/
 - Add the ordered **present party scope** of an acting character: the acting character, then the commander and the effective party members (canonical `live_companions` order) located in the acting character's room.
 - Add one text member-token resolver for the `= <成員>` and `由 <成員>` command suffixes, matching only the commander and effective members by display name.
 - Add stable rejection codes `not_party_member`, `member_not_present`, `member_cannot_act` with fixed Traditional Chinese messages. A forged, stale, or non-member identity is rejected and is never replaced by the commander.
+- Add `party_in_combat(acting, *members)` (acting character, commander or any named member in an active session) and require a live puppet session before trusting a possession flag.
 - No mutation, no new command, no protocol change in this slice.
 
 ## Capabilities
@@ -30,11 +31,11 @@ None.
 
 ## Effort
 
-**4.5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
+**5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
 
 ## Batch: party member management
 
-Declared implementation order: **1 of 30**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
+Declared implementation order: **1 of 31**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
 
 No direct prerequisites.
 
