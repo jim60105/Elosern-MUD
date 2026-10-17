@@ -14,8 +14,8 @@ See proposal.md for motivation. Observed today: `world/rules/combat_session/batt
 
 - **Commander resolution.** `resolve_commander(acting)` returns `acting` for a `PlayerCharacter`, and for a possessed, puppeted NPC returns the live owner from `db.possessed_by` when that owner is a `PlayerCharacter`; anything else raises `PartyScopeError("not_party_member")`. Alternative considered: trusting `session.account` puppets; rejected because the deterministic rules must not read transport state.
 - **Membership is re-derived, never trusted.** `authorize_member(commander, member_id, purpose, anchor)` accepts an integer dbid only. It resolves the live object, then requires `member is commander` or `member in live_companions(commander)`; otherwise `not_party_member`. Presence requires `member.location is anchor.location` with a non-null location (`member_not_present`). The `act` purpose additionally rejects a companion whose stored HP is at or below 1 (`member_cannot_act`); the `organize` purpose admits it (design §4.1). The commander itself is never "knocked out" by this predicate; defeat aftermath keeps its own rules.
-- **Anchor.** The anchor is the acting character: the commander normally, the possessed companion while possessing. This keeps "present" meaning "in the room where the player is acting" and matches the design statement for the non-possessed case; see the batch gap note on possession.
-- **Ordered scope.** `present_party_scope(acting)` returns a de-duplicated tuple: acting character first, then the commander, then `live_companions(commander)` in roster order, each kept only when present in the anchor room. Deterministic ordering keeps clock settlement and snapshot registries reproducible.
+- **Anchor.** The anchor is the commander's room. Per the user's 2026-10-18 decision the whole party (owner body included) follows a possessed traversal (`party-follow-under-possession`), so the possessed companion and the commander are co-located by construction; the room check remains only to exclude a member a failed follow or a non-exit relocation left elsewhere.
+- **Ordered scope.** `present_party_scope(acting)` returns a de-duplicated tuple: the commander first, then `live_companions(commander)` in roster order, each kept only when present in the commander's room; possession does not change it. Deterministic ordering keeps clock settlement and snapshot registries reproducible.
 - **Text tokens.** `resolve_member_token(acting, token)` compares the stripped token against `npc_display_name` / character key of the commander and effective members (exact match). Zero or multiple matches reject with `not_party_member`; it never falls back to the caller.
 - **Combat activity.** `party_in_combat(acting, *members)` returns true when the acting character, the commander or any named member reads an active session (`is_in_active_session`); every combat-barred rule (transfer, booking, field item use) uses it so a possessed figure in a session cannot bypass the bar.
 - **Stale possession.** Commander resolution additionally requires `is_player_driven(acting)` (a live puppet session) so a leftover `possessed_by` cannot launder authority.
@@ -23,7 +23,6 @@ See proposal.md for motivation. Observed today: `world/rules/combat_session/batt
 
 ## Risks / Trade-offs
 
-- [Possession anchor differs from a literal reading of "commander's room"] → Recorded as a planning gap in the batch handoff; the acting-room anchor is the only one that keeps the possessed figure itself in scope when bodies separate.
 - [Name collisions in text tokens] → Ambiguity rejects instead of guessing.
 
 ## Migration Plan

@@ -28,16 +28,12 @@ Every member-scoped request SHALL name its member by identity, and the system SH
 - **WHEN** a request names the dbid of a companion that has since been deleted
 - **THEN** it is rejected with `not_party_member` rather than acting as the commander
 
-### Requirement: Member presence is checked against the acting room
-A member-scoped request SHALL require the named member to be located in the same room as the acting character, and SHALL reject an absent member with `member_not_present`.
+### Requirement: Member presence is checked against the commander's room
+A member-scoped request SHALL require the named member to be located in the commander's room, and SHALL reject an absent member with `member_not_present`.
 
 #### Scenario: A companion in another room is absent
 - **WHEN** the commander names a companion that stayed behind in another room
 - **THEN** the request is rejected with `member_not_present`
-
-#### Scenario: Separated bodies under possession
-- **WHEN** the player possesses 艾拉 and has walked her into another room, leaving the commander's body and 卡恩 behind
-- **THEN** requests anchored on 艾拉 treat the commander and 卡恩 as `member_not_present`, while 艾拉 herself is present
 
 ### Requirement: Acting purposes exclude knocked-out members
 A request whose purpose is acting (item use, casting, practice booking) SHALL reject a companion whose stored HP is at or below the nonlethal floor with `member_cannot_act`. A request whose purpose is organizing (bag transfer, equipment toggle) SHALL admit that companion.
@@ -51,15 +47,15 @@ A request whose purpose is acting (item use, casting, practice booking) SHALL re
 - **THEN** the member check passes
 
 ### Requirement: The present party scope is ordered and room-bound
-The present party scope of an acting character SHALL list the acting character first, then the commander, then effective companions in party order, each only when located in the acting character's room, with no duplicates.
+The present party scope SHALL list the commander first, then effective companions in party order, each only when located in the commander's room; the acting character (the commander, or the possessed companion) is always part of it.
 
 #### Scenario: A companion elsewhere is outside the scope
 - **WHEN** the commander stands with 艾拉 while 卡恩 waits in another room
 - **THEN** the present party scope is exactly the commander followed by 艾拉
 
-#### Scenario: Possession scope starts with the possessed figure
-- **WHEN** the player possesses 艾拉 and the commander's body shares her room
-- **THEN** the scope is 艾拉, then the commander, then other present companions
+#### Scenario: Possession does not change the scope
+- **WHEN** the player possesses 艾拉 and the whole party shares her room
+- **THEN** the scope is the commander, 艾拉, then 卡恩 — the same tuple as without possession
 
 ### Requirement: Text member tokens resolve only within the party
 A text member token SHALL resolve by exact display name among the commander and effective party members only. A token matching zero or several members SHALL be rejected with `not_party_member` and SHALL NOT fall back to the caller.

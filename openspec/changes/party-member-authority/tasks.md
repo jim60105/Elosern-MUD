@@ -8,7 +8,7 @@ Total estimate: **5 hours**, including implementation, focused verification, doc
 
 ## 2. Scope, text token and guards (2h)
 
-- [ ] 2.1 Add `present_party_scope(acting)` and `resolve_member_token(acting, token)`; verify ordering (acting, commander, roster order), different-room exclusion, possession ordering, de-duplication, exact-name match, ambiguous and unknown tokens rejected without caller fallback.
+- [ ] 2.1 Add `present_party_scope(acting)` and `resolve_member_token(acting, token)`; verify ordering (commander, roster order), exclusion of a member left elsewhere by a failed follow, identical scope with and without possession, de-duplication, exact-name match, ambiguous and unknown tokens rejected without caller fallback.
 - [ ] 2.2 Add `party_in_combat(acting, *members)` and the live-puppet requirement in `resolve_commander`; verify a possessed figure in a session bars the request while the commander body is out of combat, and a flagged but unpuppeted NPC is rejected.
 
 ## 3. Integration (1h)

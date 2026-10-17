@@ -7,7 +7,7 @@ Every party-management mutation in the approved design (`docs/superpowers/specs/
 ## What Changes
 
 - Add one read-only rules boundary that resolves the **commander** from the authenticated acting character (the character itself, or the owner of a possessed companion), and authorizes a named member for one purpose (`organize`: bag/equipment reorganization, which admits a knocked-out member; `act`: item use, casting, practice, which does not).
-- Add the ordered **present party scope** of an acting character: the acting character, then the commander and the effective party members (canonical `live_companions` order) located in the acting character's room.
+- Add the ordered **present party scope**: the commander, then the effective party members (canonical `live_companions` order) located in the commander's room; possession does not change it because the whole party follows a possessed traversal (`party-follow-under-possession`).
 - Add one text member-token resolver for the `= <成員>` and `由 <成員>` command suffixes, matching only the commander and effective members by display name.
 - Add stable rejection codes `not_party_member`, `member_not_present`, `member_cannot_act` with fixed Traditional Chinese messages. A forged, stale, or non-member identity is rejected and is never replaced by the commander.
 - Add `party_in_combat(acting, *members)` (acting character, commander or any named member in an active session) and require a live puppet session before trusting a possession flag.
@@ -35,13 +35,13 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **1 of 31**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
+Declared implementation order: **1 of 32**. The full order, ownership map and conflict matrices are in the planning handoff for the 2026-10-18 design and are repeated per change in this section.
 
 No direct prerequisites.
 
 ### Code and spec conflicts within the new batch
 
-- Every later rule, protocol and action change imports `world/rules/party_scope.py` (dependency only, D). No other change edits it except `party-rest-move-settlement` (adds nothing to its public surface; D).
+- Every later rule, protocol and action change imports `world/rules/party_scope.py` (dependency only, D); `party-follow-under-possession` uses `resolve_commander` for the follower set (D). No other change edits it except `party-rest-move-settlement` (adds nothing to its public surface; D).
 - `.github/evennia-shards.json`: conditional manifest conflict with every change that adds a test module; preserve exactly-one-shard ownership in declared order.
 
 ### Active change coordination
