@@ -205,9 +205,13 @@ While the current combat frame is the target frame of an enabled SINGLE, SELF or
 - **WHEN** the player toggles two foes with Space and moves the focus to the confirm position
 - **THEN** both foes carry the selected mark while the focus is elsewhere, the confirm position's lit set is exactly those two foes, and confirming sends their identities in presenter order
 
+#### Scenario: A SELF skill lights the controlled figure
+- **WHEN** the target frame of an enabled SELF skill opens while the commanded actor is the player's own controlled figure
+- **THEN** the only position is on the controlled figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
+
 #### Scenario: A SELF skill lights the commanded actor figure
-- **WHEN** the target frame of an enabled SELF skill opens
-- **THEN** the only position is on the commanded actor figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
+- **WHEN** the target frame of an enabled SELF skill opens while the commanded actor is a companion
+- **THEN** the only position is on that companion's stage figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
 
 #### Scenario: Knocked-out and unlisted participants
 - **WHEN** a revive-style SINGLE skill lists a knocked-out companion and a knocked-out foe as candidates while a defeated foe is not listed
