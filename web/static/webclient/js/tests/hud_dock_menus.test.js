@@ -59,15 +59,15 @@ function explorationPanel(overrides) {
 }
 
 function combatPanel(overrides) {
-  return Object.assign(
-    {
-      schema_version: 6,
+  const base = {
+      schema_version: 7,
       available: true,
       kind: "combat",
       session: {
         session_id: "hostile:1:0",
         mode: "hostile",
         round: 0,
+        round_revision: 0,
         state: "ready",
         reason: null,
       },
@@ -84,9 +84,14 @@ function combatPanel(overrides) {
           conditions: [],
         },
       ],
-      root_actions: ["attack", "skills", "items", "defend", "flee"],
-      secondary_actions: ["forfeit"],
-      skills: [
+      root_actions: ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
+      secondary_actions: ["surrender"],
+      actors: [{ identity: 2, commandable: true, reason: null }],
+      choices: {
+        actor_id: 2,
+        items: [],
+        tactics: [],
+        skills: [
         {
           category: "elemental_magic",
           label: "元素魔法",
@@ -138,11 +143,26 @@ function combatPanel(overrides) {
             },
           ],
         },
-      ],
+        ],
+      },
+      draft: {
+        round_revision: 0,
+        draft_version: 0,
+        required_actor_ids: [2],
+        entries: [],
+        needs_selection_ids: [2],
+        reselection_reasons: [],
+      },
       suggestions: { status: "unavailable" },
-    },
-    overrides || {}
-  );
+  };
+  const opts = Object.assign({}, overrides);
+  // Tests name the requested actor's grouped catalog directly; route a
+  // `skills` override into the v7 choices object.
+  if (opts.skills !== undefined) {
+    opts.choices = Object.assign({}, base.choices, { skills: opts.skills });
+    delete opts.skills;
+  }
+  return Object.assign(base, opts);
 }
 
 function suggestionsEnvelope(status, cards) {

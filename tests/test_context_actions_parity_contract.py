@@ -41,7 +41,7 @@ _OPTIONS_FRAGMENTS = (
 
 
 class ContextActionsOptionsParityContract(unittest.TestCase):
-    @covers_requirement("webclient-context-actions-suggestions::the-v6-client-mirror-and-parity-contract-enforce-the-suggestions-shape")
+    @covers_requirement("webclient-context-actions-suggestions::the-v7-client-mirror-and-parity-contract-enforce-the-suggestions-shape")
     def test_python_and_js_option_bounds_are_identical(self):
         py_source = _PY_OPTIONS.read_text(encoding="utf-8")
         js_source = protocol_client_source()

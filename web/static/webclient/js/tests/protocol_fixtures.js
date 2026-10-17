@@ -56,9 +56,9 @@ function validCombatParticipant(overrides) {
   return deepMerge(
     {
       identity: 2,
-      token: "e1",
+      token: "a1",
       display_name: "哥布林",
-      team: "foes",
+      team: "party",
       state: "active",
       hp_current: 100,
       hp_maximum: 100,
@@ -69,46 +69,87 @@ function validCombatParticipant(overrides) {
   );
 }
 
-function validCombatPanel(overrides) {
+function validCombatActor(overrides) {
+  return deepMerge({ identity: 2, commandable: true, reason: null }, overrides);
+}
+
+function validCombatChoices(overrides) {
   return deepMerge(
     {
-      schema_version: 6,
-      available: true,
-      kind: "combat",
-      session: {
-        session_id: "hostile:1:0",
-        mode: "hostile",
-        round: 0,
-        state: "ready",
-        reason: null,
-      },
-      participants: [validCombatParticipant()],
-      root_actions: ["attack", "skills", "items", "defend", "flee"],
-      secondary_actions: ["forfeit"],
+      actor_id: 2,
       skills: [validCategoryGroup()],
-      suggestions: { status: "unavailable" },
+      items: [],
+      tactics: [],
     },
     overrides
   );
 }
 
+function validCombatDraft(overrides) {
+  return deepMerge(
+    {
+      round_revision: 0,
+      draft_version: 0,
+      required_actor_ids: [2],
+      entries: [],
+      needs_selection_ids: [2],
+      reselection_reasons: [],
+    },
+    overrides
+  );
+}
+
+function validCombatPanel(overrides) {
+  const base = {
+    schema_version: 7,
+    available: true,
+    kind: "combat",
+    session: {
+      session_id: "hostile:1:0",
+      mode: "hostile",
+      round: 0,
+      round_revision: 0,
+      state: "ready",
+      reason: null,
+    },
+    participants: [validCombatParticipant()],
+    root_actions: ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
+    secondary_actions: ["surrender"],
+    actors: [validCombatActor()],
+    choices: validCombatChoices(),
+    draft: validCombatDraft(),
+    suggestions: { status: "unavailable" },
+  };
+  const opts = Object.assign({}, overrides);
+  // Tests name the requested actor's grouped catalog directly; route a
+  // `skills` override into the v7 choices object.
+  if (opts.skills !== undefined) {
+    opts.choices = deepMerge(base.choices, { skills: opts.skills });
+    delete opts.skills;
+  }
+  return deepMerge(base, opts);
+}
+
 function validRecoveryPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "combat",
       session: {
         session_id: "hostile:1:0",
         mode: "hostile",
         round: 2,
+        round_revision: 3,
         state: T_RECOVERY,
         reason: { code: "missing_participant", message: "戰鬥成員已無法確認。" },
       },
       participants: [],
       root_actions: [],
-      secondary_actions: ["forfeit"],
-      skills: [],
+      secondary_actions: ["surrender"],
+      actors: [],
+      choices: null,
+      draft: null,
       suggestions: { status: "unavailable" },
     },
     overrides
@@ -132,7 +173,7 @@ function validSuggestions(overrides) {
 function validContextActionsExplorationPanel(overrides) {
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       affordances: [],
@@ -570,6 +611,9 @@ module.exports = {
   validSkillGroup,
   validCategoryGroup,
   validCombatParticipant,
+  validCombatActor,
+  validCombatChoices,
+  validCombatDraft,
   validCombatPanel,
   validRecoveryPanel,
   nestedSkills,

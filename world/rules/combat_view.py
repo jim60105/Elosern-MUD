@@ -4,7 +4,7 @@ Presentation (WebClient ``context_actions``) and the Telnet ``combat actions``
 command serialize the same frozen view; neither reads raw ``.db.active_combat``
 fields directly. The query strictly parses the persistent record, reconstructs
 its battlefield, preserves ``player_ids`` then ``enemy_ids`` order, and returns
-frozen session, participant, and active-skill descriptor values. It never
+frozen session, participant, actor, choices, and draft view values. It never
 mutates traits, resources, buffs, sexual state, battlefield, session, quest,
 location, or world time, and it never materializes a lazy buff or sexual
 handler.
@@ -16,13 +16,7 @@ caller rather than being repaired here.
 
 Participant conditions (context_actions v6) reuse the status panel's read model
 for each participant entity: the same codes, labels and severities in the same
-order, cut to the first ``MAX_PARTICIPANT_CONDITIONS``. Disclosure finding
-(design D2): the status read model carries no hidden or owner-only condition --
-neither ``ConditionValue`` nor ``ConditionDisplay`` has a visibility flag, the
-severity vocabulary (beneficial, informational, warning, harmful, critical) has
-no private member, and no code family is reserved for the owner -- so no row is
-filtered before it reaches the opposing player. Only ``code``, ``label`` and
-``severity`` are exposed; durations, modifiers and provenance stay owner-side.
+order, cut to the first ``MAX_PARTICIPANT_CONDITIONS``.
 
 Skill descriptors carry ``hostile``/``beneficial``: the static target-side
 classification of ``world.skills.effects.polarity`` over the effects routed to
@@ -33,6 +27,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from world.lore.elements import ELEMENT_REGISTRY
+from world.lore.items import ITEM_REGISTRY
 from world.rules.action_preview import adjusted_cost
 from world.rules.action_preview import preview_skill
 from world.rules.combat import BattlefieldActionContext
@@ -41,8 +36,14 @@ from world.rules.combat_session import (
     read_session,
     reconstruct_battlefield,
 )
+from world.rules.combat_session.battlefield import authorize_combat_actor
+from world.rules.combat_session.rounds import (
+    _eligible_taunt_target,
+    preflight_draft_entries,
+)
 from world.rules.disengage import FLEE_SKILL_KEY
-from world.rules.player_messages import rejection_message
+from world.rules.items import enumerate_actor_item_choices
+from world.rules.player_messages import rejection_message, session_reason_message
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_display import MissingDisplayMetadataError
 from world.rules.status_query import StatusQueryError, build_status_read_model
@@ -51,29 +52,23 @@ from world.skills.registry import SKILL_REGISTRY, SkillCategory, SkillKind
 
 # Presentation bounds owned by the combat view (equal or below protocol limits).
 MAX_PARTICIPANTS = 16
-# Flattened active-skill descriptor bound. Raised from 32 to clear the current
-# theoretical maximum of 157 obtainable active skills (95 base active skills
-# including innate and holy rites, plus the 62 registered sexual acts of the
-# catalogue) with headroom for catalog growth; a multiple of 16 like the other
-# presentation bounds.
+MAX_ACTORS = 5
+MAX_ITEMS = 128
+MAX_TACTICS = 3
 MAX_SKILLS = 192
 MAX_SESSION_ID_CODE_POINTS = 128
 MAX_DISPLAY_NAME_CODE_POINTS = 64
 MAX_REASON_MESSAGE_CODE_POINTS = 512
-# Per-participant condition rows presented on the combat panel (v6).
 MAX_PARTICIPANT_CONDITIONS = 8
-# Wire bound of one condition label (the status panel's MAX_CONDITION_LABEL).
 MAX_PARTICIPANT_CONDITION_LABEL = 128
+MAX_ITEM_SUMMARY_CODE_POINTS = 512
 
-# Stable root action keys in approved keyboard order.
-ROOT_ACTIONS = ("attack", "skills", "items", "defend", "flee")
-SECONDARY_ACTIONS = ("forfeit",)
-RECOVERY_SECONDARY_ACTIONS = ("forfeit",)
+# Stable action keys in approved keyboard order (v7).
+ROOT_ACTIONS = ("attack", "skills", "items", "defend", "dodge", "taunt", "retreat")
+SECONDARY_ACTIONS = ("surrender",)
+RECOVERY_SECONDARY_ACTIONS = ("surrender",)
 BASIC_ATTACK_KEY = "basic_attack"
 
-# Display labels for every presentation category, in the registry's fixed
-# declaration order. Kept beside the category enum so both presenters share
-# exactly one heading vocabulary.
 CATEGORY_LABELS: dict[SkillCategory, str] = {
     SkillCategory.ELEMENTAL_MAGIC: "元素魔法",
     SkillCategory.MARTIAL_ARTS: "武技",
@@ -91,14 +86,6 @@ class CombatViewError(ValueError):
 
 @dataclass(frozen=True)
 class ConditionRow:
-    """One participant condition as the status read model derives it.
-
-    Attributes:
-        code: The stable condition code (buff definition key or rule ID).
-        label: The Traditional Chinese display label.
-        severity: The status severity vocabulary value.
-    """
-
     code: str
     label: str
     severity: str
@@ -106,24 +93,6 @@ class ConditionRow:
 
 @dataclass(frozen=True)
 class ParticipantView:
-    """One ordered combat participant with a stable session token.
-
-    Attributes:
-        identity: The positive opaque ObjectDB dbref.
-        token: The session-local ``aN`` or ``eN`` token.
-        display_name: The bounded display name.
-        team: ``"party"`` or ``"foes"``.
-        state: ``"active"``, ``"fled"``, ``"knocked_out"``, or ``"defeated"``.
-        hp_current: The current true HP value.
-        hp_maximum: The maximum true HP value.
-        portrait_ref: The opaque art-catalog key for this participant while
-            the participant is present in the ``webclient-art-panel`` portrait
-            catalog, else ``None``.
-        conditions: The participant's first ``MAX_PARTICIPANT_CONDITIONS``
-            status conditions in the status read model's order; empty when
-            the entity carries none or is not modelled by the read model.
-    """
-
     identity: int
     token: str
     display_name: str
@@ -137,29 +106,6 @@ class ParticipantView:
 
 @dataclass(frozen=True)
 class SkillDescriptorView:
-    """One owned active skill with deterministic availability data.
-
-    Attributes:
-        key: The stable skill key.
-        label: The registry label.
-        description: The registry effect description.
-        cost: The exact resource cost mapping.
-        target_spec: The ``TargetSpec`` value.
-        element: The nullable element key.
-        category: The ``SkillCategory`` value.
-        group: The optional second-level group key (an element key for
-            ``elemental_magic``, a line name for ``sexual_act``).
-        enabled: Whether the skill is currently usable.
-        reason_code: Stable disabled reason code, or ``None`` when enabled.
-        reason_message: Safe Traditional Chinese disabled explanation.
-        valid_target_ids: Ordered participant IDs that pass the target checks.
-        shorthands: Applicable approved AREA shorthands.
-        freeform_scales: The freeform cast scales offered to a master.
-        hostile: Whether an effect routed to the chosen targets is hostile.
-        beneficial: Whether an effect routed to the chosen targets is
-            beneficial.
-    """
-
     key: str
     label: str
     description: str
@@ -180,15 +126,6 @@ class SkillDescriptorView:
 
 @dataclass(frozen=True)
 class SkillGroupView:
-    """One ordered sub-group of skill descriptors within a category.
-
-    Attributes:
-        group: The sub-group key (an element key or sexual-act line name),
-            or ``None`` for categories that never carry a second level.
-        label: The display label; ``None`` exactly when ``group`` is ``None``.
-        skills: The ordered skill descriptors of this sub-group.
-    """
-
     group: str | None
     label: str | None
     skills: tuple[SkillDescriptorView, ...]
@@ -196,46 +133,88 @@ class SkillGroupView:
 
 @dataclass(frozen=True)
 class CategoryGroupView:
-    """One ordered category of skill sub-groups for presentation.
-
-    Attributes:
-        category: The ``SkillCategory`` value.
-        label: The display label.
-        groups: The ordered sub-groups; exactly one ``group=None`` sub-group
-            for categories that never carry a second level.
-    """
-
     category: str
     label: str
     groups: tuple[SkillGroupView, ...]
 
 
 @dataclass(frozen=True)
+class ItemDescriptorView:
+    item_key: str
+    label: str
+    summary: str
+    quantity: int
+    enabled: bool
+    reason: tuple[str, str] | None
+    target_spec: str
+    targets: tuple[int, ...]
+    hostile: bool
+    beneficial: bool
+
+
+@dataclass(frozen=True)
+class TacticDescriptorView:
+    key: str
+    label: str
+    enabled: bool
+    reason: tuple[str, str] | None
+    targets: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class ActorSummaryView:
+    identity: int
+    commandable: bool
+    reason: tuple[str, str] | None
+
+
+@dataclass(frozen=True)
+class ChoicesView:
+    actor_id: int
+    skills: tuple[CategoryGroupView, ...]
+    items: tuple[ItemDescriptorView, ...]
+    tactics: tuple[TacticDescriptorView, ...]
+
+
+@dataclass(frozen=True)
+class DraftEntryView:
+    actor_id: int
+    command: dict[str, Any]
+
+
+@dataclass(frozen=True)
+class ReselectionReasonView:
+    actor_id: int
+    reason: tuple[str, str]
+
+
+@dataclass(frozen=True)
+class DraftProgressView:
+    round_revision: int
+    draft_version: int
+    required_actor_ids: tuple[int, ...]
+    entries: tuple[DraftEntryView, ...]
+    needs_selection_ids: tuple[int, ...]
+    reselection_reasons: tuple[ReselectionReasonView, ...]
+
+
+@dataclass(frozen=True)
 class SessionView:
-    """One bounded session summary for presentation.
-
-    Attributes:
-        session_id: The bounded stable session identifier.
-        mode: ``hostile`` or ``guild_exam``.
-        round: The non-negative elapsed round count.
-        state: ``ready`` or ``recovery``.
-        reason: A ``(code, message)`` reason for a recovery session, else ``None``.
-    """
-
     session_id: str
     mode: str
     round: int
+    round_revision: int
     state: str
     reason: tuple[str, str] | None
 
 
 @dataclass(frozen=True)
 class CombatView:
-    """The complete frozen read-only combat presentation inputs."""
-
     session: SessionView
     participants: tuple[ParticipantView, ...]
-    skills: tuple[SkillDescriptorView, ...]
+    actors: tuple[ActorSummaryView, ...]
+    choices: ChoicesView | None
+    draft: DraftProgressView | None
     root_actions: tuple[str, ...]
     secondary_actions: tuple[str, ...]
 
@@ -263,13 +242,6 @@ def _participant_state(entity: Any, identity: int, record: Any) -> str:
 
 
 def participant_conditions(entity: Any) -> tuple[ConditionRow, ...]:
-    """Return the entity's first status conditions as presented rows.
-
-    An entity the status read model does not model (``StatusQueryError``) or
-    one carrying a condition without display metadata yields ``()`` so one
-    participant never makes the whole panel unavailable; so does a presented
-    row whose label exceeds the wire bound.
-    """
     try:
         model = build_status_read_model(entity)
     except (StatusQueryError, MissingDisplayMetadataError):
@@ -292,44 +264,210 @@ def _bound(value: str, maximum: int, field: str) -> str:
 
 
 def combat_participants(actor: Any) -> tuple[int, ...]:
-    """Return the ordered participant identities of the actor's active session.
-
-    Reads the persisted ``player_ids`` then ``enemy_ids`` tuples and returns
-    them in exactly that order, with no portrait or other presentation data.
-    Both :func:`build_combat_view` and ``world.rules.art_view.build_art_view``
-    consume this one roster query so the ``context_actions`` and ``art`` panels
-    can never drift on participant membership or order. Raises
-    :class:`CombatViewError` when there is no valid active session.
-    """
     record = read_session(actor)
     if record is None:
         raise CombatViewError("no active combat session")
     return tuple((*record.player_ids, *record.enemy_ids))
 
 
-def build_combat_view(actor: Any, *, for_actor: Any | None = None) -> CombatView:
-    """Build the frozen combat view for ``actor`` or raise ``CombatViewError``.
+def rejection_message_from_session(reason_code: str) -> str:
+    return session_reason_message(reason_code)
 
-    When ``for_actor`` is specified, builds the choices for that authorized
-    allied actor (companion or commander) under the authenticated ``actor``
-    (commander). Raises ``CombatViewError`` if ``for_actor`` is unauthorized.
-    A missing record raises ``CombatViewError`` so the caller can choose
-    unavailable presentation. A strictly parsed but unreconstructable session
-    returns a recovery view instead: no cast or flee action, one confirmed
-    Forfeit entry, and no participant or skill data.
+
+def _reselection_reason_pair(raw_reason: Any) -> tuple[str, str]:
+    if isinstance(raw_reason, dict):
+        code = str(raw_reason.get("reason", "unknown"))
+    elif hasattr(raw_reason, "value"):
+        code = str(raw_reason.value)
+    else:
+        code = str(raw_reason)
+    msg = session_reason_message(code)
+    return (code, msg)
+
+
+def _wire_draft_command(entry: Any) -> dict[str, Any]:
+    """Normalize one stored draft entry into the closed v7 wire command union.
+
+    The persisted draft keeps the internal ``{"kind", "payload"}`` shape whose
+    skill payload uses ``targets_or_shorthand`` and whose tactical payload uses
+    ``tactical_key``. The panel publishes one canonical spelling per kind
+    instead: ``skill`` carries ``skill_key`` plus at most one of
+    ``target_ids``/``target_shorthand`` and an optional ``scale``; ``item``
+    carries ``item_key`` and an optional ``target_id``; ``tactical`` carries
+    ``key`` and an optional ``target_id``.
     """
+    if not isinstance(entry, dict):
+        raise CombatViewError("draft entry is not a mapping")
+    kind = entry.get("kind")
+    payload = entry.get("payload") or {}
+    if not isinstance(payload, dict):
+        raise CombatViewError("draft entry payload is not a mapping")
+    if kind == "skill":
+        command: dict[str, Any] = {"skill_key": payload.get("skill_key")}
+        targets_or_shorthand = payload.get("targets_or_shorthand")
+        if isinstance(targets_or_shorthand, str):
+            command["target_shorthand"] = targets_or_shorthand
+        elif targets_or_shorthand:
+            # An empty stored target list is the rules layer's input for a
+            # NONE/SELF skill: the wire carries no target field at all.
+            command["target_ids"] = [int(target) for target in targets_or_shorthand]
+        if payload.get("scale") is not None:
+            command["scale"] = float(payload["scale"])
+        return {"kind": "skill", "payload": command}
+    if kind == "item":
+        item_command: dict[str, Any] = {"item_key": payload.get("item_key")}
+        if payload.get("target_id") is not None:
+            item_command["target_id"] = int(payload["target_id"])
+        return {"kind": "item", "payload": item_command}
+    if kind == "tactical":
+        tactical_command: dict[str, Any] = {"key": payload.get("tactical_key")}
+        if payload.get("target_id") is not None:
+            tactical_command["target_id"] = int(payload["target_id"])
+        return {"kind": "tactical", "payload": tactical_command}
+    raise CombatViewError(f"unknown draft command kind {kind!r}")
+
+
+def _build_actors(
+    commander: Any, record: Any, battlefield: Any
+) -> tuple[ActorSummaryView, ...]:
+    from evennia.objects.models import ObjectDB
+
+    actors: list[ActorSummaryView] = []
+    for pid in record.player_ids:
+        entity = ObjectDB.objects.filter(id=pid).first()
+        if entity is None:
+            continue
+        try:
+            authorize_combat_actor(commander, entity, record, battlefield)
+            actors.append(ActorSummaryView(identity=pid, commandable=True, reason=None))
+        except CombatSessionError as err:
+            code = str(err.args[0]) if err.args else "forbidden_actor"
+            msg = rejection_message_from_session(code)
+            actors.append(
+                ActorSummaryView(
+                    identity=pid,
+                    commandable=False,
+                    reason=(code, msg),
+                )
+            )
+    if len(actors) > MAX_ACTORS:
+        raise CombatViewError(f"actors list exceeds {MAX_ACTORS}")
+    return tuple(actors)
+
+
+def _build_items(
+    target_actor: Any,
+    battlefield: Any,
+    candidate_entities: list[Any] | None = None,
+    in_combat: bool = True,
+) -> tuple[ItemDescriptorView, ...]:
+    from world.rules.service_messages import rejection_message as item_rejection_message
+
+    context = BattlefieldActionContext(
+        battlefield, event_context={"battlefield": battlefield}
+    )
+    choices = enumerate_actor_item_choices(
+        target_actor,
+        context,
+        candidate_entities=list(candidate_entities or ()),
+        in_combat=in_combat,
+    )
+    if len(choices) > MAX_ITEMS:
+        raise CombatViewError(f"actor item choices {len(choices)} exceeds {MAX_ITEMS}")
+
+    descriptors: list[ItemDescriptorView] = []
+    for choice in choices:
+        definition = ITEM_REGISTRY.get(choice.item_key)
+        summary = (
+            definition.presentation.summary_zh
+            if definition and definition.presentation
+            else ""
+        )
+        if sum(1 for _ in summary) > MAX_ITEM_SUMMARY_CODE_POINTS:
+            summary = summary[:MAX_ITEM_SUMMARY_CODE_POINTS]
+
+        reason_pair = None
+        if not choice.enabled and choice.reason is not None:
+            code = choice.reason.value
+            msg = item_rejection_message(choice.reason)
+            reason_pair = (code, msg)
+
+        target_ids = tuple(
+            int(t.pk) for t in choice.valid_targets if hasattr(t, "pk")
+        )
+
+        descriptors.append(
+            ItemDescriptorView(
+                item_key=choice.item_key,
+                label=choice.label,
+                summary=summary,
+                quantity=choice.quantity,
+                enabled=choice.enabled,
+                reason=reason_pair,
+                target_spec=choice.target_spec,
+                targets=target_ids,
+                hostile=choice.hostile,
+                beneficial=choice.beneficial,
+            )
+        )
+    return tuple(descriptors)
+
+
+def _build_tactics(
+    target_actor: Any, record: Any, battlefield: Any
+) -> tuple[TacticDescriptorView, ...]:
+    tactics: list[TacticDescriptorView] = []
+    # Defend
+    tactics.append(
+        TacticDescriptorView(
+            key="defend",
+            label="防禦",
+            enabled=True,
+            reason=None,
+            targets=(),
+        )
+    )
+    # Dodge
+    tactics.append(
+        TacticDescriptorView(
+            key="dodge",
+            label="閃避",
+            enabled=True,
+            reason=None,
+            targets=(),
+        )
+    )
+    # Taunt
+    eligible_enemy_ids = tuple(
+        eid
+        for eid in record.enemy_ids
+        if _eligible_taunt_target(battlefield, record, eid) is not None
+    )
+    taunt_enabled = len(eligible_enemy_ids) > 0
+    taunt_reason = (
+        None
+        if taunt_enabled
+        else ("target_invalid", session_reason_message("target_invalid"))
+    )
+    tactics.append(
+        TacticDescriptorView(
+            key="taunt",
+            label="嘲諷",
+            enabled=taunt_enabled,
+            reason=taunt_reason,
+            targets=eligible_enemy_ids,
+        )
+    )
+    return tuple(tactics)
+
+
+def build_combat_view(actor: Any, *, for_actor: Any | None = None) -> CombatView:
     record = read_session(actor)
     if record is None:
         raise CombatViewError("no active combat session")
     roster = combat_participants(actor)
     session_id = _bound(record.session_id, MAX_SESSION_ID_CODE_POINTS, "session_id")
-    session = SessionView(
-        session_id=session_id,
-        mode=record.mode,
-        round=record.rounds_elapsed,
-        state="ready",
-        reason=None,
-    )
+
     try:
         battlefield = reconstruct_battlefield(actor, record)
     except CombatSessionError as error:
@@ -340,28 +478,105 @@ def build_combat_view(actor: Any, *, for_actor: Any | None = None) -> CombatView
                 session_id=session_id,
                 mode=record.mode,
                 round=record.rounds_elapsed,
+                round_revision=record.round_revision,
                 state="recovery",
                 reason=(reason_code, reason_message),
             ),
             participants=(),
-            skills=(),
+            actors=(),
+            choices=None,
+            draft=None,
             root_actions=(),
             secondary_actions=RECOVERY_SECONDARY_ACTIONS,
         )
 
-    target_actor = actor if for_actor is None else for_actor
-    from world.rules.combat_session.battlefield import authorize_combat_actor
+    actors = _build_actors(actor, record, battlefield)
+    preflight = preflight_draft_entries(actor, record, battlefield)
+    required_actor_ids = tuple(preflight["required_actors"])
+    valid_entries = preflight["valid_entries"]
+    needs_selection_ids = tuple(preflight["missing_actors"])
+
+    reselection_reasons_list: list[ReselectionReasonView] = []
+    for aid, r_info in preflight.get("reselection_reasons", {}).items():
+        reselection_reasons_list.append(
+            ReselectionReasonView(
+                actor_id=aid,
+                reason=_reselection_reason_pair(r_info),
+            )
+        )
+
+    entries_list: list[DraftEntryView] = []
+    for aid, entry in valid_entries.items():
+        entries_list.append(DraftEntryView(actor_id=aid, command=_wire_draft_command(entry)))
+    if len(entries_list) > MAX_ACTORS:
+        raise CombatViewError(f"draft entries exceed {MAX_ACTORS}")
+    if len(reselection_reasons_list) > MAX_ACTORS:
+        raise CombatViewError(f"reselection reasons exceed {MAX_ACTORS}")
+
+    draft = DraftProgressView(
+        round_revision=record.round_revision,
+        draft_version=record.draft_version,
+        required_actor_ids=required_actor_ids,
+        entries=tuple(entries_list),
+        needs_selection_ids=needs_selection_ids,
+        reselection_reasons=tuple(reselection_reasons_list),
+    )
+
+    # Determine requested actor
+    if for_actor is not None:
+        target_actor = for_actor
+    elif needs_selection_ids:
+        from evennia.objects.models import ObjectDB
+
+        first_id = needs_selection_ids[0]
+        target_actor = ObjectDB.objects.filter(id=first_id).first() or actor
+    else:
+        target_actor = actor
+
     try:
         authorize_combat_actor(actor, target_actor, record, battlefield)
+        is_commandable = True
     except CombatSessionError as err:
-        raise CombatViewError(f"unauthorized actor: {err}") from err
+        if for_actor is not None:
+            raise CombatViewError(f"unauthorized actor: {err}") from err
+        is_commandable = False
 
     participants = _build_participants(actor, record, battlefield, roster)
-    skills = _build_skills(target_actor, record, battlefield, participants)
+
+    if is_commandable:
+        skill_descriptors = _build_skills(target_actor, record, battlefield, participants)
+        skill_groups = group_skill_views(skill_descriptors)
+        items = _build_items(
+            target_actor, battlefield, _participant_entities(participants)
+        )
+        tactics = _build_tactics(target_actor, record, battlefield)
+    else:
+        skill_groups = ()
+        items = ()
+        tactics = ()
+
+    choices = ChoicesView(
+        actor_id=int(target_actor.pk),
+        skills=skill_groups,
+        items=items,
+        tactics=tactics,
+    )
+
+    session = SessionView(
+        session_id=session_id,
+        mode=record.mode,
+        round=record.rounds_elapsed,
+        round_revision=record.round_revision,
+        state="ready",
+        reason=None,
+    )
+
     return CombatView(
         session=session,
         participants=participants,
-        skills=skills,
+        actors=actors,
+        choices=choices,
+        draft=draft,
         root_actions=ROOT_ACTIONS,
         secondary_actions=SECONDARY_ACTIONS,
     )
@@ -422,16 +637,7 @@ def _build_skills(
         battlefield,
         event_context={"battlefield": battlefield},
     )
-    from evennia.objects.models import ObjectDB
-
-    candidate_entities: list[Any] = []
-    for participant in participants:
-        entity = ObjectDB.objects.filter(id=participant.identity).first()
-        if entity is None:
-            raise CombatViewError(
-                f"participant {participant.identity} is unreconstructable"
-            )
-        candidate_entities.append(entity)
+    candidate_entities = _participant_entities(participants)
 
     seen: set[str] = set()
     descriptors: list[SkillDescriptorView] = []
@@ -442,34 +648,30 @@ def _build_skills(
         skill = SKILL_REGISTRY.get(key)
         if skill is None or skill.kind is not SkillKind.ACTIVE:
             continue
-        # An allied personal flee is not a session action (§6): the party's
-        # escape is the confirmed party operation (the root ``flee`` action),
-        # so the skill list never offers the personal-flee bypass. Enemy
-        # disengagement is decided by the AI policy, not from this list.
         if key == FLEE_SKILL_KEY:
             continue
-        from world.skills.eligibility import skill_identity_eligible
-
-        if not skill_identity_eligible(actor, skill):
-            continue
-        if len(descriptors) >= MAX_SKILLS:
-            raise CombatViewError("active-skill count exceeds presentation bounds")
-        preview = preview_skill(actor, key, context, list(candidate_entities))
         element = skill.element.key if skill.element is not None else None
+        preview = preview_skill(actor, key, context, candidate_entities)
         valid_ids = tuple(
-            participant.identity
-            for participant in participants
+            int(target.pk)
+            for target in preview.valid_targets
             if any(
-                getattr(target, "pk", None) == participant.identity
-                for target in preview.valid_targets
+                p.identity == int(target.pk) and p.state == "active"
+                for p in participants
             )
         )
         if preview.enabled:
             reason_code = None
             reason_message = None
         else:
-            reason_code = preview.reason.value if preview.reason is not None else "unavailable"
-            reason_message = rejection_message(preview.reason) if preview.reason is not None else "目前無法使用。"
+            reason_code = (
+                preview.reason.value if preview.reason is not None else "unavailable"
+            )
+            reason_message = (
+                rejection_message(preview.reason)
+                if preview.reason is not None
+                else "目前無法使用。"
+            )
         hostile, beneficial = skill_target_polarity(skill)
         descriptors.append(
             SkillDescriptorView(
@@ -495,33 +697,31 @@ def _build_skills(
 
 
 def _element_label(element_key: str) -> str | None:
-    """Return the display label for one element sub-group key."""
     element = ELEMENT_REGISTRY.get(element_key)
     return element.display_name_zh if element is not None else element_key
+
+
+def _participant_entities(participants: tuple[ParticipantView, ...]) -> list[Any]:
+    """Resolve every presented participant to its live entity, or fail closed."""
+    from evennia.objects.models import ObjectDB
+
+    entities: list[Any] = []
+    for participant in participants:
+        entity = ObjectDB.objects.filter(id=participant.identity).first()
+        if entity is None:
+            raise CombatViewError(
+                f"participant {participant.identity} is unreconstructable"
+            )
+        entities.append(entity)
+    return entities
 
 
 def group_skill_views(
     skills: tuple[SkillDescriptorView, ...],
 ) -> tuple[CategoryGroupView, ...]:
-    """Group ordered skill descriptors into the categorized panel structure.
-
-    Iterates ``SkillCategory`` in declaration order, so category order never
-    depends on what the entity happens to own. Within ``elemental_magic``
-    sub-groups follow ``ELEMENT_REGISTRY`` declaration order; within
-    ``enhancement`` sub-groups follow the fixed ``None`` -> ``"天賦"`` ->
-    ``"身法"`` order; within ``holy_rite`` sub-groups follow the fixed
-    ``None`` -> ``"聖禮"`` order; within
-    ``sexual_act`` sub-groups follow first-seen ``group`` order among the
-    entity's owned skills; every other category emits exactly one
-    ``group=None`` sub-group. A category or sub-group with zero owned skills
-    is omitted entirely, not emitted empty. Skills keep their ``owned_keys()``
-    order within every sub-group.
-    """
     categories: list[CategoryGroupView] = []
     for category in SkillCategory:
-        owned = tuple(
-            skill for skill in skills if skill.category == category.value
-        )
+        owned = tuple(skill for skill in skills if skill.category == category.value)
         if not owned:
             continue
         if category is SkillCategory.ELEMENTAL_MAGIC:
@@ -555,9 +755,6 @@ def group_skill_views(
                     )
                 )
         elif category is SkillCategory.SEXUAL_ACT:
-            # First-seen ``group`` order among the owned skills. A ``None``
-            # group is its own bucket (``group=None``/``label=None``), so a
-            # line-less act is still presented rather than silently dropped.
             sub_groups = []
             seen: set[str | None] = set()
             for skill in owned:
@@ -598,34 +795,38 @@ def group_skill_views(
     return tuple(categories)
 
 
-def rejection_message_from_session(reason_code: str) -> str:
-    """Return a safe Traditional Chinese message for a session reason code."""
-    from world.rules.player_messages import session_reason_message
-
-    return session_reason_message(reason_code)
-
-
 __all__ = [
     "BASIC_ATTACK_KEY",
     "CATEGORY_LABELS",
+    "ActorSummaryView",
     "CategoryGroupView",
+    "ChoicesView",
     "CombatView",
     "CombatViewError",
     "ConditionRow",
+    "DraftEntryView",
+    "DraftProgressView",
+    "ItemDescriptorView",
+    "MAX_ACTORS",
     "MAX_DISPLAY_NAME_CODE_POINTS",
+    "MAX_ITEMS",
+    "MAX_ITEM_SUMMARY_CODE_POINTS",
     "MAX_PARTICIPANT_CONDITION_LABEL",
     "MAX_PARTICIPANT_CONDITIONS",
     "MAX_PARTICIPANTS",
     "MAX_REASON_MESSAGE_CODE_POINTS",
     "MAX_SESSION_ID_CODE_POINTS",
     "MAX_SKILLS",
+    "MAX_TACTICS",
     "ParticipantView",
     "RECOVERY_SECONDARY_ACTIONS",
+    "ReselectionReasonView",
     "ROOT_ACTIONS",
     "SECONDARY_ACTIONS",
     "SessionView",
     "SkillDescriptorView",
     "SkillGroupView",
+    "TacticDescriptorView",
     "build_combat_view",
     "combat_participants",
     "group_skill_views",

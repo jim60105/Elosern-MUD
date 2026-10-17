@@ -195,7 +195,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
     def _open_category(self, page, category: str) -> None:
         """Arrow to ``category`` in the category frame and Enter into it (a
         single-group category opens its skill frame directly)."""
-        names = [item["category"] for item in self._combat_panel(page)["skills"]]
+        names = [
+            item["category"]
+            for item in self._combat_panel(page)["choices"]["skills"]
+        ]
         self.assertIn(category, names)
         self._press_to(page, "ArrowDown", names.index(category))
         self._press(page, "Enter")
@@ -209,10 +212,10 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         single-column skill pane ignores the horizontal arrow between
         rows whose index math was trusted here before."""
         panel = self._combat_panel(page)
-        names = [item["category"] for item in panel["skills"]]
+        names = [item["category"] for item in panel["choices"]["skills"]]
         self.assertIn(category, names)
         category_index = names.index(category)
-        groups = panel["skills"][names.index(category)]["groups"]
+        groups = panel["choices"]["skills"][names.index(category)]["groups"]
         carrier_index = next(
             (
                 index

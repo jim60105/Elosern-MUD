@@ -18,7 +18,7 @@ from ._support import (
 class SuggestionsEnvelopeTests(unittest.TestCase):
     """Per-status suggestions schema tests (tasks 1.3-1.4)."""
 
-    @covers_requirement("webclient-context-actions-suggestions::the-context-actions-panel-carries-a-suggestions-envelope-at-version-6")
+    @covers_requirement("webclient-context-actions-suggestions::the-context-actions-panel-carries-a-suggestions-envelope-at-version-7")
     def test_generating_and_unavailable_carry_only_status(self):
         for status in ("generating", "unavailable"):
             with self.subTest(status=status):
@@ -200,12 +200,13 @@ class SuggestionsEnvelopeTests(unittest.TestCase):
                 with self.assertRaises(ContextActionsError):
                     validate_context_actions(_valid_panel(suggestions=suggestions))
 
-    def test_deepest_legitimate_envelope_leaf_stays_at_depth_eleven(self):
-        # Design D-5: with suggestions.cards[].params present (leaf depth 7),
-        # the deepest legitimate envelope leaf remains combat skills at depth
-        # 11 (the freeform_scales entry value), so MAX_DEPTH = 12 needs no
-        # change. Depth is measured from the ui_snapshot envelope root exactly
-        # like check_json_safety.
+    def test_deepest_legitimate_envelope_leaf_stays_within_max_depth(self):
+        # v7 moves the combat skill catalog under choices, one level deeper
+        # than the v6 top-level skills array. With freeform_scales present the
+        # deepest legitimate envelope leaf is now at depth 12 (the
+        # freeform_scales entry value), exactly MAX_DEPTH, so the canonical
+        # bound still needs no change. Depth is measured from the ui_snapshot
+        # envelope root exactly like check_json_safety.
         from web.webclient.presentation.protocol import MAX_DEPTH, check_json_safety
 
         payload = _valid_panel(
@@ -249,7 +250,7 @@ class SuggestionsEnvelopeTests(unittest.TestCase):
             return max(_leaf_depth(child, depth + 1) for child in children)
 
         check_json_safety(envelope)
-        self.assertEqual(_leaf_depth(envelope), 11)
+        self.assertEqual(_leaf_depth(envelope), 12)
         self.assertLessEqual(_leaf_depth(envelope), MAX_DEPTH)
 
 

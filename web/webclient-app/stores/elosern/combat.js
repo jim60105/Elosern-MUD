@@ -125,7 +125,7 @@ export function applyCombat(ctx) {
     if (panel.kind !== "combat") {
       return null;
     }
-    for (const category of panel.skills || []) {
+    for (const category of (panel.choices && panel.choices.skills) || []) {
       for (const group of category.groups || []) {
         for (const skill of group.skills || []) {
           if (skill && skill.key === skillKey) {

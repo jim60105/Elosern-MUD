@@ -5,10 +5,10 @@ Exact combat context actions panel, keyboard menu, allowlisted combat adapters, 
 ## Requirements
 
 ### Requirement: Combat context actions are an exact read-only panel
-The production presentation registry SHALL register `context_actions` schema version 6.
+The production presentation registry SHALL register `context_actions` schema version 7.
 For a valid active combat session, its available payload SHALL contain exactly
 `schema_version`, `available`, `kind`, `session`, `participants`, `root_actions`,
-`secondary_actions`, `skills`, and `suggestions`; `available` SHALL be true, `kind`
+`secondary_actions`, `actors`, `choices`, `draft`, and `suggestions`; `available` SHALL be true, `kind`
 SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}`.
 
 #### Scenario: Active session produces canonical combat presentation
@@ -26,12 +26,12 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 #### Scenario: Combat fields never leak outside a combat session
 - **WHEN** the active puppet is in exploration mode or creation-pending
 - **THEN** `context_actions` contains no `session`, `participants`, `root_actions`,
-  `secondary_actions`, or `skills` field — the exploration available form (exploration mode) or
+  `secondary_actions`, `actors`, `choices`, or `draft` field — the exploration available form (exploration mode) or
   the shared unavailable form is emitted instead
 
 #### Scenario: Combat fields stay byte-identical across the version bump
-- **WHEN** a v4-compatible combat fixture, extended with the version-6 participant `conditions` and skill `hostile`/`beneficial`, is validated by the version-6 validator and the client mirror
-- **THEN** every combat field serializes exactly as it did at schema version 4, with `schema_version` equal to 6, the `suggestions` object (version 5) and the version-6 participant and skill facts added
+- **WHEN** a v7 party-command fixture is validated by the server and client mirror
+- **THEN** the exact v7 actor/choices/draft shape is accepted, v6 conditions and polarity remain present, and old-version or puppet-level skills payloads reject
 
 #### Scenario: Absent location emits the shared unavailable form
 - **WHEN** the puppet has an absent location
@@ -44,15 +44,15 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 
 #### Scenario: Session fields are exact and constrained
 - **WHEN** a combat `context_actions` payload is validated
-- **THEN** `session` contains exactly `session_id`, `mode`, `round`, `state`, and
+- **THEN** `session` contains exactly `session_id`, `mode`, `round`, `round_revision`, `state`, and
   `reason`: session ID is bounded, mode is `hostile` or `guild_exam`, round is a
-  non-negative safe integer, state is `ready` or `recovery`, and reason is null or an
+  non-negative safe integer, round_revision is a non-negative safe integer equal to the nonnull draft revision, state is `ready` or `recovery`, and reason is null or an
   exact object containing a stable code and a safe Traditional Chinese message
 
 #### Scenario: Ready and recovery sessions carry consistent reason and actions
 - **WHEN** a session record is strictly parsed
 - **THEN** a ready session has a null reason, and a recovery session has a non-null
-  reason, no cast/flee action, and one confirmed Forfeit descriptor
+  reason, no personal round action, and one confirmed party surrender descriptor
 
 #### Scenario: The presenter only reads and reconstructs the session record
 - **WHEN** combat presentation is built
@@ -69,13 +69,17 @@ SHALL be `combat`, and `suggestions` SHALL be exactly `{"status": "unavailable"}
 - **WHEN** the combat available form is serialized at version 6
 - **THEN** its top-level field set is unchanged from version 5, every participant additionally carries `conditions`, every skill descriptor additionally carries `hostile` and `beneficial`, the presenter stays read-only, and the exploration and unavailable forms differ from version 5 only in `schema_version`
 
+#### Scenario: Version 7 adds authoritative party facts
+- **WHEN** the combat available form is serialized at version 7
+- **THEN** it carries bounded actor summaries, one actor-scoped choices object and durable draft progress, retains participant conditions and skill polarity, stays read-only, and changes exploration/unavailable forms only in schema_version
+
 ### Requirement: Combat presentation enumerates complete deterministic choices
-The combat panel's `skills` field SHALL be an ordered array of category groups, each
+The requested actor's `choices.skills` field SHALL be an ordered array of category groups, each
 carrying the category's stable key, a bounded display label, and an ordered array of one
 or more sub-groups; each sub-group carries a nullable group key, a label non-null exactly
 when the group key is non-null, and an ordered array of skill descriptors. Category
-ordering SHALL follow `SkillCategory`'s declaration order (seven members after the
-`holy_rite` addition; `movement` and `innate_gift` are retired).
+ordering SHALL follow `SkillCategory`'s declaration order (seven members, `holy_rite`
+included; `movement` and `innate_gift` retired).
 
 #### Scenario: Stored skill order and passive exclusion are preserved within each sub-group
 - **WHEN** a player owns active skills `wind_blade`, `fire_ball` in that stored order (both
@@ -93,7 +97,7 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 
 #### Scenario: The retired category keys are never emitted
 - **WHEN** an entity owns the re-homed acquired passives `flight` and `elf_longevity` and the re-homed innate active `flee`
-- **THEN** no category group carries category `"movement"` or `"innate_gift"` anywhere in the `skills` array; `flee` is not emitted as a skill row at all — the allied personal flee is no longer a session action, so no skill-list bypass exists — and the two PASSIVE skills are excluded by passive filtering exactly as any other owned passive
+- **THEN** no category group carries category `"movement"` or `"innate_gift"` anywhere in the `skills` array; the reserved `flee` skill is omitted from personal commands and reaches only the confirmed party operation, and the two PASSIVE skills are excluded by passive filtering exactly as any other owned passive
 
 #### Scenario: An owned category with no members is omitted, not emitted empty
 - **WHEN** an entity owns no skill classified `sexual_act`
@@ -118,7 +122,7 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 
 #### Scenario: A catalog-complete panel fits within the canonical JSON byte bound
 - **WHEN** the combat view is built for an entity owning every currently obtainable active skill
-  (all base active skills plus every registered sexual act) and the resulting `context_actions`
+  (all base active skills plus every registered sexual act) with the maximal currently registered usable item choices and 16 participants, and the resulting `context_actions`
   payload is serialized
 - **THEN** the panel builds without a presentation error and the canonical JSON size of the
   serialized payload is at or below `MAX_CANONICAL_JSON_BYTES` (65,536), and every array in the
@@ -205,11 +209,11 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 
 #### Scenario: Each skill declares whether it is hostile or beneficial to its chosen targets
 - **WHEN** the combat panel serializes `basic_attack`, `heal`, the cleanse skill, a skill applying a debuff-polarity buff to its targets, a gauge-transfer (drain) skill, a sexual-stimulus skill, a skill applying a buff-polarity buff to its targets, a damage skill whose damage is routed only to the `enemies` audience, a movement-only skill, and a skill that both damages and heals its chosen targets
-- **THEN** `hostile` is true exactly when at least one effect routed to the chosen targets (the `selected` audience, recipient not actor-bound) is classified hostile, and `beneficial` exactly when one is classified beneficial, by the registry's static per-effect-kind classification (a buff application takes its buff definition's polarity: `debuff` hostile, `buff` beneficial; a gauge transfer takes its declared direction: `drain` hostile, `restore` beneficial); so the ten skills read `hostile`/`beneficial` as true/false, false/true, false/true, true/false, true/false, true/false, false/true, false/false, false/false and true/true; no amount, formula or current participant takes part, and the server and client validators reject a descriptor missing either field or carrying a non-boolean value
+- **THEN** `hostile` is true exactly when at least one effect routed to the chosen targets (the `selected` audience, recipient not actor-bound) is classified hostile, and `beneficial` exactly when one is classified beneficial, by the registry's static per-effect-kind classification (a buff application takes its buff definition's polarity: `debuff` hostile, `buff` beneficial); so the ten skills read `hostile`/`beneficial` as true/false, false/true, false/true, true/false, true/false, true/false, false/true, false/false, false/false and true/true; no amount, formula or current participant takes part, and the server and client validators reject a descriptor missing either field or carrying a non-boolean value
 
 #### Scenario: Every effect kind is classified
 - **WHEN** the classification table is checked against every effect dataclass the effect parser can produce
-- **THEN** each kind is classified exactly once as `hostile`, `beneficial`, `neutral`, `buff-definition` (buff applications), or `gauge-direction` (gauge transfers), and an unclassified kind fails the test
+- **THEN** each kind is classified exactly once as `hostile`, `beneficial`, `neutral`, or `buff-definition` (buff applications), and an unclassified kind fails the test
 
 #### Scenario: Participants carry their conditions
 - **WHEN** a foe is poisoned and a companion is blessed in an active session, and a participant carries more than eight conditions
@@ -375,7 +379,7 @@ one level, and disabled entries SHALL send no packet.
 
 ### Requirement: Combat target selection sends one shape per TargetSpec
 The browser SHALL derive target controls only from the validated skill descriptor.
-NONE SHALL submit no target field. SELF SHALL display the authenticated actor binding
+NONE SHALL submit no target field. SELF SHALL display the commanded actor binding
 but submit no target field. SINGLE SHALL submit `target_ids` containing exactly one
 server-provided identity. AREA SHALL let Space toggle unique server-provided candidates
 and Enter submit either a nonempty explicit `target_ids` list or one mutually exclusive
@@ -383,7 +387,7 @@ approved `target_shorthand`.
 
 #### Scenario: SELF binds without an actor field
 - **WHEN** the player submits an enabled SELF skill
-- **THEN** the payload contains `skill_key` and no actor, participant, target ID, or shorthand field, and the server binds the authenticated puppet
+- **THEN** combat.command names the authorized actor outside its skill payload; the skill payload has skill_key and no target ID or shorthand, and SELF binds the commanded actor
 
 #### Scenario: AREA multi-selection is explicit and unique
 - **WHEN** the player toggles two valid AREA candidates with Space and confirms
@@ -907,3 +911,40 @@ Aiming a hostile skill at the player's own side, or a beneficial skill at the op
 #### Scenario: A locked submission waits
 - **WHEN** a mutation is in flight while the question card is open
 - **THEN** 是 is disabled with the stated reason, 否 and the close control still work, and nothing is sent until the lock releases and the player activates 是
+
+### Requirement: Party protocol publishes bounded actor choices and durable progress
+Version 7 SHALL expose all allied actor summaries, one requested actor choices object and the durable draft. Choices SHALL carry complete actor skill/item/tactic availability and targets; progress SHALL carry session round/draft versions, required actors and confirmed entries. Server/client validators SHALL enforce exact fields, bounded values and identity relationships.
+
+#### Scenario: Actor-local query
+- **WHEN** an authorized read-only actor-choice request names a companion
+- **THEN** the canonical panel shows that member catalog/resources/stock without a command, possession or time change
+
+#### Scenario: Catalog and envelope bounds
+- **WHEN** five allies exist and the chosen actor owns the complete obtainable skill catalog and usable items
+- **THEN** the panel emits one complete choices catalog and all progress summaries within the 65,536-byte envelope, without truncation or five duplicate catalogs
+
+#### Scenario: Strict mirror parity
+- **WHEN** a payload has unknown fields, duplicate actor IDs, off-party draft actors, unsafe revisions or missing polarity
+- **THEN** server and client mirrors reject the same malformed payload
+
+### Requirement: Actor item summaries and reselection reasons are explicit bounded facts
+Actor item rows SHALL include server-authored summary text of at most512 code points and at most128 distinct usable keys. Draft reselection_reasons SHALL carry at most five exact actor_id/reason rows, each joining a required actor in needs_selection_ids. Server and mirror SHALL reject missing, extra or contradictory fields.
+
+#### Scenario: Companion-only item information
+- **WHEN** a selected companion owns an item absent from commander inventory
+- **THEN** its item row supplies its own bounded summary and targets without commander inventory lookups
+
+#### Scenario: Invalid entry explanation
+- **WHEN** a previously confirmed skill becomes unaffordable
+- **THEN** canonical draft includes that member in needs_selection_ids with its exact bounded code/message reason while retaining other valid entries
+
+### Requirement: Version 7 root keys and recovery choices are exact
+Ready combat SHALL use root keys attack,skills,items,defend,dodge,taunt,retreat and secondary surrender. Recovery SHALL have no personal root choices, only surrender, empty actor summaries and null choices/draft. Ready choices SHALL describe one allied actor; all identity/list/revision bounds SHALL be mirrored.
+
+#### Scenario: Recovery and stale legacy shape
+- **WHEN** recovery renders or an old puppet-level skills form arrives
+- **THEN** recovery cannot select a personal action and the legacy shape fails exact v7 validation
+
+#### Scenario: Recovery retains the surrender admission revision
+- **WHEN** a validly parsed session has unreconstructable participants and null draft choices
+- **THEN** its session.round_revision remains authoritative for surrender prompt and confirmation, without deriving a revision from missing draft fields

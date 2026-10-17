@@ -16,7 +16,6 @@ from world.rules.combat_session import (
 from world.rules.combat_view import (
     CombatViewError,
     build_combat_view,
-    group_skill_views,
 )
 from world.rules.guild_exam_request import (
     OUTCOME_SCHEDULE,
@@ -189,7 +188,8 @@ class CmdCombatActions(Command):
             self.caller.msg("戰鬥紀錄異常，無法列出動作。可使用「投降」結束戰鬥。")
             return
         lines = ["可用技能與目標代號："]
-        for category in group_skill_views(view.skills):
+        choices = view.choices
+        for category in choices.skills if choices is not None else ():
             lines.append(f"◆ {category.label}")
             for sub_group in category.groups:
                 if sub_group.label is not None:

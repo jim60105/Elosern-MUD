@@ -65,8 +65,17 @@ var PROTOCOL_ERROR_CODES = [
 var SEVERITIES = ["beneficial", "informational", "warning", "harmful", "critical"];
 
 // context_actions panel bounds (mirror of web.webclient.presentation.combat_panel).
+// The panel's own schema version (mirror of CONTEXT_ACTIONS_SCHEMA_VERSION):
+// v7 publishes the exact party actor/choices/draft read model.
+var CONTEXT_ACTIONS_SCHEMA_VERSION = 7;
 var MAX_SESSION_ID_CODE_POINTS = 128;
 var MAX_PARTICIPANTS = 16;
+// v7 party bounds (mirror of world.rules.combat_view): ordered allied actor
+// summaries, one requested-actor choices object and the durable draft.
+var MAX_ACTORS = 5;
+var MAX_ITEMS = 128;
+var MAX_TACTICS = 3;
+var MAX_ITEM_SUMMARY_CODE_POINTS = 512;
 // Per-participant condition rows (v6; mirror of world.rules.combat_view).
 var MAX_PARTICIPANT_CONDITIONS = 8;
 // Flattened active-skill descriptor bound. Raised from 32 to clear the
@@ -83,18 +92,21 @@ var MAX_TOKEN = 16;
 var MAX_ACTION_KEYS = 16;
 var MAX_COST_KEYS = 8;
 var MAX_REASON_MESSAGE = 512;
+var MAX_REASON_CODE = 64;
 var SESSION_MODES = ["hostile", "guild_exam"];
 var SESSION_STATES = ["ready", "recovery"];
 var TEAMS = ["party", "foes"];
 var PARTICIPANT_STATES = ["active", "fled", "knocked_out", "defeated"];
 var TARGET_SPECS = ["none", "self", "single", "area"];
+var ITEM_TARGET_SPECS = ["none", "self", "single"];
+var TACTIC_KEYS = ["defend", "dodge", "taunt"];
 var ALLOWED_SHORTHANDS = ["all-enemies", "all-allies", "all"];
 var FREEFORM_SCALES_ALLOWED = [0.25, 0.5, 1, 2, 4];
 var FREEFORM_SCALES_MAX = 5;
 var FREEFORM_LABELS_ALLOWED = ["1/4", "1/2", "1", "2", "4"];
-var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "flee"];
-var SECONDARY_ACTIONS = ["forfeit"];
-var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
+var ROOT_ACTIONS = ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"];
+var SECONDARY_ACTIONS = ["surrender"];
+var RECOVERY_SECONDARY_ACTIONS = ["surrender"];
 // Exploration available form bounds (mirror of
 // web.webclient.presentation.combat_panel).
 var CONTEXT_ACTIONS_MAX_AFFORDANCES = 320;
@@ -437,7 +449,7 @@ var PANEL_ALLOWLIST = {
   gallery: 3,
   art: ART_SCHEMA_VERSION,
   status: 3,
-  context_actions: 6,
+  context_actions: CONTEXT_ACTIONS_SCHEMA_VERSION,
   local_map: 1,
   party: 2,
   objectives: 1,
@@ -498,7 +510,12 @@ module.exports = {
   PROTOCOL_ERROR_CODES: PROTOCOL_ERROR_CODES,
   SEVERITIES: SEVERITIES,
   MAX_SESSION_ID_CODE_POINTS: MAX_SESSION_ID_CODE_POINTS,
+  CONTEXT_ACTIONS_SCHEMA_VERSION: CONTEXT_ACTIONS_SCHEMA_VERSION,
   MAX_PARTICIPANTS: MAX_PARTICIPANTS,
+  MAX_ACTORS: MAX_ACTORS,
+  MAX_ITEMS: MAX_ITEMS,
+  MAX_TACTICS: MAX_TACTICS,
+  MAX_ITEM_SUMMARY_CODE_POINTS: MAX_ITEM_SUMMARY_CODE_POINTS,
   MAX_PARTICIPANT_CONDITIONS: MAX_PARTICIPANT_CONDITIONS,
   MAX_SKILLS: MAX_SKILLS,
   MAX_DISPLAY_NAME: MAX_DISPLAY_NAME,
@@ -510,11 +527,14 @@ module.exports = {
   MAX_ACTION_KEYS: MAX_ACTION_KEYS,
   MAX_COST_KEYS: MAX_COST_KEYS,
   MAX_REASON_MESSAGE: MAX_REASON_MESSAGE,
+  MAX_REASON_CODE: MAX_REASON_CODE,
   SESSION_MODES: SESSION_MODES,
   SESSION_STATES: SESSION_STATES,
   TEAMS: TEAMS,
   PARTICIPANT_STATES: PARTICIPANT_STATES,
   TARGET_SPECS: TARGET_SPECS,
+  ITEM_TARGET_SPECS: ITEM_TARGET_SPECS,
+  TACTIC_KEYS: TACTIC_KEYS,
   ALLOWED_SHORTHANDS: ALLOWED_SHORTHANDS,
   FREEFORM_SCALES_ALLOWED: FREEFORM_SCALES_ALLOWED,
   FREEFORM_SCALES_MAX: FREEFORM_SCALES_MAX,

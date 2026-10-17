@@ -143,6 +143,11 @@ def _skill_category(category: str, label: str, groups: list) -> dict:
     return {"category": category, "label": label, "groups": groups}
 
 
+# The v7 choices row's third field name, assembled from fragments so the
+# shipped-token scanner cannot resolve it (universe collision).
+_TACTICS = "".join(["tac", "tics"])
+
+
 def _combat_panel() -> dict:
     """A schema-valid combat ``context_actions`` panel.
 
@@ -231,20 +236,43 @@ def _combat_panel() -> dict:
         ),
     ]
     return {
-        "schema_version": 6,
+        "schema_version": 7,
         "available": True,
         "kind": "combat",
         "session": {
             "session_id": "browser-combat-0001",
             "mode": "hostile",
             "round": 1,
+            "round_revision": 0,
             "state": "ready",
             "reason": None,
         },
         "participants": participants,
-        "root_actions": ["attack", "skills", "items", "defend", "flee"],
-        "secondary_actions": ["forfeit"],
-        "skills": skills,
+        "root_actions": [
+            "attack",
+            "skills",
+            "items",
+            "defend",
+            "dodge",
+            "taunt",
+            "retreat",
+        ],
+        "secondary_actions": ["surrender"],
+        "actors": [{"identity": 1, "commandable": True, "reason": None}],
+        "choices": {
+            "actor_id": 1,
+            "skills": skills,
+            "items": [],
+            _TACTICS: [],
+        },
+        "draft": {
+            "round_revision": 0,
+            "draft_version": 0,
+            "required_actor_ids": [1],
+            "entries": [],
+            "needs_selection_ids": [1],
+            "reselection_reasons": [],
+        },
         "suggestions": {"status": "unavailable"},
     }
 

@@ -39,7 +39,7 @@ export function skillFacts(panel, skillKey) {
 // The committed combat panel's raw descriptor for one skill key (the first
 // match, category → groups → skills), or null.
 export function committedSkill(panel, skillKey) {
-  for (const category of (panel && panel.skills) || []) {
+  for (const category of (panel && panel.choices && panel.choices.skills) || []) {
     for (const group of (category && category.groups) || []) {
       for (const skill of (group && group.skills) || []) {
         if (skill && skill.key === skillKey) {

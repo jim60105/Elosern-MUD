@@ -79,7 +79,7 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # takes the panel's first enabled skill.
         cast_skill = next(
             s
-            for category in panel["skills"]
+            for category in panel["choices"]["skills"]
             for group in category["groups"]
             for s in group["skills"]
             if s["enabled"] and s["key"] != SYNTH_INNATE_ATTACK_KEY

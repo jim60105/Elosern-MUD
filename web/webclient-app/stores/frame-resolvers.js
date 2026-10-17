@@ -405,7 +405,9 @@ export function createFrameResolver(deps) {
       // An out-of-range index is the identity-loss degradation (the builder
       // itself would render an empty frame; the table contract is the
       // marker).
-      const category = ((combat.panel.skills) || [])[indexParam(params, "categoryIndex")];
+      const category = ((combat.panel.choices && combat.panel.choices.skills) || [])[
+        indexParam(params, "categoryIndex")
+      ];
       if (!category) return marker(null);
       const menu = CombatMenu.openCategory(combat, indexParam(params, "categoryIndex"));
       return menu ? isolate(menu) : marker(null);
@@ -413,7 +415,7 @@ export function createFrameResolver(deps) {
     "combat.group": (params) => {
       const combat = combatModel();
       if (!combat) return marker(null);
-      const group = (((combat.panel.skills || [])[indexParam(params, "categoryIndex")] || {}).groups || [])[
+      const group = ((((combat.panel.choices && combat.panel.choices.skills) || [])[indexParam(params, "categoryIndex")] || {}).groups || [])[
         indexParam(params, "groupIndex")
       ];
       if (!group) return marker(null);

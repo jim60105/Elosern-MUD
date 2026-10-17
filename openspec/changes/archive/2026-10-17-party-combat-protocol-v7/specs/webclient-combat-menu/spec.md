@@ -76,8 +76,8 @@ The requested actor's `choices.skills` field SHALL be an ordered array of catego
 carrying the category's stable key, a bounded display label, and an ordered array of one
 or more sub-groups; each sub-group carries a nullable group key, a label non-null exactly
 when the group key is non-null, and an ordered array of skill descriptors. Category
-ordering SHALL follow `SkillCategory`'s declaration order (seven members after the
-`holy_rite` addition; `movement` and `innate_gift` are retired).
+ordering SHALL follow `SkillCategory`'s declaration order (seven members, `holy_rite`
+included; `movement` and `innate_gift` retired).
 
 #### Scenario: Stored skill order and passive exclusion are preserved within each sub-group
 - **WHEN** a player owns active skills `wind_blade`, `fire_ball` in that stored order (both
