@@ -307,7 +307,9 @@ def _wire_draft_command(entry: Any) -> dict[str, Any]:
         targets_or_shorthand = payload.get("targets_or_shorthand")
         if isinstance(targets_or_shorthand, str):
             command["target_shorthand"] = targets_or_shorthand
-        elif targets_or_shorthand is not None:
+        elif targets_or_shorthand:
+            # An empty stored target list is the rules layer's input for a
+            # NONE/SELF skill: the wire carries no target field at all.
             command["target_ids"] = [int(target) for target in targets_or_shorthand]
         if payload.get("scale") is not None:
             command["scale"] = float(payload["scale"])
@@ -354,14 +356,22 @@ def _build_actors(
 
 
 def _build_items(
-    target_actor: Any, battlefield: Any, in_combat: bool = True
+    target_actor: Any,
+    battlefield: Any,
+    candidate_entities: list[Any] | None = None,
+    in_combat: bool = True,
 ) -> tuple[ItemDescriptorView, ...]:
     from world.rules.service_messages import rejection_message as item_rejection_message
 
     context = BattlefieldActionContext(
         battlefield, event_context={"battlefield": battlefield}
     )
-    choices = enumerate_actor_item_choices(target_actor, context, in_combat=in_combat)
+    choices = enumerate_actor_item_choices(
+        target_actor,
+        context,
+        candidate_entities=list(candidate_entities or ()),
+        in_combat=in_combat,
+    )
     if len(choices) > MAX_ITEMS:
         raise CombatViewError(f"actor item choices {len(choices)} exceeds {MAX_ITEMS}")
 
@@ -536,7 +546,9 @@ def build_combat_view(actor: Any, *, for_actor: Any | None = None) -> CombatView
     if is_commandable:
         skill_descriptors = _build_skills(target_actor, record, battlefield, participants)
         skill_groups = group_skill_views(skill_descriptors)
-        items = _build_items(target_actor, battlefield, in_combat=True)
+        items = _build_items(
+            target_actor, battlefield, _participant_entities(participants)
+        )
         tactics = _build_tactics(target_actor, record, battlefield)
     else:
         skill_groups = ()
@@ -625,16 +637,7 @@ def _build_skills(
         battlefield,
         event_context={"battlefield": battlefield},
     )
-    from evennia.objects.models import ObjectDB
-
-    candidate_entities: list[Any] = []
-    for participant in participants:
-        entity = ObjectDB.objects.filter(id=participant.identity).first()
-        if entity is None:
-            raise CombatViewError(
-                f"participant {participant.identity} is unreconstructable"
-            )
-        candidate_entities.append(entity)
+    candidate_entities = _participant_entities(participants)
 
     seen: set[str] = set()
     descriptors: list[SkillDescriptorView] = []
@@ -696,6 +699,21 @@ def _build_skills(
 def _element_label(element_key: str) -> str | None:
     element = ELEMENT_REGISTRY.get(element_key)
     return element.display_name_zh if element is not None else element_key
+
+
+def _participant_entities(participants: tuple[ParticipantView, ...]) -> list[Any]:
+    """Resolve every presented participant to its live entity, or fail closed."""
+    from evennia.objects.models import ObjectDB
+
+    entities: list[Any] = []
+    for participant in participants:
+        entity = ObjectDB.objects.filter(id=participant.identity).first()
+        if entity is None:
+            raise CombatViewError(
+                f"participant {participant.identity} is unreconstructable"
+            )
+        entities.append(entity)
+    return entities
 
 
 def group_skill_views(

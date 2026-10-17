@@ -34,6 +34,7 @@ from ._support import (
     _valid_choices,
     _valid_draft,
     _valid_panel,
+    _valid_participant,
 )
 
 
@@ -258,6 +259,81 @@ class PartyProtocolSchemaTests(unittest.TestCase):
                             )
                         )
                     )
+
+    def test_draft_command_rejects_present_null_optional_fields(self):
+        bad = [
+            {"kind": "tactical", "payload": {"key": "defend", "target_id": None}},
+            {"kind": "skill", "payload": {"skill_key": "t_ember_burst", "target_ids": None}},
+            {"kind": "skill", "payload": {"skill_key": "t_ember_burst", "scale": None}},
+            {"kind": "item", "payload": {"item_key": "t_ember_spray", "target_id": None}},
+        ]
+        for command in bad:
+            with self.subTest(command=command):
+                with self.assertRaises(Exception):
+                    validate_context_actions(
+                        _valid_panel(
+                            draft=_valid_draft(
+                                entries=[{"actor_id": 2, "command": command}],
+                                needs_selection_ids=[],
+                            )
+                        )
+                    )
+
+    def test_wire_command_omits_an_empty_target_list(self):
+        # A NONE/SELF skill stores an empty target list; the wire carries no
+        # target field, so the panel still validates.
+        from world.rules.combat_view import _wire_draft_command
+
+        command = _wire_draft_command(
+            {
+                "kind": "skill",
+                "payload": {"skill_key": "t_ember_burst", "targets_or_shorthand": []},
+            }
+        )
+        self.assertEqual(
+            command, {"kind": "skill", "payload": {"skill_key": "t_ember_burst"}}
+        )
+        validate_context_actions(
+            _valid_panel(
+                draft=_valid_draft(
+                    entries=[{"actor_id": 2, "command": command}],
+                    needs_selection_ids=[],
+                )
+            )
+        )
+
+    def test_actor_and_required_identities_must_be_presented_allies(self):
+        # The actor summary and the draft's required actors must join party
+        # participants, never a foe.
+        with self.assertRaises(Exception):
+            validate_context_actions(
+                _valid_panel(participants=[_valid_participant(team="foes")])
+            )
+        with self.assertRaises(Exception):
+            validate_context_actions(
+                _valid_panel(
+                    draft=_valid_draft(
+                        required_actor_ids=[2, 9],
+                        needs_selection_ids=[9],
+                    ),
+                    participants=[
+                        _valid_participant(),
+                        _valid_participant(identity=9, token="e1", team="foes"),
+                    ],
+                )
+            )
+
+    def test_taunt_targets_must_be_presented_enemies(self):
+        with self.assertRaises(Exception):
+            validate_context_actions(
+                self._panel(
+                    **{
+                        _TACTICS: [
+                            _valid_tactic(key="taunt", label="嘲諷", targets=[2])
+                        ]
+                    }
+                )
+            )
 
     def test_recovery_has_no_personal_choices(self):
         with self.assertRaises(Exception):

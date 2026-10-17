@@ -56,9 +56,9 @@ function validCombatParticipant(overrides) {
   return deepMerge(
     {
       identity: 2,
-      token: "e1",
+      token: "a1",
       display_name: "哥布林",
-      team: "foes",
+      team: "party",
       state: "active",
       hp_current: 100,
       hp_maximum: 100,

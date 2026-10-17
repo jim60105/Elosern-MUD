@@ -140,9 +140,9 @@ def _valid_category_group(**overrides):
 def _valid_participant(**overrides):
     value = {
         "identity": 2,
-        "token": "e1",
+        "token": "a1",
         "display_name": "goblin",
-        "team": "foes",
+        "team": "party",
         "state": "active",
         "hp_current": 100,
         "hp_maximum": 100,

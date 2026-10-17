@@ -91,7 +91,8 @@ export function badgeCount(surface, view) {
         return 0;
       }
       let count = 0;
-      ((panel.skills || [])).forEach((category) => {
+      // v7 moved the requested actor's grouped catalog under `choices`.
+      (((panel.choices && panel.choices.skills) || [])).forEach((category) => {
         ((category.groups || [])).forEach((group) => {
           count += (group.skills || []).length;
         });

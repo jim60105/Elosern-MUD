@@ -596,6 +596,18 @@ def _validate_choices(value: Any) -> dict[str, Any]:
     }
 
 
+def _choices_have_enabled(choices: dict[str, Any]) -> bool:
+    """True when a validated choices view carries any enabled choice."""
+    for category in choices["skills"]:
+        for group in category["groups"]:
+            for skill in group["skills"]:
+                if skill["enabled"]:
+                    return True
+    if any(item["enabled"] for item in choices["items"]):
+        return True
+    return any(tactic["enabled"] for tactic in choices["tactics"])
+
+
 def _validate_draft_command(value: Any) -> dict[str, Any]:
     _require_exact_fields(value, "draft command", {"kind", "payload"}, {})
     kind = value["kind"]
@@ -616,15 +628,17 @@ def _validate_draft_command(value: Any) -> dict[str, Any]:
         key = _validate_identifier(payload["skill_key"], "skill_key")
         if key == "flee":
             raise ProtocolValidationError("flee is forbidden in draft entries")
-        target_ids = payload.get("target_ids")
-        target_shorthand = payload.get("target_shorthand")
-        if target_ids is not None and target_shorthand is not None:
+        has_ids = "target_ids" in payload
+        has_shorthand = "target_shorthand" in payload
+        if has_ids and has_shorthand:
             raise ProtocolValidationError(
                 "a skill draft command carries target_ids or target_shorthand, not both"
             )
-        if target_ids is not None:
+        if has_ids:
+            target_ids = payload["target_ids"]
             if (
-                not isinstance(target_ids, list)
+                isinstance(target_ids, bool)
+                or not isinstance(target_ids, list)
                 or not target_ids
                 or len(target_ids) > MAX_SKILL_TARGETS
             ):
@@ -642,12 +656,12 @@ def _validate_draft_command(value: Any) -> dict[str, Any]:
                         "skill draft target_ids must be unique"
                     )
                 seen_ids.add(target_id)
-        if target_shorthand is not None and target_shorthand not in ALLOWED_SHORTHANDS:
+        if has_shorthand and payload["target_shorthand"] not in ALLOWED_SHORTHANDS:
             raise ProtocolValidationError(
                 "skill draft target_shorthand is not an approved shorthand"
             )
-        scale = payload.get("scale")
-        if scale is not None:
+        if "scale" in payload:
+            scale = payload["scale"]
             if isinstance(scale, bool) or not isinstance(scale, (int, float)):
                 raise ProtocolValidationError("skill draft scale must be numeric")
             if float(scale) not in _FREEFORM_SCALES:
@@ -662,7 +676,7 @@ def _validate_draft_command(value: Any) -> dict[str, Any]:
         item_key = _require_str(payload, "item_key", maximum=MAX_ITEM_KEY)
         if not item_key.strip():
             raise ProtocolValidationError("item_key must be non-empty")
-        if payload.get("target_id") is not None:
+        if "target_id" in payload:
             _require_int(payload, "target_id", minimum=1, maximum=MAX_SAFE_INTEGER)
     elif kind == "tactical":
         _require_exact_fields(
@@ -674,13 +688,12 @@ def _validate_draft_command(value: Any) -> dict[str, Any]:
         tactical_key = payload["key"]
         if tactical_key not in TACTIC_KEYS:
             raise ProtocolValidationError("tactical draft key must be defend, dodge, or taunt")
-        target_id = payload.get("target_id")
-        if tactical_key == "taunt":
-            if target_id is None:
-                raise ProtocolValidationError("a taunt draft command requires a target_id")
+        if "target_id" in payload:
+            if tactical_key in {"defend", "dodge"}:
+                raise ProtocolValidationError(f"{tactical_key} must have no target_id")
             _require_int(payload, "target_id", minimum=1, maximum=MAX_SAFE_INTEGER)
-        elif target_id is not None:
-            raise ProtocolValidationError(f"{tactical_key} must have no target_id")
+        elif tactical_key == "taunt":
+            raise ProtocolValidationError("a taunt draft command requires a target_id")
     else:
         raise ProtocolValidationError(f"unknown draft command kind {kind}")
     return {"kind": kind, "payload": dict(payload)}
@@ -976,6 +989,37 @@ def validate_context_actions(payload: Any) -> dict[str, Any]:
             raise ContextActionsError("draft round_revision must match session round_revision")
 
         identity_set = {p["identity"] for p in participant_views}
+        ally_identities = {
+            p["identity"] for p in participant_views if p["team"] == "party"
+        }
+        enemy_identities = {
+            p["identity"] for p in participant_views if p["team"] == "foes"
+        }
+        for actor in actor_views:
+            if actor["identity"] not in ally_identities:
+                raise ContextActionsError(
+                    "actor summaries must reference presented allies"
+                )
+        for required_id in draft_view["required_actor_ids"]:
+            if required_id not in ally_identities:
+                raise ContextActionsError(
+                    "required actors must be presented allies"
+                )
+        chosen_actor = next(
+            actor for actor in actor_views if actor["identity"] == choices_view["actor_id"]
+        )
+        if not chosen_actor["commandable"] and _choices_have_enabled(choices_view):
+            raise ContextActionsError(
+                "a noncommandable actor must have no enabled choices"
+            )
+        for tactic in choices_view["tactics"]:
+            if tactic["key"] != "taunt":
+                continue
+            for target_id in tactic["targets"]:
+                if target_id not in enemy_identities:
+                    raise ContextActionsError(
+                        "taunt targets must be presented enemies"
+                    )
         for cat in choices_view["skills"]:
             for grp in cat["groups"]:
                 for sk in grp["skills"]:

@@ -180,6 +180,9 @@ function validateDisabledReason(value) {
     throw new Error("disabled_reason code exceeds its bound");
   }
   requireString(value.message, "disabled_reason message", MAX_REASON_MESSAGE);
+  if (!value.message.trim()) {
+    throw new Error("disabled_reason message must be non-empty");
+  }
   return value;
 }
 
@@ -406,7 +409,7 @@ function validateIdentityList(value, name, allowEmpty) {
   if (!allowEmpty && value.length === 0) {
     throw new Error(name + " must be non-empty");
   }
-  var seen = {};
+  var seen = Object.create(null);
   value.forEach(function (target) {
     if (typeof target !== "number" || !Number.isInteger(target) || target <= 0) {
       throw new Error(name + " must be positive integers");
@@ -469,7 +472,7 @@ function validateChoicesSkills(skills) {
   if (skillViews.length > MAX_SKILLS) {
     throw new Error("flattened skill count exceeds their bound");
   }
-  var skillKeys = {};
+  var skillKeys = Object.create(null);
   skillViews.forEach(function (skill) {
     if (skillKeys[skill.key]) {
       throw new Error("skill keys must be unique");
@@ -559,7 +562,7 @@ function validateChoices(value, seenActors, identitySet) {
   if (!Array.isArray(value.items) || value.items.length > MAX_ITEMS) {
     throw new Error("item choices exceed bound");
   }
-  var itemKeys = {};
+  var itemKeys = Object.create(null);
   value.items.forEach(function (item) {
     validateItemChoice(item);
     item.targets.forEach(function (target) {
@@ -575,7 +578,7 @@ function validateChoices(value, seenActors, identitySet) {
   if (!Array.isArray(value.tactics) || value.tactics.length > MAX_TACTICS) {
     throw new Error("tactic choices exceed bound");
   }
-  var tacticKeys = {};
+  var tacticKeys = Object.create(null);
   value.tactics.forEach(function (tactic) {
     validateTacticChoice(tactic);
     tactic.targets.forEach(function (target) {
@@ -660,6 +663,32 @@ function validateDraftEntry(value) {
   return value;
 }
 
+
+function choicesHaveEnabled(choices) {
+  var enabled = false;
+  choices.skills.forEach(function (category) {
+    category.groups.forEach(function (group) {
+      group.skills.forEach(function (skill) {
+        if (skill.enabled) {
+          enabled = true;
+        }
+      });
+    });
+  });
+  choices.items.forEach(function (item) {
+    if (item.enabled) {
+      enabled = true;
+    }
+  });
+  choices.tactics.forEach(function (tactic) {
+    if (tactic.enabled) {
+      enabled = true;
+    }
+  });
+  return enabled;
+}
+
+
 function validateReselectionReason(value) {
   requireExactFields(value, "reselection reason", ["actor_id", "reason"], []);
   requireInt(value.actor_id, "actor_id", 1, MAX_SAFE_INTEGER);
@@ -683,7 +712,7 @@ function validateDraftProgress(value) {
   if (!Array.isArray(required) || required.length > MAX_ACTORS) {
     throw new Error("required_actor_ids exceeds actor bound");
   }
-  var seenRequired = {};
+  var seenRequired = Object.create(null);
   required.forEach(function (actorId) {
     requireInt(actorId, "required actor id", 1, MAX_SAFE_INTEGER);
     if (seenRequired[actorId]) {
@@ -696,7 +725,7 @@ function validateDraftProgress(value) {
   if (!Array.isArray(entries) || entries.length > MAX_ACTORS) {
     throw new Error("draft entries exceed actor bound");
   }
-  var seenEntries = {};
+  var seenEntries = Object.create(null);
   entries.forEach(function (entry) {
     validateDraftEntry(entry);
     if (!seenRequired[entry.actor_id]) {
@@ -712,7 +741,7 @@ function validateDraftProgress(value) {
   if (!Array.isArray(needs) || needs.length > MAX_ACTORS) {
     throw new Error("needs_selection_ids exceeds actor bound");
   }
-  var seenNeeds = {};
+  var seenNeeds = Object.create(null);
   needs.forEach(function (actorId) {
     requireInt(actorId, "needs selection actor id", 1, MAX_SAFE_INTEGER);
     if (!seenRequired[actorId]) {
@@ -728,7 +757,7 @@ function validateDraftProgress(value) {
   if (!Array.isArray(reasons) || reasons.length > MAX_ACTORS) {
     throw new Error("reselection_reasons exceeds actor bound");
   }
-  var seenReasons = {};
+  var seenReasons = Object.create(null);
   reasons.forEach(function (row) {
     validateReselectionReason(row);
     if (!seenRequired[row.actor_id] || !seenNeeds[row.actor_id]) {
@@ -784,7 +813,7 @@ function validateContextActionsPanel(payload) {
   if (!Array.isArray(actors) || actors.length > MAX_ACTORS) {
     throw new Error("actors exceed their bound");
   }
-  var seenActors = {};
+  var seenActors = Object.create(null);
   actors.forEach(function (actor) {
     validateActorSummary(actor);
     if (seenActors[actor.identity]) {
@@ -824,6 +853,41 @@ function validateContextActionsPanel(payload) {
     if (draftView.round_revision !== session.round_revision) {
       throw new Error("draft round_revision must match session round_revision");
     }
+    var allyIdentities = Object.create(null);
+    var enemyIdentities = Object.create(null);
+    participants.forEach(function (participant) {
+      if (participant.team === "party") {
+        allyIdentities[participant.identity] = true;
+      } else {
+        enemyIdentities[participant.identity] = true;
+      }
+    });
+    actors.forEach(function (actor) {
+      if (!allyIdentities[actor.identity]) {
+        throw new Error("actor summaries must reference presented allies");
+      }
+    });
+    draftView.required_actor_ids.forEach(function (actorId) {
+      if (!allyIdentities[actorId]) {
+        throw new Error("required actors must be presented allies");
+      }
+    });
+    var chosen = actors.filter(function (actor) {
+      return actor.identity === choicesView.actor_id;
+    })[0];
+    if (!chosen.commandable && choicesHaveEnabled(choicesView)) {
+      throw new Error("a noncommandable actor must have no enabled choices");
+    }
+    choicesView.tactics.forEach(function (tactic) {
+      if (tactic.key !== "taunt") {
+        return;
+      }
+      tactic.targets.forEach(function (targetId) {
+        if (!enemyIdentities[targetId]) {
+          throw new Error("taunt targets must be presented enemies");
+        }
+      });
+    });
   } else {
     if (rootActions.length > 0) {
       throw new Error("recovery session exposes no root actions");

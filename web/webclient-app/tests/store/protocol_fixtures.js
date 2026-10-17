@@ -144,10 +144,10 @@ export function explorationPanel(overrides = undefined) {
 export function combatActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "combat",
-      session: { session_id: "s-1", mode: "hostile", round: 1, state: "ready", reason: null },
+      session: { session_id: "s-1", mode: "hostile", round: 1, round_revision: 0, state: "ready", reason: null },
       participants: [
         {
           identity: 7,
@@ -172,9 +172,18 @@ export function combatActions(overrides = undefined) {
           conditions: [],
         },
       ],
-      root_actions: ["attack", "skills", "items", "defend", "flee"],
-      secondary_actions: ["forfeit"],
-      skills: [],
+      root_actions: ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
+      secondary_actions: ["surrender"],
+      actors: [{ identity: 8, commandable: true, reason: null }],
+      choices: { actor_id: 8, skills: [], items: [], tactics: [] },
+      draft: {
+        round_revision: 0,
+        draft_version: 0,
+        required_actor_ids: [8],
+        entries: [],
+        needs_selection_ids: [8],
+        reselection_reasons: [],
+      },
       // The UMD reducer's exact-field validation: a combat-form panel's
       // `suggestions` must be exactly { status: "unavailable" }.
       suggestions: { status: "unavailable" },

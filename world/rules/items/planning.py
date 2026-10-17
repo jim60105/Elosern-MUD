@@ -38,32 +38,35 @@ from world.rules.items.reads import (
     _select_mirror,
 )
 from world.rules.targeting import RoomActionContext
-from world.skills.effects.polarity import (
-    BENEFICIAL,
-    HOSTILE,
-    _loaded_buff_polarity,
-)
+from world.skills.effects.polarity import _loaded_buff_polarity
 
 
-def _item_effect_polarity(effect: Any) -> str:
-    """Return the typed target-side polarity of one item effect.
+def _item_effect_polarities(effect: Any) -> tuple[bool, bool]:
+    """Return the typed ``(hostile, beneficial)`` flags of one item effect.
 
     The classification is per effect kind, never the declared target scope: a
     signed gauge drain is hostile wherever it lands (a self-scoped drain is a
     cost, not a benefit), a positive adjustment is beneficial, an applied
     status takes its buff definition's polarity, and a removal is beneficial
-    when it strips a debuff and hostile when it strips a buff.
+    when it strips a debuff and hostile when it strips a buff. Removing every
+    status strips both kinds, so it is hostile and beneficial at once.
     """
     if isinstance(effect, GaugeAdjustEffect):
-        return HOSTILE if effect.amount < 0 else BENEFICIAL
+        return (True, False) if effect.amount < 0 else (False, True)
     if isinstance(effect, StatusApplyEffect):
-        return HOSTILE if _loaded_buff_polarity(effect.status) == "debuff" else BENEFICIAL
+        if _loaded_buff_polarity(effect.status) == "debuff":
+            return (True, False)
+        return (False, True)
     if isinstance(effect, StatusRemoveEffect):
-        if effect.selector in ("all", "negative"):
-            return BENEFICIAL
+        if effect.selector == "negative":
+            return (False, True)
         if effect.selector == "positive":
-            return HOSTILE
-        return BENEFICIAL if _loaded_buff_polarity(effect.selector) == "debuff" else HOSTILE
+            return (True, False)
+        if effect.selector == "all":
+            return (True, True)
+        if _loaded_buff_polarity(effect.selector) == "debuff":
+            return (False, True)
+        return (True, False)
     raise ValueError(f"unclassified item effect kind {type(effect)!r}")
 
 
@@ -312,9 +315,12 @@ def enumerate_actor_item_choices(
 
         # Polarity derivation: typed per-effect classification, never the
         # declared target scope (a self-scoped drain is a cost, not a benefit).
-        polarities = [_item_effect_polarity(eff) for eff in profile.effects]
-        hostile = HOSTILE in polarities
-        beneficial = BENEFICIAL in polarities
+        hostile = False
+        beneficial = False
+        for effect in profile.effects:
+            effect_hostile, effect_beneficial = _item_effect_polarities(effect)
+            hostile = hostile or effect_hostile
+            beneficial = beneficial or effect_beneficial
 
         # Determine valid targets and enabled state
         if target_spec == "single":
