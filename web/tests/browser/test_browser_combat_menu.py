@@ -685,6 +685,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
 
     @covers_requirement("webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy")
+    @covers_requirement("webclient-combat-menu::actor-item-use-and-tactics-reuse-the-complete-existing-selection-flow")
     def test_item_and_tactic_choices_send_the_actor_command(self):
         """The commanded actor's own items and basic actions
         (webclient-party-items-tactics).
