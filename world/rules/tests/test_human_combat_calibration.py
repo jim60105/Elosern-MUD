@@ -5,7 +5,8 @@ Real-runtime calibration, bounded resolver probes, and persistent host evidence.
 
 import random
 import unittest
-from dataclasses import dataclass
+from contextlib import contextmanager, nullcontext
+from dataclasses import dataclass, field, replace
 from typing import Any
 from unittest.mock import patch
 
@@ -30,12 +31,15 @@ from world.rules.character_creation import (
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
+    RoundTactical,
     _handle_damage,
     _heal_magnitude,
     _stored_hp,
     is_battle_over,
     run_round,
 )
+from world.rules.combat.scalars import crosses_knockout, nonlethal_projection
+from world.rules.buffs import TickRecord
 from world.lore.items import ITEM_REGISTRY
 from world.rules.equipment import add_item, normalized_equipment, toggle_equipment
 from world.rules.equipment_effects import (
@@ -61,6 +65,11 @@ from world.rules.progression import apply_lineage_auto_seed
 from world.rules.progression import can_use_skill
 from world.skills.registry import SKILL_REGISTRY
 from world.skills.restrictions import exam_restriction
+from world.skills.effects import (
+    DamagePolicy,
+    EffectPolicy,
+    ResolvedEffect,
+)
 
 
 @dataclass(frozen=True)
@@ -704,3 +713,649 @@ class EquipmentGrowthCommittedReloadTests(TransactionTestCase):
             equipment_weapon_multiplier(self._reread(attacker)),
             self._factor("military_s_sword"),
         )
+
+
+# ---------------------------------------------------------------------------
+# Finite combined damage factor budget evidence
+# (party-combat-factor-budget-calibration, change 18 of the party-combat batch)
+#
+# The batch contract fixes this slice at 30 explicit cases: the 12 listed
+# combinations run with the actor sides exchanged (player attacker and enemy
+# attacker) plus six invariant controls added once. Every expected amount below
+# is an independently hand-derived literal -- the scalar placement (round, then
+# ratio mitigation, then the rider, then the floor, then the authored scale,
+# then Defend) is never re-derived by calling the calculator under test. These
+# are measurements at the factor boundary, not an encounter balance claim:
+# finite encounter outcome tuning belongs to party-combat-encounter-calibration.
+# ---------------------------------------------------------------------------
+
+#: The fixed scalar boundary every case shares unless it says otherwise: attack
+#: 60, mitigation K 40 against defense 20 (the retired subtraction engine
+#: floored this matchup; ratio mitigation does not), both sides' agility 10.
+_FACTOR_ATTACK = 60
+_FACTOR_DEFENSE = 20
+_FACTOR_AGILITY = 10
+#: Margin 29: a landing base hit, below the rulebook's solid-hit margin 40.
+_FACTOR_BASE_ROLL = 80
+#: A natural critical face.
+_FACTOR_CRIT_ROLL = 100
+#: A shipped predicate fact (the elemental registry key the conditional cases
+#: declare on the defender), so the policy vocabulary check passes.
+_FACTOR_FACT = "fire"
+#: The declared physical weapon factor the abstract cases name. No shipped
+#: weapon declares 1.5, so this is one file-local synthetic declaration (the
+#: device ``test_damage_bands`` already uses), never an authored retune and
+#: never registry-echo arithmetic.
+_FACTOR_WEAPON = 1.5
+
+
+@dataclass(frozen=True)
+class _FactorCase:
+    """One explicit factor case with an independently hand-derived outcome."""
+
+    label: str
+    expected: int
+    school: str = "physical"
+    roll: int = _FACTOR_BASE_ROLL
+    scale: float = 1.0
+    coefficient: float = 1.0
+    attack: int = _FACTOR_ATTACK
+    defense: int = _FACTOR_DEFENSE
+    defender_agility: int = _FACTOR_AGILITY
+    weapon: float | None = None
+    predicate: tuple[str, ...] = ()
+    matched_multiplier: float = 1.0
+    extra_strikes: int = 0
+    max_hp_fraction: float = 0.0
+    bypass: bool = False
+    defender_max_hp: int = 200
+    defender_tactic: str | None = None
+    counterfactual: int | None = None
+    counterfactual_overrides: dict[str, Any] = field(default_factory=dict)
+    expected_strikes: int = 1
+
+
+#: The 12 listed factor combinations. Each is run in both directions, so the
+#: bounded base set is 24 observed outcomes; the counterfactual literal records
+#: what the same inputs produce once the declaration under test is removed.
+FACTOR_CASES: tuple[_FactorCase, ...] = (
+    _FactorCase(
+        "physical basic coefficient1/base roll/weapon1 (attack 60, K 40, defense 20)",
+        expected=40,
+    ),
+    _FactorCase(
+        "physical weapon factor 1.5: round(60 x 1.5) = 90, 90 x 40 / 60 = 60",
+        expected=60,
+        weapon=_FACTOR_WEAPON,
+        counterfactual=40,
+        counterfactual_overrides={"weapon": None},
+    ),
+    _FactorCase(
+        "magic with the same 1.5 weapon declaration: the factor is never consumed",
+        expected=40,
+        school="magic",
+        weapon=_FACTOR_WEAPON,
+    ),
+    _FactorCase(
+        "explicit bypass at defense 60: round(60) x 40 / 40 = 60",
+        expected=60,
+        defense=60,
+        bypass=True,
+        counterfactual=24,
+        counterfactual_overrides={"bypass": False},
+    ),
+    _FactorCase(
+        "matched conditional multiplier 2: round(60 x 2) = 120, 120 x 40 / 60 = 80",
+        expected=80,
+        predicate=(_FACTOR_FACT,),
+        matched_multiplier=2.0,
+        counterfactual=40,
+        counterfactual_overrides={"predicate": (), "matched_multiplier": 1.0},
+    ),
+    _FactorCase(
+        "max-HP rider 0.1 on HP 100: 40 + floor(100 x 0.1) = 50",
+        expected=50,
+        max_hp_fraction=0.1,
+        defender_max_hp=100,
+        counterfactual=40,
+        counterfactual_overrides={"max_hp_fraction": 0.0},
+    ),
+    _FactorCase(
+        "authored scale 0.5 with the rider: floor(50 x 0.5 + 0.5) = 25",
+        expected=25,
+        max_hp_fraction=0.1,
+        defender_max_hp=100,
+        scale=0.5,
+        counterfactual=20,
+        counterfactual_overrides={"max_hp_fraction": 0.0},
+    ),
+    _FactorCase(
+        "coefficient 2 x critical 2 x weapon 1.5 x two strikes: 240 each, 480 total",
+        expected=240,
+        roll=_FACTOR_CRIT_ROLL,
+        coefficient=2.0,
+        weapon=_FACTOR_WEAPON,
+        extra_strikes=1,
+        expected_strikes=2,
+    ),
+    _FactorCase(
+        "Defend 0.35 after the authored scale: floor(30 x 0.65) = 19",
+        expected=19,
+        weapon=_FACTOR_WEAPON,
+        scale=0.5,
+        defender_tactic="defend",
+        counterfactual=30,
+        counterfactual_overrides={"defender_tactic": None},
+    ),
+    _FactorCase(
+        "Dodge threshold 25 turns a landing margin into a miss",
+        expected=0,
+        defender_agility=20,
+        defender_tactic="dodge",
+        counterfactual=40,
+        counterfactual_overrides={"defender_tactic": None},
+    ),
+    _FactorCase(
+        "raw 100 with an insufficient margin still misses",
+        expected=0,
+        roll=_FACTOR_CRIT_ROLL,
+        defender_agility=60,
+    ),
+    _FactorCase(
+        "combined conditional2/coefficient2/weapon1.5/critical2/rider/scale2/two strikes",
+        expected=980,
+        roll=_FACTOR_CRIT_ROLL,
+        coefficient=2.0,
+        predicate=(_FACTOR_FACT,),
+        matched_multiplier=2.0,
+        weapon=_FACTOR_WEAPON,
+        extra_strikes=1,
+        max_hp_fraction=0.1,
+        defender_max_hp=100,
+        scale=2.0,
+        expected_strikes=2,
+    ),
+)
+
+#: The authored initial/selected factor reference the preceding slice shipped,
+#: re-measured here where the parity probe equips them for real.
+_AUTHORED_INITIAL_WEAPON = "plain_sword"
+_AUTHORED_SELECTED_WEAPON = "military_s_sword"
+
+
+@contextmanager
+def _declared_factor(attacker, factor: float):
+    """Equip one file-local synthetic weapon declaring ``factor`` on the actor."""
+    from world.lore.items import EquipmentModifierKey, EquipmentSlot
+    from world.rules.equipment_effects import EquipmentEffectRule
+    from world.tests.synthetic_data import make_item
+
+    item = make_item(
+        key="t_factor_sword",
+        equipment_slot=EquipmentSlot.WEAPON_MAIN,
+        modifier_key=EquipmentModifierKey.PLAIN_SWORD,
+    )
+    rule = EquipmentEffectRule(
+        adjustments={},
+        gauge_caps={},
+        immune=(),
+        attached_buffs=(),
+        exposure_bias=0,
+        weapon_damage_multiplier=factor,
+    )
+    equipment = dict(attacker.db.equipment or {})
+    equipment["weapon_main"] = item.key
+    attacker.db.equipment = equipment
+    with (
+        patch.dict("world.rules.equipment_effects.ITEM_REGISTRY", {item.key: item}),
+        patch.dict(
+            "world.rules.equipment_effects.EQUIPMENT_EFFECT_RULES",
+            {EquipmentModifierKey.PLAIN_SWORD: rule},
+        ),
+    ):
+        yield
+
+
+class CombatFactorBudgetTests(EvenniaTest):
+    """The finite combined factor budget matrix (30 explicit cases)."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="factor_budget_room")
+
+    def _actor(self, cls, key, *, hp=200, attack=60, agility=10, defense=10):
+        actor = create_object(cls, key=key, location=self.room)
+        actor._apply_trait_config(_trait_config({
+            "hp": hp,
+            "mp": 100,
+            "sp": 100,
+            "atk_phys": attack,
+            "agility": agility,
+            "defense": defense,
+            "magic_power": attack,
+            "guild_merit": 0,
+        }))
+        actor.db.inventory = []
+        actor.db.equipment = {
+            "weapon_main": None,
+            "weapon_off": None,
+            "armor": None,
+            "accessories": [],
+        }
+        actor.db.skills = {"active": [], "passive": []}
+        return actor
+
+    def _pair(self, case: _FactorCase, *, player_attacker: bool):
+        """Build the real player and enemy actors for one direction."""
+        attacker_cls, defender_cls = (
+            (PlayerCharacter, Monster) if player_attacker else (Monster, PlayerCharacter)
+        )
+        prefix = "player_attacker" if player_attacker else "enemy_attacker"
+        attacker = self._actor(attacker_cls, f"{prefix}_attacker", attack=case.attack)
+        defender = self._actor(
+            defender_cls,
+            f"{prefix}_defender",
+            hp=case.defender_max_hp,
+            attack=1,
+            agility=case.defender_agility,
+            defense=case.defense,
+        )
+        if case.predicate:
+            defender.db.combat_traits = list(case.predicate)
+        return attacker, defender
+
+    def _stage(self, attacker, defender, case: _FactorCase):
+        """Stage one case's strike and return the per-strike staged amounts."""
+        predicate = case.predicate
+        matched = case.matched_multiplier
+        bypass = case.bypass
+        rider = case.max_hp_fraction
+        tactic = case.defender_tactic
+        policy = None
+        if predicate or matched != 1.0 or bypass or rider or case.extra_strikes:
+            policy = DamagePolicy(
+                predicate=predicate,
+                attack_multiplier=matched,
+                unconditional_defense_bypass=bypass,
+                max_hp_fraction=rider,
+                extra_strikes=case.extra_strikes,
+            )
+        event_context: dict[str, Any] = {}
+        if policy is not None or case.coefficient != 1.0:
+            event_context["resolved_effect"] = ResolvedEffect(
+                policy=EffectPolicy(coefficient=case.coefficient, damage=policy)
+            )
+        if tactic is not None:
+            battlefield = Battlefield(
+                {
+                    "attackers": frozenset({str(attacker.key)}),
+                    "defenders": frozenset({str(defender.key)}),
+                },
+                {str(attacker.key): attacker, str(defender.key): defender},
+            )
+            battlefield.tactical = RoundTactical({str(defender.key): tactic})
+            event_context["battlefield"] = battlefield
+        weapon = case.weapon
+        weapon_scope = (
+            _declared_factor(attacker, weapon) if weapon else nullcontext()
+        )
+        with (
+            weapon_scope,
+            patch("world.rules.combat.damage.roll_d100", return_value=case.roll),
+            patch(
+                "world.rules.combat.damage.evaluate_combat_modifiers",
+                return_value={},
+            ),
+        ):
+            pending = _handle_damage(
+                attacker,
+                [defender],
+                f"damage:none:{case.school}",
+                event_context,
+                case.scale,
+            )
+        return [int(item.description.rsplit("|", 1)[1]) for item in pending]
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
+        "combat-resolution::damage-multiplier-is-banded-by-margin-of-success-with-a-magnitude-only-critical-on-a",
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage",
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins",
+        "combat-resolution::ratio-mitigation-clamps-negative-defense-and-shares-settlement-and-estimation",
+    )
+    def test_combined_factor_matrix_holds_on_both_sides(self):
+        # 24 of the 30 bounded cases: every listed combination observed with a
+        # real player attacker and a real enemy attacker, at the fixed literals.
+        observed = 0
+        for case in FACTOR_CASES:
+            for player_attacker in (True, False):
+                with self.subTest(
+                    case=case.label, player_attacker=player_attacker
+                ):
+                    attacker, defender = self._pair(
+                        case, player_attacker=player_attacker
+                    )
+                    amounts = self._stage(attacker, defender, case)
+                    self.assertEqual(len(amounts), case.expected_strikes)
+                    self.assertEqual(set(amounts), {case.expected})
+                    if case.counterfactual is not None:
+                        counterfactual = self._stage(
+                            attacker,
+                            defender,
+                            replace(case, **case.counterfactual_overrides),
+                        )
+                        self.assertEqual(set(counterfactual), {case.counterfactual})
+                    observed += 1
+        self.assertEqual(observed, 24)
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
+        "combat-resolution::defend-reduces-eligible-final-scaled-direct-damage",
+        "combat-resolution::dodge-affects-only-shared-hit-checks-and-their-margins",
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
+        "combat-resolution::ratio-mitigation-clamps-negative-defense-and-shares-settlement-and-estimation",
+        "combat-resolution::per-round-upkeep-ticks-buffs-and-advances-sexual-decay-by-the-round-duration",
+    )
+    def test_invariant_controls_hold_once_each(self):
+        # The remaining six of the 30 bounded cases, added once rather than per
+        # direction: the controls the combined budget must not move.
+        live_case = FACTOR_CASES[0]
+
+        # 1. Unchecked direct damage receives no Dodge roll: a roster key that
+        # never declared Dodge lands at the undodged literal even while another
+        # key's declaration is active in the same field.
+        attacker, defender = self._pair(live_case, player_attacker=True)
+        battlefield = Battlefield(
+            {"a": frozenset({str(attacker.key)}), "d": frozenset({str(defender.key)})},
+            {str(attacker.key): attacker, str(defender.key): defender},
+        )
+        battlefield.tactical = RoundTactical({"someone_else": "dodge"})
+        event_context = {"battlefield": battlefield}
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=_FACTOR_BASE_ROLL),
+            patch(
+                "world.rules.combat.damage.evaluate_combat_modifiers", return_value={}
+            ),
+        ):
+            unchecked = _handle_damage(
+                attacker, [defender], "damage:none:physical", event_context, 1.0
+            )
+        self.assertEqual(int(unchecked[0].description.rsplit("|", 1)[1]), 40)
+
+        # 2. Per-recipient AREA Dodge differs by declaration: the same fixed
+        # face lands on the undeclared recipient and misses on the declared one.
+        area_attacker = self._actor(PlayerCharacter, "area_attacker", attack=60)
+        dodging = self._actor(Monster, "area_dodging", attack=1, agility=20, defense=20)
+        standing = self._actor(Monster, "area_standing", attack=1, agility=20, defense=20)
+        area_field = Battlefield(
+            {
+                "a": frozenset({str(area_attacker.key)}),
+                "d": frozenset({str(dodging.key), str(standing.key)}),
+            },
+            {
+                str(area_attacker.key): area_attacker,
+                str(dodging.key): dodging,
+                str(standing.key): standing,
+            },
+        )
+        area_field.tactical = RoundTactical({str(dodging.key): "dodge"})
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=_FACTOR_BASE_ROLL),
+            patch(
+                "world.rules.combat.damage.evaluate_combat_modifiers", return_value={}
+            ),
+        ):
+            area = _handle_damage(
+                area_attacker,
+                [dodging, standing],
+                "damage:none:physical",
+                {"battlefield": area_field},
+                1.0,
+            )
+        self.assertEqual(int(area[0].description.rsplit("|", 1)[1]), 0)
+        self.assertEqual(int(area[1].description.rsplit("|", 1)[1]), 40)
+
+        # 3. Upkeep damage ignores Defend: a damaging buff tick is applied by
+        # the tick itself, so a declared defender takes the full 10.
+        slow = self._actor(PlayerCharacter, "upkeep_slow", hp=100, attack=10, agility=1)
+        fast = self._actor(Monster, "upkeep_fast", hp=100, attack=10, agility=99)
+        upkeep_field = Battlefield(
+            {"ally": frozenset({str(slow.key)}), "enemy": frozenset({str(fast.key)})},
+            {str(slow.key): slow, str(fast.key): fast},
+        )
+        tick = TickRecord(definition_key="t_factor_dot", source_pk=7, delta=-10, hp_before=100)
+
+        def fake_tick(entity, seconds):
+            if str(entity.key) == str(slow.key):
+                entity.traits.hp.current = entity.traits.hp.current - 10
+                return (tick,)
+            return ()
+
+        with (
+            patch("world.rules.combat.battlefield.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.roll_d100", return_value=90),
+            patch("world.rules.combat.rounds.tick_buffs", side_effect=fake_tick),
+            patch("world.rules.combat.rounds.settle_upkeep", return_value=()),
+            patch("world.rules.combat.rounds.decay_tick"),
+            patch(
+                "world.rules.combat.rounds.climax_settlement_action",
+                return_value=None,
+            ),
+        ):
+            run_round(
+                upkeep_field,
+                lambda entity, field: None,
+                tactical_declarations={str(slow.key): "defend"},
+            )
+        self.assertEqual(slow.traits.hp.current, 90)
+
+        # 4. Explicit bypass ignores Defend: the declared defender takes the
+        # undefended amount, while the same strike without the bypass is reduced.
+        bypass_case = _FactorCase(
+            "bypass control",
+            expected=60,
+            bypass=True,
+            defender_tactic="defend",
+            counterfactual=26,
+            counterfactual_overrides={"bypass": False, "defender_tactic": "defend"},
+        )
+        attacker, defender = self._pair(bypass_case, player_attacker=False)
+        self.assertEqual(set(self._stage(attacker, defender, bypass_case)), {60})
+        self.assertEqual(
+            set(
+                self._stage(
+                    attacker,
+                    defender,
+                    replace(bypass_case, **bypass_case.counterfactual_overrides),
+                )
+            ),
+            {26},
+        )
+
+        # 5. The nonlethal projection follows the final direct amount: the
+        # staged amount is what the projection consumes.
+        protected = self._actor(PlayerCharacter, "nonlethal_target", hp=200, defense=20)
+        protected.traits.hp.current = protected.traits.hp.base
+        attacker, _ = self._pair(FACTOR_CASES[0], player_attacker=False)
+        with (
+            patch("world.rules.combat.damage.roll_d100", return_value=_FACTOR_BASE_ROLL),
+            patch(
+                "world.rules.combat.damage.evaluate_combat_modifiers", return_value={}
+            ),
+        ):
+            pending = _handle_damage(
+                attacker,
+                [protected],
+                "damage:none:physical",
+                {"nonlethal": True},
+                1.0,
+            )[0]
+        final_amount = int(pending.description.rsplit("|", 1)[1])
+        self.assertEqual(final_amount, 40)
+        pending.apply()
+        self.assertEqual(protected.traits.hp.current, 160)
+        self.assertEqual(
+            nonlethal_projection(current=30.0, loss=final_amount), 1.0
+        )
+        self.assertTrue(crosses_knockout(current=30.0, loss=final_amount))
+
+        # 6. Literal base traits, proficiency access, practice affinity and
+        # strike count remain unchanged across the whole matrix.
+        attacker, defender = self._pair(live_case, player_attacker=True)
+        before_attacker = self._literal_invariants(attacker)
+        before_defender = self._literal_invariants(defender)
+        for case in FACTOR_CASES:
+            amounts = self._stage(attacker, defender, case)
+            expected_strikes = 2 if case.extra_strikes else 1
+            self.assertEqual(len(amounts), expected_strikes)
+        self.assertEqual(self._literal_invariants(attacker), before_attacker)
+        self.assertEqual(self._literal_invariants(defender), before_defender)
+
+    @staticmethod
+    def _literal_invariants(entity) -> tuple:
+        traits = entity.traits
+        skills = entity.db.skills or {}
+        return (
+            tuple(
+                getattr(traits, name).base
+                for name in (
+                    "hp",
+                    "mp",
+                    "sp",
+                    "atk_phys",
+                    "magic_power",
+                    "agility",
+                    "defense",
+                )
+            ),
+            dict(entity.db.skill_proficiency or {}),
+            list(entity.db.affinity_elements or []),
+            {
+                key: tuple(value) if isinstance(value, (list, tuple)) else value
+                for key, value in skills.items()
+            },
+        )
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence",
+        "monster-ai-effect-estimation::damage-estimates-use-settlement-arithmetic-without-settlement",
+        "combat-resolution::physical-damage-multiplies-the-rounded-attack-component-by-equipped-weapon-factor",
+    )
+    def test_estimator_and_settlement_agree_on_the_authored_factor(self):
+        # Cross-path parity at the factor boundary with real shipped gear: the
+        # estimator's own read path reports the same authored declaration the
+        # settlement read path consumes, and its analytic projection for the
+        # fixed matchup equals the settled average over all 100 faces -- each
+        # against an independently hand-derived literal.
+        from world.rules.monster_ai import (
+            DecisionReads,
+            DecisionScope,
+            build_decision_snapshot,
+            enumerate_candidates,
+            estimate_candidates,
+            roster_index,
+            stable_identity,
+        )
+
+        skill_key = "basic_swordplay"  # damage:none:physical, coefficient 1.0
+        # Hand-derived settled averages for the fixed matchup (monster attack
+        # 40 base, target hp 500 / defense 10 / agility 20, defender threshold
+        # 71, ratio retention 40 / 50 = 0.8):
+        #   unarmed:      margin = roll - 61, so faces 61..99 land 32 and the
+        #                 raw-100 critical lands 64 -> (39x32 + 64) / 100.
+        #   plain_sword:  +2 atk, factor 1.05 -> attack 42, base 35, crit 70.
+        #   military_s:   +12 atk and +4 agility (adjusted agility 14, so the
+        #                 margin is roll - 57 and the solid band is 97..99),
+        #                 attack 52, factor 1.25 -> base 52, solid 78, crit 104.
+        expectations = {
+            None: 13.12,
+            _AUTHORED_INITIAL_WEAPON: 14.35,
+            _AUTHORED_SELECTED_WEAPON: 24.18,
+        }
+        monster = self._actor(Monster, "parity_attacker", attack=40, agility=10)
+        monster.db.skills = {"active": [skill_key], "passive": []}
+        target = self._actor(PlayerCharacter, "parity_target", hp=500, defense=10, agility=20)
+        context = BattlefieldActionContext(
+            Battlefield(
+                {
+                    "attackers": frozenset({str(monster.key)}),
+                    "defenders": frozenset({str(target.key)}),
+                },
+                {str(monster.key): monster, str(target.key): target},
+            ),
+            event_context={"simulated": True},
+        )
+        roster = roster_index((monster, target))
+
+        for weapon_key, expected in expectations.items():
+            with self.subTest(weapon=weapon_key):
+                if weapon_key is None:
+                    monster.db.equipment = dict(
+                        monster.db.equipment, weapon_main=None
+                    )
+                else:
+                    from world.rules.equipment import add_item, toggle_equipment
+
+                    add_item(monster, weapon_key)
+                    self.assertEqual(
+                        toggle_equipment(monster, weapon_key).outcome, "success"
+                    )
+                # A fresh read set per state, so the estimator's memoized
+                # factor read is taken against the currently equipped gear.
+                reads = DecisionReads()
+                snapshot = build_decision_snapshot(
+                    monster,
+                    context,
+                    scope=DecisionScope("factor-parity:0:0", 0, 0),
+                    participants=(target,),
+                    reads=reads,
+                )
+                candidates = enumerate_candidates(
+                    snapshot,
+                    actor=monster,
+                    context=context,
+                    roster=roster,
+                    reads=reads,
+                )
+                estimates = estimate_candidates(
+                    candidates,
+                    snapshot=snapshot,
+                    actor=monster,
+                    context=context,
+                    roster=roster,
+                    reads=reads,
+                )
+                estimate = next(
+                    item
+                    for item in estimates.estimates
+                    if item.identity.skill_key == skill_key
+                )
+                projection = next(
+                    item
+                    for item in estimate.recipients
+                    if item.identity == stable_identity(target)
+                )
+                # The estimator's read path reports exactly the declaration the
+                # settlement read path consumes (one authored source, no
+                # duplicated balance constant).
+                self.assertEqual(
+                    reads.weapon_multiplier(monster),
+                    equipment_weapon_multiplier(monster),
+                )
+                settled = 0.0
+                for face in range(1, 101):
+                    target.traits.hp.current = target.traits.hp.base
+                    monster.traits.sp.current = monster.traits.sp.base
+                    with patch(
+                        "world.rules.combat.damage.roll_d100", return_value=face
+                    ):
+                        result = ActionResolver.resolve(
+                            ActionRequest(
+                                monster, skill_key, [target], context, scale=1.0
+                            )
+                        )
+                    self.assertEqual(result.outcome, "success", result.detail)
+                    settled += target.traits.hp.base - _stored_hp(target)
+                self.assertAlmostEqual(settled / 100, expected, places=4)
+                self.assertAlmostEqual(projection.damage, expected, places=4)
