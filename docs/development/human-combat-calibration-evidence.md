@@ -191,3 +191,167 @@ agree in every state.
 Shard ownership: the extended module
 `world/rules/tests/test_human_combat_calibration.py` keeps its single existing entry in
 `.github/evennia-shards.json`; no module was added, moved or renamed.
+
+## Combined player/enemy encounter calibration
+
+`party-combat-encounter-calibration` (change 19 of the party-combat batch) measures the
+bounded combined player/enemy encounter set: exactly **eight human-only cells × seeds
+0-3**, i.e. 32 encounter trials, under the same 200-round bound the preceding probes
+used. No new species, elf/beastfolk target or calamity cell is added, and the
+calibration-only high probes stay unshipped.
+
+Backend: Evennia test runner on SQLite (`server/db/evennia-test.sqlite3`); Python
+3.13.14; measured revision `169e7299`; deterministic per trial (each trial seeds
+`random` with its cell's seed, one trial per cell/seed pair). Focused label:
+`uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb
+world.rules.tests.test_human_combat_calibration.EncounterCalibrationTests`.
+
+### How one trial is driven
+
+Each cell builds real humans — the F-rank creation kit build, or the rank's restricted
+senior constructed from the real authored profile and equipped with its real weapon,
+armor and accessory through the ordinary inventory/equipment rows, with its exam
+restriction activated — plus the cell's monster (a real species individual, or the
+existing synthetic `high_lower`/`high_upper` probe). Each ally's selection is submitted
+through the real persistent-draft facade (`submit_player_action()`,
+`submit_player_item_use()`, or the tactical entry kind via `confirm_actor_command()`),
+so an ally acts only from a submitted command and an omitted command leaves the round
+unresolved (asserted separately: the missing-command probe resolves nothing and neither
+side's HP moves). Every resolved round carries the simulation marker, and each trial
+asserts that ordinary growth, unlocks and reward state are unchanged. The enemy keeps
+its shipped defensive and evasive skills.
+
+The scripts are explicit and bounded. A single-member cell selects the first affordable
+permitted attack from its own chain (`true_sword_saint`, `blade_saint_arts`,
+`thousand_blade_art`, `tendon_sever`, `flowing_strikes`, `basic_swordplay`, default
+`basic_attack`). The three-member D party additionally declares `defend` (member 0,
+round 2), `dodge` (member 1, round 3) and `taunt` (member 2, round 4) as round-start
+tactical entries, gives its supporter an own-skill turn every third round and offers its
+own-inventory `healing_potion` on rounds 2 and 5 to the party's most wounded living
+member. Each selection is checked against the same public preflight the facade enforces,
+so an invalid action is never silently replaced; every trial records its rejections and
+all 32 trials recorded zero.
+
+The 32 trials run twice: a baseline pass and the same 32-trial selected-value pass. The
+selected-value pass records the balance values it consumes through their real consumer
+sources and reproduces the baseline taxonomy and round counts exactly.
+
+### Selected values: every eligible value retained
+
+The tuning evaluation compared the 32 measured baseline trials against the finite
+eligible surface. No observed combined result identified an overbudget authored
+magnitude, so every eligible value is **retained**, and the selected-value pass measures
+the same values:
+
+| Surface value | Initial | Selected | Observed effect on the 32 trials |
+|---|---:|---:|---|
+| `damage.mitigation_k` | 40 | **40 (kept)** | Every cell resolved within its bound; no cell unfinished, all rejections zero |
+| `tactics.defend_reduction` | 0.35 | **0.35 (kept)** | The D party's round-2 Defend resolved with no rejected selection |
+| `tactics.dodge_threshold_bonus` | 25 | **25 (kept)** | The D party's round-3 Dodge resolved with no rejected selection |
+| realistic weapon factors in force | `1.05` common / `1.10` uncommon / `1.15` rare / `1.25` legendary | **kept** | Measured per cell: F/E `plain_sword` 1.05, D/C `military_d_sword`/`military_c_sword` 1.10, B `military_b_sword` 1.15, S `military_s_sword` 1.25 |
+
+The finite surface also admits at most the two existing physical skill definitions the
+preceding factor-budget evidence used as its conditional and multi-strike probe cases.
+Recorded keys: **`flowing_strikes`** (coefficient 1.4, one extra strike — the
+two-strike case; it is the D cell's measured selection) for the multi-strike probe, and
+**`blade_saint_arts`** (coefficient 4.0, `bypass_defense=True`) for the conditional
+probe. Both were **considered and unchanged**. One qualification is recorded rather than
+glossed: `blade_saint_arts` declares an *empty* predicate, so it is an unconditional
+bypass, not a matched conditional multiplier; every shipped skill that declares a
+non-empty matched predicate (`light_arrow`, `penitent_touch`, `judgment_strike`,
+`heavens_judgment_light`, `crystal_shatter`, `earths_judgment`) carries a **magic**
+damage effect, which no cell's physical chain selects and which the physical weapon
+factor never touches. It is therefore the nearest shipped physical analogue of the
+conditional probe case, recorded as such. No cell's observed results would have been
+changed by either key, and neither was changed.
+
+### Measured eight-cell outcomes (seeds 0-3, baseline and selected-value passes)
+
+Rounds are the executed rounds per seed; medians are over the four seeds. The selected
+pass reproduced every count, HP and rejection exactly.
+
+| Cell | Rounds (seed 0/1/2/3) | Median | Monster defeats | Retreats | Human losses | All standing | Unfinished | Rejects | Final human HP |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| F creation kit vs grain pecker | 8 / 7 / 12 / 6 | 7.5 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 159 / 150 / 157 / 157 |
+| E restricted senior vs E ordinary | 6 / 4 / 6 / 4 | 5.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 96 / 88 / 88 / 92 |
+| D restricted party (3) vs D ordinary | 5 / 3 / 5 / 2 | 4.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 82,110,110 / 110,110,110 / 82,110,110 / 96,110,110 |
+| C restricted senior vs C ordinary (real policy) | 8 / 6 / 13 / 6 | 7.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 85 / 48 / 88 / 85 |
+| B restricted senior vs B ordinary | 2 / 2 / 3 / 2 | 2.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 132 / 132 / 106 / 132 |
+| B restricted senior vs high-lower probe | 11 / 5 / 12 / 10 | 10.5 | 2/4 | 0 | 2/4 | 2/4 | 0 | 0 | 34 / 59 / 0 / 0 |
+| B restricted senior vs high-upper probe | 12 / 5 / 11 / 7 | 9.5 | 0/4 | 0 | 4/4 | 0/4 | 0 | 0 | 0 / 0 / 0 / 0 |
+| S restricted senior vs high-upper probe | 2 / 2 / 5 / 2 | 2.0 | 4/4 | 0 | 0 | 4/4 | 0 | 0 | 200 / 200 / 183 / 200 |
+
+The B-vs-high-upper losses leave the probe at 391 / 583 / 489 / 502 of its 700 HP, so the
+upper-tier cell remains a real boundary rather than a defeat that never damages its
+opponent. The high-upper probe is a calibration-only, unshipped reference: the S cell's
+sampled 4/4 result promises neither universal S-tier victory nor any all-standing
+A-tier party safety, and no calamity cell is measured here.
+
+### Diagnosis: measured divergences from the historical projected table
+
+The historical table above is pre-cutover projected evidence and is deliberately not
+re-measured. Every divergence in the new measurement is diagnosed here rather than
+absorbed:
+
+- **C cell (historical 1/4 defeats + 3/4 retreats; measured 4/4 defeats, 0 retreats).**
+  The cell does resolve through the shipped `monster_behaviour_policy` — the recorded
+  per-trial enemy-policy provenance shows real-policy decisions only for this cell and
+  deterministic stand-and-fight decisions only for the others — so the cliff stepper was
+  free to flee. It did not reach its flee condition under these seeds: the C senior's
+  measured selection (`tendon_sever` with the authored `military_c_sword` factor 1.10)
+  closes the fight in 6-13 rounds. Defeat and retreat remain separately reported and an
+  escape is never recorded as a zero-HP defeat.
+- **B senior vs high-lower probe (historical 4/4 defeats ≈14 rounds; measured 2/4
+  defeats + 2/4 human losses, median 10.5).** The historical row predates the authored
+  weapon factors; the B senior's measured selection is `thousand_blade_art` with
+  `military_b_sword` 1.15 against a 320-HP probe, so the matchup is now a race that
+  splits 2/4 across these seeds. The loss rows leave the probe at 55 and 81 HP, i.e. a
+  bounded near-loss, not a mis-equipped kit. No authored value was changed: nothing in
+  the eligible surface would change this cell without a global weakening, and the
+  observed split is a recorded high-tier boundary outcome rather than a defect.
+- **S senior vs high-upper probe (historical 3/4 defeats ≈54 rounds; measured 4/4
+  defeats, median 2).** The S senior's measured selection is `true_sword_saint`
+  (coefficient 5.5, defense bypass) landing 330-619 per round against the 700-HP probe,
+  so that probe no longer challenges the strongest restricted senior. Recorded as a
+  measured magnitude observation for the later tier-balance work: `true_sword_saint`
+  is not on this change's eligible surface, and lowering `K`, the tactical constants or
+  the weapon factors to lengthen this cell would be exactly the unsupported global
+  weakening the batch contract forbids. No value was changed.
+- **F/E/D/B-ordinary cells.** Same outcomes as the historical table (defeat, all
+  standing, zero rejects); the medians are smaller because the authored weapon factors
+  now apply, which is a measured effect of the previous slice rather than a regression.
+
+### Diagnosis: real-kit restriction mismatch resolved during the run
+
+The three-member D party's restricted members cap **effective max HP at 110** (the
+rank's authored reducing ceiling) while the underlying `hp` trait base stays 200. The
+supporter's first inventory-item selection was therefore rejected `hp_full` at 110/200,
+because the script's wounded test used the trait base instead of the restricted
+ceiling. Diagnosed and fixed in this change by gating the item turn on the same public
+item preflight the facade itself enforces: the selection is now a legal use of the real
+consumable on the party's most wounded living member, and all 32 trials record zero
+rejections. The diagnosis changed no approved value; the restricted ceiling and the
+consumable's own declaration are untouched.
+
+### Qualification: probe combat policy
+
+The probes patch the session's combat policy to the simulated marker so that no ordinary
+growth, unlock or reward occurs. That same marker suppresses the hostile session's
+per-entity `nonlethal_keys`, which normally floors allied companions at 1 HP and marks
+them knocked out; the party cells are therefore measured under stricter-than-shipped
+companion lethality, and the D cell's all-standing result is the stricter measurement.
+
+### Traceability
+
+The three discoverable tests that substantively establish this change's added
+`human-combat-calibration` requirement ("Real party encounter evidence records selected
+values and bounded outcomes") are
+`EncounterCalibrationTests.test_eight_encounter_cells_run_explicit_draft_commands_over_four_seeds`,
+`EncounterCalibrationTests.test_selected_values_reproduce_the_measured_encounter_outcomes`
+and
+`EncounterCalibrationTests.test_an_ally_without_a_submitted_command_never_auto_attacks`.
+They carry the change's own canonical annotation once the delta spec is synced into
+`openspec/specs/`, which is the first gate that can resolve that identifier; until then
+they carry the existing `human-combat-calibration` requirement IDs they also establish.
+Shard ownership is unchanged: the module keeps its single existing entry in
+`.github/evennia-shards.json`, and no test module was added, moved or renamed.
