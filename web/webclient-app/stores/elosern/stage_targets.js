@@ -8,7 +8,7 @@
 //
 // A position is `{ key, kind, identities, side, digit, offStage, label }`:
 // - `member` — one SINGLE `target-<id>` or AREA `area-<id>` item, on one figure;
-// - `self` — the SELF `self-confirm` item, on the controlled figure;
+// - `self` — the SELF `self-confirm` item, on the commanded actor's figure;
 // - `group` — one AREA `shorthand-<key>` item, lighting a whole side;
 // - `confirm` — the AREA `area-confirm` item, lighting the current choice.
 

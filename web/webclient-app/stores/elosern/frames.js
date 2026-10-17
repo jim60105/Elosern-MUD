@@ -162,6 +162,9 @@ export function applyFrames(ctx) {
     }
     const item = ctx.router.depth() > 0 ? ctx.router.currentItem() : null;
     ctx.pushFrame({ source: "combat.actor", params: {} }, item ? item.key : null);
+    // The 變更成員 control disappears once the frame mounts, so hand DOM
+    // focus to the dock (never the document body).
+    ctx.dockFocusRequest += 1;
     ctx.publishView();
     return true;
   };
@@ -850,9 +853,13 @@ export function applyFrames(ctx) {
       if (settled) {
         ctx.pendingActorSelection = null;
         ctx.frameResolver.resetCombatSelection();
-        // Return to the root so the new actor's canonical flow opens in the
-        // same card; only ever from the actor frame (one root in the stack).
-        if (router.depth() > 0 && router.currentDescriptor().source === "combat.actor") {
+        // Return to exactly one root, whatever frame the query was issued
+        // from: an EXPLICIT switch starts in the actor frame, while the
+        // automatic advance starts in the submitted skill/target frame of the
+        // PREVIOUS actor. Keeping that frame would leave the new actor in a
+        // stale skill/scale/target step (the resolver still mounts it when
+        // both actors own the skill), so the plan never carries over.
+        if (router.depth() > 0) {
           ctx.resetFramesToRoot();
           ctx.dockFocusRequest += 1;
         }

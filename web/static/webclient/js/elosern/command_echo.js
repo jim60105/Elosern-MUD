@@ -106,12 +106,12 @@
     "account.character.create",
     "account.character.switch",
     "creation.roll_name",
-    // The guarded party combat actions have no client producer yet: the
-    // combat dock still dispatches the retired combat.cast/combat.flee/
-    // combat.forfeit IDs, and the typed combat command surface plus its own
-    // echo spellings belong to the party-combat-text-commands slice of the
-    // same batch. Declaring them silent keeps the catalog honest (no
-    // fabricated command line) until that slice ships its resolvers.
+    // The guarded party combat actions are declared silent: the dock now
+    // produces combat.actor_choices and combat.command, but neither has a
+    // typed-command echo spelling in this catalog (the typed combat surface
+    // echoes through the text client's own input lines). exit_prompt and
+    // exit_confirm belong to the party-exit confirmation slice. Declaring
+    // them silent keeps the catalog honest — no fabricated command line.
     "combat.actor_choices",
     "combat.command",
     "combat.exit_prompt",

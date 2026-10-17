@@ -69,6 +69,7 @@ function skills() {
             skill(ATTACK, "普通攻擊", "single", [ALLY, FOE], { hostile: true }),
             skill("t_mend", "急救", "single", [PLAYER, ALLY], { beneficial: true }),
             skill("t_guard", "守勢", "self", []),
+            skill("t_curse", "自縛", "self", [], { hostile: true }),
           ],
         },
       ],
@@ -126,6 +127,14 @@ describe("party command selection (store)", () => {
   }
 
   function enterCombat(options = {}) {
+    // A second entry in one test is a fresh client (a new transport
+    // generation retires the previous epoch).
+    if (gen > 0) {
+      setActivePinia(createPinia());
+      store = useElosernStore();
+      sender = fx.createFakeSender();
+      store.setSender(sender);
+    }
     gen += 1;
     revision = 1;
     store.beginTransport(gen);
@@ -248,7 +257,13 @@ describe("party command selection (store)", () => {
     expect(command.payload.command).toEqual({ kind: "skill", payload: { skill_key: ATTACK, target_ids: [FOE] } });
     // A final accepted command resolves the whole round; no party submit
     // screen and no further navigation.
-    commit({ needs: [], entries: [{ actor_id: PLAYER, command: command.payload.command }] });
+    commit({
+      needs: [],
+      entries: [
+        { actor_id: PLAYER, command: command.payload.command },
+        { actor_id: ALLY, command: { kind: "skill", payload: { skill_key: "t_mend", target_ids: [PLAYER] } } },
+      ],
+    });
     answer(command, "round_committed");
     expect(sender.sent.actions).toHaveLength(1);
     expect(store.view.mode).toBe("combat");
@@ -285,6 +300,15 @@ describe("party command selection (store)", () => {
     // The advance envelope reads the freshly published revision, never the
     // one before the draft save.
     expect(advance.base_revision).toBe(rev);
+    // The companion's choices commit: the advance opens ONE root and never
+    // keeps the previous actor's skill/target frame.
+    const rev2 = commit({ actorId: ALLY, needs: [ALLY], draftVersion: 1 });
+    answer(advance, "actor_choices", { at: rev2 });
+    expect(store.router.currentDescriptor().source).toBe("combat.root");
+    expect(store.view.dockDepth).toBe(1);
+    expect(store.view.focus.key).toBe("attack");
+    expect(store.view.focusedSkill).toBeNull();
+    expect(store.view.stageTarget).toBeNull();
     // Re-observing the same result dispatches nothing more.
     answer(command, "draft_saved", { at: rev });
     expect(sender.sent.actions.filter((a) => a.action_id === "combat.actor_choices")).toHaveLength(1);
@@ -349,6 +373,34 @@ describe("party command selection (store)", () => {
     expect(store.router.currentDescriptor().source).toBe("combat.root");
   });
 
+  it("reconnect follows the server's first-missing-actor choice without a query", () => {
+    // The server's reconnecting snapshot already names the member still
+    // needing a command; the client adopts it and asks nothing.
+    gen += 1;
+    revision = 1;
+    store.beginTransport(gen);
+    store.setConnected(true);
+    const entries = [
+      { actor_id: PLAYER, command: { kind: "skill", payload: { skill_key: ATTACK, target_ids: [FOE] } } },
+    ];
+    const result = store.receive(
+      gen,
+      "ui_snapshot",
+      [
+        fx.snapshot({
+          presentation_epoch: fx.EPOCH_C,
+          mode: "combat",
+          revision,
+          panels: { status: fx.statusPanel(), context_actions: panel({ actorId: ALLY, needs: [ALLY], entries }) },
+        }),
+      ],
+      {},
+    );
+    expect(result.accepted, JSON.stringify(result)).toBe(true);
+    expect(store.view.combatProgress).toMatchObject({ actorId: ALLY, confirmed: 1, needsSelection: 1 });
+    expect(sender.sent.actions).toHaveLength(0);
+  });
+
   it("a companion SELF lights the companion while a SINGLE target stays another member", () => {
     enterCombat({ actorId: ALLY });
     // SELF: the only stage position is the commanded companion.
@@ -382,17 +434,31 @@ describe("party command selection (store)", () => {
 
   it("a companion SELF asks with the companion's own cross-side wording", () => {
     enterCombat({ actorId: ALLY });
-    store.focusItemByKey("skills");
+    const openCurse = () => {
+      store.focusItemByKey("skills");
+      store.focusPress("Enter");
+      store.focusItemByKey("skill-cat-0");
+      store.focusPress("Enter");
+      store.focusItemByKey("t_curse");
+      store.focusPress("Enter");
+    };
+    openCurse();
     store.focusPress("Enter");
-    store.focusItemByKey("skill-cat-0");
-    store.focusPress("Enter");
-    store.focusItemByKey("t_guard");
-    store.focusPress("Enter");
-    // 守勢 is neither hostile nor beneficial: no question; it sends one command.
-    expect(store.view.crossSideConfirm).toBeNull();
-    store.focusPress("Enter");
+    expect(sender.sent.actions).toHaveLength(0);
+    expect(store.view.crossSideConfirm?.question).toBe("確定要對自己使用〈自縛〉？");
+    // 是 sends exactly one envelope bound to the commanded companion.
+    expect(store.confirmCrossSide()).toBeTruthy();
     const command = lastAction();
     expect(command.action_id).toBe("combat.command");
     expect(command.payload.actor_id).toBe(ALLY);
+    expect(command.payload.command).toEqual({ kind: "skill", payload: { skill_key: "t_curse" } });
+    // A committed draft change cancels a fresh held question without sending.
+    enterCombat({ actorId: ALLY });
+    openCurse();
+    store.focusPress("Enter");
+    expect(store.view.crossSideConfirm).not.toBeNull();
+    commit({ actorId: ALLY, draftVersion: 9, needs: [PLAYER, ALLY] });
+    expect(store.view.crossSideConfirm).toBeNull();
+    expect(sender.sent.actions).toHaveLength(0);
   });
 });

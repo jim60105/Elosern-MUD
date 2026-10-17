@@ -72,7 +72,7 @@ export function targetingFor(step) {
 }
 
 // The position key a figure's identity stands for: its member item, or the
-// SELF confirm on the controlled figure.
+// SELF confirm on the commanded actor's figure.
 export function positionKeyFor(step, identity) {
   if (!step || identity === null || identity === undefined) {
     return null;

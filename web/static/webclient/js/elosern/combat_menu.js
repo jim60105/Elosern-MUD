@@ -492,13 +492,27 @@
     var byId = participantById(panelParticipants(panel));
     var status = draftStatus(panel);
     var currentActor = panel && panel.choices ? panel.choices.actor_id : null;
+    var actors = (panel && panel.actors) || [];
+    // Display names shared by two or more allied actors take the session
+    // token (the stage's target-name convention), so same-name members stay
+    // distinguishable in the selector.
+    var nameCounts = {};
+    actors.forEach(function (actor) {
+      var row = byId[actor.identity] || {};
+      var name = typeof row.display_name === "string" ? row.display_name : "";
+      if (name) {
+        nameCounts[name] = (nameCounts[name] || 0) + 1;
+      }
+    });
     var rows = [];
-    ((panel && panel.actors) || []).forEach(function (actor) {
+    actors.forEach(function (actor) {
       var row = byId[actor.identity] || {};
       var key = String(actor.identity);
+      var name = typeof row.display_name === "string" ? row.display_name : "";
+      var token = typeof row.token === "string" ? row.token : "";
       var label =
-        (typeof row.display_name === "string" && row.display_name) ||
-        (typeof row.token === "string" && row.token) ||
+        (name && nameCounts[name] > 1 && token ? name + "（" + token + "）" : name) ||
+        token ||
         key;
       var description = null;
       if (status.confirmed[key]) {
@@ -518,6 +532,7 @@
         payload: null,
         command: true,
         actorId: actor.identity,
+        token: token || null,
         current: String(actor.identity) === String(currentActor),
         actorStatus: status.confirmed[key]
           ? "confirmed"
@@ -551,12 +566,18 @@
     var byId = participantById(panelParticipants(panel));
     var actorId = panel.choices.actor_id;
     var row = byId[actorId] || {};
+    var name = typeof row.display_name === "string" ? row.display_name : "";
+    var token = typeof row.token === "string" ? row.token : "";
+    var shared =
+      name &&
+      ((panel.actors || []).filter(function (actor) {
+        var other = byId[actor.identity] || {};
+        return other.display_name === name;
+      }).length > 1);
     return {
       actorId: actorId,
       actorLabel:
-        (typeof row.display_name === "string" && row.display_name) ||
-        (typeof row.token === "string" && row.token) ||
-        String(actorId),
+        (shared && token ? name + "（" + token + "）" : name) || token || String(actorId),
       confirmed: (panel.draft.entries || []).length,
       total: (panel.draft.required_actor_ids || []).length,
       needsSelection: (panel.draft.needs_selection_ids || []).length,

@@ -210,15 +210,21 @@ export function combatActions(overrides = undefined) {
       .filter((row) => row && row.team === "party")
       .map((row) => row.identity);
     panel.actors = partyIds.map((identity) => ({ identity, commandable: true, reason: null }));
-    const actorId = partyIds.includes(panel.choices.actor_id) ? panel.choices.actor_id : partyIds[0];
-    panel.choices = { ...panel.choices, actor_id: actorId };
-    panel.draft = {
-      ...panel.draft,
-      required_actor_ids: partyIds,
-      needs_selection_ids: partyIds,
-      entries: [],
-      reselection_reasons: [],
-    };
+    // Derive only what the caller omitted: an explicit choices/draft override
+    // is the test's own authoritative state.
+    if (!(overrides.choices && Object.prototype.hasOwnProperty.call(overrides.choices, "actor_id"))) {
+      const actorId = partyIds.includes(panel.choices.actor_id) ? panel.choices.actor_id : partyIds[0];
+      panel.choices = { ...panel.choices, actor_id: actorId };
+    }
+    if (overrides.draft === undefined) {
+      panel.draft = {
+        ...panel.draft,
+        required_actor_ids: partyIds,
+        needs_selection_ids: partyIds,
+        entries: [],
+        reselection_reasons: [],
+      };
+    }
   }
   return panel;
 }

@@ -626,6 +626,34 @@ test("a reselection reason joins the actor row by identity", () => {
   assert.equal(actor.items[0].enabled, true);
 });
 
+test("same-name allied actors carry their session token in the selector", () => {
+  const panel = actorPanel({
+    participants: [
+      validParticipant({ identity: 5, token: "a1", display_name: "同行劍士", team: "party" }),
+      validParticipant({ identity: 6, token: "a2", display_name: "同行劍士", team: "party" }),
+    ],
+    actors: [
+      { identity: 5, commandable: true, reason: null },
+      { identity: 6, commandable: true, reason: null },
+    ],
+    choices: { actor_id: 5, skills: nestedSkills(validSkill()), items: [], tactics: [] },
+    draft: {
+      round_revision: 0,
+      draft_version: 0,
+      required_actor_ids: [5, 6],
+      entries: [],
+      needs_selection_ids: [5, 6],
+      reselection_reasons: [],
+    },
+  });
+  const actor = CombatMenu.buildMenus(panel, {}).menus.actor;
+  assert.deepEqual(
+    actor.items.map((item) => item.label),
+    ["同行劍士（a1）", "同行劍士（a2）"]
+  );
+  assert.equal(CombatMenu.progressLine(panel).actorLabel, "同行劍士（a1）");
+});
+
 test("the progress line reports the commanded actor and the draft counts", () => {
   assert.deepEqual(CombatMenu.progressLine(actorPanel()), {
     actorId: 6,
