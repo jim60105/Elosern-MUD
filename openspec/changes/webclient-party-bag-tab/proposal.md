@@ -30,7 +30,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **24 of 32**.
+Declared implementation order: **25 of 33**.
 
 - depends-on: webclient-party-window-member-tab
 - depends-on: party-inventory-panel
