@@ -12,6 +12,7 @@ from tools.spec_traceability import covers_requirement
 import ast
 import math
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from unittest.mock import patch
 
@@ -39,6 +40,7 @@ from world.rules.combat_session import engage, read_session, reconstruct_battlef
 from world.rules.disengage import _adjusted_agility as flee_agility
 from world.rules.equipment import toggle_equipment
 from world.rules.equipment_effects import (
+    EQUIPMENT_EFFECT_RULES,
     equipment_adjustments,
     equipment_gauge_caps,
     equipment_weapon_multiplier,
@@ -406,9 +408,6 @@ class AccessorFoldTests(_WearerCase):
         "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration"
     )
     def test_equipment_weapon_multiplier_precedence_and_controls(self):
-        from dataclasses import replace
-        from world.rules.equipment_effects import EQUIPMENT_EFFECT_RULES
-
         # _SABER is weapon_main, _ECHO is weapon_off, _PLATE is armor
         # Patch _SABER rule with factor 1.5, _ECHO rule with factor 2.0
         saber_rule = replace(EQUIPMENT_EFFECT_RULES[_ATK_KEY], weapon_damage_multiplier=1.5)
@@ -582,7 +581,13 @@ class DamageWiringTests(_FixtureFieldCase):
         defender = FakeEntity("wiring defender", hp=1000, agility=10, defense=5)
         baseline = self._staged_damage(attacker, defender)
         _worn(attacker, weapon=_SABER.key)
-        worn = self._staged_damage(attacker, defender)
+        # This case's role is additive equipment wiring, so the borrowed
+        # rulebook row's authored physical factor is normalized to neutral:
+        # the selected nonneutral factors are shipped data with their own
+        # contract (their independent arithmetic lives in test_damage_bands).
+        neutral_row = replace(EQUIPMENT_EFFECT_RULES[_ATK_KEY], weapon_damage_multiplier=1.0)
+        with patch.dict(EQUIPMENT_EFFECT_RULES, {_ATK_KEY: neutral_row}):
+            worn = self._staged_damage(attacker, defender)
         # Crit roll 100 doubles the weapon's flat attack before defense.
         # With ratio mitigation (K=40, def=5):
         # baseline: round(20 * 2.0) * 40 / 45 = 40 * 40 / 45 = 35.55... -> 35

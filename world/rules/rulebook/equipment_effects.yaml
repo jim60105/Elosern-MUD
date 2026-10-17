@@ -6,12 +6,20 @@
 # the item's registered rarity, checked by world/rules/equipment_effects.py at
 # load time (rarity is never read at runtime). Percent fields use an explicit
 # signed `+N%` / `-N%` string; flat fields are signed integers.
+#
+# `weapon_damage_multiplier` is authored data, never inferred from rarity or
+# progression: the equipment-growth-runtime-calibration change selected the
+# physical weapon factors below (1.0-1.28) together with the `weapon_multiplier`
+# ceilings, and published the initial/selected values, the neutral exceptions
+# and the measured growth in docs/development/human-combat-calibration-evidence.md.
+# Weapon-slot entries without a physical attack bonus carry an explicit neutral
+# 1.0 declaring no physical bonus; encounter tuning remains owned elsewhere.
 budgets:
-  common: {flat: 4, percent: 5, soft_percent: 10, bias: 0, gauge: 5, weapon_multiplier: 1.0}
-  uncommon: {flat: 6, percent: 8, soft_percent: 15, bias: 1, gauge: 10, weapon_multiplier: 1.0}
-  rare: {flat: 8, percent: 10, soft_percent: 20, bias: 1, gauge: 15, weapon_multiplier: 1.0}
-  epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20, weapon_multiplier: 1.0}
-  legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25, weapon_multiplier: 1.0}
+  common: {flat: 4, percent: 5, soft_percent: 10, bias: 0, gauge: 5, weapon_multiplier: 1.10}
+  uncommon: {flat: 6, percent: 8, soft_percent: 15, bias: 1, gauge: 10, weapon_multiplier: 1.15}
+  rare: {flat: 8, percent: 10, soft_percent: 20, bias: 1, gauge: 15, weapon_multiplier: 1.25}
+  epic: {flat: 10, percent: 12, soft_percent: 25, bias: 2, gauge: 20, weapon_multiplier: 1.30}
+  legendary: {flat: 12, percent: 15, soft_percent: 30, bias: 2, gauge: 25, weapon_multiplier: 1.35}
 effects:
   guild_limit_e:
     adjustments: {}
@@ -23,54 +31,69 @@ effects:
     adjustments: {}
   military_e_sword:
     adjustments: {atk_phys: 3}
+    weapon_damage_multiplier: 1.05
   military_e_armor:
     adjustments: {defense: 3}
   military_d_sword:
     adjustments: {atk_phys: 4}
+    weapon_damage_multiplier: 1.10
   military_d_armor:
     adjustments: {defense: 5, agility: 1}
   military_c_sword:
     adjustments: {atk_phys: 6, agility: 1}
+    weapon_damage_multiplier: 1.10
   military_c_armor:
     adjustments: {defense: 6, agility: 1}
   military_b_sword:
     adjustments: {atk_phys: 8, agility: 1}
+    weapon_damage_multiplier: 1.15
   military_b_armor:
     adjustments: {defense: 8, agility: 2}
   military_a_sword:
     adjustments: {atk_phys: 10, agility: 3}
+    weapon_damage_multiplier: 1.20
   military_a_armor:
     adjustments: {defense: 10, agility: 2}
   military_s_sword:
     adjustments: {atk_phys: 12, agility: 4}
+    weapon_damage_multiplier: 1.25
   military_s_armor:
     adjustments: {defense: 12, agility: 3}
   apprentice_focus_staff:
     adjustments: {magic_power: 4, mp_cost: "-5%"}
+    # Casting tool: no physical attack bonus, so the neutral declaration stands.
+    weapon_damage_multiplier: 1.0
   apothecary_beads:
     attached_buffs: [item_regen_light]
   archmage_mending_robe:
     adjustments: {magic_power: 8, mp_cost: "-12%"}
   ashen_scimitar:
     adjustments: {atk_phys: 4, agility: 2}
+    weapon_damage_multiplier: 1.10
   beastfolk_gale_earring:
     adjustments: {agility: "+4%"}
   beastfolk_heavy_hide_armor:
     adjustments: {defense: 6, agility: "-8%"}
   beastfolk_repeating_bow:
     adjustments: {atk_phys: 3, agility: 4}
+    weapon_damage_multiplier: 1.10
   beastfolk_spirit_wand:
     adjustments: {magic_power: 5, mp_cost: "-6%"}
+    # Casting tool: no physical attack bonus, so the neutral declaration stands.
+    weapon_damage_multiplier: 1.0
   beastfolk_stalker_garb:
     adjustments: {defense: 2, agility: "+6%"}
   beastfolk_tribal_totem:
     adjustments: {atk_phys: 2, defense: 2}
   beastfolk_twin_claws:
     adjustments: {atk_phys: 6, defense: -2}
+    weapon_damage_multiplier: 1.10
   beastfolk_war_spear:
     adjustments: {atk_phys: 5, defense: 2}
+    weapon_damage_multiplier: 1.10
   beastfolk_warhammer:
     adjustments: {atk_phys: 6, agility: "-6%"}
+    weapon_damage_multiplier: 1.10
   black_maid_dress:
     adjustments: {pleasure_gain: "+10%"}
     exposure_bias: 1
@@ -85,11 +108,13 @@ effects:
     adjustments: {defense: 5, agility: 5}
   dragon_lair_trophy_blade:
     adjustments: {atk_phys: 9, magic_power: 3}
+    weapon_damage_multiplier: 1.22
   elven_forest_veil:
     adjustments: {defense: 4, pleasure_gain: "+15%"}
     exposure_bias: 1
   elven_longbow:
     adjustments: {atk_phys: 6, agility: 3}
+    weapon_damage_multiplier: 1.20
   elven_traditional_robe:
     adjustments: {defense: 3, pleasure_gain: "+20%"}
     exposure_bias: 2
@@ -100,24 +125,33 @@ effects:
     immune: [fear]
   gilded_saber:
     adjustments: {atk_phys: 5}
+    weapon_damage_multiplier: 1.10
   gliding_cloak:
     adjustments: {agility: 8}
   great_axe:
     adjustments: {atk_phys: 6, agility: "-8%"}
+    weapon_damage_multiplier: 1.12
   guild_recruit_badge:
     adjustments: {defense: 1}
   hunters_longbow:
     adjustments: {atk_phys: 4, agility: 2}
+    weapon_damage_multiplier: 1.10
   hunting_throwing_axe:
     adjustments: {atk_phys: 2, agility: -1}
+    weapon_damage_multiplier: 1.05
   hyperesthesia_charm:
     adjustments: {pleasure_gain: "+8%", sp_cost: "+5%"}
   iron_dagger:
     adjustments: {atk_phys: 1}
+    weapon_damage_multiplier: 1.05
   iron_shield:
     adjustments: {defense: 4}
+    # Defensive off-hand: no physical attack bonus, so the neutral declaration
+    # stands (a shield in the main hand blocks the off-hand fallback anyway).
+    weapon_damage_multiplier: 1.0
   knight_blade:
     adjustments: {atk_phys: 5, defense: 1}
+    weapon_damage_multiplier: 1.12
   knight_platemail:
     adjustments: {atk_phys: -2, defense: 8, agility: "-10%"}
     gauge_caps: {hp: 15}
@@ -127,6 +161,7 @@ effects:
     adjustments: {magic_power: 3, mp_cost: "-8%"}
   magic_sword:
     adjustments: {atk_phys: 8, magic_power: 6}
+    weapon_damage_multiplier: 1.20
   nymph_buds_clamp:
     adjustments: {pleasure_gain: "+8%", sp_cost: "+5%"}
   passion_silk_choker:
@@ -135,6 +170,7 @@ effects:
     adjustments: {pleasure_gain: "+10%", heal_gain: "+5%"}
   plain_sword:
     adjustments: {atk_phys: 2}
+    weapon_damage_multiplier: 1.05
   prism_charm:
     adjustments: {magic_power: 5}
   protective_ring:
@@ -148,6 +184,7 @@ effects:
     immune: [dark_curse]
   rose_crest_rapier:
     adjustments: {atk_phys: 7, agility: 3}
+    weapon_damage_multiplier: 1.20
   royal_heirloom_pendant:
     adjustments: {defense: 4, mp_cost: "-5%"}
   royal_signet_ring:
@@ -163,8 +200,10 @@ effects:
     exposure_bias: 1
   shadow_blade:
     adjustments: {atk_phys: 12, agility: 3}
+    weapon_damage_multiplier: 1.28
   shadow_blade_echo:
     adjustments: {atk_phys: 10, agility: -3}
+    weapon_damage_multiplier: 1.25
   silver_feather_earring:
     adjustments: {pleasure_gain: "+15%"}
     exposure_bias: 1
@@ -172,6 +211,7 @@ effects:
     adjustments: {pleasure_gain: "+5%"}
   steel_fang_dagger:
     adjustments: {atk_phys: 4, agility: 2}
+    weapon_damage_multiplier: 1.10
   # Utility equipment: explicitly no combat or social effects (D1).
   storage_pouch: {}
   tremor_crystal:
@@ -184,3 +224,4 @@ effects:
     adjustments: {atk_phys: 3}
   wooden_club:
     adjustments: {atk_phys: 3, agility: -2}
+    weapon_damage_multiplier: 1.05
