@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **15 of 31**.
+Declared implementation order: **16 of 32**.
 
 - depends-on: party-member-panel
 
