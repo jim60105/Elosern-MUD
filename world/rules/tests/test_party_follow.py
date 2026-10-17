@@ -301,7 +301,10 @@ class GridFollowTests(EvenniaTest):
         self.assertEqual(follow_lines(msg), [])
 
     def test_failed_notification_never_raises_from_the_hook(self):
-        self._companion("quiet npc")
+        rejecting = create_object(SelectiveRejectingRoom, key="Rejecting", location=None)
+        rejecting.rejected_keys = ("quiet npc",)
+        door = create_object(Exit, key="trap", location=self.room1, destination=rejecting)
+        companion = self._companion("quiet npc")
         real_msg = self.char1.msg
 
         def _failing_msg(text=None, *args, **kwargs):
@@ -309,9 +312,15 @@ class GridFollowTests(EvenniaTest):
                 raise RuntimeError("injected notify failure")
             return real_msg(text, *args, **kwargs)
 
-        with patch.object(self.char1, "msg", side_effect=_failing_msg):
-            self.door.at_traverse(self.char1, self.room2)
-        self.assertIs(self.char1.location, self.room2)
+        with patch.object(self.char1, "msg", side_effect=_failing_msg), patch(
+            "world.rules.party.log_warn"
+        ) as warn:
+            door.at_traverse(self.char1, rejecting)
+        self.assertIs(self.char1.location, rejecting)
+        self.assertIs(companion.location, self.room1)
+        warn.assert_called_once()
+        self.assertEqual(warn.call_args.args[0], "party_follow_notification_failed")
+        self.assertIs(warn.call_args.kwargs["context"]["possessed"], False)
 
 
 class WildernessFollowTests(EvenniaTest):
