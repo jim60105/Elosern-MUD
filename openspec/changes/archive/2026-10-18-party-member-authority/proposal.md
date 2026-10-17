@@ -26,7 +26,7 @@ None.
 ## Impact
 
 - New module `world/rules/party_scope.py`; tests `world/rules/tests/test_party_scope.py` (registered in `.github/evennia-shards.json`).
-- Reads only `world/rules/party.py` (`live_companions`, `bound_owner_of`), `world/rules/possession.py` (owner resolution) and stored HP through `world.rules.action.stored_gauge_pair`. No other code path changes.
+- Reads only `world/rules/party.py` (`live_companions`, `bound_owner_of`), `world/rules/possession.py` (owner-side possession binding) and unrounded stored HP through `world.rules.action._stored_trait_value` (the same reader `combat_companions` compares against the nonlethal floor). No other code path changes.
 - No dependency, schema, command, or document change.
 
 ## Effort
