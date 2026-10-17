@@ -458,7 +458,10 @@ describe("the plates layer in the client", () => {
     expect(wrapper.findAll('[data-testid="stage-target-marker"]')).toHaveLength(0);
     expect(wrapper.findAll('[data-testid="stage-target-hit"]')).toHaveLength(0);
     expect(wrapper.get('[data-testid="foe-slot"][data-identity="204"] [data-testid="stage-actor"]').attributes("data-speaking")).toBe("true");
-  });
+    // The journey mounts the whole shell and walks the target step, so it
+    // takes seconds on a shared runner: the same explicit headroom the other
+    // mount-heavy suites carry keeps the default budget from timing it out.
+  }, 20000);
 
   it("passes each participant's conditions and stage x to its plate, and closes a plate tooltip when a round starts", async () => {
     const participants = [

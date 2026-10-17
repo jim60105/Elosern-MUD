@@ -222,7 +222,9 @@ describe("AppClient live mode changes", () => {
     commit("exploration");
     await nextTick();
     expect(stage().attributes("data-mode-change")).toBe("combat-exploration");
-  });
+    // Four shell mounts and their commits: the same explicit headroom the
+    // other mount-heavy suites carry keeps a loaded runner from timing it out.
+  }, 20000);
 
   it("the leaving host is inert while it animates out, and the dock is back in reach at once", async () => {
     store.setMotionLevel("full");
