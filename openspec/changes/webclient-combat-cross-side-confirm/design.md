@@ -64,6 +64,18 @@ above it (`z-index` within the anchor), centred in the anchor's span. `view.stag
 stage's dim, lit set and markers do not change. `QuestionCard` gains `initialFocus: "yes" | "no"`; `focusFirst`
 and the lock-release watcher use it.
 
+Implementation notes:
+
+- `skipDisabled` is true whenever the mode is not exploration, so it would lock 是 for the whole fight. The lock is
+  the combat submission gate instead: not connected, an inactive phase, `mutationsLocked`, a mutation in flight or a
+  declared revision not yet committed. `confirmCrossSide` re-checks it and keeps the card open when it refuses.
+- The room cards' question disables both answers while locked. The spec here keeps 否 working, so `QuestionCard`
+  also gains `noWhileLocked` (default false), plus a visual `tone="caution"` with a decorative `caption`.
+- The card sits in the anchor's column below the collapsed prompt, so it never covers the prompt. It is centred on
+  the stage and vertically centred in the span the prompt leaves free.
+- The commit-time settle re-runs the predicate on the held payload: a replacement that ends the crossing closes the
+  card, and a changed label or side rewords it.
+
 ### D4. Storybook
 
 `Core/AppShell` (via `combatKeys`): `CrossSideAllyHarm` (Attack → companion → Enter), `CrossSideSelfHarm`,
