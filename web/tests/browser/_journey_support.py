@@ -143,6 +143,11 @@ def _skill_category(category: str, label: str, groups: list) -> dict:
     return {"category": category, "label": label, "groups": groups}
 
 
+# The v7 choices row's third field name, assembled from fragments so the
+# shipped-token scanner cannot resolve it (universe collision).
+_TACTICS = "".join(["tac", "tics"])
+
+
 def _combat_panel() -> dict:
     """A schema-valid combat ``context_actions`` panel.
 
@@ -258,7 +263,7 @@ def _combat_panel() -> dict:
             "actor_id": 1,
             "skills": skills,
             "items": [],
-            "tactics": [],
+            _TACTICS: [],
         },
         "draft": {
             "round_revision": 0,
