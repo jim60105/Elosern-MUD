@@ -41,3 +41,18 @@ The resolver table SHALL additionally implement, and produce the menus the migra
 
 - **WHEN** `creation.form` resolves with `{view: "custom" | "concept"}`
 - **THEN** it resolves to the wizard's empty marker frame
+
+#### Scenario: Services render outside the dock
+
+- **WHEN** any service surface is presented
+- **THEN** the committed `services` panel has no dock frame and every service surface renders in a frameless reference drawer or overlay, which is why no services family is implemented
+
+#### Scenario: Dialogue presents in the narrative caption
+
+- **WHEN** dialogue mode is live
+- **THEN** dialogue keeps the exploration root frame in the dock and presents its scripted picks in the narrative caption, which is why no dialogue family is implemented
+
+#### Scenario: Services and dialogue families are explicitly not implemented
+
+- **WHEN** the completed resolver table is declared
+- **THEN** it implements no services family and no dialogue family, and any `services.*` or `dialogue.*` descriptor is an unregistered source that resolves to the unresolvable marker

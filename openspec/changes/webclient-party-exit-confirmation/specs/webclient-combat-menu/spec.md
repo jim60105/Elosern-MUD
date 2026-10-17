@@ -18,7 +18,7 @@ submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
 - **WHEN** the selected actor has an eligible item, Defend, Dodge or Taunt choice
 - **THEN** the shared menu permits its complete selection flow and no not_implemented placeholder blocks it; disabled reasons reflect actual actor capability
 
-#### Scenario: Surrender requires confirmation
+#### Scenario: Forfeit requires confirmation
 - **WHEN** the player opens the Surrender entry but has not confirmed
 - **THEN** no mutation is sent, and No, the close control or Escape discards the prompt and returns to exactly the prior menu, actor and selection without ending combat
 
@@ -58,11 +58,11 @@ submit, Escape SHALL pop one level, and disabled entries SHALL send no packet.
 - **WHEN** a participant carries a `portrait_ref` present in the committed portrait catalog, and another carries `null`
 - **THEN** the first renders that catalog entry (including its placeholder card) and the second renders no portrait, and the browser constructs no subject key or URL
 
-#### Scenario: The surrender confirmation is an explicit two-step modal
+#### Scenario: The forfeit confirmation is an explicit two-step panel
 - **WHEN** the player opens the Surrender entry
 - **THEN** a warning card renders with No focused as the safe answer and a Yes answer, no mutation is sent, and only activating Yes emits one combat.exit_confirm carrying session_id, round_revision, operation and the server confirmation_token
 
-#### Scenario: The surrender warning states the consequence
+#### Scenario: The forfeit warning states the consequence
 - **WHEN** the surrender confirmation screen renders
 - **THEN** it states the whole party's scope and the server-authored consequence verbatim
 
