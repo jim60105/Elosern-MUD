@@ -618,6 +618,70 @@ class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
             self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
         self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
 
+    @covers_requirement("inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations")
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    def test_text_payloads_match_the_guarded_wire_translation(self):
+        from web.webclient.actions.combat_actions import (
+            _rules_command,
+            validate_command_payload,
+        )
+
+        engage(self.char1, self.monster)
+        record = read_session(self.char1)
+        envelope = {
+            "session_id": record.session_id,
+            "round_revision": record.round_revision,
+            "draft_version": record.draft_version,
+            "actor_id": self.companion.pk,
+        }
+
+        def translated(command):
+            payload = validate_command_payload({**envelope, "command": command})
+            return _rules_command(payload["command"])
+
+        def typed(verb, kind_argument, target_value):
+            probe = CmdCombatCommand()
+            probe.caller = self.char1
+            probe.args = ""
+            return probe._command_for(verb, kind_argument, target_value)
+
+        # The typed spellings build the exact internal commands the guarded
+        # browser payloads translate into, so both entry points admit the same
+        # draft entry through the same facade call.
+        self.assertEqual(
+            typed("skill", _TIDE_ARC.key, "e1"),
+            translated(
+                {
+                    "kind": "skill",
+                    "payload": {
+                        "skill_key": _TIDE_ARC.key,
+                        "target_ids": [self.monster.pk],
+                    },
+                }
+            ),
+        )
+        self.assertEqual(
+            typed("item", "t_ember_spray", "e1"),
+            translated(
+                {
+                    "kind": "item",
+                    "payload": {
+                        "item_key": "t_ember_spray",
+                        "target_id": self.monster.pk,
+                    },
+                }
+            ),
+        )
+        self.assertEqual(
+            typed("taunt", "", "e1"),
+            translated(
+                {
+                    "kind": "tactic",
+                    "payload": {"key": "taunt", "target_id": self.monster.pk},
+                }
+            ),
+        )
+
 
 class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
     """One real text path through skill, item, revision and confirmed exit."""
