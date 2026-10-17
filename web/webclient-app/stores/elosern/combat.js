@@ -267,4 +267,27 @@ export function applyCombat(ctx) {
       ctx.publishView();
     }
   };
+
+  // The stage target step's pointer entry (webclient-combat-stage-target-
+  // picking D5): a figure's hit area, its marker and the prompt's chips name
+  // one position key. Hover focuses it; activation focuses it and confirms
+  // through the router's own pointer confirm — the same façade members the
+  // digit picks use, so the payloads are the card rows'.
+  ctx.stageTargetPointer = function stageTargetPointer(key, action) {
+    const step = ctx.stageTargetNow();
+    if (!step || !step.positions.some((position) => position.key === key)) {
+      return false;
+    }
+    if (action === "hover") {
+      return step.focusKey === key ? true : ctx.router.focusItemByKey(key);
+    }
+    if (action !== "activate") {
+      return false;
+    }
+    if (step.focusKey !== key && !ctx.router.focusItemByKey(key)) {
+      return false;
+    }
+    ctx.router.confirm({ source: "pointer" });
+    return true;
+  };
 }

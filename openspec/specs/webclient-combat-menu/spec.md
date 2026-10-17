@@ -268,7 +268,7 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: A single-target frame is a vertical list
 - **WHEN** the player opens Attack with an ally and two foes listed as candidates
-- **THEN** the target rows render in one column in the server's order, each marked as ally or foe, ArrowDown moves to the next candidate, and ArrowRight moves focus nowhere
+- **THEN** the frame's items stay in the server's order, the card collapses to the target prompt, each candidate is a position on its stage figure, ArrowRight and ArrowDown move to the next position in stage order, ArrowLeft and ArrowUp to the previous one, each wrapping, and the digits 1–3 pick the candidates in the server's order
 
 #### Scenario: Categories and groups are vertical lists
 - **WHEN** the player opens Skills with several categories, and later a category with several sub-groups
@@ -314,9 +314,10 @@ one level, and disabled entries SHALL send no packet.
 
 #### Scenario: Confirmation frames follow server candidate order with side markers
 - **WHEN** the single-target, self, or no-target confirmation frame renders
-- **THEN** it renders as the same single-column list in the server's candidate order,
-  each target row marked by its side as well as its name, and the AREA frame keeps its
-  token grid
+- **THEN** the no-target frame renders as the same single-column list; the single-target,
+  self, and AREA frames keep their items in the server's candidate order, are chosen on the
+  stage figures, and the target prompt and the live announcement name each focused
+  target's side as well as its name
 
 #### Scenario: Root detail copy is explanatory only
 - **WHEN** the detail beside a root row carries client-local explanatory copy describing
@@ -342,7 +343,7 @@ one level, and disabled entries SHALL send no packet.
 #### Scenario: The participant frame is display-only in the HUD island
 - **WHEN** combat presents the figure plates
 - **THEN** they are not a row container and not part of the dock's composite widget;
-  target selection remains the dock's target frame
+  targets are chosen in the stage target step
 
 #### Scenario: Category frames carry per-row descriptor counts
 - **WHEN** the category or group frame renders its entries
@@ -792,3 +793,54 @@ listed in the same order the WebClient panel would list them.
 #### Scenario: A category with no group shows no sub-heading
 - **WHEN** `combat actions` is invoked by a player owning `martial_arts` skills
 - **THEN** the `martial_arts` heading's skills are listed directly beneath it with no sub-heading line
+
+### Requirement: Combat targets are picked on the stage figures
+While the current combat frame is the target frame of an enabled SINGLE, SELF or AREA skill (the stage target step), the client SHALL let the player choose targets on the stage figures instead of in the card's rows. The frame's items, their server order, the keyboard router, the digit picks, Escape, Space and every dispatch payload SHALL stay unchanged; the client SHALL only map the arrow keys and pointer onto the frame's existing items.
+
+#### Scenario: Each TargetSpec maps onto stage positions
+- **WHEN** the target frame of an enabled skill opens for each TargetSpec
+- **THEN** SINGLE has one position per server candidate (its `target-<id>` item); SELF has one position, its `self-confirm` item, on the controlled figure; AREA has one position per candidate (its `area-<id>` item), then one group position per approved shorthand the skill carries (its `shorthand-<key>` item), then the `area-confirm` position; NONE and a disabled skill's frame start no stage target step and render their rows in the card as before
+
+#### Scenario: Positions follow stage order
+- **WHEN** the stage target step builds its positions with a four-figure party and nine standing foes in two ranks, all of them candidates, and a fled participant the server still lists
+- **THEN** the member positions run in the formation's stage order — every drawn figure by the horizontal centre of its formation box, from left to right (the front rank first on a tie), so the party comes before the foes — followed by candidates no stage figure draws (only a fled participant can be one) in the server's order, then (AREA) the group positions in the server's shorthand order, then the confirm position; the order is the formation engine's stage order, never measured from the DOM
+
+#### Scenario: Arrow keys move along the stage
+- **WHEN** the player presses ArrowRight, ArrowDown, ArrowLeft and ArrowUp in a stage target step with four positions
+- **THEN** ArrowRight and ArrowDown move the frame's focus to the next position in stage order and ArrowLeft and ArrowUp to the previous one, each wrapping at the ends, through the router's existing focus-by-key operation; in a SELF step every arrow keeps the focus where it is; when the frame's focus is on an item that is no position (such as a back row), ArrowRight and ArrowDown move to the first position and ArrowLeft and ArrowUp to the last; outside the stage target step the arrow keys reach the router unchanged
+
+#### Scenario: Enter, Space, digits and Escape keep their meaning
+- **WHEN** the player presses Enter on a SINGLE position, Space and then Enter on an AREA member, Enter on an AREA group position, Enter on the AREA confirm position, a digit, and Escape
+- **THEN** Enter on the SINGLE position submits one `combat.cast` whose `target_ids` is that candidate; Space and Enter on the AREA member each toggle its selection; Enter on a group position chooses that shorthand; Enter on the confirm position submits the AREA payload; a digit N focuses and activates the frame's N-th item in the server's order; Escape pops exactly one frame and the stage leaves the step in that frame; every payload is byte-identical to the one the same choice produced from the card's rows
+
+#### Scenario: The opening focus is unchanged
+- **WHEN** the player opens Attack, and separately a skill whose first server candidate is an ally
+- **THEN** Attack opens focused on the first enabled foe the server listed and the other skill on the frame's first item, exactly as the card's rows did; nothing is selected or sent
+
+#### Scenario: Pointer picks a figure
+- **WHEN** the player moves the pointer over a selectable foe's figure, then clicks it, and in an AREA step clicks a group chip and the confirm chip in the target prompt
+- **THEN** hovering focuses that foe's position, the click focuses it and activates it through the router's confirm with a pointer source, sending exactly one `combat.cast` for a SINGLE step and toggling the member for an AREA step, and the chips choose their shorthand and submit the AREA payload; after a chip click DOM focus is back on `#action-dock`, so a following Enter activates the focused position rather than the chip; a figure that is not a candidate takes no pointer
+
+#### Scenario: Whole-group positions light the group
+- **WHEN** an AREA skill carries the shorthands `all-enemies` and `all-allies` and the player moves onto the `all-enemies` position, then to `all-allies`, then presses Enter and moves to the confirm position
+- **THEN** each group is one position whose lit set is every candidate of that side, the focus moves between the groups and never between their members, Enter chooses `all-allies` and clears any explicit selection, and the confirm position's lit set is the chosen group; confirming sends one request carrying `target_shorthand: "all-allies"` and no target-ID field
+
+#### Scenario: AREA explicit selection stays visible
+- **WHEN** the player toggles two foes with Space and moves the focus to the confirm position
+- **THEN** both foes carry the selected mark while the focus is elsewhere, the confirm position's lit set is exactly those two foes, and confirming sends their identities in presenter order
+
+#### Scenario: A SELF skill lights the controlled figure
+- **WHEN** the target frame of an enabled SELF skill opens
+- **THEN** the only position is on the controlled figure, which is lit with the arrow marker, Enter submits the payload without any target field, and the arrow keys keep the focus
+
+#### Scenario: Knocked-out and unlisted participants
+- **WHEN** a revive-style SINGLE skill lists a knocked-out companion and a knocked-out foe as candidates while a defeated foe is not listed
+- **THEN** the knocked-out companion and the knocked-out foe are positions on their stage figures, which keep their fallen treatment and carry the arrow marker, and the unlisted defeated foe is no position and carries no marker
+
+#### Scenario: A changing target set follows the panel
+- **WHEN** a committed panel replacement removes the focused candidate while the stage target step is open, and later a replacement adds a candidate
+- **THEN** the existing repair moves the focus to the nearest surviving item, the lit set and the markers follow in the same frame so no vanished figure stays lit, and the added candidate gains its position in stage order
+
+#### Scenario: Playback suspends the step
+- **WHEN** a combat round starts playing while the stage target step is open
+- **THEN** the arrow keys are not claimed, no position is lit or marked, and no figure carries the step's dim while the round plays; if the frame is still current when the round ends, the step resumes with its focus

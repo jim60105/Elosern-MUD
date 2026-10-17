@@ -209,3 +209,38 @@ describe("downed party figures", () => {
     wrapper.unmount();
   });
 });
+
+// webclient-combat-stage-target-picking (design D4): the party takes the same
+// step dim — the controlled figure included — except the lit set; a downed
+// figure keeps its kneel instead; hit areas only on selectable figures; the
+// previous dims return when the step ends.
+describe("CompanionLineup in the stage target step", () => {
+  it("lights only the lit set and restores the dims after the step", async () => {
+    const wrapper = mount(CompanionLineup, { props: { slots: figures(), dimmed: false, motionLevel: "off", fallen: { 4: "down" } } });
+    const read = () =>
+      wrapper.findAll('[data-testid="companion-figure"]').map((slot) => ({
+        id: slot.attributes("data-identity"),
+        speaking: slot.get('[data-testid="stage-actor"]').attributes("data-speaking"),
+        focus: slot.attributes("data-target-focus") ?? null,
+        hit: slot.find('[data-testid="stage-target-hit"]').exists(),
+        style: slot.attributes("style"),
+      }));
+    const before = read();
+    // Outside the step the controlled figure is lit and companions listen.
+    expect(before.find((s) => s.id === "1").speaking).toBe("true");
+    expect(before.find((s) => s.id === "2").speaking).toBe("false");
+    await wrapper.setProps({ targeting: { lit: new Set(["2"]), selectable: new Set(["1", "2", "4"]), selected: new Set() } });
+    const during = Object.fromEntries(read().map((s) => [s.id, s]));
+    expect(during["2"]).toMatchObject({ speaking: "true", focus: "true", hit: true });
+    expect(during["1"]).toMatchObject({ speaking: "false", focus: null, hit: true });
+    expect(during["3"]).toMatchObject({ speaking: "false", hit: false });
+    // The downed candidate keeps its kneel instead of the dim.
+    expect(during["4"]).toMatchObject({ speaking: "true", hit: true });
+    expect(read().map((s) => s.style)).toEqual(before.map((s) => s.style));
+    await wrapper.get('[data-identity="1"] [data-testid="stage-target-hit"]').trigger("click");
+    expect(wrapper.emitted("target-pointer")).toEqual([[1, "activate"]]);
+    await wrapper.setProps({ targeting: null });
+    expect(read()).toEqual(before);
+    wrapper.unmount();
+  });
+});

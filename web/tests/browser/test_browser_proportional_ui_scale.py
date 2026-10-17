@@ -216,9 +216,13 @@ class ProportionalUiScaleBrowserTest(unittest.TestCase):
         self.assertTrue(all(box["x"] + box["w"] <= centre - gap + 1 for box in formation["party"]), formation)
         self.assertTrue(all(box["x"] >= centre + gap - 1 for box in formation["foes"]), formation)
         self.assertEqual(formation["plates"], len(formation["party"]) - 1 + len(formation["foes"]))
-        # 攻擊 opens the target frame; the first enabled foe row sends once.
+        # 攻擊 opens the target frame, which is chosen on the stage figures
+        # (webclient-combat-stage-target-picking): the foe's hit area over its
+        # resized figure sends once. Migrated from a click on the card's row,
+        # now hidden; the same defect (a pointer target left at the old
+        # geometry, or dead after a resize) is detected on the figure.
         self.page.locator('[data-testid="dock-menu"] button[role="option"]', has_text="攻擊").first.click()
-        target = self.page.locator('[data-testid="dock-menu"] button[role="option"]:not([aria-disabled="true"])', has_text="灰袍盜賊").first
+        target = self.page.locator('[data-testid="stage-target-hit"][data-identity="31"]')
         target.wait_for(state="visible")
         target.click()
         actions = self.page.evaluate("window.__participantPolish.sent.actions.map((a) => a.action_code || a.code || a.action)")

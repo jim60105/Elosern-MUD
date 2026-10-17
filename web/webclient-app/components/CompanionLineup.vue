@@ -27,7 +27,34 @@ const props = defineProps({
   fallen: { type: Object, default: null },
   // A change of look lands in the commit's frame (a reload or a reconnect).
   fallInstant: { type: Boolean, default: false },
+  // The stage target step (webclient-combat-stage-target-picking D4), or
+  // null outside it: `{ lit, selectable, selected }` Sets of
+  // String(identity). Every figure outside the lit set takes the listener
+  // dim (the controlled one too; a fallen figure keeps its fallen look
+  // instead), and each selectable figure carries one hit area. No box, z or
+  // position changes; when the step ends the figures return to the dims
+  // above.
+  targeting: { type: Object, default: null },
 });
+const emit = defineEmits(["target-pointer"]);
+function idOf(slot) {
+  return slot.identity == null ? null : String(slot.identity);
+}
+function dimmedFor(slot) {
+  if (props.targeting) {
+    const id = idOf(slot);
+    return !(id !== null && props.targeting.lit.has(id)) && !fallenFor(slot);
+  }
+  return slot.isControlled ? props.dimmed : slot.identity !== props.speakingIdentity;
+}
+function targetLit(slot) {
+  const id = idOf(slot);
+  return !!props.targeting && id !== null && props.targeting.lit.has(id);
+}
+function targetSelectable(slot) {
+  const id = idOf(slot);
+  return !!props.targeting && id !== null && props.targeting.selectable.has(id);
+}
 function fallenFor(slot) {
   return (slot.identity != null && props.fallen?.[String(slot.identity)]) || null;
 }
@@ -67,18 +94,29 @@ function slotStyle(index) {
       class="companion-lineup__slot" data-testid="companion-figure"
       :data-slot="index" :data-identity="slot.identity"
       :data-controlled="String(slot.isControlled)" :data-fallen="fallenFor(slot)" :data-rank="formation?.figures?.[index]?.rank ?? null" :style="slotStyle(index)"
+      :data-target-focus="targetLit(slot) ? 'true' : null"
+      :data-target-motion="targeting ? (motionLevel === 'full' ? 'full' : 'static') : null"
     >
       <div class="formation-figure" :data-glide-key="`party:${slot.identity ?? `slot-${index}`}`">
       <StageActor
         :artwork="slot.artwork" :panel="slot.panel" :has-reference="slot.hasReference"
         :name="slot.displayName" side="left"
-        :dimmed="slot.isControlled ? dimmed : slot.identity !== speakingIdentity" :motion-level="motionLevel"
+        :dimmed="dimmedFor(slot)" :motion-level="motionLevel"
         :gesture="slot.isControlled ? gesture : null"
         :gesture-key="slot.isControlled ? gestureKey : null"
         :float-amount="slot.isControlled ? floatAmount : null"
         :fallen="fallenFor(slot)" :fall-instant="fallInstant"
       />
       </div>
+      <span
+        v-if="targetSelectable(slot)"
+        class="stage-target__hit"
+        data-testid="stage-target-hit"
+        :data-identity="slot.identity"
+        aria-hidden="true"
+        @pointerenter="emit('target-pointer', slot.identity, 'hover')"
+        @click="emit('target-pointer', slot.identity, 'activate')"
+      ></span>
     </div>
   </div>
 </template>

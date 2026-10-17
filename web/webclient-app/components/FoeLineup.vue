@@ -32,8 +32,16 @@
 //   defeats stands in its pre-round look until its own defeat beat collapses
 //   it (`fallen`, from the stage); each foe plays its beat gesture
 //   (`stage.gestures`).
-// Decorative art: no focusable element, no pointer events, hidden from
-// assistive technology (the plates carry each foe's accessible reading).
+// - During the stage target step (webclient-combat-stage-target-picking D4,
+//   `targeting`): every foe outside the focused position's lit set takes the
+//   dialogue listener dim through StageActor's `dimmed` (a fallen foe keeps
+//   its fallen look instead, lit or not); a lit foe carries
+//   `data-target-focus` (a pulsing ring at `full`, a static one below); each
+//   selectable foe carries one hit area over its box, the only element of the
+//   line-up that takes a pointer. No box, z or position changes.
+// Decorative art: no focusable element, no pointer events outside the step's
+// hit areas, hidden from assistive technology (the plates carry each foe's
+// accessible reading; the card's live region the step's).
 import { computed } from "vue";
 import StageActor from "./StageActor.vue";
 import { FOE_STAGE_MAX, fallenLook } from "./foe-lineup.js";
@@ -66,11 +74,27 @@ const props = defineProps({
   fallen: { type: Object, default: null },
   // A change of look lands in the commit's frame (a reload or a reconnect).
   fallInstant: { type: Boolean, default: false },
+  // The stage target step (stage-targeting.js `targetingFor`), or null
+  // outside it: `{ lit, selectable, selected }` Sets of String(identity).
+  targeting: { type: Object, default: null },
 });
 
 // `settled` fires when a foe that left the row has finished fading (at `off`,
 // in the commit's frame), so the client can release the room it held.
-const emit = defineEmits(["settled"]);
+// `target-pointer` (identity, "hover" | "activate") is a selectable foe's
+// hit area during the stage target step.
+const emit = defineEmits(["settled", "target-pointer"]);
+
+function targetDimmed(participant) {
+  if (!props.targeting) return false;
+  return !props.targeting.lit.has(String(participant.identity)) && !fallenFor(participant);
+}
+function targetLit(participant) {
+  return !!props.targeting && props.targeting.lit.has(String(participant.identity));
+}
+function targetSelectable(participant) {
+  return !!props.targeting && props.targeting.selectable.has(String(participant.identity));
+}
 
 const shown = computed(() =>
   (props.stage ? props.stage.foes : props.foes).slice(0, Math.min(props.max, FOE_STAGE_MAX)),
@@ -168,6 +192,8 @@ function gestureFor(participant) {
         :data-portrait-ref="p.portrait_ref ?? ''"
         :data-beat="gestureFor(p)?.gesture ?? null"
         :data-fallen="fallenFor(p)"
+        :data-target-focus="targetLit(p) ? 'true' : null"
+        :data-target-motion="targeting ? (motionLevel === 'full' ? 'full' : 'static') : null"
         :style="slotStyle(i)"
       >
         <div class="formation-figure" :data-glide-key="`foe:${p.identity}`">
@@ -177,7 +203,7 @@ function gestureFor(participant) {
             :has-reference="p.portrait_ref !== null && p.portrait_ref !== undefined"
             :name="p.display_name"
             side="right"
-            :dimmed="false"
+            :dimmed="targetDimmed(p)"
             :motion-level="motionLevel"
             :gesture="gestureFor(p)?.gesture ?? null"
             :gesture-key="stage?.key ?? null"
@@ -186,6 +212,15 @@ function gestureFor(participant) {
             :fall-instant="fallInstant"
           />
         </div>
+        <span
+          v-if="targetSelectable(p)"
+          class="stage-target__hit"
+          data-testid="stage-target-hit"
+          :data-identity="p.identity"
+          aria-hidden="true"
+          @pointerenter="emit('target-pointer', p.identity, 'hover')"
+          @click="emit('target-pointer', p.identity, 'activate')"
+        ></span>
       </div>
     </TransitionGroup>
   </div>

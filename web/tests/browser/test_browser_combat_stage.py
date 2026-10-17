@@ -15,6 +15,7 @@ import re
 from playwright.sync_api import expect
 
 from tools.spec_traceability import covers_requirement
+from world.rules.combat_view import BASIC_ATTACK_KEY
 
 from .browser_base import BrowserAcceptanceTest
 from .browser_helpers import focus_action_dock, snapshot_envelope, wait_for_store_state
@@ -368,6 +369,115 @@ def _card_skills(foes: list) -> list:
     ]
 
 
+# The stage target step (webclient-combat-stage-target-picking): every stage
+# figure's step state, the arrow markers, the collapsed card and its chips,
+# the router's focus and the step model's positions, read in one frame.
+_READ_STEP = """() => {
+  const q = (sel) => document.querySelector(sel);
+  const box = (el) => { if (!el) return null; const r = el.getBoundingClientRect();
+    return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, width: r.width, height: r.height }; };
+  const store = window.__elosernBridge.store;
+  const step = store.view.stageTarget;
+  const slots = [...document.querySelectorAll(
+    '[data-anchor="actor-left"] [data-testid="companion-figure"], [data-anchor="actor-right"] [data-testid="foe-slot"]')];
+  return {
+    focus: store.view.focus.key,
+    positions: step ? step.positions.map((p) => ({ key: p.key, kind: p.kind, ids: p.identities })) : null,
+    announce: (q('[data-testid="target-announce"]') || {}).textContent || '',
+    figures: slots.map((slot) => {
+      const actor = slot.querySelector('[data-testid="stage-actor"]');
+      return {
+        identity: slot.getAttribute('data-identity'),
+        speaking: actor.getAttribute('data-speaking'),
+        focus: slot.getAttribute('data-target-focus'),
+        fallen: slot.getAttribute('data-fallen'),
+        filter: getComputedStyle(actor).filter,
+        animation: getComputedStyle(slot.querySelector(':scope > .formation-figure')).animationName,
+        hit: !!slot.querySelector(':scope > [data-testid="stage-target-hit"]'),
+        seal: !!slot.querySelector('[data-testid="stage-actor-seal"]'),
+        box: box(actor),
+      };
+    }),
+    markers: [...document.querySelectorAll('[data-testid="stage-target-marker"]')].map((m) => ({
+      identity: m.getAttribute('data-identity'),
+      state: m.getAttribute('data-state'),
+      selected: m.getAttribute('data-selected') === 'true',
+      check: !!m.querySelector('[data-testid="stage-target-check"]'),
+      digit: (m.querySelector('.stage-target__digit') || {}).textContent || null,
+      underline: getComputedStyle(m, '::after').content !== 'none' && getComputedStyle(m, '::after').height !== 'auto',
+      box: box(m),
+    })),
+    pointerTakers: [...document.querySelectorAll('[data-anchor="actor-left"] *, [data-anchor="actor-right"] *')]
+      .filter((el) => getComputedStyle(el).pointerEvents !== 'none').map((el) => el.getAttribute('data-testid')),
+    plates: [...document.querySelectorAll('[data-anchor="plates"] [data-testid="figure-plate"]')].map((el) => ({
+      identity: el.getAttribute('data-identity'), filter: getComputedStyle(el).filter, box: box(el) })),
+    card: box(q('#action-dock')),
+    prompt: !!q('[data-testid="target-prompt"]'),
+    chips: [...document.querySelectorAll('[data-testid="target-prompt-chip"]')].map((c) => ({ key: c.getAttribute('data-key'), box: box(c) })),
+    active: document.activeElement ? document.activeElement.id : null,
+    tooltips: document.querySelectorAll('[role="tooltip"]').length,
+  };
+}"""
+
+# Captures the outbound `ui_action` envelopes in `window.__stpSent` instead of
+# sending them, and answers each with a completed result at the committed
+# revision, so the next pick is never held by the previous one's lock.
+_CAPTURE_ACTIONS = """() => {
+  if (window.__stpSent) { window.__stpSent.length = 0; return; }
+  window.__stpSent = [];
+  const original = Evennia.msg.bind(Evennia);
+  Evennia.msg = function (cmdname, args, kwargs, callback) {
+    if (cmdname === 'ui_action') {
+      const envelope = (args || [])[0];
+      window.__stpSent.push(envelope);
+      setTimeout(() => {
+        const store = window.__elosernBridge.store;
+        const view = store.view;
+        store.receive(view.generation, 'ui_action_result', [{
+          protocol_version: 1, presentation_epoch: view.epoch, request_id: envelope.request_id,
+          outcome: 'success', code: 'completed', message: '完成', presentation_revision: view.revision,
+        }], {});
+      }, 0);
+      return undefined;
+    }
+    return original(cmdname, args, kwargs, callback);
+  };
+}"""
+
+
+def _stage_skills(foes: list, allies: list) -> list:
+    """Basic attack (SINGLE: one companion and the foes) and an AREA skill
+    with both sides as candidates and the three approved shorthands."""
+    return [
+        _skill_category(
+            "martial_arts",
+            "武技",
+            [
+                _skill_group(
+                    None,
+                    None,
+                    [
+                        _skill(BASIC_ATTACK_KEY, "普通攻擊", "以武器攻擊一名目標。", {}, "single", None, True, allies[:1] + foes, []),
+                        _skill(
+                            "t_storm", "雷暴", "雷光落在多名目標身上。", {"mp": 20}, "area", "lightning", True,
+                            allies + foes, ["all-enemies", "all-allies", "all"],
+                        ),
+                    ],
+                ),
+            ],
+        ),
+    ]
+
+
+def _stage_panels(count: int = 3, companions: int = 3, **kwargs) -> dict:
+    panels = _combat_panels(count, companions=companions, **kwargs)
+    panel = panels["context_actions"]
+    foes = [p["identity"] for p in panel["participants"] if p["team"] == "foes" and p["state"] != "defeated"]
+    allies = [p["identity"] for p in panel["participants"] if p["team"] == "party" and p["identity"] >= 101]
+    panel["skills"] = _stage_skills(foes, allies)
+    return panels
+
+
 class CombatStageBrowserTest(BrowserAcceptanceTest):
     """The combat stage: the foe line-up and the shared-scale formation."""
 
@@ -570,6 +680,27 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 page.keyboard.press("Enter")
                 page.wait_for_timeout(120)
                 c = page.evaluate(_READ_CARD)
+                if kind == "targets":
+                    # The AREA target frame is a stage target step
+                    # (webclient-combat-stage-target-picking): the card
+                    # collapses to the prompt at the same centre, width and
+                    # top, its chips inside it. Migrated from the token-grid
+                    # and equal-box assertions, which detected a frame that
+                    # resized or overflowed the card; the collapsed box and
+                    # the chips' containment detect the same class of defect.
+                    step = page.evaluate(_READ_STEP)
+                    self.assertTrue(step["prompt"], viewport)
+                    for edge in ("left", "top", "width"):
+                        self.assertAlmostEqual(c["card"][edge], boxes[0][edge], delta=1.0, msg=f"{kind} {edge}")
+                    self.assertLessEqual(c["card"]["height"], 136 * scale + 1, viewport)
+                    self.assertGreaterEqual(len(step["chips"]), 1, viewport)
+                    for chip in step["chips"]:
+                        self.assertGreaterEqual(chip["box"]["left"], c["card"]["left"] - 0.5, viewport)
+                        self.assertLessEqual(chip["box"]["right"], c["card"]["right"] + 0.5, viewport)
+                        self.assertLessEqual(chip["box"]["bottom"], c["card"]["bottom"] + 0.5, viewport)
+                    page.keyboard.press("Escape")
+                    page.wait_for_timeout(120)
+                    continue
                 self.assertEqual(c["paneKind"], kind, viewport)
                 self.assertEqual(c["menuOverflowX"], 0, f"{kind} overflows at {viewport}")
                 self.assertGreaterEqual(len(c["cells"]), 4 if kind == "targets" else 5)
@@ -960,6 +1091,242 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function("() => document.documentElement.dataset.motion === 'reduced'")
         reduced = page.evaluate("(sel) => getComputedStyle(document.querySelector(sel)).transitionDuration", fall)
         self.assertEqual(reduced, "0s, 0.15s, 0.15s")
+        page.close()
+
+    # ---- The stage target step (webclient-combat-stage-target-picking) ----
+
+    def _open_step(self, page, skill: str) -> dict:
+        """Open ``skill``'s target frame from the combat root through the
+        router (attack, or 技能 → the one category → the skill)."""
+        page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
+        path = ["attack"] if skill == BASIC_ATTACK_KEY else ["skills", "skill-cat-0", skill]
+        for key in path:
+            self.assertTrue(page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('{key}')"), key)
+            page.evaluate("() => window.__elosernBridge.store.focusPress('Enter', false)")
+        page.wait_for_function(
+            "() => document.querySelectorAll('[data-testid=\"stage-target-marker\"]').length > 0", timeout=15000
+        )
+        page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+        return page.evaluate(_READ_STEP)
+
+    def _sent(self, page) -> list:
+        return page.evaluate("() => (window.__stpSent || []).map((e) => e.payload)")
+
+    def _wait_released(self, page) -> None:
+        wait_for_store_state(page, lambda st: st["dispatch"]["inFlight"] is None)
+
+    @covers_requirement(
+        "webclient-combat-menu::the-combat-action-dock-follows-the-approved-keyboard-hierarchy",
+        "webclient-contextual-hud::the-combat-command-card-stands-at-the-stage-s-dead-centre",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
+        "webclient-contextual-hud::the-webclient-renders-a-full-bleed-cinematic-stage-with-anchored-hud-surfaces",
+        "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
+        "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
+    )
+    def test_targets_are_picked_on_the_stage(self):
+        """Attack with a four-figure party against three foes, at both
+        formation viewports: the card collapses to the target prompt at the
+        same centre, width and top (at most 136px*S, meeting no marker), every
+        figure but the focused foe takes the listener dim, only the candidates
+        carry markers and hit areas, the markers' left-to-right order is the
+        step's stage order and the arrows walk it, a hit-area click sends the
+        keyboard's payload once, and Escape restores every figure. An AREA
+        chip click hands focus back to the card, so ArrowRight and Enter act
+        on the focused position, not the chip."""
+        page = self._page(REFERENCE, companions=3)
+        page.evaluate(_CAPTURE_ACTIONS)
+        for viewport in FORMATION_VIEWPORTS:
+            with self.subTest(viewport=viewport):
+                size = "%dx%d" % viewport
+                self._resize(page, viewport)
+                self._commit(page, "combat", _stage_panels())
+                self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 3")
+                page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
+                page.wait_for_function(
+                    "() => (window.__elosernBridge.store.view.combatMenu?.items || []).some((i) => i.key === 'attack')",
+                    timeout=15000,
+                )
+                focus_action_dock(page)
+                scale = self._read(page)["scale"]
+                rest = page.evaluate(_READ_STEP)
+                self.assertFalse(rest["markers"] or rest["prompt"], size)
+                self.assertEqual(rest["pointerTakers"], [], f"no pointer target outside the step at {size}")
+
+                step = self._open_step(page, BASIC_ATTACK_KEY)
+                card = step["card"]
+                self.assertTrue(step["prompt"], size)
+                for edge in ("left", "width", "top"):
+                    self.assertAlmostEqual(card[edge], rest["card"][edge], delta=1.0, msg=f"{edge} at {size}")
+                self.assertLessEqual(card["height"], 136 * scale + 1, size)
+                for marker in step["markers"]:
+                    self.assertFalse(_intersects(card, marker["box"]), f"the prompt meets a marker at {size}")
+                for plate in step["plates"]:
+                    self.assertFalse(_intersects(card, plate["box"]), f"the prompt meets a plate at {size}")
+                    self.assertEqual(plate["filter"], "none", f"plate {plate['identity']} is dimmed at {size}")
+                # Attack opens on the first listed foe; it alone is lit.
+                self.assertEqual(step["focus"], "target-11", size)
+                speaking = {f["identity"]: f["speaking"] for f in step["figures"]}
+                self.assertEqual(speaking.pop("11"), "true", size)
+                self.assertTrue(all(v == "false" for v in speaking.values()), f"{speaking} at {size}")
+                # Markers and hit areas on the candidates only.
+                self.assertEqual(sorted(m["identity"] for m in step["markers"]), ["101", "11", "12", "13"], size)
+                self.assertEqual(sorted(f["identity"] for f in step["figures"] if f["hit"]), ["101", "11", "12", "13"])
+                self.assertEqual(step["pointerTakers"], ["stage-target-hit"] * 4, size)
+                self.assertEqual([m["state"] for m in step["markers"] if m["identity"] == "11"], ["focus"])
+                # The markers' left-to-right order is the step's stage order.
+                by_left = sorted(step["markers"], key=lambda m: m["box"]["left"])
+                members = [p["key"] for p in step["positions"] if p["kind"] == "member"]
+                self.assertEqual(["target-" + m["identity"] for m in by_left], members, size)
+                index = members.index("target-11")
+                page.keyboard.press("ArrowRight")
+                self.assertEqual(page.evaluate(_READ_STEP)["focus"], members[(index + 1) % len(members)], size)
+                page.keyboard.press("ArrowLeft")
+                page.keyboard.press("ArrowLeft")
+                left_key = members[(index - 1) % len(members)]
+                self.assertEqual(page.evaluate(_READ_STEP)["focus"], left_key, size)
+                # Enter sends the keyboard payload; a click on the same
+                # figure's hit area sends exactly the same one.
+                page.keyboard.press("Enter")
+                page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
+                self._wait_released(page)
+                self._open_step(page, BASIC_ATTACK_KEY)
+                identity = left_key.removeprefix("target-")
+                page.locator(f'[data-testid="stage-target-hit"][data-identity="{identity}"]').click()
+                page.wait_for_function("() => window.__stpSent.length === 2", timeout=5000)
+                sent = self._sent(page)
+                self.assertEqual(sent[0], sent[1], size)
+                self.assertEqual(sent[0], {"skill_key": BASIC_ATTACK_KEY, "target_ids": [int(identity)]}, size)
+                self._wait_released(page)
+                # Escape restores every figure and removes every marker.
+                self._open_step(page, BASIC_ATTACK_KEY)
+                page.keyboard.press("Escape")
+                page.evaluate("() => new Promise((r) => requestAnimationFrame(r))")
+                after = page.evaluate(_READ_STEP)
+                self.assertEqual(after["markers"], [], size)
+                self.assertFalse(after["prompt"], size)
+                self.assertEqual(
+                    {f["identity"]: f["speaking"] for f in after["figures"]},
+                    {f["identity"]: f["speaking"] for f in rest["figures"]},
+                    size,
+                )
+                self.assertEqual(after["pointerTakers"], [], size)
+
+                # AREA: the chips fit the collapsed card; a chip click leaves
+                # DOM focus on the card, so ArrowRight + Enter act on the
+                # focused position (全體我方), not the clicked chip (全體敵人).
+                area = self._open_step(page, "t_storm")
+                self.assertLessEqual(area["card"]["height"], 136 * scale + 1, size)
+                for chip in area["chips"]:
+                    self.assertGreaterEqual(chip["box"]["left"], area["card"]["left"] - 0.5, size)
+                    self.assertLessEqual(chip["box"]["right"], area["card"]["right"] + 0.5, size)
+                    self.assertLessEqual(chip["box"]["bottom"], area["card"]["bottom"] + 0.5, size)
+                for marker in area["markers"]:
+                    self.assertFalse(_intersects(area["card"], marker["box"]), f"the AREA prompt meets a marker at {size}")
+                page.locator('[data-testid="target-prompt-chip"][data-key="shorthand-all-enemies"]').click()
+                self.assertEqual(page.evaluate("() => document.activeElement.id"), "action-dock", size)
+                self.assertEqual(page.evaluate(_READ_STEP)["focus"], "shorthand-all-enemies", size)
+                page.keyboard.press("ArrowRight")
+                page.keyboard.press("Enter")
+                self.assertEqual(page.evaluate(_READ_STEP)["focus"], "shorthand-all-allies", size)
+                page.locator('[data-testid="target-prompt-chip"][data-key="area-confirm"]').click()
+                page.wait_for_function("() => window.__stpSent.length === 3", timeout=5000)
+                self.assertEqual(self._sent(page)[2], {"skill_key": "t_storm", "target_shorthand": "all-allies"}, size)
+                self._wait_released(page)
+                page.evaluate("() => { window.__stpSent.length = 0; }")
+        page.close()
+
+    @covers_requirement(
+        "webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec",
+        "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
+        "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor",
+        "webclient-contextual-hud::fallen-combat-figures-read-as-defeated-or-down-at-a-glance",
+        "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
+        "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
+    )
+    def test_area_targets_light_groups_on_the_stage(self):
+        """An AREA skill against four foes (one knocked out, one defeated)
+        with a four-figure party: starting the step closes an open plate
+        tooltip and moves focus out of the plates group; Space selects two
+        foes, whose markers carry the check; the all-allies position lights
+        every party candidate; confirm sends the shorthand; the lit figure
+        pulses at full and is static with an underlined marker at reduced; the
+        knocked-out candidate keeps its fallen look under its arrow; and a
+        step-dimmed foe differs from the defeated one by pose and text."""
+        page = self._page(REFERENCE, motion_level=None, companions=3)
+        page.evaluate(_CAPTURE_ACTIONS)
+        panels = _stage_panels(4, defeated=(14,))
+        for p in panels["context_actions"]["participants"]:
+            if p["identity"] == 13:
+                p["state"], p["hp_current"] = "knocked_out", 0
+            if p["identity"] == 11:
+                p["conditions"] = [{"code": "poison", "label": "中毒", "severity": "harmful"}]
+        self._commit(page, "combat", panels)
+        self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 4")
+        wait_for_store_state(page, lambda st: st["dispatch"]["inFlight"] is None and not st["dispatch"]["beatLocked"])
+        page.wait_for_function(
+            "() => (window.__elosernBridge.store.view.combatMenu?.items || []).some((i) => i.key === 'skills')",
+            timeout=15000,
+        )
+        # A plate glyph holds keyboard focus with its tooltip open.
+        glyph = page.locator('[data-anchor="plates"] [data-testid="figure-plate"][data-identity="11"] '
+                             '[data-testid="figure-plate__condition--poison"]')
+        glyph.focus()
+        page.locator('[data-testid="figure-plate__condition-tooltip"]').wait_for(state="visible", timeout=5000)
+        step = self._open_step(page, "t_storm")
+        self.assertEqual(step["tooltips"], 0, "starting the step closes the plate tooltip")
+        self.assertEqual(step["active"], "action-dock", "focus left the plates group for the card")
+        # The candidates: the three companions and every foe but the defeated one.
+        self.assertEqual(sorted(m["identity"] for m in step["markers"]), ["101", "102", "103", "11", "12", "13"])
+        # The knocked-out candidate keeps its fallen look and carries the arrow.
+        figures = {f["identity"]: f for f in step["figures"]}
+        self.assertEqual(figures["13"]["fallen"], "defeated")
+        self.assertTrue(figures["13"]["hit"])
+        # Space selects two foes; both carry the check while focus moves on.
+        for identity in ("11", "12"):
+            page.evaluate(f"() => window.__elosernBridge.store.focusItemByKey('area-{identity}')")
+            page.keyboard.press(" ")
+        page.evaluate("() => window.__elosernBridge.store.focusItemByKey('area-confirm')")
+        confirm = page.evaluate(_READ_STEP)
+        checked = sorted(m["identity"] for m in confirm["markers"] if m["selected"] and m["check"])
+        self.assertEqual(checked, ["11", "12"])
+        self.assertEqual(sorted(m["identity"] for m in confirm["markers"] if m["state"] == "focus"), ["11", "12"])
+        self.assertEqual(confirm["announce"], "施展：已選 2 名")
+        # A step-dimmed standing foe beside the defeated one: pose and text differ.
+        self.assertEqual(figures["14"]["fallen"], "defeated")
+        self.assertTrue(figures["14"]["seal"])
+        page.evaluate("() => window.__elosernBridge.store.focusItemByKey('area-11')")
+        dimmed = {f["identity"]: f for f in page.evaluate(_READ_STEP)["figures"]}
+        self.assertEqual(dimmed["12"]["speaking"], "false")
+        self.assertIsNone(dimmed["12"]["fallen"])
+        self.assertFalse(dimmed["12"]["seal"])
+        plates = {p["identity"]: p for p in self._read(page)["plates"]}
+        self.assertEqual(plates["14"]["fallenText"], "✕已擊破")
+        self.assertIsNone(plates["12"]["fallenText"])
+        # The all-allies position lights every party candidate.
+        page.evaluate("() => window.__elosernBridge.store.focusItemByKey('shorthand-all-allies')")
+        allies = page.evaluate(_READ_STEP)
+        lit = sorted(f["identity"] for f in allies["figures"] if f["speaking"] == "true" and not f["fallen"])
+        self.assertEqual(lit, ["101", "102", "103"])
+        self.assertEqual(allies["announce"], "目標：全體我方，共 3 名")
+        # At full the lit figure's ring pulses.
+        self.assertEqual(
+            {f["animation"] for f in allies["figures"] if f["identity"] in ("101", "102", "103")}, {"elosern-target-pulse"}
+        )
+        page.keyboard.press("Enter")  # choose all-allies (clears the selection)
+        page.evaluate("() => window.__elosernBridge.store.focusItemByKey('area-confirm')")
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
+        self.assertEqual(self._sent(page)[0], {"skill_key": "t_storm", "target_shorthand": "all-allies"})
+        self._wait_released(page)
+        # Reduced: the focused figure's ring is static and its marker underlined.
+        page.evaluate("() => window.__elosernBridge.store.setMotionLevel('reduced')")
+        page.wait_for_function("() => document.documentElement.dataset.motion === 'reduced'")
+        reduced = self._open_step(page, "t_storm")
+        focused = [f for f in reduced["figures"] if f["focus"] == "true"]
+        self.assertTrue(focused, reduced["focus"])
+        self.assertTrue(all(f["animation"] == "none" for f in focused), focused)
+        self.assertTrue(all(m["underline"] for m in reduced["markers"] if m["state"] == "focus"))
+        self.assertFalse(any(m["underline"] for m in reduced["markers"] if m["state"] != "focus"))
         page.close()
 
     @covers_requirement(

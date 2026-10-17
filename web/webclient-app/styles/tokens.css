@@ -206,6 +206,10 @@
      window): a looping highlight that states no progress; still at reduced
      and off. */
   --motion-playback-sweep: 1.6s;
+  /* The stage target step's focus pulse (webclient-combat-stage-target-
+     picking D4): the lit figure's ring breathes on this loop at `full` and
+     stands still (static and brighter) at reduced and off. */
+  --motion-target-pulse: 1.2s;
   --motion-marker-travel: 2px;
   /* The combat beat pause (webclient-combat-beat-queue design D2, AVG stage
      design §10.2): the wait between one beat page and the next. Only the
@@ -270,6 +274,24 @@
      the side that is not speaking renders at this brightness. A static
      state; the motion layer owns any transition into it. */
   --actor-dim: 0.6;
+  /* The stage target step (webclient-combat-stage-target-picking D4): the
+     lit figure's gold ring (a glow that follows the figure's own outline),
+     breathing between its rest and peak at `full` and standing at its
+     static, brighter value below; the floor light under its feet; and the
+     arrow marker's gold, ink and size. */
+  --target-ring-rest:
+    drop-shadow(0 0 calc(3px * var(--ui-scale)) rgba(255, 240, 204, 0.75))
+    drop-shadow(0 0 calc(9px * var(--ui-scale)) rgba(228, 200, 142, 0.5));
+  --target-ring-peak:
+    drop-shadow(0 0 calc(4px * var(--ui-scale)) rgba(255, 246, 222, 0.95))
+    drop-shadow(0 0 calc(18px * var(--ui-scale)) rgba(236, 196, 112, 0.8));
+  --target-ring-static:
+    drop-shadow(0 0 calc(4px * var(--ui-scale)) rgba(255, 246, 222, 1))
+    drop-shadow(0 0 calc(14px * var(--ui-scale)) rgba(236, 196, 112, 0.85));
+  --target-floor: radial-gradient(closest-side, rgba(255, 226, 160, 0.55), rgba(228, 200, 142, 0.22) 55%, transparent);
+  --target-marker-size: calc(24px * var(--ui-scale));
+  --target-marker-gold: linear-gradient(180deg, #fff3d2 0%, #f0d48e 45%, #c99a45 100%);
+  --target-marker-ink: #17110a;
   /* The fallen looks (webclient-combat-defeated-foes design D1/D2): a pose
      (a pure compression about the figure's base), a tone and an opacity per
      look, and the broken seal's size (of the figure's width) and its centre
@@ -543,6 +565,51 @@
 ::selection {
   background: var(--seal-600);
   color: #fff;
+}
+
+/*
+ * The stage target step (webclient-combat-stage-target-picking D4). Shared
+ * by the two line-ups (a slot carries `data-target-focus` while lit and
+ * `data-target-motion` full|static during the step) and the plates layer's
+ * markers. A lit figure's ring follows its outline; below `full` (and under
+ * the OS request while no level is stored) it stands still and brighter and
+ * the focused marker gains an underline, so the focus never rests on motion
+ * or brightness alone: the filled, larger arrow distinguishes it too.
+ */
+.stage-target__hit {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+[data-target-focus="true"] > .formation-figure {
+  filter: var(--target-ring-rest);
+  animation: elosern-target-pulse var(--motion-target-pulse) ease-in-out infinite alternate;
+}
+[data-target-focus="true"]::before {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: -3%;
+  height: 9%;
+  z-index: -1;
+  background: var(--target-floor);
+  pointer-events: none;
+}
+[data-target-motion="static"][data-target-focus="true"] > .formation-figure {
+  animation: none;
+  filter: var(--target-ring-static);
+}
+@keyframes elosern-target-pulse {
+  from { filter: var(--target-ring-rest); }
+  to { filter: var(--target-ring-peak); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion]) [data-target-focus="true"] > .formation-figure {
+    animation: none;
+    filter: var(--target-ring-static);
+  }
 }
 
 /*
@@ -875,6 +942,7 @@
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
+  --motion-target-pulse: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -904,6 +972,7 @@
   --motion-stagger: 0ms;
   --motion-marker-bob: 0ms;
   --motion-playback-sweep: 0ms;
+  --motion-target-pulse: 0ms;
   --motion-travel: 0;
   --motion-flash-peak: 0;
 }
@@ -944,6 +1013,7 @@
     --motion-stagger: 0ms;
     --motion-marker-bob: 0ms;
     --motion-playback-sweep: 0ms;
+  --motion-target-pulse: 0ms;
     --motion-travel: 0;
     --motion-flash-peak: 0;
   }

@@ -492,6 +492,19 @@ const renderPlayer = (args) => ({
         await nextTick();
         store.focusPress(key, false);
       }
+      // `combatPath` (webclient-combat-stage-target-picking): rows opened in
+      // turn by key (focus, then Enter), e.g. 技能 → 強化 → 連鎖雷擊;
+      // `combatToggle`: AREA members then toggled with Space.
+      for (const key of args.combatPath || []) {
+        await nextTick();
+        store.focusItemByKey(key);
+        store.focusPress("Enter", false);
+      }
+      for (const key of args.combatToggle || []) {
+        await nextTick();
+        store.focusItemByKey(key);
+        store.focusPress(" ", false);
+      }
       // `combatFocus`: then focus one row of that frame by its key.
       if (args.combatFocus) {
         await nextTick();
@@ -757,6 +770,45 @@ export const CombatMasterScale = {
   render: renderPlayer,
   args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown", "Enter"], combatFocus: "scale-2" },
 };
+// The stage target step (webclient-combat-stage-target-picking): the card
+// collapses to its target prompt, the stage takes the dialogue listener dim
+// except the focused position's lit set, each candidate carries a gold arrow
+// marker with its digit, and the lit figure's ring pulses (static below
+// `full`). Use the arrow keys to walk the stage and Enter / a click to pick.
+const SUPPORT = ["skills", "skill-cat-2"];
+export const TargetSingleFoe = { render: renderPlayer, args: { combat: true, combatPath: ["attack"] } };
+export const TargetSingleAlly = { render: renderPlayer, args: { combat: true, combatPath: [...SUPPORT, "mend_light"], combatFocus: "target-101" } };
+export const TargetSelf = { render: renderPlayer, args: { combat: true, combatPath: [...SUPPORT, "rally"] } };
+export const TargetAreaExplicit = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: [...SUPPORT, "chain_lightning"], combatToggle: ["area-31", "area-33"], combatFocus: "area-confirm" },
+};
+export const TargetAreaAllFoes = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: [...SUPPORT, "chain_lightning"], combatFocus: "shorthand-all-enemies" },
+};
+export const TargetAreaAllAllies = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: [...SUPPORT, "chain_lightning"], combatFocus: "shorthand-all-allies" },
+};
+// Five foes, the fifth fled but still listed: it has no figure, so nothing is
+// lit and the prompt names it 場外.
+export const TargetOffStageFoe = {
+  render: renderPlayer,
+  args: { combat: 5, foeOverrides: { 35: { state: "fled" } }, combatPath: ["attack"], combatFocus: "target-35" },
+};
+// A knocked-out foe the server still lists keeps its fallen look and carries
+// the arrow; a defeated foe beside it is no candidate.
+export const TargetDefeatedCandidate = {
+  render: renderPlayer,
+  args: {
+    combat: 4,
+    foeOverrides: { 32: { state: "knocked_out", hp_current: 0 }, 34: { state: "defeated", hp_current: 0 } },
+    combatPath: ["attack"],
+    combatFocus: "target-32",
+  },
+};
+export const TargetReducedMotion = { render: renderPlayer, args: { combat: true, combatPath: ["attack"], motionLevel: "reduced" } };
 // Four foes (one defeated), a long foe name ellipsized on its plate. The
 // offline journey exposes round()/round(true) for normal/terminal playback.
 export const CombatParticipantPolish = { render: renderPlayer, args: { combat: 4, participantPolish: true } };

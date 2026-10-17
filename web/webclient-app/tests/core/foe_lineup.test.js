@@ -431,3 +431,59 @@ describe("the line-up selection", () => {
     expect(fallenLook("party", "active")).toBeNull();
   });
 });
+
+// webclient-combat-stage-target-picking (design D4): during the stage target
+// step every foe outside the lit set takes the dialogue listener dim (a
+// fallen foe keeps its fallen look instead), lit foes carry the focus ring
+// (static below `full`), and only selectable foes carry a hit area; no box or
+// z changes, and nothing remains once the step ends.
+describe("FoeLineup in the stage target step", () => {
+  let wrapper;
+  afterEach(() => {
+    wrapper?.unmount();
+    wrapper = null;
+  });
+  const targeting = (lit, selectable) => ({ lit: new Set(lit), selectable: new Set(selectable), selected: new Set() });
+  const foes = [foe(1), foe(2), foe(3, { state: "defeated" }), foe(4)];
+  const read = () =>
+    wrapper.findAll('[data-testid="foe-slot"]').map((slot) => ({
+      id: slot.attributes("data-identity"),
+      speaking: slot.get('[data-testid="stage-actor"]').attributes("data-speaking"),
+      focus: slot.attributes("data-target-focus") ?? null,
+      motion: slot.attributes("data-target-motion") ?? null,
+      hit: slot.find('[data-testid="stage-target-hit"]').exists(),
+      style: slot.attributes("style"),
+    }));
+
+  it("dims all but the lit set, keeps the fallen look, and puts hit areas on candidates only", async () => {
+    wrapper = mount(FoeLineup, { props: { foes, artPanel: ART, formation: formationSide(4), motionLevel: "full" } });
+    const before = read();
+    expect(before.every((s) => s.speaking === "true" && !s.hit && s.focus === null && s.motion === null)).toBe(true);
+    await wrapper.setProps({ targeting: targeting(["2"], ["1", "2", "3"]) });
+    const during = read();
+    expect(during.map((s) => s.speaking)).toEqual(["false", "true", "true", "false"]);
+    expect(during.map((s) => s.focus)).toEqual([null, "true", null, null]);
+    expect(during.map((s) => s.hit)).toEqual([true, true, true, false]);
+    expect(during.every((s) => s.motion === "full")).toBe(true);
+    // No box or z changes for the step.
+    expect(during.map((s) => s.style)).toEqual(before.map((s) => s.style));
+    // The hit area reports the identity and the action.
+    await wrapper.findAll('[data-testid="stage-target-hit"]')[0].trigger("pointerenter");
+    await wrapper.findAll('[data-testid="stage-target-hit"]')[0].trigger("click");
+    expect(wrapper.emitted("target-pointer")).toEqual([[1, "hover"], [1, "activate"]]);
+    // Below `full` the ring is static.
+    await wrapper.setProps({ motionLevel: "reduced" });
+    expect(read().every((s) => s.motion === "static")).toBe(true);
+    // The step ends: every foe returns to its state before it.
+    await wrapper.setProps({ targeting: null });
+    expect(read()).toEqual(before);
+  });
+
+  it("styles the static ring, the pulse and the reduced-motion fallback in the shared tokens", () => {
+    const tokens = readFileSync(join(APP_ROOT, "styles/tokens.css"), "utf-8");
+    expect(tokens).toMatch(/\[data-target-focus="true"\] > \.formation-figure \{[^}]*animation: elosern-target-pulse var\(--motion-target-pulse\)/);
+    expect(tokens).toMatch(/\[data-target-motion="static"\]\[data-target-focus="true"\] > \.formation-figure \{[^}]*animation: none/);
+    expect(tokens).toMatch(/@media \(prefers-reduced-motion: reduce\) \{\s*:root:not\(\[data-motion\]\) \[data-target-focus="true"\] > \.formation-figure \{[^}]*animation: none/);
+    expect(tokens).toMatch(/\.stage-target__hit \{[^}]*pointer-events: auto/);
+  });
+});

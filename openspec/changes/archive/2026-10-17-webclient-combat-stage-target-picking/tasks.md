@@ -13,13 +13,13 @@ same class of defect.
 
 ## 1. The step model and the arrow claim (≈2.5 h)
 
-- [ ] 1.1 Create `stores/elosern/stage_targets.js` with `stageTargetModel(...)` and its helpers (design D1): step
+- [x] 1.1 Create `stores/elosern/stage_targets.js` with `stageTargetModel(...)` and its helpers (design D1): step
   detection, positions per form, stage order from the formation's `formationOrder` (design D1), undrawn (fled) members, group and confirm
   positions, lit/selectable/selected sets, digits, and the announcement strings. AppClient publishes `formationOrder` from the `formation` object to the store.
-- [ ] 1.2 In `stores/elosern/view.js` publish `stageTarget` (null outside a step or while `beatLocked()`); in
+- [x] 1.2 In `stores/elosern/view.js` publish `stageTarget` (null outside a step or while `beatLocked()`); in
   `stores/elosern/interaction.js` claim the four arrow keys in `focusPress` while `stageTarget` is non-null
   (design D2); in `stores/elosern/combat.js` add `stageTargetPointer(key, action)` (design D5).
-- [ ] 1.3 Add `tests/store/stage_target_step.test.js` with fixed panels: SINGLE (ally + two foes; positions in stage
+- [x] 1.3 Add `tests/store/stage_target_step.test.js` with fixed panels: SINGLE (ally + two foes; positions in stage
   order; Right/Down/Left/Up wrap; Attack opens on the first foe; Enter emits one `combat.cast` byte-identical to the
   card-row payload); SELF (one position on the controlled identity; arrows no-op; payload has no target field); AREA
   (members then `shorthand-*` then `area-confirm`; Space toggles; group lit sets for `all-enemies`, `all-allies`,
@@ -34,17 +34,17 @@ same class of defect.
 
 ## 2. Figures, markers and prompt (≈2.5 h)
 
-- [ ] 2.1 `components/FoeLineup.vue` and `components/CompanionLineup.vue`: the `targeting` prop, the dim expression
+- [x] 2.1 `components/FoeLineup.vue` and `components/CompanionLineup.vue`: the `targeting` prop, the dim expression
   through StageActor's `dimmed`, the marker and hit-area elements, `data-target-focus`, the pulse keyframes and the
   reduced/off/`prefers-reduced-motion` static ring and underline (design D4); marker/pulse tokens in
   `styles/tokens.css`. `StageActor.vue` stays unchanged.
-- [ ] 2.2 `components/HudFrame.vue` plates layer: render the markers at the formation marker slots (design D4); AppClient
+- [x] 2.2 `components/HudFrame.vue` plates layer: render the markers at the formation marker slots (design D4); AppClient
   bumps `plateTooltipClose` when a step starts.
-- [ ] 2.3 `components/ActionDock.vue`: the target prompt, the hidden row region, the focus move to `#action-dock`,
+- [x] 2.3 `components/ActionDock.vue`: the target prompt, the hidden row region, the focus move to `#action-dock`,
   the AREA chips and the polite live region (design D3); `components/HudFrame.vue`: the step's `height: auto;
   max-height: 136px·S` card rule; chips are `tabindex="-1"` buttons that return DOM focus to `#action-dock`. `AppClient.vue`: pass `targeting`/`stageTarget` from
   `store.view.stageTarget` and wire the hit areas and chips to `stageTargetPointer`.
-- [ ] 2.4 Extend `tests/core/foe_lineup.test.js` and `tests/core/companion_lineup.test.js` (lit vs dimmed
+- [x] 2.4 Extend `tests/core/foe_lineup.test.js` and `tests/core/companion_lineup.test.js` (lit vs dimmed
   `data-speaking`, markers only on selectable slots with the right `data-state`, digit and ✓, hit areas only while
   `targeting` is non-null, no box/z change, the reduced-motion rule present), `tests/action/action_dock.test.js`
   (prompt content per form, hidden row region, live-region text, chips emit the pointer entry) and `tests/core/figure_plate.test.js` (plates never dimmed in a step). Run
@@ -55,7 +55,7 @@ same class of defect.
 
 Build once: `pnpm run build`.
 
-- [ ] 3.1 Add to `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest`:
+- [x] 3.1 Add to `web/tests/browser/test_browser_combat_stage.py` `CombatStageBrowserTest`:
   `test_targets_are_picked_on_the_stage` (1451x790 and 1600x900; four-figure party, three foes; Attack: the card
   collapses to ≤ 136px·S at the same centre/width/top and intersects no marker (also with an AREA skill's chips); every non-focused figure has
   `data-speaking="false"`, the focused foe `"true"`; markers only on candidates; the member order by marker `left`
@@ -71,7 +71,7 @@ Build once: `pnpm run build`.
   `CombatStageBrowserTest.test_foes_stand_opposite_the_player`. Run
   `uv run --locked python -m web.tests.browser.unittest_driver web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_targets_are_picked_on_the_stage web.tests.browser.test_browser_combat_stage.CombatStageBrowserTest.test_area_targets_light_groups_on_the_stage`
   and verify both pass.
-- [ ] 3.2 Migrate the methods that click or read the in-card target rows. Find them with
+- [x] 3.2 Migrate the methods that click or read the in-card target rows. Find them with
   `grep -n "target-\|area-\|shorthand-\|self-confirm" web/tests/browser/test_browser_combat_menu.py web/tests/browser/test_browser_combat_panels.py web/tests/browser/test_browser_combat_scales.py web/tests/browser/test_browser_combat_skills.py web/tests/browser/test_browser_contextual_hud_dock.py web/tests/browser/test_browser_pointer.py web/tests/browser/test_browser_proportional_ui_scale.py`;
   keyboard paths stay valid (items unchanged), pointer clicks on target rows move to `stage-target-hit` or prompt
   chips, and row-DOM assertions in a target frame move to markers/lit state. Run, one file per command:
@@ -85,16 +85,16 @@ Build once: `pnpm run build`.
 
 ## 4. Storybook (≈0.75 h)
 
-- [ ] 4.1 Add the fixtures and the stories of design D7 (`Core/AppShell` eight target stories; `Core/FoeLineup` and
+- [x] 4.1 Add the fixtures and the stories of design D7 (`Core/AppShell` eight target stories; `Core/FoeLineup` and
   `Core/CompanionLineup` `Targeting`). Run `pnpm run build-storybook` then `pnpm run showcase-coverage` and verify
   both succeed with `component-manifest.json` unchanged; screenshot `core-appshell--target-single-foe`,
   `--target-area-all-foes` and `--target-reduced-motion` at 1451x790 and confirm the dim, markers and prompt.
 
 ## 5. Documentation and gates (≈0.5 h)
 
-- [ ] 5.1 Add the stage target step to `web/webclient-app/AGENTS.md` (combat section: targets are picked on the stage;
+- [x] 5.1 Add the stage target step to `web/webclient-app/AGENTS.md` (combat section: targets are picked on the stage;
   arrows in stage order; digits in server order).
-- [ ] 5.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
+- [x] 5.2 Run `uv run --locked python -m tools.spec_traceability check`, `uv run --locked python -m tools.contract_gate`,
   and with a `MUD_TEST_SETTINGS=1` env file
   `uv run --locked --env-file=<file> evennia test --settings test_settings.py --keepdb tests.test_evennia_test_optimization_contract tests.test_webclient_frozen_contract`;
   then `openspec validate webclient-combat-stage-target-picking --strict`. Verify all pass.

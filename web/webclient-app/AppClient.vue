@@ -52,6 +52,7 @@ import FoeLineup from "./components/FoeLineup.vue";
 import { drawnFoes, fallenLook, foeStageLimit } from "./components/foe-lineup.js";
 import FigurePlate from "./components/FigurePlate.vue";
 import { plateHpCurrent, repeatedNames } from "./components/figure-plate.js";
+import { formationOrderFor, markersFor, onStage, positionKeyFor, targetingFor } from "./components/stage-targeting.js";
 import { useCombatFormation } from "./composables/use-combat-formation.js";
 import { useFormationGlide } from "./composables/use-formation-glide.js";
 import DialogueChoices from "./components/DialogueChoices.vue";
@@ -441,6 +442,48 @@ watch(
   },
 );
 
+// The stage target step (webclient-combat-stage-target-picking D1/D4): the
+// store's model of the current target frame (null outside it), the stage
+// order it reads (published from the very formation the stage draws), the
+// line-ups' lit/selectable sets, and the arrow markers in the plates layer.
+const controlledFigureId = computed(() => renderedLineup.value.find((slot) => slot.isControlled)?.identity ?? null);
+const stageTarget = computed(() => onStage(store.view.stageTarget || null, controlledFigureId.value));
+const drawnParty = computed(() => {
+  const shape = formation.value;
+  return shape ? renderedLineup.value.slice(0, shape.party.figures.length).map((slot) => slot.identity) : [];
+});
+const drawnFoeIds = computed(() => {
+  const shape = formation.value;
+  return shape ? lineupFoes.value.slice(0, shape.foes.figures.length).map((p) => p.identity) : [];
+});
+const stageOrder = computed(() => formationOrderFor(formation.value, drawnParty.value, drawnFoeIds.value));
+watch(stageOrder, (order) => store.setStageFormation(order), { immediate: true });
+const targeting = computed(() => targetingFor(stageTarget.value));
+const targetMarkers = computed(() =>
+  markersFor(stageTarget.value, formation.value, drawnParty.value, drawnFoeIds.value),
+);
+function onTargetFigure(identity, action) {
+  const key = positionKeyFor(stageTarget.value, identity);
+  if (key) store.stageTargetPointer(key, action);
+}
+function onTargetPosition(key, action) {
+  store.stageTargetPointer(key, action);
+}
+// Starting a step closes any open plate tooltip (webclient-combat-figure-
+// plates D3) and moves keyboard focus out of the plates group to the card,
+// so the step's arrow keys and the group's never compete.
+watch(
+  () => !!stageTarget.value,
+  (active, was) => {
+    if (!active || was) return;
+    plateTooltipClose.value += 1;
+    const focused = typeof document === "undefined" ? null : document.activeElement;
+    if (focused && focused.closest && focused.closest('[data-anchor="plates"]')) {
+      document.getElementById("action-dock")?.focus({ preventScroll: true });
+    }
+  },
+);
+
 // The scene caption stays centred in the open stage between the party's
 // innermost figure and the leftmost foe (app-shell.css reads
 // `--caption-left`/`--caption-right`). The foe edge keeps the room of a line
@@ -592,6 +635,8 @@ const rootStyle = computed(() => {
             :glide="formationGlide"
             :fallen="fallenMap"
             :fall-instant="modeHydrating"
+            :targeting="targeting"
+            @target-pointer="onTargetFigure"
           />
         </template>
         <!-- The opposite side of the stage (webclient-dialogue-stage-actors
@@ -649,7 +694,9 @@ const rootStyle = computed(() => {
               :inert="beatHold || null"
               :art-panel="panel('art')"
               :motion-level="store.view.motionLevel"
+              :targeting="targeting"
               @settled="onFoeLineupSettled"
+              @target-pointer="onTargetFigure"
             />
           </Transition>
         </template>
@@ -685,6 +732,39 @@ const rootStyle = computed(() => {
               :fallen="entry.fallen"
             />
           </TransitionGroup>
+          <!-- The stage target step's arrow markers (webclient-combat-stage-
+               target-picking D4): one per selectable drawn figure at its
+               formation marker slot, directly above its plate; filled and
+               larger on a lit figure, outlined otherwise, with the item's
+               digit (server order) and a check for a selected AREA member.
+               They appear without an entrance and take a pointer like the
+               figure's hit area; the card's live region is their reading. -->
+          <div v-if="targetMarkers.length" class="stage-target-markers" aria-hidden="true">
+            <span
+              v-for="marker in targetMarkers"
+              :key="marker.key"
+              class="stage-target__marker"
+              data-testid="stage-target-marker"
+              :data-identity="marker.identity"
+              :data-state="marker.state"
+              :data-selected="marker.selected ? 'true' : null"
+              :data-target-motion="store.view.motionLevel === 'full' ? 'full' : 'static'"
+              :style="{
+                left: `${marker.box.left}px`,
+                top: `${marker.box.top}px`,
+                width: `${marker.box.width}px`,
+                height: `${marker.box.height}px`,
+              }"
+              @pointerenter="onTargetPosition(marker.positionKey, 'hover')"
+              @click="onTargetPosition(marker.positionKey, 'activate')"
+            >
+              <svg class="stage-target__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M3.5 2.5h17v10.2L12 21.5 3.5 12.7z" />
+              </svg>
+              <b v-if="marker.digit !== null" class="stage-target__digit">{{ marker.digit }}</b>
+              <i v-if="marker.selected" class="stage-target__check" data-testid="stage-target-check">✓</i>
+            </span>
+          </div>
         </template>
         <!-- The dialogue choice list (webclient-dialogue-choices-overlay
              D4/D5), centred over the stage: only in dialogue with the panel
@@ -847,7 +927,9 @@ const rootStyle = computed(() => {
           :view="store.view"
           :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
           :card="store.view.mode === 'combat'"
+          :stage-target="store.view.mode === 'combat' ? stageTarget : null"
           @action="onAction"
+          @target-pointer="onTargetPosition"
           @back="onDockBack"
           @skip="store.skipBeats"
         >
@@ -1275,6 +1357,114 @@ const rootStyle = computed(() => {
 }
 .figure-plates > .figure-plate-leave-to {
   opacity: 0;
+}
+
+/* The stage target step's arrow markers (webclient-combat-stage-target-
+   picking D4). The layer spans the plates anchor and takes no pointer; each
+   marker is a 24px·S pointer target at its figure's marker slot. The arrow
+   is a gold shield pointing down at the figure: outlined while selectable,
+   filled, larger and glowing on a lit figure, its digit inside. At `full`
+   the focused arrow bobs on the page marker's loop; below it stands still
+   and an underline bar marks it. */
+.stage-target-markers {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.stage-target__marker {
+  position: absolute;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  cursor: pointer;
+  color: var(--gold-300);
+  transform-origin: 50% 100%;
+}
+.stage-target__arrow {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  fill: rgba(16, 12, 9, 0.62);
+  stroke: var(--gold-400);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.7));
+}
+.stage-target__digit {
+  position: relative;
+  margin-top: -18%;
+  font: 600 calc(11px * var(--ui-scale)) / 1 var(--f-mono);
+  letter-spacing: 0;
+  color: var(--gold-300);
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.8);
+}
+.stage-target__marker[data-state="focus"] {
+  z-index: 1;
+  transform: scale(1.3);
+  animation: elosern-target-marker-bob var(--motion-marker-bob) ease-in-out infinite alternate;
+}
+.stage-target__marker[data-state="focus"] .stage-target__arrow {
+  fill: #e9c97f;
+  stroke: #fff4d6;
+  stroke-width: 1.2;
+  filter:
+    drop-shadow(0 0 calc(4px * var(--ui-scale)) rgba(255, 226, 150, 0.9))
+    drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6));
+}
+.stage-target__marker[data-state="focus"] .stage-target__digit {
+  color: var(--target-marker-ink);
+  text-shadow: none;
+}
+.stage-target__check {
+  position: absolute;
+  right: -34%;
+  top: -30%;
+  display: grid;
+  place-items: center;
+  width: 62%;
+  height: 62%;
+  border-radius: 50%;
+  background: #2f6b46;
+  border: 1px solid #b9e6c4;
+  color: #f3fff6;
+  font: 700 calc(10px * var(--ui-scale)) / 1 var(--f-sans);
+  font-style: normal;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+}
+.stage-target__marker[data-target-motion="static"][data-state="focus"] {
+  animation: none;
+}
+.stage-target__marker[data-target-motion="static"][data-state="focus"]::after {
+  content: "";
+  position: absolute;
+  left: 14%;
+  right: 14%;
+  bottom: -22%;
+  height: 2px;
+  border-radius: 1px;
+  background: #fff1cc;
+  box-shadow: 0 0 calc(4px * var(--ui-scale)) rgba(255, 226, 150, 0.9);
+}
+@keyframes elosern-target-marker-bob {
+  from { transform: scale(1.3) translateY(calc(-1 * var(--motion-marker-travel) * var(--motion-travel))); }
+  to { transform: scale(1.3) translateY(calc(var(--motion-marker-travel) * var(--motion-travel))); }
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion]) .stage-target__marker[data-state="focus"] {
+    animation: none;
+  }
+  :root:not([data-motion]) .stage-target__marker[data-state="focus"]::after {
+    content: "";
+    position: absolute;
+    left: 14%;
+    right: 14%;
+    bottom: -22%;
+    height: 2px;
+    background: #fff1cc;
+  }
 }
 
 /* Carry the mount container's viewport height down to the shell so the

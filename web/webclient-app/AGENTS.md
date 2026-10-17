@@ -24,6 +24,15 @@ prototypes; the real app differs too much for a prototype to be useful).
   (`▼ 倒地`); both differ from the listener dim by shape and text
   (StageActor's `fallen`). The place card and the participant roster are not
   shown in combat; the controlled figure's values stay in the vitals dock.
+- Combat targets are picked on the stage figures (the stage target step,
+  `stores/elosern/stage_targets.js`, published as `view.stageTarget`): in the
+  target frame of an enabled SINGLE, SELF or AREA skill the card collapses to
+  a target prompt, every figure outside the focused position's lit set takes
+  the dialogue listener dim, each candidate carries a gold arrow marker above
+  its plate (`components/stage-targeting.js`) and a hit area over its figure.
+  The arrow keys walk the positions in stage order (left to right on the
+  formation); the digits still pick the frame's items in server order; Enter,
+  Space and Escape, the item order and every payload are the card rows'.
 - Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
   condition; always shown in combat.
 - Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen

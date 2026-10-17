@@ -229,6 +229,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // The SkillBook 施放 entry (skillbook-authoritative-casting D6).
     beginSkillUse: ctx.beginSkillUse,
     chooseShorthand: ctx.chooseShorthand,
+    // The stage target step (webclient-combat-stage-target-picking): the
+    // pointer entry of the figures, markers and prompt chips, and the stage
+    // order AppClient publishes from the formation it draws.
+    stageTargetPointer: ctx.stageTargetPointer,
+    setStageFormation: ctx.setStageFormation,
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
     // one-frame stack. Browser helpers use it to normalize the stack.

@@ -45,6 +45,8 @@ const LEVEL_TOKENS = [
   "--motion-stagger",
   "--motion-marker-bob",
   "--motion-playback-sweep",
+  // The stage target step's focus pulse (webclient-combat-stage-target-picking).
+  "--motion-target-pulse",
   "--motion-travel",
   "--motion-flash-peak",
 ];

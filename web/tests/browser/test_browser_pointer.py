@@ -191,8 +191,22 @@ class PointerAcceptanceTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             ) from exc
         target_keys = [k for k in self._rows(page) if k.startswith("target-")]
         self.assertGreaterEqual(len(target_keys), 1)
+        # The target frame is chosen on the stage figures
+        # (webclient-combat-stage-target-picking): the card's rows are hidden,
+        # so the pointer clicks the first listed candidate's hit area over
+        # its figure. Migrated from a click on the hidden row; the same defect
+        # (a pointer pick that sends another payload, or none) is detected.
+        drawn = page.evaluate(
+            "() => [...document.querySelectorAll('[data-testid=\"stage-target-hit\"]')]"
+            ".map((el) => 'target-' + el.getAttribute('data-identity'))"
+        )
+        target_keys = [k for k in target_keys if k in drawn]
+        self.assertGreaterEqual(len(target_keys), 1, "no candidate carries a stage hit area")
         cast_before = sent_action_count(page, "combat.cast")
-        self._click_row(page, target_keys[0])
+        page.locator(
+            f'[data-testid="stage-target-hit"][data-identity="{target_keys[0].removeprefix("target-")}"]'
+        ).click()
+        page.wait_for_timeout(120)
         def _last_target_set(state):
             return state.get("lastTarget") == target_keys[0].removeprefix("target-")
         wait_for_store_state(page, _last_target_set, timeout=15000)

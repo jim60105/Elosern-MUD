@@ -555,6 +555,13 @@ defineExpose({ menuOpen });
   height: min(calc(400px * var(--ui-scale)), 100%);
   min-height: 0;
 }
+/* The stage target step (webclient-combat-stage-target-picking D3): the card
+   collapses to its target prompt at the same centre, width and top — the
+   host shrinks to the prompt, at most 136px·S tall. */
+.elosern-stage[data-elosern-mode="combat"] .stage-card-host:has(> .action-dock--target) {
+  height: auto;
+  max-height: calc(136px * var(--ui-scale));
+}
 
 /* presence (exploration-presence-rail design D4; redesign §4.1): the
    presence rail stands on the stage floor, right-aligned and inset left of
