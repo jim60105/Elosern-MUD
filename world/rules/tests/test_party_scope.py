@@ -1,22 +1,14 @@
 """Tests for the party member authority boundary (party-member-authority).
 
-Intended requirement IDs, recorded here until the capability is synced into
-``openspec/specs/`` and ``tools.spec_traceability list`` can hand out the
-canonical ones (``covers_requirement`` decorators are added then):
-
-- ``party-member-authority::the-commander-is-resolved-from-the-authenticated-acting-character``
-- ``party-member-authority::a-named-member-is-re-derived-and-never-substituted``
-- ``party-member-authority::member-presence-is-checked-against-the-commander-s-room``
-- ``party-member-authority::acting-purposes-exclude-knocked-out-members``
-- ``party-member-authority::the-present-party-scope-is-ordered-and-room-bound``
-- ``party-member-authority::text-member-tokens-resolve-only-within-the-party``
-- ``party-member-authority::combat-activity-is-judged-across-the-involved-members``
-- ``party-member-authority::a-stale-possession-flag-grants-no-authority``
-- ``party-member-authority::membership-rejections-are-stable-and-write-nothing``
+Every requirement of the capability is established here; the
+``covers_requirement`` decorators carry the canonical IDs that
+``tools.spec_traceability list`` reports for ``openspec/specs/party-member-authority``.
 """
 
 import unittest
 from unittest.mock import patch
+
+from tools.spec_traceability import covers_requirement
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -66,6 +58,9 @@ def _rejected(case, call, reason):
 class PartyScopeInputTests(unittest.TestCase):
     """Identity input is validated before any object is read."""
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_non_dbid_member_identities_are_rejected(self):
         # A boolean is an int subclass, a string is an id in text form, and a
         # float is not an identity: none may authorize anything.
@@ -81,6 +76,9 @@ class PartyScopeInputTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             authorize_member(object(), 1, "trade")
 
+    @covers_requirement(
+        "party-member-authority::membership-rejections-are-stable-and-write-nothing"
+    )
     def test_rejection_messages_are_fixed_and_complete(self):
         self.assertEqual(
             PARTY_SCOPE_MESSAGES,
@@ -113,9 +111,15 @@ class PartyScopeTestCase(EvenniaTest):
 class CommanderResolutionTests(PartyScopeTestCase):
     """The commander comes from the acting character, never from a caller."""
 
+    @covers_requirement(
+        "party-member-authority::the-commander-is-resolved-from-the-authenticated-acting-character"
+    )
     def test_player_character_is_its_own_commander(self):
         self.assertIs(resolve_commander(self.char1), self.char1)
 
+    @covers_requirement(
+        "party-member-authority::the-commander-is-resolved-from-the-authenticated-acting-character"
+    )
     def test_possession_keeps_the_commander(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -123,6 +127,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
         self.assertTrue(is_player_driven(companion))
         self.assertIs(resolve_commander(companion), self.char1)
 
+    @covers_requirement(
+        "party-member-authority::the-commander-is-resolved-from-the-authenticated-acting-character"
+    )
     def test_non_player_non_possessed_objects_are_rejected(self):
         for acting in (
             create_object(NPC, key="路人", location=self.room1),
@@ -137,6 +144,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
                     REASON_NOT_PARTY_MEMBER,
                 )
 
+    @covers_requirement(
+        "party-member-authority::a-stale-possession-flag-grants-no-authority"
+    )
     def test_flagged_but_unpuppeted_npc_is_refused(self):
         npc = create_object(NPC, key="殘旗", location=self.room1)
         npc.db.possessed_by = self.char1.pk
@@ -161,6 +171,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
                         REASON_NOT_PARTY_MEMBER,
                     )
 
+    @covers_requirement(
+        "party-member-authority::a-stale-possession-flag-grants-no-authority"
+    )
     def test_missing_owner_mirror_grants_no_authority(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -174,6 +187,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::a-stale-possession-flag-grants-no-authority"
+    )
     def test_mirror_naming_another_companion_grants_no_authority(self):
         companion = self._companion("艾拉")
         other = self._companion("卡恩")
@@ -190,6 +206,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::a-stale-possession-flag-grants-no-authority"
+    )
     def test_foreign_account_session_grants_no_authority(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -201,6 +220,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
                 REASON_NOT_PARTY_MEMBER,
             )
 
+    @covers_requirement(
+        "party-member-authority::membership-rejections-are-stable-and-write-nothing"
+    )
     def test_stale_flag_rejection_writes_nothing(self):
         npc = create_object(NPC, key="殘旗三", location=self.room1)
         npc.db.possessed_by = self.char1.pk
@@ -215,6 +237,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
             [_attribute_rows(entity) for entity in entities], before
         )
 
+    @covers_requirement(
+        "party-member-authority::membership-rejections-are-stable-and-write-nothing"
+    )
     def test_foreign_session_rejection_writes_nothing(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -236,6 +261,9 @@ class CommanderResolutionTests(PartyScopeTestCase):
 class MemberAuthorizationTests(PartyScopeTestCase):
     """A named member is re-derived from the roster, never substituted."""
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_commander_is_always_an_authorized_member(self):
         self.assertIs(
             authorize_member(self.char1, self.char1.pk, PURPOSE_ORGANIZE),
@@ -246,6 +274,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             self.char1,
         )
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_effective_companion_is_admitted_for_both_purposes(self):
         companion = self._companion("艾拉")
         for purpose in (PURPOSE_ORGANIZE, PURPOSE_ACT):
@@ -255,6 +286,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
                     companion,
                 )
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_non_member_npc_in_the_room_is_rejected(self):
         outsider = create_object(NPC, key="路人", location=self.room1)
         _rejected(
@@ -263,6 +297,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_deleted_member_identity_is_rejected(self):
         companion = self._companion("艾拉")
         stale_id = companion.pk
@@ -274,6 +311,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::a-named-member-is-re-derived-and-never-substituted"
+    )
     def test_forged_roster_entry_is_rejected(self):
         # A non-NPC object with a matching back-reference is not a companion:
         # the membership read owns the filter, not the stored roster list.
@@ -286,6 +326,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::member-presence-is-checked-against-the-commander-s-room"
+    )
     def test_absent_member_is_rejected(self):
         companion = self._companion("卡恩")
         self.assertTrue(companion.move_to(self.room2, quiet=True))
@@ -296,6 +339,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             REASON_MEMBER_NOT_PRESENT,
         )
 
+    @covers_requirement(
+        "party-member-authority::member-presence-is-checked-against-the-commander-s-room"
+    )
     def test_an_anchor_cannot_widen_the_presence_check(self):
         nearby = self._companion("艾拉")
         remote = self._companion("卡恩")
@@ -318,6 +364,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             REASON_MEMBER_NOT_PRESENT,
         )
 
+    @covers_requirement(
+        "party-member-authority::acting-purposes-exclude-knocked-out-members"
+    )
     def test_knocked_out_companion_cannot_act_but_can_be_organized(self):
         companion = self._companion("卡恩", hp=1)
 
@@ -331,6 +380,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             companion,
         )
 
+    @covers_requirement(
+        "party-member-authority::acting-purposes-exclude-knocked-out-members"
+    )
     def test_hp_above_the_floor_is_admitted_for_acting(self):
         # The floor compares the unrounded stored value: 1.5 HP is above the
         # nonlethal floor even though the integer presentation pair reads 1.
@@ -341,6 +393,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
             companion,
         )
 
+    @covers_requirement(
+        "party-member-authority::membership-rejections-are-stable-and-write-nothing"
+    )
     def test_rejections_write_nothing(self):
         companion = self._companion("艾拉")
         outsider = create_object(NPC, key="路人", location=self.room1)
@@ -382,6 +437,9 @@ class MemberAuthorizationTests(PartyScopeTestCase):
 class PresentPartyScopeTests(PartyScopeTestCase):
     """The present scope is ordered, room-bound, and always includes the actor."""
 
+    @covers_requirement(
+        "party-member-authority::the-present-party-scope-is-ordered-and-room-bound"
+    )
     def test_scope_lists_the_commander_then_roster_order(self):
         first = self._companion("艾拉")
         second = self._companion("卡恩")
@@ -390,6 +448,9 @@ class PresentPartyScopeTests(PartyScopeTestCase):
             present_party_scope(self.char1), (self.char1, first, second)
         )
 
+    @covers_requirement(
+        "party-member-authority::the-present-party-scope-is-ordered-and-room-bound"
+    )
     def test_companion_elsewhere_is_outside_the_scope(self):
         first = self._companion("艾拉")
         second = self._companion("卡恩")
@@ -397,6 +458,9 @@ class PresentPartyScopeTests(PartyScopeTestCase):
 
         self.assertEqual(present_party_scope(self.char1), (self.char1, first))
 
+    @covers_requirement(
+        "party-member-authority::the-present-party-scope-is-ordered-and-room-bound"
+    )
     def test_possession_does_not_change_the_scope(self):
         first = self._companion("艾拉")
         second = self._companion("卡恩")
@@ -424,6 +488,9 @@ class PresentPartyScopeTests(PartyScopeTestCase):
 
         self.assertEqual(present_party_scope(rootless), (rootless,))
 
+    @covers_requirement(
+        "party-member-authority::the-present-party-scope-is-ordered-and-room-bound"
+    )
     def test_acting_figure_left_behind_is_still_in_scope(self):
         first = self._companion("艾拉")
         second = self._companion("卡恩")
@@ -440,6 +507,9 @@ class PresentPartyScopeTests(PartyScopeTestCase):
 class MemberTokenTests(PartyScopeTestCase):
     """Text tokens resolve by exact name inside the party only."""
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_plain_key_resolves(self):
         companion = self._companion("艾拉")
 
@@ -450,6 +520,9 @@ class MemberTokenTests(PartyScopeTestCase):
 
         self.assertIs(resolve_member_token(self.char1, "  艾拉 "), companion)
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_titled_companion_resolves_by_composed_name_and_bare_key(self):
         companion = self._companion("艾拉")
         companion.npc_title = "見習劍士"
@@ -459,6 +532,9 @@ class MemberTokenTests(PartyScopeTestCase):
         )
         self.assertIs(resolve_member_token(self.char1, "艾拉"), companion)
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_unknown_and_blank_tokens_are_rejected(self):
         self._companion("艾拉")
         create_object(NPC, key="路人", location=self.room1)
@@ -470,6 +546,9 @@ class MemberTokenTests(PartyScopeTestCase):
                     REASON_NOT_PARTY_MEMBER,
                 )
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_ambiguous_token_is_rejected(self):
         self._companion("雙胞胎")
         self._companion("雙胞胎")
@@ -480,6 +559,9 @@ class MemberTokenTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_composed_name_collision_is_rejected(self):
         titled = self._companion("甲")
         titled.npc_title = "乙"
@@ -491,6 +573,9 @@ class MemberTokenTests(PartyScopeTestCase):
             REASON_NOT_PARTY_MEMBER,
         )
 
+    @covers_requirement(
+        "party-member-authority::text-member-tokens-resolve-only-within-the-party"
+    )
     def test_commander_is_a_legitimate_match(self):
         self._companion("艾拉")
 
@@ -508,6 +593,9 @@ class MemberTokenTests(PartyScopeTestCase):
             REASON_MEMBER_NOT_PRESENT,
         )
 
+    @covers_requirement(
+        "party-member-authority::membership-rejections-are-stable-and-write-nothing"
+    )
     def test_token_rejections_write_nothing(self):
         first = self._companion("艾拉")
         create_object(NPC, key="路人", location=self.room1)
@@ -549,6 +637,9 @@ class PartyInCombatTests(PartyScopeTestCase):
             side_effect=predicate,
         )
 
+    @covers_requirement(
+        "party-member-authority::combat-activity-is-judged-across-the-involved-members"
+    )
     def test_possessed_figure_in_combat_bars_the_request(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -557,6 +648,9 @@ class PartyInCombatTests(PartyScopeTestCase):
             self.assertTrue(party_in_combat(companion))
             self.assertTrue(party_in_combat(self.char1, companion))
 
+    @covers_requirement(
+        "party-member-authority::combat-activity-is-judged-across-the-involved-members"
+    )
     def test_commander_in_combat_bars_a_request_made_through_the_figure(self):
         companion = self._companion("艾拉")
         enter_possession(self.char1, companion)
@@ -564,6 +658,9 @@ class PartyInCombatTests(PartyScopeTestCase):
         with self._in_combat(self.char1):
             self.assertTrue(party_in_combat(companion))
 
+    @covers_requirement(
+        "party-member-authority::combat-activity-is-judged-across-the-involved-members"
+    )
     def test_named_member_in_combat_bars_the_request(self):
         companion = self._companion("艾拉")
 
@@ -577,6 +674,9 @@ class PartyInCombatTests(PartyScopeTestCase):
         with self._in_combat():
             self.assertFalse(party_in_combat(self.char1, companion))
 
+    @covers_requirement(
+        "party-member-authority::combat-activity-is-judged-across-the-involved-members"
+    )
     def test_every_involved_identity_is_consulted(self):
         companion = self._companion("艾拉")
         consulted = []
