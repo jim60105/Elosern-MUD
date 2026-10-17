@@ -15,9 +15,18 @@ from tools.spec_traceability import covers_requirement
 from typeclasses.characters import Character, PlayerCharacter
 from typeclasses.npcs import NPC, LLMNPC
 from world.quests.catalog import register_catalog
-from world.rules.party import join_party
+from world.quests.escort_lifecycle import escort_compensation
+from world.rules.party import (
+    combat_companions,
+    follow_companions,
+    is_companion,
+    join_party,
+    leave_party,
+    party_ids,
+)
 from world.rules.possession import (
     POSSESSION_REJECTION_MESSAGES,
+    REASON_NOT_CO_LOCATED,
     REASON_RELEASE_REFUSED,
     REASON_TRANSFER_REFUSED,
     UNPOSSESS_REFUSED_RETURN_MESSAGE,
@@ -25,8 +34,11 @@ from world.rules.possession import (
     PossessionWriteError,
     current_possession,
     enter_possession,
+    release_for_party_change,
     release_on_disconnect,
     release_possession,
+    restore_party_control,
+    snapshot_party_control,
 )
 
 
@@ -113,6 +125,15 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertEqual(self.session.puppet, self.npc)
         self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet"))
         self.assertTrue(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        # The occupied room and the logout metadata come back too.
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertEqual(self.npc.attributes.get("prelogout_location"), self.room1)
+        self.assertIsNotNone(current_possession(self.char1))
+        self.assertEqual(self.npc.db.possessed_by, self.char1.pk)
+        npc_reloaded = LLMNPC.objects.get(id=self.npc.id)
+        self.assertEqual(npc_reloaded.db_location_id, self.room1.pk)
 
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
@@ -425,16 +446,28 @@ class PossessionTransitionTests(EvenniaTest):
         """Scenario: A refused return keeps the state and says so."""
         enter_possession(self.char1, self.npc)
 
+        from web.webclient.presentation import ingress
+
         account = self.account
         real_puppet_object = account.puppet_object
+        real_synchronize = ingress.synchronize_session
+        rooms_at_synchronize: list[tuple[object, object]] = []
 
         def _silent_refuse_return(session, target):
             if target == self.char1:
                 return
             real_puppet_object(session, target)
 
-        with patch.object(account, "puppet_object", side_effect=_silent_refuse_return):
-            with patch("world.rules.possession.log_error") as mock_log:
+        def _spy_synchronize(session, obj):
+            rooms_at_synchronize.append((obj, self.npc.location))
+            return real_synchronize(session, obj)
+
+        with patch.object(account, "puppet_object", side_effect=_silent_refuse_return), patch(
+            "web.webclient.presentation.ingress.synchronize_session", side_effect=_spy_synchronize
+        ):
+            with patch("world.rules.possession.log_error") as mock_log, patch(
+                "world.rules.possession.log_info"
+            ) as mock_info:
                 with self.assertRaises(PossessionWriteError) as ctx:
                     release_possession(self.char1, npc=self.npc, reason="handback")
                 self.assertEqual(ctx.exception.reason, REASON_RELEASE_REFUSED)
@@ -445,10 +478,33 @@ class PossessionTransitionTests(EvenniaTest):
                     mock_log.call_args[1].get("context", {}).get("step"),
                     "possession_release",
                 )
+                # No successful-release boundary event is emitted on failure.
+                self.assertEqual(
+                    [
+                        call
+                        for call in mock_info.call_args_list
+                        if call.args and call.args[0] == "possession_release"
+                    ],
+                    [],
+                )
 
-        # Attributes remain set
+        # The refusal path already sees the companion back in its room.
+        refusal_synchronizations = [
+            room for obj, room in rooms_at_synchronize if obj is self.npc
+        ]
+        self.assertTrue(refusal_synchronizations)
+        for room in refusal_synchronizations:
+            self.assertIs(room, self.room1)
+
+        # Attributes remain set; room and metadata survive compensation.
         self.assertIsNotNone(self.char1.db.possession)
         self.assertEqual(self.npc.db.possessed_by, self.char1.pk)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertTrue(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        self.assertEqual(self.npc.attributes.get("prelogout_location"), self.room1)
 
         # Idempotent retry completes return
         release_possession(self.char1, npc=self.npc, reason="handback")
@@ -568,6 +624,585 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertEqual(npc_reloaded.db.possessed_by, self.char1.pk)
         self.assertIn(f"id({self.account.id})", npc_reloaded.locks.get("puppet"))
 
+    # ------------------------------------------------------------------
+    # Normal release preserves the companion's room presence
+    # ------------------------------------------------------------------
+
+    def _make_combat_eligible(self, hp: int = 50) -> None:
+        """Give the synthetic companion a stored HP above the nonlethal floor."""
+        self.npc.race = "human"
+        self.npc.apply_race_baseline()
+        self.npc.traits.hp.base = hp
+        self.npc.traits.hp.current = hp
+
+    def _release_for_reason(self, reason: str) -> None:
+        """Run the normal release ladder for one of the two release reasons."""
+        if reason == "handback":
+            release_possession(self.char1, npc=self.npc, reason="handback")
+        else:
+            release_for_party_change(self.npc, self.char1)
+
+    def _release_failing_after_residual_cleanup(self) -> None:
+        """Run a release whose unpuppet finishes and then raises.
+
+        The real ``_unpuppet`` completes, including the new residual cleanup, so
+        the raised error exercises the compensation surface.
+        """
+        import world.rules.possession as possession_mod
+
+        real_unpuppet = possession_mod._unpuppet
+
+        def cleanup_then_raise(*args, **kwargs):
+            real_unpuppet(*args, **kwargs)
+            raise RuntimeError("failure injected after residual cleanup")
+
+        with patch("world.rules.possession._unpuppet", side_effect=cleanup_then_raise):
+            with self.assertRaises(PossessionWriteError):
+                release_possession(self.char1, npc=self.npc, reason="handback")
+
+    def _assert_companion_release_kept_the_room(self) -> None:
+        """Shared postconditions of a co-located normal release."""
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertIn(self.char1, self.room1.contents)
+        self.assertTrue(is_companion(self.npc, self.char1))
+        self.assertIn(self.npc.pk, party_ids(self.char1))
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.attributes.has("prelog_location"))
+        self.assertFalse(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertNotIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+        npc_reloaded = LLMNPC.objects.get(id=self.npc.id)
+        self.assertEqual(npc_reloaded.db_location_id, self.room1.pk)
+        self.assertFalse(npc_reloaded.attributes.has("prelogout_location"))
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_handback_keeps_both_party_members_in_the_shared_room(self):
+        """歸位 returns control without stashing the companion off-grid."""
+        enter_possession(self.char1, self.npc)
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertIn(self.char1, self.room1.contents)
+
+        release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self._assert_companion_release_kept_the_room()
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_party_change_handback_keeps_the_companion_in_the_shared_room(self):
+        """release_for_party_change leaves the companion in its room and in the party."""
+        enter_possession(self.char1, self.npc)
+
+        release_for_party_change(self.npc, self.char1)
+
+        self._assert_companion_release_kept_the_room()
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_handback_sequence_restores_the_room_before_owner_synchronization(self):
+        """The release ladder keeps its order and the companion is in-room at sync."""
+        enter_possession(self.char1, self.npc)
+
+        from web.webclient.presentation import ingress
+
+        order: list[str] = []
+        room_at_synchronize: list[tuple[object, object]] = []
+        real_unpuppet_object = self.account.unpuppet_object
+        real_puppet_object = self.account.puppet_object
+        real_synchronize = ingress.synchronize_session
+
+        def spy_unpuppet(session):
+            order.append("unpuppet")
+            return real_unpuppet_object(session)
+
+        def spy_puppet(session, target):
+            order.append("puppet_owner" if target is self.char1 else "puppet_other")
+            return real_puppet_object(session, target)
+
+        def spy_synchronize(session, obj):
+            order.append("synchronize")
+            room_at_synchronize.append((obj, self.npc.location))
+            return real_synchronize(session, obj)
+
+        with patch.object(self.account, "unpuppet_object", side_effect=spy_unpuppet), patch.object(
+            self.account, "puppet_object", side_effect=spy_puppet
+        ), patch(
+            "web.webclient.actions.dispatcher.retire_sequence",
+            side_effect=lambda session: order.append("retire"),
+        ), patch(
+            "web.webclient.presentation.ingress.reset_client_sequence",
+            side_effect=lambda session: order.append("reset"),
+        ), patch(
+            "web.webclient.presentation.ingress.send_unpuppet_transition",
+            side_effect=lambda session: order.append("detach"),
+        ), patch(
+            "web.webclient.presentation.ingress.synchronize_session",
+            side_effect=spy_synchronize,
+        ):
+            release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self.assertIn("detach", order)
+        self.assertLess(order.index("detach"), order.index("retire"))
+        self.assertLess(order.index("retire"), order.index("reset"))
+        self.assertLess(order.index("reset"), order.index("unpuppet"))
+        self.assertLess(order.index("unpuppet"), order.index("puppet_owner"))
+        self.assertLess(order.index("puppet_owner"), order.index("synchronize"))
+        owner_synchronizations = [room for obj, room in room_at_synchronize if obj is self.char1]
+        self.assertTrue(owner_synchronizations)
+        for room in owner_synchronizations:
+            self.assertIs(room, self.room1)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_stash_then_raise_during_unpuppet_still_restores_the_room(self):
+        """A hook that stashes the room and then raises cannot skip restoration."""
+        enter_possession(self.char1, self.npc)
+        real_unpuppet_object = self.account.unpuppet_object
+
+        def stash_then_raise(session):
+            real_unpuppet_object(session)
+            raise RuntimeError("hook raised after the last-session stash")
+
+        with patch.object(self.account, "unpuppet_object", side_effect=stash_then_raise):
+            release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self._assert_companion_release_kept_the_room()
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_multi_session_handback_restores_the_original_room_for_every_attempt(self):
+        """Every attempt restores the pre-release room, never a re-read one.
+
+        The two-session ladder executes real unpuppet and repuppet hooks
+        through observational wrappers, and a controlled disturbance between
+        attempts ensures a per-iteration snapshot would capture the disturbed
+        room instead of the original snapshot.
+        """
+        enter_possession(self.char1, self.npc)
+        sess2 = MagicMock()
+        sess2.sessid = 7777
+        sess2.logged_in = True
+        sess2.puppet = self.npc
+        sess2.msg = MagicMock()
+
+        real_unpuppet_object = self.account.unpuppet_object
+        real_puppet_object = self.account.puppet_object
+        unpuppet_calls: list[object] = []
+        room_at_repuppet: list[object] = []
+
+        def wrapped_unpuppet(session):
+            unpuppet_calls.append(session)
+            return real_unpuppet_object(session)
+
+        def wrapped_puppet(session, target):
+            room_at_repuppet.append(self.npc.location)
+            res = real_puppet_object(session, target)
+            if session == self.session:
+                # Controlled between-attempt disturbance:
+                # Move companion to room2 before the next attempt so that any
+                # per-iteration snapshot would differ from the original room1.
+                self.npc.location = self.room2
+                sess2.puppet = self.npc
+            return res
+
+        with patch.object(
+            self.account.sessions, "all", return_value=[self.session, sess2]
+        ), patch.object(
+            self.account, "unpuppet_object", side_effect=wrapped_unpuppet
+        ), patch.object(
+            self.account, "puppet_object", side_effect=wrapped_puppet
+        ), patch(
+            "web.webclient.actions.dispatcher.retire_sequence"
+        ), patch(
+            "web.webclient.presentation.ingress.reset_client_sequence"
+        ), patch(
+            "web.webclient.presentation.ingress.send_unpuppet_transition"
+        ), patch(
+            "web.webclient.presentation.ingress.synchronize_session"
+        ):
+            release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self.assertEqual(unpuppet_calls[:2], [self.session, sess2])
+        self.assertEqual(len(room_at_repuppet), 2)
+        for room in room_at_repuppet:
+            self.assertIs(room, self.room1)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.attributes.has("prelog_location"))
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_release_preserves_an_intentionally_remote_companion_position(self):
+        """A companion that moved away keeps its own room; no reunion teleport."""
+        enter_possession(self.char1, self.npc)
+        self.npc.move_to(self.room2, quiet=True)
+        self.assertIs(self.npc.location, self.room2)
+
+        release_possession(self.char1, npc=self.npc, reason="handback")
+
+        self.assertIs(self.npc.location, self.room2)
+        self.assertEqual(self.npc.db_location_id, self.room2.pk)
+        self.assertIn(self.npc, self.room2.contents)
+        self.assertIs(self.char1.location, self.room1)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertTrue(is_companion(self.npc, self.char1))
+        with self.assertRaises(PossessionGateError) as ctx:
+            enter_possession(self.char1, self.npc)
+        self.assertEqual(ctx.exception.reason, REASON_NOT_CO_LOCATED)
+
+    def _assert_repeat_possession_follow_and_combat(self, reason: str) -> None:
+        """Both normal reasons survive repeat possession, following and collection."""
+        self._make_combat_eligible()
+        enter_possession(self.char1, self.npc)
+        self._release_for_reason(reason)
+        self.assertTrue(is_companion(self.npc, self.char1))
+        self.assertIs(self.npc.location, self.room1)
+
+        # Repeat possession needs no operator repair and no intervening login.
+        enter_possession(self.char1, self.npc)
+        self.assertEqual(self.session.puppet, self.npc)
+        self._release_for_reason(reason)
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIs(self.npc.location, self.room1)
+
+        self.char1.move_to(self.room2, quiet=True)
+        follow_companions(self.char1, self.room1, destination=self.room2)
+        self.assertIs(self.npc.location, self.room2)
+        self.assertEqual(
+            [int(npc.pk) for npc in combat_companions(self.char1)],
+            [int(self.npc.pk)],
+        )
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_handback_allows_repeat_possession_follow_and_combat_collection(self):
+        """Scenario: The released companion can be possessed again, then follows."""
+        self._assert_repeat_possession_follow_and_combat("handback")
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_party_change_allows_repeat_possession_follow_and_combat_collection(self):
+        """Scenario: A party-change handback leaves the same eligibility."""
+        self._assert_repeat_possession_follow_and_combat("party_change")
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_membership_removal_after_release_leaves_the_companion_on_grid(self):
+        """Release keeps membership; the owning removal never stashes the body."""
+        enter_possession(self.char1, self.npc)
+
+        release_for_party_change(self.npc, self.char1)
+
+        # Release boundary: still a member, still in the shared room.
+        self.assertTrue(is_companion(self.npc, self.char1))
+        self.assertIn(self.npc.pk, party_ids(self.char1))
+        self.assertIs(self.npc.location, self.room1)
+
+        # The owning operation then removes the legitimate source.
+        leave_party(self.npc, self.char1, reason="dismissed")
+
+        self.assertFalse(is_companion(self.npc, self.char1))
+        self.assertNotIn(self.npc.pk, party_ids(self.char1))
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_failure_after_residual_cleanup_restores_room_and_logout_metadata(self):
+        """The new compensation surface restores room and logout metadata."""
+        enter_possession(self.char1, self.npc)
+        self.assertEqual(self.npc.attributes.get("prelogout_location"), self.room1)
+
+        self._release_failing_after_residual_cleanup()
+
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertTrue(self.npc.attributes.has("prelogout_location"))
+        self.assertEqual(self.npc.attributes.get("prelogout_location"), self.room1)
+        self.assertIsNotNone(current_possession(self.char1))
+        self.assertEqual(self.npc.db.possessed_by, self.char1.pk)
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertTrue(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+
+        # A successful retry then leaves the room and the metadata clean.
+        release_possession(self.char1, npc=self.npc, reason="handback")
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.attributes.has("prelog_location"))
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_rollback_restores_absent_logout_attributes(self):
+        """Compensation re-removes logout Attributes that were absent at snapshot."""
+        enter_possession(self.char1, self.npc)
+        self.npc.attributes.remove("prelogout_location")
+        self.npc.attributes.remove("prelog_location")
+
+        self._release_failing_after_residual_cleanup()
+
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.attributes.has("prelog_location"))
+        self.assertEqual(self.session.puppet, self.npc)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_rollback_restores_present_logout_attribute_values(self):
+        """Compensation restores a present-None and a foreign logout target exactly."""
+        enter_possession(self.char1, self.npc)
+        self.npc.attributes.add("prelogout_location", None)
+        self.npc.attributes.add("prelog_location", self.room2)
+
+        self._release_failing_after_residual_cleanup()
+
+        self.assertTrue(self.npc.attributes.has("prelogout_location"))
+        self.assertIsNone(self.npc.attributes.get("prelogout_location"))
+        self.assertTrue(self.npc.attributes.has("prelog_location"))
+        self.assertEqual(self.npc.attributes.get("prelog_location"), self.room2)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_accountless_possession_release_and_rollback_preserve_logout_metadata(self):
+        """Account-less releases clear residuals on success and restore exact metadata on rollback."""
+        owner = create_object(PlayerCharacter, key="無帳號玩家", location=self.room1)
+        npc = create_object(LLMNPC, key="無帳號同伴", location=self.room1)
+        join_party(npc, owner)
+
+        cases = [
+            ("absent", "absent"),
+            ("present_none", "present_none"),
+            ("foreign_room", "foreign_room"),
+            ("foreign_room", "present_none"),
+            ("absent", "foreign_room"),
+        ]
+
+        def _configure(attr, mode):
+            if mode == "absent":
+                npc.attributes.remove(attr)
+            elif mode == "present_none":
+                npc.attributes.add(attr, None)
+            elif mode == "foreign_room":
+                npc.attributes.add(attr, self.room2)
+
+        def _assert_attr(attr, mode):
+            if mode == "absent":
+                self.assertFalse(npc.attributes.has(attr))
+            elif mode == "present_none":
+                self.assertTrue(npc.attributes.has(attr))
+                self.assertIsNone(npc.attributes.get(attr))
+            elif mode == "foreign_room":
+                self.assertTrue(npc.attributes.has(attr))
+                self.assertEqual(npc.attributes.get(attr), self.room2)
+
+        for prelogout_mode, prelog_mode in cases:
+            with self.subTest(prelogout=prelogout_mode, prelog=prelog_mode):
+                try:
+                    enter_possession(owner, npc)
+                    _configure("prelogout_location", prelogout_mode)
+                    _configure("prelog_location", prelog_mode)
+
+                    snapshot = snapshot_party_control(owner, npc)
+                    self.assertIsNone(snapshot["account"])
+
+                    # Normal release completes and clears residuals via account-less _unpuppet
+                    release_possession(owner, npc=npc, reason="handback")
+                    self.assertIs(npc.location, self.room1)
+                    self.assertFalse(npc.attributes.has("prelogout_location"))
+                    self.assertFalse(npc.attributes.has("prelog_location"))
+
+                    # Rollback restores exact metadata via account-less restore_party_control
+                    restore_party_control(owner, npc, snapshot)
+                    self.assertIs(npc.location, self.room1)
+                    self.assertEqual(npc.db_location_id, self.room1.pk)
+                    self.assertIn(npc, self.room1.contents)
+                    _assert_attr("prelogout_location", prelogout_mode)
+                    _assert_attr("prelog_location", prelog_mode)
+                finally:
+                    # Reset possession state on owner and npc for next iteration
+                    owner.db.possession = None
+                    npc.db.possessed_by = None
+                    npc.locks.remove("puppet")
+
+        # Successful clean release at end
+        enter_possession(owner, npc)
+        release_possession(owner, npc=npc, reason="handback")
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(npc.db_location_id, self.room1.pk)
+        self.assertFalse(npc.attributes.has("prelogout_location"))
+        self.assertFalse(npc.attributes.has("prelog_location"))
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_recovery_puppeting_failure_restores_exact_logout_metadata(self):
+        """Recovery puppeting executes the real hook then raises; finally restores exact metadata."""
+        import world.rules.possession as possession_mod
+        real_unpuppet = possession_mod._unpuppet
+        real_puppet_object = self.account.puppet_object
+
+        def unpuppet_then_fail(*args, **kwargs):
+            real_unpuppet(*args, **kwargs)
+            raise RuntimeError("simulated release failure triggering compensation")
+
+        def puppet_hook_then_raise(session, target):
+            real_puppet_object(session, target)
+            if target == self.npc:
+                raise RuntimeError("recovery puppet hook failed after real execution")
+
+        cases = [
+            ("absent", "absent"),
+            ("present_none", "present_none"),
+            ("foreign_room", "foreign_room"),
+            ("foreign_room", "present_none"),
+            ("absent", "foreign_room"),
+        ]
+
+        def _configure(attr, mode):
+            if mode == "absent":
+                self.npc.attributes.remove(attr)
+            elif mode == "present_none":
+                self.npc.attributes.add(attr, None)
+            elif mode == "foreign_room":
+                self.npc.attributes.add(attr, self.room2)
+
+        def _assert_attr(attr, mode):
+            if mode == "absent":
+                self.assertFalse(self.npc.attributes.has(attr))
+            elif mode == "present_none":
+                self.assertTrue(self.npc.attributes.has(attr))
+                self.assertIsNone(self.npc.attributes.get(attr))
+            elif mode == "foreign_room":
+                self.assertTrue(self.npc.attributes.has(attr))
+                self.assertEqual(self.npc.attributes.get(attr), self.room2)
+
+        for prelogout_mode, prelog_mode in cases:
+            with self.subTest(prelogout=prelogout_mode, prelog=prelog_mode):
+                try:
+                    enter_possession(self.char1, self.npc)
+                    _configure("prelogout_location", prelogout_mode)
+                    _configure("prelog_location", prelog_mode)
+
+                    with patch("world.rules.possession._unpuppet", side_effect=unpuppet_then_fail):
+                        with patch.object(self.account, "puppet_object", side_effect=puppet_hook_then_raise):
+                            with self.assertRaises(RuntimeError):
+                                release_possession(self.char1, npc=self.npc, reason="handback")
+
+                    # The finally block restored location and exact pre-release metadata
+                    self.assertIs(self.npc.location, self.room1)
+                    self.assertEqual(self.npc.db_location_id, self.room1.pk)
+                    self.assertIn(self.npc, self.room1.contents)
+                    _assert_attr("prelogout_location", prelogout_mode)
+                    _assert_attr("prelog_location", prelog_mode)
+                finally:
+                    # Reset possession state on char1 and npc for next iteration
+                    self.char1.db.possession = None
+                    self.npc.db.possessed_by = None
+                    self.npc.locks.remove("puppet")
+                    real_puppet_object(self.session, self.char1)
+                    self.npc.location = self.room1
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_outer_party_control_rollback_restores_room_and_logout_metadata(self):
+        """An outer escort compensation boundary restores every companion surface."""
+        enter_possession(self.char1, self.npc)
+
+        with self.assertRaises(RuntimeError):
+            with escort_compensation(self.char1, (self.npc,)):
+                release_for_party_change(self.npc, self.char1)
+                self.assertIs(self.npc.location, self.room1)
+                raise RuntimeError("outer escort operation failed")
+
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertEqual(self.npc.attributes.get("prelogout_location"), self.room1)
+        self.assertEqual(self.char1.db.possession["npc_dbid"], self.npc.pk)
+        self.assertEqual(self.npc.db.possessed_by, self.char1.pk)
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertTrue(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_release_event_records_the_reason_and_the_companion_room(self):
+        """One release boundary event per reason, carrying the final room."""
+        for reason in ("handback", "party_change"):
+            with self.subTest(reason=reason):
+                enter_possession(self.char1, self.npc)
+                with patch("world.rules.possession.log_info") as info:
+                    self._release_for_reason(reason)
+                info.assert_called_once()
+                event = info.call_args_list[0]
+                self.assertEqual(event.args[0], "possession_release")
+                context = event.kwargs["context"]
+                self.assertEqual(context["char"], str(self.char1.pk))
+                self.assertEqual(context["npc"], str(self.npc.pk))
+                self.assertEqual(context["reason"], reason)
+                self.assertEqual(context["room"], str(self.room1.pk))
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_repeated_release_is_a_noop_without_a_duplicate_event(self):
+        """A repeated normal release moves nothing and logs nothing."""
+        enter_possession(self.char1, self.npc)
+        release_possession(self.char1, npc=self.npc, reason="handback")
+        party_before = party_ids(self.char1)
+        location_before = self.npc.location
+
+        with patch("world.rules.possession.log_info") as info:
+            release_possession(self.char1, npc=self.npc, reason="handback")
+
+        info.assert_not_called()
+        self.assertIs(self.npc.location, location_before)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertEqual(party_ids(self.char1), party_before)
+        self.assertIsNone(self.npc.db.possessed_by)
+
     @covers_requirement(
         "companion-possession-transition::a-possessed-character-reads-as-entranced-in-the-room"
     )
@@ -582,6 +1217,9 @@ class PossessionTransitionTests(EvenniaTest):
         name_entranced = self.char1.get_display_name(self.char2)
         self.assertIn("呆立入神", name_entranced)
         self.assertEqual(name_entranced, f"{self.char1.name}（呆立入神）")
+        # The owner's body stays physically in the room while possessed.
+        self.assertIn(self.char1, self.room1.contents)
+        self.assertIn(self.npc, self.room1.contents)
 
         desc_entranced = self.char1.get_display_desc(self.char2)
         self.assertIn("呆立入神", desc_entranced)
@@ -596,6 +1234,9 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertNotIn("呆立入神", name_after)
         room_chars_after = self.room1.get_display_characters(self.char2)
         self.assertNotIn("呆立入神", room_chars_after)
+        self.assertIn(self.char1, self.room1.contents)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
 
 
 class PossessionTransitionCommandTests(EvenniaTest):
@@ -630,6 +1271,37 @@ class PossessionTransitionCommandTests(EvenniaTest):
         self.assertEqual(self.session.puppet, self.char1)
         self.assertIsNone(self.char1.db.possession)
         self.assertIsNone(self.npc.db.possessed_by)
+
+    @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_unpossess_command_keeps_the_companion_in_the_shared_room(self):
+        """The 歸位 command returns control without stashing the companion."""
+        enter_possession(self.char1, self.npc)
+        self.assertEqual(self.session.puppet, self.npc)
+        self.assertIn(self.npc, self.room1.contents)
+
+        cmd = CmdUnpossess()
+        cmd.caller = self.npc
+        cmd.session = self.session
+        cmd.args = ""
+        cmd.raw_string = "unpossess"
+        with patch.object(self.npc, "msg"):
+            cmd.func()
+
+        self.assertEqual(self.session.puppet, self.char1)
+        self.assertIs(self.npc.location, self.room1)
+        self.assertEqual(self.npc.db_location_id, self.room1.pk)
+        self.assertIn(self.npc, self.room1.contents)
+        self.assertIn(self.char1, self.room1.contents)
+        self.assertTrue(is_companion(self.npc, self.char1))
+        self.assertIn(self.npc.pk, party_ids(self.char1))
+        self.assertIsNone(self.char1.db.possession)
+        self.assertIsNone(self.npc.db.possessed_by)
+        self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.cmdset.has(PossessedCharacterCmdSet))
+        self.assertNotIn(f"id({self.account.id})", self.npc.locks.get("puppet") or "")
 
     @covers_requirement(
         "companion-possession-transition::entering-possession-transfers-the-puppet-with-a-verify-then-recover-ladder"

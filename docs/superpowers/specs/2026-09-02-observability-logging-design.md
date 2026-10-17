@@ -288,6 +288,7 @@ Evennia 的 cmdhandler 只在命令正常完成時呼叫 `at_post_cmd`（func �
 
 | `quest_beat_published` | `beat_id`, `quest`, `snapshot_id`, `owner`; committed linked publication, never blueprint or prose |
 | `quest_beat_publication_rejected` | `beat_id`, `snapshot_id`, `owner`; warning with sanitized exception type/message, no blueprint or prose-bearing chain |
+| `possession_release` | `char`、`npc`、`reason`、`room`；正常歸位或隊伍變更交還控制權的狀態邊界（`handback`／`party_change`），記錄同伴最終所在房間 |
 
 ### 4.3 AI／外部服務邊界
 
