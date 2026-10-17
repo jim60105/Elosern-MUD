@@ -18,6 +18,8 @@ Every allied actor receives an explicit bounded policy script that submits real 
 
 The eligible tuning surface is finite: K, defend_reduction, dodge_threshold_bonus; the real weapon multipliers and ceilings selected in equipment-growth-runtime-calibration; and at most the two existing physical skill definitions used as the conditional and multi-strike probe cases in factor-budget evidence. Choose those two registry keys from the actual preceding evidence before a tuning run and record them, never an unnamed new attack. No global skill weakening, stat/proficiency growth or unrelated magic/heal/armor redesign. Compare the32 baseline trials with the same32 selected-value trials once; values may be retained if evidence supports them. Any implicated further probe reuses this finite set, never drops a required cell. Record baseline/selected values, outcomes, rejects, elapsed rounds, medians, restrictions, backend/revision and diagnoses. A failed real-kit match blocks acceptance. Historical projected evidence and sampled higher-tier limitations remain qualified; no universal balance guarantee is made.
 
+Recorded before the tuning run: the multi-strike probe key is `flowing_strikes` (coefficient 1.4 with one extra strike, i.e. the two-strike case the factor-budget evidence declared) and the conditional probe key is `blade_saint_arts` (coefficient 4.0). Every shipped declaration carrying a non-empty matched predicate is a magic effect, so no physical skill declares one; `blade_saint_arts` is the nearest shipped physical analogue of the conditional case and is recorded as such in `docs/development/human-combat-calibration-evidence.md`. Neither key was changed: no observed combined result required it.
+
 
 ## Risks / Trade-offs
 

@@ -31,6 +31,7 @@ from world.rules.character_creation import (
 from world.rules.combat import (
     Battlefield,
     BattlefieldActionContext,
+    COMBAT_YAML,
     RoundTactical,
     _handle_damage,
     _heal_magnitude,
@@ -56,7 +57,19 @@ from world.rules.combat_session.policies import (
     _basic_attack_request,
     _enemy_policy,
 )
+from world.rules.combat_session import (
+    _context_for,
+    _persist,
+    confirm_actor_command,
+    read_session,
+    reconstruct_battlefield,
+    submit_player_action,
+    submit_player_item_use,
+)
+from world.rules.combat_session.battlefield import _commandable_required_actors
 from world.rules.combat_session.records import CombatSessionRecord
+from world.rules.party import join_party
+from world.rules.items import ItemUseRequest, preflight_item_use
 from world.rules.guild_exam_restrictions import (
     activate_exam_restriction,
     preflight_exam_restriction,
@@ -1390,3 +1403,759 @@ class CombatFactorBudgetTests(EvenniaTest):
                     settled += target.traits.hp.base - _stored_hp(target)
                 self.assertAlmostEqual(settled / 100, expected, places=4)
                 self.assertAlmostEqual(projection.damage, expected, places=4)
+
+
+# ---------------------------------------------------------------------------
+# Combined player/enemy encounter calibration
+# (party-combat-encounter-calibration, change 19 of the party-combat batch)
+# ---------------------------------------------------------------------------
+
+#: The exact seeds every encounter cell runs: eight cells x four seeds is the
+#: bounded 32-trial pass the batch contract fixes.
+CALIBRATION_SEEDS: tuple[int, ...] = (0, 1, 2, 3)
+#: The same 200-round bound the preceding calibration probes used.
+CALIBRATION_MAX_ROUNDS = 200
+#: The three-member party's fixed round-start tactical rounds (1-based round
+#: number -> (member index, tactical key)). Each declaration consumes that
+#: member's action for the round and is admitted through the draft facade's
+#: own tactical entry kind, never as an ordinary action.
+_D_PARTY_TACTICAL_ROUNDS: dict[int, tuple[int, str]] = {
+    2: (0, "defend"),
+    3: (1, "dodge"),
+    4: (2, "taunt"),
+}
+#: The supporter's own-inventory consumable, granted through the ordinary
+#: inventory rule so the item selection is a real held-item use.
+_D_PARTY_ITEM = "healing_potion"
+#: The explicit attack chain every scripted ally selects from, in order. The
+#: first affordable permitted entry wins; ``basic_attack`` is the legal
+#: default and the chain is the same order the preceding probes selected with.
+_ENCOUNTER_ATTACK_CHAIN = (
+    "true_sword_saint",
+    "blade_saint_arts",
+    "thousand_blade_art",
+    "tendon_sever",
+    "flowing_strikes",
+    "basic_swordplay",
+)
+
+
+@dataclass(frozen=True)
+class EncounterCell:
+    """One named human-only encounter cell of the bounded eight-cell set."""
+
+    label: str
+    #: Restriction rank; ``None`` selects the F-rank creation kit build.
+    rank: str | None
+    #: How many allied humans fight in this cell (1 or the D party's 3).
+    party_size: int
+    #: The monster factory tag this cell faces.
+    monster: str
+    #: ``True`` keeps the real enemy behaviour policy (its own flee policy);
+    #: ``False`` supplies a deterministic basic-attack enemy, exactly as the
+    #: preceding stand-and-fight probes did.
+    real_enemy_policy: bool = False
+
+
+#: The eight existing human-only encounter cells. No new species, elf/beastfolk
+#: target or calamity cell is added, and the two high probes stay unshipped.
+ENCOUNTER_CELLS: tuple[EncounterCell, ...] = (
+    EncounterCell("F_creation_kit_vs_grain_pecker", None, 1, "grain_pecker"),
+    EncounterCell("E_senior_vs_E_ordinary", "E", 1, "shore_walker"),
+    EncounterCell("D_party_vs_D_ordinary", "D", 3, "wood_stalker"),
+    EncounterCell("C_senior_vs_C_ordinary", "C", 1, "cliff_stepper", True),
+    EncounterCell("B_senior_vs_B_ordinary", "B", 1, "bank_lurker"),
+    EncounterCell("B_senior_vs_high_lower_probe", "B", 1, "high_lower"),
+    EncounterCell("B_senior_vs_high_upper_probe", "B", 1, "high_upper"),
+    EncounterCell("S_senior_vs_high_upper_probe", "S", 1, "high_upper"),
+)
+
+
+@dataclass(frozen=True)
+class EncounterOutcome:
+    """One bounded encounter trial's recorded outcome taxonomy."""
+
+    cell: str
+    seed: int
+    rounds: int
+    monster_defeated: bool
+    monster_retreated: bool
+    ally_loss: bool
+    all_standing: bool
+    unfinished: bool
+    rejected: tuple[str, ...]
+    final_ally_hps: tuple[int, ...]
+    final_monster_hp: int
+    #: Rounds whose resolution carried the simulation marker.
+    simulated_rounds: int
+    #: Rounds whose provider was the session's draft-derived party provider.
+    draft_rounds: int
+    #: Every ally's practice/skill/declared-base surfaces were unchanged.
+    growth_frozen: bool
+    #: The balance values this pass consumed, read through their real
+    #: consumer sources: ratio mitigation K, the Defend reduction, the Dodge
+    #: threshold bonus, and each ally's worn weapon factor.
+    balance_values: tuple[float, float, float, tuple[float, ...]]
+    #: Enemy decisions taken through the shipped ``monster_behaviour_policy``
+    #: and through the deterministic stand-and-fight policy, respectively.
+    real_enemy_decisions: int
+    deterministic_enemy_decisions: int
+
+
+def _build_encounter_monster(cell: EncounterCell, room: Room) -> Monster:
+    """Build the cell's monster from its factory tag."""
+    if cell.monster == "grain_pecker":
+        monster = construct_species_individual("sway_whistle_sparrow", "grain_pecker")
+    elif cell.monster == "shore_walker":
+        monster = construct_species_individual("tide_lamp_crab", "shore_walker")
+    elif cell.monster == "wood_stalker":
+        monster = construct_species_individual("fog_mane_lynx", "wood_stalker")
+    elif cell.monster == "cliff_stepper":
+        monster = construct_species_individual("rock_echo_goat", "cliff_stepper")
+    elif cell.monster == "bank_lurker":
+        monster = construct_species_individual("tide_devouring_crocodile", "bank_lurker")
+    elif cell.monster == "high_lower":
+        monster = _build_synthetic_probe_monster(
+            "high_lower", hp=320, attack=28, agility=18, defense=20
+        )
+    elif cell.monster == "high_upper":
+        monster = _build_synthetic_probe_monster(
+            "high_upper", hp=700, attack=38, agility=26, defense=28
+        )
+    else:  # pragma: no cover - a cell tag outside this bounded set is a bug
+        raise AssertionError(f"unknown encounter monster tag {cell.monster!r}")
+    monster.location = room
+    return monster
+
+
+def _build_encounter_ally(cell: EncounterCell, room: Room, index: int) -> NPC:
+    """Build one cell ally: the F creation kit, or a restricted senior."""
+    key = f"{cell.label}_{index}"
+    if cell.rank is None:
+        profile = resolve_starting_profile("human", "human_plains")
+        values = _resolve_values(
+            profile,
+            {
+                "hp": 69, "mp": 69, "sp": 69,
+                "atk_phys": 4, "agility": 4, "defense": 4,
+                "magic_power": 5,
+            },
+        )
+        human = create_object(NPC, key=key, location=room)
+        human._apply_trait_config(_trait_config(values))
+        human.db.inventory = ["plain_sword", "leather_armor", "silver_hairpin"]
+        human.db.equipment = {
+            "weapon_main": "plain_sword",
+            "weapon_off": None,
+            "armor": "leather_armor",
+            "accessories": ["silver_hairpin"],
+        }
+        human.db.skills = {"active": ["basic_swordplay"], "passive": []}
+        return human
+
+    from world.rules.guild_exam_restrictions import PROFILES
+
+    rank = cell.rank
+    prof = PROFILES[rank]
+    human = create_object(NPC, key=key, location=room)
+    human._apply_trait_config(_trait_config({
+        "hp": 200,
+        "mp": 150,
+        "sp": 150,
+        "atk_phys": 30,
+        "agility": 30,
+        "defense": 30,
+        "magic_power": 30,
+        "guild_merit": 0,
+    }))
+    inventory = [prof.weapon, prof.armor]
+    if prof.accessory:
+        inventory.append(prof.accessory)
+    human.db.inventory = inventory
+    human.db.equipment = {
+        "weapon_main": prof.weapon,
+        "weapon_off": None,
+        "armor": prof.armor,
+        "accessories": [],
+    }
+    human.db.skills = {"active": list(prof.allowed_skills), "passive": []}
+    apply_lineage_auto_seed(human)
+    preflight_exam_restriction(human, rank)
+    activate_exam_restriction(human, f"exam_{rank}_{human.pk}", rank)
+    return human
+
+
+def _own_attack_skill(ally: Any) -> str:
+    """Return the first affordable permitted attack of the explicit chain."""
+    record = exam_restriction(ally)
+    allowed = record["allowed_skills"] if record else ally.skills.owned_keys()
+    for skill_key in _ENCOUNTER_ATTACK_CHAIN:
+        if skill_key not in allowed or not can_use_skill(ally, SKILL_REGISTRY[skill_key]):
+            continue
+        cost = SKILL_REGISTRY[skill_key].cost
+        if all(
+            _stored_trait_value(getattr(ally.traits, resource)) >= amount
+            for resource, amount in cost.items()
+        ):
+            return skill_key
+    return BASIC_ATTACK_KEY
+
+
+#: The rounds (1-based) the party's supporter offers its own inventory item.
+#: Two turns inside the first cycle, so the item selection is exercised
+#: without ever submitting a use whose consumable is already spent.
+_D_PARTY_ITEM_ROUNDS = (2, 5)
+
+
+def _item_turn(
+    ally: Any, battlefield: Battlefield, record: CombatSessionRecord
+) -> dict[str, Any] | None:
+    """Return the supporter's own-inventory item selection, or ``None``.
+
+    The script consults the same public item preflight the facade enforces, so
+    the selection it submits is a real legal use: the consumable-targeting
+    choice is the party's most wounded living member, exactly the command a
+    player would issue.
+    """
+    party_keys = battlefield.teams.get(battlefield.team_of(str(ally.key)), frozenset())
+    candidates = [
+        battlefield.roster[key]
+        for key in party_keys
+        if key in battlefield.roster
+        and not battlefield.is_knocked_out(key)
+        and _stored_hp(battlefield.roster[key]) > 0
+    ]
+    if not candidates:
+        return None
+    target = min(candidates, key=lambda e: (_stored_hp(e), str(e.key)))
+    preflight = preflight_item_use(
+        ItemUseRequest(actor=ally, item_key=_D_PARTY_ITEM, target=target),
+        in_combat=True,
+        context=_context_for(battlefield, record),
+    )
+    if not preflight.allowed:
+        return None
+    return {"kind": "item", "item_key": _D_PARTY_ITEM, "target": target}
+
+
+def _encounter_command(
+    cell: EncounterCell,
+    member_index: int,
+    round_number: int,
+    ally: Any,
+    monster: Monster,
+    battlefield: Battlefield,
+    record: CombatSessionRecord,
+) -> dict[str, Any]:
+    """Return one allied actor's explicit bounded selection for this round.
+
+    The script's default is a legal attack picked from the actor's own
+    permitted chain; the three-member party additionally declares its fixed
+    tactical actions on rounds 2-4 and alternates one supporter-owned skill
+    turn and its own-inventory item turns between its other explicit attacks.
+    Every branch returns a real selection; an ineligible selection is never
+    silently replaced.
+    """
+    if cell.party_size == 3:
+        tactical = _D_PARTY_TACTICAL_ROUNDS.get(round_number)
+        if tactical is not None and tactical[0] == member_index:
+            k_action = tactical[1]
+            return {
+                "kind": "tactical",
+                "tactical_key": k_action,
+                "target_id": int(monster.pk) if k_action == "taunt" else None,
+                "target": None,
+            }
+        if member_index == 1 and round_number % 3 == 0:
+            return {
+                "kind": "skill",
+                "skill_key": _own_attack_skill(ally),
+                "target": monster,
+            }
+        if member_index == 2 and round_number in _D_PARTY_ITEM_ROUNDS:
+            item_selection = _item_turn(ally, battlefield, record)
+            if item_selection is not None:
+                return item_selection
+    return {"kind": "skill", "skill_key": _own_attack_skill(ally), "target": monster}
+
+
+def _submit_encounter_command(
+    commander: Any, ally: Any, command: dict[str, Any]
+) -> dict[str, Any]:
+    """Submit one selection through the real persistent-draft facade."""
+    if command["kind"] == "tactical":
+        record = read_session(commander)
+        return confirm_actor_command(
+            commander,
+            record.session_id,
+            record.round_revision,
+            record.draft_version,
+            int(ally.pk),
+            {
+                "kind": "tactical",
+                "payload": {
+                    "tactical_key": command["tactical_key"],
+                    "target_id": command["target_id"],
+                },
+            },
+        )
+    if command["kind"] == "item":
+        return submit_player_item_use(
+            commander,
+            command["item_key"],
+            target=command["target"],
+            commanded_actor=ally,
+        )
+    return submit_player_action(
+        commander, command["skill_key"], [command["target"]], commanded_actor=ally
+    )
+
+
+def _deterministic_enemy_policy(entity, battlefield, *, context=None, scale=1.0, decision=None):
+    """Return the stand-and-fight enemy action the earlier probes pinned.
+
+    The enemy keeps its ordinary policy boundary: it picks a legal basic
+    attack against the lowest-HP living ally. Only the cell that owns the real
+    flee policy keeps ``monster_behaviour_policy``.
+
+    ``_enemy_policy`` also passes the authored cast ``scale`` and the recorded
+    AI ``decision``; a plain basic attack consumes neither, so both are
+    accepted and deliberately unused here.
+    """
+    enemy_keys = next(
+        (
+            members
+            for team, members in battlefield.teams.items()
+            if team != battlefield.team_of(str(entity.key))
+        ),
+        frozenset(),
+    )
+    candidates = [
+        battlefield.roster[key]
+        for key in enemy_keys
+        if key in battlefield.roster
+        and not battlefield.is_knocked_out(key)
+        and _stored_hp(battlefield.roster[key]) > 0
+    ]
+    if not candidates:
+        return None
+    target = min(candidates, key=lambda e: (_stored_hp(e), str(e.key)))
+    return ActionRequest(entity, BASIC_ATTACK_KEY, [target], context)
+
+
+def _invariant_snapshot(allies: list[Any], monster: Monster) -> tuple:
+    """Return every surface a simulated trial must leave untouched."""
+    return (
+        tuple(
+            (
+                ally.key,
+                tuple(sorted((ally.db.skill_proficiency or {}).items())),
+                tuple(sorted((ally.db.skills or {}).get("active") or ())),
+                (ally.traits.hp.base, ally.traits.atk_phys.base, ally.traits.agility.base),
+            )
+            for ally in allies
+        ),
+        (monster.traits.hp.base, monster.traits.atk_phys.base),
+    )
+
+
+def _run_encounter_trial(room: Room, cell: EncounterCell, seed: int) -> EncounterOutcome:
+    """Run one bounded encounter cell trial through the persistent draft.
+
+    Every allied actor's selection is admitted through the real draft facade
+    (``submit_player_action`` / ``submit_player_item_use`` / the tactical
+    admission), so an ally acts only from a submitted command -- the round
+    resolves through the session's own draft-derived provider and no
+    autonomous allied fallback exists. The simulation marker is applied to
+    every resolved round, so ordinary growth, unlocks and rewards are frozen.
+    """
+    random.seed(seed)
+    commander = _build_encounter_ally(cell, room, 0)
+    allies = [commander]
+    for index in range(1, cell.party_size):
+        ally = _build_encounter_ally(cell, room, index)
+        join_party(ally, commander)
+        if index == 2:
+            # Two real consumables: the supporter's own inventory covers both
+            # of its item turns without ever offering a spent one.
+            add_item(ally, _D_PARTY_ITEM)
+            add_item(ally, _D_PARTY_ITEM)
+        allies.append(ally)
+    monster = _build_encounter_monster(cell, room)
+
+    for ally in allies:
+        ally.traits.hp.current = ally.traits.hp.base
+        ally.traits.mp.current = ally.traits.mp.base
+        ally.traits.sp.current = ally.traits.sp.base
+    monster.traits.hp.current = monster.traits.hp.base
+
+    before = _invariant_snapshot(allies, monster)
+    record = CombatSessionRecord(
+        session_id=f"encounter-{cell.label}-{seed}",
+        mode="hostile",
+        room_id=int(room.pk),
+        player_ids=tuple(int(ally.pk) for ally in allies),
+        enemy_ids=(int(monster.pk),),
+        fled_ids=(),
+        knocked_out_ids=(),
+        rounds_elapsed=0,
+        exam_id=None,
+    )
+    _persist(commander, record)
+
+    from world.rules.combat_session import rounds as rounds_module
+
+    real_run_round = rounds_module.run_round
+    rejected: list[str] = []
+    counters = {"rounds": 0, "simulated": 0, "draft": 0}
+    battlefield: Battlefield | None = None
+    last_round = None
+    # A fleeing monster may settle the session inside the very round it fled,
+    # which clears the durable record. The round's own battlefield is the one
+    # authority that still carries this round's ``fled`` membership, so it is
+    # read here rather than from a pre-round reconstruction.
+    monster_fled = False
+
+    def observing_run_round(field, provider, **kwargs):
+        nonlocal monster_fled
+        if kwargs.get("simulated") is True:
+            counters["simulated"] += 1
+        if callable(getattr(provider, "is_interactive_ally", None)):
+            counters["draft"] += 1
+        logs = real_run_round(field, provider, **kwargs)
+        monster_fled = monster_fled or str(monster.key) in field.fled
+        return logs
+
+    simulated_policy = lambda battlefield, record: (True, frozenset())  # noqa: E731
+    # A stand-and-fight cell supplies its enemy's deterministic basic attack
+    # exactly as the preceding probes did. The cell that owns the real flee
+    # policy resolves through the shipped ``monster_behaviour_policy`` itself,
+    # so its retreat outcome is a real policy outcome rather than a fixture
+    # choice -- and both paths are counted, so the recorded evidence says which
+    # one produced the round.
+    from world.rules.monster_behaviour import monster_behaviour_policy
+
+    enemy_decisions = {"real": 0, "deterministic": 0}
+
+    def real_enemy_policy(entity, battlefield, **kwargs):
+        enemy_decisions["real"] += 1
+        return monster_behaviour_policy(entity, battlefield, **kwargs)
+
+    def deterministic_enemy_policy(entity, battlefield, **kwargs):
+        enemy_decisions["deterministic"] += 1
+        return _deterministic_enemy_policy(
+            entity, battlefield, context=kwargs.get("context")
+        )
+
+    enemy_policy_patch = patch(
+        "world.rules.combat_session.policies.monster_behaviour_policy",
+        side_effect=(
+            real_enemy_policy if cell.real_enemy_policy else deterministic_enemy_policy
+        ),
+    )
+    with (
+        patch(
+            "world.rules.combat_session.battlefield._session_policy",
+            side_effect=simulated_policy,
+        ),
+        patch(
+            "world.rules.combat_session.rounds._session_policy",
+            side_effect=simulated_policy,
+        ),
+        patch(
+            "world.rules.combat_session.rounds.run_round",
+            side_effect=observing_run_round,
+        ),
+        enemy_policy_patch,
+    ):
+        for _ in range(CALIBRATION_MAX_ROUNDS):
+            current = read_session(commander)
+            if current is None:
+                break
+            battlefield = reconstruct_battlefield(commander, current)
+            if is_battle_over(battlefield):
+                break
+            required = _commandable_required_actors(commander, current, battlefield)
+            if not required:
+                break
+            entities = {int(entity.pk): entity for entity in battlefield.roster.values()}
+            round_number = counters["rounds"] + 1
+            result: dict[str, Any] | None = None
+            for pk in required:
+                ally = entities[pk]
+                command = _encounter_command(
+                    cell,
+                    allies.index(ally),
+                    round_number,
+                    ally,
+                    monster,
+                    battlefield,
+                    current,
+                )
+                result = _submit_encounter_command(commander, ally, command)
+                if result.get("outcome") == "rejected":
+                    rejected.append(
+                        f"{ally.key}:{result.get('reason')}"
+                        f":hp={_stored_hp(ally)}/{ally.traits.hp.base}"
+                        f":round={round_number}:command={command}"
+                    )
+                    break
+            if result is None or result.get("outcome") == "rejected":
+                break
+            if result.get("outcome") == "draft":  # pragma: no cover - a bug
+                raise AssertionError(f"the complete draft of {cell.label} did not resolve")
+            if result.get("round_record") is not None:
+                last_round = result["round_record"]
+            counters["rounds"] += 1
+
+    if battlefield is None:
+        battlefield = reconstruct_battlefield(commander, read_session(commander))
+
+    if last_round is not None:
+        final_hps = tuple(int(last_round.hp_after[int(ally.pk)]) for ally in allies)
+        final_monster_hp = int(last_round.hp_after[int(monster.pk)])
+    else:
+        final_hps = tuple(int(_stored_hp(ally)) for ally in allies)
+        final_monster_hp = int(_stored_hp(monster))
+
+    living_allies = [hp for hp in final_hps if hp > 0]
+    monster_defeated = final_monster_hp <= 0
+    monster_retreated = monster_fled or str(monster.key) in battlefield.fled
+    ally_loss = not living_allies
+    all_standing = len(living_allies) == len(allies)
+    unfinished = not (monster_defeated or monster_retreated or ally_loss)
+
+    balance_values = (
+        float(COMBAT_YAML["damage"]["mitigation_k"]),
+        float(COMBAT_YAML["tactics"]["defend_reduction"]),
+        float(COMBAT_YAML["tactics"]["dodge_threshold_bonus"]),
+        tuple(equipment_weapon_multiplier(ally) for ally in allies),
+    )
+    return EncounterOutcome(
+        cell=cell.label,
+        seed=seed,
+        rounds=counters["rounds"],
+        monster_defeated=monster_defeated,
+        monster_retreated=monster_retreated,
+        ally_loss=ally_loss,
+        all_standing=all_standing,
+        unfinished=unfinished,
+        rejected=tuple(rejected),
+        final_ally_hps=final_hps,
+        final_monster_hp=final_monster_hp,
+        simulated_rounds=counters["simulated"],
+        draft_rounds=counters["draft"],
+        growth_frozen=_invariant_snapshot(allies, monster) == before,
+        balance_values=balance_values,
+        real_enemy_decisions=enemy_decisions["real"],
+        deterministic_enemy_decisions=enemy_decisions["deterministic"],
+    )
+
+
+class EncounterCalibrationTests(EvenniaTest):
+    """The eight-cell combined player/enemy encounter calibration."""
+
+    def setUp(self):
+        super().setUp()
+        self.room = create_object(Room, key="encounter_calibration_room")
+
+    def _run_all_cells(self) -> list[EncounterOutcome]:
+        """Run the eight cells over seeds 0-3: exactly 32 bounded trials."""
+        return [
+            _run_encounter_trial(self.room, cell, seed)
+            for cell in ENCOUNTER_CELLS
+            for seed in CALIBRATION_SEEDS
+        ]
+
+    def _assert_recorded_evidence(self, outcomes: list[EncounterOutcome]) -> None:
+        """Assert every recorded evidence property of one 32-trial pass.
+
+        Each trial establishes action validity, the simulation marker, the
+        absence of an autonomous allied provider, a complete outcome taxonomy
+        and a bounded round median -- never a pinned balance outcome, so there
+        is no seeded victory band.
+        """
+        self.assertEqual(len(outcomes), len(ENCOUNTER_CELLS) * len(CALIBRATION_SEEDS))
+        for outcome in outcomes:
+            with self.subTest(cell=outcome.cell, seed=outcome.seed):
+                self.assertEqual(
+                    outcome.rejected, (), "every scripted command must resolve"
+                )
+                self.assertGreater(outcome.rounds, 0, "a bounded run executes")
+                self.assertLessEqual(outcome.rounds, CALIBRATION_MAX_ROUNDS)
+                self.assertEqual(
+                    outcome.simulated_rounds,
+                    outcome.rounds,
+                    "every round carries the simulation marker",
+                )
+                self.assertEqual(
+                    outcome.draft_rounds,
+                    outcome.rounds,
+                    "allies act only from submitted draft commands",
+                )
+                self.assertTrue(
+                    outcome.growth_frozen,
+                    "simulation freezes growth, unlocks and ordinary rewards",
+                )
+                self.assertEqual(
+                    sum(
+                        (
+                            outcome.monster_defeated,
+                            outcome.monster_retreated,
+                            outcome.ally_loss,
+                            outcome.unfinished,
+                        )
+                    ),
+                    1,
+                    "defeat, retreat, loss and unfinished are distinct outcomes",
+                )
+                self.assertFalse(
+                    outcome.unfinished,
+                    "the measured cells all reach a terminal outcome",
+                )
+                real_policy_cell = next(
+                    cell for cell in ENCOUNTER_CELLS if cell.label == outcome.cell
+                ).real_enemy_policy
+                if real_policy_cell:
+                    self.assertGreater(
+                        outcome.real_enemy_decisions,
+                        0,
+                        "the fleeing cell resolves through the shipped policy",
+                    )
+                    self.assertEqual(outcome.deterministic_enemy_decisions, 0)
+                else:
+                    self.assertEqual(outcome.real_enemy_decisions, 0)
+                    self.assertGreater(
+                        outcome.deterministic_enemy_decisions,
+                        0,
+                        "a stand-and-fight cell supplies its own enemy action",
+                    )
+        for cell in ENCOUNTER_CELLS:
+            rounds = sorted(
+                outcome.rounds for outcome in outcomes if outcome.cell == cell.label
+            )
+            middle = len(rounds) // 2
+            median = (
+                rounds[middle]
+                if len(rounds) % 2
+                else (rounds[middle - 1] + rounds[middle]) / 2
+            )
+            self.assertGreaterEqual(median, 1, "the round median is a real run")
+            self.assertLessEqual(median, CALIBRATION_MAX_ROUNDS)
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    @covers_requirement(
+        "human-combat-calibration::evidence-separates-defeat-retreat-support-safety-and-unverified-projections"
+    )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
+    )
+    def test_eight_encounter_cells_run_explicit_draft_commands_over_four_seeds(self):
+        self._assert_recorded_evidence(self._run_all_cells())
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    @covers_requirement(
+        "human-combat-calibration::combined-ratio-weapon-and-tactical-calibration-covers-both-combat-sides"
+    )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
+    )
+    def test_selected_values_reproduce_the_measured_encounter_outcomes(self):
+        # The tuning evaluation found no observed combined result that required
+        # a rebalance, so every eligible authored value is retained and the
+        # selected-value pass runs with the same values the baseline pass
+        # measured. The pass records the values it consumed through their real
+        # consumer sources and reproduces the recorded taxonomy and round
+        # counts exactly -- a deterministic comparison, not a new balance pin.
+        baseline = self._run_all_cells()
+        self._assert_recorded_evidence(baseline)
+        selected = self._run_all_cells()
+        self._assert_recorded_evidence(selected)
+        for expected, actual in zip(baseline, selected, strict=True):
+            with self.subTest(cell=expected.cell, seed=expected.seed):
+                self.assertEqual(actual.balance_values, expected.balance_values)
+                self.assertEqual(
+                    (
+                        actual.rounds,
+                        actual.monster_defeated,
+                        actual.monster_retreated,
+                        actual.ally_loss,
+                        actual.all_standing,
+                        actual.unfinished,
+                        actual.rejected,
+                        actual.final_ally_hps,
+                        actual.final_monster_hp,
+                    ),
+                    (
+                        expected.rounds,
+                        expected.monster_defeated,
+                        expected.monster_retreated,
+                        expected.ally_loss,
+                        expected.all_standing,
+                        expected.unfinished,
+                        expected.rejected,
+                        expected.final_ally_hps,
+                        expected.final_monster_hp,
+                    ),
+                )
+
+    @covers_requirement(
+        "human-combat-calibration::human-calibration-uses-real-resolver-gear-restrictions-and-bounded-outcome-evidence"
+    )
+    @covers_requirement(
+        "human-combat-calibration::real-party-encounter-evidence-records-selected-values-and-bounded-outcomes"
+    )
+    def test_an_ally_without_a_submitted_command_never_auto_attacks(self):
+        # No autonomous allied fallback: with a companion's command missing the
+        # draft stays incomplete, the round does not resolve, and the
+        # companion neither attacks nor is attacked.
+        cell = ENCOUNTER_CELLS[2]
+        commander = _build_encounter_ally(cell, self.room, 0)
+        companion = _build_encounter_ally(cell, self.room, 1)
+        join_party(companion, commander)
+        monster = _build_encounter_monster(cell, self.room)
+        monster.traits.hp.current = monster.traits.hp.base
+        record = CombatSessionRecord(
+            session_id=f"encounter-{cell.label}-no-command",
+            mode="hostile",
+            room_id=int(self.room.pk),
+            player_ids=(int(commander.pk), int(companion.pk)),
+            enemy_ids=(int(monster.pk),),
+            fled_ids=(),
+            knocked_out_ids=(),
+            rounds_elapsed=0,
+            exam_id=None,
+        )
+        _persist(commander, record)
+        simulated_policy = lambda battlefield, record: (True, frozenset())  # noqa: E731
+        with (
+            patch(
+                "world.rules.combat_session.battlefield._session_policy",
+                side_effect=simulated_policy,
+            ),
+            patch(
+                "world.rules.combat_session.rounds._session_policy",
+                side_effect=simulated_policy,
+            ),
+        ):
+            result = submit_player_action(
+                commander,
+                _own_attack_skill(commander),
+                [monster],
+                commanded_actor=commander,
+            )
+        self.assertEqual(result["outcome"], "draft", result)
+        after = read_session(commander)
+        self.assertEqual(after.rounds_elapsed, 0)
+        self.assertEqual(monster.traits.hp.current, monster.traits.hp.base)
+        self.assertEqual(
+            companion.traits.hp.current, int(companion.traits.hp.max)
+        )
+
+
+
+
