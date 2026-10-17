@@ -29,6 +29,7 @@ from world.lore.items import (
     LiturgicalRole,
 )
 from world.lore.settlements.shops import SHOP_REGISTRY
+from world.skills.equipment import EquipmentSlot
 from world.rules.buffs import BUFF_DEFINITIONS
 from world.rules.equipment_effects import (
     EQUIPMENT_EFFECT_RULES,
@@ -329,12 +330,18 @@ class EquipmentEffectRulebookTests(unittest.TestCase):
         "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
     )
     def test_weapon_multiplier_budget_overflow_is_rejected(self):
-        # plain_sword is common (weapon_multiplier ceiling 1.0).
-        self._expect_rejection(
-            lambda d: d["effects"]["plain_sword"].update(
-                {"weapon_damage_multiplier": 1.1}
+        # One step above plain_sword's own authored rarity ceiling: derived
+        # from the canonical budgets so a valid retune of either side stays
+        # consistent (the selected ceilings are authored data).
+        document = _canonical_document()
+        ceiling = document["budgets"]["common"]["weapon_multiplier"]
+
+        def mutate(d):
+            d["effects"]["plain_sword"].update(
+                {"weapon_damage_multiplier": ceiling + 0.05}
             )
-        )
+
+        self._expect_rejection(mutate)
 
     @covers_requirement(
         "equipment-effects::the-equipment-effect-rulebook-validates-a-closed-schema-at-load-time",
@@ -1146,8 +1153,10 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         self.assertEqual(
             equipment_adjustment_text("purified_pendant"), "防禦 +2｜免疫中毒"
         )
-        # Flat weapon.
-        self.assertEqual(equipment_adjustment_text("plain_sword"), "攻擊 +2")
+        # Flat weapon carrying its authored selected physical factor.
+        self.assertEqual(
+            equipment_adjustment_text("plain_sword"), "攻擊 +2｜武器傷害 x1.05"
+        )
         # Flat defense with a percent agility tradeoff.
         self.assertEqual(
             equipment_adjustment_text("chainmail"), "防禦 +5｜敏捷 −5%"
@@ -1157,6 +1166,84 @@ class ShippedAdjustmentProseContractTests(unittest.TestCase):
         # P4-only vocabulary (pleasure_gain/exposure_bias) stays absent.
         self.assertEqual(
             equipment_adjustment_text("sister_vestments"), "防禦 −4｜治療 +10%"
+        )
+
+
+class ShippedWeaponFactorContractTests(unittest.TestCase):
+    """The shipped roster's authored weapon factors stay budgeted declarations.
+
+    Every weapon-slot entry declares its factor explicitly, so the loaded
+    dataclass default of 1.0 can never stand in for an authored value: a
+    neutral 1.0 is a justified declaration for a weapon without a physical
+    attack bonus, and every physical weapon carries a selected nonneutral
+    factor inside its own rarity ceiling. Values are read from the loaded
+    rulebook and the canonical budgets document -- no per-item value is pinned
+    here; the selected values, their initial 1.0 predecessors and the measured
+    growth live in docs/development/human-combat-calibration-evidence.md.
+    """
+
+    def _weapon_entries(self):
+        document = _canonical_document()
+        for item_key, definition in sorted(ITEM_REGISTRY.items()):
+            if definition.equipment_slot not in (
+                EquipmentSlot.WEAPON_MAIN,
+                EquipmentSlot.WEAPON_OFF,
+            ):
+                continue
+            entry = document["effects"][item_key]
+            budgets = document["budgets"][definition.presentation.rarity.value]
+            yield item_key, definition, entry, budgets
+
+    @covers_requirement(
+        "equipment-effects::per-rarity-budgets-mechanically-bound-every-authored-value",
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
+        "equipment-effects::shipped-weapons-have-authored-selected-values-backed-by-real-growth-evidence",
+    )
+    def test_every_shipped_weapon_declares_a_budgeted_factor(self):
+        weapons = list(self._weapon_entries())
+        self.assertTrue(weapons)
+        for item_key, definition, entry, budgets in weapons:
+            with self.subTest(item=item_key):
+                self.assertIn("weapon_damage_multiplier", entry)
+                factor = entry["weapon_damage_multiplier"]
+                self.assertGreaterEqual(factor, 1.0)
+                self.assertLessEqual(factor, budgets["weapon_multiplier"])
+                # The loaded declaration is the authored one, never a default.
+                self.assertEqual(
+                    EQUIPMENT_EFFECT_RULES[
+                        definition.modifier_key
+                    ].weapon_damage_multiplier,
+                    float(factor),
+                )
+                physical = entry.get("adjustments", {}).get("atk_phys", 0) > 0
+                # Nonneutral exactly where the weapon carries a physical bonus:
+                # a neutral declaration is the no-physical-bonus exception.
+                self.assertEqual(factor > 1.0, physical)
+
+    @covers_requirement(
+        "equipment-effects::weapon-multiplier-uses-exactly-one-equipped-weapon-declaration",
+        "equipment-effects::shipped-weapons-have-authored-selected-values-backed-by-real-growth-evidence",
+    )
+    def test_shipped_physical_weapons_author_a_tiered_progression(self):
+        # The authored roster is not a dormant all-1.0 field: physical weapons
+        # select at least two distinct factors, and the factor selected at the
+        # highest rarity carrying a physical weapon strictly exceeds the one
+        # selected at the lowest such rarity (rarity still never selects it at
+        # runtime -- the progression is authored data, asserted as a relation).
+        tiers = [rarity.value for rarity in ItemRarity]
+        by_rarity: dict[str, set[float]] = {}
+        for item_key, definition, entry, _budgets in self._weapon_entries():
+            if entry.get("adjustments", {}).get("atk_phys", 0) <= 0:
+                continue
+            by_rarity.setdefault(definition.presentation.rarity.value, set()).add(
+                float(entry["weapon_damage_multiplier"])
+            )
+        self.assertTrue(by_rarity)
+        factors = {factor for selected in by_rarity.values() for factor in selected}
+        self.assertGreaterEqual(len(factors), 2)
+        populated = [rarity for rarity in tiers if rarity in by_rarity]
+        self.assertGreater(
+            max(by_rarity[populated[-1]]), max(by_rarity[populated[0]])
         )
 
 
