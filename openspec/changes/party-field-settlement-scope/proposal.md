@@ -36,7 +36,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **3 of 30**.
+Declared implementation order: **3 of 31**.
 
 - depends-on: party-rest-move-settlement
 
