@@ -39,7 +39,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **10 of 31**.
+Declared implementation order: **11 of 32**.
 
 - depends-on: party-rest-move-settlement
 - depends-on: companion-field-cast-actions

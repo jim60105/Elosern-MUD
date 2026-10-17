@@ -7,8 +7,9 @@
 into a concrete number of seconds, cap that value at `MAX_SKIP_SECONDS`
 (`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`,
 call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities)` with exactly the capped
-value, where `entities` is the caller's present party scope (the caller, the commander, and every
-effective companion in the caller's room, in party order). Every SKIP advance SHALL settle each
+value, where `entities` is the caller's present party scope (the commander and every effective
+companion in the commander's room, in party order; the same whether or not the caller is a
+possessed companion). Every SKIP advance SHALL settle each
 in-scope member's own standing practice booking; no skip path clears a booking it did not settle.
 
 #### Scenario: rest settles the present party
