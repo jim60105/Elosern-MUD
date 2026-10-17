@@ -245,11 +245,54 @@ const partyParticipants = (companions, downed = []) => [
     conditions: [],
   })),
 ];
+// The commanded actor's own committed stock and basic actions
+// (webclient-party-items-tactics): one SELF item, one SINGLE item over the
+// drawn foes, one item carrying its committed no-effect reason, one hostile
+// item over the party (whose submission opens the actor-bound warning), and
+// the three basic actions — 挑釁 over the same foes, 閃避 sealed with its
+// committed reason (the disabled-row state).
+const combatChoices = (roster) => {
+  const foes = roster.filter((row) => row.team === "foes").map((row) => row.identity);
+  const party = roster.filter((row) => row.team === "party").map((row) => row.identity);
+  return {
+    items: [
+      {
+        item_key: "healing_salve", label: "合成藥膏", summary: "恢復少量體力。",
+        quantity: 3, enabled: true, reason: null, target_spec: "self",
+        targets: [], hostile: false, beneficial: true,
+      },
+      {
+        item_key: "ember_flask", label: "合成火瓶", summary: "擲向一名敵人。",
+        quantity: 1, enabled: true, reason: null, target_spec: "single",
+        targets: foes, hostile: true, beneficial: false,
+      },
+      {
+        item_key: "bitter_draught", label: "苦澀藥劑", summary: "對一名同伴造成傷害。",
+        quantity: 1, enabled: true, reason: null, target_spec: "single",
+        targets: party, hostile: true, beneficial: false,
+      },
+      {
+        item_key: "empty_vial", label: "空瓶", summary: "目前沒有任何效果。",
+        quantity: 2, enabled: false,
+        reason: { code: "no_effect", message: "這件物品目前沒有可用的效果。" },
+        target_spec: "none", targets: [], hostile: false, beneficial: false,
+      },
+    ],
+    tactics: [
+      { key: "defend", label: "防禦", enabled: true, reason: null, targets: [] },
+      { key: "dodge", label: "閃避", enabled: false, reason: { code: "dodge_unavailable", message: "這名成員目前無法閃避。" }, targets: [] },
+      { key: "taunt", label: "挑釁", enabled: true, reason: null, targets: foes },
+    ],
+  };
+};
 // `conditions` spreads the plate conditions and low hit points over the
 // roster (webclient-combat-figure-plates).
 const combatPanelWith = (foes, overrides = {}, companions = 2, conditions = false, downed = []) => {
   const roster = [...partyParticipants(companions, downed), ...foeParticipants(foes, overrides)];
-  return protocolFixtures.combatActions({ ...combatRoster(conditions ? withPlateConditions(roster) : roster) });
+  return protocolFixtures.combatActions({
+    ...combatRoster(conditions ? withPlateConditions(roster) : roster),
+    choices: combatChoices(roster),
+  });
 };
 const combatRoster = (participants) => ({ participants, skills: combatSkills(participants) });
 const combatArt = (art) => ({
@@ -804,7 +847,46 @@ export const CombatSkillDetail = {
   render: renderPlayer,
   args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown"] },
 };
-export const CombatDisabledCommand = { render: renderPlayer, args: { combat: true, combatKeys: ["ArrowDown", "ArrowDown"] } };
+// A disabled row stays focusable for its explanation: the sealed 閃避 basic
+// action carries the actor's committed reason (webclient-party-items-tactics).
+export const CombatDisabledCommand = { render: renderPlayer, args: { combat: true, combatFocus: "dodge" } };
+// The commanded actor's own items (webclient-party-items-tactics): the 道具
+// frame lists the actor's stock with its quantity and effect summary, and the
+// unusable vial carries its committed reason.
+export const CombatItemStock = { render: renderPlayer, args: { combat: true, combatPath: ["items"] } };
+// One item's review step: a SELF item's 對自己使用 confirm row.
+export const CombatItemSelfUse = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: ["items", "item-healing_salve"] },
+};
+// A SINGLE item reuses the stage target step over its own server-listed foe.
+export const CombatItemTargetStep = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: ["items", "item-ember_flask"], combatFocus: "target-31" },
+};
+// The actor-bound cross-side warning for a hostile item on an ally: the card
+// asks once (webclient-combat-cross-side-confirm) and nothing is sent.
+export const CombatItemAllyWarning = {
+  render: renderPlayer,
+  args: {
+    combat: true,
+    actorIdentity: "1",
+    combatPath: ["items", "item-bitter_draught"],
+    combatFocus: "target-101",
+    combatSubmit: true,
+  },
+};
+// The basic actions: 防禦 confirms its round choice, and the sealed 閃避 row
+// carries its committed reason.
+export const CombatTacticConfirm = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: ["defend"], combatFocus: "tactic-confirm" },
+};
+// 挑釁 reuses the stage single-enemy step with the server-listed enemies.
+export const CombatTauntTargetStep = {
+  render: renderPlayer,
+  args: { combat: true, combatPath: ["taunt"], combatFocus: "target-31" },
+};
 export const CombatMasterScale = {
   render: renderPlayer,
   args: { combat: true, combatKeys: ["ArrowDown", "Enter", "ArrowDown", "Enter", "Enter", "ArrowDown", "Enter"], combatFocus: "scale-2" },
