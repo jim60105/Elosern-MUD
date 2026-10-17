@@ -35,7 +35,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **6 of 30**.
+Declared implementation order: **6 of 31**.
 
 - depends-on: party-member-authority
 - depends-on: party-transfer-text-commands
@@ -47,7 +47,7 @@ Declared implementation order: **6 of 30**.
 - `party-transfer-text-commands`: shared files `commands/items.py`, both command docs (F; that change first, hence the ordering dependency).
 - `companion-field-item-use`: shared files `web/webclient/actions/service_actions.py`, `commands/items.py`, `web/webclient-app/composables/intents.js`; shared spec `inventory-item-actions` both requirements (F; this change first, the later one re-modifies preserving `actor_id` on the toggle).
 - `party-inventory-panel`: consumes the toggle descriptor shape (D).
-- `webclient-party-bag-tab`: removes `InventoryPanel.vue` edited here (F; ordered).
+- `webclient-party-bag-retire`: removes `InventoryPanel.vue` edited here (F; ordered).
 - `.github/evennia-shards.json`: conditional manifest conflict.
 
 ### Active change coordination
