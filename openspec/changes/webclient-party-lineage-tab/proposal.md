@@ -31,7 +31,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **29 of 32**.
+Declared implementation order: **30 of 33**.
 
 - depends-on: webclient-party-skill-tab
 - depends-on: lineage-panel-v2-graphs
