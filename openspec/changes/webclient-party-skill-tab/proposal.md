@@ -21,7 +21,7 @@ None.
 
 - `webclient-party-window`: adds the skill tab requirements.
 - `webclient-skillbook-casting`: the two SkillBook requirements are renamed to the 技能 tab.
-- `webclient-contextual-hud`: the reference-drawer skill-book scenarios name the 技能 tab.
+- `webclient-contextual-hud`: the reference-drawer skill-book scenarios name the 技能 tab; the skill-book booking-control requirement is removed.
 - `webclient-component-showcase`: the status/skill surfaces requirement names `PartySkillTab`.
 - `webclient-action-dispatch`: the registry scenario no longer names SkillBook.
 
@@ -35,7 +35,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **26 of 30**.
+Declared implementation order: **27 of 31**.
 
 - depends-on: webclient-party-status-tab
 - depends-on: companion-field-cast-actions

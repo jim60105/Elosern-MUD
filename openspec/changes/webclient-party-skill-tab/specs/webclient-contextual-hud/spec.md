@@ -68,3 +68,9 @@ The client's reference surfaces SHALL render in a wide workspace 12px below the 
 #### Scenario: Book use transfers the modal focus owner
 - **WHEN** the player deliberately activates book use and its authoritative flow is ready
 - **THEN** the book closes, its scrim/trap retires, and focus moves to the sole dock-owned casting flow without a behind-drawer control becoming interactive
+
+## REMOVED Requirements
+
+### Requirement: The skill book offers a practice booking control
+**Reason**: `SkillBook` is deleted; booking moves to the party window's 技能 tab action bar (排入修煉).
+**Migration**: See `webclient-party-window` requirement "The skill tab casts and books for the viewed member".
