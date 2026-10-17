@@ -20,7 +20,8 @@ None.
 
 ### Modified Capabilities
 
-- `webclient-desktop-shell`: the tool-group and stable-placement requirements, plus an added hotkey requirement.
+- `webclient-desktop-shell`: the tool-group, stable-placement, required-surfaces and keyboard-routing requirements, plus an added hotkey requirement.
+- `webclient-contextual-hud`: the reference-surfaces requirement names the party and shop windows.
 
 ## Impact
 
@@ -32,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **29 of 30**.
+Declared implementation order: **30 of 31**.
 
 - depends-on: webclient-shop-window
 
