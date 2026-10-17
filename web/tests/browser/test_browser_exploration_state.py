@@ -612,7 +612,11 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         ``(action_code, label, params)``), on an affordance-free panel."""
         return {
             "context_actions": {
-                "schema_version": 6,
+                # The registered ``context_actions`` schema version
+                # (CONTEXT_ACTIONS_SCHEMA_VERSION in the client mirror): v7
+                # since the party-combat protocol cutover. The exploration
+                # form's exact field set is unchanged.
+                "schema_version": 7,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -726,7 +730,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._wait_exploration_available(page)
         pinned_context = {
             "context_actions": {
-                "schema_version": 6,
+                "schema_version": 7,
                 "available": True,
                 "kind": "exploration",
                 "affordances": [],
@@ -807,7 +811,7 @@ class ExplorationBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         def context_actions(suggestions: dict) -> dict:
             return {
                 "context_actions": {
-                    "schema_version": 6,
+                    "schema_version": 7,
                     "available": True,
                     "kind": "exploration",
                     "affordances": [],

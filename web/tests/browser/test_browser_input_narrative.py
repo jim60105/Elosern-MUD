@@ -1180,6 +1180,12 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # while the wire envelope carries exactly the action payload. The clear
         # and the dispatch run in ONE evaluate (Pinia store: clear the unwrapped
         # array in place) so no server update interleaves.
+        # The carrier is the live SkillBook field cast ``explore.cast`` — the
+        # only shipped action whose catalog entry composes the canonical
+        # `cast <skill>[=<target>]` line from the display descriptor
+        # (web/static/webclient/js/elosern/command_echo.js). The v7 party
+        # cutover retired ``combat.cast`` to a silent ``combat.command``, so the
+        # old id has no catalog entry and could never echo a line.
         # The staged payload and display descriptors are inert here: the
         # journey proves the envelope passes through byte-identical and the
         # echo renders from the descriptor only — nothing resolves these
@@ -1188,7 +1194,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         page.evaluate(
             """(p) => {
               window.__elosernBridge.store.narrative.length = 0;
-              return Elosern.actions.submit('combat.cast', p,
+              return Elosern.actions.submit('explore.cast', p,
                 { skillLabel: '燼心爆', targetLabel: '燼殼工蟲' });
             }""",
             payload,
@@ -1201,7 +1207,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         ]
         self.assertEqual(len(envelopes), 1)
         envelope = envelopes[0]
-        self.assertEqual(envelope["action_id"], "combat.cast")
+        self.assertEqual(envelope["action_id"], "explore.cast")
         self.assertEqual(
             json.dumps(envelope["payload"], sort_keys=True),
             json.dumps(payload, sort_keys=True),
@@ -1212,7 +1218,7 @@ class DrawerNarrativeBrowserTest(BrowserAcceptanceTest):
         # without the skill label, so nothing echoes.
         self._wait_action_idle(page)
         page.evaluate(
-            "() => Elosern.actions.submit('combat.cast', "
+            "() => Elosern.actions.submit('explore.cast', "
             "{ skill_key: 't_ember_burst', target_ids: [1] })"
         )
         self._wait_action_idle(page)

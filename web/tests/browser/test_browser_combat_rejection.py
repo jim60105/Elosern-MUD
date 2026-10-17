@@ -124,9 +124,17 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         wait_for_presentation_settled(page)
         session = self._combat_panel(page)["session"]
         prev_result = store_state(page)["lastActionResult"]
-        # A modified client may name the correct session/revision/operation
-        # but cannot forge the server-bound token: the rules boundary rejects
-        # the confirmation before any draft, round or session mutation.
+        # A modified client may name any session/revision/operation but cannot
+        # forge the server-bound token. The rules boundary's admission order
+        # verifies the token first — a pure computation over the caller's own
+        # claims (world.rules.combat_session.exit._verify_confirmation_token),
+        # so that no server state is disclosed by which check failed — and only
+        # then rereads the durable session inside the serialized unit. A forged
+        # token therefore rejects as `invalid_confirmation_token` before any
+        # draft, round or session mutation; `unknown_session_id` is reserved for
+        # a digest-valid token whose claimed session no longer matches the
+        # commander's current record (the party-combat-confirmed-surrender
+        # design's documented order).
         page.evaluate(
             "(s) => Elosern.actions.submit('combat.exit_confirm', {"
             " session_id: 'hostile:999:0',"
@@ -145,9 +153,11 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
 
         wait_for_store_state(page, _fresh_rejected)
         result = self._last_result(page)
-        self.assertEqual(result["code"], "unknown_session_id")
+        self.assertEqual(result["code"], "invalid_confirmation_token")
         panel = self._combat_panel(page)
-        self.assertEqual(panel["session"]["session_id"], session_id)
+        # The rejection mutated nothing: the same live session is still committed.
+        self.assertEqual(panel["session"]["session_id"], session["session_id"])
+        self.assertEqual(panel["session"]["round_revision"], session["round_revision"])
 
 
 class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -181,6 +191,57 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             return state.get("mode") == "combat" and panel.get("available") is True
 
         wait_for_store_state(page, _combat_panel_ready, timeout=timeout)
+
+    def _command_every_required_actor(self, page) -> int:
+        """Command the round's actors; returns the ui_action count.
+
+        The v7 party protocol commits a round only when the durable draft holds
+        every required actor's command, so one submission saves the draft
+        (``draft_saved``, 指令已確認，等待其他成員) and the server republishes the
+        next missing member as the requested actor. The commander opens with a
+        basic attack on the last participant and every other member holds the
+        line with the non-damaging Defend tactic, so the round carries exactly
+        one attack, the foe stays above its flee boundary and the fight is
+        still active for the reconnect these journeys drive.
+        """
+        panel = self._combat_panel(page)
+        required = list(panel["draft"]["required_actor_ids"])
+        self.assertTrue(required, "an active draft names its required actors")
+        round_before = int(panel["session"]["round"])
+        target = panel["participants"][-1]["identity"]
+        commands = 0
+        for _ in required:
+            wait_for_presentation_settled(page)
+            actor_id = int(self._combat_panel(page)["choices"]["actor_id"])
+            if commands == 0:
+                submit_combat_command(
+                    page, {"skill_key": SYNTH_INNATE_ATTACK_KEY, "target_ids": [target]}
+                )
+            else:
+                submit_combat_command(page, {"key": "defend"}, kind="tactic")
+            commands += 1
+            wait_for_store_state(
+                page,
+                lambda s, a=actor_id: self._command_landed(s, a, round_before),
+            )
+        return commands
+
+    @staticmethod
+    def _command_landed(state: dict, actor_id: int, round_before: int) -> bool:
+        """Whether one submitted command reached the committed presentation.
+
+        A draft save publishes the actor's own entry; the round-committing
+        command publishes the newer round. Leaving the mode is the same signal,
+        so a round that settles the fight terminally is never mistaken for a
+        command that never landed.
+        """
+        if state.get("mode") != "combat":
+            return True
+        panel = (state.get("panels") or {}).get("context_actions") or {}
+        if int((panel.get("session") or {}).get("round") or 0) > round_before:
+            return True
+        entries = ((panel.get("draft") or {}).get("entries")) or []
+        return any(entry.get("actor_id") == actor_id for entry in entries)
 
     @covers_requirement("webclient-combat-menu::reconnect-rebuilds-combat-without-replaying-intent")
     def test_reconnect_resumes_same_session_without_new_round(self):
@@ -291,19 +352,12 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             "  }, 100);"
             "}"
         )
-        target = self._combat_panel(page)["participants"][-1]["identity"]
-        submit_combat_command(
-            page, {"skill_key": SYNTH_INNATE_ATTACK_KEY, "target_ids": [target]}
-        )
-        # The cast is admitted and a round commits; the result reaches the store
-        # but the client's in-flight request is never released (the no-op timer
-        # keeps the result out of the client).
-        def _round_committed(state: dict) -> bool:
-            panel = (state.get("panels") or {}).get("context_actions") or {}
-            session = panel.get("session") or {}
-            return bool(panel.get("available")) and int(session.get("round") or 0) >= 1
-
-        wait_for_store_state(page, _round_committed)
+        # Every required actor's command is needed before a round commits, so
+        # the walk submits one basic attack per member and the LAST one is the
+        # committing command. The results reach the store but the client's
+        # in-flight request is never released (the no-op timer keeps them out
+        # of the client).
+        commands = self._command_every_required_actor(page)
         # The assertions below read the action client's in-memory
         # uncertain-notice state and the outbound recorder; a one-shot
         # recovery reload (fired by a slow re-attach under load) would wipe
@@ -415,7 +469,9 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # was already sent once before the disconnect).
         from .browser_helpers import sent_action_count
 
-        self.assertEqual(sent_action_count(page, "combat.command"), 1)
+        # No automatic replacement command after the reconnect: only the
+        # commands the journey itself submitted are on the wire.
+        self.assertEqual(sent_action_count(page, "combat.command"), commands)
 
         # Leave the shared server clean for subsequent tests.
         page.evaluate("Evennia.msg('text', ['combat forfeit'], {})")
@@ -432,16 +488,7 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         # notice. This control proves the uncertain flag is set only for
         # genuinely unconfirmed mutations.
         wait_for_presentation_settled(page)
-        target = self._combat_panel(page)["participants"][-1]["identity"]
-        submit_combat_command(
-            page, {"skill_key": SYNTH_INNATE_ATTACK_KEY, "target_ids": [target]}
-        )
-        def _round_committed(state: dict) -> bool:
-            panel = (state.get("panels") or {}).get("context_actions") or {}
-            session = panel.get("session") or {}
-            return bool(panel.get("available")) and int(session.get("round") or 0) >= 1
-
-        wait_for_store_state(page, _round_committed)
+        commands = self._command_every_required_actor(page)
         # The in-flight gate releases once the committed revision reaches the
         # declared presentation revision: the mutation is confirmed.
         def _in_flight_released(state: dict) -> bool:
@@ -491,7 +538,9 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         )
 
         from .browser_helpers import sent_action_count
-        self.assertEqual(sent_action_count(page, "combat.command"), 1)
+        # No automatic replacement command after the reconnect: only the
+        # commands the journey itself submitted are on the wire.
+        self.assertEqual(sent_action_count(page, "combat.command"), commands)
 
         # Leave the shared server clean for subsequent tests.
         page.evaluate("Evennia.msg('text', ['combat forfeit'], {})")

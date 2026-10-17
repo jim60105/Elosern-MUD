@@ -639,7 +639,10 @@ class VueFoundationBrowserTest(BrowserAcceptanceTest):
         # Drive the store to an active session through the stable test hook
         # (the live OOB delivery of these envelopes is C3's transport work).
         context_actions = {
-            "schema_version": 6,
+            # The registered ``context_actions`` version (v7 since the
+            # party-combat protocol cutover); the exploration form's exact
+            # field set is unchanged.
+            "schema_version": 7,
             "available": True,
             "kind": "exploration",
             "affordances": [

@@ -23,9 +23,11 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     store_state_or_none,
+    submit_combat_command,
     wait_for_page_shown,
     wait_for_presentation_settled,
     wait_for_shell_active,
+    wait_for_store_state,
 )
 from .harness import ManagedServerTearDownMixin
 
@@ -87,28 +89,93 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 return participant["identity"]
         raise AssertionError("no enemy participant")
 
-    def _cast_basic_attack(self, page) -> str:
-        """One basic attack through the dock: the attack opener, then the foe.
+    def _cast_basic_attack(self, page) -> int:
+        """Command the round's actors; returns the ui_action count.
 
-        The keyboard path only: the root's first item opens the target menu,
-        and the foe's own row is focused by its key (the committed
-        `target-<identity>` contract) rather than by a press count, because a
-        synthetic preset arrives with a companion on the target frame.
+        The player's own actor takes the keyboard path: the root's first item
+        opens the target menu, and the foe's own row is focused by its key (the
+        committed `target-<identity>` contract) rather than by a press count,
+        because a synthetic preset arrives with a companion on the target frame.
+
+        Under the v7 party protocol a round commits only when the durable draft
+        holds every required actor's command (webclient-combat-menu: "Party
+        protocol publishes bounded actor choices and durable progress"): one
+        submission saves the draft (`draft_saved`, 指令已確認，等待其他成員) and
+        the server republishes the next missing member as the requested actor.
+        Every other member is therefore commanded too — with the non-damaging
+        Defend tactic, so the round holds exactly one attack and the foe stays
+        above its flee boundary (a second attack would cross it and settle the
+        fight terminally instead of in an ordinary round).
         """
         self._wait_combat_mode(page)
-        wait_for_presentation_settled(page)
-        focus_action_dock(page)
-        page.keyboard.press("Enter")  # attack (the root's first item) -> target menu
-        page.wait_for_timeout(120)
-        target = self._basic_attack_target_identity(page)
-        focused = page.evaluate(
-            "(key) => window.__elosernBridge.store.focusItemByKey(key)",
-            f"target-{target}",
+        panel = self._wait_commandable(page)
+        required = list(panel["draft"]["required_actor_ids"])
+        self.assertTrue(required, "an active draft names its required actors")
+        started_round = int(panel["session"]["round"])
+        controlled = int(
+            store_state(page)["panels"]["status"]["actor"]["identity"]
         )
-        self.assertTrue(focused, "the target frame holds the foe's own row")
-        page.keyboard.press("Enter")  # select the monster target
-        page.wait_for_timeout(120)
-        return target
+        commands = 0
+        for _actor in required:
+            wait_for_presentation_settled(page)
+            requested = int(self._wait_commandable(page)["choices"]["actor_id"])
+            if commands == 0:
+                self.assertEqual(
+                    requested, controlled, "the player's own actor opens the round"
+                )
+                focus_action_dock(page)
+                page.keyboard.press("Enter")  # attack (the first root item)
+                page.wait_for_timeout(120)
+                target = self._basic_attack_target_identity(page)
+                focused = page.evaluate(
+                    "(key) => window.__elosernBridge.store.focusItemByKey(key)",
+                    f"target-{target}",
+                )
+                self.assertTrue(focused, "the target frame holds the foe's own row")
+                page.keyboard.press("Enter")  # select the monster target
+            else:
+                submit_combat_command(page, {"key": "defend"}, kind="tactic")
+            commands += 1
+            # The command is admitted asynchronously: gate on the committed
+            # panel showing it (the actor's own draft entry, or the round it
+            # committed) before commanding the next member.
+            wait_for_store_state(
+                page,
+                lambda s, a=requested: self._command_landed(s, a, started_round),
+            )
+        return commands
+
+    @staticmethod
+    def _command_landed(state: dict, actor_id: int, started_round: int) -> bool:
+        """Whether one submitted command reached the committed presentation."""
+        panel = (state.get("panels") or {}).get("context_actions") or {}
+        if int((panel.get("session") or {}).get("round") or 0) > started_round:
+            return True
+        entries = ((panel.get("draft") or {}).get("entries")) or []
+        return any(entry.get("actor_id") == actor_id for entry in entries)
+
+    def _wait_commandable(self, page, timeout: int = 30000) -> dict:
+        """Gate on the committed panel carrying the dock's draft and choices.
+
+        The committed panel is not always the commandable form the walk drives:
+        an active session is also publishable in the recovery form (`choices`
+        and `draft` null, with no personal command surface; webclient-combat-
+        menu: "Unreconstructable participant offers safe recovery"), and the
+        engage transition can commit `mode: combat` while the exploration form
+        is still committed. A transient read is never taken for the draft.
+        """
+
+        def _commandable(state: dict) -> bool:
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            return (
+                state.get("mode") == "combat"
+                and panel.get("available") is True
+                and isinstance(panel.get("choices"), dict)
+                and isinstance(panel.get("draft"), dict)
+            )
+
+        wait_for_store_state(page, _commandable, timeout=timeout)
+        return self._combat_panel(page)
 
     def _playback(self, page):
         return store_state(page).get("beatPlayback")
@@ -146,7 +213,7 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._cast_basic_attack(page)
+        commands = self._cast_basic_attack(page)
 
         # The published round carries the beats, is already done, and holds no
         # displayed hit points: nothing plays by itself at `off`.
@@ -166,9 +233,11 @@ class CombatBeatsBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(page.locator('[data-testid="action-dock-playback"]').count(), 0)
 
         # The declared revision is accepted and the round is done, so the dock
-        # accepts again; the attack is the only ui_action of the round.
+        # accepts again; the round's ui_actions are exactly the commands the
+        # walk sent — the player's attack and, for every other required member,
+        # the Defend tactic — and nothing else was sent.
         wait_for_presentation_settled(page)
-        self.assertEqual(sent_action_count(page), 1)
+        self.assertEqual(sent_action_count(page), commands)
         self.assertIsNone(store_state(page)["dispatch"]["inFlight"])
 
         texts = self._page_texts(page)

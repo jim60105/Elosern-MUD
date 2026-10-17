@@ -508,7 +508,10 @@ class OptionsSurfaceBrowserTest(BrowserAcceptanceTest):
                     server_time: s.serverTime,
                     panels: {
                         context_actions: {
-                            schema_version: 6,
+                            // The registered panel version (the v7 party-combat
+                            // cutover); the exploration form's exact field set
+                            // is unchanged.
+                            schema_version: 7,
                             available: true,
                             kind: 'exploration',
                             affordances: [],
