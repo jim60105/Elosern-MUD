@@ -19,7 +19,7 @@ Design §4.4 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-de
 
 ### Modified Capabilities
 
-None.
+- `game-command-docs`: the `cast` reference syntax documents the `由 <成員>` suffix.
 
 ## Impact
 
@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **7 of 30**.
+Declared implementation order: **7 of 31**.
 
 - depends-on: party-field-settlement-scope
 - depends-on: party-member-equipment
