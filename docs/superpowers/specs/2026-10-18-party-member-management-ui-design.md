@@ -78,19 +78,19 @@ All rules below live under `world/rules/`. Each mutation validates fully before 
 
 ### 4.4 Companion field actions
 
-Out-of-combat item use and field casting take an actor. Costs are charged to the actor, SELF effects bind to the actor, and practice XP accrues to the actor through the existing path. The time cost equals the commander performing the same action. A member that is knocked out, unable to act, or absent is rejected with the existing reason codes. In combat these surfaces route to the v7 actor command flow instead (§6.4).
+Out-of-combat item use and field casting take an actor. Costs are charged to the actor, SELF effects bind to the actor, and practice XP accrues to the actor through the existing path. The time cost equals the commander performing the same action. A member that is knocked out, unable to act, or absent is rejected with the existing reason codes. A companion's field cast that would open combat is allowed and goes through the same confirmation-before-engaging flow the commander uses: the confirmation names the casting companion as the actor, the commander stays the authenticated puppet, a forged or stale actor is rejected, cancelling changes nothing, and confirming opens combat charging the caster's cost and practice XP once. In combat these surfaces route to the v7 actor command flow instead (§6.4).
 
 ### 4.5 Practice booking per member
 
-Each member owns one `db.practice_booking`. The commander can book practice for any member. The next SKIP advance settles every in-scope member's booking through the existing `grant_study_practice_xp` writer.
+Each member owns one `db.practice_booking`, and the commander can book practice for any member. A booking stands until a SKIP advance settles it: every in-scope member's booking is settled through the existing `grant_study_practice_xp` writer for the whole hours elapsed, and a sub-hour advance consumes it with zero growth. A skip without a booking clause and movement leave bookings untouched, and a failed advance restores every settled member's booking.
 
 ### 4.6 Party-wide time settlement
 
-Three commander-initiated clock advances settle the commander plus every effective party member present in the commander's room: SKIP (rest and time skip in `world/rules/time_skip.py`), movement (`world/rules/movement.py`), and out-of-combat field casting and item use. The wider scope applies to gauge regeneration, buff expiry and decay, and practice settlement. Every other advance keeps its current scope, including the church rite in `world/rules/church.py`, which settles only its participant, the GM console, and defeat aftermath. Combat settlement already includes companions and is unchanged. A member in another room is not settled by the commander's advance.
+Three commander-initiated clock advances settle the commander plus every effective party member, who are co-located by rule (§4.9): SKIP (rest and time skip in `world/rules/time_skip.py`), movement (`world/rules/movement.py`), and out-of-combat field casting and item use. The wider scope applies to gauge regeneration, buff expiry and decay, and practice settlement. Every other advance keeps its current scope, including the church rite in `world/rules/church.py`, which settles only its participant, the GM console, and defeat aftermath. Combat settlement already includes companions and is unchanged. An effective member that is nonetheless not in the commander's room (a defensive case that the rule in §4.9 is meant to make unreachable) is not settled.
 
 ### 4.7 Unlock notifications
 
-When any member's practice award unlocks a skill, the commander receives a notification naming the member and the skill (艾拉 學會了 群體治癒). The rail's unread dot is session-scoped state in `ndb`; opening that member's skill tab clears it, and a reconnect drops it. Viewing therefore never writes persistent state.
+When any member's practice award unlocks a skill, the commander receives a notification naming the member and the skill (艾拉 學會了 群體治癒). The rail's unread dot is session-scoped state in `ndb`; opening that member's skill tab clears it, and a reconnect drops it. Viewing therefore never writes persistent state. The 新 tag on a newly unlocked skill stays for the session; opening the skill tab clears only the dot. The commander's own unlocks keep their existing message.
 
 ### 4.8 Text-client parity
 
@@ -100,12 +100,18 @@ The text client exposes every operation. Each new or changed command is document
 |---|---|
 | `給 <物品> = <成員>`, `取回 <物品> = <成員>` | Transfer between members |
 | `裝備 <物品> = <成員>` | Toggle a member's equipment |
-| `買 <物品> <數量> = <成員>` | Buy into a member's bag |
-| `賣 <物品> <數量> = <成員>` | Sell from a member's bag |
+| `買 <物品> <數量> = <成員>` | Buy into a member's bag (an alias of the existing buy command) |
+| `賣 <物品> <數量> = <成員>` | Sell from a member's bag (an alias of the existing sell command) |
 | `使用 <物品> = <成員>` | A member uses an item |
 | Casting with `由 <成員>` | A member casts |
 | `修煉 <技能> = <成員>` | Book a member's practice |
-| `狀態 <成員>`, `技能 <成員>`, `系譜 <成員>` | Show a member's data |
+| `狀態 <成員>`, `技能 <成員>`, `系譜 <成員>` | Show a member's data (new commands) |
+
+### 4.9 Party co-location under possession
+
+While the player possesses a companion, the whole effective party, including the owner's original character, follows the possessed body through every exit traversal. Party members are therefore always in the same room, with or without possession, and every party-scoped rule in this design reads effective membership without a room anchor. This amends how the existing follow behavior treats a possession: the follower set is derived from effective membership rather than from the puppet being the owner. Possession entry and exit rules and the `possessed_shop` refusal are unchanged.
+
+`修煉` is also a new command; the web action is `explore.practice` and only books. `給` keeps its existing behavior for a recipient who is not a party member, including quest delivery; for a party member it uses the transfer rule and advances no delivery. Whether buying for a companion counts toward an acquisition quest's progress is pinned by a test of the actual behavior and is not otherwise specified here.
 
 ## 5. Presentation protocol
 
@@ -115,16 +121,17 @@ Every change follows the versioned exact-field schema convention. No old/new com
 |---|---|
 | `party` v2 → v3 | Each summary row adds MP, SP, a knocked-out flag, and the session unread-unlock flag. The commander is row 0. |
 | `party_member` (new) | The viewed member's member-tab facts: bond stage, membership (general and temporary commissions), intimate state, persona prose (commander only), and action descriptors for possess or release, leave, and opening the NPC persona editor. |
-| `character` v5 → v6 | Built for the viewed member. Persona and intimate sections are removed (moved to `party_member`). Traits with breakdown layers, disguise, guild, and skill groups remain. |
+| `character` v7 → v9 | Two steps. v8 is built for the viewed member, with the persona and intimate sections removed (moved to `party_member`) while traits with breakdown layers, disguise, guild, and skill groups remain. v9 adds compact skill growth fields per row; the selected skill's lineage position and freeform ladder ride a `selected_skill` section chosen by `party.view_member` so the payload stays inside the OOB bound. |
 | `party_inventory` (new) | The viewed member's equipment and bag rows with toggle, use, and transfer descriptors, plus the party purse. The `inventory` section leaves `services`. |
 | Item holdings query (new) | For one selected item: every member's held count, and for equipment every member's stat delta against that member's current slot occupant. |
-| `services` shop section | Stock rows gain the item presentation (kind, icon, rarity, summary) and the delta for the viewed member. Sellable rows list the viewed member's unequipped items. |
-| `lineage` v1 → v2 | Built for the viewed member. The unit becomes a connected skill graph: group label, root keys, unique nodes with level, XP band, capped, owned, usable, and prerequisite text, plus edges with their minimum level, and owned/total counts. The chain meter is removed. |
-| `status` v1 | Unchanged. It still describes the stage's controlled figure for the HUD vitals dock. |
+| `services` v6 → v7 (shop section) | Stock rows gain the item presentation (kind, icon, rarity, summary) and the delta for the viewed member. Sellable rows list the viewed member's unequipped items. |
+| `skill_use` v1 → v2 | Adds `actor_id`; costs, targets, and combat openings are computed for the casting member. |
+| `lineage` v1 → v2 | Built for the viewed member. The unit becomes a connected skill graph: group label, root keys, unique nodes with level, XP band, capped, owned, usable, and prerequisite text, plus edges with their minimum level, and owned/total counts. The chain meter is removed. An isolated single-node graph exists only for an owned skill. |
+| `status` v3 | Unchanged. It still describes the stage's controlled figure for the HUD vitals dock. |
 
 The party window and the shop share one viewed-member selection. Selecting 艾拉 in the party window makes 艾拉 the shop's default recipient.
 
-Action identifiers: `party.view_member` and `party.transfer` are new. `inventory.toggle_equip`, `inventory.use`, field casting, and practice booking gain an actor. `shop.buy` gains a recipient and `shop.sell` gains a seller.
+Action identifiers: `party.view_member` and `party.transfer` are new. `party.view_member` carries the member id plus an optional `item_key` (for the holdings query) and `skill_key` (for the selected skill), so no third selection action exists. `inventory.toggle_equip`, `inventory.use`, field casting, and practice booking gain an actor. `shop.buy` gains a recipient and `shop.sell` gains a seller.
 
 ## 6. Party window
 
@@ -148,12 +155,12 @@ The rail lists members with portrait, name, a ▼倒地 shape-and-text marker fo
 The list column holds the portrait nameplate (art, name, title, HP and MP). The detail column holds:
 
 - For a companion: bond stage with stage pips, membership tags, and intimate state. The action bar offers 請其離隊 (two-step confirmation like the quest drawer's abandon), 人物卡 (opens the existing `NpcPersonaEditor`), and 附身 or 解除附身.
-- For the commander: the four persona prose fields and intimate state. The action bar offers 編輯人物設定.
+- For the commander: the four persona prose fields (個性, 生平, 習慣, 背景) and intimate state. The action bar offers 編輯人物設定.
 - For 空位: the invite target and its enabled or disabled descriptor, taken from the existing `explore.party_invite` affordance.
 
 ### 6.2 背包 tab
 
-The list column shows the viewed member's equipment doll (main hand, off hand, armor, accessory count) above the bag rows. Selecting a doll slot filters the bag to items for that slot. The detail column shows the item ribbon, name, summary, and the holdings strip: one cell per member with that member's count, and for equipment the stat delta. Each non-owner cell ends in 交給 X. The quantity stepper in the action bar sets how many to give; equipment transfers one. The action bar also offers 使用… or 裝備 (naming the replaced item). To take an item back from a companion, the player selects that companion on the rail and uses the commander's cell.
+The list column shows the viewed member's equipment doll (main hand, off hand, armor, accessory count out of the five accessory slots) above the bag rows. Selecting a doll slot filters the bag to items for that slot. The detail column shows the item ribbon, name, summary, and the holdings strip: one cell per member with that member's count, and for equipment the stat delta. Each non-owner cell ends in 交給 X. The quantity stepper in the action bar sets how many to give; equipment transfers one. The action bar also offers 使用… or 裝備 (naming the replaced item). To take an item back from a companion, the player selects that companion on the rail and uses the commander's cell.
 
 In combat the holdings strip shows counts only, transfer controls are absent, the action bar shows the 戰鬥中無法交換物品 reason, and 使用 becomes 設為 X 本回合的行動…, which saves that member's v7 draft entry. Equipment toggles stay available for every member.
 
@@ -216,19 +223,19 @@ The rule text removed from the windows (follow rules, transfer rules, combat res
 
 ## 12. Decomposition
 
-Implementation ships as about 20 OpenSpec changes, each under one engineer-day. The implementation plan fixes the exact split, dependencies, and conflict matrix.
+Implementation ships as roughly thirty OpenSpec changes, each strictly under eight engineer-hours. The proposals under `openspec/changes/` fix the exact split, the mandatory order, the dependencies, and the conflict matrices; this table is only the shape.
 
 | Phase | Changes |
 |---|---|
-| Rules (1–7) | Party-wide time settlement; member transfer; member equipment; companion field actions; per-member practice; shop recipient and seller; unlock notifications. Text commands ship with their rule. |
-| Protocol (8–12) | Viewed-member selection with `party` v3 and `party_member`; `character` v6; `party_inventory` and the holdings query; `lineage` v2 graphs; structured shop rows. |
-| Client (13–20) | Shared primitives; party window shell with the 成員 tab, navigation, and hotkeys; 背包; 狀態; 技能; 系譜; shop window; help content, removal of replaced components, and assembled acceptance. |
+| Rules | Party-wide time settlement; member transfer; member equipment; companion field actions; per-member practice; shop recipient and seller; unlock notifications. Text commands ship with their rule. |
+| Protocol | Viewed-member selection with `party` v3 and `party_member`; `character` v6; `party_inventory` and the holdings query; `lineage` v2 graphs; structured shop rows. |
+| Client | Shared primitives; party window shell with the 成員 tab, navigation, and hotkeys; 背包; 狀態; 技能; 系譜; shop window; help content, removal of replaced components, and assembled acceptance. |
 
 ## 13. Non-goals
 
 - No restyle of the letters, codex, title, gallery, settings, help, or remaining service windows in this batch. They adopt the shared primitives in a later design.
 - No affinity cost or bond gate on managing a companion's items.
 - No item transfer during combat, and no new combat command kind.
-- No change to buy or sell price formulas, to possession entry or exit rules, or to the `possessed_shop` refusal.
+- No change to buy or sell price formulas, to possession entry or exit rules, or to the `possessed_shop` refusal. Only the follow behavior under possession changes (§4.9).
 - No companion wallets and no shared party inventory store.
 - No persistent unread-unlock record.

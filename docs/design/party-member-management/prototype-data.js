@@ -19,10 +19,10 @@ export const MEMBERS = [
 export const MEMBER_DETAIL = {
   1: {
     persona: [
-      { label: "外貌", text: "銀灰短髮，左頰有一道淺疤，總是穿著洗舊的旅行斗篷。" },
       { label: "個性", text: "話少但心軟，對弱者沒有辦法視而不見。" },
-      { label: "來歷", text: "北境邊村的鐵匠之女，為了尋找失蹤的兄長而踏上旅途。" },
-      { label: "目標", text: "在阿爾托利亞的公會打聽兄長最後的委託紀錄。" },
+      { label: "生平", text: "北境邊村的鐵匠之女，為了尋找失蹤的兄長而踏上旅途。" },
+      { label: "習慣", text: "總是穿著洗舊的旅行斗篷，睡前會擦拭長劍。" },
+      { label: "背景", text: "在阿爾托利亞的公會打聽兄長最後的委託紀錄。" },
     ],
     intimate: [
       { label: "敏感度", value: "Lv 2" },
@@ -94,7 +94,7 @@ export const INVENTORY = {
   },
 };
 
-export const ACCESSORY_SLOTS = 2;
+export const ACCESSORY_SLOTS = 5;
 
 // Item holdings query: per-member stat delta against the current slot
 // occupant (server-computed; equipment only).
