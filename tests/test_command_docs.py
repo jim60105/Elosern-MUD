@@ -98,7 +98,22 @@ EXPECTED_COMMANDS: dict[str, dict[str, str]] = {
         "syntax": "combat forfeit、combat forfeit confirm <token>",
         "context": "戰鬥（需在進行中的戰鬥）",
     },
-    "combat actions": {"syntax": "combat actions", "context": "戰鬥（需在進行中的戰鬥）"},
+    "combat retreat": {
+        "syntax": "combat retreat、combat retreat confirm <token>",
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
+    "combat actions": {
+        "syntax": "combat actions [<actor-token>]",
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
+    "combat command": {
+        "syntax": (
+            "combat command <actor-token> skill <skill_key>[@<scale>][=<targets>]、"
+            "combat command <actor-token> item <item_key>[=<target-token>]、"
+            "combat command <actor-token> defend/dodge/taunt[=<enemy-token>]"
+        ),
+        "context": "戰鬥（需在進行中的戰鬥）",
+    },
     "guild register": {
         "syntax": "guild register",
         "context": "公會（需當地公會服務人員）",

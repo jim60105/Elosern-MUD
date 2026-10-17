@@ -3,15 +3,19 @@
 from tools.spec_traceability import covers_requirement
 
 import inspect
+import re
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaCommandTestMixin, EvenniaTest, EvenniaTestCase
 
 from commands.action import CmdCast
-from commands.combat import CmdCombatActions
+from commands.combat import CmdCombatActions, CmdCombatCommand
+from commands.items import CmdUseItem
 from world.lore.elements import Element
+from world.rules.player_messages import rejection_message, session_reason_message
 from typeclasses.characters import PlayerCharacter
 from typeclasses.monsters import Monster
 from typeclasses.rooms import Room
@@ -20,6 +24,7 @@ from world.rules.combat_session import (
     SessionReason,
     engage,
     parse_session_targets,
+    read_session,
     resolve_target_token,
 )
 from world.rules.combat_view import build_combat_view
@@ -87,6 +92,15 @@ _SCOPE_LOGICALS = (
     "items",
     "prices",
 )
+
+
+@contextmanager
+def _deterministic_round():
+    """Freeze every dice read the ordinary round pipeline performs."""
+    with patch("world.rules.combat.battlefield.roll_d100", return_value=100), patch(
+        "world.rules.combat.damage.roll_d100", return_value=100
+    ), patch("world.rules.combat.rounds.roll_d100", return_value=100):
+        yield
 
 
 def _scope_extra() -> dict:
@@ -346,6 +360,339 @@ class CombatActionsCommandTests(BattlefieldIsolation, EvenniaCommandTestMixin, E
         self.assertTrue(
             any("無法確認當前戰鬥。" in m for m in messages), messages
         )
+
+
+class CombatCommandTests(BattlefieldIsolation, EvenniaTest):
+    """The actor-scoped text party-command surface (party-combat-text-commands).
+
+    ``combat command`` is exercised exactly as a player meets it: one allied
+    actor token, one skill/item/tactic selection through the shared draft
+    admission, and the auto-resolving final confirmation. Evidence records the
+    rendered command output alongside the durable record each step produced.
+    """
+
+    def setUp(self):
+        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=_scope_extra())
+        super().setUp()
+        self.room = create_object(Room, key="combat command room")
+        self.char1.location = self.room
+        self.char1.race = "t_duskmari"
+        self.char1.apply_race_baseline()
+        self.char1.traits.magic_power.base = 30
+        self.char1.traits.mp.base = 50
+        self.char1.traits.mp.current = 50
+        grant_lineage(self.char1, [_SPELL])
+        self.companion = self._companion()
+        self.monster = _monster("command goblin", hp=200)
+        self.monster.location = self.room
+        self.sent: list[str] = []
+        self.char1.msg = lambda text="", **kwargs: self.sent.append(str(text))
+
+    def _companion(self):
+        """One bound, co-located ally with its own skill, MP and item."""
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        npc = create_object(NPC, key="command companion")
+        npc.location = self.room
+        npc.race = "t_duskmari"
+        npc.apply_race_baseline()
+        npc.traits.hp.base = 100
+        npc.traits.hp.current = 50
+        npc.traits.mp.base = 50
+        npc.traits.mp.current = 50
+        npc.db.skills = {"active": [_TIDE_ARC.key], "passive": []}
+        npc.db.inventory = ["t_ember_spray"]
+        join_party(npc, self.char1)
+        return npc
+
+    def _run(self, command_class, args=""):
+        command = command_class()
+        command.caller = self.char1
+        command.args = args
+        self.sent.clear()
+        command.func()
+        return "\n".join(self.sent)
+
+    @covers_requirement("player-combat-session::telnet-combat-discovery-and-target-tokens-have-rule-parity")
+    def test_actor_and_target_tokens_are_independent(self):
+        engage(self.char1, self.monster)
+        companion_text = self._run(
+            CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1"
+        )
+        # The companion's own selection is admitted: the round stays open for
+        # the commander, so nothing resolved and nothing was paid yet.
+        self.assertIn("指令已確認，等待其他成員。", companion_text)
+        self.assertIn("尚需選擇：a1", companion_text)
+        record = read_session(self.char1)
+        self.assertEqual(
+            record.draft_entries[self.companion.pk]["payload"]["skill_key"],
+            _TIDE_ARC.key,
+        )
+        self.assertEqual(self.char1.traits.mp.current, 50)
+        self.assertEqual(self.companion.traits.mp.current, 50)
+        self.assertEqual(record.rounds_elapsed, 0)
+        # a1-as-actor with e1-as-target is a different pairing on the same
+        # immutable token space: the commander's own entry completes the round.
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        record = read_session(self.char1)
+        self.assertEqual(record.rounds_elapsed, 1)
+        # Each actor paid its own selection's cost and nothing else.
+        self.assertEqual(self.companion.traits.mp.current, 40)
+        self.assertLess(self.char1.traits.mp.current, 50)
+
+    @covers_requirement("player-combat-session::commander-may-select-only-currently-controllable-allied-actors")
+    def test_actor_token_must_name_a_party_member(self):
+        engage(self.char1, self.monster)
+        before = read_session(self.char1)
+        self.assertEqual(
+            self._run(CmdCombatCommand, f"e1 skill {_SPELL}=e1"),
+            session_reason_message("forbidden_actor"),
+        )
+        self.assertEqual(
+            self._run(CmdCombatCommand, f"a9 skill {_SPELL}=e1"),
+            session_reason_message("unknown_session_id"),
+        )
+        self.assertEqual(read_session(self.char1), before)
+
+    @covers_requirement("player-combat-session::all-personal-skill-choices-and-costs-are-actor-scoped")
+    def test_scale_token_reaches_the_shared_mastery_gate(self):
+        from world.rules.action import RejectReason
+
+        engage(self.char1, self.monster)
+        before = read_session(self.char1)
+        # The companion owns no freeform mastery: the shared gate rejects the
+        # scale before any entry exists.
+        self.assertEqual(
+            self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}@2=e1"),
+            rejection_message(RejectReason.SCALED_CAST_FORBIDDEN),
+        )
+        # A non-label magnitude is the same stable rejection at the text layer.
+        self.assertEqual(
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}@7=e1"),
+            rejection_message(RejectReason.SCALED_CAST_FORBIDDEN),
+        )
+        self.assertEqual(read_session(self.char1), before)
+
+    @covers_requirement("player-combat-session::telnet-combat-discovery-and-target-tokens-have-rule-parity")
+    def test_target_syntax_rejections_leave_the_draft_untouched(self):
+        engage(self.char1, self.monster)
+        before = read_session(self.char1)
+        for value, reason in (
+            ("e1,e1", "duplicate_participant"),
+            ("e9", "unknown_session_id"),
+            ("e1,command goblin", "unknown_session_id"),
+            ("all-enemies,e1", "unknown_session_id"),
+        ):
+            with self.subTest(value=value):
+                self.assertEqual(
+                    self._run(CmdCombatCommand, f"a1 skill {_SPELL}={value}"),
+                    session_reason_message(reason),
+                )
+                self.assertEqual(read_session(self.char1), before)
+
+    @covers_requirement("player-combat-session::telnet-combat-discovery-and-target-tokens-have-rule-parity")
+    def test_combat_actions_lists_one_actor_with_costs_items_and_progress(self):
+        engage(self.char1, self.monster)
+        commander_text = self._run(CmdCombatActions, "")
+        self.assertIn("a1＝", commander_text)
+        self.assertIn(f"{_SPELL}（{_SPELL_LABEL}）", commander_text)
+        self.assertIn("可使用道具：", commander_text)
+        self.assertIn("戰術：", commander_text)
+        self.assertIn("本回合指令進度", commander_text)
+        self.assertIn("必要成員：a1、a2", commander_text)
+        companion_text = self._run(CmdCombatActions, "a2")
+        self.assertIn("a2＝command companion", companion_text)
+        self.assertIn(_TIDE_ARC.key, companion_text)
+        # The listing is actor scoped: the companion's menu never advertises
+        # the commander's own skill.
+        self.assertNotIn(_SPELL, companion_text)
+        self.assertEqual(
+            self._run(CmdCombatActions, "e1"),
+            session_reason_message("forbidden_actor"),
+        )
+        self.assertEqual(
+            self._run(CmdCombatActions, "a9"),
+            session_reason_message("unknown_session_id"),
+        )
+
+    @covers_requirement("player-combat-session::confirmed-round-selections-persist-as-one-editable-session-draft")
+    def test_replacing_an_earlier_choice_keeps_one_entry(self):
+        engage(self.char1, self.monster)
+        self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1")
+        first = read_session(self.char1)
+        text = self._run(CmdCombatCommand, "a2 item t_ember_spray")
+        record = read_session(self.char1)
+        self.assertEqual(record.draft_version, first.draft_version + 1)
+        self.assertEqual(list(record.draft_entries), [self.companion.pk])
+        self.assertEqual(record.draft_entries[self.companion.pk]["kind"], "item")
+        self.assertIn("道具 t_ember_spray", text)
+        self.assertEqual(record.rounds_elapsed, 0)
+
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    @covers_requirement("inventory-item-actions::text-clients-expose-the-same-deterministic-item-operations")
+    def test_no_cost_before_the_complete_round_and_local_item_consumption(self):
+        engage(self.char1, self.monster)
+        # Fault isolation: the enemy deals no damage, so only the companion's
+        # own item effect is observed.
+        self.monster.traits.atk_phys.base = 0
+        self._run(CmdCombatCommand, "a2 item t_ember_spray")
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 0)
+        self.assertEqual(self.companion.traits.hp.current, 50)
+        self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 1)
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        # The completing confirmation is the round's own execution: the item
+        # is consumed and heals its own actor there, never at selection.
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
+        self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 0)
+        self.assertGreater(self.companion.traits.hp.current, 50)
+
+    @covers_requirement("player-combat-session::taunt-selects-one-enemy-and-resolves-competing-declarations-by-initiative")
+    def test_tactics_are_actor_scoped_draft_entries(self):
+        engage(self.char1, self.monster)
+        self._run(CmdCombatCommand, "a2 defend")
+        self.assertEqual(
+            read_session(self.char1).draft_entries[self.companion.pk]["payload"],
+            {"tactical_key": "defend", "target_id": None},
+        )
+        self._run(CmdCombatCommand, "a2 dodge")
+        self.assertEqual(
+            read_session(self.char1).draft_entries[self.companion.pk]["payload"],
+            {"tactical_key": "dodge", "target_id": None},
+        )
+        self._run(CmdCombatCommand, "a2 taunt=e1")
+        self.assertEqual(
+            read_session(self.char1).draft_entries[self.companion.pk]["payload"],
+            {"tactical_key": "taunt", "target_id": self.monster.pk},
+        )
+        # Shape rejections: a target on a targetless tactic, a missing taunt
+        # target and a stray argument all refuse without touching the draft.
+        before = read_session(self.char1)
+        for invalid in ("a2 taunt", "a2 defend=e1", "a2 defend x"):
+            with self.subTest(invalid=invalid):
+                text = self._run(CmdCombatCommand, invalid)
+                self.assertTrue(text.strip())
+                self.assertEqual(read_session(self.char1), before)
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
+
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    def test_commander_cast_and_use_confirm_only_the_commander_entry(self):
+        engage(self.char1, self.monster)
+        cast_text = self._run(CmdCast, f"{_SPELL}=e1")
+        self.assertIn("指令已確認，等待其他成員。", cast_text)
+        record = read_session(self.char1)
+        self.assertEqual(list(record.draft_entries), [self.char1.pk])
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(self.char1.traits.mp.current, 50)
+        self.char1.db.inventory = ["t_ember_spray"]
+        self.char1.traits.hp.base = 100
+        self.char1.traits.hp.current = 10
+        self.assertEqual(self._run(CmdUseItem, "t_ember_spray"), "指令已確認，等待其他成員。")
+        record = read_session(self.char1)
+        self.assertEqual(record.draft_entries[self.char1.pk]["kind"], "item")
+        self.assertEqual(record.rounds_elapsed, 0)
+        self.assertEqual(self.char1.db.inventory.count("t_ember_spray"), 1)
+
+    @covers_requirement("player-combat-session::reconnect-and-restart-restore-confirmed-selection-progress-without-execution")
+    def test_partial_text_draft_survives_restart_without_executing(self):
+        engage(self.char1, self.monster)
+        revision_text = self._run(CmdCombatActions, "")
+        self.assertIn("本回合指令進度", revision_text)
+        self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1")
+        # Simulate a server restart / reconnect: every in-process battlefield
+        # is discarded and the session is restored from its durable record.
+        from world.rules.combat_session import restore_active_session
+        from world.rules.skip_safety import _BATTLEFIELDS
+
+        _BATTLEFIELDS.clear()
+        restore_active_session(self.char1)
+        restored = read_session(self.char1)
+        self.assertIsNotNone(restored)
+        self.assertEqual(restored.rounds_elapsed, 0)
+        self.assertEqual(list(restored.draft_entries), [self.companion.pk])
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+        self.assertEqual(read_session(self.char1).rounds_elapsed, 1)
+
+
+class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
+    """One real text path through skill, item, revision and confirmed exit."""
+
+    def setUp(self):
+        open_synthetic_scope(self, *_SCOPE_LOGICALS, extra=_scope_extra())
+        super().setUp()
+        self.room = create_object(Room, key="text party room")
+        self.char1.location = self.room
+        self.char1.race = "t_duskmari"
+        self.char1.apply_race_baseline()
+        self.char1.traits.magic_power.base = 30
+        self.char1.traits.mp.base = 50
+        self.char1.traits.mp.current = 50
+        grant_lineage(self.char1, [_SPELL])
+        self.companion = self._companion()
+        self.monster = _monster("text party goblin", hp=400)
+        self.monster.location = self.room
+        self.sent: list[str] = []
+        self.char1.msg = lambda text="", **kwargs: self.sent.append(str(text))
+
+    def _companion(self):
+        from typeclasses.npcs import NPC
+        from world.rules.party import join_party
+
+        npc = create_object(NPC, key="text party companion")
+        npc.location = self.room
+        npc.race = "t_duskmari"
+        npc.apply_race_baseline()
+        npc.traits.hp.base = 100
+        npc.traits.hp.current = 50
+        npc.db.skills = {"active": [_TIDE_ARC.key], "passive": []}
+        npc.db.inventory = ["t_ember_spray"]
+        join_party(npc, self.char1)
+        return npc
+
+    def _run(self, command_class, args=""):
+        command = command_class()
+        command.caller = self.char1
+        command.args = args
+        self.sent.clear()
+        command.func()
+        return "\n".join(self.sent)
+
+    @covers_requirement("player-combat-session::final-member-confirmation-automatically-submits-one-complete-ordinary-round")
+    @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
+    def test_multi_actor_text_rounds_then_confirmed_exit(self):
+        from commands.combat import CmdCombatRetreat
+
+        engage(self.char1, self.monster)
+        self.assertIn("必要成員：a1、a2", self._run(CmdCombatActions, ""))
+        self.assertIn(
+            "指令已確認，等待其他成員。",
+            self._run(CmdCombatCommand, f"a2 skill {_TIDE_ARC.key}=e1"),
+        )
+        with _deterministic_round():
+            self._run(CmdCombatCommand, f"a1 skill {_SPELL}=e1")
+            self.assertIn(
+                "指令已確認，等待其他成員。",
+                self._run(CmdCombatCommand, "a2 item t_ember_spray"),
+            )
+            self._run(CmdCombatCommand, "a1 defend")
+        record = read_session(self.char1)
+        self.assertEqual(record.rounds_elapsed, 2)
+        self.assertEqual(record.draft_entries, {})
+        self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 0)
+        # The confirmed exit is the party-scoped retreat prompt's own token;
+        # the party is faster than its pursuer, so the contest succeeds.
+        self.char1.traits.agility.base = 500
+        self.monster.traits.agility.base = 0
+        prompt = self._run(CmdCombatRetreat, "")
+        self.assertIn("combat retreat confirm", prompt)
+        token = re.search(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})", prompt).group(1)
+        self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
+        self.assertIsNone(self.char1.db.active_combat)
 
 
 class CastCommandSettlementSurfaceTests(unittest.TestCase):
