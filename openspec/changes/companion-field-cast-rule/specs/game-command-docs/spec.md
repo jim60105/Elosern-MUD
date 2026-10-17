@@ -12,7 +12,7 @@ the matching element's mastery skill (all other uses are rejected).
 - **WHEN** the drift contract test inspects the `cast` entry
 - **THEN** the reference syntax row equals the manifest syntax
   `cast <skill_key>[@<scale>][=<target_key>] [由 <成員>]` and the description mentions the proportional
-  magnitude adjustment, the mastery requirement, and that `由 <成員>` names the caster (a companion cannot open combat)
+  magnitude adjustment, the mastery requirement, and that `由 <成員>` names the caster (a companion's cast at a monster opens combat exactly like the commander's)
 
 #### Scenario: The overview describes scaled casting
 - **WHEN** a player opens `docs/game/commands.md`

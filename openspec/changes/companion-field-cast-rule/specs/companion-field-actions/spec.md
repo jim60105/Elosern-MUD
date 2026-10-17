@@ -28,12 +28,20 @@ A companion field cast SHALL charge the same command time as the commander casti
 - **WHEN** 艾拉 casts a six-second field skill
 - **THEN** the world clock advances exactly six seconds once, settling every present member
 
-### Requirement: Companions cannot open combat from the field
-A field cast whose caster is not the commander SHALL NOT open combat: a monster anchor or a monster-normalizing target SHALL be rejected with `companion_cannot_open` before any resource, roll, session or clock access.
+### Requirement: A companion's field cast may open combat under the commander's session
+A field cast whose caster is a present companion and whose target is a co-located living monster (an explicit anchor or a normalized single monster target) SHALL open combat through the existing field-initiation path exactly as the commander's cast would, with the session owned by the commander and the opening skill seeded as the caster's draft entry; the caster's resources and practice are accounted once when that entry resolves.
 
-#### Scenario: A companion's attack spell on a monster is refused
-- **WHEN** the commander asks 艾拉 to cast 冰錐術 at a monster in the room
-- **THEN** the cast is rejected with `companion_cannot_open`, no combat session exists, and 艾拉's MP is unchanged
+#### Scenario: A companion's spell opens combat
+- **WHEN** the commander has 艾拉 cast 冰錐術 at a monster in the room out of combat
+- **THEN** one hostile session owned by the commander is persisted, 冰錐術 is saved as 艾拉's opening draft entry, no command time is charged, and 艾拉's MP and practice change only when that entry resolves in the round
+
+#### Scenario: A forged or stale caster cannot open combat
+- **WHEN** the caster names an NPC outside the party, or a companion that has left the room
+- **THEN** the cast is rejected with `not_party_member` or `member_not_present` before any session, resource, roll or clock access, and the commander is not used in its place
+
+#### Scenario: The commander still has to command
+- **WHEN** a companion opened combat
+- **THEN** the round resolves only once every required member, the commander included, has a confirmed draft entry, exactly as for a commander-opened encounter
 
 ### Requirement: Unfit casters are refused with stable reasons
 A caster that is knocked out SHALL be rejected with `member_cannot_act`; an absent caster with `member_not_present`; a non-member with `not_party_member`; a caster blocked by an existing action gate SHALL receive that gate's existing reason.

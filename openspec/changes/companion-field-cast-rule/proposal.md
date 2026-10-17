@@ -6,7 +6,7 @@ Design §4.4 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-de
 
 ## What Changes
 
-- New rules entry `cast_as_member(acting, member_id, skill_key, *, targets, opening_target, scale)` in `world/rules/field_cast.py`: member boundary (acting purpose), then `cast_in_field(member, ...)`. A non-commander caster may not open combat (`companion_cannot_open`), checked before any resource, roll, session or clock access.
+- New rules entry `cast_as_member(acting, member_id, skill_key, *, targets, opening_target, scale)` in `world/rules/field_cast.py`: member boundary (acting purpose), then `cast_in_field(member, ...)`. A companion's cast at a co-located monster opens combat through the existing field-initiation path under the commander's session, seeding the companion's opening draft entry (user decision of 2026-10-18).
 - Target candidates for an ordinary field cast stay room-relative; SELF binds to the caster (existing resolver behaviour once the caster is the request actor).
 - Text: `cast ... 由 <成員>` outside combat casts as the member; inside an active session it saves that member's skill command through the existing `combat command` actor path.
 - Both player command documents describe the suffix.
@@ -19,21 +19,22 @@ Design §4.4 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-de
 
 ### Modified Capabilities
 
+- `field-combat-initiation`: a companion initiator opens the commander's encounter and seeds its own opening entry.
 - `game-command-docs`: the `cast` reference syntax documents the `由 <成員>` suffix.
 
 ## Impact
 
-- `world/rules/field_cast.py`, `commands/action.py` (`CmdCast` suffix parse and session routing), `world/rules/action/contracts.py` only if a new reject reason enum member is needed for `companion_cannot_open`, `world/rules/player_messages.py` (fixed message).
+- `world/rules/field_cast.py`, `commands/action.py` (`CmdCast` suffix parse and session routing), `world/rules/combat_initiation.py` (companion initiator under the commander's session).
 - Docs: `docs/game/commands.md`, `docs/game/command-reference.md`.
 - Tests: `world/rules/tests/test_companion_field_cast.py`, `commands/tests/test_cast_member_suffix.py` (sharded).
 
 ## Effort
 
-**5.5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
+**6.5 hours total, strictly less than 8 hours**, including implementation, focused verification, documentation and integration.
 
 ## Batch: party member management
 
-Declared implementation order: **7 of 31**.
+Declared implementation order: **8 of 32**.
 
 - depends-on: party-field-settlement-scope
 - depends-on: party-member-equipment
