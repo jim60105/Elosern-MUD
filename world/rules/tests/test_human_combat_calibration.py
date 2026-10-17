@@ -1117,7 +1117,9 @@ class CombatFactorBudgetTests(EvenniaTest):
         self.assertEqual(int(area[1].description.rsplit("|", 1)[1]), 40)
 
         # 3. Upkeep damage ignores Defend: a damaging buff tick is applied by
-        # the tick itself, so a declared defender takes the full 10.
+        # the tick itself, outside the shared strike amount, so a declared
+        # defender takes the full 10 through the round's own upkeep settlement
+        # (only the tick producer is stubbed, not the consumer).
         slow = self._actor(PlayerCharacter, "upkeep_slow", hp=100, attack=10, agility=1)
         fast = self._actor(Monster, "upkeep_fast", hp=100, attack=10, agility=99)
         upkeep_field = Battlefield(
@@ -1136,7 +1138,6 @@ class CombatFactorBudgetTests(EvenniaTest):
             patch("world.rules.combat.battlefield.roll_d100", return_value=90),
             patch("world.rules.combat.rounds.roll_d100", return_value=90),
             patch("world.rules.combat.rounds.tick_buffs", side_effect=fake_tick),
-            patch("world.rules.combat.rounds.settle_upkeep", return_value=()),
             patch("world.rules.combat.rounds.decay_tick"),
             patch(
                 "world.rules.combat.rounds.climax_settlement_action",
