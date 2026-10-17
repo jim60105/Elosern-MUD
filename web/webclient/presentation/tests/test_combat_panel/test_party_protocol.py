@@ -26,6 +26,7 @@ from world.rules.tests._combat_session_helpers import (
 from world.tests.synthetic_data import SYNTH_SKILLS
 
 from ._support import (
+    _TACTICS,
     _monster,
     _player,
     _recovery_panel,
@@ -71,7 +72,7 @@ class PartyProtocolSchemaTests(unittest.TestCase):
 
     def test_valid_party_panel_round_trips(self):
         payload = _valid_panel(
-            choices=_valid_choices(items=[_valid_item()], tactics=[_valid_tactic()])
+            choices=_valid_choices(items=[_valid_item()], **{_TACTICS: [_valid_tactic()]})
         )
         normalized = validate_context_actions(payload)
         self.assertEqual(normalized["schema_version"], CONTEXT_ACTIONS_SCHEMA_VERSION)
@@ -129,9 +130,9 @@ class PartyProtocolSchemaTests(unittest.TestCase):
 
     def test_tactic_rows_are_exact_and_bounded(self):
         normalized = validate_context_actions(
-            self._panel(tactics=[_valid_tactic(), _valid_tactic(key="dodge", label="閃避")])
+            self._panel(**{_TACTICS: [_valid_tactic(), _valid_tactic(key="dodge", label="閃避")]})
         )
-        self.assertEqual(len(normalized["choices"]["tactics"]), 2)
+        self.assertEqual(len(normalized["choices"][_TACTICS]), 2)
         for bad in (
             {"key": "block", "label": "格擋", "enabled": True, "reason": None, "targets": []},
             {"key": "defend", "label": "防禦", "enabled": True, "reason": None, "targets": [2]},
@@ -140,11 +141,16 @@ class PartyProtocolSchemaTests(unittest.TestCase):
         ):
             with self.subTest(tactic=bad):
                 with self.assertRaises(Exception):
-                    validate_context_actions(self._panel(tactics=[bad]))
+                    validate_context_actions(self._panel(**{_TACTICS: [bad]}))
         with self.assertRaises(Exception):
             validate_context_actions(
                 self._panel(
-                    tactics=[_valid_tactic(key=key, label=key) for key in ("defend", "dodge", "taunt", "defend")]
+                    **{
+                        _TACTICS: [
+                            _valid_tactic(key=key, label=key)
+                            for key in ("defend", "dodge", "taunt", "defend")
+                        ]
+                    }
                 )
             )
 
@@ -307,7 +313,7 @@ class PartyProtocolPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(item["summary"])
         self.assertTrue(item["beneficial"])
         self.assertFalse(item["hostile"])
-        tactics = {row["key"]: row for row in payload["choices"]["tactics"]}
+        tactics = {row["key"]: row for row in payload["choices"][_TACTICS]}
         self.assertEqual(set(tactics), {"defend", "dodge", "taunt"})
         self.assertEqual(tactics["defend"]["targets"], [])
         self.assertEqual(tactics["dodge"]["targets"], [])

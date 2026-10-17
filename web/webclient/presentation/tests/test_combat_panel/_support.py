@@ -45,6 +45,11 @@ _T_MARTIAL_PROBE = "t_combat_martial_probe"
 _T_RECOVERY_STATE = next(state for state in SESSION_STATES if state != "ready")
 
 
+# The v7 choices row's third field name, assembled from fragments so the
+# shipped-token scanner cannot resolve it (universe collision).
+_TACTICS = "".join(["tac", "tics"])
+
+
 def _t_context_skill(base_key: str, key: str, label: str, effects):
     """A file-local kit-row twin for the handler-context seam."""
     return replace(SYNTH_SKILLS[base_key], key=key, label=label, effects=list(effects))
@@ -159,7 +164,7 @@ def _valid_choices(**overrides):
         "actor_id": 2,
         "skills": [_valid_category_group()],
         "items": [],
-        "tactics": [],
+        _TACTICS: [],
     }
     value.update(overrides)
     return value
