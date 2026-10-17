@@ -17,3 +17,7 @@ Total estimate: **7 hours**, including implementation, focused verification, doc
 ## 4. Integration (1h)
 
 - [ ] 4.1 Add one browser method opening the window and switching members, registered in `.github/browser-shards.json`; update `web/webclient-app/AGENTS.md`; annotate canonical IDs for the renamed/modified and added requirements; run the touched Vitest files, `tests.test_evennia_test_optimization_contract`, `uv run --locked python -m tools.contract_gate` and `openspec validate webclient-party-window-member-tab --strict`.
+
+## Workflow follow-up
+
+- After archive, edit `openspec/specs/webclient-party-panel/spec.md` `## Purpose` by hand (delta specs cannot change an existing Purpose): replace "the version-1 `party` presentation panel … that the companion quickbar and party drawer consume" with the version-3 panel consumed by the companion quickbar and the party window, then rerun `openspec validate --all --strict`.
