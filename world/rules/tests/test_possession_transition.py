@@ -37,6 +37,8 @@ from world.rules.possession import (
     release_for_party_change,
     release_on_disconnect,
     release_possession,
+    restore_party_control,
+    snapshot_party_control,
 )
 
 
@@ -781,40 +783,44 @@ class PossessionTransitionTests(EvenniaTest):
     def test_multi_session_handback_restores_the_original_room_for_every_attempt(self):
         """Every attempt restores the pre-release room, never a re-read one.
 
-        The two-session ladder emulates Evennia's last-session stash per
-        attempt, so a second-iteration read of the stashed location would
-        restore ``None`` instead of the original room.
+        The two-session ladder executes real unpuppet and repuppet hooks
+        through observational wrappers, and a controlled disturbance between
+        attempts ensures a per-iteration snapshot would capture the disturbed
+        room instead of the original snapshot.
         """
         enter_possession(self.char1, self.npc)
         sess2 = MagicMock()
         sess2.sessid = 7777
         sess2.logged_in = True
         sess2.puppet = self.npc
-        puppet_map = {self.session: self.npc, sess2: self.npc}
+        sess2.msg = MagicMock()
+
+        real_unpuppet_object = self.account.unpuppet_object
+        real_puppet_object = self.account.puppet_object
+        unpuppet_calls: list[object] = []
         room_at_repuppet: list[object] = []
 
-        def fake_get_puppet(session):
-            return puppet_map.get(session)
+        def wrapped_unpuppet(session):
+            unpuppet_calls.append(session)
+            return real_unpuppet_object(session)
 
-        def fake_puppet(session, target):
+        def wrapped_puppet(session, target):
             room_at_repuppet.append(self.npc.location)
-            puppet_map[session] = target
-            session.puppet = target
-
-        def fake_unpuppet(session):
-            self.npc.db.prelogout_location = self.npc.location
-            self.npc.location = None
-            puppet_map[session] = None
-            session.puppet = None
+            res = real_puppet_object(session, target)
+            if session == self.session:
+                # Controlled between-attempt disturbance:
+                # Move companion to room2 before the next attempt so that any
+                # per-iteration snapshot would differ from the original room1.
+                self.npc.location = self.room2
+                sess2.puppet = self.npc
+            return res
 
         with patch.object(
             self.account.sessions, "all", return_value=[self.session, sess2]
         ), patch.object(
-            self.account, "unpuppet_object", side_effect=fake_unpuppet
+            self.account, "unpuppet_object", side_effect=wrapped_unpuppet
         ), patch.object(
-            self.account, "puppet_object", side_effect=fake_puppet
-        ), patch.object(
-            self.account, "get_puppet", side_effect=fake_get_puppet
+            self.account, "puppet_object", side_effect=wrapped_puppet
         ), patch(
             "web.webclient.actions.dispatcher.retire_sequence"
         ), patch(
@@ -826,12 +832,14 @@ class PossessionTransitionTests(EvenniaTest):
         ):
             release_possession(self.char1, npc=self.npc, reason="handback")
 
+        self.assertEqual(unpuppet_calls[:2], [self.session, sess2])
         self.assertEqual(len(room_at_repuppet), 2)
         for room in room_at_repuppet:
             self.assertIs(room, self.room1)
         self.assertIs(self.npc.location, self.room1)
         self.assertEqual(self.npc.db_location_id, self.room1.pk)
         self.assertFalse(self.npc.attributes.has("prelogout_location"))
+        self.assertFalse(self.npc.attributes.has("prelog_location"))
 
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
@@ -975,6 +983,148 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertIsNone(self.npc.attributes.get("prelogout_location"))
         self.assertTrue(self.npc.attributes.has("prelog_location"))
         self.assertEqual(self.npc.attributes.get("prelog_location"), self.room2)
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_accountless_possession_release_and_rollback_preserve_logout_metadata(self):
+        """Account-less releases clear residuals on success and restore exact metadata on rollback."""
+        owner = create_object(PlayerCharacter, key="無帳號玩家", location=self.room1)
+        npc = create_object(LLMNPC, key="無帳號同伴", location=self.room1)
+        join_party(npc, owner)
+
+        cases = [
+            ("absent", "absent"),
+            ("present_none", "present_none"),
+            ("foreign_room", "foreign_room"),
+            ("foreign_room", "present_none"),
+            ("absent", "foreign_room"),
+        ]
+
+        def _configure(attr, mode):
+            if mode == "absent":
+                npc.attributes.remove(attr)
+            elif mode == "present_none":
+                npc.attributes.add(attr, None)
+            elif mode == "foreign_room":
+                npc.attributes.add(attr, self.room2)
+
+        def _assert_attr(attr, mode):
+            if mode == "absent":
+                self.assertFalse(npc.attributes.has(attr))
+            elif mode == "present_none":
+                self.assertTrue(npc.attributes.has(attr))
+                self.assertIsNone(npc.attributes.get(attr))
+            elif mode == "foreign_room":
+                self.assertTrue(npc.attributes.has(attr))
+                self.assertEqual(npc.attributes.get(attr), self.room2)
+
+        for prelogout_mode, prelog_mode in cases:
+            with self.subTest(prelogout=prelogout_mode, prelog=prelog_mode):
+                try:
+                    enter_possession(owner, npc)
+                    _configure("prelogout_location", prelogout_mode)
+                    _configure("prelog_location", prelog_mode)
+
+                    snapshot = snapshot_party_control(owner, npc)
+                    self.assertIsNone(snapshot["account"])
+
+                    # Normal release completes and clears residuals via account-less _unpuppet
+                    release_possession(owner, npc=npc, reason="handback")
+                    self.assertIs(npc.location, self.room1)
+                    self.assertFalse(npc.attributes.has("prelogout_location"))
+                    self.assertFalse(npc.attributes.has("prelog_location"))
+
+                    # Rollback restores exact metadata via account-less restore_party_control
+                    restore_party_control(owner, npc, snapshot)
+                    self.assertIs(npc.location, self.room1)
+                    self.assertEqual(npc.db_location_id, self.room1.pk)
+                    self.assertIn(npc, self.room1.contents)
+                    _assert_attr("prelogout_location", prelogout_mode)
+                    _assert_attr("prelog_location", prelog_mode)
+                finally:
+                    # Reset possession state on owner and npc for next iteration
+                    owner.db.possession = None
+                    npc.db.possessed_by = None
+                    npc.locks.remove("puppet")
+
+        # Successful clean release at end
+        enter_possession(owner, npc)
+        release_possession(owner, npc=npc, reason="handback")
+        self.assertIs(npc.location, self.room1)
+        self.assertEqual(npc.db_location_id, self.room1.pk)
+        self.assertFalse(npc.attributes.has("prelogout_location"))
+        self.assertFalse(npc.attributes.has("prelog_location"))
+
+    @covers_requirement(
+        "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
+    )
+    def test_recovery_puppeting_failure_restores_exact_logout_metadata(self):
+        """Recovery puppeting executes the real hook then raises; finally restores exact metadata."""
+        import world.rules.possession as possession_mod
+        real_unpuppet = possession_mod._unpuppet
+        real_puppet_object = self.account.puppet_object
+
+        def unpuppet_then_fail(*args, **kwargs):
+            real_unpuppet(*args, **kwargs)
+            raise RuntimeError("simulated release failure triggering compensation")
+
+        def puppet_hook_then_raise(session, target):
+            real_puppet_object(session, target)
+            if target == self.npc:
+                raise RuntimeError("recovery puppet hook failed after real execution")
+
+        cases = [
+            ("absent", "absent"),
+            ("present_none", "present_none"),
+            ("foreign_room", "foreign_room"),
+            ("foreign_room", "present_none"),
+            ("absent", "foreign_room"),
+        ]
+
+        def _configure(attr, mode):
+            if mode == "absent":
+                self.npc.attributes.remove(attr)
+            elif mode == "present_none":
+                self.npc.attributes.add(attr, None)
+            elif mode == "foreign_room":
+                self.npc.attributes.add(attr, self.room2)
+
+        def _assert_attr(attr, mode):
+            if mode == "absent":
+                self.assertFalse(self.npc.attributes.has(attr))
+            elif mode == "present_none":
+                self.assertTrue(self.npc.attributes.has(attr))
+                self.assertIsNone(self.npc.attributes.get(attr))
+            elif mode == "foreign_room":
+                self.assertTrue(self.npc.attributes.has(attr))
+                self.assertEqual(self.npc.attributes.get(attr), self.room2)
+
+        for prelogout_mode, prelog_mode in cases:
+            with self.subTest(prelogout=prelogout_mode, prelog=prelog_mode):
+                try:
+                    enter_possession(self.char1, self.npc)
+                    _configure("prelogout_location", prelogout_mode)
+                    _configure("prelog_location", prelog_mode)
+
+                    with patch("world.rules.possession._unpuppet", side_effect=unpuppet_then_fail):
+                        with patch.object(self.account, "puppet_object", side_effect=puppet_hook_then_raise):
+                            with self.assertRaises(RuntimeError):
+                                release_possession(self.char1, npc=self.npc, reason="handback")
+
+                    # The finally block restored location and exact pre-release metadata
+                    self.assertIs(self.npc.location, self.room1)
+                    self.assertEqual(self.npc.db_location_id, self.room1.pk)
+                    self.assertIn(self.npc, self.room1.contents)
+                    _assert_attr("prelogout_location", prelogout_mode)
+                    _assert_attr("prelog_location", prelog_mode)
+                finally:
+                    # Reset possession state on char1 and npc for next iteration
+                    self.char1.db.possession = None
+                    self.npc.db.possessed_by = None
+                    self.npc.locks.remove("puppet")
+                    real_puppet_object(self.session, self.char1)
+                    self.npc.location = self.room1
 
     @covers_requirement(
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
