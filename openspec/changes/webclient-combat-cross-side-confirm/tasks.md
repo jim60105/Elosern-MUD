@@ -14,10 +14,10 @@ scratch file; no loops over browser files; Evennia commands use a `MUD_TEST_SETT
   (design D2); add `confirmCrossSide` / `cancelCrossSide` and the invalidation on a `context_actions` replacement,
   playback lock and mode change. `stores/elosern/view.js`: publish `crossSideConfirm`. `stores/elosern/interaction.js`:
   claim no dock key while it is set.
-- [ ] 1.3 `components/QuestionCard.vue`: `initialFocus` prop (`"yes"` default). `AppClient.vue`: the combat
+- [x] 1.3 `components/QuestionCard.vue`: `initialFocus` prop (`"yes"` default). `AppClient.vue`: the combat
   `QuestionCard` in the `choices` slot with `initial-focus="no"`, `inert` on the dock while it shows (design D3).
   `components/ActionDock.vue`: no change beyond accepting `inert` if the attribute is passed through.
-- [ ] 1.4 Add `web/webclient-app/tests/store/cross_side_confirm.test.js`: the predicate over fixed inputs (hostile →
+- [x] 1.4 Add `web/webclient-app/tests/store/cross_side_confirm.test.js`: the predicate over fixed inputs (hostile →
   ally / self / foe / mixed AREA / `all` / `all-enemies`; beneficial (heal and buff) → foe / ally / `all-allies`; both facts on foe,
   ally, `all`; neither fact; NONE → null) with the exact question strings; the flow (Enter, digit and
   `stageTargetPointer` activation on an ally with Attack send nothing and set `crossSideConfirm`; `confirmCrossSide`
