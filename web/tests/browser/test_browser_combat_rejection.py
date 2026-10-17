@@ -287,7 +287,7 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         )
         target = self._combat_panel(page)["participants"][-1]["identity"]
         submit_combat_command(
-            page, {"skill_key": "basic_attack", "target_ids": [target]}
+            page, {"skill_key": SYNTH_INNATE_ATTACK_KEY, "target_ids": [target]}
         )
         # The cast is admitted and a round commits; the result reaches the store
         # but the client's in-flight request is never released (the no-op timer
@@ -428,7 +428,7 @@ class CombatReconnectBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         wait_for_presentation_settled(page)
         target = self._combat_panel(page)["participants"][-1]["identity"]
         submit_combat_command(
-            page, {"skill_key": "basic_attack", "target_ids": [target]}
+            page, {"skill_key": SYNTH_INNATE_ATTACK_KEY, "target_ids": [target]}
         )
         def _round_committed(state: dict) -> bool:
             panel = (state.get("panels") or {}).get("context_actions") or {}
