@@ -36,7 +36,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **24 of 31**.
+Declared implementation order: **25 of 32**.
 
 - depends-on: webclient-party-bag-tab
 
