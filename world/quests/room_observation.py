@@ -169,20 +169,24 @@ def _advance_arrival(
     return fulfill_record_for(player, record, definition)
 
 
-def observe_room_entry(room: Any, obj: Any) -> None:
+def observe_room_entry(room: Any, obj: Any, *, observe_lore: bool = True) -> None:
     """Advance REACH stages; escort stages require final settled provenance.
 
     Arrival advances only when the player is the arriving object and at least
     one bound companion is present in the destination room -- already there or
     arriving with the player (party-quest D-2); there is no companion-alone
     entry point. Each quest transitions at most once per hook call; terminal
-    records and non-matching destinations are ignored.
+    records and non-matching destinations are ignored. ``observe_lore=False``
+    keeps the quest transition but skips the arrival-lore scheduling, for a
+    possessed companion's owner body whose movement must not fire player
+    arrival presentation.
     """
     from typeclasses.characters import PlayerCharacter
 
     if not isinstance(obj, PlayerCharacter):
         return
-    observe_arrival_lore(obj, room)
+    if observe_lore:
+        observe_arrival_lore(obj, room)
     records = read_records(obj)
     if not any(
         record.state is QuestState.IN_PROGRESS

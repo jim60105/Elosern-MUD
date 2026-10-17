@@ -11,7 +11,8 @@ map-knowledge recording (``record_arrival``), and companion following
 exception inside the transaction, an outer-commit failure, or a falsy
 wilderness-lineage return that relocated the traverser anyway — the already
 persisted relocation is compensated in a fixed deterministic order before the
-failure surfaces: traverser and companions are moved back, the wilderness
+failure surfaces: the traverser and every follower (companions, and the
+commander's body under possession) are moved back, the wilderness
 script's bookkeeping is restored from shallow snapshots, and every Evennia
 in-process cache surface the settlement touched is reconciled. Django rollback
 alone reverts only durable rows; the idmapper's ``db_location``, the rooms'
@@ -52,25 +53,28 @@ from world.rules.clock import (
     build_advance_snapshot_registry,
     get_world_clock,
 )
-from world.rules.party import _companion_co_located, live_companions
+from world.rules.party import follow_scope
 from world.rules.surfaces import attribute_snapshot
 
-# Move-observable attribute surfaces the settlement can write on the
-# traverser, snapshotted directly (the advance registry covers the remainder).
-# ``quest_log`` and the destination room's pin/state surfaces use the quest
-# module's own helpers so the two writers never drift.
+# Move-observable attribute surfaces the settlement can write on the traverser
+# or the commander behind a possessed traverser, snapshotted directly (the
+# advance registry covers the remainder). ``quest_log`` and the destination
+# room's pin/state surfaces use the quest module's own helpers so the two
+# writers never drift.
 _TRAVERSER_SURFACES: tuple[str, ...] = ("map_knowledge",)
 
 
 @dataclass
 class CompanionState:
-    """One co-located companion's pre-move location and wilderness registration.
+    """One co-located follower's pre-move location and wilderness registration.
 
-    ``registration`` is the script's ``itemcoordinates`` entry (a coordinate
-    tuple) when the companion was tracked in the wilderness, else ``None``.
+    A follower is an effective companion or, under possession, the commander's
+    own body. ``registration`` is the script's ``itemcoordinates`` entry (a
+    coordinate tuple) when the follower was tracked in the wilderness, else
+    ``None``.
     """
 
-    npc: Any
+    entity: Any
     location: Any
     registration: tuple[int, int] | None
 
@@ -85,8 +89,10 @@ class MovementSnapshot:
     ``wilderness_coordinates``/``wilderness_source_coordinates`` mirror the
     ``settle_movement`` call, so compensation can tell a gate entry from a
     wilderness step or grid return. ``registry`` and the clock fields are
-    ``None`` for non-``PlayerCharacter`` traversers, whose settlement steps are
-    internal no-ops.
+    ``None`` for non-player-driven traversers, whose settlement steps are
+    internal no-ops. ``commander`` is the player behind a possessed traverser
+    (``None`` when there is none); its body is part of ``companions`` and its
+    map-knowledge and quest surfaces are registered for restoration.
     """
 
     traverser: Any
@@ -96,6 +102,7 @@ class MovementSnapshot:
     wilderness_source_coordinates: tuple[int, int] | None
     traverser_registration: tuple[int, int] | None
     companions: list[CompanionState]
+    commander: Any | None
     wilderness_itemcoordinates: dict | None
     wilderness_rooms: dict | None
     wilderness_unused_rooms: list | None
@@ -146,7 +153,7 @@ def settle_movement(
         from world.quests.escort_events import escort_event_boundary
 
         with escort_event_boundary((
-            traversing_object, *(state.npc for state in snapshot.companions),
+            traversing_object, *(state.entity for state in snapshot.companions),
         )), transaction.atomic():
             result = traverse()
             # A published encounter whose declared locator covers the settled
@@ -249,8 +256,6 @@ def _snapshot_movement_state(
     wilderness_source_coordinates: tuple[int, int] | None,
 ) -> MovementSnapshot:
     """Record every pre-move surface the settlement may write (design D2)."""
-    from typeclasses.characters import PlayerCharacter
-
     wilderness = None
     traverser_registration = None
     if wilderness_source_coordinates is not None:
@@ -264,25 +269,39 @@ def _snapshot_movement_state(
         # resolved by lookup.
         matches = search_script(WILDERNESS_NAME)
         wilderness = matches[0] if matches else None
+    if wilderness is None:
+        # A non-exit relocation (operator teleport) can leave or enter the
+        # wilderness without coordinate arguments; resolve the involved script
+        # from the source or destination room so the traverser's registration
+        # and the script's bookkeeping are still snapped and restored.
+        wilderness = getattr(source_location, "wilderness", None) or getattr(
+            destination, "wilderness", None
+        )
+    if wilderness is not None and traverser_registration is None:
+        traverser_registration = wilderness.itemcoordinates.get(traversing_object)
 
+    commander, followers = follow_scope(
+        traversing_object,
+        source_location,
+        wilderness_source_coordinates,
+        log_unresolved=False,
+    )
     companions: list[CompanionState] = []
-    if isinstance(traversing_object, PlayerCharacter):
-        for npc in live_companions(traversing_object):
-            try:
-                if _companion_co_located(npc, source_location, wilderness_source_coordinates):
-                    registration = (
-                        wilderness.itemcoordinates.get(npc) if wilderness is not None else None
-                    )
-                    companions.append(CompanionState(npc, npc.location, registration))
-            except Exception as error:
-                # Mirrors follow_companions' per-NPC exception isolation: a
-                # stale or corrupt companion is skipped, never allowed to abort
-                # the settlement before it starts.
-                log_warn(
-                    "movement_companion_snapshot_skipped",
-                    exc=error,
-                    context={"obj": str(npc)},
-                )
+    for follower in followers:
+        try:
+            registration = (
+                wilderness.itemcoordinates.get(follower) if wilderness is not None else None
+            )
+            companions.append(CompanionState(follower, follower.location, registration))
+        except Exception as error:
+            # Mirrors follow_companions' per-follower exception isolation: a
+            # stale or corrupt follower is skipped, never allowed to abort the
+            # settlement before it starts.
+            log_warn(
+                "movement_companion_snapshot_skipped",
+                exc=error,
+                context={"obj": str(follower)},
+            )
 
     itemcoordinates = rooms = unused_rooms = None
     if wilderness is not None:
@@ -301,20 +320,26 @@ def _snapshot_movement_state(
         # known here, and a widened window is a strict superset of what the
         # actual advance can write (every registered contract's discovery
         # queries are window-independent today).
+        snapshot_entities = [traversing_object]
+        if commander is not None and commander is not traversing_object:
+            # A possessed traverser's owner body is moved by the follow step and
+            # its map-knowledge/quest surfaces can be written there too.
+            snapshot_entities.append(commander)
         registry = build_advance_snapshot_registry(
-            clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, (traversing_object,)
+            clock, MAX_ADVANCE_SECONDS, AdvanceSource.COMMAND, snapshot_entities
         )
-        traverser_attrs = {
-            (key, None): attribute_snapshot(traversing_object, key)
-            for key in _TRAVERSER_SURFACES
-        }
-        if getattr(traversing_object, "quest_log", None) is not None:
-            traverser_attrs[("quest_log", None)] = snapshot_quest_log(traversing_object)
-        entry = registry.get(id(traversing_object))
-        if entry is None:
-            registry[id(traversing_object)] = SurfaceSnapshot(attributes=traverser_attrs)
-        else:
-            entry.attributes.update(traverser_attrs)
+        for entity in snapshot_entities:
+            entity_attrs = {
+                (key, None): attribute_snapshot(entity, key)
+                for key in _TRAVERSER_SURFACES
+            }
+            if getattr(entity, "quest_log", None) is not None:
+                entity_attrs[("quest_log", None)] = snapshot_quest_log(entity)
+            entry = registry.get(id(entity))
+            if entry is None:
+                registry[id(entity)] = SurfaceSnapshot(attributes=entity_attrs)
+            else:
+                entry.attributes.update(entity_attrs)
         if destination is not None:
             destination_attrs = {
                 ("pin_reasons", None): snapshot_pin_reasons(destination),
@@ -335,6 +360,7 @@ def _snapshot_movement_state(
         wilderness_source_coordinates=wilderness_source_coordinates,
         traverser_registration=traverser_registration,
         companions=companions,
+        commander=commander,
         wilderness_itemcoordinates=itemcoordinates,
         wilderness_rooms=rooms,
         wilderness_unused_rooms=unused_rooms,
@@ -383,14 +409,20 @@ def _compensate_traverser(snapshot: MovementSnapshot) -> None:
             and registration == snapshot.traverser_registration
         ):
             return
-        if wilderness is not None and snapshot.wilderness_source_coordinates is not None:
-            # Wilderness step undo and grid-return undo are the same primitive:
-            # re-register at the source coordinates, which also restores the
-            # location (the contrib recreates a coordinate-equivalent room when
-            # the source room was recycled). A plain move_to back cannot do
-            # this for the grid-return case, because the source wilderness room
-            # may already be recycled.
-            wilderness.move_obj(traverser, snapshot.wilderness_source_coordinates)
+        restored_coordinates = (
+            snapshot.wilderness_source_coordinates
+            if snapshot.wilderness_source_coordinates is not None
+            else snapshot.traverser_registration
+        )
+        if wilderness is not None and restored_coordinates is not None:
+            # Wilderness step undo, grid-return undo, and the undo of a
+            # non-exit relocation that stayed in the wilderness are the same
+            # primitive: re-register at the pre-move coordinates, which also
+            # restores the location (the contrib recreates a
+            # coordinate-equivalent room when the source room was recycled). A
+            # plain move_to back cannot do this for the grid-return case,
+            # because the source wilderness room may already be recycled.
+            wilderness.move_obj(traverser, restored_coordinates)
         elif wilderness is not None:
             # Gate-entry undo: hook-free return to the grid room, then
             # deregister the traverser from the wilderness bookkeeping (the
@@ -447,37 +479,41 @@ def _compensate_home(snapshot: MovementSnapshot) -> None:
 
 
 def _compensate_companions(snapshot: MovementSnapshot) -> None:
-    """Return every companion the follow step moved back to its pre-move state."""
+    """Return every follower the follow step moved to its pre-move state.
+
+    The list includes the commander's own body under possession; the body's
+    restoration is the same hook-free relocation or coordinate-API primitive.
+    """
     wilderness = snapshot.wilderness
     for companion in snapshot.companions:
-        npc = companion.npc
+        entity = companion.entity
         try:
             registration = (
-                wilderness.itemcoordinates.get(npc) if wilderness is not None else None
+                wilderness.itemcoordinates.get(entity) if wilderness is not None else None
             )
-            if npc.location is companion.location and registration == companion.registration:
+            if entity.location is companion.location and registration == companion.registration:
                 continue
             if companion.registration is not None and wilderness is not None:
                 # Wilderness-registered companion: re-register at the pre-move
                 # coordinates, which also restores the location.
-                wilderness.move_obj(npc, companion.registration)
+                wilderness.move_obj(entity, companion.registration)
             elif companion.location is not None:
-                moved = npc.move_to(companion.location, quiet=True, move_hooks=False)
-                if moved and npc.ndb.wilderness is not None:
+                moved = entity.move_to(companion.location, quiet=True, move_hooks=False)
+                if moved and entity.ndb.wilderness is not None:
                     # Mirrors follow_companions leaving the wilderness: clear
                     # any registration the hook-free move_to could not pop.
-                    npc.ndb.wilderness.at_post_object_leave(npc)
+                    entity.ndb.wilderness.at_post_object_leave(entity)
         except Exception as error:
             log_warn(
                 "rollback_restore_failed",
                 exc=error,
                 context={
                     "stage": "movement_companion",
-                    "obj": str(npc),
+                    "obj": str(entity),
                     "key": "location",
                 },
             )
-            _force_reconcile_location(npc, companion.location)
+            _force_reconcile_location(entity, companion.location)
 
 
 def _restore_wilderness_bookkeeping(snapshot: MovementSnapshot) -> None:
@@ -521,8 +557,14 @@ def _restore_surfaces(snapshot: MovementSnapshot) -> None:
         # attribute (refreshing the backend cache), re-fetches recorded
         # locations by primary key and assigns through the location setter so
         # the contents caches reconcile, flushes cached-but-deleted instances,
-        # and refreshes the traverser's trait/sexual caches.
-        _restore_advance_registry(snapshot.registry, (snapshot.traverser,))
+        # and refreshes the restored entities' trait/sexual caches.
+        restore_entities = [snapshot.traverser]
+        if (
+            snapshot.commander is not None
+            and snapshot.commander is not snapshot.traverser
+        ):
+            restore_entities.append(snapshot.commander)
+        _restore_advance_registry(snapshot.registry, tuple(restore_entities))
     except Exception as error:
         log_warn(
             "rollback_restore_failed",

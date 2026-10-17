@@ -330,6 +330,28 @@ def _restore_occupied_location(npc: Any, location: Any) -> None:
     npc.location = location
 
 
+def _materialize_wilderness_location(player: Any) -> None:
+    """Give a registered wilderness body its coordinates' room before repuppet.
+
+    A failed follow can leave the unpuppeted owner body with ``location=None``
+    while the wilderness script still tracks it at its coordinates (the
+    contrib recycles a room as soon as no account remains inside it). Evennia's
+    ``at_pre_puppet`` would then restore the body from its logout target or
+    ``home``; materializing the registered position instead keeps a release
+    from reuniting a party a failed follow left apart. Best-effort: a body
+    with no registration falls through to Evennia's existing restoration.
+    """
+    if getattr(player, "location", None) is not None:
+        return
+    wilderness = getattr(getattr(player, "ndb", None), "wilderness", None)
+    if wilderness is None:
+        return
+    coordinates = wilderness.itemcoordinates.get(player)
+    if coordinates is None:
+        return
+    wilderness.move_obj(player, coordinates)
+
+
 # ---------------------------------------------------------------------------
 # Seam implementations for companion-possession-transition
 # ---------------------------------------------------------------------------
@@ -491,6 +513,20 @@ def _unpuppet(player: Any, npc: Any, reason: str = "handback") -> None:
         send_unpuppet_transition,
         synchronize_session,
     )
+
+    try:
+        # A failed wilderness follow can leave the owner body location-less but
+        # registered; materialize it before Evennia's repuppet location restore.
+        _materialize_wilderness_location(player)
+    except Exception as error:
+        log_warn(
+            "possession_location_restore_failed",
+            exc=error,
+            context={
+                "char": str(getattr(player, "pk", "?")),
+                "step": "possession_materialize",
+            },
+        )
 
     for session in sessions:
         send_unpuppet_transition(session)
