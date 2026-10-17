@@ -34,7 +34,7 @@ Design §4.1 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-de
 
 ## Batch: party member management
 
-Declared implementation order: **4 of 30**.
+Declared implementation order: **4 of 31**.
 
 - depends-on: party-member-authority
 

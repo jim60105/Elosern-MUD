@@ -7,7 +7,7 @@ Move held items between the commander and present party members outside combat a
 ## ADDED Requirements
 
 ### Requirement: Transfers happen only outside combat
-A member item transfer SHALL be rejected with `transfer_in_combat` while the commander is in an active combat session, before any other check, and SHALL write nothing.
+A member item transfer SHALL be rejected with `transfer_in_combat` while the acting character, the commander, the giver or the receiver is in an active combat session, before any other check, and SHALL write nothing.
 
 #### Scenario: Transfer during combat is refused
 - **WHEN** the commander, in an active combat session, asks to move a potion from 艾拉 to 卡恩
