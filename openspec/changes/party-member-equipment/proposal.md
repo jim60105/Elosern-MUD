@@ -21,6 +21,7 @@ None.
 
 - `inventory-item-actions`: exact toggle payload with `actor_id`; text `裝備` names a member.
 - `equipment-inventory`: adds the any-present-member requirement.
+- `webclient-service-menus`: the service-action allowlist admits the toggle's exact `actor_id`.
 
 ## Impact
 
@@ -40,6 +41,8 @@ Declared implementation order: **6 of 30**.
 - depends-on: party-transfer-text-commands
 
 ### Code and spec conflicts within the new batch
+
+- `webclient-service-menus` requirement "Service actions are exact, allowlisted, and server-authoritative" is re-modified in order by `party-member-equipment`, `companion-field-item-use` and `shop-party-recipient-seller`; each later delta preserves the earlier member references (S, ordered).
 
 - `party-transfer-text-commands`: shared files `commands/items.py`, both command docs (F; that change first, hence the ordering dependency).
 - `companion-field-item-use`: shared files `web/webclient/actions/service_actions.py`, `commands/items.py`, `web/webclient-app/composables/intents.js`; shared spec `inventory-item-actions` both requirements (F; this change first, the later one re-modifies preserving `actor_id` on the toggle).

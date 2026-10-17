@@ -22,6 +22,7 @@ None.
 
 - `companion-field-actions`: adds explicit-user item use.
 - `inventory-item-actions`: `inventory.use` payload with `actor_id`; `使用` names a member.
+- `webclient-service-menus`: the service-action allowlist admits the use's exact `actor_id`.
 
 ## Impact
 
@@ -42,6 +43,8 @@ Declared implementation order: **9 of 30**.
 - depends-on: companion-field-cast-rule
 
 ### Code and spec conflicts within the new batch
+
+- `webclient-service-menus` requirement "Service actions are exact, allowlisted, and server-authoritative" is re-modified in order by `party-member-equipment`, `companion-field-item-use` and `shop-party-recipient-seller`; each later delta preserves the earlier member references (S, ordered).
 
 - `party-member-equipment`: shared files `service_actions.py`, `commands/items.py`, `intents.js`, `InventoryPanel.vue`; shared spec `inventory-item-actions` (F; that change first; this delta preserves its toggle wording).
 - `companion-field-cast-rule`: shared spec `companion-field-actions` (S; that change creates it) and both command docs (F).
