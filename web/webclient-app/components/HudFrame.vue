@@ -270,6 +270,29 @@ defineExpose({ menuOpen });
     >
       <slot name="choices" />
     </div>
+    <!-- The figure plates (webclient-combat-formation D4): filled only
+         while the formation stands (a leaving plate fades out inert); inert
+         and hidden from assistive technology while a round that ended the
+         fight is held. The anchor is the plates' keyboard group
+         (webclient-combat-figure-plates D4): it follows the `choices` anchor
+         in DOM order because that anchor hosts the teleported combat command
+         card (webclient-combat-command-card-centred D3), so Tab from the
+         action dock inside the card reaches the plates next. Its paint order
+         is its explicit z-index (3), above the portraits and the flash and
+         below the islands, the band and the choices anchor. -->
+    <div
+      ref="platesRef"
+      class="stage-anchor"
+      data-anchor="plates"
+      data-testid="anchor-plates"
+      :role="plateGroup ? 'group' : null"
+      :aria-label="plateGroup ? '戰場' : null"
+      :tabindex="plateGroup ? (plateFocusInside ? -1 : 0) : null"
+      :inert="beatHold || null"
+      :aria-hidden="beatHold ? 'true' : null"
+    >
+      <slot name="plates" />
+    </div>
     <div class="stage-band" data-testid="stage-band">
       <div
         class="stage-anchor"
@@ -290,27 +313,6 @@ defineExpose({ menuOpen });
           <slot name="band-command" />
         </Teleport>
       </div>
-    </div>
-    <!-- The figure plates (webclient-combat-formation D4): filled only
-         while the formation stands (a leaving plate fades out inert); inert
-         and hidden from assistive technology while a round that ended the
-         fight is held. The anchor is the plates' keyboard group
-         (webclient-combat-figure-plates D4): after the band in DOM order, so
-         Tab from the action dock reaches it next; its paint order is its
-         explicit z-index (3), above the portraits and the flash and below
-         the islands and the band. -->
-    <div
-      ref="platesRef"
-      class="stage-anchor"
-      data-anchor="plates"
-      data-testid="anchor-plates"
-      :role="plateGroup ? 'group' : null"
-      :aria-label="plateGroup ? '戰場' : null"
-      :tabindex="plateGroup ? (plateFocusInside ? -1 : 0) : null"
-      :inert="beatHold || null"
-      :aria-hidden="beatHold ? 'true' : null"
-    >
-      <slot name="plates" />
     </div>
     <div
       class="stage-anchor"

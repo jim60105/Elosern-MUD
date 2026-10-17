@@ -817,7 +817,8 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
             landed = page.evaluate(
                 "() => { const a = document.activeElement;"
                 " return { inPlates: !!a.closest('[data-anchor=\"plates\"]'),"
-                " inDock: !!a.closest('#action-dock'), identity: a.getAttribute('data-identity') }; }"
+                " inDock: !!a.closest('#action-dock'), identity: a.getAttribute('data-identity'),"
+                " landed: a.tagName + '#' + (a.id || '') + '[' + (a.getAttribute('data-testid') || '') + ']' }; }"
             )
             if not landed["inDock"]:
                 break

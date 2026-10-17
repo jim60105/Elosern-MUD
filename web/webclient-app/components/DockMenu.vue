@@ -950,7 +950,10 @@ watch(
 }
 .dock-detail__meta kbd {
   font-family: var(--f-mono);
-  font-size: calc(var(--text-xs) * 0.9);
+  /* The key hint sits on the strip's own line, so it renders at `--text-xs`,
+     the client's legibility floor (retarget-desktop-viewport-contract D4);
+     a shrunk step would put chrome type under the floor. */
+  font-size: var(--text-xs);
   line-height: 1.3;
   background: var(--ink-780);
   border: 1px solid var(--ink-600);
