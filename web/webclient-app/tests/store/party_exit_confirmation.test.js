@@ -254,6 +254,32 @@ describe("party-scope exit confirmation (store flow)", () => {
     expect(requests("combat.exit_confirm")).toHaveLength(0);
   });
 
+  it("a root reset abandons an outstanding prompt request", () => {
+    enterCombat();
+    openExit();
+    expect(prompt()).toBeNull();
+    // The reset runs before the server's answer arrives: the late result must
+    // not reopen the discarded confirmation over the new root.
+    store.resetFramesToRoot();
+    deliverPrompt();
+    expect(prompt()).toBeNull();
+    expect(store.view.partyExitConfirm).toBeNull();
+    expect(requests("combat.exit_confirm")).toHaveLength(0);
+  });
+
+  it("background text commands are inert while the question stands", () => {
+    enterCombat();
+    openExit();
+    deliverPrompt();
+    expect(prompt()).not.toBeNull();
+    expect(store.view.commandAccepts).toBe(false);
+    expect(store.sendText("combat actions")).toBe(false);
+    expect(sender.sent.texts).toHaveLength(0);
+    expect(store.cancelPartyExit()).toBe(true);
+    expect(store.view.commandAccepts).toBe(true);
+    expect(store.sendText("look")).toBe(true);
+  });
+
   it("an unrelated result never opens the card; a failed send releases the dock", () => {
     enterCombat();
     openExit();

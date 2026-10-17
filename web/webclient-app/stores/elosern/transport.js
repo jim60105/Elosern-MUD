@@ -291,6 +291,13 @@ export function applyTransport(ctx) {
   };
 
   ctx.sendText = function sendText(text) {
+    // The party-scope exit confirmation (webclient-party-exit-confirmation):
+    // background commands are inert while its question stands, so a typed
+    // command (or a borrowed free-form send) can never mutate the session
+    // behind the unanswered card.
+    if (ctx.partyExitPrompt) {
+      return false;
+    }
     if (!ctx.view.value.connected) {
       return false;
     }

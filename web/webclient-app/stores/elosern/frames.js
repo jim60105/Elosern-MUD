@@ -122,6 +122,9 @@ export function applyFrames(ctx) {
     // Nor the party-scope exit confirmation: a root reset discards the
     // prompt (the server draft it was requested against is never touched).
     ctx.partyExitPrompt = null;
+    // Nor an outstanding prompt request: a response that arrives after the
+    // reset must never reopen the discarded confirmation over the new root.
+    ctx.pendingPartyExit = null;
     // Nor a pending actor query: a root reset abandons the local intent, so a
     // late commit never yanks the dock back to the root unprompted.
     ctx.pendingActorSelection = null;

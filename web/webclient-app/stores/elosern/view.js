@@ -262,6 +262,7 @@ export function applyView(ctx) {
       // The field clears exactly when the send it would make is delivered.
       freeformBound: ctx.freeformTarget != null,
       commandAccepts:
+        !ctx.partyExitPrompt &&
         rs.connected &&
         !rs.mutationsLocked &&
         !ctx.inFlight &&
