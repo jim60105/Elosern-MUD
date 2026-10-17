@@ -221,7 +221,8 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
     @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_three_strike_divert_cap_and_gauge_ledger_discipline(self):
         """WHEN three strikes hit a target with divert buff, cap and gauge ledgers are respected across all three strikes."""
-        # Set magic_power to 30, defense to 10 -> post-defense damage = 20 per strike.
+        # Set magic_power to 30, defense to 10: ratio mitigation retains
+        # k / (k + defense) = 40/50 of the hit, so each strike lands 24.
         self.actor.traits.magic_power.base = 30
         self.target.traits.defense.base = 10
         self.target.traits.hp.base = 100
@@ -251,10 +252,10 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
             with patch("world.rules.combat.damage.roll_d100", side_effect=[80, 80, 80]):
                 res = ActionResolver.resolve(req)
             self.assertEqual(res.outcome, "success")
-            # 20 post-defense * 0.5 = 10 diverted per strike.
-            # Strike 1: 10 diverted, remaining cap = 20
-            # Strike 2: 10 diverted, remaining cap = 10
-            # Strike 3: 10 diverted, remaining cap = 0
+            # 24 post-defense * 0.5 = 12 diverted per strike.
+            # Strike 1: 12 diverted, remaining cap = 18
+            # Strike 2: 12 diverted, remaining cap = 6
+            # Strike 3: the cap's own last 6, so 18 of it lands as HP damage
             # Total diverted = 30 (cap of 30 exhausted)
             buff_inst = self.target.buffs.all[buff_def.key]
             self.assertEqual(get_divert_consumed(buff_inst), 30)
@@ -262,14 +263,14 @@ class MultiStrikeCapWideningSettlementTests(EvenniaTestCase):
             # MP reduced by 30
             self.assertEqual(self.target.traits.mp.current, 70)
 
-            # Residual HP damage per strike is 20 - 10 = 10; across 3 strikes = 30
-            self.assertEqual(_stored_hp(self.target), 70)
+            # Residual HP damage is 24 - 12, 24 - 12 and 24 - 6; across the
+            # three strikes = 42.
+            self.assertEqual(_stored_hp(self.target), 58)
 
-            # Exactly 3 damage events with amount=10
+            # Exactly 3 damage events, each carrying its strike's own residual
             damages = [e for e in res.event_log.entries if e.kind == "damage"]
             self.assertEqual(len(damages), 3)
-            for d in damages:
-                self.assertEqual(d.data["amount"], 10)
+            self.assertEqual([d.data["amount"] for d in damages], [12, 12, 18])
 
     @covers_requirement("skill-effect-model::a-follow-up-strike-repeats-damage-on-evidence-or-unconditionally-without-repeating-the-action")
     def test_three_strike_lethal_crossing_single_defeat_credit(self):

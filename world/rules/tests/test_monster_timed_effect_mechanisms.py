@@ -165,7 +165,9 @@ class TimedMonsterEffectMechanismTests(EvenniaTestCase):
         """
         skill = _rider_skill()
         self._own(self.caster, skill)
-        self.enemy.traits.defense.base = 500
+        # Ratio mitigation retains ``k / (k + defense)``: only a defense that
+        # dominates the attack drives the retained hit under the damage floor.
+        self.enemy.traits.defense.base = 10000
         controls = (self.caster, self.ally, self.control)
 
         missed = self._resolve(skill, [self.enemy], roll=1)

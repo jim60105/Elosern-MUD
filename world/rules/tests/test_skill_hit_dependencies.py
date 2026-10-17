@@ -170,11 +170,11 @@ class SkillHitDependenciesTests(EvenniaTestCase):
     def test_absorbed_hit_credits_the_rider_independently_of_hp_loss(self):
         """Scenario: Hit evidence and defeat; an absorbed hit still qualifies.
 
-        The victim's defense drives the pre-floor damage below zero, so the
-        committed HP loss is the rulebook's unscaled damage floor while the hit
-        is still true, and the rider transfers its full fixed amount exactly
-        once. The case cannot drift into the miss vector: a miss transfers
-        nothing at all.
+        The victim's defense drives the ratio-retained damage below the
+        rulebook's unscaled floor, so the committed HP loss is that floor while
+        the hit is still true, and the rider transfers its full fixed amount
+        exactly once. The case cannot drift into the miss vector: a miss
+        transfers nothing at all.
         """
         skill = self._make_skill(
             "absorbed_hit_rider",
@@ -191,7 +191,10 @@ class SkillHitDependenciesTests(EvenniaTestCase):
         )
         skill = replace(skill, cost={"mp": 0, "sp": 0})
         req = ActionRequest(self.actor, skill.key, [self.target_a], self.context)
-        self.target_a.traits.defense.base = 500
+        # Ratio mitigation retains ``k / (k + defense)`` of the hit, so the
+        # defense must dominate the attack by orders of magnitude before the
+        # retained amount falls through the rulebook's unscaled damage floor.
+        self.target_a.traits.defense.base = 10000
         self.target_a.traits.mp.current = 50
         self.actor.traits.mp.current = 0
         self.actor.traits.mp.base = 100
