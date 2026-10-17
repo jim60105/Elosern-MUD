@@ -16,6 +16,7 @@ from typeclasses.rooms import Room
 from world.rules.combat_session import engage
 from world.rules.combat_view import (
     CATEGORY_LABELS,
+    CombatView,
     CombatViewError,
     ROOT_ACTIONS,
     SECONDARY_ACTIONS,
@@ -149,6 +150,17 @@ def _owned(*rows) -> dict[str, list[str]]:
     }
 
 
+def _flat_skills(view: CombatView) -> list[SkillDescriptorView]:
+    """Flatten a view's requested-actor choices catalog into one descriptor list."""
+    assert view.choices is not None
+    return [
+        skill
+        for category in view.choices.skills
+        for group in category.groups
+        for skill in group.skills
+    ]
+
+
 def _descriptor(skill) -> SkillDescriptorView:
     """Build one minimal frozen skill descriptor from a SkillDef."""
     return SkillDescriptorView(
@@ -225,7 +237,8 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         )
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        keys = [skill.key for skill in view.skills]
+        descriptors = _flat_skills(view)
+        keys = [skill.key for skill in descriptors]
         flee_key, attack_key = _innate_keys()
         act_registry = _live_registry(
             "world.skills.sexual_acts", "SEXUAL_ACT" + "_REGISTRY"
@@ -248,7 +261,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # bypass may not appear in the skill list at all.
         self.assertNotIn(flee_key, keys)
         self.assertNotIn(_T_PASSIVE.key, keys)
-        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
+        wind = next(skill for skill in descriptors if skill.key == _T_AREA.key)
         self.assertEqual(wind.target_spec, "area")
         # With free targeting every approved shorthand expands to valid
         # candidates, so all three are exposed as conveniences.
@@ -257,7 +270,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # With ANY scope every relation passes the faction check, so the
         # actor itself is also a valid explicit target for the area skill.
         self.assertEqual(wind.valid_target_ids, (self.player.pk, self.monster.pk))
-        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        fire = next(skill for skill in descriptors if skill.key == _T_CAST.key)
         self.assertEqual(fire.cost, dict(_T_CAST.cost))
         self.assertEqual(fire.element, _T_ELEMENT)
 
@@ -266,9 +279,13 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.db.skills = _owned(_T_AREA, _T_FOCUS)
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
+        wind = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_AREA.key
+        )
         self.assertEqual(wind.freeform_scales, ())
-        focus = next(skill for skill in view.skills if skill.key == _T_FOCUS.key)
+        focus = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_FOCUS.key
+        )
         self.assertEqual(focus.freeform_scales, ())
 
         # The full ladder shows only with the spell itself at the top rung.
@@ -284,7 +301,9 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
             rungs={_T_AREA.key: top_level},
         )
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
+        wind = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_AREA.key
+        )
         base_mp = int(_T_AREA.cost["mp"])
         # At the top rung under the global tip cap, every canonical scale is
         # allowed — computed from the shared ladder/cost authorities, never
@@ -296,13 +315,17 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
                 for scale, label in FREEFORM_CAST_SCALES
             ),
         )
-        focus = next(skill for skill in view.skills if skill.key == _T_FOCUS.key)
+        focus = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_FOCUS.key
+        )
         self.assertEqual(focus.freeform_scales, ())
 
         # Element mastery never advertises scales for another element's spells.
         self.player.db.skills = _owned(_T_GLOW, _mastery_row())
         view = build_combat_view(self.player)
-        light = next(skill for skill in view.skills if skill.key == _T_GLOW.key)
+        light = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_GLOW.key
+        )
         self.assertEqual(light.freeform_scales, ())
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
@@ -311,7 +334,9 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.player.traits.mp.current = 0
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        fire = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_CAST.key
+        )
         self.assertFalse(fire.enabled)
         self.assertEqual(fire.reason_code, "insufficient_resource")
         self.assertTrue(fire.reason_message.strip())
@@ -330,12 +355,16 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         # interim eligibility is ownership + MP only.
         self.player.traits.magic_power.base = 15
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == _T_STORM.key)
+        fire = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_STORM.key
+        )
         self.assertTrue(fire.enabled)
 
         self.player.traits.magic_power.base = 30
         view = build_combat_view(self.player)
-        fire = next(skill for skill in view.skills if skill.key == _T_STORM.key)
+        fire = next(
+            skill for skill in _flat_skills(view) if skill.key == _T_STORM.key
+        )
         self.assertTrue(fire.enabled)
 
     @covers_requirement("webclient-combat-menu::menu-target-shorthands-are-convenience-ui")
@@ -352,7 +381,8 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         grant_lineage(self.player, [_T_AREA.key, _T_CAST.key])
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        wind = next(skill for skill in view.skills if skill.key == _T_AREA.key)
+        descriptors = _flat_skills(view)
+        wind = next(skill for skill in descriptors if skill.key == _T_AREA.key)
         self.assertTrue(wind.enabled)
         # The menu's all-enemies shorthand remains a convenience, while the
         # freely-targetable skill also lists the ally companion as an explicit
@@ -360,7 +390,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertEqual(wind.shorthands, ("all-enemies", "all-allies", "all"))
         self.assertIn(self.monster.pk, wind.valid_target_ids)
         self.assertIn(companion.pk, wind.valid_target_ids)
-        fire = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        fire = next(skill for skill in descriptors if skill.key == _T_CAST.key)
         self.assertIn(companion.pk, fire.valid_target_ids)
 
     @covers_requirement("webclient-combat-menu::combat-context-actions-are-an-exact-read-only-panel")
@@ -400,7 +430,7 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
 
         # Authorized companion view
         comp_view = build_combat_view(self.player, for_actor=companion)
-        self.assertIn(_T_CAST.key, [s.key for s in comp_view.skills])
+        self.assertIn(_T_CAST.key, [s.key for s in _flat_skills(comp_view)])
 
         # Unauthorized view: enemy as for_actor
         with self.assertRaises(CombatViewError):
@@ -596,13 +626,14 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
     def test_descriptors_carry_target_polarity(self):
         engage(self.player, self.monster)
         view = build_combat_view(self.player)
-        cast = next(skill for skill in view.skills if skill.key == _T_CAST.key)
+        descriptors = _flat_skills(view)
+        cast = next(skill for skill in descriptors if skill.key == _T_CAST.key)
         # The kit cast is a single elemental damage spell.
         self.assertEqual((cast.hostile, cast.beneficial), (True, False))
         flee_key, _ = _innate_keys()
         # The allied flee descriptor is absent by design (§6), so no session
         # skill row can be the individual-escape bypass.
-        self.assertNotIn(flee_key, [skill.key for skill in view.skills])
+        self.assertNotIn(flee_key, [skill.key for skill in descriptors])
 
     def test_no_session_raises_view_error(self):
         with self.assertRaises(CombatViewError):
@@ -615,9 +646,10 @@ class CombatViewTests(BattlefieldIsolation, EvenniaTestCase):
         self.assertTrue(view.recovery)
         self.assertIsNotNone(view.session.reason)
         self.assertEqual(view.root_actions, ())
-        self.assertEqual(view.secondary_actions, ("forfeit",))
+        self.assertEqual(view.secondary_actions, ("surrender",))
         self.assertEqual(view.participants, ())
-        self.assertEqual(view.skills, ())
+        self.assertIsNone(view.choices)
+        self.assertIsNone(view.draft)
 
     def test_participant_states_fled_knocked_out_and_defeated(self):
         from world.rules.combat_session import from_storage, read_session, to_storage, _persist

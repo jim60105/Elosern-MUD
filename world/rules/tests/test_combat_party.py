@@ -917,12 +917,23 @@ class PartyActorCommandsTests(BattlefieldIsolation, EvenniaTestCase):
 
         # 1. View choices for companion
         view = build_combat_view(self.player, for_actor=companion)
-        skill_keys = [s.key for s in view.skills]
+        skill_keys = [
+            skill.key
+            for category in view.choices.skills
+            for group in category.groups
+            for skill in group.skills
+        ]
         self.assertIn(_T_CAST, skill_keys)
 
         # 2. View choices for commander lacks companion skill
         commander_view = build_combat_view(self.player)
-        self.assertNotIn(_T_CAST, [s.key for s in commander_view.skills])
+        commander_keys = [
+            skill.key
+            for category in commander_view.choices.skills
+            for group in category.groups
+            for skill in group.skills
+        ]
+        self.assertNotIn(_T_CAST, commander_keys)
 
         # 3. Companion executes _T_CAST
         submit_player_action(self.player, BASIC_ATTACK_KEY, [self.monster])

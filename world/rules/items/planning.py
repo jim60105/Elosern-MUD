@@ -38,6 +38,33 @@ from world.rules.items.reads import (
     _select_mirror,
 )
 from world.rules.targeting import RoomActionContext
+from world.skills.effects.polarity import (
+    BENEFICIAL,
+    HOSTILE,
+    _loaded_buff_polarity,
+)
+
+
+def _item_effect_polarity(effect: Any) -> str:
+    """Return the typed target-side polarity of one item effect.
+
+    The classification is per effect kind, never the declared target scope: a
+    signed gauge drain is hostile wherever it lands (a self-scoped drain is a
+    cost, not a benefit), a positive adjustment is beneficial, an applied
+    status takes its buff definition's polarity, and a removal is beneficial
+    when it strips a debuff and hostile when it strips a buff.
+    """
+    if isinstance(effect, GaugeAdjustEffect):
+        return HOSTILE if effect.amount < 0 else BENEFICIAL
+    if isinstance(effect, StatusApplyEffect):
+        return HOSTILE if _loaded_buff_polarity(effect.status) == "debuff" else BENEFICIAL
+    if isinstance(effect, StatusRemoveEffect):
+        if effect.selector in ("all", "negative"):
+            return BENEFICIAL
+        if effect.selector == "positive":
+            return HOSTILE
+        return BENEFICIAL if _loaded_buff_polarity(effect.selector) == "debuff" else HOSTILE
+    raise ValueError(f"unclassified item effect kind {type(effect)!r}")
 
 
 _FULL_REASON_BY_STAT: dict[ItemStat, ItemUseReason] = {
@@ -283,18 +310,11 @@ def enumerate_actor_item_choices(
         else:
             target_spec = "none"
 
-        # Polarity derivation
-        hostile = any(
-            eff.scope is ItemTargetScope.ALL_ENEMIES
-            or (isinstance(eff, GaugeAdjustEffect) and eff.amount < 0)
-            for eff in profile.effects
-        )
-        beneficial = any(
-            eff.scope in (ItemTargetScope.SELF, ItemTargetScope.ALL_ALLIES)
-            or (isinstance(eff, GaugeAdjustEffect) and eff.amount > 0)
-            or (isinstance(eff, StatusRemoveEffect) and eff.selector in ("all", "negative"))
-            for eff in profile.effects
-        )
+        # Polarity derivation: typed per-effect classification, never the
+        # declared target scope (a self-scoped drain is a cost, not a benefit).
+        polarities = [_item_effect_polarity(eff) for eff in profile.effects]
+        hostile = HOSTILE in polarities
+        beneficial = BENEFICIAL in polarities
 
         # Determine valid targets and enabled state
         if target_spec == "single":
