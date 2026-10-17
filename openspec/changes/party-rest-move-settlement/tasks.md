@@ -8,7 +8,7 @@ Total estimate: **7 hours**, including implementation, focused verification, doc
 
 ## 2. Movement scope (2.5h)
 
-- [ ] 2.1 Change `charge_movement` to take `source_location` (and wilderness source coordinates), compute the travelling party with the follow predicate, and update `typeclasses/exits.py::after_successful_movement` to pass them; verify grid, wilderness step and gate-entry traversals settle followers, a companion elsewhere is untouched, a possessed traversal settles only the traverser, and the flight waiver still skips the advance.
+- [ ] 2.1 Change `charge_movement` to take `source_location` (and wilderness source coordinates), compute the travelling party with the follow predicate, and update `typeclasses/exits.py::after_successful_movement` to pass them; verify grid, wilderness step and gate-entry traversals settle followers, a companion elsewhere is untouched, a possessed traversal settles the traverser, the owner body and co-located companions, and the flight waiver still skips the advance.
 - [ ] 2.2 Extend `world/rules/movement_settlement.py` so the snapshot registry and `_restore_advance_registry` cover the same travelling party; verify with an injected clock failure that every member's gauges/buffs and the tick are restored and the traverser is compensated back to the source.
 
 ## 3. Unchanged scopes and observability (1h)

@@ -7,7 +7,7 @@ Define which commander-initiated world-clock advances settle the present party, 
 ## ADDED Requirements
 
 ### Requirement: Skip advances settle the present party
-Every SKIP-source advance started by a rest, sleep, wait, or graphical wait SHALL settle the present party scope of the acting character: the acting character, the commander, and every effective companion located in that room.
+Every SKIP-source advance started by a rest, sleep, wait, or graphical wait SHALL settle the present party scope: the commander and every effective companion located in the commander's room, whether or not the player is possessing a companion.
 
 #### Scenario: Resting regenerates a co-located companion
 - **WHEN** the commander rests one hour with companion 艾拉 at MP 10 of 120 in the same room
@@ -18,15 +18,15 @@ Every SKIP-source advance started by a rest, sleep, wait, or graphical wait SHAL
 - **THEN** 卡恩's gauges and buff state are unchanged by that advance
 
 ### Requirement: Movement advances settle the travelling party
-A movement advance for a player-character traverser SHALL settle the traverser and every effective companion co-located with it in the source room before the step. A possessed traverser SHALL settle only itself.
+A movement advance SHALL settle the travelling party: the traverser and every party member the follow step moves with it (effective companions and, for a possessed traverser, the commander's body, co-located in the source room before the step).
 
 #### Scenario: Followers regenerate with the step
 - **WHEN** the commander steps through an exit with 艾拉 in the source room
 - **THEN** the one movement advance settles both the commander and 艾拉
 
-#### Scenario: Possessed movement keeps its single scope
-- **WHEN** the player, possessing 艾拉, steps through an exit
-- **THEN** the movement advance settles only 艾拉
+#### Scenario: Possessed movement settles the whole travelling party
+- **WHEN** the player, possessing 艾拉, steps through an exit while the player's body and 卡恩 share her source room
+- **THEN** the one movement advance settles 艾拉, the player's body and 卡恩
 
 ### Requirement: Other advances keep their scope
 Church rites, GM console advances, defeat aftermath and combat settlement SHALL keep their existing entity scopes and SHALL NOT be widened by this capability.

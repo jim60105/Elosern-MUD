@@ -7,9 +7,9 @@
 resolving the cost from `CLOCK_YAML["command_defaults"][cost_key]` and calling
 `world.rules.clock.get_world_clock().advance(cost, AdvanceSource.COMMAND, entities)` when
 `world.rules.player_control.is_player_driven(traversing_object)` is true, and doing nothing
-otherwise. `entities` SHALL be the traverser followed by every effective companion co-located with a
-`PlayerCharacter` traverser in `source_location` before the step (the companions the follow step
-moves); a possessed traverser's `entities` SHALL be exactly the traverser.
+otherwise. `entities` SHALL be the traverser followed by every party member the follow step moves
+with it: the effective companions co-located in `source_location` before the step and, for a
+possessed traverser, the commander's body.
 
 #### Scenario: charge_movement advances the clock by the resolved cost for a PlayerCharacter
 - **WHEN** `charge_movement(player_character, "move")` is called
@@ -24,7 +24,8 @@ moves); a possessed traverser's `entities` SHALL be exactly the traverser.
 #### Scenario: A possessed NPC charges movement like a player
 - **WHEN** `charge_movement(npc, "move")` is called for an NPC that is possessed and puppeted
 - **THEN** the clock advances by `CLOCK_YAML["command_defaults"]["move"]` with
-  `AdvanceSource.COMMAND` and the possessed NPC as the only settled entity
+  `AdvanceSource.COMMAND`, settling the possessed NPC first and then the commander's body and
+  every companion co-located with it in the source room
 
 #### Scenario: charge_movement always uses AdvanceSource.COMMAND
 - **WHEN** `charge_movement()` is called with any registered `cost_key`

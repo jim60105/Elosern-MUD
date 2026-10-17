@@ -7,8 +7,9 @@
 into a concrete number of seconds, cap that value at `MAX_SKIP_SECONDS`
 (`rulebook/clock.yaml`'s `max_sleep_seconds`), and, when `evaluate_skip_safety()` returns `None`,
 call `WorldClock.advance(seconds, AdvanceSource.SKIP, entities)` with exactly the capped
-value, where `entities` is the caller's present party scope (the caller, the commander, and every
-effective companion in the caller's room, in party order).
+value, where `entities` is the caller's present party scope (the commander and every effective
+companion in the commander's room, in party order; the same whether or not the caller is a
+possessed companion).
 
 #### Scenario: An unlabeled adapter skip clears a rolled-back booking before advancing
 - **WHEN** a rolled-back advance has restored a stale `practice_booking` and the accepted
