@@ -144,7 +144,7 @@ watch(
     }
     await nextTick();
     const after = typeof document === "undefined" ? null : document.activeElement;
-    if (after === document.body && focused && dockRef.value.contains(focused)) {
+    if (after === document.body && focused && dockRef.value && dockRef.value.contains(focused)) {
       dockRef.value.focus({ preventScroll: true });
     }
   },
