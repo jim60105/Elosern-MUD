@@ -1236,6 +1236,7 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
+        "webclient-combat-menu::a-cast-across-sides-asks-for-confirmation-first",
         "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
         "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
     )
