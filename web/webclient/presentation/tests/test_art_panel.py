@@ -1497,12 +1497,11 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
 
     @covers_requirement("webclient-combat-menu::combat-results-update-canonical-panels-and-preserve-narrative-logs")
     def test_combat_result_publishes_status_context_actions_and_art_together(self):
-        from unittest.mock import patch
-
         from server.conf import inputfuncs
         from web.webclient.actions.registry import build_production_action_registry
         from web.webclient.actions.dispatcher import handle_ui_action
         from web.webclient.presentation.registry import build_production_registry
+        from world.rules.combat_session import read_session
 
         room = create_object(Room, key="atomic arena")
         room.scene_archetype = "t_synth_lodge"
@@ -1514,26 +1513,30 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         coordinator = __import__(
             "web.webclient.presentation.coordinator", fromlist=["attach_coordinator"]
         ).attach_coordinator(self.ws_session, build_production_registry())
+        # The dock's one confirming terminal route: the flee row only reaches
+        # the party exit's confirmation boundary and rejects until the
+        # confirmation window ships (webclient-party-exit-confirmation), while
+        # Forfeit requests and confirms its surrender in one dispatch.
         action = {
             "protocol_version": 1,
             "presentation_epoch": envelope["presentation_epoch"],
             "request_id": "combat:1",
             "base_revision": envelope["revision"],
-            "action_id": "combat.flee",
-            "payload": {},
+            "action_id": "combat.forfeit",
+            "payload": {"session_id": read_session(self.char1).session_id},
         }
         self.sessionhandler.data_out.reset_mock()
-        with patch("world.rules.disengage.roll_d100", return_value=100):
-            handle_ui_action(
-                self.ws_session,
-                self.char1,
-                action,
-                build_production_action_registry(),
-                build_production_registry(),
-            )
-        # A terminal outcome (flee) publishes a full snapshot: the mode flips
-        # back to exploration, so every mode-relevant panel is replaced,
-        # including the art catalog without the fled monster.
+        handle_ui_action(
+            self.ws_session,
+            self.char1,
+            action,
+            build_production_action_registry(),
+            build_production_registry(),
+        )
+        # A terminal outcome (the confirmed surrender) publishes a full
+        # snapshot: the mode flips back to exploration, so every mode-relevant
+        # panel is replaced, including the art catalog without the session's
+        # own monster.
         snapshots = [
             call.kwargs["ui_snapshot"][0][0]
             for call in self.sessionhandler.data_out.call_args_list
@@ -1543,7 +1546,8 @@ class ArtSnapshotIntegrationTests(BattlefieldIsolation, EvenniaTest):
         panels = snapshots[-1]["panels"]
         for name in ("status", "context_actions", "art", "exploration", "character", "services", "local_map"):
             self.assertIn(name, panels)
-        # The fled participant leaves the art catalog in the same publication.
+        # The ended session's participants leave the art catalog in the same
+        # publication.
         catalog = panels["art"]["portrait_catalog"]
         self.assertNotIn(str(monster.pk), catalog)
         self.assertNotIn(str(self.char1.pk), catalog)

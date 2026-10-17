@@ -94,8 +94,14 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         keys = [skill["key"] for skill in self._flatten_skills(payload)]
         innate_keys = set(synth_innate_overlay()["skills"])
         self.assertIn(T_EMBER, keys)
-        # The production-forced innate rows arrive under their runtime keys.
-        self.assertTrue(innate_keys <= set(keys), innate_keys - set(keys))
+        # The production-forced innate rows arrive under their runtime keys,
+        # except the allied personal flee: it is not a session action (§6), so
+        # the skill list never offers that bypass — the root `flee` action
+        # asserted above is the party exit's own entry point.
+        from world.rules.disengage import FLEE_SKILL_KEY
+
+        self.assertFalse(innate_keys - {FLEE_SKILL_KEY} - set(keys), "a forced innate row is missing")
+        self.assertNotIn(FLEE_SKILL_KEY, keys)
         self.assertEqual(T_EMBER, SYNTH_SKILLS["t_ember_burst"].key)
         self.assertEqual(
             [p["portrait_ref"] for p in payload["participants"]],
@@ -122,7 +128,8 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             "context_actions",
             PresentationContext(actor=self.player, protocol_version=1),
         )
-        innate_keys = list(synth_innate_overlay()["skills"])
+        from world.rules.combat_session import BASIC_ATTACK_KEY
+
         self.assertEqual(
             [category["category"] for category in payload["skills"]],
             ["elemental_magic", "martial_arts", "sexual_act"],
@@ -150,10 +157,12 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
             [sub_group["group"] for sub_group in sexual["groups"]][0],
             SYNTH_SKILLS[T_ACT].group,
         )
-        # Both forced innate rows (basic_attack, flee) land in martial_arts.
+        # The forced basic-attack row lands in martial_arts beside the probe;
+        # the allied personal flee is not a session action (§6) and never
+        # reaches this list.
         self.assertEqual(
             [skill["key"] for skill in martial["groups"][0]["skills"]],
-            [_T_MARTIAL_PROBE, innate_keys[1], innate_keys[0]],
+            [_T_MARTIAL_PROBE, BASIC_ATTACK_KEY],
         )
 
     @covers_requirement("webclient-combat-menu::combat-presentation-enumerates-complete-deterministic-choices")
@@ -358,7 +367,14 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
                 for scale, _label in FREEFORM_CAST_SCALES
             ],
         )
+        # The innate rows carry no element, so they reveal no rungs; the
+        # personal-flee row is not in the combat list at all (§6).
+        from world.rules.disengage import FLEE_SKILL_KEY
+
         for innate_key in synth_innate_overlay()["skills"]:
+            if innate_key == FLEE_SKILL_KEY:
+                self.assertNotIn(innate_key, by_key)
+                continue
             self.assertNotIn("freeform_scales", by_key[innate_key])
 
     @covers_requirement("webclient-combat-menu::the-combat-panel-hides-freeform-casting-from-non-masters")
@@ -422,11 +438,16 @@ class ContextActionsPresenterTests(BattlefieldIsolation, EvenniaTestCase):
         }
         self.assertGreater(len(twins) + len(registry), 32)
         with patch.dict(registry, twins):
+            from world.rules.disengage import FLEE_SKILL_KEY
+
+            # The presenter never lists the allied personal-flee bypass (§6),
+            # so the census of presented rows excludes it.
             all_active = sorted(
                 key
                 for key, skill in registry.items()
                 if skill.kind is SkillKind.ACTIVE
                 and skill_identity_eligible(self.player, skill)
+                and key != FLEE_SKILL_KEY
             )
             ineligible = [
                 key

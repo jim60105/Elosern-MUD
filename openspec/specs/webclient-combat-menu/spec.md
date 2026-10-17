@@ -93,7 +93,7 @@ ordering SHALL follow `SkillCategory`'s declaration order (seven members after t
 
 #### Scenario: The retired category keys are never emitted
 - **WHEN** an entity owns the re-homed acquired passives `flight` and `elf_longevity` and the re-homed innate active `flee`
-- **THEN** no category group carries category `"movement"` or `"innate_gift"` anywhere in the `skills` array; `flee` (ACTIVE, so not passive-filtered) lists under the `martial_arts` category's null sub-group, and the two PASSIVE skills are excluded by passive filtering exactly as any other owned passive
+- **THEN** no category group carries category `"movement"` or `"innate_gift"` anywhere in the `skills` array; `flee` is not emitted as a skill row at all — the allied personal flee is no longer a session action, so no skill-list bypass exists — and the two PASSIVE skills are excluded by passive filtering exactly as any other owned passive
 
 #### Scenario: An owned category with no members is omitted, not emitted empty
 - **WHEN** an entity owns no skill classified `sexual_act`
