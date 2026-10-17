@@ -8,7 +8,7 @@ Design §3.3, §6.2 and §7 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 - New pure rules read `world/rules/party_inventory.py::item_holdings(acting, giver, item_key, *, in_combat)` and `equipment_delta(member, item_key)` (hypothetical swap through the breakdown read model; no write).
 - New panel `item_holdings` v1 (`web/webclient/presentation/item_holdings.py`), available in exploration and combat, with per-member `held`, `equipped`, `delta` and `receive` facts.
-- **BREAKING (pre-release)** `party.view_member` payload becomes `{member_id, tab, item_key}` (nullable item); the selection stores the item; its affected panels add `item_holdings`. The design lists only `party.view_member` and `party.transfer` as new action identifiers, so the holdings query rides the existing selection action instead of adding a third identifier (recorded as a planning interpretation).
+- **BREAKING (pre-release)** `party.view_member` payload becomes `{member_id, tab, skill_key, item_key}` (nullable item; `skill_key` from `character-skill-growth-fields`); the selection stores the item; its affected panels add `item_holdings`. The design lists only `party.view_member` and `party.transfer` as new action identifiers, so the holdings query rides the existing selection action instead of adding a third identifier (recorded as a planning interpretation).
 - JS mirror, parity, allowlist and fixtures.
 
 ## Capabilities
@@ -32,7 +32,7 @@ Design §3.3, §6.2 and §7 of `docs/superpowers/specs/2026-10-18-party-member-m
 
 ## Batch: party member management
 
-Declared implementation order: **19 of 30**.
+Declared implementation order: **19 of 31**.
 
 - depends-on: party-inventory-panel
 

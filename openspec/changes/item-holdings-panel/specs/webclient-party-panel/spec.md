@@ -3,7 +3,7 @@
 ## MODIFIED Requirements
 
 ### Requirement: party.view_member selects the viewed member for the session
-The production registry SHALL register `party.view_member` accepting exactly `{member_id, tab, item_key}`, where `member_id` names the commander or an effective party member (presence not required), `tab` is one of `member`, `bag`, `status`, `skills`, `lineage`, `shop`, and `item_key` is a bounded whitespace-free item key or null. The selection SHALL be stored per session, keyed to the commander, and SHALL never authorize a mutation.
+The production registry SHALL register `party.view_member` accepting exactly `{member_id, tab, skill_key, item_key}`, where `member_id` names the commander or an effective party member (presence not required), `tab` is one of `member`, `bag`, `status`, `skills`, `lineage`, `shop`, `skill_key` is a bounded skill key or null naming the skill selected in the 技能 tab, and `item_key` is a bounded whitespace-free item key or null. The selection SHALL be stored per session, keyed to the commander, and SHALL never authorize a mutation.
 
 #### Scenario: Selecting a companion republishes the party panel
 - **WHEN** the player selects 艾拉 on the member rail
@@ -24,3 +24,7 @@ The production registry SHALL register `party.view_member` accepting exactly `{m
 #### Scenario: An unknown item key clears the holdings
 - **WHEN** `item_key` names an item no registry entry defines
 - **THEN** the selection stores null for the item and `item_holdings` reports no rows
+
+#### Scenario: Selecting a skill publishes its detail
+- **WHEN** the player selects 冰錐術 in the 技能 tab for 艾拉
+- **THEN** the session selection holds 艾拉 and 冰錐術 and the next `character` payload carries `selected_skill` for 冰錐術

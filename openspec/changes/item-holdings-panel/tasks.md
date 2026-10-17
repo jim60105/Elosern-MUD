@@ -8,7 +8,7 @@ Total estimate: **6.5 hours**, including implementation, focused verification, d
 
 ## 2. Panel and selection (2.5h)
 
-- [ ] 2.1 Extend `party.view_member` to `{member_id, tab, item_key}` and the stored selection; implement and register `item_holdings` v1; verify action schema tests, presenter tests (no selection, commander-first rows, possession-identical), maximal bound, and the JS mirror/parity/allowlist contract.
+- [ ] 2.1 Extend `party.view_member` to `{member_id, tab, skill_key, item_key}` and the stored selection; implement and register `item_holdings` v1; verify action schema tests, presenter tests (no selection, commander-first rows, possession-identical), maximal bound, and the JS mirror/parity/allowlist contract.
 
 ## 3. Integration (1.5h)
 
