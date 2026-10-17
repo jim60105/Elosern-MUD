@@ -32,7 +32,7 @@ Design §4.7 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-de
 
 ## Batch: party member management
 
-Declared implementation order: **12 of 31**.
+Declared implementation order: **13 of 32**.
 
 - depends-on: party-practice-booking
 - depends-on: companion-field-item-use
