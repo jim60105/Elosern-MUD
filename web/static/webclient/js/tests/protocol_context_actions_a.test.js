@@ -21,12 +21,12 @@ test("validates the available context_actions combat panel", () => {
   assert.doesNotThrow(() => Protocol.validateContextActionsPanel(validRecoveryPanel()));
   // The registered production allowlist must advertise the same version the
   // server ships (mirror of web.webclient.presentation.registry).
-  assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 6);
+  assert.equal(Protocol.PANEL_ALLOWLIST.context_actions, 7);
   // Every normalized form carries the registered version, never a stale one.
-  assert.equal(Protocol.validateContextActionsPanel(validCombatPanel()).schema_version, 6);
+  assert.equal(Protocol.validateContextActionsPanel(validCombatPanel()).schema_version, 7);
   assert.equal(
     Protocol.validateContextActionsPanel(validContextActionsExplorationPanel()).schema_version,
-    6
+    7
   );
 });
 
@@ -71,7 +71,7 @@ test("validates the available context_actions exploration form", () => {
     ],
   });
   const normalized = Protocol.validateContextActionsPanel(panel);
-  assert.equal(normalized.schema_version, 6);
+  assert.equal(normalized.schema_version, 7);
   assert.equal(normalized.kind, "exploration");
   assert.equal(normalized.affordances.length, 4);
   assert.deepEqual(normalized.affordances[0].params, { room: true });

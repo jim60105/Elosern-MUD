@@ -14,46 +14,71 @@ const Protocol = require("../elosern/protocol.js");
 const { T_ACT_ARENA, T_ACT_SOLO, T_FIRE_LABEL, snapshot, validStatusPanel } = require("./protocol_support.js");
 const { nestedSkills, validCategoryGroup, validCombatPanel, validCombatParticipant, validCombatSkill, validRecoveryPanel, validSkillGroup } = require("./protocol_fixtures.js");
 
-test("the combat form is byte-identical to version 4 plus suggestions", () => {
-  const version6 = validCombatPanel();
-  const stripV6 = (panel) => {
-    const copy = JSON.parse(JSON.stringify(panel));
-    copy.participants.forEach((participant) => delete participant.conditions);
-    copy.skills.forEach((category) =>
-      category.groups.forEach((group) =>
-        group.skills.forEach((skill) => {
-          delete skill.hostile;
-          delete skill.beneficial;
-        })
-      )
-    );
-    delete copy.schema_version;
-    delete copy.suggestions;
-    return copy;
-  };
-  const version4 = Object.assign({ schema_version: 4 }, stripV6(version6));
-  assert.equal(version6.schema_version, 6);
-  // Every combat field serializes exactly as at version 4; only the version
-  // field, the suggestions envelope (v5) and the v6 participant conditions
-  // and skill hostile/beneficial facts are added.
-  const version4Copy = Object.assign({}, version4);
-  delete version4Copy.schema_version;
-  assert.deepEqual(stripV6(version6), version4Copy);
-  assert.deepEqual(version6.suggestions, { status: "unavailable" });
-  assert.deepEqual(version6.participants[0].conditions, []);
-  assert.doesNotThrow(() => Protocol.validateContextActionsPanel(version6));
-  assert.throws(() => Protocol.validateContextActionsPanel(version4));
-  // A version-5 payload is rejected by the v6 mirror.
-  assert.throws(() =>
-    Protocol.validateContextActionsPanel(Object.assign({}, version6, { schema_version: 5 }))
-  );
-  assert.throws(() =>
-    Protocol.validatePanel(
-      "context_actions",
-      Protocol.PANEL_ALLOWLIST.context_actions,
-      Object.assign({}, version6, { schema_version: 5 })
+test("the combat form follows the exact v7 party field set", () => {
+  const version7 = validCombatPanel();
+  // The v4 participant and skill fields: strip the v6 participant conditions
+  // and the v6 polarity booleans, which survive inside the v7 choices catalog.
+  const version4Participants = JSON.parse(JSON.stringify(version7.participants));
+  version4Participants.forEach((participant) => delete participant.conditions);
+  const version4Skills = JSON.parse(JSON.stringify(version7.choices.skills));
+  version4Skills.forEach((category) =>
+    category.groups.forEach((group) =>
+      group.skills.forEach((skill) => {
+        delete skill.hostile;
+        delete skill.beneficial;
+      })
     )
   );
+  assert.equal(version7.schema_version, 7);
+  const normalized = Protocol.validateContextActionsPanel(version7);
+  assert.equal(normalized.schema_version, 7);
+  assert.deepEqual(
+    normalized.participants.map((participant) => {
+      const copy = Object.assign({}, participant);
+      delete copy.conditions;
+      return copy;
+    }),
+    version4Participants
+  );
+  assert.deepEqual(normalized.participants.map((participant) => participant.conditions), [[]]);
+  const skill = normalized.choices.skills[0].groups[0].skills[0];
+  assert.equal(skill.hostile, true);
+  assert.equal(skill.beneficial, false);
+  const strippedSkill = Object.assign({}, skill);
+  delete strippedSkill.hostile;
+  delete strippedSkill.beneficial;
+  assert.deepEqual(strippedSkill, version4Skills[0].groups[0].skills[0]);
+  // The exact v7 party field set replaces the obsolete top-level skills.
+  assert.deepEqual(Object.keys(normalized).sort(), [
+    "actors",
+    "available",
+    "choices",
+    "draft",
+    "kind",
+    "participants",
+    "root_actions",
+    "schema_version",
+    "secondary_actions",
+    "session",
+    "suggestions",
+  ]);
+  assert.deepEqual(normalized.root_actions, [
+    "attack",
+    "skills",
+    "items",
+    "defend",
+    "dodge",
+    "taunt",
+    "retreat",
+  ]);
+  assert.deepEqual(normalized.secondary_actions, ["surrender"]);
+  assert.deepEqual(normalized.suggestions, { status: "unavailable" });
+  // A legacy top-level skills field and pre-v7 versions all reject.
+  assert.throws(() =>
+    Protocol.validateContextActionsPanel(Object.assign({}, version7, { skills: version4Skills }))
+  );
+  assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ schema_version: 6 })));
+  assert.throws(() => Protocol.validateContextActionsPanel(validCombatPanel({ schema_version: 5 })));
 });
 
 test("participant conditions are exact bounded status rows", () => {
@@ -107,8 +132,8 @@ test("the unavailable forms differ only in schema_version", () => {
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
-  const version6 = {
-    schema_version: 6,
+  const version7 = {
+    schema_version: 7,
     available: false,
     reason: { code: "presentation_unavailable", message: "目前無法顯示此介面" },
   };
@@ -117,21 +142,21 @@ test("the unavailable forms differ only in schema_version", () => {
     delete copy.schema_version;
     return copy;
   };
-  assert.deepEqual(withoutVersion(version6), withoutVersion(version4));
+  assert.deepEqual(withoutVersion(version7), withoutVersion(version4));
   assert.doesNotThrow(() =>
-    Protocol.validatePanel("context_actions", 6, version6)
+    Protocol.validatePanel("context_actions", 7, version7)
   );
-  assert.throws(() => Protocol.validatePanel("context_actions", 6, version4));
+  assert.throws(() => Protocol.validatePanel("context_actions", 7, version4));
   assert.throws(() =>
-    Protocol.validatePanel("context_actions", 6, Object.assign({}, version6, { schema_version: 5 }))
+    Protocol.validatePanel("context_actions", 7, Object.assign({}, version7, { schema_version: 5 }))
   );
   // The unavailable form rejects a suggestions field: the field set stays
   // exactly schema_version/available/reason.
   assert.throws(() =>
     Protocol.validatePanel(
       "context_actions",
-      6,
-      Object.assign({}, version6, { suggestions: { status: "unavailable" } })
+      7,
+      Object.assign({}, version7, { suggestions: { status: "unavailable" } })
     )
   );
 });
@@ -190,7 +215,7 @@ test("freeform_scales is optional and validated when present", () => {
 test("rejects malformed context_actions panels atomically", () => {
   assert.throws(() =>
     Protocol.validatePanel("context_actions", Protocol.PANEL_ALLOWLIST.context_actions, {
-      schema_version: 6,
+      schema_version: 7,
       available: false,
     })
   );

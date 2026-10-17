@@ -106,21 +106,24 @@ function nestedSkills(...skills) {
 }
 
 function readyPanel(overrides) {
-  return Object.assign(
-    {
-      schema_version: 6,
-      available: true,
-      kind: "combat",
-      session: {
-        session_id: "hostile:1:0",
-        mode: "hostile",
-        round: 0,
-        state: "ready",
-        reason: null,
-      },
-      participants: [validParticipant()],
-      root_actions: ["attack", "skills", "items", "defend", "flee"],
-      secondary_actions: ["forfeit"],
+  const base = {
+    schema_version: 7,
+    available: true,
+    kind: "combat",
+    session: {
+      session_id: "hostile:1:0",
+      mode: "hostile",
+      round: 0,
+      round_revision: 0,
+      state: "ready",
+      reason: null,
+    },
+    participants: [validParticipant()],
+    root_actions: ["attack", "skills", "items", "defend", "dodge", "taunt", "retreat"],
+    secondary_actions: ["surrender"],
+    actors: [{ identity: 2, commandable: true, reason: null }],
+    choices: {
+      actor_id: 2,
       skills: nestedSkills(
         validSkill(),
         validSkill({
@@ -133,10 +136,27 @@ function readyPanel(overrides) {
           beneficial: false,
         })
       ),
-      suggestions: { status: "unavailable" },
+      items: [],
+      tactics: [],
     },
-    overrides
-  );
+    draft: {
+      round_revision: 0,
+      draft_version: 0,
+      required_actor_ids: [2],
+      entries: [],
+      needs_selection_ids: [2],
+      reselection_reasons: [],
+    },
+    suggestions: { status: "unavailable" },
+  };
+  const opts = Object.assign({}, overrides);
+  // Tests name the requested actor's grouped catalog directly; route a
+  // `skills` override into the v7 choices object.
+  if (opts.skills !== undefined) {
+    opts.choices = Object.assign({}, base.choices, { skills: opts.skills });
+    delete opts.skills;
+  }
+  return Object.assign(base, opts);
 }
 
 test("root menu preserves stable action order and disables placeholders", () => {
@@ -209,7 +229,7 @@ test("recovery root exposes only a confirmed Forfeit path", () => {
 
 test("skill list follows panel order and excludes passives already", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(
+  panel.choices.skills = nestedSkills(
     validSkill({ key: T_B }),
     validSkill({ key: T_A })
   );
@@ -222,7 +242,7 @@ test("skill list follows panel order and excludes passives already", () => {
 
 test("disabled skill stays focusable but never sends a packet", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(
+  panel.choices.skills = nestedSkills(
     validSkill({
       key: T_A,
       enabled: false,
@@ -244,7 +264,7 @@ test("disabled skill stays focusable but never sends a packet", () => {
 
 test("NONE skill submits skill_key only", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(validSkill({ key: T_NONE, target_spec: "none", targets: [], enabled: true }));
+  panel.choices.skills = nestedSkills(validSkill({ key: T_NONE, target_spec: "none", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, T_NONE);
   assert.equal(menu.items.length, 1);
@@ -254,7 +274,7 @@ test("NONE skill submits skill_key only", () => {
 
 test("SELF skill submits skill_key only without an actor field", () => {
   const panel = readyPanel();
-  panel.skills = nestedSkills(validSkill({ key: T_SELF, target_spec: "self", targets: [], enabled: true }));
+  panel.choices.skills = nestedSkills(validSkill({ key: T_SELF, target_spec: "self", targets: [], enabled: true }));
   const combat = CombatMenu.buildMenus(panel, {});
   const menu = CombatMenu.openSkill(combat, T_SELF);
   assert.equal(menu.items[0].actionId, "combat.cast");
@@ -275,7 +295,7 @@ test("AREA supports Space toggle, explicit list, and mutually exclusive shorthan
     validParticipant(),
     validParticipant({ identity: 3, display_name: "野狼" }),
   ];
-  panel.skills = nestedSkills(
+  panel.choices.skills = nestedSkills(
     validSkill({
       key: T_B,
       label: T_B_LABEL,
@@ -307,7 +327,7 @@ test("AREA payload preserves presenter order regardless of toggle order", () => 
     validParticipant(),
     validParticipant({ identity: 3, display_name: "野狼" }),
   ];
-  panel.skills = nestedSkills(
+  panel.choices.skills = nestedSkills(
     validSkill({
       key: T_B,
       label: T_B_LABEL,

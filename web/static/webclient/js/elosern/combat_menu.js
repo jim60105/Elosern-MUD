@@ -77,12 +77,17 @@
   // nesting is presentation metadata for headings; the menu itself still
   // presents one complete active-skill list (the approved keyboard hierarchy
   // has Skills open the flat list, not category navigation).
+  //
+  // v7 publishes the requested actor's grouped catalog under `choices`; the
+  // obsolete puppet-level `skills` field is gone (recovery carries null
+  // choices, so it flattens to the empty list).
+  function choicesSkills(panel) {
+    return (panel && panel.choices && panel.choices.skills) || [];
+  }
+
   function panelSkills(panel) {
-    if (!panel || !panel.skills) {
-      return [];
-    }
     var skills = [];
-    panel.skills.forEach(function (category) {
+    choicesSkills(panel).forEach(function (category) {
       (category.groups || []).forEach(function (subGroup) {
         (subGroup.skills || []).forEach(function (skill) {
           skills.push(skill);
@@ -158,7 +163,7 @@
   // pane (design D11/D15: no pagination — the bounded pane scrolls).
   function categoryItems(panel) {
     var items = [];
-    ((panel && panel.skills) || []).forEach(function (category, index) {
+    choicesSkills(panel).forEach(function (category, index) {
       var count = 0;
       (category.groups || []).forEach(function (group) {
         count += (group.skills || []).length;
@@ -177,7 +182,7 @@
   }
 
   function groupItems(panel, categoryIndex) {
-    var category = ((panel && panel.skills) || [])[categoryIndex];
+    var category = choicesSkills(panel)[categoryIndex];
     var groups = (category && category.groups) || [];
     var items = [];
     groups.forEach(function (group, index) {
@@ -199,7 +204,7 @@
   // beside the detail pane (the draft's `.sk` row + `.skdetail`).
   function groupSkillItems(combat, categoryIndex, groupIndex) {
     var panel = combat.panel;
-    var category = ((panel && panel.skills) || [])[categoryIndex];
+    var category = choicesSkills(panel)[categoryIndex];
     var group = ((category && category.groups) || [])[groupIndex];
     var items = [];
     ((group && group.skills) || []).forEach(function (skill) {
@@ -230,7 +235,7 @@
   // directly; a multi-group category opens the group frame (design D11).
   function openCategory(combat, categoryIndex) {
     var panel = combat.panel;
-    var category = ((panel && panel.skills) || [])[categoryIndex];
+    var category = choicesSkills(panel)[categoryIndex];
     var groups = (category && category.groups) || [];
     if (groups.length === 1) {
       return {
@@ -255,7 +260,7 @@
   // `open-group`): the group's descriptors beside the detail pane.
   function openGroup(combat, categoryIndex, groupIndex) {
     var panel = combat.panel;
-    var category = ((panel && panel.skills) || [])[categoryIndex];
+    var category = choicesSkills(panel)[categoryIndex];
     var group = ((category && category.groups) || [])[groupIndex];
     if (!group) {
       return null;
