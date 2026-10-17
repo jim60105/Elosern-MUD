@@ -34,7 +34,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **11 of 31**.
+Declared implementation order: **12 of 32**.
 
 - depends-on: party-member-authority
 - depends-on: party-practice-booking
