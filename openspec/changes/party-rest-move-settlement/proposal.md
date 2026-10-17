@@ -6,7 +6,7 @@ Design §2 and §4.6 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 ## What Changes
 
-- SKIP advances (`rest`, `sleep`, `wait`, `explore.wait`, `explore.practice` skips) settle the present party scope of the acting character (`party-member-authority`): the acting character, the commander, and every effective companion in that room.
+- SKIP advances (`rest`, `sleep`, `wait`, `explore.wait`; `explore.practice` stops skipping in `party-practice-booking`) settle the present party scope of the acting character (`party-member-authority`): the acting character, the commander, and every effective companion in that room.
 - Movement advances settle the traverser plus the companions that travel with it (co-located in the source room of a player-character traversal). A possessed traverser has no followers and keeps its single-entity scope.
 - The movement and skip rollback snapshots cover every settled member, so a failed advance restores each member's gauges, buffs and booking.
 - Church rite, GM console, defeat aftermath and combat settlement keep their current scopes. A member in another room is never settled.
@@ -37,7 +37,7 @@ Design §2 and §4.6 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 ## Batch: party member management
 
-Declared implementation order: **2 of 30**.
+Declared implementation order: **2 of 31**.
 
 - depends-on: party-member-authority
 
