@@ -69,6 +69,7 @@ from world.rules.character_creation import (
     PERSONA_PROSE_KEYS,
 )
 from world.rules.equipment_effects import equipment_adjustment_text
+from world.rules.action_preview import adjusted_cost
 from world.rules.progression import freeform_scale_entries_for
 from world.rules.status_query import (
     CharacterReadModel,
@@ -701,12 +702,17 @@ def _active_skill_row(row: Any, actor: Any) -> dict[str, Any]:
     the registry-backed ``cost``, ``target_spec``, ``usable_out_of_combat``,
     and — for a freeform-eligible skill the actor has mastery to scale —
     ``freeform_scales``.
+
+    The ``cost`` is the actor's OWN adjusted cost (equipment and condition
+    percentage modifiers applied), the same amount the resolver checks and
+    deducts and the same base the ``freeform_scales`` entries scale, so the
+    advertised rungs can never contradict the advertised cost.
     """
     skill = SKILL_REGISTRY.get(row.key)
     entry = {"key": row.key, "label": row.label}
     if skill is None:
         return entry
-    entry["cost"] = dict(skill.cost)
+    entry["cost"] = adjusted_cost(actor, skill)
     entry["target_spec"] = skill.target_spec.value
     entry["usable_out_of_combat"] = skill.usable_out_of_combat
     scales = freeform_scale_entries_for(actor, skill)

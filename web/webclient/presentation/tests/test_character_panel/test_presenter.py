@@ -1,6 +1,5 @@
 """Character panel presenter tests: canonical envelope, roster, and disguise rendering."""
 from tools.spec_traceability import covers_requirement
-import math
 from unittest.mock import patch
 from evennia.utils.create import create_object
 from evennia.utils.test_resources import EvenniaTest
@@ -376,9 +375,19 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             for r in g["skills"]
             if r["key"] == T_EMBER
         )
-        # Enrichment mirrors the live row: the kit burst's own cost/target
-        # ride the wire (no shipped pricing numbers anywhere).
-        self.assertEqual(row["cost"], dict(_live_skill_registry()[T_EMBER].cost))
+        # Enrichment mirrors the live row: the kit burst's own target rides the
+        # wire, and its cost is the actor's effective one — the resolver's own
+        # adjusted amount (the equipped kit dagger's percent adjustment
+        # included), which is the base the freeform rungs would scale.
+        from world.rules.action_preview import adjusted_cost
+
+        effective = adjusted_cost(self.player, _live_skill_registry()[T_EMBER])
+        self.assertEqual(row["cost"], effective)
+        self.assertNotEqual(
+            effective,
+            dict(_live_skill_registry()[T_EMBER].cost),
+            "the equipped percent cost adjustment must move the presented cost",
+        )
         self.assertEqual(row["target_spec"], "single")
         # The kit burst carries a DamageEffect: skill-field-availability
         # flipped every damage-carrying skill to selectable-outside-combat
@@ -415,11 +424,14 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             for r in g["skills"]
             if r["key"] == T_EMBER
         )
-        # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0.
-        base_mp = int(_live_skill_registry()[T_EMBER].cost["mp"])
+        # Ladder rungs available at the Lv.3 ceiling: 0.25/0.5/1.0. Each rung
+        # scales the actor's EFFECTIVE cost: the kit burst declares 12 MP and
+        # the equipped kit dagger adjusts it by −5%, so the base the rungs
+        # scale is 11 and the rounded rungs are 3, 6 and 11.
+        self.assertEqual(row["cost"], {"mp": 11})
         self.assertEqual(
             [entry["mp_cost"] for entry in row["freeform_scales"]],
-            [max(1, math.floor(base_mp * scale + 0.5)) for scale in (0.25, 0.5, 1)],
+            [3, 6, 11],
         )
 
 
@@ -468,7 +480,9 @@ class CharacterPresenterTests(BattlefieldIsolation, EvenniaTest):
             set(row),
             {"key", "label", "cost", "target_spec", "usable_out_of_combat"},
         )
-        self.assertEqual(row["cost"], {"mp": 12})
+        # The declared 12 MP carries the equipped kit dagger's −5% adjustment
+        # like every other presented row.
+        self.assertEqual(row["cost"], {"mp": 11})
         self.assertEqual(row["target_spec"], "single")
         self.assertIs(row["usable_out_of_combat"], True)
 
