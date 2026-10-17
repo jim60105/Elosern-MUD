@@ -680,6 +680,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertFalse(npc_reloaded.attributes.has("prelogout_location"))
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_handback_keeps_both_party_members_in_the_shared_room(self):
@@ -694,6 +695,7 @@ class PossessionTransitionTests(EvenniaTest):
         self._assert_companion_release_kept_the_room()
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_party_change_handback_keeps_the_companion_in_the_shared_room(self):
@@ -705,6 +707,7 @@ class PossessionTransitionTests(EvenniaTest):
         self._assert_companion_release_kept_the_room()
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_handback_sequence_restores_the_room_before_owner_synchronization(self):
@@ -761,6 +764,7 @@ class PossessionTransitionTests(EvenniaTest):
             self.assertIs(room, self.room1)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_stash_then_raise_during_unpuppet_still_restores_the_room(self):
@@ -778,6 +782,7 @@ class PossessionTransitionTests(EvenniaTest):
         self._assert_companion_release_kept_the_room()
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_multi_session_handback_restores_the_original_room_for_every_attempt(self):
@@ -842,6 +847,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertFalse(self.npc.attributes.has("prelog_location"))
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_release_preserves_an_intentionally_remote_companion_position(self):
@@ -886,6 +892,7 @@ class PossessionTransitionTests(EvenniaTest):
         )
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_handback_allows_repeat_possession_follow_and_combat_collection(self):
@@ -893,6 +900,7 @@ class PossessionTransitionTests(EvenniaTest):
         self._assert_repeat_possession_follow_and_combat("handback")
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_party_change_allows_repeat_possession_follow_and_combat_collection(self):
@@ -900,6 +908,7 @@ class PossessionTransitionTests(EvenniaTest):
         self._assert_repeat_possession_follow_and_combat("party_change")
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_membership_removal_after_release_leaves_the_companion_on_grid(self):
@@ -923,6 +932,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertIn(self.npc, self.room1.contents)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_failure_after_residual_cleanup_restores_room_and_logout_metadata(self):
@@ -954,6 +964,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertIsNone(self.npc.db.possessed_by)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_rollback_restores_absent_logout_attributes(self):
@@ -969,6 +980,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertEqual(self.session.puppet, self.npc)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_rollback_restores_present_logout_attribute_values(self):
@@ -985,6 +997,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertEqual(self.npc.attributes.get("prelog_location"), self.room2)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_accountless_possession_release_and_rollback_preserve_logout_metadata(self):
@@ -1057,6 +1070,7 @@ class PossessionTransitionTests(EvenniaTest):
         self.assertFalse(npc.attributes.has("prelog_location"))
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_recovery_puppeting_failure_restores_exact_logout_metadata(self):
@@ -1127,6 +1141,7 @@ class PossessionTransitionTests(EvenniaTest):
                     self.npc.location = self.room1
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_outer_party_control_rollback_restores_room_and_logout_metadata(self):
@@ -1169,6 +1184,7 @@ class PossessionTransitionTests(EvenniaTest):
                 self.assertEqual(context["room"], str(self.room1.pk))
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_repeated_release_is_a_noop_without_a_duplicate_event(self):
@@ -1257,6 +1273,7 @@ class PossessionTransitionCommandTests(EvenniaTest):
         self.assertIsNone(self.npc.db.possessed_by)
 
     @covers_requirement(
+        "companion-possession-transition::normal-possession-release-preserves-the-companion-s-room-presence",
         "companion-possession-transition::releasing-possession-returns-the-puppet-to-the-owner-with-the-same-ladder"
     )
     def test_unpossess_command_keeps_the_companion_in_the_shared_room(self):
