@@ -129,6 +129,16 @@ export function applyInteraction(ctx) {
       }
       return false;
     }
+    // The party-scope exit confirmation (webclient-party-exit-confirmation)
+    // claims the dock's keys the same way: no arrow, digit, Enter or Space
+    // moves or activates the menu behind the card, and a lone Escape that
+    // reaches the bridge cancels it exactly like 否.
+    if (ctx.partyExitPrompt) {
+      if (key === KeyboardRouter.ESCAPE && !repeat) {
+        return ctx.cancelPartyExit();
+      }
+      return false;
+    }
     if (ctx.reducer.getState().mode === "dialogue") {
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
     }

@@ -119,6 +119,12 @@ export function applyFrames(ctx) {
     ctx.resetRoomCard?.();
     // Nor the cross-side question: a root reset drops the held cast unsent.
     ctx.crossSideConfirm = null;
+    // Nor the party-scope exit confirmation: a root reset discards the
+    // prompt (the server draft it was requested against is never touched).
+    ctx.partyExitPrompt = null;
+    // Nor an outstanding prompt request: a response that arrives after the
+    // reset must never reopen the discarded confirmation over the new root.
+    ctx.pendingPartyExit = null;
     // Nor a pending actor query: a root reset abandons the local intent, so a
     // late commit never yanks the dock back to the root unprompted.
     ctx.pendingActorSelection = null;
@@ -174,7 +180,7 @@ export function applyFrames(ctx) {
   // is in flight, a round plays, or the cross-side question holds the dock.
   ctx.openCombatActor = function openCombatActor() {
     const rs = ctx.reducer.getState();
-    if (!committedCombat(rs) || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+    if (!committedCombat(rs) || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return false;
     }
     const item = ctx.router.depth() > 0 ? ctx.router.currentItem() : null;
@@ -271,7 +277,7 @@ export function applyFrames(ctx) {
   ctx.useCombatItem = function useCombatItem(itemKey) {
     const rs = ctx.reducer.getState();
     const panel = committedCombat(rs);
-    if (!panel || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+    if (!panel || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return false;
     }
     const combat = ctx.frameResolver.combatModel();
@@ -361,9 +367,11 @@ export function applyFrames(ctx) {
     if (!item) {
       return;
     }
-    // The cross-side question is open (webclient-combat-cross-side-confirm
-    // D2): the router behind the dialog never activates anything.
-    if (ctx.crossSideConfirm) {
+    // A modal question is open (the cross-side warning or the party-scope
+    // exit confirmation): the router behind the dialog never activates
+    // anything — no dock key, pointer or direct router confirm can dispatch
+    // or alter a selection through this entry.
+    if (ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return;
     }
     // Activation reads the RAW committed row (the focus projection strips the
@@ -483,9 +491,11 @@ export function applyFrames(ctx) {
         ctx.publishView();
         return;
       }
-      if (item.key === "forfeit") {
-        ctx.pushFrame({ source: "combat.forfeit", params: {} }, item.key);
-        ctx.publishView();
+      // The party-scope exit rows (webclient-party-exit-confirmation): 撤退
+      // and 投降 ask the server for their bound confirmation prompt — the
+      // dock pushes no client-local frame and sends no mutation of its own.
+      if (item.exitOperation) {
+        ctx.requestPartyExit(item.exitOperation);
         return;
       }
       // The commanded actor's own items and basic actions
@@ -921,6 +931,187 @@ export function applyFrames(ctx) {
     pending.question = outcome.question;
   };
 
+  // ---- The party-scope exit confirmation --------------------------------
+  // (webclient-party-exit-confirmation)
+  //
+  // Two client-local records, both bound to the exact session/round/epoch/
+  // transport generation they were read from and both dropped without a send
+  // on any replacement (a reconnect, a mode change, a played round):
+  // - `pendingPartyExit`: the one read-only `combat.exit_prompt` this client
+  //   dispatched and has not yet observed (`{requestId, operation, sessionId,
+  //   roundRevision, generation, epoch}`). It is the correlation of MY intent,
+  //   so a restored or re-delivered result, a reconnect replay or a typed
+  //   request can never open the question.
+  // - `partyExitPrompt`: the held server-bound confirmation (`{operation,
+  //   label, question, consequence, scope, token, sessionId, roundRevision,
+  //   generation, epoch}`). Nothing is sent while it is set: Yes sends the one
+  //   `combat.exit_confirm` carrying this exact token, and No / ✕ / Escape
+  //   only discard the prompt — the server draft, the menu and the selection
+  //   stay exactly as they were and no time advances.
+  ctx.pendingPartyExit = null;
+  ctx.partyExitPrompt = null;
+
+  // The client-local prompt state for one row (no dispatch): the exercise of
+  // deciding nothing happens until Yes. Used by the tests and the view.
+  function partyExitBinding(rs, record) {
+    return {
+      sessionId: record.sessionId,
+      roundRevision: record.roundRevision,
+      generation: record.generation,
+      epoch: record.epoch,
+    };
+  }
+
+  // Whether one held/pending party-exit record can no longer act on the
+  // committed state: a mode change, a transport loss, a detached or replaced
+  // session/round, a new epoch, or a rebuilt transport generation.
+  function partyExitReplaced(rs, record) {
+    const panel = committedCombat(rs);
+    if (rs.mode !== "combat" || !rs.connected || !panel || !panel.session) {
+      return true;
+    }
+    return (
+      panel.session.session_id !== record.sessionId ||
+      panel.session.round_revision !== record.roundRevision ||
+      rs.generation !== record.generation ||
+      rs.activeEpoch !== record.epoch
+    );
+  }
+
+  // Consume the pending prompt query once its own result commits. Returns
+  // true when the local record changed. Only the exact request id at the same
+  // epoch is MY result; a refusal/rejection clears the intent silently (the
+  // ordinary action-result feedback owns the message), and so does a released
+  // lock with no result at all (a synchronous send failure), so the dock
+  // never sticks.
+  function consumePendingPartyExit(rs) {
+    const pending = ctx.pendingPartyExit;
+    if (!pending) {
+      return false;
+    }
+    const result = rs.lastActionResult;
+    if (result && result.requestId === pending.requestId && result.epoch === pending.epoch) {
+      ctx.pendingPartyExit = null;
+      if (result.outcome === "success" && result.code === "party_exit_prompt") {
+        const prompt = CombatMenu.partyExitPrompt(pending.operation, result.data);
+        if (prompt) {
+          ctx.partyExitPrompt = Object.assign({}, prompt, partyExitBinding(rs, pending));
+        }
+      }
+      return true;
+    }
+    if (!ctx.inFlight || partyExitReplaced(rs, pending)) {
+      ctx.pendingPartyExit = null;
+      return true;
+    }
+    return false;
+  }
+
+  // One party-scope exit request (the 撤退 / 投降 root row): the read-only
+  // prompt query. Refused while a mutation is in flight, a round plays, or a
+  // question already holds the dock (an unanswered cast warning is answered
+  // before an exit prompt opens). Neither operation requires the commanded
+  // member to be commandable — the request belongs to the commander.
+  ctx.requestPartyExit = function requestPartyExit(operation) {
+    const rs = ctx.reducer.getState();
+    const panel = committedCombat(rs);
+    if (
+      !panel ||
+      !panel.session ||
+      ctx.inFlight ||
+      ctx.beatLocked() ||
+      ctx.crossSideConfirm ||
+      ctx.pendingPartyExit ||
+      ctx.partyExitPrompt ||
+      typeof operation !== "string" ||
+      operation === ""
+    ) {
+      return false;
+    }
+    const requestId = ctx.dispatchAction("combat.exit_prompt", {
+      session_id: panel.session.session_id,
+      round_revision: panel.session.round_revision,
+      operation,
+    });
+    if (requestId === null || requestId === undefined) {
+      return false;
+    }
+    ctx.pendingPartyExit = {
+      requestId,
+      operation,
+      sessionId: panel.session.session_id,
+      roundRevision: panel.session.round_revision,
+      generation: rs.generation,
+      epoch: rs.activeEpoch,
+    };
+    // The dispatch published before this record existed, so its own
+    // synchronous result (or its released lock after a failed send) is
+    // settled here, against the committed state as it is now.
+    if (consumePendingPartyExit(ctx.reducer.getState())) {
+      ctx.publishView();
+    }
+    return true;
+  };
+
+  // The commit-time settlement of both records: consume the pending query's
+  // result, then drop a held prompt the committed state can no longer confirm
+  // — without sending, and without any retry of the discarded Yes.
+  ctx.settlePartyExit = function settlePartyExit(rs) {
+    if (consumePendingPartyExit(rs)) {
+      return;
+    }
+    const held = ctx.partyExitPrompt;
+    if (!held) {
+      return;
+    }
+    if (partyExitReplaced(rs, held) || ctx.beatLocked()) {
+      ctx.partyExitPrompt = null;
+      if (rs.mode === "combat") {
+        ctx.dockFocusRequest += 1;
+      }
+    }
+  };
+
+  // 是: send the held confirmation once. The card closes first, so the one
+  // dispatch can never be repeated by a second activation, a reconnect or a
+  // re-observed result; a mutation lock keeps the card open and sends nothing.
+  ctx.confirmPartyExit = function confirmPartyExit() {
+    const held = ctx.partyExitPrompt;
+    if (!held) {
+      return null;
+    }
+    if (router.isMutationInFlight() || router.isAwaitingRevision()) {
+      return null;
+    }
+    const requestId = ctx.dispatchAction("combat.exit_confirm", {
+      session_id: held.sessionId,
+      round_revision: held.roundRevision,
+      operation: held.operation,
+      confirmation_token: held.token,
+    });
+    if (requestId === null || requestId === undefined) {
+      return null;
+    }
+    ctx.partyExitPrompt = null;
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return requestId;
+  };
+
+  // 否 / ✕ / Escape: discard only the local prompt. The router stack, the
+  // focused row, the AREA selection and the server draft are untouched — no
+  // level was ever pushed and no time advances.
+  ctx.cancelPartyExit = function cancelPartyExit() {
+    if (!ctx.partyExitPrompt) {
+      return false;
+    }
+    ctx.partyExitPrompt = null;
+    router.clearRepeatGuard();
+    ctx.dockFocusRequest += 1;
+    ctx.publishView();
+    return true;
+  };
+
   // ---- The commanded-actor transition (webclient-party-command-selection) --
   //
   // Runs in the settle window, before the view is built, and never
@@ -987,7 +1178,7 @@ export function applyFrames(ctx) {
   // reconnect or a typed round never schedules navigation.
   ctx.autoAdvanceCombatActor = function autoAdvanceCombatActor(rs) {
     const record = ctx.pendingCombatAdvance;
-    if (!record || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm) {
+    if (!record || ctx.inFlight || ctx.beatLocked() || ctx.crossSideConfirm || ctx.partyExitPrompt) {
       return;
     }
     const panel = committedCombat(rs);

@@ -510,11 +510,26 @@ const crossSideLocked = computed(
     !!store.view.dispatch?.inFlight ||
     !!store.view.submitLocked,
 );
+// The party-scope exit confirmation (webclient-party-exit-confirmation): the
+// server-bound question Retreat/Surrender requested, over the dock the row
+// was activated from. It shares the cross-side card's gate — Yes waits for
+// the same submission lock, No and the close control always answer — and its
+// safe answer is 否.
+const partyExit = computed(() =>
+  store.view.mode === "combat" ? store.view.partyExitConfirm ?? null : null,
+);
+const partyExitOpen = computed(() => partyExit.value !== null);
+const partyExitQuestion = computed(() => partyExit.value?.question ?? null);
+const partyExitDetail = computed(() => partyExit.value?.consequence ?? null);
+const partyExitCaption = computed(() => (partyExit.value ? `全隊${partyExit.value.label}` : null));
+const partyExitLocked = computed(() => crossSideLocked.value);
+// Either modal question: it owns the keyboard and the focus hand-back.
+const questionOpen = computed(() => crossSideOpen.value || partyExitOpen.value);
 // Every close path requests DOM focus on the dock through the store; a
 // close the store does not route there (the mode left combat), or a focus
 // the still-inert dock refused, falls back to the mode's focus home, so the
 // question never leaves focus on the document body.
-watch(crossSideOpen, async (open, was) => {
+watch(questionOpen, async (open, was) => {
   if (open || !was) return;
   if (typeof window !== "undefined") {
     hoverHeld = true;
@@ -596,6 +611,7 @@ const rootStyle = computed(() => {
     class="elosern-root"
     data-testid="elosern-client-root"
     :data-cross-side-open="crossSideOpen ? 'true' : null"
+    :data-party-exit-open="partyExitOpen ? 'true' : null"
     :style="rootStyle"
   >
       <AppShell
@@ -918,6 +934,30 @@ const rootStyle = computed(() => {
             @no="store.cancelCrossSide()"
             @close="store.cancelCrossSide()"
           />
+          <!-- The party-scope exit confirmation (webclient-party-exit-
+               confirmation): the server-bound question Retreat/Surrender
+               requested, with the whole party's scope and the server-authored
+               consequence, focus starting on its safe answer 否. The dock the
+               row was activated from stays exactly as it was beneath the
+               inert card, so 否 / ✕ / Escape restore it verbatim. -->
+          <QuestionCard
+            v-else-if="partyExitOpen"
+            class="party-exit-question"
+            test-id="party-exit-question"
+            :question="partyExitQuestion"
+            :detail="partyExitDetail"
+            :caption="partyExitCaption"
+            tone="caution"
+            initial-focus="no"
+            no-while-locked
+            close-label="返回戰鬥選單"
+            :locked="partyExitLocked"
+            reason="上一個行動尚未完成，請稍候。"
+            :entrance="!modeHydrating"
+            @yes="store.confirmPartyExit()"
+            @no="store.cancelPartyExit()"
+            @close="store.cancelPartyExit()"
+          />
           <DialogueChoices
             v-else-if="choicesShown"
             :entrance="!modeHydrating"
@@ -1010,7 +1050,7 @@ const rootStyle = computed(() => {
           :card="store.view.mode === 'combat'"
           :stage-target="store.view.mode === 'combat' ? stageTarget : null"
           :combat-progress="store.view.mode === 'combat' ? store.view.combatProgress : null"
-          :inert="crossSideOpen || null"
+          :inert="crossSideOpen || partyExitOpen || null"
           @action="onAction"
           @open-actors="store.openCombatActor()"
           @target-pointer="onTargetPosition"
@@ -1482,9 +1522,17 @@ const rootStyle = computed(() => {
   filter: saturate(0.6);
   transition: opacity var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
 }
+.elosern-root[data-party-exit-open="true"] #action-dock {
+  opacity: 0.45;
+  filter: saturate(0.6);
+  transition: opacity var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
+}
 .elosern-root[data-cross-side-open="true"] .stage-target__hit,
 .elosern-root[data-cross-side-open="true"] .stage-target__marker,
-.elosern-root[data-cross-side-open="true"] .target-prompt__chip {
+.elosern-root[data-cross-side-open="true"] .target-prompt__chip,
+.elosern-root[data-party-exit-open="true"] .stage-target__hit,
+.elosern-root[data-party-exit-open="true"] .stage-target__marker,
+.elosern-root[data-party-exit-open="true"] .target-prompt__chip {
   pointer-events: none;
 }
 .stage-target-markers {

@@ -63,7 +63,7 @@
       "files_a": [
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_area_shorthand_flow",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_disabled_items_defend_send_no_packet",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_flee_flow_submits_empty_payload",
+        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_prompt_confirm_sends_one_exit_confirm",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_none_skill_submits_skill_key_only",
         "web.tests.browser.test_browser_services_shop.ShopClosedJourneys.test_closed_shop_disables_all_trades"
       ],
@@ -86,7 +86,7 @@
       "files_a": [
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_area_explicit_multi_selection",
         "web.tests.browser.test_browser_combat_panels.CombatMenuBrowserTest.test_disabled_reason_is_visible_without_packet",
-        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_forfeit_requires_confirmation",
+        "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_party_exit_cancel_keeps_the_draft_and_the_clock",
         "web.tests.browser.test_browser_combat_skills.CombatMenuBrowserTest.test_terminal_outcome_publishes_fresh_exploration_panels",
         "web.tests.browser.test_browser_services_quest_drawer.ServicesUnavailableJourney.test_unavailable_services_drawer_renders_reason_only"
       ],
@@ -228,7 +228,7 @@
         "web.tests.browser.test_harness.PortAllocationTests"
       ],
       "files_b": [
-        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_stale_forfeit_rejects",
+        "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_forged_exit_confirmation_rejects",
         "web.tests.browser.test_browser_combat_rejection.CombatRejectionBrowserTest.test_tampered_target_rejects_without_round",
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_buy_quantity_validation_exact_copper",
         "web.tests.browser.test_browser_services_shop.ShopJourneys.test_sell_and_repeated_inventory_without_use_control"

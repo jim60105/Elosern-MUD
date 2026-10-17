@@ -474,14 +474,19 @@ describe("cross-side question (store flow)", () => {
       expect(question(), key).toBeNull();
       expect(sent().at(-1).payload.command.payload.skill_key, key).toBe(key);
     }
-    // Flee and the Forfeit confirmation are untouched.
+    // The party-scope exit rows never open the cross-side question
+    // (webclient-party-exit-confirmation): 撤退 / 投降 ask the server for
+    // their own bound prompt instead.
     enterCombat();
-    store.focusItemByKey("forfeit");
-    store.focusPress("Enter");
-    store.focusItemByKey("confirm-forfeit");
+    store.focusItemByKey("surrender");
     store.focusPress("Enter");
     expect(question()).toBeNull();
-    expect(sent().at(-1).action_id).toBe("combat.forfeit");
+    expect(sent().at(-1).action_id).toBe("combat.exit_prompt");
+    expect(sent().at(-1).payload).toEqual({
+      session_id: "s-1",
+      round_revision: 0,
+      operation: "surrender",
+    });
   });
 
   it("a panel replacement that drops the target cancels; an unrelated one keeps it", () => {
@@ -581,7 +586,11 @@ describe("cross-side question (store flow)", () => {
     openAttack();
     store.focusItemByKey(`target-${ALLY}`);
     store.focusPress("Enter");
-    store.dispatchAction("combat.flee", { session_id: "s-1" });
+    store.dispatchAction("combat.exit_prompt", {
+      session_id: "s-1",
+      round_revision: 0,
+      operation: "surrender",
+    });
     expect(sent()).toHaveLength(1);
     expect(store.confirmCrossSide()).toBeNull();
     expect(sent()).toHaveLength(1);

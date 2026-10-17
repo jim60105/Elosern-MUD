@@ -578,6 +578,50 @@ const renderPlayer = (args) => ({
         await nextTick();
         store.focusPress("Enter", false);
       }
+      // `partyExit` (webclient-party-exit-confirmation): the whole party's
+      // exit confirmation. Activating the 撤退 / 投降 root row requests the
+      // server-bound prompt (the fake transport records that one request) and
+      // the story commits the server's party_exit_prompt result, so the card
+      // stands with 否 focused, the party's scope and the authored
+      // consequence. `partyExitConfirm` then answers 是: exactly one
+      // combat.exit_confirm (`window.__partyExitStory.sent`).
+      if (args.partyExit) {
+        const sender = protocolFixtures.createFakeSender();
+        store.setSender(sender);
+        window.__partyExitStory = { store, sent: sender.sent };
+        await nextTick();
+        store.focusItemByKey(args.partyExit);
+        store.focusPress("Enter", false);
+        const request = sender.sent.actions[sender.sent.actions.length - 1];
+        const retreat = args.partyExit === "retreat";
+        const received = store.receive(
+          1,
+          "ui_action_result",
+          [
+            protocolFixtures.actionResult({
+              request_id: request.request_id,
+              code: "party_exit_prompt",
+              presentation_revision: 1,
+              data: {
+                operation: args.partyExit,
+                confirmation_token: retreat ? "R-0-storytoken9f8e7d6c" : "S-0-storytoken9f8e7d6c",
+                scope: "party",
+                consequence: retreat
+                  ? "全隊嘗試脫離戰鬥。\n撤退失敗會消耗全隊本回合行動。"
+                  : "全隊退出戰鬥，並結算目前已累積的戰鬥時間。\n一般戰鬥會以戰敗收場。",
+              },
+            }),
+          ],
+          {},
+        );
+        if (!received.accepted || store.lastPanelRejection) {
+          throw new Error(`Party exit prompt was rejected: ${JSON.stringify(store.lastPanelRejection || received)}`);
+        }
+        if (args.partyExitConfirm) {
+          await nextTick();
+          store.confirmPartyExit();
+        }
+      }
       // The exploration companion-focus variants (reuse-lineup-person-focus
       // 3.1): the client-local verb card of a RENDERED companion. Opening it
       // lights that existing actor-left figure and lifts it above every
@@ -953,6 +997,17 @@ export const CrossSideBothFacts = {
 export const CrossSideNoConfirm = {
   render: renderPlayer,
   args: { ...CROSS, combatSender: true, combatPath: ["attack"], combatFocus: "target-31" },
+};
+// The party-scope exit confirmation (webclient-party-exit-confirmation):
+// 撤退 / 投降 request their server-bound prompt, and the card states the whole
+// party's scope and the server-authored consequence with 否 focused. 是 sends
+// the one combat.exit_confirm; 否 / ✕ / Escape discard the prompt and keep the
+// draft, the focused row and the clock unchanged.
+export const PartyExitSurrenderPrompt = { render: renderPlayer, args: { combat: true, partyExit: "surrender" } };
+export const PartyExitRetreatPrompt = { render: renderPlayer, args: { combat: true, partyExit: "retreat" } };
+export const PartyExitConfirmed = {
+  render: renderPlayer,
+  args: { combat: true, partyExit: "surrender", partyExitConfirm: true },
 };
 export const TargetReducedMotion = { render: renderPlayer, args: { combat: true, combatPath: ["attack"], motionLevel: "reduced" } };
 // Four foes (one defeated), a long foe name ellipsized on its plate. The

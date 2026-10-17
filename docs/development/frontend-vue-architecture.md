@@ -208,7 +208,7 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 - **進度列**：卡片外框內的單行 `combat-actor-line`（`store.view.combatProgress`），
   顯示受指揮成員與已確認／需求數量；其 `變更成員` 按鈕是卡片層級的控制項，
   **不是**新的根清單列（根清單恰為 attack／skills／items／bag／defend／dodge／taunt／
-  flee／forfeit；後三者見下一節，Retreat／Surrender 屬 webclient-party-exit-confirmation）。
+  retreat／surrender；兩列出場操作見「整隊撤退與投降」一節）。
   開啟成員框架時會把 DOM 焦點交還 dock，按鈕本身於框架掛載後消失。
 - **守門信封**：`combat.command` 的 `session_id`／`round_revision`／`draft_version`／
   `actor_id` 在送出當下由已提交面板讀取（絕不沿用舊版本），技能本體維持原本
@@ -267,3 +267,43 @@ Wave B 依此結構建置離線元件；C1 進行實作，雙方必須鎖定相�
 相關閘門：`tests/store/party_items_tactics.test.js`、`tests/world/inventory_panel.test.js`、
 Node 閘門的 `combat_menu.test.js`，以及受管理的
 `test_item_and_tactic_choices_send_the_actor_command`。
+
+## 整隊撤退與投降（webclient-party-exit-confirmation）
+
+撤退與投降是**隊伍範圍**的操作，不是受指揮成員的個人動作：任何成員的根目錄（含
+recovery 根目錄）都能開啟，且不要求該成員可被指揮。兩者共用同一個伺服器綁定的確認
+契約，沒有相容傳輸。
+
+- **根目錄兩列**：`撤退`／`投降`（`combat_menu.js` 的 `partyExitRow`）恆為啟用，本身
+  不帶 action id；啟動只發出一次唯讀的 `combat.exit_prompt`
+  `{session_id, round_revision, operation}`（送出當下由已提交面板讀取）。退役的
+  `combat.flee`／`combat.forfeit` 生產者與其本機二次確認框架（`menus.forfeit`、
+  `combat.forfeit` descriptor、DockMenu 的 `confirm` 警告文案）一併移除。
+- **共用確認契約**：`CombatMenu.partyExitPrompt(operation, data)` 驗證伺服器
+  `party_exit_prompt` 結果的四個欄位（`operation`／`confirmation_token`／`scope=party`
+  ／`consequence`），產生唯一的問句（`確定要全隊撤退？`／`確定要全隊投降？`）、
+  伺服器撰寫的後果全文與 token；任一不符即 `null`（不開卡、無可確認項）。
+- **安全預設的視窗**：`AppClient` 在 `choices` 錨點以既有的 `QuestionCard`（caution、
+  初始焦點 `否`、`no-while-locked`）呈現；`view.partyExitConfirm` 只帶
+  `{operation, label, question, consequence}`。卡片開啟時 dock 為 `inert`、舞台命中區
+  與 dock 按鍵全部失效（`#action-dock` 變暗、`data-party-exit-open`），且
+  `onRouterEvent`、`stageTargetPointer` 都不動作。
+- **取消**：`否`／✕／Escape 走 `cancelPartyExit()`，只丟棄本機提示——不推任何框架、
+  不送出任何 `ui_action`、不推進時間，焦點回到開啟它們的那一列；伺服器草稿與既有
+  草稿條目完全不動。
+- **確認**：`confirmPartyExit()` 只在持有提示且無進行中 mutation 時，送出恰好一次
+  `combat.exit_confirm`（`session_id`／`round_revision`／`operation`／
+  `confirmation_token`）；卡片立即關閉，重連或重播結果都不會重送同一個 Yes，
+  也不保留可重試的副本。成功的撤退失敗／成功／投降狀態由後續已提交面板（含
+  canonical 回合與 terminal 快照）取代視圖，客戶端不自行推算搬遷或治療。
+- **失效**：提示綁定 `session_id`／`round_revision`／transport generation／epoch。
+  任一替換、斷線、模式變更或回合播放中的提示一律取消且不重試；同回合的無關
+  resync（token 仍有效）保留提示。
+- **舊路由**：`combat.flee`／`combat.forfeit` 僅剩伺服器端既有的拒絕與淘汰紀錄；
+  客戶端不再有任何生產者，`Elosern.actions` 之外的程式路徑也無法確認沒有 token 的
+  操作。
+
+相關閘門：`tests/store/party_exit_confirmation.test.js`、Node 閘門的
+`combat_menu.test.js`（含 `partyExitPrompt` 契約）、以及受管理的
+`test_party_exit_prompt_confirm_sends_one_exit_confirm` 與
+`test_party_exit_cancel_keeps_the_draft_and_the_clock`。

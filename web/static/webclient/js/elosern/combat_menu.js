@@ -3,9 +3,10 @@
  *
  * Transforms a validated `context_actions` combat panel into the logical
  * keyboard menus consumed by KeyboardRouter: a root (Attack, Skills, Items,
- * Defend, Flee), a paginated active-skill list, target flows for every
- * TargetSpec, Space multi-selection for AREA, and a confirmed Forfeit
- * secondary menu; the actor selector frame lists the server's allied actors
+ * Defend, Dodge, Taunt, Retreat, Surrender), a paginated active-skill list,
+ * target flows for every TargetSpec, Space multi-selection for AREA, and the
+ * shared party-scope exit contract both Retreat and Surrender request through
+ * (`partyExitPrompt`); the actor selector frame lists the server's allied actors
  * with their confirmed/needs-selection/reselection-reason status and the
  * compact progress line the card chrome renders. The module preserves the
  * originating skill focus on
@@ -28,14 +29,23 @@
   "use strict";
 
   // The client-local root inventory (webclient-party-items-tactics): Attack,
-  // Skills, Items, the Bag drawer opener, the three basic actions, Flee and
-  // the confirmed Forfeit entry. Dodge and Taunt join Defend as actor-scoped
-  // basic actions; no placeholder row remains.
-  var ROOT_ACTIONS = ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"];
-  var SECONDARY_ACTIONS = ["forfeit"];
-  var RECOVERY_SECONDARY_ACTIONS = ["forfeit"];
+  // Skills, Items, the Bag drawer opener, the three basic actions, Retreat and
+  // Surrender. Dodge and Taunt join Defend as actor-scoped basic actions; no
+  // placeholder row remains. Retreat and Surrender are party-scope operations
+  // (webclient-party-exit-confirmation): the retired per-actor combat.flee /
+  // combat.forfeit routes and their client-local confirmation frame are gone,
+  // so neither row carries an action id of its own.
+  var ROOT_ACTIONS = ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "retreat", "surrender"];
+  var SECONDARY_ACTIONS = ["surrender"];
+  var RECOVERY_SECONDARY_ACTIONS = ["surrender"];
   var PAGE_SIZE = 6;
   var BASIC_ATTACK_KEY = "basic_attack";
+  // The two party-scope exit operations and their client display labels
+  // (webclient-party-exit-confirmation). Both take the same server-bound
+  // confirmation route: one read-only prompt request, then one confirmed
+  // `combat.exit_confirm`; the token decides which operation runs.
+  var PARTY_EXIT_OPERATIONS = ["retreat", "surrender"];
+  var PARTY_EXIT_LABELS = { retreat: "撤退", surrender: "投降" };
   // The three basic actions' client display labels (the panel carries its own
   // label; this is the fallback for a tactic the panel does not offer).
   var TACTIC_LABELS = { defend: "防禦", dodge: "閃避", taunt: "挑釁" };
@@ -127,8 +137,8 @@
     defend: "這名成員這回合採取防禦。",
     dodge: "這名成員這回合採取閃避。",
     taunt: "挑釁一名敵人，把它的注意力引到這名成員身上。",
-    flee: "嘗試脫離這場戰鬥。",
-    forfeit: "放棄這場戰鬥；送出前需要再次確認。",
+    retreat: "請求全隊撤退；確認前不會送出任何變更。",
+    surrender: "請求全隊投降；確認前不會送出任何變更。",
   };
 
   // -------------------------------------------------------------------------
@@ -242,23 +252,65 @@
   // Every root, category, and group row carries `command: true`: the dock
   // renders those frames as one vertical command list (a single column, so
   // Up/Down wrap and Left/Right are no-ops).
+  //
+  // One party-scope exit root row (撤退 / 投降, webclient-party-exit-
+  // confirmation): reachable from every member's root and from the recovery
+  // root, never gated on the commanded member being commandable — the request
+  // itself is actor-independent. The row carries no action id: activating it
+  // asks the server for the bound confirmation prompt (frames.js), and only
+  // the question card's Yes sends the one `combat.exit_confirm`.
+  function partyExitRow(operation) {
+    return {
+      key: operation,
+      label: PARTY_EXIT_LABELS[operation],
+      enabled: true,
+      actionId: null,
+      payload: null,
+      exitOperation: operation,
+      command: true,
+      description: ROOT_COPY[operation],
+    };
+  }
+
+  // The shared confirmation contract of both exit operations
+  // (webclient-party-exit-confirmation): the exact bounded fields the
+  // server's `party_exit_prompt` result carries, turned into the one question
+  // the card renders — the whole party's scope, the operation's own label and
+  // the server-authored consequence. `null` for anything the protocol would
+  // not admit (the identity-loss degradation: no card, nothing to confirm).
+  function partyExitPrompt(operation, data) {
+    var row = data || {};
+    if (PARTY_EXIT_OPERATIONS.indexOf(operation) === -1 || row.operation !== operation) {
+      return null;
+    }
+    if (row.scope !== "party") {
+      return null;
+    }
+    if (typeof row.confirmation_token !== "string" || row.confirmation_token === "") {
+      return null;
+    }
+    if (typeof row.consequence !== "string" || row.consequence === "") {
+      return null;
+    }
+    var label = PARTY_EXIT_LABELS[operation];
+    return {
+      operation: operation,
+      label: label,
+      question: "確定要全隊" + label + "？",
+      consequence: row.consequence,
+      scope: row.scope,
+      token: row.confirmation_token,
+    };
+  }
+
   function rootItems(panel) {
     var recovery = panel && panel.session && panel.session.state === "recovery";
-    // Forfeit always opens the secondary confirmation menu first; only
-    // `confirm-forfeit` sends `combat.forfeit`. In recovery the root exposes
-    // exactly that confirmed Forfeit path and nothing else.
+    // Retreat and Surrender always request the server-bound confirmation
+    // prompt first; only its Yes sends the one `combat.exit_confirm`. In
+    // recovery the root exposes exactly that confirmed Surrender path and
+    // nothing else.
     if (recovery) {
-      return [
-        {
-          key: "forfeit",
-          label: "投降",
-          enabled: true,
-          actionId: null,
-          payload: null,
-          command: true,
-          description: ROOT_COPY.forfeit,
-        },
-      ];
+      return [partyExitRow("surrender")];
     }
     return [
       { key: "attack", label: "攻擊", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.attack },
@@ -268,8 +320,8 @@
       tacticRootRow("defend", tacticModels(panel)),
       tacticRootRow("dodge", tacticModels(panel)),
       tacticRootRow("taunt", tacticModels(panel)),
-      { key: "flee", label: "逃跑", enabled: true, actionId: "combat.flee", payload: {}, commandDisplay: { actionLabel: "逃跑" }, command: true, description: ROOT_COPY.flee },
-      { key: "forfeit", label: "投降", enabled: true, actionId: null, payload: null, command: true, description: ROOT_COPY.forfeit },
+      partyExitRow("retreat"),
+      partyExitRow("surrender"),
     ];
   }
 
@@ -1010,16 +1062,6 @@
         gridCols: 1,
         title: "成員",
       },
-      forfeit: {
-        items: [
-          { key: "confirm-forfeit", label: "確認投降", enabled: true, actionId: "combat.forfeit", payload: { session_id: panel.session.session_id } },
-          { key: "cancel-forfeit", label: "取消", enabled: true, actionId: null, payload: null },
-        ],
-        focusKey: null,
-        grid: true,
-        gridCols: 2,
-        title: "投降",
-      },
       // The 道具 frame (webclient-party-items-tactics): the commanded actor's
       // own usable stock, one command row per committed item choice.
       items: {
@@ -1239,9 +1281,12 @@
     ROOT_ACTIONS: ROOT_ACTIONS.slice(),
     SECONDARY_ACTIONS: SECONDARY_ACTIONS.slice(),
     RECOVERY_SECONDARY_ACTIONS: RECOVERY_SECONDARY_ACTIONS.slice(),
+    PARTY_EXIT_OPERATIONS: PARTY_EXIT_OPERATIONS.slice(),
     PAGE_SIZE: PAGE_SIZE,
     BASIC_ATTACK_KEY: BASIC_ATTACK_KEY,
     rootItems: rootItems,
+    partyExitRow: partyExitRow,
+    partyExitPrompt: partyExitPrompt,
     actorItems: actorItems,
     progressLine: progressLine,
     commandEnvelope: commandEnvelope,

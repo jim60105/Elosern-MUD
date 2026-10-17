@@ -336,7 +336,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusPress("ArrowDown")).toBe(true);
       expect(store.view.focus.key).toBe("skills");
       expect(store.view.focus.label).toBe("技能");
-      for (const key of ["items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"]) {
+      for (const key of ["items", "bag", "defend", "dodge", "taunt", "retreat", "surrender"]) {
         expect(store.focusPress("ArrowDown")).toBe(true);
         expect(store.view.focus.key).toBe(key);
       }
@@ -344,7 +344,7 @@ describe("store dispatch + focus", () => {
       expect(store.focusPress("ArrowDown")).toBe(true);
       expect(store.view.focus.key).toBe("attack");
       expect(store.focusPress("ArrowUp")).toBe(true);
-      expect(store.view.focus.key).toBe("forfeit");
+      expect(store.view.focus.key).toBe("surrender");
     });
 
     it("the combat top-navigation 背包 entry opens inventory without any dispatch", () => {

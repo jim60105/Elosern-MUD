@@ -164,7 +164,7 @@ test("root menu preserves stable action order with no placeholder rows", () => {
   const root = combat.menus.root.items;
   assert.deepEqual(
     root.map((item) => item.key),
-    ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "flee", "forfeit"]
+    ["attack", "skills", "items", "bag", "defend", "dodge", "taunt", "retreat", "surrender"]
   );
   // The commanded actor's committed capability decides the items row: an
   // actor with no usable stock carries the capability reason, never a
@@ -192,12 +192,26 @@ test("root menu preserves stable action order with no placeholder rows", () => {
     assert.equal(item.disabledReason.code, "unavailable");
     assert.ok(item.description && !/\d/.test(item.description), item.description);
   });
-  assert.equal(root[7].actionId, "combat.flee");
-  assert.deepEqual(root[7].payload, {});
-  // Forfeit opens the confirmation secondary menu; it never submits directly.
-  assert.equal(root[8].key, "forfeit");
-  assert.equal(root[8].enabled, true);
-  assert.equal(root[8].actionId, null);
+  // Retreat and Surrender (webclient-party-exit-confirmation) are the two
+  // party-scope exit rows: always reachable, never gated on the commanded
+  // member, and neither one dispatches its own action — activating one asks
+  // the server for the bound confirmation prompt first.
+  assert.deepEqual(
+    root.slice(7).map((item) => [item.key, item.label, item.enabled, item.actionId, item.payload, item.exitOperation]),
+    [
+      ["retreat", "撤退", true, null, null, "retreat"],
+      ["surrender", "投降", true, null, null, "surrender"],
+    ]
+  );
+  root.slice(7).forEach((item) => {
+    assert.equal(item.command, true);
+    assert.ok(item.description && !/\d/.test(item.description), item.description);
+  });
+  // No retired per-actor route survives in the model: no flee/forfeit row and
+  // no client-local confirmation frame.
+  assert.equal(CombatMenu.ROOT_ACTIONS.includes("flee"), false);
+  assert.equal(CombatMenu.ROOT_ACTIONS.includes("forfeit"), false);
+  assert.equal(combat.menus.forfeit, undefined);
 });
 
 // The committed actor-local item stock (webclient-party-items-tactics): the
@@ -440,33 +454,63 @@ test("an unknown item or basic action never resolves a frame", () => {
   assert.equal(CombatMenu.tacticMenu(combat, "defend"), null, "no committed tactic row resolves");
 });
 
-test("forfeit confirmation menu requires explicit confirm to send", () => {
+test("a party exit row opens no frame and submits nothing on its own", () => {
   const combat = CombatMenu.buildMenus(readyPanel(), {});
-  const forfeit = combat.menus.forfeit;
-  assert.deepEqual(
-    forfeit.items.map((item) => item.key),
-    ["confirm-forfeit", "cancel-forfeit"]
-  );
-  assert.equal(forfeit.items[0].actionId, "combat.forfeit");
-  assert.equal(forfeit.items[0].payload.session_id, "hostile:1:0");
-  assert.equal(forfeit.items[1].actionId, null);
-
   const emitted = [];
   const router = menuRouter(emitted);
   router.pushMenu(combat.menus.root);
-  router.pushMenu(forfeit);
-  router.press(KeyboardRouter.ESCAPE);
-  assert.equal(router.depth(), 1, "Escape returns to root, combat continues");
-  assert.ok(!emitted.some(([name]) => name === "submit"));
-
-  router.pushMenu(forfeit);
+  for (let i = 0; i < 7; i += 1) {
+    router.press(KeyboardRouter.ARROW_DOWN);
+  }
+  assert.equal(router.currentItem().key, "retreat");
+  assert.equal(router.depth(), 1);
+  assert.deepEqual(
+    emitted.filter(([name]) => name !== "focus"),
+    [],
+    "arrow navigation never activates a row"
+  );
   router.press(KeyboardRouter.ENTER);
   const submits = emitted.filter(([name]) => name === "submit");
-  assert.equal(submits.length, 1);
-  assert.equal(submits[0][1].item.actionId, "combat.forfeit");
+  assert.equal(submits.length, 1, "exactly one activation");
+  assert.equal(submits[0][1].item.exitOperation, "retreat");
+  assert.equal(router.depth(), 1, "the exit row never pushes a client-local frame");
 });
 
-test("recovery root exposes only a confirmed Forfeit path", () => {
+// The shared party-exit confirmation contract (webclient-party-exit-
+// confirmation): both operations turn the server's exact bounded prompt data
+// into one question; anything else is the identity-loss degradation.
+test("the party exit contract words both operations and rejects anything else", () => {
+  const data = {
+    operation: "retreat",
+    confirmation_token: "R-0-9f8e7d6c5b4a39281706f5e4",
+    scope: "party",
+    consequence: "整隊退出戰鬥。\n撤退失敗會消耗全隊本回合行動。",
+  };
+  const retreat = CombatMenu.partyExitPrompt("retreat", data);
+  assert.equal(retreat.operation, "retreat");
+  assert.equal(retreat.label, "撤退");
+  assert.equal(retreat.question, "確定要全隊撤退？");
+  assert.equal(retreat.consequence, data.consequence);
+  assert.equal(retreat.scope, "party");
+  assert.equal(retreat.token, data.confirmation_token);
+  const surrender = CombatMenu.partyExitPrompt("surrender", {
+    ...data,
+    operation: "surrender",
+    confirmation_token: "S-0-9f8e7d6c5b4a39281706f5e4",
+  });
+  assert.equal(surrender.question, "確定要全隊投降？");
+  assert.equal(surrender.token, "S-0-9f8e7d6c5b4a39281706f5e4");
+  // The token decides the operation: a mismatched claim, an unknown
+  // operation, a forged scope or a missing field never opens a card.
+  assert.equal(CombatMenu.partyExitPrompt("surrender", data), null);
+  assert.equal(CombatMenu.partyExitPrompt("flee", data), null);
+  assert.equal(CombatMenu.partyExitPrompt("retreat", { ...data, scope: "actor" }), null);
+  assert.equal(CombatMenu.partyExitPrompt("retreat", { ...data, confirmation_token: "" }), null);
+  assert.equal(CombatMenu.partyExitPrompt("retreat", { ...data, consequence: "" }), null);
+  assert.equal(CombatMenu.partyExitPrompt("retreat", null), null);
+});
+
+test("recovery root exposes only the confirmed Surrender path", () => {
   const panel = readyPanel({
     session: {
       session_id: "hostile:1:0",
@@ -478,11 +522,10 @@ test("recovery root exposes only a confirmed Forfeit path", () => {
   });
   const combat = CombatMenu.buildMenus(panel, {});
   const root = combat.menus.root.items;
-  assert.deepEqual(root.map((item) => item.key), ["forfeit"]);
-  assert.equal(root[0].actionId, null, "recovery Forfeit still needs confirmation");
-  const confirm = combat.menus.forfeit.items[0];
-  assert.equal(confirm.actionId, "combat.forfeit");
-  assert.equal(confirm.payload.session_id, "hostile:1:0");
+  assert.deepEqual(root.map((item) => item.key), ["surrender"]);
+  assert.equal(root[0].label, "投降");
+  assert.equal(root[0].actionId, null, "recovery Surrender still asks for its prompt first");
+  assert.equal(root[0].exitOperation, "surrender");
 });
 
 test("skill list follows panel order and excludes passives already", () => {

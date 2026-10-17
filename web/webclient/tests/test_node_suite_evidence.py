@@ -1459,5 +1459,58 @@ class RoomActionsEvidenceTest(unittest.TestCase):
         self.assertIn("pass", result.stdout)
 
 
+class PartyExitEvidenceTest(unittest.TestCase):
+    """webclient-party-exit-confirmation: the party-scope exit confirmation
+    belongs to the combat card. The DOM-independent menu model's shared
+    contract and the store's prompt/cancel/confirm lifecycle are the executed
+    evidence; the managed browser journeys cover the live client's two-step
+    confirmation (CI-owned)."""
+
+    @covers_requirement(
+        "webclient-combat-menu::party-command-and-exit-adapters-accept-only-guarded-exact-payloads",
+    )
+    @covers_requirement(
+        "webclient-combat-menu::browser-party-exits-require-a-safe-default-party-consequence-dialog",
+    )
+    def test_party_exit_confirmation_node_and_vitest_evidence_passes(self):
+        node = subprocess.run(
+            [
+                "node",
+                "--test",
+                str(REPO_ROOT / "web/static/webclient/js/tests/combat_menu.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            node.returncode,
+            0,
+            "party-exit menu Node evidence failed:\n" + node.stdout + node.stderr,
+        )
+        result = subprocess.run(
+            [
+                "npx",
+                "--no-install",
+                "vitest",
+                "run",
+                str(REPO_ROOT / "web/webclient-app/tests/store/party_exit_confirmation.test.js"),
+            ],
+            cwd=str(REPO_ROOT),
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+        self.assertEqual(
+            result.returncode,
+            0,
+            "party-exit confirmation Vitest evidence failed:\n"
+            + result.stdout
+            + result.stderr,
+        )
+        self.assertIn("pass", result.stdout)
+
+
 if __name__ == "__main__":
     unittest.main()

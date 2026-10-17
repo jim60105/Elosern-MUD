@@ -54,9 +54,13 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "scale-1", label: "1 倍", enabled: true, action_id: "choose-scale", scaleChoice: true, description: "MP 10" },
     { key: "scale-2", label: "2 倍", enabled: true, action_id: "choose-scale", scaleChoice: true, description: "MP 16" },
   ];
+  // The creation confirm frame's own rows (creation_menu.js `confirmMenu`):
+  // the only live confirm/*-cancel* producer since the combat party-scope
+  // exit became the shared question card's (webclient-party-exit-
+  // confirmation).
   const confirmItems = [
-    { key: "confirm-forfeit", label: "確認投降", enabled: true, action_id: "combat.forfeit" },
-    { key: "cancel-forfeit", label: "取消", enabled: true, navigation: true, surface: "cancel-forfeit" },
+    { key: "confirm-creation.activate", label: "確認", enabled: true, action_id: "creation.activate" },
+    { key: "cancel-creation.activate", label: "取消", enabled: true, navigation: true, surface: "cancel" },
   ];
   // The character panel's read-only rows: focusable navigation cells that
   // submit nothing — the `plain` pane's production shape.
@@ -203,17 +207,19 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     { key: "attack", surface: "attack", label: "攻擊", enabled: true, command: true, navigation: true, description: "選擇一名目標，以普通攻擊出手。" },
     { key: "skills", surface: "skills", label: "技能", enabled: true, command: true, navigation: true, count: 3, description: "從已習得的技能中選擇施展。" },
     { key: "defend", surface: "defend", label: "防禦", enabled: false, command: true, navigation: true, disabled_reason: { code: "not_implemented", message: "防禦功能尚未開放。" } },
-    { key: "flee", label: "逃跑", enabled: true, command: true, action_id: "combat.flee", params: {} },
+    // The party-scope exit rows are local cells (webclient-party-exit-
+    // confirmation): they dispatch no action id of their own.
+    { key: "retreat", label: "撤退", enabled: true, command: true, navigation: true, surface: "retreat" },
   ];
 
   it("renders the command list with the reference glyphs and only the skills count", () => {
     const w = mountMenu(commandItems);
     expect(w.get('[data-testid="dock-menu"]').attributes("data-pane-kind")).toBe("commands");
     assertRowsInOrder(w, commandItems, "combat-row");
-    // Per-key stroke attributes: attack/flee have a round cap, the star none.
+    // Per-key stroke attributes: attack/retreat have a round cap, the star none.
     const path = (key) => w.get(`[data-item-key="${key}"] .dock-menu__command-icon path`);
     expect(path("attack").attributes("stroke-linecap")).toBe("round");
-    expect(path("flee").attributes("stroke-linecap")).toBe("round");
+    expect(path("retreat").attributes("stroke-linecap")).toBe("round");
     expect(path("skills").attributes("stroke-linecap")).toBeUndefined();
     const counts = w.findAll(".dock-menu__command-count");
     expect(counts).toHaveLength(1);
@@ -236,7 +242,9 @@ describe("DockMenu per-pane-kind (task 5.10)", () => {
     detail = w.get('[data-testid="combat-detail"]');
     expect(detail.text()).toContain("防禦功能尚未開放。");
     expect(detail.text()).not.toContain("Enter");
-    await w.setProps({ focusedKey: "flee" });
-    expect(w.get('[data-testid="combat-detail"]').text()).toContain("執行");
+    // The party-scope exit row is a local cell: it opens the server-bound
+    // prompt rather than dispatching an action of its own.
+    await w.setProps({ focusedKey: "retreat" });
+    expect(w.get('[data-testid="combat-detail"]').text()).toContain("開啟");
   });
 });

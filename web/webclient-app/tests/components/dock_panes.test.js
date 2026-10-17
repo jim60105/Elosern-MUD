@@ -98,8 +98,8 @@ describe("classifyPane (task 5.1)", () => {
   it("classifies the confirm frame (confirm-* / cancel-* rows) as confirm", () => {
     const frame = {
       items: [
-        { key: "confirm-forfeit", label: "確認投降", action_id: "combat.forfeit" },
-        { key: "cancel-forfeit", label: "取消", navigation: true, surface: "cancel-forfeit" },
+        { key: "confirm-creation.activate", label: "確認", action_id: "creation.activate" },
+        { key: "cancel-creation.activate", label: "取消", navigation: true, surface: "cancel" },
       ],
     };
     expect(classifyPane(frame)).toBe("confirm");

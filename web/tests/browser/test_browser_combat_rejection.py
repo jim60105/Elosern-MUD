@@ -117,17 +117,23 @@ class CombatRejectionBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
     def _combat_panel(self, page):
         return store_state(page)["panels"]["context_actions"]
 
-    def test_stale_forfeit_rejects(self):
+    def test_forged_exit_confirmation_rejects(self):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
         wait_for_presentation_settled(page)
-        session_id = self._combat_panel(page)["session"]["session_id"]
+        session = self._combat_panel(page)["session"]
         prev_result = store_state(page)["lastActionResult"]
+        # A modified client may name the correct session/revision/operation
+        # but cannot forge the server-bound token: the rules boundary rejects
+        # the confirmation before any draft, round or session mutation.
         page.evaluate(
-            "(id) => Elosern.actions.submit('combat.forfeit', "
-            "{ session_id: 'hostile:999:0' })",
-            session_id,
+            "(s) => Elosern.actions.submit('combat.exit_confirm', {"
+            " session_id: 'hostile:999:0',"
+            " round_revision: s.round_revision,"
+            " operation: 'surrender',"
+            " confirmation_token: 'S-0-forgedtoken0000000000' })",
+            session,
         )
         def _fresh_rejected(state: dict) -> bool:
             result = state.get("lastActionResult")

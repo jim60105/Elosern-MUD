@@ -60,6 +60,20 @@ prototypes; the real app differs too much for a prototype to be useful).
   return to the step, and a panel that drops the skill or a target, a
   playing round or a mode change cancels it. Only the static facts decide;
   never add client-side combat maths to it.
+- Party exits are party-scope, never the selected member's (`stores/elosern/
+  frames.js` `requestPartyExit`/`confirmPartyExit`/`cancelPartyExit`, published
+  as `view.partyExitConfirm`): 撤退 and 投降 sit at the end of every member
+  root (and are the recovery root's only row) and are reachable without the
+  member being commandable. Activating one sends one read-only
+  `combat.exit_prompt {session_id, round_revision, operation}`; the
+  server-bound answer opens the same `QuestionCard` in `choices` with 否
+  focused, the whole-party scope and the server-authored consequence
+  (`question-card-detail`), and every dock key, pointer and stage hit inert.
+  是 sends exactly one `combat.exit_confirm` with the held token; 否 / ✕ /
+  Escape discard only the prompt — the draft, the focused row and the clock
+  stay untouched. The prompt is bound to session/round/generation/epoch: any
+  replacement, a disconnect or a played round cancels it without a retry, and
+  `combat.flee` / `combat.forfeit` have no client producer left.
 - Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
   condition; always shown in combat.
 - Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen

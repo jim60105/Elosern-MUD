@@ -337,13 +337,11 @@ watch(
         </button>
       </div>
 
-      <!-- CONFIRM: the forfeit confirmation panel (task 6.7): 取消 and
-           確認投降 rows, still requiring an explicit confirm. -->
+      <!-- CONFIRM: a confirm/cancel frame's rows (task 6.7). The combat
+           party-scope exit is the shared question card's, never this pane
+           (webclient-party-exit-confirmation); the pane carries no dormant
+           forfeit copy of its own, only the frame's two rows. -->
       <div v-else-if="paneKind === 'confirm'" class="dock-menu__confirm" :style="paneGridStyle">
-        <div class="dock-menu__confirm-warn">
-          <p class="dock-menu__confirm-title">確認投降？</p>
-          <p class="dock-menu__confirm-note">投降後本場戰鬥結束，無法回復。</p>
-        </div>
         <div class="dock-menu__confirm-buttons">
           <button
             v-for="row in rows"
@@ -696,25 +694,7 @@ watch(
   color: var(--paper-500);
 }
 
-/* CONFIRM (task 6.7): the draft's forfeit warning panel with 取消 / 確認投降
-   rows. */
-.dock-menu__confirm-warn {
-  background: var(--panel);
-  border: var(--line);
-  border-radius: var(--radius);
-  padding: calc(12px * var(--ui-scale));
-}
-.dock-menu__confirm-title {
-  margin: 0 0 calc(6px * var(--ui-scale));
-  font-size: var(--text-md);
-  font-weight: 600;
-  color: var(--seal-400);
-}
-.dock-menu__confirm-note {
-  margin: 0;
-  font-size: var(--text-xs);
-  color: var(--paper-500);
-}
+/* CONFIRM (task 6.7): a confirm/cancel frame's two rows. */
 .dock-menu__confirm-buttons {
   display: flex;
   flex-wrap: wrap;

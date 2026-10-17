@@ -998,26 +998,27 @@ class ArtCombatBrowserTest(ArtSceneBrowserTest):
             for p in combat["participants"]
             if p["team"] == "foes"
         )
-        # Forfeit the battle deterministically (no dice roll): the terminal
+        # Surrender the battle deterministically (no dice roll): the terminal
         # settlement clears the session and the catalog entry disappears in the
         # same combat update.
         # The combat root is one vertical list (webclient-combat-command-
-        # window), so the forfeit row is reached with ArrowDown. Root order:
+        # window), so the surrender row is reached with ArrowDown. Root order:
         # attack, skills, items, 背包 (the client-local drawer row), defend,
-        # flee, forfeit.
+        # dodge, taunt, retreat, surrender.
         self._focus_combat_dock(page)
-        for _ in range(6):
+        for _ in range(8):
             page.keyboard.press("ArrowDown")
             page.wait_for_timeout(60)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
-            "forfeit",
-            "the forfeit row is the focused root cell",
+            "surrender",
+            "the surrender row is the focused root cell",
         )
-        page.keyboard.press("Enter")  # open the secondary Forfeit menu
-        # The confirmation frame mounts before the confirming Enter.
-        self._wait_combat_row_key(page, "confirm-forfeit")
-        page.keyboard.press("Enter")  # confirm-forfeit
+        page.keyboard.press("Enter")  # request the server-bound prompt
+        # The confirmation card mounts before the confirming Yes.
+        card = page.locator('[data-testid="party-exit-question"]')
+        card.wait_for(state="visible", timeout=30000)
+        card.locator('[data-testid="question-card-yes"]').click()
         wait_for_store_state(page, _out_of_combat_mode, timeout=15000)
         art = store_state(page)["panels"]["art"]
         self.assertNotIn(str(monster_id), art["portrait_catalog"])

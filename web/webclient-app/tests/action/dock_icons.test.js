@@ -19,8 +19,8 @@ describe("dock-icons glyph table", () => {
     // (index.html:958) — the identical string the `items` tab draws.
     inventory: "M4 8h16v11H4zM8 8V6a4 4 0 0 1 8 0v2",
     defend: "M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6l-8-3Z",
-    flee: "M13 5l7 7-7 7M4 12h16",
-    forfeit: "M6 2h12l-5 8v6M9 2l1 7",
+    retreat: "M13 5l7 7-7 7M4 12h16",
+    surrender: "M6 2h12l-5 8v6M9 2l1 7",
   };
 
   it("returns the reference `d` string for every reference-matched key", () => {
@@ -46,10 +46,10 @@ describe("dock-icons glyph table", () => {
     expect(glyphAttrs("move")).toEqual({ "stroke-linecap": "round", "stroke-linejoin": "round" });
     expect(glyphAttrs("interact")).toEqual({ "stroke-linejoin": "round" });
     expect(glyphAttrs("attack")).toEqual({ "stroke-linecap": "round" });
-    expect(glyphAttrs("flee")).toEqual({ "stroke-linecap": "round" });
+    expect(glyphAttrs("retreat")).toEqual({ "stroke-linecap": "round" });
     // The star glyphs and the other replaced/untouched keys carry no
     // attributes (the reference omits them there).
-    for (const key of ["look", "suggestions", "skills", "items", "defend", "forfeit", "character", "quests", "inventory", "wait"]) {
+    for (const key of ["look", "suggestions", "skills", "items", "defend", "surrender", "character", "quests", "inventory", "wait"]) {
       expect(glyphAttrs(key)).toEqual({});
     }
     expect(glyphAttrs(null)).toEqual({});
