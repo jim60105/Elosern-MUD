@@ -35,7 +35,7 @@ scratch file; no loops over browser files; Evennia commands use a `MUD_TEST_SETT
 
 Build once: `pnpm run build`.
 
-- [ ] 2.1 Add `test_cross_side_cast_asks_first` to `web/tests/browser/test_browser_combat_stage.py`
+- [x] 2.1 Add `test_cross_side_cast_asks_first` to `web/tests/browser/test_browser_combat_stage.py`
   `CombatStageBrowserTest`: Attack → a companion → Enter opens `[data-testid="cross-side-question"]` with role
   `dialog`, the text `確定要對友方使用〈基本攻擊〉？` and focus on 否, no `combat.cast` sent, every figure's
   `data-speaking` unchanged from the step; Escape returns to the step with focus on `#action-dock` and the same
