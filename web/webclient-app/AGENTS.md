@@ -33,6 +33,17 @@ prototypes; the real app differs too much for a prototype to be useful).
   The arrow keys walk the positions in stage order (left to right on the
   formation); the digits still pick the frame's items in server order; Enter,
   Space and Escape, the item order and every payload are the card rows'.
+- A cast across sides asks first (`stores/elosern/cross_side.js`, held in
+  the store as `crossSideConfirm`, published as `view.crossSideConfirm`): a
+  target-step submission whose skill is `hostile` and reaches a `party`
+  participant (the actor included), or `beneficial` and reaches a `foes`
+  one, opens a caution `QuestionCard` (`確定要對{友方|自己|敵方|友方與敵方}使用〈…〉？`)
+  below the collapsed prompt with focus on 否, instead of sending. The dock is
+  inert beneath it, no dock key or stage pointer acts, the stage keeps the
+  step's dim and markers; 是 sends the held payload once, 否 / ✕ / Escape
+  return to the step, and a panel that drops the skill or a target, a
+  playing round or a mode change cancels it. Only the static facts decide;
+  never add client-side combat maths to it.
 - Vitals (HP/MP/stamina) are hidden at full and auto-appear when damaged or under a
   condition; always shown in combat.
 - Dialogue collapses the action dock, and pressing 交談 enters the dialogue screen

@@ -117,6 +117,18 @@ export function applyInteraction(ctx) {
     // moves the hidden dock's focus, pushes or pops a frame, or activates a
     // hidden entry. The dialogue choice list handles its own keys (digits,
     // arrows, Enter, Space, Escape) before they reach the bridge.
+    // The cross-side question (webclient-combat-cross-side-confirm D2): the
+    // question card handles its own keys, so the dock claims none — no
+    // arrow, digit, Enter or Space moves or activates the target step behind
+    // it, and an unclaimed Space still clicks a focused answer natively. A
+    // lone Escape that reaches the bridge (focus fell outside the card)
+    // cancels the question exactly like 否.
+    if (ctx.crossSideConfirm) {
+      if (key === KeyboardRouter.ESCAPE && !repeat) {
+        return ctx.cancelCrossSide();
+      }
+      return false;
+    }
     if (ctx.reducer.getState().mode === "dialogue") {
       return key === "/" ? ctx.router.press(key, !!repeat) : false;
     }

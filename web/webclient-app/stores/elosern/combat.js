@@ -274,6 +274,11 @@ export function applyCombat(ctx) {
   // through the router's own pointer confirm — the same façade members the
   // digit picks use, so the payloads are the card rows'.
   ctx.stageTargetPointer = function stageTargetPointer(key, action) {
+    // No hover or click behind the cross-side question moves the focus or
+    // sends a cast (webclient-combat-cross-side-confirm D2).
+    if (ctx.crossSideConfirm) {
+      return false;
+    }
     const step = ctx.stageTargetNow();
     if (!step || !step.positions.some((position) => position.key === key)) {
       return false;

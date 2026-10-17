@@ -213,6 +213,32 @@ export function combatSkills(participants) {
         },
       ],
     },
+    // 神之秘法 (webclient-combat-cross-side-confirm): skills whose static facts
+    // cross sides when aimed the other way — a heal and a buff any figure
+    // may receive, a drain any figure may suffer (the controlled one too), a
+    // harmful SELF rite, and one AREA skill that both harms and restores.
+    {
+      category: "divine_mystery",
+      label: "神之秘法",
+      groups: [
+        {
+          group: null,
+          label: null,
+          skills: [
+            skill("revive_light", "復甦之光", "以溫暖的光芒治癒一名目標。", { mp: 12 }, "single", [1, ...allies, ...foes], { beneficial: true }),
+            skill("ward_blessing", "守護祝福", "為一名目標披上守護的祝福。", { mp: 8 }, "single", [1, ...allies, ...foes], { beneficial: true }),
+            skill("life_drain", "生命汲取", "自一名目標身上汲取生命。", { mp: 10 }, "single", [1, ...allies, ...foes], HOSTILE),
+            skill("blood_pact", "血之契約", "以自身的血換取片刻的力量。", { sp: 5 }, "self", [], HOSTILE),
+            skill("tide_reversal", "潮汐逆轉", "讓戰場的潮汐倒轉，敵我同受其力。", { mp: 30 }, "area", [...allies, ...foes], {
+              hostile: true,
+              beneficial: true,
+              element: "water",
+              shorthands: ["all-enemies", "all-allies", "all"],
+            }),
+          ],
+        },
+      ],
+    },
   ];
 }
 

@@ -1236,6 +1236,101 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.close()
 
     @covers_requirement(
+        "webclient-combat-menu::a-cast-across-sides-asks-for-confirmation-first",
+        "webclient-combat-menu::combat-targets-are-picked-on-the-stage-figures",
+        "webclient-contextual-hud::the-stage-target-step-presents-the-targets-on-the-stage-figures",
+    )
+    def test_cross_side_cast_asks_first(self):
+        """Attack (hostile) on a companion asks first: Enter opens the modal
+        question with focus on 否 and sends nothing, the stage keeps the
+        step's dim and markers, no figure takes a pointer and a click on a
+        foe's hit area does nothing; Escape returns to the step with focus
+        on the card and the same marker focused; 是 sends exactly one cast
+        with the companion's target and leaves focus on the card; Attack on
+        a foe sends at once with no question."""
+        page = self._page(REFERENCE, companions=3)
+        page.evaluate(_CAPTURE_ACTIONS)
+        panels = _stage_panels()
+        for category in panels["context_actions"]["skills"]:
+            for group in category["groups"]:
+                for skill in group["skills"]:
+                    if skill["key"] == BASIC_ATTACK_KEY:
+                        skill.update(label="合成攻擊", hostile=True)
+        self._commit(page, "combat", panels)
+        self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 3")
+        page.evaluate("() => window.__elosernBridge.store.resetFramesToRoot()")
+        page.wait_for_function(
+            "() => (window.__elosernBridge.store.view.combatMenu?.items || []).some((i) => i.key === 'attack')",
+            timeout=15000,
+        )
+        focus_action_dock(page)
+        self._open_step(page, BASIC_ATTACK_KEY)
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-101')"))
+        page.evaluate("() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)))")
+        step = page.evaluate(_READ_STEP)
+        self.assertEqual(step["focus"], "target-101")
+        question = page.locator('[data-testid="cross-side-question"]')
+
+        page.keyboard.press("Enter")
+        question.wait_for(state="visible", timeout=5000)
+        expect(question).to_have_attribute("role", "dialog")
+        expect(question).to_have_attribute("aria-modal", "true")
+        expect(question.locator('[data-testid="question-card-question"]')).to_have_text("確定要對友方使用〈合成攻擊〉？")
+        label_id = question.get_attribute("aria-labelledby")
+        self.assertEqual(page.evaluate(f"() => document.getElementById('{label_id}').textContent"), "確定要對友方使用〈合成攻擊〉？")
+        page.wait_for_function(
+            "() => document.activeElement && document.activeElement.dataset.testid === 'question-card-no'", timeout=5000
+        )
+        self.assertEqual(self._sent(page), [])
+        held = page.evaluate(_READ_STEP)
+        self.assertEqual(
+            {f["identity"]: f["speaking"] for f in held["figures"]},
+            {f["identity"]: f["speaking"] for f in step["figures"]},
+        )
+        self.assertEqual(
+            sorted((m["identity"], m["state"]) for m in held["markers"]),
+            sorted((m["identity"], m["state"]) for m in step["markers"]),
+        )
+        self.assertEqual(held["pointerTakers"], [], "no figure takes a pointer behind the question")
+        self.assertTrue(page.evaluate("() => document.getElementById('action-dock').inert"))
+        # A click on a foe's hit area reaches nothing behind the question.
+        hit = page.locator('[data-testid="stage-target-hit"][data-identity="12"]').bounding_box()
+        page.mouse.click(hit["x"] + hit["width"] / 2, hit["y"] + hit["height"] / 2)
+        page.evaluate("() => new Promise((r) => requestAnimationFrame(r))")
+        self.assertEqual(self._sent(page), [])
+        self.assertEqual(page.evaluate(_READ_STEP)["focus"], "target-101")
+
+        # Escape returns to the step unchanged, focus on the card.
+        question.locator('[data-testid="question-card-no"]').focus()
+        page.keyboard.press("Escape")
+        question.wait_for(state="detached", timeout=5000)
+        page.wait_for_function("() => document.activeElement && document.activeElement.id === 'action-dock'", timeout=5000)
+        back = page.evaluate(_READ_STEP)
+        self.assertEqual(back["focus"], "target-101")
+        self.assertTrue(back["prompt"])
+        self.assertEqual([m["identity"] for m in back["markers"] if m["state"] == "focus"], ["101"])
+        self.assertEqual(self._sent(page), [])
+
+        # Enter asks again; 是 sends exactly one cast and focus returns to the card.
+        page.keyboard.press("Enter")
+        question.wait_for(state="visible", timeout=5000)
+        question.locator('[data-testid="question-card-yes"]').click()
+        page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
+        question.wait_for(state="detached", timeout=5000)
+        page.wait_for_function("() => document.activeElement && document.activeElement.id === 'action-dock'", timeout=5000)
+        self.assertEqual(self._sent(page), [{"skill_key": BASIC_ATTACK_KEY, "target_ids": [101]}])
+        self._wait_released(page)
+
+        # Attack on a foe is sent at once.
+        self._open_step(page, BASIC_ATTACK_KEY)
+        self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-11')"))
+        page.keyboard.press("Enter")
+        page.wait_for_function("() => window.__stpSent.length === 2", timeout=5000)
+        self.assertEqual(self._sent(page)[1], {"skill_key": BASIC_ATTACK_KEY, "target_ids": [11]})
+        self.assertEqual(question.count(), 0)
+        page.close()
+
+    @covers_requirement(
         "webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec",
         "webclient-contextual-hud::combat-figures-stand-in-a-shared-scale-formation",
         "webclient-contextual-hud::companion-standing-portraits-line-up-behind-the-controlled-character-in-the-actor-left-anchor",

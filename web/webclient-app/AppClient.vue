@@ -5,7 +5,7 @@
 // backing OOB read model is present (the truthful-data scope, roadmap §7 —
 // no surface is invented for a panel without a backing model). The behavior
 // groups live in ./composables/ (each watch stays with the state it mutates).
-import { computed, provide, ref, watch } from "vue";
+import { computed, nextTick, provide, ref, watch } from "vue";
 import { useElosernStore } from "./stores/elosern.js";
 import { useAppClient } from "./composables/use-app-client.js";
 import AppShell from "./components/AppShell.vue";
@@ -464,11 +464,65 @@ const targetMarkers = computed(() =>
 );
 function onTargetFigure(identity, action) {
   const key = positionKeyFor(stageTarget.value, identity);
-  if (key) store.stageTargetPointer(key, action);
+  if (key) onTargetPosition(key, action);
 }
 function onTargetPosition(key, action) {
+  // A pointer resting on a figure when the cross-side question closes enters
+  // its hit area without moving; that is no hover, so the step keeps the
+  // focused position the question returned to until the pointer moves.
+  if (action === "hover" && hoverHeld) return;
   store.stageTargetPointer(key, action);
 }
+let hoverHeld = false;
+function releaseHover() {
+  hoverHeld = false;
+  if (typeof window !== "undefined") {
+    window.removeEventListener("pointermove", releaseHover, { capture: true });
+    window.removeEventListener("keydown", releaseHover, { capture: true });
+  }
+}
+// A key press or leaving combat also ends the hold, so it never outlives the
+// moment it guards.
+watch(
+  () => store.view.mode,
+  () => releaseHover(),
+);
+
+// The cross-side question (webclient-combat-cross-side-confirm D2/D3): a
+// held cast's yes/no card over the stage target step. 是 waits for the same
+// submission gate every combat command does (a mutation in flight, a
+// declared revision not yet committed, a locked or inactive session); 否 and
+// the close control always answer.
+const crossSideQuestion = computed(() =>
+  store.view.mode === "combat" ? store.view.crossSideConfirm?.question ?? null : null,
+);
+const crossSideOpen = computed(() => crossSideQuestion.value !== null);
+const crossSideLocked = computed(
+  () =>
+    !store.view.connected ||
+    store.view.phase !== "active" ||
+    !!store.view.mutationsLocked ||
+    !!store.view.dispatch?.inFlight ||
+    !!store.view.submitLocked,
+);
+// Every close path requests DOM focus on the dock through the store; a
+// close the store does not route there (the mode left combat), or a focus
+// the still-inert dock refused, falls back to the mode's focus home, so the
+// question never leaves focus on the document body.
+watch(crossSideOpen, async (open, was) => {
+  if (open || !was) return;
+  if (typeof window !== "undefined") {
+    hoverHeld = true;
+    window.addEventListener("pointermove", releaseHover, { once: true, capture: true });
+    window.addEventListener("keydown", releaseHover, { once: true, capture: true });
+  }
+  await nextTick();
+  await nextTick();
+  const active = typeof document === "undefined" ? null : document.activeElement;
+  if (!active || active === document.body) {
+    shellRef.value?.restoreFocusHome?.();
+  }
+});
 // Starting a step closes any open plate tooltip (webclient-combat-figure-
 // plates D3) and moves keyboard focus out of the plates group to the card,
 // so the step's arrow keys and the group's never compete.
@@ -536,6 +590,7 @@ const rootStyle = computed(() => {
     ref="rootRef"
     class="elosern-root"
     data-testid="elosern-client-root"
+    :data-cross-side-open="crossSideOpen ? 'true' : null"
     :style="rootStyle"
   >
       <AppShell
@@ -837,6 +892,27 @@ const rootStyle = computed(() => {
             @pick="onCardPick"
             @back="onCardBack"
           />
+          <!-- The cross-side question (webclient-combat-cross-side-confirm
+               D3): over the collapsed command card, centred in the anchor,
+               focus starting on its safe answer 否. The card host (the
+               teleported dock) stays where it is, inert beneath it. -->
+          <QuestionCard
+            v-else-if="crossSideOpen"
+            class="cross-side-question"
+            test-id="cross-side-question"
+            :question="crossSideQuestion"
+            caption="跨陣營施展"
+            tone="caution"
+            initial-focus="no"
+            no-while-locked
+            close-label="返回選擇目標"
+            :locked="crossSideLocked"
+            reason="上一個行動尚未完成，請稍候。"
+            :entrance="!modeHydrating"
+            @yes="store.confirmCrossSide()"
+            @no="store.cancelCrossSide()"
+            @close="store.cancelCrossSide()"
+          />
           <DialogueChoices
             v-else-if="choicesShown"
             :entrance="!modeHydrating"
@@ -928,6 +1004,7 @@ const rootStyle = computed(() => {
           :playback="store.view.mode === 'combat' && !!store.view.dispatch.beatLocked"
           :card="store.view.mode === 'combat'"
           :stage-target="store.view.mode === 'combat' ? stageTarget : null"
+          :inert="crossSideOpen || null"
           @action="onAction"
           @target-pointer="onTargetPosition"
           @back="onDockBack"
@@ -1366,6 +1443,42 @@ const rootStyle = computed(() => {
    filled, larger and glowing on a lit figure, its digit inside. At `full`
    the focused arrow bobs on the page marker's loop; below it stands still
    and an underline bar marks it. */
+/* The cross-side question (webclient-combat-cross-side-confirm D3): the card
+   stands in the choices anchor's column below the collapsed command card
+   (`order` places it after the card host whatever the DOM order), centred on
+   the stage and vertically centred in the span the prompt leaves free, so it
+   never covers the prompt that names the skill and the focused target. It is
+   a little wider than the column (a centred flex item overflows both sides
+   equally), so the question sets on one or two balanced lines. While it is
+   open no figure's hit area, arrow marker or prompt chip takes a pointer, so
+   no click or hover behind it moves the step. */
+.elosern-stage[data-elosern-mode="combat"] [data-anchor="choices"] > .cross-side-question {
+  order: 1;
+  position: relative;
+  z-index: 2;
+  flex: none;
+  align-self: center;
+  width: calc(336px * var(--ui-scale));
+  max-height: none;
+  margin: auto 0;
+  box-shadow:
+    var(--shadow-lg),
+    0 0 0 calc(1px * var(--ui-scale)) rgba(0, 0, 0, 0.5),
+    0 calc(18px * var(--ui-scale)) calc(48px * var(--ui-scale)) calc(-8px * var(--ui-scale)) rgba(0, 0, 0, 0.85),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.55);
+}
+/* The inert card beneath recedes, so the question is the one surface that
+   reads as live. */
+.elosern-root[data-cross-side-open="true"] #action-dock {
+  opacity: 0.45;
+  filter: saturate(0.6);
+  transition: opacity var(--motion-fast) var(--ease-standard), filter var(--motion-fast) var(--ease-standard);
+}
+.elosern-root[data-cross-side-open="true"] .stage-target__hit,
+.elosern-root[data-cross-side-open="true"] .stage-target__marker,
+.elosern-root[data-cross-side-open="true"] .target-prompt__chip {
+  pointer-events: none;
+}
 .stage-target-markers {
   position: absolute;
   inset: 0;

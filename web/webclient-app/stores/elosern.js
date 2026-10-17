@@ -233,6 +233,11 @@ export const useElosernStore = defineStore("elosern", () => {
     // pointer entry of the figures, markers and prompt chips, and the stage
     // order AppClient publishes from the formation it draws.
     stageTargetPointer: ctx.stageTargetPointer,
+    // The cross-side question's answers (webclient-combat-cross-side-
+    // confirm): 是 sends the held cast once; 否 / ✕ / Escape return to the
+    // target step.
+    confirmCrossSide: ctx.confirmCrossSide,
+    cancelCrossSide: ctx.cancelCrossSide,
     setStageFormation: ctx.setStageFormation,
     // The single root-reset entry (replaces the deleted menu-less
     // `router.reset`): post the committed mode's root descriptor as the
@@ -241,7 +246,7 @@ export const useElosernStore = defineStore("elosern", () => {
     // open; the public entry publishes that at once (the internal reset runs
     // inside the publish window and must not publish itself).
     resetFramesToRoot: () => {
-      const hadCard = ctx.centredCardOpen();
+      const hadCard = ctx.centredCardOpen() || ctx.crossSideConfirm !== null;
       ctx.resetFramesToRoot();
       if (hadCard) {
         ctx.publishView();
