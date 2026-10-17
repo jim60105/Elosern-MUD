@@ -60,6 +60,7 @@ export const StatusTraitBreakdown = { render: party, args: { initialTab: "status
 export const StatusNoGuild = { render: party, args: { initialTab: "status", initialMember: 3 } };
 
 export const SkillBook = { render: party, args: { initialTab: "skill", initialMember: 2, initialSkill: "healing_light" } };
+export const SkillFreeformScales = { render: party, args: { initialTab: "skill", initialMember: 2, initialSkill: "ice_shard" } };
 export const SkillInCombat = { render: party, args: { initialTab: "skill", initialMember: 2, initialSkill: "healing_light", combat: true } };
 
 export const LineageGraph = { render: party, args: { initialTab: "lineage", initialMember: 2, initialGraph: "ice" } };

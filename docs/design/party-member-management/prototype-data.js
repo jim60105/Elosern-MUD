@@ -153,32 +153,35 @@ export const CHARACTER = {
   },
 };
 
-// character v6 skill groups for each member.
+// character v6 skill groups for each member. `scales` is the freeform
+// 威力 ladder (progression.yaml freeform_cast_scales: 1/4, 1/2, 1, 2, 4),
+// present only when the member owns the element's mastery; a rung with
+// `level` is still locked behind that skill's own proficiency.
 export const SKILLS = {
   1: {
     active: [
       { category: "劍術", skills: [
-        { key: "slash", name: "斬擊", icon: "sword", level: 3, progress: 0.4, target: "單體敵方", cost: "SP 6", field: false, rungs: ["一般", "強化 ×1.5"], locked_rungs: [], path: ["—", "斬擊", "雙重斬"] },
-        { key: "guard_break", name: "破防擊", icon: "sword", level: 1, progress: 0.15, target: "單體敵方", cost: "SP 10", field: false, rungs: ["一般"], locked_rungs: ["強化（Lv 3）"], path: ["斬擊", "破防擊", "—"], fresh: false },
+        { key: "slash", name: "斬擊", icon: "sword", level: 3, progress: 0.4, target: "單體敵方", cost: "SP 6", field: false, scales: null, path: ["—", "斬擊", "雙重斬"] },
+        { key: "guard_break", name: "破防擊", icon: "sword", level: 1, progress: 0.15, target: "單體敵方", cost: "SP 10", field: false, scales: null, path: ["斬擊", "破防擊", "—"], fresh: false },
       ] },
     ],
-    passive: [{ category: "體能", skills: [{ key: "endurance", name: "耐力", icon: "skills", level: 2, progress: 0.5, target: "—", cost: "—", field: false, rungs: [], locked_rungs: [], path: ["—", "耐力", "—"] }] }],
+    passive: [{ category: "體能", skills: [{ key: "endurance", name: "耐力", icon: "skills", level: 2, progress: 0.5, target: "—", cost: "—", field: false, scales: null, path: ["—", "耐力", "—"] }] }],
   },
   2: {
     active: [
       { category: "神聖 ‧ 治療", skills: [
-        { key: "healing_light", name: "治癒之光", icon: "holy", level: 2, progress: 0.62, target: "單體友方", cost: "MP 8", field: true, rungs: ["一般", "強化 ×1.5"], locked_rungs: ["極大（Lv 4）"], path: ["祈禱", "治癒之光", "聖光庇護"] },
-        { key: "mass_heal", name: "群體治癒", icon: "holy", level: 1, progress: 0.02, target: "全體友方", cost: "MP 20", field: true, rungs: ["一般"], locked_rungs: [], path: ["治癒之光", "群體治癒", "—"], fresh: true },
+        { key: "healing_light", name: "治癒之光", icon: "holy", level: 2, progress: 0.62, target: "單體友方", cost: "MP 8", field: true, scales: null, path: ["祈禱", "治癒之光", "聖光庇護"] },
+        { key: "mass_heal", name: "群體治癒", icon: "holy", level: 1, progress: 0.02, target: "全體友方", cost: "MP 20", field: true, scales: null, path: ["治癒之光", "群體治癒", "—"], fresh: true },
       ] },
       { category: "冰 ‧ 魔法", skills: [
-        { key: "ice_shard", name: "冰錐術", icon: "ice", level: 2, progress: 0.3, target: "單體敵方", cost: "MP 6", field: false, rungs: ["一般", "強化 ×1.5"], locked_rungs: [], path: ["—", "冰錐術", "冰槍"] },
-        { key: "frost_touch", name: "寒霜之觸", icon: "ice", level: 3, progress: 1, capped: true, target: "單體敵方", cost: "MP 4", field: false, rungs: ["一般"], locked_rungs: [], path: ["—", "寒霜之觸", "冰霜護甲"] },
+        { key: "ice_shard", name: "冰錐術", icon: "ice", level: 2, progress: 0.3, target: "單體敵方", cost: "MP 6", field: false, scales: [{ label: "1/4", mp: 2 }, { label: "1/2", mp: 3 }, { label: "1", mp: 6 }, { label: "2", mp: 12, level: 6 }, { label: "4", mp: 24, level: 10 }], path: ["—", "冰錐術", "冰槍"] },
+        { key: "frost_touch", name: "寒霜之觸", icon: "ice", level: 3, progress: 1, capped: true, target: "單體敵方", cost: "MP 4", field: false, scales: null, path: ["—", "寒霜之觸", "冰霜護甲"] },
       ] },
     ],
-    passive: [{ category: "冥想", skills: [{ key: "meditation", name: "冥想", icon: "skills", level: 1, progress: 0.7, target: "—", cost: "—", field: false, rungs: [], locked_rungs: [], path: ["—", "冥想", "—"] }] }],
+    passive: [{ category: "冥想", skills: [{ key: "meditation", name: "冥想", icon: "skills", level: 1, progress: 0.7, target: "—", cost: "—", field: false, scales: null, path: ["—", "冥想", "—"] }] }],
   },
   3: {
-    active: [{ category: "錘術", skills: [{ key: "crush", name: "粉碎", icon: "hammer", level: 2, progress: 0.8, target: "單體敵方", cost: "SP 12", field: false, rungs: ["一般"], locked_rungs: [], path: ["—", "粉碎", "震地"] }] }],
+    active: [{ category: "錘術", skills: [{ key: "crush", name: "粉碎", icon: "hammer", level: 2, progress: 0.8, target: "單體敵方", cost: "SP 12", field: false, scales: null, path: ["—", "粉碎", "震地"] }] }],
     passive: [],
   },
 };

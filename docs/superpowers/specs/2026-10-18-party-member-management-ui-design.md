@@ -163,7 +163,7 @@ The list column shows a hero row (portrait, name, title, and the guild `GradeGem
 
 ### 6.4 技能 tab
 
-The existing SkillBook content moves into the frame: active/passive segment, search, the category tree, and the detail card (target, cost, field capability, freeform rungs). Each row adds a proficiency meter and level, and newly unlocked skills carry a 新 tag. The detail adds the lineage position (prerequisite → skill → next unlock) that links into the 系譜 tab. The action bar offers 施放 (cast by the viewed member through the existing server preview and target flow) and 排入修煉 (book that member's practice). In combat both are disabled with their reason; combat casting stays on the command card.
+The existing SkillBook content moves into the frame: active/passive segment, search, the category tree, and the detail card (target, cost, field capability, and the 威力與消耗 row of the freeform scale ladder `1/4`, `1/2`, `1`, `2`, `4` with each rung's MP cost or its locking proficiency level, shown only when the member owns the element's mastery). Each row adds a proficiency meter and level, and newly unlocked skills carry a 新 tag. The detail adds the lineage position (prerequisite → skill → next unlock) that links into the 系譜 tab. The action bar offers 施放 (cast by the viewed member through the existing server preview and target flow) and 排入修煉 (book that member's practice). In combat both are disabled with their reason; combat casting stays on the command card.
 
 ### 6.5 系譜 tab
 

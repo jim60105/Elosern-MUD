@@ -81,9 +81,15 @@ const castReason = computed(() => {
           <div class="pm-fact">消耗<b>{{ skill.cost }}</b></div>
           <div class="pm-fact">戰鬥外<b>{{ skill.field ? "可施放" : "不可" }}</b></div>
         </div>
-        <template v-if="skill.rungs.length || skill.locked_rungs.length">
-          <div class="pm-label">威力階段</div>
-          <div class="sk-rungs"><span v-for="r in skill.rungs" :key="r">{{ r }}</span><span v-for="r in skill.locked_rungs" :key="r" class="is-locked"><PmGlyph name="lock" />{{ r }}</span></div>
+        <template v-if="skill.scales">
+          <div class="pm-label">威力與消耗</div>
+          <div class="sk-scales">
+            <span v-for="r in skill.scales" :key="r.label" :class="{ 'is-locked': r.level }">
+              <b>威力×{{ r.label }}</b>
+              <template v-if="r.level">Lv {{ r.level }}</template>
+              <template v-else>MP {{ r.mp }}</template>
+            </span>
+          </div>
         </template>
         <div class="pm-label">熟練度</div>
         <div class="sk-prog">
@@ -114,9 +120,11 @@ const castReason = computed(() => {
 .sk-seg button.is-active { color: var(--gold-300); background: rgba(207, 68, 68, 0.2); }
 .sk-search { display: flex; align-items: center; gap: var(--sp-2); padding: var(--sp-1) var(--sp-3); color: var(--paper-500); border: 1px solid var(--ink-600); border-radius: var(--radius-sm); }
 .sk-search input { flex: 1; min-width: 0; color: var(--paper-100); font: var(--text-xs) var(--f-sans); background: transparent; border: 0; outline: none; }
-.sk-rungs { display: flex; flex-wrap: wrap; gap: var(--sp-2); }
-.sk-rungs span { display: inline-flex; align-items: center; gap: var(--sp-1); padding: 2px var(--sp-3); color: var(--paper-100); font-size: var(--text-xs); border: 1px solid var(--pm-line); border-radius: var(--radius-sm); }
-.sk-rungs span.is-locked { color: var(--paper-700); border-style: dashed; }
+.sk-scales { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--sp-2); }
+.sk-scales span { display: grid; justify-items: center; gap: 2px; padding: var(--sp-2) var(--sp-1); color: var(--paper-400); font-size: var(--text-xs); border: 1px solid var(--pm-line); border-radius: var(--radius-sm); }
+.sk-scales b { color: var(--paper-50); font: 500 var(--text-sm) var(--f-num); }
+.sk-scales span.is-locked { color: var(--paper-700); border-style: dashed; }
+.sk-scales span.is-locked b { color: var(--paper-500); }
 .sk-prog { display: grid; grid-template-columns: auto 1fr auto; gap: var(--sp-3); align-items: center; color: var(--paper-200); font: var(--text-xs) var(--f-num); }
 .sk-path { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-2); color: var(--paper-500); font-size: var(--text-xs); }
 .sk-node { padding: 2px var(--sp-3); color: var(--paper-100); border: 1px solid var(--pm-line); border-radius: var(--radius-sm); }

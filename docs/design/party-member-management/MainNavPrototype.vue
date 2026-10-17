@@ -55,7 +55,7 @@ const tip = ref(null);
 </template>
 
 <style scoped>
-.nv { position: relative; height: 100%; display: grid; grid-template-rows: auto auto 1fr; color: var(--paper-200); font-family: var(--f-sans); }
+.nv { position: relative; height: 100%; display: grid; grid-template-rows: auto 1fr; color: var(--paper-200); font-family: var(--f-sans); }
 .nv-bar {
   grid-row: 1;
   display: flex; align-items: center; gap: var(--sp-2);
@@ -105,8 +105,9 @@ const tip = ref(null);
   background: var(--panel-solid); border: 1px solid rgba(185, 154, 96, 0.45); border-radius: var(--radius-sm);
   z-index: 2;
 }
-.nv-banner { grid-row: 2; padding: var(--sp-1) var(--sp-5); color: var(--paper-50); font-size: var(--text-xs); letter-spacing: 0.1em; background: rgba(124, 32, 38, 0.85); }
-.nv-stage { grid-row: 3; position: relative; background: linear-gradient(rgba(5, 6, 8, 0.55), rgba(5, 6, 8, 0.8)), url(/art/showcase/sample-guild.webp) center / cover; overflow: hidden; }
+/* The banner overlays the stage so toggling possession never moves the scene. */
+.nv-banner { position: absolute; top: calc(48px * var(--ui-scale)); left: 0; right: 0; z-index: 1; padding: var(--sp-1) var(--sp-5); color: var(--paper-50); font-size: var(--text-xs); letter-spacing: 0.1em; background: rgba(124, 32, 38, 0.85); }
+.nv-stage { grid-row: 2; position: relative; background: linear-gradient(rgba(5, 6, 8, 0.55), rgba(5, 6, 8, 0.8)), url(/art/showcase/sample-guild.webp) center / cover; overflow: hidden; }
 .nv-figure { position: absolute; left: 8%; bottom: 0; height: 88%; opacity: 0.85; }
 .nv-lineup { position: absolute; right: var(--sp-8); bottom: var(--sp-8); display: flex; gap: var(--sp-3); }
 .nv-mate { display: grid; justify-items: center; gap: 2px; color: var(--paper-300); font-size: var(--text-xs); background: transparent; border: 0; cursor: pointer; }
