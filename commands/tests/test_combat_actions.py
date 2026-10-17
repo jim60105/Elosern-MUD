@@ -838,14 +838,20 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         self.assertEqual(record.rounds_elapsed, 2)
         self.assertEqual(record.draft_entries, {})
         self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 0)
-        # The confirmed exit is the party-scoped retreat prompt's own token;
-        # the party is faster than its pursuer, so the contest succeeds.
+        # The confirmed exit is the party-scoped retreat prompt's own token.
+        # The contest compares the SLOWEST able ally's adjusted agility, so the
+        # companion's own value is what decides it; the roll is pinned exactly
+        # like the sibling retreat tests so the outcome is deterministic.
         self.char1.traits.agility.base = 500
+        self.companion.traits.agility.base = 500
         self.monster.traits.agility.base = 0
         prompt = self._run(CmdCombatRetreat, "")
         self.assertIn("combat retreat confirm", prompt)
         token = re.search(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})", prompt).group(1)
-        self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
+        from unittest.mock import patch
+
+        with patch("world.rules.disengage.roll_d100", return_value=100):
+            self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
         self.assertIsNone(self.char1.db.active_combat)
 
     @covers_requirement(
@@ -898,9 +904,13 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         mp_before = self.companion.traits.mp.current
 
         # The pursuer is far faster: the contested retreat fails
-        # deterministically, running the ordinary enemy round once.
+        # deterministically, running the ordinary enemy round once. The
+        # enemy's own attack is set above zero so that round's one execution
+        # is observable as damage, never inferred from the round counter.
         self.char1.traits.agility.base = 0
         self.monster.traits.agility.base = 500
+        self.monster.traits.atk_phys.base = 50
+        party_hp_before = self.char1.traits.hp.current + self.companion.traits.hp.current
         prompt = self._run(CmdCombatRetreat, "")
         self.assertIn("撤退", prompt)
         token = re.search(r"confirm ([A-Z0-9]+-[0-9]+-[0-9A-F]{20})", prompt).group(1)
@@ -911,6 +921,11 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(current.session_id)
         self.assertEqual((current.rounds_elapsed, current.round_revision), (1, 1))
         self.assertEqual(current.draft_entries, {}, "the whole saved draft was discarded")
+        self.assertLess(
+            self.char1.traits.hp.current + self.companion.traits.hp.current,
+            party_hp_before,
+            "the failed retreat ran exactly one enemy round with its own upkeep",
+        )
         # The discarded command never executed: no item, no MP spent.
         self.assertEqual(self.companion.db.inventory.count("t_ember_spray"), 1)
         self.assertEqual(self.companion.traits.mp.current, mp_before)

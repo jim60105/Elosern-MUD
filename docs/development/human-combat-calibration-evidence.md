@@ -389,9 +389,10 @@ re-measures nothing.
   entries, draft version and round revision, and reconnect re-sends no command.
 - `PartyAcceptanceBrowserTest.test_cancelled_exit_keeps_the_whole_draft_and_a_committed_exit_settles_once`:
   cancelling the retreat prompt preserves the whole saved draft, the round revision
-  and the clock; the confirmed surrender emits exactly one `combat.exit_confirm`,
-  settles once, and the accepted token replayed through the real transport is
-  rejected with no second settlement.
+  and the clock; the confirmed surrender emits exactly one `combat.exit_confirm`
+  and settles once. Replaying the accepted token through the real transport is
+  answered as an idempotent `already_committed` success (no error), which settles
+  nothing a second time — the clock and the settled session are unchanged.
 - `FullTextPartyRoundTests.test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft`
   (`commands/tests/test_combat_actions.py`): the text transcript proves the
   companion's menu/target parity with the committed panel (its own skill and item,
@@ -404,13 +405,21 @@ re-measures nothing.
 
 ### Batch evidence owned elsewhere
 
-- Failed-retreat enemy action and upkeep, the no-able-ally defeat branch, terminal
-  time settling once and carried party members: `world.rules.tests.test_combat_party`
-  (for example
-  `test_a_failed_retreat_consumes_every_opportunity_and_runs_one_enemy_round`,
+- Failed-retreat enemy action and upkeep at the assembled command layer:
+  `FullTextPartyRoundTests.test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft`
+  (above) asserts the one enemy round's own damage; the durable branch semantics
+  (no-able-ally defeat, terminal time settling once) are
+  `world.rules.tests.test_combat_party`
+  (`test_a_failed_retreat_consumes_every_opportunity_and_runs_one_enemy_round`,
   `test_a_failed_retreat_the_enemy_round_decides_settles_terminal_once`,
   `test_no_able_allied_member_takes_the_ordinary_defeat_path`) and
   `world.rules.tests.test_confirmed_surrender`.
+- A carried downed companion on a successful retreat:
+  `world.rules.tests.test_combat_party.test_a_success_carries_the_knocked_out_companion_and_settles_one_round_once`.
+- Hostile and examination consequences of a party exit: the examination
+  sessions' own settlement suites (`world.rules.tests.test_church_combat_ministry`
+  and the defeat-aftermath suites); a guild-examination retreat is recorded as a
+  FAIL by that owner, and this change adds no second policy.
 - Hostile/exam consequences and aftermath: the defeat-aftermath and exam-restriction
   suites referenced by the encounter calibration section above.
 - Selected real weapon factors and encounter cells: the equipment-growth and

@@ -318,6 +318,7 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             [[str(companion)]],
             "the SELF position is the commanded companion, never the controlled figure",
         )
+        time_before_round = store_state(page)["serverTime"]
         commands_before = self._commands_sent(page)
         self._press(page, "Enter")
         self._wait_unlocked(page)
@@ -362,6 +363,25 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         entries = [e for e in self._panel(page)["draft"]["entries"] if e["actor_id"] == companion]
         self.assertEqual(len(entries), 1, "the replacement keeps exactly one entry")
         self.assertEqual(entries[0]["command"]["kind"], "item")
+        # A replacement executes nothing: no round, no revision, no time, and
+        # the companion's stock is still untouched until the final member
+        # confirms the complete round. A committed command republishes the
+        # panel with the commander as the commanded actor, so the companion's
+        # own stock is read back through the read-only switch.
+        self._switch_actor(page, companion)
+        after_replace = self._panel(page)
+        self.assertEqual(after_replace["session"]["round"], 0, "the replacement ran no round")
+        self.assertEqual(after_replace["session"]["round_revision"], 0)
+        self.assertEqual(store_state(page)["serverTime"], time_before_round)
+        self.assertEqual(
+            next(
+                item["quantity"]
+                for item in after_replace["choices"]["items"]
+                if item["item_key"] == COMPANION_ITEM_KEY
+            ),
+            quantity_before,
+            "the replacement consumed nothing",
+        )
 
         # -- the commander's command completes the round --------------------
         self._switch_actor(page, player)
@@ -379,6 +399,22 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         resolved = self._panel(page)
         self.assertEqual(resolved["draft"]["entries"], [], "the resolved round leaves a fresh draft")
         self.assertEqual(set(resolved["draft"]["needs_selection_ids"]), set(party))
+        commander_hp = next(
+            p["hp_current"] for p in resolved["participants"] if int(p["identity"]) == player
+        )
+        companion_hp = next(
+            p["hp_current"] for p in resolved["participants"] if int(p["identity"]) == companion
+        )
+        self.assertEqual(
+            companion_hp,
+            next(
+                p["hp_maximum"]
+                for p in resolved["participants"]
+                if int(p["identity"]) == companion
+            ),
+            "the companion's own item healed the companion, its own actor",
+        )
+        self.assertLess(commander_hp, panel["participants"][0]["hp_maximum"] + 1)
         # The resolved panel returns the commander as the commanded actor; the
         # companion's own stock is read back through the read-only switch.
         self._switch_actor(page, companion)
@@ -409,6 +445,16 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             ),
             timeout=20000,
         )
+        cast_entry = next(
+            entry
+            for entry in self._panel(page)["draft"]["entries"]
+            if entry["actor_id"] == companion
+        )
+        self.assertEqual(
+            cast_entry["command"],
+            {"kind": "skill", "payload": {"scale": 1, "skill_key": COMPANION_SKILL_KEY}},
+            "the completed round carries the companion's own SELF skill verbatim",
+        )
         self._switch_actor(page, player)
         self._commit_player_attack(page, foes)
         self._wait_unlocked(page)
@@ -421,6 +467,20 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             timeout=30000,
         )
         self._wait_beat_settled(page)
+        second_round = self._panel(page)
+        companion_after = next(
+            p for p in second_round["participants"] if int(p["identity"]) == companion
+        )
+        self.assertTrue(
+            companion_after["conditions"],
+            "the companion's executed SELF skill left its own applied effect",
+        )
+        # The actor-local accounting is observable as the companion's own
+        # stock (round one) and its own applied effect (round two); the
+        # commander's HP movement here is the enemy's ordinary round, which is
+        # not this journey's subject.
+        self.assertTrue(commander_hp > 0)
+        self._wait_beat_settled(page)
 
         # -- the existing centred-card/target/warning contracts hold at the
         #    second accepted viewport as well --------------------------------
@@ -429,6 +489,21 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             {"width": ACCEPTANCE_VIEWPORTS[1][0], "height": ACCEPTANCE_VIEWPORTS[1][1]}
         )
         page.wait_for_timeout(200)
+
+        # The stage-target contract is exercised at the second viewport too:
+        # the companion's SELF step still stands on the companion's own figure.
+        self._switch_actor(page, companion)
+        self._open_skill_frame(page, COMPANION_SKILL_KEY)
+        stage_wide = store_state(page)["stageTarget"]
+        self.assertEqual(stage_wide["form"], "self")
+        self.assertEqual(
+            [position["identities"] for position in stage_wide["positions"]],
+            [[str(companion)]],
+            "the companion SELF figure holds at the second accepted viewport",
+        )
+        self._press(page, "Escape")
+        self._root(page)
+
         box = page.locator("#action-dock").bounding_box()
         viewport = page.viewport_size
         self.assertLessEqual(
