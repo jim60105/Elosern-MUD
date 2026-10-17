@@ -34,7 +34,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **16 of 31**.
+Declared implementation order: **17 of 32**.
 
 - depends-on: character-panel-v8-viewed-member
 - depends-on: party-practice-booking
