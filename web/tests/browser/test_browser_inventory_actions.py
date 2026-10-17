@@ -11,8 +11,10 @@ of the enabled equipment row dispatches exactly one ``inventory.toggle_equip``
 immediately, and the pointer affordance emits the identical envelope through
 the same gates. Cancel, Escape, and an abnormal transport close all retire
 the dialog without dispatching anything. In combat, the dock's frameless
-背包 row opens the same drawer without inventing an action, and a
-keyboard-confirmed potion use there dispatches exactly one ``inventory.use``.
+背包 row opens the same drawer without inventing an action, and a potion
+chosen through it yields to the commanded member's own item review step: that
+one ``combat.command`` item draft, completed by the next member's own command,
+is the single potion settlement — never an actorless ``inventory.use``.
 """
 
 from __future__ import annotations
@@ -340,7 +342,7 @@ class InventoryActionJourneys(_ItemActionBase, ServicesBrowserTest):
 
 
 class CombatBagDrawerJourney(_ItemActionBase, ServicesBrowserTest):
-    """The combat dock's frameless 背包 row and a keyboard-confirmed combat use."""
+    """The combat dock's frameless 背包 row and one actor-commanded combat use."""
 
     SERVICES_MODE = "inventory_actions"
 
@@ -353,6 +355,75 @@ class CombatBagDrawerJourney(_ItemActionBase, ServicesBrowserTest):
                 return
             page.wait_for_timeout(250)
         raise AssertionError("combat mode never became available")
+
+    def _panel(self, page) -> dict:
+        return store_state(page)["panels"]["context_actions"]
+
+    def _focus_ring_row(self, page, key: str, limit: int = 20) -> None:
+        """Walk the mounted single-column ring (Down wraps) until ``key`` holds focus."""
+        for _ in range(limit):
+            if (store_state_or_none(page) or {}).get("focus", {}).get("key") == key:
+                return
+            _press(page, "ArrowDown")
+
+    def _foe_identity(self, page) -> int:
+        for participant in self._panel(page)["participants"]:
+            if participant["team"] == "foes" and participant["state"] == "active":
+                return int(participant["identity"])
+        raise AssertionError("no active foe")
+
+    def _wait_beat_settled(self, page, timeout: int = 60000) -> None:
+        """Wait until the resolved round's playback finished and the card is ready."""
+        page.wait_for_timeout(600)
+        wait_for_store_state(
+            page,
+            lambda s: (
+                s.get("beatPlayback") is None
+                or (s.get("beatPlayback") or {}).get("phase") == "done"
+            )
+            and not s.get("beatHold")
+            and not (s.get("dispatch") or {}).get("beatLocked")
+            and s.get("combatProgress") is not None,
+            timeout=timeout,
+        )
+
+    def _settle_round_with_companion_attack(self, page) -> None:
+        """Complete the round by commanding the next member's basic attack.
+
+        The v7 party contract saves each member's command as one draft entry
+        and runs the round only when every required member has one, so the
+        accepted panel republishes for the next member needing selection and
+        that member's own command list answers the root. The frame the
+        previous member left open stays mounted (re-resolved from the accepted
+        panel), so the walk starts by returning to the root.
+        """
+        wait_for_store_state(
+            page,
+            lambda s: not (s.get("dispatch") or {}).get("inFlight"),
+            timeout=30000,
+        )
+        for _ in range(3):
+            if (store_state_or_none(page) or {}).get("dockSource") == "combat.root":
+                break
+            _press(page, "Escape")
+        self.assertEqual(
+            (store_state_or_none(page) or {}).get("dockSource"), "combat.root"
+        )
+        foe = self._foe_identity(page)
+        self._focus_ring_row(page, "attack")
+        _press(page, "Enter")
+        self._focus_ring_row(page, f"target-{foe}")
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("context_actions") or {}).get("session")
+                or {}
+            ).get("round", 0)
+            >= 1,
+            timeout=30000,
+        )
+        self._wait_beat_settled(page)
 
     @covers_requirement(
         "inventory-item-actions::inventory-tiles-confirm-use-and-directly-toggle-equipment"
@@ -373,13 +444,12 @@ class CombatBagDrawerJourney(_ItemActionBase, ServicesBrowserTest):
         # Walk the vertical root command list (webclient-combat-command-window:
         # Up/Down wraps the ring, Left/Right inert) until the client-local
         # 背包 row is focused.
-        focused_key = None
-        for _ in range(12):
-            focused_key = (store_state_or_none(page) or {}).get("focus", {}).get("key")
-            if focused_key == "bag":
-                break
-            _press(page, "ArrowDown")
-        self.assertEqual(focused_key, "bag", "the combat dock exposes the 背包 row")
+        self._focus_ring_row(page, "bag", limit=12)
+        self.assertEqual(
+            (store_state_or_none(page) or {}).get("focus", {}).get("key"),
+            "bag",
+            "the combat dock exposes the 背包 row",
+        )
 
         _press(page, "Enter")
         wait_for_store_state(
@@ -398,15 +468,68 @@ class CombatBagDrawerJourney(_ItemActionBase, ServicesBrowserTest):
         self.assertEqual(sent_action_count(page), 0)
         self.assertEqual(store_state(page).get("dockDepth"), 1)
 
-        # Combat item use through the same frameless surface: keyboard
-        # activation opens the confirmation and the keyboard confirm
-        # dispatches exactly one inventory.use.
-        self._keyboard_activate_tile(page, bag_action_fixture_values()["potion_key"])
-        self.assertEqual(self._dialog_count(page), 1)
-        self._keyboard_confirm_dialog(page)
-        self.assertEqual(sent_action_count(page, "inventory.use"), 1)
-        self._wait_row(
+        # Combat item use belongs to the commanded member
+        # (inventory-item-actions: Combat use belongs to the commanded member):
+        # the tile activation yields the drawer to the card's own item
+        # review step — the same frame the 道具 root row opens — and the
+        # actorless `inventory.use` is never dispatched, so the drawer opens
+        # no local confirmation there.
+        potion = bag_action_fixture_values()["potion_key"]
+        self._keyboard_activate_tile(page, potion)
+        wait_for_store_state(
             page,
-            bag_action_fixture_values()["potion_key"],
-            lambda row: row["held"] == 1,
+            lambda s: s.get("hudDrawer") is None
+            and s.get("dockSource") == "combat.item"
+            and s.get("dockDepth") == 2,
+            dom_readiness={
+                # The pushed frame is the item's own review/target step (its
+                # row is `self-confirm` / `none-confirm` / `target-<id>`), so
+                # the readiness gate is that step's mounted row region.
+                "selector": '#action-dock [data-testid="dock-menu"] [data-item-key]',
+                "predicate": (
+                    "() => !!document.querySelector("
+                    "'#action-dock [data-testid=\"dock-menu\"] [data-item-key]')"
+                ),
+                "description": "the card's own item step mounted",
+            },
+            timeout=30000,
         )
+        self.assertEqual(
+            self._dialog_count(page), 0, "combat use opens no drawer-local confirmation"
+        )
+        self.assertEqual(sent_action_count(page, "inventory.use"), 0)
+
+        # The SELF item's own review row is the confirmation: exactly one
+        # guarded `combat.command` item draft, and nothing else.
+        _press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: any(
+                entry["command"].get("kind") == "item"
+                for entry in (
+                    (((s.get("panels") or {}).get("context_actions") or {}).get("draft"))
+                    or {}
+                ).get("entries", [])
+            ),
+            timeout=30000,
+        )
+        item_commands = [
+            args[0]
+            for cmd, args, _kwargs in page.evaluate("window.__elosernSent || []")
+            if cmd == "ui_action"
+            and args
+            and args[0].get("action_id") == "combat.command"
+            and args[0]["payload"]["command"]["kind"] == "item"
+        ]
+        self.assertEqual(len(item_commands), 1, item_commands)
+        self.assertEqual(
+            item_commands[0]["payload"]["command"]["payload"], {"item_key": potion}
+        )
+        self.assertEqual(sent_action_count(page, "inventory.use"), 0)
+
+        # One settlement: the draft executes nothing by itself, so the round is
+        # completed with the next member's own attack, and that single
+        # resolution consumes exactly one potion.
+        self._settle_round_with_companion_attack(page)
+        self._wait_row(page, potion, lambda row: row["held"] == 1)
+        self.assertEqual(sent_action_count(page, "inventory.use"), 0)

@@ -364,6 +364,19 @@ def main() -> None:
             # choice (the preflight refuses a full-HP heal).
             companion.traits.hp.current = max(1, int(companion.traits.hp.max) - 40)
             companion.save()
+            # The seeded foe resolves the low tier's authored ``instinctive``
+            # profile (world/rules/rulebook/monster_behaviour.yaml): one
+            # single-target skill at the UNIQUE lowest-HP enemy, never AREA,
+            # and a sole candidate consumes no tie-break die. Wounding the
+            # commander just below the companion therefore pins the foe's
+            # target to the commander, so the companion's own item round takes
+            # no enemy damage and the assembled journey can assert the item's
+            # exact committed heal rather than a direction. The foe still
+            # acts: it strikes the commander.
+            character.traits.hp.current = max(
+                1, min(int(character.traits.hp.max), int(companion.traits.hp.current) - 5)
+            )
+            character.save()
             # The kit companion's own active is a SINGLE-shape row; the
             # assembled SELF journey needs one actor-local SELF skill of the
             # companion's own, so grant the kit's SELF buff through the same

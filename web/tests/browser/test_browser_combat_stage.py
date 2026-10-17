@@ -478,6 +478,23 @@ def _stage_panels(count: int = 3, companions: int = 3, **kwargs) -> dict:
     return panels
 
 
+def _command_envelope(command: dict) -> dict:
+    """The guarded v7 ``combat.command`` payload of the stage fixture panel.
+
+    The shipped envelope (``CombatMenu.commandEnvelope``): the committed
+    session, round revision and draft version, the commanded actor, and the
+    closed ``{kind, payload}`` command union member.
+    """
+    panel = _combat_panel()
+    return {
+        "session_id": panel["session"]["session_id"],
+        "round_revision": panel["session"]["round_revision"],
+        "draft_version": panel["draft"]["draft_version"],
+        "actor_id": panel["choices"]["actor_id"],
+        "command": command,
+    }
+
+
 class CombatStageBrowserTest(BrowserAcceptanceTest):
     """The combat stage: the foe line-up and the shared-scale formation."""
 
@@ -1111,7 +1128,13 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         return page.evaluate(_READ_STEP)
 
     def _sent(self, page) -> list:
-        return page.evaluate("() => (window.__stpSent || []).map((e) => e.payload)")
+        """The outbound envelopes as ``[action_id, payload]`` pairs, in send order.
+
+        ``payload`` is the guarded v7 ``combat.command`` payload
+        (``CombatMenu.commandEnvelope``). The per-send ``request_id`` is
+        deliberately excluded, so two identical submissions compare equal.
+        """
+        return page.evaluate("() => (window.__stpSent || []).map((e) => [e.action_id, e.payload])")
 
     def _wait_released(self, page) -> None:
         wait_for_store_state(page, lambda st: st["dispatch"]["inFlight"] is None)
@@ -1139,6 +1162,13 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         for viewport in FORMATION_VIEWPORTS:
             with self.subTest(viewport=viewport):
                 size = "%dx%d" % viewport
+                # A real pointer must be clear of the stage before the step
+                # opens: a hover over a figure legitimately focuses that
+                # figure's target (the pointer claims the same positions the
+                # arrows do), and the previous iteration's click leaves the
+                # mouse over a stage figure across the resize, so the new
+                # step's hit areas would appear under it.
+                page.mouse.move(2, 2)
                 self._resize(page, viewport)
                 self._commit(page, "combat", _stage_panels())
                 self._wait(page, "s.party.length === 4 && s.rows.length === 1 && s.rows[0].slots.length === 3")
@@ -1196,7 +1226,16 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 page.wait_for_function("() => window.__stpSent.length === 2", timeout=5000)
                 sent = self._sent(page)
                 self.assertEqual(sent[0], sent[1], size)
-                self.assertEqual(sent[0], {"skill_key": BASIC_ATTACK_KEY, "target_ids": [int(identity)]}, size)
+                self.assertEqual(
+                    sent[0],
+                    [
+                        "combat.command",
+                        _command_envelope(
+                            {"kind": "skill", "payload": {"skill_key": BASIC_ATTACK_KEY, "target_ids": [int(identity)]}}
+                        ),
+                    ],
+                    size,
+                )
                 self._wait_released(page)
                 # Escape restores every figure and removes every marker.
                 self._open_step(page, BASIC_ATTACK_KEY)
@@ -1231,7 +1270,16 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
                 self.assertEqual(page.evaluate(_READ_STEP)["focus"], "shorthand-all-allies", size)
                 page.locator('[data-testid="target-prompt-chip"][data-key="area-confirm"]').click()
                 page.wait_for_function("() => window.__stpSent.length === 3", timeout=5000)
-                self.assertEqual(self._sent(page)[2], {"skill_key": "t_storm", "target_shorthand": "all-allies"}, size)
+                self.assertEqual(
+                    self._sent(page)[2],
+                    [
+                        "combat.command",
+                        _command_envelope(
+                            {"kind": "skill", "payload": {"skill_key": "t_storm", "target_shorthand": "all-allies"}}
+                        ),
+                    ],
+                    size,
+                )
                 self._wait_released(page)
                 page.evaluate("() => { window.__stpSent.length = 0; }")
         page.close()
@@ -1319,7 +1367,15 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
         question.wait_for(state="detached", timeout=5000)
         page.wait_for_function("() => document.activeElement && document.activeElement.id === 'action-dock'", timeout=5000)
-        self.assertEqual(self._sent(page), [{"skill_key": BASIC_ATTACK_KEY, "target_ids": [101]}])
+        self.assertEqual(
+            self._sent(page),
+            [
+                [
+                    "combat.command",
+                    _command_envelope({"kind": "skill", "payload": {"skill_key": BASIC_ATTACK_KEY, "target_ids": [101]}}),
+                ]
+            ],
+        )
         self._wait_released(page)
 
         # Attack on a foe is sent at once.
@@ -1327,7 +1383,13 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         self.assertTrue(page.evaluate("() => window.__elosernBridge.store.focusItemByKey('target-11')"))
         page.keyboard.press("Enter")
         page.wait_for_function("() => window.__stpSent.length === 2", timeout=5000)
-        self.assertEqual(self._sent(page)[1], {"skill_key": BASIC_ATTACK_KEY, "target_ids": [11]})
+        self.assertEqual(
+            self._sent(page)[1],
+            [
+                "combat.command",
+                _command_envelope({"kind": "skill", "payload": {"skill_key": BASIC_ATTACK_KEY, "target_ids": [11]}}),
+            ],
+        )
         self.assertEqual(question.count(), 0)
         page.close()
 
@@ -1412,7 +1474,15 @@ class CombatStageBrowserTest(BrowserAcceptanceTest):
         page.evaluate("() => window.__elosernBridge.store.focusItemByKey('area-confirm')")
         page.keyboard.press("Enter")
         page.wait_for_function("() => window.__stpSent.length === 1", timeout=5000)
-        self.assertEqual(self._sent(page)[0], {"skill_key": "t_storm", "target_shorthand": "all-allies"})
+        self.assertEqual(
+            self._sent(page)[0],
+            [
+                "combat.command",
+                _command_envelope(
+                    {"kind": "skill", "payload": {"skill_key": "t_storm", "target_shorthand": "all-allies"}}
+                ),
+            ],
+        )
         self._wait_released(page)
         # Reduced: the focused figure's ring is static and its marker underlined.
         page.evaluate("() => window.__elosernBridge.store.setMotionLevel('reduced')")

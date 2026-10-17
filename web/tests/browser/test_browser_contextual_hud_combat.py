@@ -28,6 +28,31 @@ from ._journey_support import (
 )
 
 
+# Swallows the read-only party-exit prompt request of a FIXTURE combat panel.
+# The committed session is not a live one, so the server would answer the very
+# same request id with its own refusal of the fixture's session/revision (the
+# observed answer is a non-success `stale` result); the store's pending-prompt
+# correlation consumes that answer rather than the server-shaped
+# `party_exit_prompt` result this journey commits (stores/elosern/frames.js
+# `consumePendingPartyExit`), and the card would stay closed. Installed BEFORE
+# ``install_outbound_recorder``, so the recorder wraps this wrapper: the one
+# read-only `combat.exit_prompt` is still recorded (and asserted) while it
+# never reaches the server. The live-server path is the assembled acceptance
+# journey's subject, not this fixture journey's.
+_SWALLOW_FIXTURE_EXIT_PROMPT = """() => {
+  if (window.__partyExitPromptSwallow) { return; }
+  window.__partyExitPromptSwallow = true;
+  const original = Evennia.msg.bind(Evennia);
+  Evennia.msg = function (cmdname, args, kwargs, callback) {
+    const envelope = (args || [])[0];
+    if (cmdname === 'ui_action' && envelope && envelope.action_id === 'combat.exit_prompt') {
+      return undefined;
+    }
+    return original(cmdname, args, kwargs, callback);
+  };
+}"""
+
+
 class ContextualHudBrowserTest(BrowserAcceptanceTest):
     """Contextual HUD action-dock behavior on the shared managed server."""
     @covers_requirement(
@@ -220,6 +245,7 @@ class ContextualHudBrowserTest(BrowserAcceptanceTest):
     def test_destructive_combat_confirmation_two_step_panel(self):
         """Opening Surrender renders the explicit two-step confirmation card."""
         page = self.logged_in_page()
+        page.evaluate(_SWALLOW_FIXTURE_EXIT_PROMPT)
         install_outbound_recorder(page)
         _inject_snapshot(page, {"context_actions": _combat_panel()}, mode="combat")
         _wait_mode(page, "combat")

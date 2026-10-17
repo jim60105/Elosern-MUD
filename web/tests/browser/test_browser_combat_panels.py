@@ -15,6 +15,7 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     wait_for_presentation_settled,
+    wait_for_store_state,
 )
 from .harness import ManagedServerTearDownMixin
 
@@ -104,6 +105,57 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def _focus_key(self, page):
         return store_state(page).get("focus", {}).get("key")
+
+    def _wait_beat_settled(self, page, timeout: int = 60000) -> None:
+        """Wait until the resolved round's playback finished and the card is ready."""
+        page.wait_for_timeout(600)
+        wait_for_store_state(
+            page,
+            lambda s: (
+                s.get("beatPlayback") is None
+                or (s.get("beatPlayback") or {}).get("phase") == "done"
+            )
+            and not s.get("beatHold")
+            and not (s.get("dispatch") or {}).get("beatLocked")
+            and s.get("combatProgress") is not None,
+            timeout=timeout,
+        )
+
+    def _settle_round_with_companion_attack(self, page) -> None:
+        """Complete the round by commanding the next member's basic attack.
+
+        The v7 party contract saves each member's command as one draft entry
+        and runs the round only when every required member has one, so the
+        accepted panel republishes for the next member needing selection and
+        that member's own command list answers the root. The frame the
+        previous member left open stays mounted (re-resolved from the accepted
+        panel), so the walk starts by returning to the root.
+        """
+        wait_for_store_state(
+            page,
+            lambda s: not (s.get("dispatch") or {}).get("inFlight"),
+            timeout=30000,
+        )
+        for _ in range(3):
+            if store_state(page).get("dockSource") == "combat.root":
+                break
+            self._press(page, "Escape")
+        self.assertEqual(store_state(page).get("dockSource"), "combat.root")
+        foe = self._basic_attack_target_identity(page)
+        self._walk_to(page, "attack")
+        self._press(page, "Enter")
+        self._walk_to(page, f"target-{foe}")
+        self._press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("context_actions") or {}).get("session")
+                or {}
+            ).get("round", 0)
+            >= 1,
+            timeout=30000,
+        )
+        self._wait_beat_settled(page)
 
     def _cell_grid(self, page) -> dict:
         """Map every listbox cell key to its (row, column) via the DOM rects.
@@ -323,6 +375,7 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             "return p && p.available === true && p.kind === 'combat' && b.router.depth() >= 1; }",
             timeout=30000,
         )
+        commanded = self._combat_panel(page)["choices"]["actor_id"]
         self._press(page, "Enter")  # attack (first root item) -> target menu
         # The synth preset arrives with a companion, so the target menu's
         # first row is not necessarily a foe — walk to the enemy row.
@@ -330,21 +383,35 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._press(page, "Enter")  # select the monster target
         actions = self._ui_actions(page)
         self.assertEqual(len(actions), 1, actions)
-        # The accepted panel advances the round; the keyboard model must be
-        # rebuilt from that panel, not the stale pre-round selection. The 30s
-        # budget matches the action-result waits: round settlement polling
-        # CPU-starves the same way on a loaded CI runner.
+        # The accepted panel is the v7 draft (webclient-party-command-
+        # selection): the command is saved and no round runs until every
+        # required member has one, so the panel republishes the next member
+        # needing selection as its commanded actor. The keyboard model must be
+        # rebuilt from that accepted panel, never from the stale pre-round
+        # selection, so the frame the previous actor left open re-resolves
+        # against the accepted panel and the root it returns to carries the
+        # newly commanded member's own committed rows. The 30s budget matches
+        # the action-result waits: round settlement polling CPU-starves the
+        # same way on a loaded CI runner.
+        root_keys = [
+            "attack", "skills", "items", "bag", "defend", "dodge",
+            "taunt", "retreat", "surrender",
+        ]
         deadline = time.monotonic() + 30
         while time.monotonic() < deadline:
-            panel = self._combat_panel(page)
-            if panel.get("available") and panel["session"]["round"] >= 1:
-                rebuilt = page.evaluate(
-                    "() => { const s = ((window.__elosernBridge && window.__elosernBridge.store.view) || null);"
-                    "const p = s && s.panels && s.panels['context_actions']; "
-                    "return p && p.available === true && p.kind === 'combat'; }"
+            state = store_state(page)
+            panel = (state.get("panels") or {}).get("context_actions") or {}
+            draft = panel.get("draft") or {}
+            if (
+                panel.get("available") is True
+                and panel.get("kind") == "combat"
+                and any(
+                    entry["actor_id"] == commanded
+                    for entry in draft.get("entries") or []
                 )
-                if rebuilt:
-                    break
+                and (panel.get("choices") or {}).get("actor_id") != commanded
+            ):
+                break
             page.wait_for_timeout(250)
         else:
             panel = self._combat_panel(page)
@@ -353,11 +420,43 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "keyboard menu was not rebuilt from the accepted panel: "
                 f"panel={panel!r} lastActionResult={result!r}"
             )
-        # The same publication carries the round's structured beats: the store
-        # commits them under `combat_beats` with that round's identity, and at
-        # least one roll beat names the monster's catalog key. Read them before
-        # any later action, because only the completing publication is
-        # available.
+        # Back at the rebuilt root: its rows are the newly commanded member's
+        # own committed list, so the 道具 row and every basic-action row mirror
+        # the accepted panel rather than the pre-round actor's.
+        self._press(page, "Escape")
+        rebuilt_state = store_state(page)
+        self.assertEqual(rebuilt_state.get("dockSource"), "combat.root")
+        self.assertEqual(rebuilt_state.get("dockDepth"), 1)
+        rebuilt_rows = page.evaluate(
+            "() => { const b = window.__elosernBridge;"
+            " const m = b && b.router && b.router.currentMenu();"
+            " return m ? m.items.map((i) => ({"
+            " key: i.key, enabled: i.enabled !== false })) : null; }"
+        )
+        rebuilt_by_key = {row["key"]: row for row in rebuilt_rows or []}
+        self.assertEqual([row["key"] for row in rebuilt_rows or []], root_keys)
+        accepted = self._combat_panel(page)
+        self.assertEqual(
+            rebuilt_by_key["items"]["enabled"],
+            bool(accepted["choices"]["items"]),
+            "the rebuilt 道具 row mirrors the accepted panel's commanded member",
+        )
+        # "tactics" is a shipped-data token; resolve the key from the panel's
+        # own shape so this test does not hard-code a harvested universe token.
+        _tactics_key = [k for k in accepted["choices"] if k not in ("actor_id", "skills", "items")][0]
+        for tactic in accepted["choices"][_tactics_key]:
+            self.assertEqual(
+                rebuilt_by_key[tactic["key"]]["enabled"],
+                tactic["enabled"],
+                "the rebuilt basic-action row mirrors the accepted panel",
+            )
+        # The next member's command completes the round; the same publication
+        # carries the round's structured beats, which the store commits under
+        # `combat_beats` with that round's identity — at least one roll beat
+        # names the monster's catalog key. Read them before any later action,
+        # because only the completing publication is available.
+        self._settle_round_with_companion_attack(page)
+        panel = self._combat_panel(page)
         beats = page.evaluate(
             "() => { const s = window.__elosernBridge && window.__elosernBridge.store.view;"
             "return (s && s.panels && s.panels['combat_beats']) || null; }"
@@ -374,7 +473,15 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             foe_ref,
             [beat["target"] for beat in beats["beats"] if beat["kind"] == "roll"],
         )
-        # The rebuilt root lets another action submit from fresh data.
+        # The rebuilt root lets another action submit from fresh data: leave
+        # the frame the resolved round left mounted, then run the attack flow
+        # again from the resolved panel.
+        for _ in range(3):
+            if store_state(page).get("dockSource") == "combat.root":
+                break
+            self._press(page, "Escape")
+        self.assertEqual(store_state(page).get("dockSource"), "combat.root")
+        self._walk_to(page, "attack")
         self._press(page, "Enter")  # attack again
         self._walk_to(page, f"target-{self._basic_attack_target_identity(page)}")
         self._press(page, "Enter")  # select the monster target
@@ -430,18 +537,45 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self._press(page, "ArrowDown")  # wind group (index 1)
         self._press(page, "Enter")  # skill frame (wind_blade)
         self.assertTrue(page.locator(".dock-menu").is_visible())
-        # Disabled root rows (`items` / `defend`) are dimmed, focusable, and
-        # marked disabled at the combat root. Pop back to the root and check
-        # the disabled `items` row.
+        # Pop back to the root: the 道具 root row is enabled whenever the
+        # commanded actor holds any item choice (webclient-party-items-tactics),
+        # so the disabled entry to check is the actor's own refused item row —
+        # dimmed, focusable, marked disabled, and explaining itself through the
+        # card's detail strip.
         self._press(page, "Escape")
         self._press(page, "Escape")
         self._press(page, "Escape")  # back at the root, focus on its opener (skills)
         self.assertEqual(store_state(page)["focus"]["key"], "skills")
-        self._press(page, "ArrowDown")  # items (disabled)
-        disabled_row = page.locator('#action-dock [data-item-key="items"]')
-        self.assertEqual(disabled_row.get_attribute("aria-disabled"), "true", "the `items` row is disabled")
+        combat_panel = self._combat_panel(page)
+        disabled_items = [
+            item for item in combat_panel["choices"]["items"] if not item["enabled"]
+        ]
+        self.assertTrue(
+            disabled_items, "the seeded healing row is refused at full HP"
+        )
+        self._press(page, "ArrowDown")  # items (enabled: the actor holds stock)
+        self._press(page, "Enter")  # 道具 frame: the actor's own stock
+        disabled_key = f"item-{disabled_items[0]['item_key']}"
+        self._walk_to(page, disabled_key)
+        disabled_row = page.locator(
+            f'#action-dock [data-item-key="{disabled_key}"]'
+        )
+        self.assertEqual(
+            disabled_row.get_attribute("aria-disabled"),
+            "true",
+            "the disabled item row is disabled",
+        )
         self.assertEqual(disabled_row.get_attribute("tabindex"), "-1")
-        self.assertEqual(store_state(page)["focus"]["key"], "items", "the disabled row keeps focus")
+        self.assertEqual(
+            store_state(page)["focus"]["key"],
+            disabled_key,
+            "the disabled row keeps focus",
+        )
+        self.assertIn(
+            disabled_items[0]["reason"]["message"],
+            page.locator('[data-testid="combat-detail"]').inner_text(),
+            "the disabled entry states its committed reason",
+        )
         self.assertEqual(
             page.locator("#action-dock").evaluate("el => el.scrollWidth <= el.clientWidth"),
             True,

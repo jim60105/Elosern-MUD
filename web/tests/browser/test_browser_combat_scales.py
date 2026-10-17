@@ -14,6 +14,7 @@ from .browser_helpers import (
     sent_action_count,
     store_state,
     wait_for_presentation_settled,
+    wait_for_store_state,
 )
 from .harness import ManagedServerTearDownMixin
 
@@ -96,6 +97,56 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
 
     def _focus_key(self, page):
         return store_state(page).get("focus", {}).get("key")
+
+    def _wait_beat_settled(self, page, timeout: int = 60000) -> None:
+        """Wait until the resolved round's playback finished and the card is ready."""
+        page.wait_for_timeout(600)
+        wait_for_store_state(
+            page,
+            lambda s: (
+                s.get("beatPlayback") is None
+                or (s.get("beatPlayback") or {}).get("phase") == "done"
+            )
+            and not s.get("beatHold")
+            and not (s.get("dispatch") or {}).get("beatLocked")
+            and s.get("combatProgress") is not None,
+            timeout=timeout,
+        )
+
+    def _settle_round_with_companion_attack(self, page, foe_id: int) -> None:
+        """Complete the round by commanding the next member's basic attack.
+
+        The v7 party contract saves each member's command as one draft entry
+        and runs the round only when every required member has one, so the
+        accepted panel republishes for the next member needing selection and
+        that member's own command list answers the root. The frame the
+        previous member left open stays mounted (re-resolved from the accepted
+        panel), so the walk starts by returning to the root.
+        """
+        wait_for_store_state(
+            page,
+            lambda s: not (s.get("dispatch") or {}).get("inFlight"),
+            timeout=30000,
+        )
+        for _ in range(3):
+            if store_state(page).get("dockSource") == "combat.root":
+                break
+            self._press(page, "Escape")
+        self.assertEqual(store_state(page).get("dockSource"), "combat.root")
+        self._walk_to(page, "attack")
+        self._press(page, "Enter")
+        self._walk_to(page, f"target-{foe_id}")
+        self._press(page, "Enter")
+        wait_for_store_state(
+            page,
+            lambda s: (
+                ((s.get("panels") or {}).get("context_actions") or {}).get("session")
+                or {}
+            ).get("round", 0)
+            >= 1,
+            timeout=30000,
+        )
+        self._wait_beat_settled(page)
 
     def _cell_grid(self, page) -> dict:
         """Map every listbox cell key to its (row, column) via the DOM rects.
@@ -317,16 +368,41 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
                 "the focused skill row uses the gold border",
             )
             # Disabled cells are dimmed (dimmer border + dimmer text) but
-            # still focusable for their explanation. Pop back to the combat root
-            # (three Escapes: skill -> group -> category -> root) and focus the
-            # disabled `items` root row.
+            # still focusable for their explanation. Pop back to the combat
+            # root (three Escapes: skill -> group -> category -> root): the
+            # 道具 root row is enabled whenever the commanded actor holds any
+            # item choice (webclient-party-items-tactics), so the disabled
+            # entry is the actor's own refused item row inside that frame.
             self._press(page, "Escape")  # -> group frame
             self._press(page, "Escape")  # -> category frame
             self._press(page, "Escape")  # -> combat root, focus on its opener (skills)
-            self._press(page, "ArrowDown")  # items row (disabled)
-            disabled = page.locator('#action-dock [data-item-key="items"]')
-            self.assertEqual(disabled.get_attribute("aria-disabled"), "true", "disabled root row is disabled")
+            combat_panel = self._combat_panel(page)
+            disabled_items = [
+                item
+                for item in combat_panel["choices"]["items"]
+                if not item["enabled"]
+            ]
+            self.assertTrue(
+                disabled_items, "the seeded healing row is refused at full HP"
+            )
+            self._press(page, "ArrowDown")  # items (enabled: the actor holds stock)
+            self._press(page, "Enter")  # 道具 frame: the actor's own stock
+            disabled_key = f"item-{disabled_items[0]['item_key']}"
+            self._walk_to(page, disabled_key)
+            disabled = page.locator(
+                f'#action-dock [data-item-key="{disabled_key}"]'
+            )
+            self.assertEqual(
+                disabled.get_attribute("aria-disabled"),
+                "true",
+                "disabled item row is disabled",
+            )
             self.assertEqual(disabled.get_attribute("tabindex"), "-1")
+            self.assertIn(
+                disabled_items[0]["reason"]["message"],
+                page.locator('[data-testid="combat-detail"]').inner_text(),
+                "the disabled entry states its committed reason",
+            )
 
     @covers_requirement("webclient-combat-menu::combat-target-selection-sends-one-shape-per-targetspec")
     @covers_requirement("webclient-desktop-shell::keyboard-routing-is-menu-first-and-submission-safe")
@@ -440,6 +516,12 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         self.assertEqual(inner["skill_key"], ladder)
         self.assertEqual(inner["scale"], 2)
         self.assertEqual(inner["target_ids"], [target])
+        # The cast saves a draft entry only (webclient-party-command-
+        # selection): no cost is paid and no effect resolves until the round
+        # runs, which needs every required member's command. The panel
+        # republishes for the next member needing selection, so complete the
+        # round with that member's own basic attack before reading the pool.
+        self._settle_round_with_companion_attack(page, target)
         # The scaled cast deducts the ladder's base cost doubled (the status
         # panel reflects the true resource pool after the round).
         deadline = time.monotonic() + 15

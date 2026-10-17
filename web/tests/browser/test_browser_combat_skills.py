@@ -1,4 +1,4 @@
-"""Keyboard-only combat skill-shape and outcome journeys (webclient-combat-menu 5.2-5.5): NONE/SELF/AREA submissions, defend/flee seams, forfeit confirmation, and the terminal-outcome panel refresh.
+"""Keyboard-only combat skill-shape and outcome journeys (webclient-combat-menu 5.2-5.5): NONE/SELF/AREA submissions, disabled-entry seams, the party retreat/surrender confirmation, and the terminal-outcome panel refresh.
 """
 
 from __future__ import annotations
@@ -297,20 +297,47 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         page = self.logged_in_page()
         install_outbound_recorder(page)
         self._engage(page)
-        self._press(page, "ArrowDown")  # skills
-        self._press(page, "ArrowDown")  # items (disabled)
-        self._press(page, "Enter")
-        self._press(page, "ArrowDown")  # 背包 (the client-local drawer row)
-        self._press(page, "ArrowDown")  # defend (disabled)
-        page.wait_for_timeout(120)
+        panel = self._combat_panel(page)
+        # webclient-party-items-tactics: the 道具 root row is enabled whenever
+        # the commanded actor holds any item choice, and the entries
+        # themselves carry the committed enabled/reason pair. The disabled
+        # entry is therefore the actor's own refused item row (the seeded
+        # healing row is illegal at full HP), focused and explained in the
+        # card's detail strip. 防禦 stays an enabled root row: opening it
+        # pushes its confirm frame and still submits nothing.
+        disabled_items = [
+            item for item in panel["choices"]["items"] if not item["enabled"]
+        ]
+        self.assertTrue(
+            disabled_items, "the seeded healing row is refused at full HP"
+        )
+        disabled_item = disabled_items[0]
+        disabled_key = f"item-{disabled_item['item_key']}"
+        self._walk_to(page, "items")
+        self._press(page, "Enter")  # 道具: the commanded actor's own stock
+        self._walk_to(page, disabled_key)
         self.assertEqual(
             store_state(page).get("focus", {}).get("key"),
-            "defend",
-            "the disabled defend row is the focused root cell",
+            disabled_key,
+            "the disabled item row is the focused cell",
+        )
+        self.assertIn(
+            disabled_item["reason"]["message"],
+            page.locator('[data-testid="combat-detail"]').inner_text(),
+            "the disabled entry states its committed reason",
         )
         self._press(page, "Enter")
         page.wait_for_timeout(300)
-        self.assertEqual(sent_action_count(page), 0)
+        self.assertEqual(sent_action_count(page), 0, "a disabled item sends no packet")
+
+        # Back at the root, 防禦 opens its round-choice confirmation: the
+        # opening itself sends nothing (only the confirm row declares it).
+        self._press(page, "Escape")
+        self._walk_to(page, "defend")
+        self.assertEqual(self._focus_key(page), "defend")
+        self._press(page, "Enter")
+        page.wait_for_timeout(300)
+        self.assertEqual(sent_action_count(page), 0, "opening 防禦 sends no packet")
 
     # The party-scope exit confirmation (webclient-party-exit-confirmation):
     # 撤退 and 投降 are party-scope root rows. Activating one requests the
@@ -371,7 +398,14 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             card.locator('[data-testid="question-card-question"]').inner_text(),
         )
         consequence = card.locator('[data-testid="question-card-detail"]').inner_text()
-        self.assertIn("全隊", consequence, "the card states the party-wide consequence")
+        # The consequence is the server-authored party_messages copy
+        # (world/rules/player_messages.py "retreat": 以整隊的名義…), so the
+        # card states the whole party's scope in the server's own wording.
+        self.assertIn(
+            "以整隊的名義嘗試脫離戰鬥",
+            consequence,
+            "the card states the party-wide consequence",
+        )
         self.assertEqual(
             page.evaluate(
                 "() => { const el = document.activeElement; "

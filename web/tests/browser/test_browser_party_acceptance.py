@@ -23,6 +23,9 @@ from tools.spec_traceability import covers_requirement
 
 from web.browser_support.browser_fixtures_data import combat_journey_values
 
+from world.rules.item_effects import GaugeAdjustEffect, ItemStat
+from world.tests.synthetic_data import SYNTH_ITEM_EFFECT_PROFILES
+
 from .browser_base import ACCEPTANCE_VIEWPORTS, BrowserAcceptanceTest
 from .browser_helpers import (
     evaluate_tolerating_navigation,
@@ -47,6 +50,16 @@ COMPANION_ITEM_KEY = "t_ember_spray"
 # The party-scope exit rows the dock opens through the server prompt.
 EXIT_ROW_RETREAT = "retreat"
 EXIT_ROW_SURRENDER = "surrender"
+
+# The companion item's authored self-scoped HP restore, read from the same
+# rulebook-side profile map settlement resolves the item through
+# (world/tests/synthetic_data/data_items.py): the journey's heal arithmetic is
+# derived from the shipped rulebook row, never a guessed number.
+COMPANION_ITEM_HEAL = next(
+    effect.amount
+    for effect in SYNTH_ITEM_EFFECT_PROFILES[COMPANION_ITEM_KEY].effects
+    if isinstance(effect, GaugeAdjustEffect) and effect.stat is ItemStat.HP
+)
 
 
 class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
@@ -382,6 +395,14 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
             quantity_before,
             "the replacement consumed nothing",
         )
+        # The companion is still the wounded actor the round will heal (the
+        # seed wounds it by exactly the kit item's own heal; nothing between
+        # here and the resolution touches it).
+        companion_before_hp = next(
+            p["hp_current"]
+            for p in after_replace["participants"]
+            if int(p["identity"]) == companion
+        )
 
         # -- the commander's command completes the round --------------------
         self._switch_actor(page, player)
@@ -405,13 +426,20 @@ class PartyAcceptanceBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTe
         companion_hp = next(
             p["hp_current"] for p in resolved["participants"] if int(p["identity"]) == companion
         )
+        companion_maximum = next(
+            p["hp_maximum"] for p in resolved["participants"] if int(p["identity"]) == companion
+        )
+        # The companion's own item is the kit's self-scoped HP restore
+        # (COMPANION_ITEM_HEAL, capped by its own maximum), and the round
+        # carries no other heal: the committed HP is exactly that capped
+        # restore of its own actor. The seeded foe's target is pinned to the
+        # wounded commander (web/tests/browser/seed/runner.py), so no enemy
+        # strike reaches the companion in this round and the value is exact
+        # in every environment rather than a direction the encounter's dice
+        # could flip.
         self.assertEqual(
             companion_hp,
-            next(
-                p["hp_maximum"]
-                for p in resolved["participants"]
-                if int(p["identity"]) == companion
-            ),
+            min(companion_maximum, companion_before_hp + COMPANION_ITEM_HEAL),
             "the companion's own item healed the companion, its own actor",
         )
         self.assertLess(commander_hp, panel["participants"][0]["hp_maximum"] + 1)

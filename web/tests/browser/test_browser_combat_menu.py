@@ -698,11 +698,20 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
             '#action-dock [data-item-key="item-trial_salve"]'
         ).inner_text()
         self.assertIn("×2", stock_text)
-        # The unusable row stays visible, disabled, and explains itself.
+        # The unusable row stays visible, disabled, and explains itself
+        # through the card's detail strip (the `action-dock-description`
+        # element is the static key-hint legend since
+        # webclient-scene-overview-swap, never a row's reason).
         self._walk_to(page, "item-trial_vial")
+        vial_reason = next(
+            item["reason"]["message"]
+            for item in self._combat_panel(page)["choices"]["items"]
+            if item["item_key"] == "trial_vial"
+        )
         self.assertIn(
-            "目前沒有可用的效果",
-            page.locator('[data-testid="action-dock-description"]').inner_text(),
+            vial_reason,
+            page.locator('[data-testid="combat-detail"]').inner_text(),
+            "the disabled item row states its committed reason",
         )
         self._walk_to(page, "item-trial_salve")
 
@@ -717,10 +726,14 @@ class CombatMenuBrowserTest(ManagedServerTearDownMixin, BrowserAcceptanceTest):
         )
         self.assertEqual(sent_action_count(page, "inventory.use"), 0)
 
-        # Back to the root, re-commit the actor's stock (a resolved round
-        # republishes the panel), then 防禦: the confirm row declares the
-        # round choice as the closed `tactic` payload.
-        self._press(page, "Escape")
+        # Back to the root (the submitted item left its own review frame
+        # mounted), re-commit the actor's stock, then 防禦: the confirm row
+        # declares the round choice as the closed `tactic` payload.
+        for _ in range(3):
+            if store_state(page).get("dockSource") == "combat.root":
+                break
+            self._press(page, "Escape")
+        self.assertEqual(store_state(page).get("dockSource"), "combat.root")
         self._inject_actor_stock(page, foes[0])
         page.wait_for_selector('#action-dock [data-item-key="defend"]', timeout=15000)
         self._walk_to(page, "defend")
