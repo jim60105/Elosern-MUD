@@ -32,7 +32,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **19 of 32**.
+Declared implementation order: **20 of 33**.
 
 - depends-on: party-panel-v3-view-member
 - depends-on: party-item-transfer
