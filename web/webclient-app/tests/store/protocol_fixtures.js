@@ -66,7 +66,7 @@ export function statusPanel(overrides = undefined) {
 export function explorationActions(overrides = undefined) {
   return deepMerge(
     {
-      schema_version: 6,
+      schema_version: 7,
       available: true,
       kind: "exploration",
       affordances: [

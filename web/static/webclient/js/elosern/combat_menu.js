@@ -5,7 +5,10 @@
  * keyboard menus consumed by KeyboardRouter: a root (Attack, Skills, Items,
  * Defend, Flee), a paginated active-skill list, target flows for every
  * TargetSpec, Space multi-selection for AREA, and a confirmed Forfeit
- * secondary menu. The module preserves the originating skill focus on
+ * secondary menu; the actor selector frame lists the server's allied actors
+ * with their confirmed/needs-selection/reselection-reason status and the
+ * compact progress line the card chrome renders. The module preserves the
+ * originating skill focus on
  * backtracking, paginates without reordering, and chooses the nearest
  * surviving item deterministically after a newer panel replaces the old one.
  *
@@ -366,7 +369,8 @@
           key: "none-confirm",
           label: "施展",
           enabled: true,
-          actionId: "combat.cast",
+          actionId: "combat.command",
+          commandKind: "skill",
           payload: castPayloadFor(skill, {}),
           commandDisplay: { skillLabel: skill.label },
         },
@@ -378,7 +382,8 @@
           key: "self-confirm",
           label: "對自己施展",
           enabled: true,
-          actionId: "combat.cast",
+          actionId: "combat.command",
+          commandKind: "skill",
           payload: castPayloadFor(skill, {}),
           commandDisplay: { skillLabel: skill.label },
         },
@@ -399,7 +404,8 @@
           description: participant.state === "active" ? null : participant.state,
           team: participant.team || null,
           enabled: true,
-          actionId: "combat.cast",
+          actionId: "combat.command",
+          commandKind: "skill",
           payload: castPayloadFor(skill, {
             target_ids: [participant.identity],
           }),
@@ -444,7 +450,8 @@
       key: "area-confirm",
       label: "確認施展",
       enabled: true,
-      actionId: "combat.cast",
+      actionId: "combat.command",
+      commandKind: "skill",
       payload: null,
       confirm: true,
       // The AREA payload is computed at submit time (areaPayload); the
@@ -453,6 +460,131 @@
       commandDisplay: { skillLabel: skill.label },
     });
     return items;
+  }
+
+  // -------------------------------------------------------------------------
+  // Actor selector, draft progress and the guarded command envelope.
+  // -------------------------------------------------------------------------
+
+  // The committed draft's status rows for the allies, keyed by actor identity.
+  function draftStatus(panel) {
+    var draft = (panel && panel.draft) || {};
+    var confirmed = {};
+    (draft.entries || []).forEach(function (entry) {
+      confirmed[String(entry.actor_id)] = true;
+    });
+    var needs = {};
+    (draft.needs_selection_ids || []).forEach(function (identity) {
+      needs[String(identity)] = true;
+    });
+    var reasons = {};
+    (draft.reselection_reasons || []).forEach(function (row) {
+      reasons[String(row.actor_id)] = row.reason || null;
+    });
+    return { confirmed: confirmed, needs: needs, reasons: reasons };
+  }
+
+  // One actor selector row per committed allied actor, in the server's order.
+  // The status is the authoritative draft progress: 已確認, 待選擇, or the
+  // server-authored reselection reason; a noncommandable actor keeps its own
+  // reason and disables the row (it stays visible and unreachable).
+  function actorItems(panel) {
+    var byId = participantById(panelParticipants(panel));
+    var status = draftStatus(panel);
+    var currentActor = panel && panel.choices ? panel.choices.actor_id : null;
+    var rows = [];
+    ((panel && panel.actors) || []).forEach(function (actor) {
+      var row = byId[actor.identity] || {};
+      var key = String(actor.identity);
+      var label =
+        (typeof row.display_name === "string" && row.display_name) ||
+        (typeof row.token === "string" && row.token) ||
+        key;
+      var description = null;
+      if (status.confirmed[key]) {
+        description = "已確認";
+      } else if (status.needs[key]) {
+        description = "待選擇";
+      }
+      var reason = status.reasons[key] || null;
+      if (reason && reason.message) {
+        description = reason.message;
+      }
+      var item = {
+        key: "actor-" + key,
+        label: label,
+        enabled: !!actor.commandable,
+        actionId: null,
+        payload: null,
+        command: true,
+        actorId: actor.identity,
+        current: String(actor.identity) === String(currentActor),
+        actorStatus: status.confirmed[key]
+          ? "confirmed"
+          : status.needs[key]
+            ? "needs-selection"
+            : "available",
+        description: description,
+      };
+      if (!actor.commandable) {
+        item.disabledReason =
+          actor.reason || { code: "not_commandable", message: "無法指揮。" };
+        // The binding fact for a noncommandable member is its server reason:
+        // it takes precedence over the progress text (a reselection reason,
+        // when the server authored one, already sits in `description`).
+        if (!reason && item.disabledReason.message) {
+          item.description = item.disabledReason.message;
+        }
+      }
+      rows.push(item);
+    });
+    return rows;
+  }
+
+  // The compact current-actor/progress line the card chrome renders: the
+  // commanded actor's display name and the authoritative draft counts
+  // (confirmed required members, and how many still need a command).
+  function progressLine(panel) {
+    if (!panel || !panel.choices || !panel.draft) {
+      return null;
+    }
+    var byId = participantById(panelParticipants(panel));
+    var actorId = panel.choices.actor_id;
+    var row = byId[actorId] || {};
+    return {
+      actorId: actorId,
+      actorLabel:
+        (typeof row.display_name === "string" && row.display_name) ||
+        (typeof row.token === "string" && row.token) ||
+        String(actorId),
+      confirmed: (panel.draft.entries || []).length,
+      total: (panel.draft.required_actor_ids || []).length,
+      needsSelection: (panel.draft.needs_selection_ids || []).length,
+    };
+  }
+
+  // The exact v7 `combat.command` payload for one command: the committed
+  // session/round/draft versions and the commanded actor are read here, at
+  // submit time, so the envelope never carries a stale version. `command` is
+  // the closed `{kind, payload}` union member. Null outside a ready session.
+  function commandEnvelope(panel, command) {
+    if (
+      !panel ||
+      !panel.session ||
+      !panel.choices ||
+      !panel.draft ||
+      !command ||
+      typeof command.kind !== "string"
+    ) {
+      return null;
+    }
+    return {
+      session_id: panel.session.session_id,
+      round_revision: panel.session.round_revision,
+      draft_version: panel.draft.draft_version,
+      actor_id: panel.choices.actor_id,
+      command: command,
+    };
   }
 
   // -------------------------------------------------------------------------
@@ -487,6 +619,19 @@
         grid: true,
         gridCols: 1,
         title: "技能",
+      },
+      // The actor selector (webclient-party-command-selection): one row per
+      // committed allied actor, in the server's order, focused on the
+      // commanded one.
+      actor: {
+        items: actorItems(panel),
+        focusKey:
+          panel.choices && panel.choices.actor_id !== null && panel.choices.actor_id !== undefined
+            ? "actor-" + panel.choices.actor_id
+            : null,
+        grid: true,
+        gridCols: 1,
+        title: "成員",
       },
       forfeit: {
         items: [
@@ -698,6 +843,9 @@
     PAGE_SIZE: PAGE_SIZE,
     BASIC_ATTACK_KEY: BASIC_ATTACK_KEY,
     rootItems: rootItems,
+    actorItems: actorItems,
+    progressLine: progressLine,
+    commandEnvelope: commandEnvelope,
     buildMenus: buildMenus,
     categoryItems: categoryItems,
     groupItems: groupItems,
