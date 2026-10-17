@@ -19,7 +19,7 @@ None.
 ### Modified Capabilities
 
 - `webclient-party-window`: adds the status tab requirements.
-- `webclient-contextual-hud`: removes the character-status drawer requirement.
+- `webclient-contextual-hud`: removes the character-status drawer requirement; drawer-art requirement names the party window.
 - `webclient-component-showcase`: the status/skill surfaces and breakdown-story requirements name the status tab.
 
 ## Impact
@@ -32,14 +32,14 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **25 of 30**.
+Declared implementation order: **26 of 31**.
 
-- depends-on: webclient-party-bag-tab
+- depends-on: webclient-party-bag-retire
 - depends-on: character-skill-growth-fields
 
 ### Code and spec conflicts within the new batch
 
-- `webclient-party-bag-tab`: shared showcase requirements "The status, character, and skill surfaces…" and "Breakdown-state stories…" (S; that first, this delta keeps its edits); shared `PartyWindow.vue`, `AppClient.vue`, manifest (F).
+- `webclient-party-bag-retire`: shared showcase requirements "The status, character, and skill surfaces…" and "Breakdown-state stories…" (S; that first, this delta keeps its edits); shared `PartyWindow.vue`, `AppClient.vue`, manifest (F).
 - `character-panel-v8-viewed-member`: last modified the drawer requirement this change removes (S; ordered).
 - `webclient-party-skill-tab`: re-modifies "The status, character, and skill surfaces…" (S; ordered after this).
 - `webclient-main-navigation-hotkeys`: replaces the 角色 entry routed here (F; ordered).
