@@ -32,7 +32,7 @@ Design §9 of `docs/superpowers/specs/2026-10-18-party-member-management-ui-desi
 
 ## Batch: party member management
 
-Declared implementation order: **21 of 30**.
+Declared implementation order: **21 of 31**.
 
 - depends-on: party-panel-v3-view-member
 - depends-on: item-holdings-panel
