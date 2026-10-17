@@ -284,13 +284,18 @@ const beatStage = computed(() => store.view.beatStage || null);
 // Direct target choices live in `combat.skill`; staged choices live in
 // `combat.target`. Resolve the focused item's action payload instead of
 // parsing its key or assuming either source. AREA submit/shorthands carry no
-// single target.
+// single target. An item's or a basic action's SINGLE row carries the same
+// scalar `target_id` (webclient-party-items-tactics), so its figure is
+// highlighted exactly like a skill's.
 const focusedCombatTarget = computed(() => {
   if (store.view.dispatch.beatLocked) return null;
   const item = store.view.combatMenu?.items?.find((row) => row.key === store.view.focus.key);
   if (item?.actionId === "toggle-target") return item.payload?.identity ?? null;
-  return item?.actionId === "combat.command" && item.commandKind === "skill" && item.payload?.target_ids?.length === 1
-    ? item.payload.target_ids[0] : null;
+  if (item?.actionId !== "combat.command") return null;
+  if (item.payload?.target_ids?.length === 1) return item.payload.target_ids[0];
+  return item.payload?.target_id === undefined || item.payload?.target_id === null
+    ? null
+    : item.payload.target_id;
 });
 const beatHold = computed(() => !!store.view.beatHold);
 const lineupFoes = computed(() => (beatStage.value ? beatStage.value.foes : combatFoes.value));
@@ -1177,6 +1182,7 @@ const rootStyle = computed(() => {
         :services="panel('services') || {}"
         :character="panel('character')"
         :wallet="inventoryWalletCopper"
+        :combat="store.view.mode === 'combat'"
         @use="onInventoryItemAction"
         @toggle-equip="onInventoryItemAction"
       />

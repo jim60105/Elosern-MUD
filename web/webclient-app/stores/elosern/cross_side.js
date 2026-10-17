@@ -51,8 +51,48 @@ export function committedSkill(panel, skillKey) {
   return null;
 }
 
+// The committed combat panel's raw item choice for one item key, or null
+// (webclient-party-items-tactics: the commanded actor's own usable stock).
+export function committedItem(panel, itemKey) {
+  for (const item of (panel && panel.choices && panel.choices.items) || []) {
+    if (item && item.item_key === itemKey) {
+      return item;
+    }
+  }
+  return null;
+}
+
+// The static facts of one item choice (its committed polarity and label). A
+// missing descriptor or field counts as false.
+export function itemFacts(panel, itemKey) {
+  const item = committedItem(panel, itemKey);
+  return item
+    ? { hostile: item.hostile === true, beneficial: item.beneficial === true, label: item.label || "" }
+    : { hostile: false, beneficial: false, label: "" };
+}
+
+// The static facts of one submitted command's subject: a skill's or an item's
+// committed polarity and label. A basic action carries no polar fact, so a
+// tactic never crosses a side and never asks.
+export function factsFor(panel, kind, key) {
+  if (kind === "item") {
+    return itemFacts(panel, key);
+  }
+  if (kind === "tactic") {
+    return { hostile: false, beneficial: false, label: "" };
+  }
+  return skillFacts(panel, key);
+}
+
+// The committed raw descriptor of one submitted command's subject (a skill or
+// an item choice), or null. The command's own kind selects the source.
+export function committedSubject(panel, kind, key) {
+  return kind === "item" ? committedItem(panel, key) : committedSkill(panel, key);
+}
+
 // The identities a submission reaches (spec "The target set of each form"):
-// - `single` → the payload's one target;
+// - `single` → the payload's one target (a skill's `target_ids` array or an
+//   item's/tactic's scalar `target_id`);
 // - `self` → the actor (unknown actor → one unresolvable identity);
 // - `area` explicit → the payload's selection;
 // - `area` shorthand → every candidate of that side (`all` → every candidate);
@@ -65,7 +105,10 @@ export function targetSetFor({ form, payload, candidates, participants, actorIde
     return [idKey(actorIdentity)];
   }
   if (form === "single") {
-    return Array.isArray(body.target_ids) ? body.target_ids.map(idKey) : [];
+    if (Array.isArray(body.target_ids)) {
+      return body.target_ids.map(idKey);
+    }
+    return body.target_id === undefined || body.target_id === null ? [] : [idKey(body.target_id)];
   }
   if (form === "area") {
     if (typeof body.target_shorthand === "string") {

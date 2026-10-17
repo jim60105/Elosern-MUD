@@ -192,7 +192,7 @@ describe("AppClient scene overview (webclient-scene-overview-swap)", () => {
     expect(menus[0].attributes("data-pane-kind")).toBe("commands");
     expect(wrapper.find('[data-testid="scene-overview"]').exists()).toBe(false);
     expect(menus[0].findAll("[data-item-key]").map((row) => row.attributes("data-item-key"))).toEqual([
-      "attack", "skills", "items", "bag", "defend", "flee", "forfeit",
+      "attack", "skills", "items", "bag", "defend", "dodge", "taunt", "flee", "forfeit",
     ]);
   });
 });
