@@ -35,7 +35,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **27 of 31**.
+Declared implementation order: **28 of 32**.
 
 - depends-on: webclient-party-status-tab
 - depends-on: companion-field-cast-actions
