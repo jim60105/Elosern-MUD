@@ -31,7 +31,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **32 of 32**. Assembled acceptance of the batch is accepted only after this change.
+Declared implementation order: **33 of 33**. Assembled acceptance of the batch is accepted only after this change.
 
 - depends-on: webclient-main-navigation-hotkeys
 
