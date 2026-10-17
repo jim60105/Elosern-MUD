@@ -848,6 +848,9 @@ class FullTextPartyRoundTests(BattlefieldIsolation, EvenniaTest):
         self.assertTrue(self._run(CmdCombatRetreat, f"confirm {token}").strip())
         self.assertIsNone(self.char1.db.active_combat)
 
+    @covers_requirement(
+        "webclient-browser-verification::actual-party-exit-acceptance-covers-cancellation-committed-outcomes-and-text-parity"
+    )
     @covers_requirement("player-combat-session::text-clients-can-complete-and-revise-every-party-command-kind")
     @covers_requirement("player-combat-session::party-exit-requires-a-commander-session-round-and-operation-bound-confirmation")
     def test_failed_retreat_keeps_the_party_and_discards_the_whole_text_draft(self):
