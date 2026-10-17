@@ -452,6 +452,12 @@ const renderPlayer = (args) => ({
         snapshot.panels.status.actor.identity = "102";
         snapshot.panels.possession_banner = { schema_version: 1, available: true, host_name: PARTY_PANEL_FULL_SAMPLE.slots[1].display_name, since_tick: 0 };
       }
+      // The cross-side stories (webclient-combat-cross-side-confirm): the
+      // controlled figure is the combat panel's own actor row, so a SELF cast
+      // resolves to 自己.
+      if (args.actorIdentity) {
+        snapshot.panels.status.actor.identity = args.actorIdentity;
+      }
       if (args.participantPolish) {
         const participants = [...PARTY_PARTICIPANTS, ...foeParticipants(4, {
           31: { display_name: "灰袍盜賊與北境巡防隊長的漫長稱號" },
@@ -509,6 +515,19 @@ const renderPlayer = (args) => ({
       if (args.combatFocus) {
         await nextTick();
         store.focusItemByKey(args.combatFocus);
+      }
+      // `combatSubmit` (webclient-combat-cross-side-confirm): then Enter on
+      // that row, as the player confirms it. A cast across sides opens the
+      // question; `combatSender` attaches a fake transport first, so a cast
+      // that goes out at once shows its echo line.
+      if (args.combatSender) {
+        const sender = protocolFixtures.createFakeSender();
+        store.setSender(sender);
+        window.__crossSideStory = { store, sent: sender.sent };
+      }
+      if (args.combatSubmit) {
+        await nextTick();
+        store.focusPress("Enter", false);
       }
       // The exploration companion-focus variants (reuse-lineup-person-focus
       // 3.1): the client-local verb card of a RENDERED companion. Opening it
@@ -807,6 +826,31 @@ export const TargetDefeatedCandidate = {
     combatPath: ["attack"],
     combatFocus: "target-32",
   },
+};
+// The cross-side question (webclient-combat-cross-side-confirm): a cast
+// aimed across sides opens a caution question over the collapsed card, focus
+// on its safe answer 否; the stage keeps the step's dim and markers. 否 / ✕ /
+// Escape return to the step; 是 sends the same cast once.
+const ARCANA = ["skills", "skill-cat-3"];
+const CROSS = { combat: true, actorIdentity: "1", combatSubmit: true };
+export const CrossSideAllyHarm = { render: renderPlayer, args: { ...CROSS, combatPath: ["attack"], combatFocus: "target-101" } };
+export const CrossSideSelfHarm = { render: renderPlayer, args: { ...CROSS, combatPath: [...ARCANA, "blood_pact"] } };
+export const CrossSideSelfDrain = { render: renderPlayer, args: { ...CROSS, combatPath: [...ARCANA, "life_drain"], combatFocus: "target-1" } };
+export const CrossSideFoeHeal = { render: renderPlayer, args: { ...CROSS, combatPath: [...ARCANA, "revive_light"], combatFocus: "target-31" } };
+export const CrossSideFoeBuff = { render: renderPlayer, args: { ...CROSS, combatPath: [...ARCANA, "ward_blessing"], combatFocus: "target-32" } };
+export const CrossSideAreaMixed = {
+  render: renderPlayer,
+  args: { ...CROSS, combatPath: [...SUPPORT, "chain_lightning"], combatToggle: ["area-101", "area-31"], combatFocus: "area-confirm" },
+};
+export const CrossSideBothFacts = {
+  render: renderPlayer,
+  args: { ...CROSS, combatPath: [...ARCANA, "tide_reversal", "shorthand-all"], combatFocus: "area-confirm" },
+};
+// The same-side case: Attack on a foe is sent at once, with no question card;
+// the fake transport records the one cast (`window.__crossSideStory.sent`).
+export const CrossSideNoConfirm = {
+  render: renderPlayer,
+  args: { ...CROSS, combatSender: true, combatPath: ["attack"], combatFocus: "target-31" },
 };
 export const TargetReducedMotion = { render: renderPlayer, args: { combat: true, combatPath: ["attack"], motionLevel: "reduced" } };
 // Four foes (one defeated), a long foe name ellipsized on its plate. The

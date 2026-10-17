@@ -48,7 +48,7 @@ Build once: `pnpm run build`.
 
 ## 3. Storybook (≈0.75 h)
 
-- [ ] 3.1 Add the fixtures and stories of design D4. Run `pnpm run build-storybook` then
+- [x] 3.1 Add the fixtures and stories of design D4. Run `pnpm run build-storybook` then
   `pnpm run showcase-coverage` and verify both succeed with `component-manifest.json` unchanged.
 
 ## 4. Documentation and gates (≈0.5 h)
