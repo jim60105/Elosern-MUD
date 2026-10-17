@@ -71,8 +71,10 @@ _DIALOGUE_TRIGGER_ACTION_IDS = frozenset({"explore.talk_scripted", "explore.talk
 
 # The combat actions whose successful completion may end the active session
 # and therefore trigger a fresh exploration action-options generation for
-# every live watcher of the actor (action-options-wiring-hardening D2).
-_COMBAT_TRIGGER_ACTION_IDS = frozenset({"combat.cast", "combat.flee", "combat.forfeit"})
+# every live watcher of the actor (action-options-wiring-hardening D2): the
+# party command's completing confirmation and the confirmed party exit are the
+# only two routes that can settle a terminal outcome.
+_COMBAT_TRIGGER_ACTION_IDS = frozenset({"combat.command", "combat.exit_confirm"})
 
 # The field cast whose instant-terminal opening also ends a combat.
 _FIELD_CAST_ACTION_ID = "explore.cast"

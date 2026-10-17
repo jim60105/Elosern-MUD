@@ -92,6 +92,7 @@ def _coordinator_for(session: Any, actor: Any) -> PresentationCoordinator:
         # like the options state: the new puppet never sees it.
         session.ndb.concept_proposal = None
         session.ndb.skill_use_selection = None
+        session.ndb.party_actor_selection = None
         from web.webclient.actions.dispatcher import retire_sequence
 
         retire_sequence(session)
@@ -131,6 +132,7 @@ def reset_client_sequence(session: Any) -> None:
         session.ndb.options_barriers = None
         session.ndb.concept_proposal = None
         session.ndb.skill_use_selection = None
+        session.ndb.party_actor_selection = None
 
 
 def options_snapshot(session: Any) -> OptionsSnapshot | None:
@@ -303,6 +305,9 @@ def build_presentation_context(
     unavailable outside the one publication that settled the round.
     """
     from web.webclient.presentation.gallery_selection import gallery_selection_snapshot
+    from web.webclient.presentation.party_actor_selection import (
+        party_actor_selection_snapshot,
+    )
     from web.webclient.presentation.skill_use_selection import skill_use_selection_snapshot
 
     return PresentationContext(
@@ -314,6 +319,7 @@ def build_presentation_context(
         gallery_subject=gallery_selection_snapshot(session, actor),
         combat_round=combat_round,
         skill_use=skill_use_selection_snapshot(session, actor),
+        party_actor=party_actor_selection_snapshot(session, actor),
     )
 
 

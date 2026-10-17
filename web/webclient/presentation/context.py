@@ -132,6 +132,11 @@ class PresentationContext:
         skill_use: The copied ``(skill_key, scale)`` SkillBook use selection
             of the current transport-and-puppet epoch (or ``None``). Only the
             ``skill_use`` presenter reads it; it never authorizes a cast.
+        party_actor: The copied requested-combat-actor identity of the current
+            transport-and-puppet epoch (or ``None``). Only the ``combat``
+            panel's choices read it, and only while the named member is still a
+            commandable party member of the same session and round; it never
+            authorizes a command.
     """
 
     actor: Any
@@ -143,6 +148,7 @@ class PresentationContext:
     gallery_subject: str | None = field(default=None)
     combat_round: Any = field(default=None)
     skill_use: tuple[str, float] | None = field(default=None)
+    party_actor: int | None = field(default=None)
 
 
 __all__ = [

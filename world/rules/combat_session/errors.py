@@ -37,3 +37,7 @@ class SessionReason(StrEnum):
     INVALID_CONFIRMATION_TOKEN = "invalid_confirmation_token"
     PARTY_EXIT_UNAVAILABLE = "party_exit_unavailable"
     PERSONAL_FLEE_FORBIDDEN = "personal_flee_forbidden"
+    # Party combat command transport: an actorless item use during an active
+    # session; the member's item selection is a draft entry of the guarded
+    # combat command path, never of the exploration item adapter.
+    COMBAT_ITEM_COMMAND_REQUIRED = "combat_item_command_required"
