@@ -383,6 +383,12 @@ class InventoryRowActionTests(ServiceRegistryIsolation):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+            # The strict record parse requires the draft fields: a record
+            # without them reads as no session at all.
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
         }
         view = self._build(player)
         self.assertIsNone(view.guild)

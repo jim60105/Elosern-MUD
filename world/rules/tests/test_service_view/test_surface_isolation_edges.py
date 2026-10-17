@@ -243,6 +243,12 @@ class MeritAndRankEdgeTests(ServiceRegistryIsolation):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+            # The strict record parse requires the draft fields: a record
+            # without them reads as no session at all.
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
         }
         with patch(
             "world.rules.service_view.read_world_clock",

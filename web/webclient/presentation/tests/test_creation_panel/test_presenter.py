@@ -172,6 +172,12 @@ class CreationPanelPresenterTests(EvenniaTest):
             "knocked_out_ids": [],
             "rounds_elapsed": 0,
             "exam_id": None,
+            # The strict record parse requires the draft fields: without them
+            # the pending shell reads as out of session.
+            "round_revision": 0,
+            "draft_version": 0,
+            "draft_entries": {},
+            "confirmed_actors": [],
         }
         payload = self._render()
         self.assertFalse(payload["available"])

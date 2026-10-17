@@ -95,6 +95,31 @@ def _resolver(entities_by_id):
     return lambda identity: entities_by_id.get(int(identity))
 
 
+def _raw_session(**overrides):
+    """One complete raw ``active_combat`` dict the strict parse accepts.
+
+    The record schema requires the draft fields, so a hand-rolled fixture must
+    carry them too: a record without them parses as malformed and every
+    active-session query then reads the actor as out of session.
+    """
+    return {
+        "session_id": "hostile:1:0",
+        "mode": "hostile",
+        "room_id": 99,
+        "player_ids": [1],
+        "enemy_ids": [2],
+        "fled_ids": [],
+        "knocked_out_ids": [],
+        "rounds_elapsed": 0,
+        "exam_id": None,
+        "round_revision": 0,
+        "draft_version": 0,
+        "draft_entries": {},
+        "confirmed_actors": [],
+        **overrides,
+    }
+
+
 @synthetic_registries("archetypes")
 class ArtViewSelectionTests(unittest.TestCase):
     def setUp(self):
@@ -109,17 +134,7 @@ class ArtViewSelectionTests(unittest.TestCase):
         goblin = _monster(2, name="goblin")
         wolf = _monster(3, name="wolf")
         entities = {1: player, 2: goblin, 3: wolf}
-        record = {
-            "session_id": "hostile:1:0",
-            "mode": "hostile",
-            "room_id": 99,
-            "player_ids": [1],
-            "enemy_ids": [2, 3],
-            "fled_ids": [],
-            "knocked_out_ids": [],
-            "rounds_elapsed": 0,
-            "exam_id": None,
-        }
+        record = _raw_session(enemy_ids=[2, 3])
         actor = _actor(self.room, active_combat=record)
         view = build_art_view(actor, resolver=_resolver(entities))
         self.assertEqual(view.scene.archetype, A_BAZAAR)
@@ -226,17 +241,7 @@ class ArtViewSelectionTests(unittest.TestCase):
             for index in range(2, MAX_PORTRAIT_CATALOG + 3)
         ]
         entities = {entity.pk: entity for entity in [player, *enemies]}
-        record = {
-            "session_id": "hostile:1:0",
-            "mode": "hostile",
-            "room_id": 99,
-            "player_ids": [1],
-            "enemy_ids": [entity.pk for entity in enemies],
-            "fled_ids": [],
-            "knocked_out_ids": [],
-            "rounds_elapsed": 0,
-            "exam_id": None,
-        }
+        record = _raw_session(enemy_ids=[entity.pk for entity in enemies])
         actor = _actor(_room([], scene_archetype=A_BAZAAR), active_combat=record)
         view = build_art_view(actor, resolver=_resolver(entities))
         self.assertEqual(len(view.entities), MAX_PORTRAIT_CATALOG)
@@ -272,17 +277,7 @@ class ArtViewSelectionTests(unittest.TestCase):
 
     def test_combat_missing_entity_is_skipped(self):
         player = _entity(1, name="hero")
-        record = {
-            "session_id": "hostile:1:0",
-            "mode": "hostile",
-            "room_id": 99,
-            "player_ids": [1],
-            "enemy_ids": [2],
-            "fled_ids": [],
-            "knocked_out_ids": [],
-            "rounds_elapsed": 0,
-            "exam_id": None,
-        }
+        record = _raw_session()
         actor = _actor(_room([], scene_archetype=A_LODGE), active_combat=record)
         view = build_art_view(actor, resolver=_resolver({1: player}))
         self.assertEqual([entity.identity for entity in view.entities], [1])
