@@ -516,6 +516,12 @@ const renderPlayer = (args) => ({
         await nextTick();
         store.focusItemByKey(args.combatFocus);
       }
+      // `combatActorFrame` (webclient-party-command-selection): the card
+      // chrome's 變更成員 control opens the actor selector frame.
+      if (args.combatActorFrame) {
+        await nextTick();
+        store.openCombatActor();
+      }
       // `combatSubmit` (webclient-combat-cross-side-confirm): then Enter on
       // that row, as the player confirms it. A cast across sides opens the
       // question; `combatSender` attaches a fake transport first, so a cast
@@ -554,7 +560,14 @@ const renderPlayer = (args) => ({
         const sender = protocolFixtures.createFakeSender();
         store.setSender(sender);
         const round = (terminal = false) => {
-          const request = store.dispatchAction("combat.cast", { skill_key: CombatMenu.BASIC_ATTACK_KEY, target_ids: [31] });
+          const live = store.reducer.getState().panels.context_actions;
+          const request = store.dispatchAction("combat.command", {
+            session_id: live.session.session_id,
+            round_revision: live.session.round_revision,
+            draft_version: live.draft.draft_version,
+            actor_id: live.choices.actor_id,
+            command: { kind: "skill", payload: { skill_key: CombatMenu.BASIC_ATTACK_KEY, target_ids: [31] } },
+          });
           const beats = [
             { seq: 0, action: 0, kind: "roll", actor: "32", target: "31", amount: null, hp_after: null, text: "敵人舉起武器。" },
             { seq: 1, action: 1, kind: "damage", actor: "32", target: "31", amount: 20, hp_after: 10, text: "武器命中，生命值下降。" },
@@ -562,7 +575,7 @@ const renderPlayer = (args) => ({
           beats.forEach((beat) => store.appendText("out", beat.text));
           const panels = {
             context_actions: terminal ? protocolFixtures.explorationActions() : protocolFixtures.combatActions({
-              skills: snapshot.panels.context_actions.skills,
+              skills: snapshot.panels.context_actions.choices.skills,
               session: { round: revision },
               participants: snapshot.panels.context_actions.participants.map((p) => p.identity === 31 ? { ...p, hp_current: 10 } : p),
             }),
@@ -772,6 +785,13 @@ export const DialogueCompanionSpeaks = { render: renderPlayer, args: { populated
 // formation keeps clear, while the message window spans the band
 // (webclient-combat-command-card-centred).
 export const CombatHud = { render: renderPlayer, args: { combat: true } };
+// The commanded-actor selector (webclient-party-command-selection): the card
+// chrome's current-actor/progress line and its 變更成員 control open the
+// actor frame inside the same centred card.
+export const CombatActorSelector = {
+  render: renderPlayer,
+  args: { combat: true, combatActorFrame: true },
+};
 // The combat command card's deeper frames (webclient-combat-command-card-
 // centred), reached through the router's own keys: the AREA target step
 // (技能 → 元素魔法 → 火 → 火風暴), a skill detail, a disabled command's
