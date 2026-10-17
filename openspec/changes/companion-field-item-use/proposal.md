@@ -36,7 +36,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **10 of 32**.
+Declared implementation order: **11 of 33**.
 
 - depends-on: party-field-settlement-scope
 - depends-on: party-member-equipment
