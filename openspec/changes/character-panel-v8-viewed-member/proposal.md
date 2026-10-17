@@ -8,7 +8,7 @@ Design §5 and §6.3 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 - **BREAKING (pre-release)** `character` v7 → v8: adds `member_id` and `conditions` (`code`, `label`, `severity`, nullable `remaining_seconds`, `modifiers`, `source`); removes `persona` and `intimate`; built for the viewed member (fallback commander) using true traits; available in exploration and combat. The design text says "v5 → v6"; the repository is at v7, so this is v8 (recorded as a planning gap).
 - Python validator, JS mirror, parity contract and fixtures move together; `party.view_member` affected panels add `character`.
-- Transitional consumers: `CharacterStatusDrawer.vue` reads persona and intimate from `party_member` (commander section for the persona editor); `SkillBook.vue` reads skills from the viewed member's `character` as before.
+- Transitional consumers: `CharacterStatusDrawer.vue` reads persona and intimate from `party_member` (commander section for the persona editor); `SkillBook.vue` reads skills from the viewed member's `character` and from now on sends `character.member_id` (not the controlled figure) as the caster and booking member, so the transitional book never mixes one member's skills with another's id.
 
 ## Capabilities
 
@@ -33,7 +33,7 @@ None.
 
 ## Batch: party member management
 
-Declared implementation order: **15 of 30**.
+Declared implementation order: **15 of 31**.
 
 - depends-on: party-member-panel
 

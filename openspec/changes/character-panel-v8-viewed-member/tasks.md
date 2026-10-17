@@ -12,7 +12,7 @@ Total estimate: **7 hours**, including implementation, focused verification, doc
 
 ## 3. Transitional drawer (1.5h)
 
-- [ ] 3.1 Rebind `CharacterStatusDrawer.vue` persona and intimate sections to `party_member` and its persona editor to the commander section; verify the Vitest drawer tests, a persona edit refreshing from `party_member`, and the combat-mode drawer rendering traits.
+- [ ] 3.1 Rebind `CharacterStatusDrawer.vue` persona and intimate sections to `party_member` and its persona editor to the commander section; switch the transitional `SkillBook.vue` caster/booking id to `character.member_id`; verify the Vitest drawer and SkillBook payload tests, a persona edit refreshing from `party_member`, and the combat-mode drawer rendering traits.
 
 ## 4. Integration (1h)
 
