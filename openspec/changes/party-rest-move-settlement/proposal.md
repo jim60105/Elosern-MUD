@@ -37,7 +37,7 @@ Design §2 and §4.6 of `docs/superpowers/specs/2026-10-18-party-member-manageme
 
 ## Batch: party member management
 
-Declared implementation order: **3 of 32**.
+Declared implementation order: **3 of 33**.
 
 - depends-on: party-member-authority
 - depends-on: party-follow-under-possession
