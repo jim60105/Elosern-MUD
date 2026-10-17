@@ -1,7 +1,7 @@
 # Party Member Management and Party Window
 
 **Date:** 2026-10-18
-**Status:** Approved in conversation section by section on 2026-10-18; awaiting written-spec review.
+**Status:** Approved in conversation section by section on 2026-10-18. The 33 implementation proposals are committed under `openspec/changes/` and listed in §12; implementation has not started.
 **Scope:** Out-of-combat and in-combat management of every party member's inventory, equipment, status, skills, and lineage; a single party window that replaces the inventory, status, skill, lineage, and party drawers; a redesigned shop; a reduced main navigation; party-wide time settlement; and the shared window primitives extracted from the quest drawer.
 
 The current webclient presents one character at a time: the session's controlled figure. Companions own inventories, equipment, gauges, skills, and practice XP, and the v7 party combat commands already let the player issue every companion's round command. Outside combat, however, the player cannot see a companion's bag, cannot move items between members, cannot re-equip a companion, cannot let a companion use an item or cast, and cannot see a companion's skill growth. This design closes that gap and restyles every affected surface after the quest drawer.
@@ -223,13 +223,99 @@ The rule text removed from the windows (follow rules, transfer rules, combat res
 
 ## 12. Decomposition
 
-Implementation ships as roughly thirty OpenSpec changes, each strictly under eight engineer-hours. The proposals under `openspec/changes/` fix the exact split, the mandatory order, the dependencies, and the conflict matrices; this table is only the shape.
+Implementation ships as 33 OpenSpec changes under `openspec/changes/`, proposed on 2026-10-18 and all passing `openspec validate --strict`. Every change is strictly under eight engineer-hours including implementation, focused verification, documentation, and integration; the largest is 7.5 hours and the batch totals 206 hours. Rules are changes 1–14, protocol 15–22, and client 23–33. Each proposal declares its order and `depends-on` lines, and lists its code and spec conflicts with the rest of the batch.
 
-| Phase | Changes |
+### 12.1 Mandatory order
+
+| # | Change | Hours | Direct prerequisites | Scope |
+|---:|---|---:|---|---|
+| 1 | `party-member-authority` | 5 | — | Commander, actor, recipient and seller authority; present-member scope; `party_in_combat` |
+| 2 | `party-follow-under-possession` | 7 | 1 | The whole party, owner body included, follows a possessed traversal (§4.9) |
+| 3 | `party-rest-move-settlement` | 7 | 1, 2 | Party-wide rest, skip, and movement settlement |
+| 4 | `party-field-settlement-scope` | 5 | 3 | Party-wide settlement for field casts and item use |
+| 5 | `party-item-transfer` | 6 | 1 | Member item transfer rule and `party.transfer` |
+| 6 | `party-transfer-text-commands` | 4.5 | 5 | `給` and `取回` for members |
+| 7 | `party-member-equipment` | 6 | 1, 6 | Equipment toggle for any present member, `裝備` command |
+| 8 | `companion-field-cast-rule` | 5.5 | 4, 7 | Companion field casting rule and the `由 <成員>` text suffix |
+| 9 | `companion-field-combat-opening` | 6.5 | 8 | Companion-initiated field combat with the commander's confirmation flow (§4.4) |
+| 10 | `companion-field-cast-actions` | 5.5 | 8, 9 | Caster-explicit skill preview and field cast actions, `skill_use` v2 |
+| 11 | `companion-field-item-use` | 5.5 | 4, 7, 8 | Companion field item use, `使用` command |
+| 12 | `party-practice-booking` | 6.5 | 3, 10, 11 | Per-member standing practice booking, `修煉` command |
+| 13 | `shop-party-recipient-seller` | 7 | 1, 12 | Shop recipient, seller, and party purse; `買`/`賣` aliases |
+| 14 | `party-unlock-notices` | 6.5 | 10, 11, 12, 13 | Unlock notifications and session unread state |
+| 15 | `party-panel-v3-view-member` | 7 | 5, 14 | `party` v3 and `party.view_member` selection |
+| 16 | `party-member-panel` | 6.5 | 15 | `party_member` panel |
+| 17 | `character-panel-v8-viewed-member` | 7 | 16 | `character` v8 for the viewed member |
+| 18 | `character-skill-growth-fields` | 7 | 12, 14, 17 | `character` v9 growth fields and `selected_skill` |
+| 19 | `member-info-text-commands` | 4.5 | 18 | `狀態`, `技能`, `系譜` member text views |
+| 20 | `party-inventory-panel` | 6.5 | 5, 11, 15 | `party_inventory` panel |
+| 21 | `item-holdings-panel` | 6.5 | 20 | Item holdings query panel |
+| 22 | `lineage-panel-v2-graphs` | 7 | 15, 19, 21 | `lineage` v2 connected skill graphs |
+| 23 | `webclient-window-primitives` | 7 | 15, 21, 22 | Shared window primitives and new glyphs |
+| 24 | `webclient-party-window-member-tab` | 7 | 16, 17, 23 | Party window shell and 成員 tab |
+| 25 | `webclient-party-bag-tab` | 5 | 13, 20, 21, 24 | 背包 tab: browse, give, use, equip |
+| 26 | `webclient-party-bag-retire` | 5.5 | 25 | Bag combat behavior and retirement of `InventoryPanel`/`EquipmentDoll` |
+| 27 | `services-shop-structured-rows` | 6.5 | 13, 21, 26 | `services` v7 structured shop rows |
+| 28 | `webclient-party-status-tab` | 6 | 18, 26 | 狀態 tab |
+| 29 | `webclient-party-skill-tab` | 7 | 10, 12, 28 | 技能 tab |
+| 30 | `webclient-party-lineage-tab` | 6 | 22, 29 | 系譜 tab |
+| 31 | `webclient-shop-window` | 7 | 27, 30 | Shop window |
+| 32 | `webclient-main-navigation-hotkeys` | 6 | 31 | Main navigation and hotkeys |
+| 33 | `party-management-acceptance` | 7.5 | 32 | Help content and assembled acceptance |
+
+The order is an admission and integration prerequisite, not a suggestion. Later deltas modify or rename requirements that an earlier change introduces, so a change is archived and synced before the next one applies. Nonconflicting preparatory work may be scheduled together, but integration follows the table.
+
+### 12.2 Design section ownership
+
+| Design section | Owning changes |
 |---|---|
-| Rules | Party-wide time settlement; member transfer; member equipment; companion field actions; per-member practice; shop recipient and seller; unlock notifications. Text commands ship with their rule. |
-| Protocol | Viewed-member selection with `party` v3 and `party_member`; `character` v6; `party_inventory` and the holdings query; `lineage` v2 graphs; structured shop rows. |
-| Client | Shared primitives; party window shell with the 成員 tab, navigation, and hotkeys; 背包; 狀態; 技能; 系譜; shop window; help content, removal of replaced components, and assembled acceptance. |
+| §1 authority and amendments | 1, 5, 24 |
+| §2 findings | 3, 4, 5, 14, 22, 26 |
+| §3.1 commander, viewed member, actor | 1, 5, 7, 10, 11, 13, 15 |
+| §3.2 party-scoped presentation, unchanged under possession | 1, 2, 15, 16, 24, 31, 32, 33 |
+| §3.3 summaries for all, detail for one | 15, 17, 18, 20, 21 |
+| §3.4 no rule explanations in the UI | 24, 31, 33 |
+| §4.1 item transfer | 5, 6 |
+| §4.2 equipment for any member | 7 |
+| §4.3 shop | 13, 27, 31 |
+| §4.4 companion field actions and combat opening | 8, 9, 10, 11 |
+| §4.5 practice booking | 12 |
+| §4.6 party-wide time settlement | 2, 3, 4 |
+| §4.7 unlock notifications | 14, 15, 18 |
+| §4.8 text-client parity | 6, 7, 8, 9, 11, 12, 13, 19, 22 |
+| §4.9 co-location under possession | 1, 2, 3 |
+| §5 presentation protocol | 10, 15, 16, 17, 18, 20, 21, 22, 27 |
+| §6 and §6.1 party window and 成員 tab | 24 |
+| §6.2 背包 | 20, 21, 25, 26 |
+| §6.3 狀態 | 17, 28 |
+| §6.4 技能 | 10, 12, 18, 29 |
+| §6.5 系譜 | 22, 30 |
+| §7 shop window | 27, 31 |
+| §8 navigation and hotkeys | 32, with the stage companion click in 24 |
+| §9 shared primitives and removals | 23 builds them; 24, 26, 28, 29, 30, 31 delete the replaced components; 33 sweeps for residue |
+| §10 error handling | 1, 5, 15 |
+| §11 verification | every change's tasks; assembled in 33 |
+| §13 non-goals | honored throughout; the amended possession-movement non-goal is owned by 2 and the companion combat opening by 9 |
+
+### 12.3 Conflict clusters
+
+The proposals carry the full lists. The shared surfaces that need ordered integration are:
+
+- Possession and movement: 2 and 3 share `movement_settlement.py` and `typeclasses/exits.py`; 2 lands first. Every rule and protocol change imports the party-scope boundary that 1 introduces.
+- Field casting: 8, 9, and 10 share `field_cast.py` and the `companion-field-actions` spec; 9 also changes the combat-opening code in `lifecycle.py`, `combat_initiation.py`, and `rounds.py`, which no other change touches.
+- Text commands: 6, 7, 8, 9, 11, 12, 13, 19, and 22 share both player command documents, `commands/items.py`, and the cmdset.
+- Action registry: `webclient-action-dispatch` requirements accumulate in the order 5, 15, 29.
+- Character versions: 17 and 18 rename the character version requirement in a chain (v7 to v8 to v9).
+- Client surfaces: 23 through 33 share `PartyWindow.vue`, `AppClient.vue`, and the component manifest, and the showcase and contextual-hud requirements for the status, skill, map, and services surfaces accumulate in order.
+- Every change that adds test modules touches `.github/evennia-shards.json` or `.github/browser-shards.json`, and each test keeps exactly one shard owner.
+
+No active OpenSpec change conflicts with the batch.
+
+### 12.4 Review dispositions and open items
+
+One independent review checked the first 31 changes and then the two changes added for the possession and companion-combat decisions. Its blocking findings were adopted: every existing requirement the new surfaces would have made wrong now has an owning change, the `character` v9 payload keeps the lineage position and freeform ladder in `selected_skill` to stay inside the OOB bound, the companion combat opening is its own change because the existing opening flow hard-codes the commander as initiator, and the possessed owner body moves by an explicit receive check followed by a hook-free move. The reviewer did not re-review the corrected versions.
+
+Change 24 carries the post-archive manual edit of the `## Purpose` paragraph of `openspec/specs/webclient-party-panel/spec.md`, which a delta cannot change. The text client's cast at a monster keeps its existing no-confirmation behavior.
 
 ## 13. Non-goals
 
